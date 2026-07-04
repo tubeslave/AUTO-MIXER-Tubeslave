@@ -245,12 +245,17 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
         method_ids=(
+            "eq_v3",
             "auto_eq",
             "corrective_eq_proposal",
             "autoeq_audit_validation",
             "phase_aware_eq_guard",
         ),
         support_paths=(
+            "backend/heuristics/eq_v3.py",
+            "backend/heuristics/resonance_eq.py",
+            "backend/heuristics/erb_masking.py",
+            "backend/heuristics/eq_ab_check.py",
             "backend/auto_eq.py",
             "backend/corrective_eq_proposal.py",
             "backend/auto_fader_v2/controller.py",
@@ -728,7 +733,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control equalizers.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("auto_eq", "corrective_eq_proposal", "phase_aware_eq_guard"),
+        method_ids=("eq_v3", "auto_eq", "corrective_eq_proposal", "phase_aware_eq_guard"),
         support_paths=(
             "backend/auto_eq.py",
             "backend/corrective_eq_proposal.py",

@@ -1,6 +1,13 @@
 """
 Cross-adaptive mirror EQ utilities.
 
+SUPERSEDED для канального маскирования методом EQ v3
+(heuristics/erb_masking.py): парная оптимизация могла улучшать одну
+пару, ухудшая другую, а boost маскируемого снижал запас до
+самовозбуждения. Модуль сохранён из-за governance-обвязки
+(processing_registry, proposal-адаптеры); новые пайплайны используют
+erb_masking.allocate_complementary_cuts.
+
 Based on IMP 7.3 (Intelligent Music Production, De Man, Reiss & Stables):
 
 Full mirror equalization strategy:

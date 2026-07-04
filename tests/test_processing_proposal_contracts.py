@@ -109,6 +109,7 @@ OBJECTIVE_FAMILY_METHODS = {
         "live_shared_mix",
     ),
     "eq": (
+        "eq_v3",
         "auto_eq",
         "corrective_eq_proposal",
         "cross_adaptive_eq",
@@ -144,7 +145,7 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "fx_direct_apply",
 )
 
-EXPECTED_METHOD_REVIEW_CARD_COUNT = 36
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 37
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",
@@ -5837,7 +5838,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     ]
     assert decision_template_summary["priority_method_decision_counts"] == {
         "1": 6,
-        "2": 7,
+        "2": 8,
         "3": 3,
         "4": 3,
         "5": 2,
@@ -6512,7 +6513,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "Master / Output",
     ]
     assert priority_decision_sections[1]["method_decision_count"] == 6
-    assert priority_decision_sections[2]["method_decision_count"] == 7
+    assert priority_decision_sections[2]["method_decision_count"] == 8
     assert priority_decision_sections[7]["method_decision_count"] == 1
     for section in priority_decision_sections.values():
         assert section["review_scope"] == "offline_proposal_only"

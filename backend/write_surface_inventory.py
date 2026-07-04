@@ -203,6 +203,10 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="EQ recommendation and audit sources",
         status="proposal_only",
         paths=(
+            "backend/heuristics/eq_v3.py",
+            "backend/heuristics/resonance_eq.py",
+            "backend/heuristics/erb_masking.py",
+            "backend/heuristics/eq_ab_check.py",
             "backend/auto_eq.py",
             "backend/auto_fader_v2/controller.py",
             "backend/cross_adaptive_eq.py",

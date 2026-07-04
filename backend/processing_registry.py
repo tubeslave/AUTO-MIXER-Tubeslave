@@ -5040,6 +5040,42 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("proposal_only", "direct_eq_apply_quarantined", "direct_eq_reset_quarantined", "blocked_apply_evidence", "no_live_writes"),
     ),
     ProcessingMethod(
+        id="eq_v3",
+        label="EQ v3 Two-Loop Equalization",
+        domain="eq",
+        status="proposal_only",
+        summary=(
+            "Two-loop equalization method: soundcheck loop with "
+            "harmonic-filtered resonance cuts (validated cut-narrow rule), "
+            "fundamental-tracked HPF, ERB masking against the sum of the "
+            "other channels with vocal-protected cut-only allocation, and a "
+            "predictive BS.1770 loudness-matched A/B gate; live loop keeps "
+            "bands inside the baseline snapshot envelope and forbids boosts "
+            "near known feedback frequencies."
+        ),
+        module="backend/heuristics/eq_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "eq_v3_live_writes_need_eq_band_readback_feedback_safety_"
+            "rollback_and_hardware_proof"
+        ),
+        promotion_next=(
+            "route eq_v3 soundcheck proposals to operator review; enable the "
+            "live differential loop only after the EQ correction family "
+            "passes supervised hardware proof"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "resonance_harmonic_filter",
+            "erb_masking_sum_of_others",
+            "predictive_bs1770_ab_gate",
+            "supersedes_pairwise_mirror_eq_for_channel_masking",
+        ),
+    ),
+    ProcessingMethod(
         id="corrective_eq_proposal",
         label="Corrective EQ Proposal Layer",
         domain="eq",

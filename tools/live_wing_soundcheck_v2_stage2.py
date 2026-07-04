@@ -13,9 +13,9 @@
    ПОРЯДОК АРГУМЕНТОВ по правилу CLAUDE.md: gcc_phat(target, reference).
 3. ПАНОРАМА: шаблоны auto_panner_adaptive (Genre.ROCK) + стереопары по
    именам (L/R): гитары L45/R45, OH L67/R67, playback L90/R90 и т.д.
-4. MIRROR EQ: CrossAdaptiveEQ (IMP 7.3) — cut маскеру (Q=4), boost
-   маскируемому (Q=2, вдвое меньше среза) по пересекающимся полосам с
-   приоритетами Ayaic. Мержится в СВОБОДНЫЕ консольные полосы (не трогает
+4. МАСКИРОВАНИЕ (EQ v3): ERB-полосы, маскер = СУММА остальных каналов
+   (Hafezi & Reiss 2015), cut-only с защитой вокала, кэп −6 дБ — заменяет
+   парный mirror EQ. Мержится в СВОБОДНЫЕ консольные полосы (не трогает
    notch и полосы, занятые spectral ceiling стадии 1).
 
 Все решения проходят SafetyGate v2. Откат в reports/. Настройки остаются.
@@ -54,7 +54,11 @@ from auto_panner_adaptive import (  # noqa: E402
     lf_energy_ratio,
     should_center_low_frequency,
 )
-from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
+from heuristics.erb_masking import (  # noqa: E402
+    allocate_complementary_cuts,
+    band_energies_db,
+    erb_band_edges,
+)
 from heuristics.spectral_ceiling_eq import (  # noqa: E402
     SpectralCeilingEQAnalyzer,
     merge_spectral_proposal_into_eq_bands,
@@ -97,12 +101,6 @@ AYAIC_PLANE = {
     "tom": -28.0, "floor_tom": -28.0, "hihat": -28.0, "overheads": -28.0,
     "bass": -25.0, "guitar": -25.0, "keys": -30.0, "playback": -25.0, "line": -27.0,
 }
-# приоритеты mirror EQ (меньше = важнее), от плоскостей Ayaic
-MIRROR_PRIORITY = {
-    "lead_vocal": 1, "kick": 2, "snare": 2, "bass": 2,
-    "guitar": 3, "playback": 3, "backing_vocal": 4, "overheads": 4,
-    "tom": 4, "floor_tom": 4, "hihat": 5, "keys": 4, "line": 4,
-}
 # панорама: роль -> позиция(и); стереопары раскладываются симметрично
 PAN_ROLE = {
     "kick": 0, "snare": 0, "bass": 0, "lead_vocal": 0,
@@ -113,11 +111,6 @@ PAN_ROLE = {
     "keys": PanPosition.L22.value,
     "tom": PanPosition.L22.value, "floor_tom": PanPosition.R22.value,
     "hihat": PanPosition.R45.value, "line": 0,
-}
-
-BAND_RANGES = {  # для CrossAdaptiveEQ.BAND_CENTERS
-    "sub": (20, 60), "bass": (60, 250), "low_mid": (250, 500), "mid": (500, 2000),
-    "high_mid": (2000, 4000), "high": (4000, 8000), "air": (8000, 16000),
 }
 
 GATE_CONFIG = {
@@ -158,18 +151,6 @@ def measure(x: np.ndarray) -> dict:
     return {"st_max_lufs": st_max,
             "est_lufs": float(np.mean(gated)) if gated.size else st_max,
             "true_peak_dbtp": tp}
-
-
-def band_energies(x: np.ndarray) -> dict:
-    seg = x[: SR * 4].astype(np.float64)
-    spec = np.abs(np.fft.rfft(seg)) ** 2
-    freqs = np.fft.rfftfreq(len(seg), 1 / SR)
-    out = {}
-    for band, (lo, hi) in BAND_RANGES.items():
-        m = (freqs >= lo) & (freqs < hi)
-        e = float(np.mean(spec[m])) if m.any() else 0.0
-        out[band] = 10.0 * np.log10(e + 1e-20)
-    return out
 
 
 def polarity_at_lag(ref: np.ndarray, tgt: np.ndarray, lag_samples: int) -> float:
@@ -370,30 +351,31 @@ def main() -> int:
             reason=f"шаблон панорамы ({active[ch]['role']})", confidence=1.0,
             risk_level="low", safe_to_apply=True))
 
-    # ===== 5. Mirror EQ (CrossAdaptiveEQ, IMP 7.3) =====
-    cae = CrossAdaptiveEQ()
-    energies = {ch: band_energies(c["x"]) for ch, c in active.items()}
-    priorities = {ch: MIRROR_PRIORITY.get(c["role"], 4) for ch, c in active.items()}
-    mirror = cae.calculate_corrections(energies, priorities)
-    # занятые/защищённые консольные полосы
+    # ===== 5. Маскирование (EQ v3: ERB против суммы) =====
+    # EQ v3: маскирование по ERB против СУММЫ остальных каналов (не парное),
+    # cut-only с защитой вокала — заменяет парный mirror EQ (CrossAdaptiveEQ):
+    # попарная оптимизация могла улучшать одну пару, ухудшая другую, а boost
+    # маскируемого снижал запас до самовозбуждения.
+    erb_edges = erb_band_edges()
+    erb_bands = {ch: band_energies_db(c["x"].astype(np.float64), SR, erb_edges)
+                 for ch, c in active.items()}
+    erb_roles = {ch: c["role"] for ch, c in active.items()}
+    masking_cuts = allocate_complementary_cuts(erb_bands, erb_roles, edges=erb_edges)
     mirror_moves: dict[int, list] = {}
-    for adj in mirror:
-        ch = int(adj.channel_id)
-        if ch not in active:
-            continue
+    for cut in masking_cuts:
+        ch = int(cut.channel)
         moves = mirror_moves.setdefault(ch, [])
-        if len(moves) >= 2:
+        if len(moves) >= 2 or abs(cut.gain_db) < 0.3:
             continue
-        gain = float(np.clip(adj.gain_db, -6.0, 2.0))
-        if abs(gain) < 0.3:
-            continue
-        moves.append((float(adj.frequency_hz), gain, float(adj.q_factor), adj.band,
-                      adj.masker_channel_id, adj.masked_channel_id))
+        moves.append((cut.freq_hz, cut.gain_db, cut.q, f"erb{cut.band_index}",
+                      ch, cut.masked_channel))
         decisions.append(ActionDecision(
-            id=f"mirror.ch{ch}.{adj.band}.{len(moves)}", action_type=ACTION_EQ, target=f"ch{ch}",
-            parameters={"frequency_hz": float(adj.frequency_hz), "gain_db": gain,
-                        "q": float(np.clip(adj.q_factor, 0.5, 4.0))},
-            reason=f"mirror EQ {adj.band}: masker ch{adj.masker_channel_id} vs masked ch{adj.masked_channel_id}",
+            id=f"mirror.ch{ch}.erb{cut.band_index}.{len(moves)}",
+            action_type=ACTION_EQ, target=f"ch{ch}",
+            parameters={"frequency_hz": cut.freq_hz, "gain_db": cut.gain_db,
+                        "q": float(np.clip(cut.q, 0.5, 4.0))},
+            reason=(f"ERB-маскирование: ch{ch} маскирует ch{cut.masked_channel} "
+                    f"({cut.mask_before_db:.1f} -> {cut.mask_after_db:.1f} dB)"),
             confidence=0.8, risk_level="low", safe_to_apply=True))
 
     # ===== SafetyGate =====

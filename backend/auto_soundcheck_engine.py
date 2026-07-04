@@ -23,6 +23,7 @@ from audio_capture import (
     AudioCapture, AudioSourceType, AudioDeviceType,
     detect_audio_device, find_device_by_name, list_audio_devices,
 )
+from heuristics.eq_v3 import soundcheck_eq_v3
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -524,6 +525,7 @@ class AutoSoundcheckEngine:
         self.sample_rate = sample_rate
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
+        self._eq_v3_proposals: Dict[int, Any] = {}
         self.auto_apply = bool(auto_apply)
         self.observe_only = bool(observe_only)
         self.feedback_emergency_apply = bool(feedback_emergency_apply)
@@ -4323,6 +4325,10 @@ class AutoSoundcheckEngine:
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
+        # EQ v3: один мультиканальный прогон (резонансы + ERB-маскирование
+        # против суммы + предсказательная A/B) ДО поканального цикла —
+        # маскирование считается по всем буферам сразу.
+        self._eq_v3_proposals = self._compute_eq_v3_proposals()
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -4532,6 +4538,50 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
+    def _compute_eq_v3_proposals(self) -> Dict[int, Any]:
+        """Мультиканальный прогон EQ v3 по активным каналам.
+
+        Возвращает {channel: EQv3ChannelProposal}. Пустой dict — аудио
+        недоступно (нет capture / короткие буферы): поканальный цикл
+        падает обратно на пресетный путь (fail-safe, пайплайн не ломается).
+        """
+        if self.audio_capture is None:
+            return {}
+        window = max(self.block_size, int(self.sample_rate * 2.0))
+        channels_payload: Dict[int, Dict[str, Any]] = {}
+        for ch, info in self.channels.items():
+            if not info.has_signal or not info.auto_corrections_enabled:
+                continue
+            try:
+                samples = np.asarray(
+                    self.audio_capture.get_buffer(ch, window), dtype=np.float64
+                ).reshape(-1)
+            except Exception:
+                continue
+            if samples.size < 4096:
+                continue
+            channels_payload[ch] = {
+                "audio": samples,
+                "role": info.source_role if info.source_role != "unknown"
+                else (info.preset or "line"),
+            }
+        if not channels_payload:
+            return {}
+        try:
+            proposals = soundcheck_eq_v3(channels_payload, self.sample_rate)
+        except Exception:
+            logger.exception("eq_v3 proposal computation failed; falling back to presets")
+            return {}
+        for ch, proposal in proposals.items():
+            logger.info(
+                "Ch %s: eq_v3 -> hpf=%s, bands=%s%s",
+                ch,
+                proposal.hpf_hz,
+                [(round(b["freq_hz"]), round(b["gain_db"], 1)) for b in proposal.applied_bands],
+                f", warnings={proposal.warnings}" if proposal.warnings else "",
+            )
+        return proposals
+
     def _apply_eq(
         self,
         ch: int,
@@ -4551,12 +4601,25 @@ class AutoSoundcheckEngine:
         - spectral.flatness — tonal vs noise character
         """
         info = self.channels[ch]
-        eq_bands = INSTRUMENT_EQ_PRESETS.get(preset)
-        if not eq_bands:
-            return
 
-        adapted_bands = list(eq_bands)
-        m = info.metrics
+        # EQ v3 (основной путь): полосы из мультиканального прогона —
+        # резонансы (гармонический фильтр) + ERB-маскирование против суммы,
+        # A/B-гейт по BS.1770 уже пройден. Пресеты — только fallback, когда
+        # аудио для v3 было недоступно.
+        v3_proposal = getattr(self, "_eq_v3_proposals", {}).get(ch)
+        if v3_proposal is not None and v3_proposal.applied_bands:
+            adapted_bands = [
+                (float(b["freq_hz"]), float(b["gain_db"]), float(b["q"]))
+                for b in v3_proposal.applied_bands
+            ]
+            m = None
+            logger.info(f"Ch {ch}: EQ v3 ({len(adapted_bands)} полос, метод eq_v3_soundcheck)")
+        else:
+            eq_bands = INSTRUMENT_EQ_PRESETS.get(preset)
+            if not eq_bands:
+                return
+            adapted_bands = list(eq_bands)
+            m = info.metrics
 
         if m and m.spectral.centroid_hz > 0:
             sm = m.spectral
@@ -5975,6 +6038,17 @@ class AutoSoundcheckEngine:
                 phase_guard_context=phase_guard_context,
             )
             if self._control_allowed(info, "eq"):
+                # EQ v3 для одиночного канала: резонансы + HPF-by-f0 доступны
+                # (маскирование против суммы требует полного прогона и здесь
+                # пусто); при недоступном аудио — fallback на пресеты.
+                try:
+                    single = self._compute_eq_v3_proposals()
+                    if ch in single:
+                        proposals = dict(getattr(self, "_eq_v3_proposals", {}) or {})
+                        proposals[ch] = single[ch]
+                        self._eq_v3_proposals = proposals
+                except Exception:
+                    logger.debug(f"Ch {ch}: single-channel eq_v3 pass failed; preset fallback")
                 self._apply_eq(
                     ch,
                     preset,
