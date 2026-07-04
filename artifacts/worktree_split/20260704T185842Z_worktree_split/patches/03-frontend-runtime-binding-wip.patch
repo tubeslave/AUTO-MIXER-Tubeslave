@@ -1,0 +1,128 @@
+diff --git a/frontend/src/services/useOperatorBackend.ts b/frontend/src/services/useOperatorBackend.ts
+index d3e2b688f..501ee918b 100644
+--- a/frontend/src/services/useOperatorBackend.ts
++++ b/frontend/src/services/useOperatorBackend.ts
+@@ -344,6 +344,60 @@ function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): P
+   };
+ }
+ 
++
++function mergeMeterFrameIntoPayloads(current: ProductLayerPayloads, frame: Record<string, unknown>): ProductLayerPayloads {
++  const frameChannels = Array.isArray(frame.channels) ? frame.channels as Array<Record<string, unknown>> : [];
++  const meterByChannel = new Map<number, Record<string, unknown>>();
++  frameChannels.forEach(row => {
++    if (!row || typeof row !== 'object') return;
++    const id = Number((row as Record<string, unknown>).channel);
++    if (Number.isFinite(id)) meterByChannel.set(id, row as Record<string, unknown>);
++  });
++
++  const next: ProductLayerPayloads = { ...current };
++
++  const inventory = current.channels && typeof current.channels === 'object'
++    ? current.channels as Record<string, unknown>
++    : null;
++  if (inventory && Array.isArray(inventory.channels) && meterByChannel.size) {
++    next.channels = {
++      ...inventory,
++      channels: (inventory.channels as unknown[]).map(row => {
++        if (!row || typeof row !== 'object') return row;
++        const record = row as Record<string, unknown>;
++        const meter = meterByChannel.get(Number(record.id ?? record.number));
++        if (!meter) return record;
++        const previousMeter = record.meter && typeof record.meter === 'object'
++          ? record.meter as Record<string, unknown>
++          : {};
++        return {
++          ...record,
++          level_db: meter.rms_db ?? record.level_db,
++          meter: {
++            ...previousMeter,
++            available: true,
++            rms_db: meter.rms_db,
++            peak_db: meter.peak_db,
++            lufs: meter.lufs ?? previousMeter.lufs
++          }
++        };
++      })
++    };
++  }
++
++  const dashboard = current.dashboard && typeof current.dashboard === 'object'
++    ? current.dashboard as Record<string, unknown>
++    : null;
++  if (dashboard) {
++    next.dashboard = {
++      ...dashboard,
++      ...(frame.master_bus && typeof frame.master_bus === 'object' ? { master_bus: frame.master_bus } : {}),
++      ...(frame.analyzer && typeof frame.analyzer === 'object' ? { analyzer: frame.analyzer } : {})
++    };
++  }
++  return next;
++}
++
+ export function useOperatorBackend() {
+   const [connectionState, setConnectionState] = useState<BackendConnectionState>(() => shouldAutoConnect() ? 'connecting' : 'mock');
+   const [payloads, setPayloads] = useState<ProductLayerPayloads>({});
+@@ -371,6 +425,7 @@ export function useOperatorBackend() {
+     websocketService.getProcessingPipelineSnapshot(false);
+     websocketService.getMainPipelinePreview(48, false);
+     websocketService.getTelemetryAlertsSnapshot(50, 8);
++    websocketService.subscribeMeters();
+   }, []);
+ 
+   const refreshBackend = useCallback(() => {
+@@ -553,6 +608,11 @@ export function useOperatorBackend() {
+       setProposalApplyResult(applyResultFromPayload(payload, 'apply_blocked'));
+       handleProposalMutation(payload);
+     };
++    const handleMeterFrame = (payload: unknown) => {
++      const frame = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null;
++      if (!frame || frame.available !== true) return;
++      setPayloads(current => mergeMeterFrameIntoPayloads(current, frame));
++    };
+     const handleDisconnected = () => {
+       setConnectionState(previous => previous === 'mock' ? 'mock' : 'offline');
+       setLogs(current => appendBackendLog(current, 'backend', 'Product Layer disconnected; using mock fallback.', 'WARN'));
+@@ -586,6 +646,7 @@ export function useOperatorBackend() {
+     websocketService.on('operator_proposal_apply_result', handleProposalApplyResult);
+     websocketService.on('operator_proposal_apply_blocked', handleProposalApplyBlocked);
+     websocketService.on('operator_proposals_imported', handleProposalMutation);
++    websocketService.on('meter_frame', handleMeterFrame);
+     websocketService.on('disconnected', handleDisconnected);
+ 
+     if (shouldAutoConnect()) {
+@@ -631,7 +692,11 @@ export function useOperatorBackend() {
+       websocketService.off('operator_proposal_apply_result', handleProposalApplyResult);
+       websocketService.off('operator_proposal_apply_blocked', handleProposalApplyBlocked);
+       websocketService.off('operator_proposals_imported', handleProposalMutation);
++      websocketService.off('meter_frame', handleMeterFrame);
+       websocketService.off('disconnected', handleDisconnected);
++      if (socketIsOpen()) {
++        websocketService.unsubscribeMeters();
++      }
+     };
+   }, [refreshBackend, requestSnapshot]);
+ 
+diff --git a/frontend/src/services/websocket.js b/frontend/src/services/websocket.js
+index 1ccca5824..eccb2a2d2 100644
+--- a/frontend/src/services/websocket.js
++++ b/frontend/src/services/websocket.js
+@@ -230,6 +230,18 @@ class WebSocketService extends BaseWebSocketTransport {
+     });
+   }
+ 
++  subscribeMeters() {
++    this.send({
++      type: 'subscribe_meters'
++    });
++  }
++
++  unsubscribeMeters() {
++    this.send({
++      type: 'unsubscribe_meters'
++    });
++  }
++
+   getChannelInventory(totalChannels = 24) {
+     this.send({
+       type: 'get_channel_inventory',

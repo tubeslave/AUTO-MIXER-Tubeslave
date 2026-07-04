@@ -1,0 +1,168 @@
+{
+  "schema": "automixer.worktree_split.v1",
+  "generated_at_utc": "2026-07-04T18:58:42Z",
+  "baseline_head": "22ece58e09",
+  "baseline_commit": "22ece58e0 Validate supervised WING proof and fail-closed writes",
+  "writer_lease_owner_present": false,
+  "stop_file_present": false,
+  "codex_autoloop_lock_present": false,
+  "scope": "local dirty worktree separation before next supervised soundcheck cycle",
+  "live_authority_granted": false,
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "commit_policy": {
+    "do_not_mix_frontend_ui_restyle_with_wing_readiness_proof": true,
+    "do_not_treat_runtime_observation_as_wing_readiness": true,
+    "do_not_commit_broad_soundcheck_apply_as_release_authority": true,
+    "operator_required_for_m005": true,
+    "owner_required_for_m006": true
+  },
+  "groups": {
+    "wing_proof_readiness_wip": [
+      "Docs/plans/M001-real-wing-interaction-plan.md",
+      "Docs/adr/wing-m005-disconnect-timeout-proof-runner-20260704.md",
+      "tools/wing_timeout_disconnect_proof_runner.py",
+      "tests/test_wing_timeout_disconnect_proof_runner.py"
+    ],
+    "soundcheck_backend_runtime_wip": [
+      "backend/handlers/__init__.py",
+      "backend/handlers/meter_stream_handlers.py",
+      "backend/operator_product_state.py",
+      "backend/write_surface_inventory.py",
+      "Docs/adr/soundcheck-runtime-observation-runner-20260704.md",
+      "Docs/adr/soundcheck-long-run-drift-audit-20260704.md",
+      "Docs/adr/operator-review-proposal-coverage-20260704.md",
+      "tools/soundcheck_runtime_observation_runner.py",
+      "tools/soundcheck_long_run_drift_audit.py",
+      "tests/test_meter_stream.py",
+      "tests/test_soundcheck_runtime_observation_runner.py",
+      "tests/test_soundcheck_long_run_drift_audit.py",
+      "tests/test_operator_product_state.py",
+      "artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/summary.json",
+      "artifacts/soundcheck_long_run_drift_audit/20260704T183743Z_soundcheck_long_run_drift_audit/summary.json"
+    ],
+    "frontend_runtime_binding_wip": [
+      "frontend/src/services/websocket.js",
+      "frontend/src/services/useOperatorBackend.ts"
+    ],
+    "frontend_ui_restyle_wip_keep_separate": [
+      "frontend/src/components/dashboard/AutomixerDashboard.tsx",
+      "frontend/src/components/prototype/AutomixerComponents.tsx",
+      "frontend/src/views/DirectorPanel.tsx",
+      "Docs/reports/screenshots_frontend_restyle_20260704.png"
+    ],
+    "m006_owner_review_packet_wip": [
+      "Docs/reports/WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md",
+      "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json"
+    ],
+    "truth_surfaces_wip": [
+      "Docs/CURRENT_STATE.md",
+      "ops/autopilot/STATE.json",
+      "ops/autopilot/BLOCKERS.md"
+    ],
+    "worktree_split_evidence": [
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/summary.json",
+      "Docs/reports/WORKTREE_SPLIT_20260704.md"
+    ],
+    "worktree_split_patch_bundle": [
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/01-wing-proof-readiness-wip.patch",
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/02-soundcheck-backend-runtime-wip.patch",
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/03-frontend-runtime-binding-wip.patch",
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/04-frontend-ui-restyle-wip.patch",
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/05-truth-surfaces-and-split-handoff.patch",
+      "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/06-m006-owner-readiness-review-packet.patch"
+    ]
+  },
+  "patch_bundle": {
+    "generated_at_utc": "2026-07-04T19:04:42Z",
+    "self_contained": false,
+    "self_contained_blocker": "runtime_observation_events_jsonl_is_large_local_evidence_and_not_in_patch_bundle",
+    "live_authority_granted": false,
+    "readiness_closure_allowed": false,
+    "readiness_matrix_update_allowed": false,
+    "patch_files": [
+      {
+        "group": "wing_proof_readiness_wip",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/01-wing-proof-readiness-wip.patch",
+        "bytes": 46529,
+        "sha256": "fe4cfc10e62273dd1a74df3b683bbb5193196969f1586783b4a9847e41b997c8"
+      },
+      {
+        "group": "soundcheck_backend_runtime_wip",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/02-soundcheck-backend-runtime-wip.patch",
+        "bytes": 189429,
+        "sha256": "3de423b194142d3389b82b87955bac9574bc7b07a78a22c376cab3cd0d0e7119"
+      },
+      {
+        "group": "frontend_runtime_binding_wip",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/03-frontend-runtime-binding-wip.patch",
+        "bytes": 5419,
+        "sha256": "d8f4dfad166d9fca02c2d235a079e142826a3cb20f725bb126e79c7d3c87d62d"
+      },
+      {
+        "group": "frontend_ui_restyle_wip_keep_separate",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/04-frontend-ui-restyle-wip.patch",
+        "bytes": 466654,
+        "sha256": "f29b92f02aef1779a36276dadbf6eb6e38478a99dd9241f385cc9cfdb82063a2"
+      },
+      {
+        "group": "truth_surfaces_and_split_handoff",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/05-truth-surfaces-and-split-handoff.patch",
+        "bytes": null,
+        "sha256": null
+      },
+      {
+        "group": "m006_owner_review_packet_wip",
+        "path": "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/06-m006-owner-readiness-review-packet.patch",
+        "bytes": 9901,
+        "sha256": "2487ac9960bc5bc16901e92eb581683de28cdf05c590856325f25a48680bd325"
+      }
+    ],
+    "excluded_large_local_evidence": [
+      {
+        "path": "artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/events.jsonl",
+        "bytes": 60032994,
+        "sha256": "c628116a717ddef3a309b095d0bdbda8f3cc807c18d575e2219de6f6f5517bdb",
+        "reason": "kept as local runtime evidence; too large for the review patch bundle"
+      }
+    ],
+    "superseded_local_artifacts_not_in_commit_groups": [
+      {
+        "path": "artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/summary.json",
+        "sha256": "d2ad599238a44a5438aa6fd42435251b336a0e00de9a8e5f91cfbc72188015c7",
+        "reason": "earlier local drift-audit attempt superseded by 20260704T183743Z"
+      },
+      {
+        "path": "artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/summary.json",
+        "sha256": "6b5a94194889d97d2ff4be2955448b5e04ac526cd78fa8da8dae507b535c0a95",
+        "reason": "earlier local drift-audit attempt superseded by 20260704T183743Z"
+      }
+    ],
+    "validation": {
+      "json_state": "passed",
+      "json_summary": "passed",
+      "git_diff_check": "passed",
+      "patch_apply_check": "pre-landing review patches 01-04 and 06 passed git apply --check on a temporary clean detached worktree at 22ece58e0; post-landing truth patch 05 is validated against the current landed split head",
+      "wing_mvp_rails": "PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py -q: 133 passed"
+    }
+  },
+  "landed_commits": [
+    "7a792457e Add read-only soundcheck runtime evidence",
+    "3cf9b53a1 Wire frontend to read-only meter stream",
+    "e745438ab Restyle frontend soundcheck dashboard",
+    "3f5d5c0eb Add supervised WING disconnect proof runner",
+    "9ce9e29ba Prepare M006 owner readiness packet"
+  ],
+  "ignored_local_evidence": [
+    "artifacts/soundcheck_runtime_observation/*/events.jsonl",
+    "artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/",
+    "artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/"
+  ],
+  "next_operator_action": "Run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review. Do not widen live authority before those gates.",
+  "notes": [
+    "The UI restyle/screenshot must remain separate from any WING readiness proof commit.",
+    "The read-only meter stream, runtime observation runner, long-run drift audit and operator review coverage are soundcheck runtime WIP only.",
+    "M005 still requires physical cable-loss, stale-readback, blocked-write-while-disconnected and reconnect proof with the operator present.",
+    "M006 still requires owner readiness review before readiness matrix rows or current supervised live-write kinds can change."
+  ]
+}

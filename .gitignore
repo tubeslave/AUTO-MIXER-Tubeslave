@@ -58,6 +58,9 @@ frontend/dist/
 ops/autopilot/WRITER_LEASE/
 artifacts/tub345_supervised_live/
 artifacts/wing_telemetry*/
+artifacts/soundcheck_runtime_observation/*/events.jsonl
+artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/
+artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/
 production_mix_v1_out/
 
 # OS

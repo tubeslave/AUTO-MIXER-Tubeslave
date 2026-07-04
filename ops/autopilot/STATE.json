@@ -11,6 +11,195 @@
   "current_blocker": "Supervised CH3 fader and gain-down proofs passed on the real WING Rack with apply, physical readback, rollback and emergency-stop/block evidence (artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json and artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json); the earlier rollback_not_applied failure is closed by the passed rerun. The read-only decision ledger remains accepted_decision_ready. Release-ready live correction families remain 0 until the M006 owner readiness review accepts the proof artifacts, live-allowed safety rows remain 0, and current supervised live-write kinds remain 0; the remaining external items are the M005 supervised disconnect/timeout/stale-state protection proof and the M006 readiness review.",
   "next_action": "Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.",
   "next_operator_action": "Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.",
+  "latest_local_runtime_validation": {
+    "validated_at_utc": "2026-07-04T19:22:59Z",
+    "scope": "local runtime/tooling only; no live WING proof, readiness closure or live-authority expansion",
+    "backend_listener": "Existing python3.11 server.py listener on 8765 answered read-only get_dashboard_snapshot and subscribe_meters smoke checks; dashboard_snapshot exposed connection, master_bus and analyzer; meter_frame exposed read_only=true and live_write=false.",
+    "frontend": "npm --prefix frontend test: 96 passed; npm --prefix frontend run build: passed",
+    "backend_targeted": "PYTHONPATH=backend python3 -m pytest tests/test_meter_stream.py tests/test_wing_timeout_disconnect_proof_runner.py tests/test_wing_operator_proposal_validation_runner.py -q: 33 passed; PYTHONPATH=backend python3 -m pytest tests/test_soundcheck_runtime_observation_runner.py tests/test_meter_stream.py tests/test_wing_timeout_disconnect_proof_runner.py -q: 13 passed",
+    "wing_mvp_rails": "PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py -q: 133 passed",
+    "full_backend_suite": "PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q: 5453 passed, 1 skipped, 1 warning in 167.83s; validates the current dirty tree after soundcheck runtime split recording, operator review proposal coverage, long-run drift audit and frontend meter cleanup without WING live authority changes",
+    "soundcheck_runtime_observation": {
+      "artifact": "artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/summary.json",
+      "duration_actual_sec": 600.005,
+      "dashboard_snapshot_count": 119,
+      "channel_inventory_count": 119,
+      "decision_queue_count": 119,
+      "safety_monitor_count": 119,
+      "operator_mode_status_count": 119,
+      "meter_frame_count": 2491,
+      "meter_available_frames": 2491,
+      "meter_live_write_frames": 0,
+      "max_channel_count": 48,
+      "unexpected_live_event_count": 0,
+      "forbidden_request_types_sent": [],
+      "write_request_sent": false,
+      "live_apply_request_sent": false,
+      "status": "passed",
+      "proof_scope": "runtime_telemetry_only_no_wing_readiness"
+    },
+    "soundcheck_long_run_drift_audit": {
+      "artifact": "artifacts/soundcheck_long_run_drift_audit/20260704T183743Z_soundcheck_long_run_drift_audit/summary.json",
+      "source_evidence": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "status": "failed",
+      "scope": "offline log audit only; old daemon evidence rejected; no readiness closure",
+      "duration_sec": 188.9,
+      "min_duration_sec": 600.0,
+      "cycle_count": 15,
+      "action_count": 443,
+      "applied_action_count": 287,
+      "live_executor_action_count": 287,
+      "positive_fader_boost_count": 0,
+      "positive_gain_or_trim_boost_count": 73,
+      "relative_only_target_count": 422,
+      "cumulative_drift_surface_count": 28,
+      "failures": [
+        "duration_below_minimum",
+        "live_executor_actions_present",
+        "positive_gain_or_trim_boosts_present",
+        "relative_only_targets_present",
+        "cumulative_relative_drift_present"
+      ],
+      "proof_scope": "offline_log_audit_only_no_wing_readiness",
+      "live_authority_granted": false,
+      "readiness_closure_allowed": false,
+      "readiness_matrix_update_allowed": false
+    },
+    "soundcheck_long_run_drift_audit_tests": "PYTHONPATH=backend python3 -m pytest tests/test_soundcheck_long_run_drift_audit.py tests/test_write_surface_inventory_static_scan.py -q: 18 passed; the audit rejects the old 188.9 second live daemon log as non-proof while preserving live_authority_granted=false",
+    "operator_review_contract": {
+      "status": "added",
+      "scope": "read-only decision_queue proposal visibility coverage; no apply authorization, no queue mutation, no live WING proof",
+      "fields_checked": [
+        "reason",
+        "risk",
+        "requested_change",
+        "old_value",
+        "new_value",
+        "rollback"
+      ],
+      "surface": "backend/operator_product_state.py build_decision_queue summary.operator_review_contract",
+      "live_authority_granted": false,
+      "readiness_closure_allowed": false,
+      "readiness_matrix_update_allowed": false
+    },
+    "operator_review_contract_tests": "PYTHONPATH=backend python3 -m pytest tests/test_operator_product_state.py -k \"operator_review_field_coverage or operator_review_incomplete_fields or decision_queue_summarizes_apply_preflight_candidates or operator_proposal_queue_accepts_assist_suggestions\" -q: 4 passed, 153 deselected; python3 -m py_compile backend/operator_product_state.py: passed",
+    "m005_runner_dry_run": "python3 tools/wing_timeout_disconnect_proof_runner.py --artifact-root /tmp/automixer_wing_timeout_disconnect_dry_run --channel 3 --value-type fader --delta-db -0.25: status planned, live_apply_request_sent=false, live_authority_granted=false",
+    "no_wing_quick": "PYTHONPATH=backend python3 tools/no_wing_release_check.py --quick --skip-frontend --artifact-root /tmp/automixer_no_wing_release_check_current failed closed on backend_port_free because the existing backend listener requires operator confirmation; no authority granted.",
+    "m005_status": "still requires operator-present physical cable-loss, stale-readback, blocked-write-while-disconnected and reconnect-recovery proof",
+    "m006_status": "still requires owner readiness review before readiness matrix rows or current supervised live-write kinds can change",
+    "frontend_meter_cleanup": "frontend/src/services/useOperatorBackend.ts now unsubscribes from the read-only meter stream during hook cleanup when the websocket is still open; npm --prefix frontend test: 96 passed; npm --prefix frontend run build: passed",
+    "dirty_worktree_split": {
+      "recorded_at_utc": "2026-07-04T18:27:09Z",
+      "baseline_head": "22ece58e09",
+      "writer_lease_owner_present": false,
+      "stop_file_present": false,
+      "split_artifact": "artifacts/worktree_split/20260704T185842Z_worktree_split/summary.json",
+      "split_report": "Docs/reports/WORKTREE_SPLIT_20260704.md",
+      "patch_bundle_generated_at_utc": "2026-07-04T19:04:42Z",
+      "wing_proof_readiness_wip": [
+        "tools/wing_timeout_disconnect_proof_runner.py",
+        "tests/test_wing_timeout_disconnect_proof_runner.py",
+        "Docs/adr/wing-m005-disconnect-timeout-proof-runner-20260704.md",
+        "Docs/plans/M001-real-wing-interaction-plan.md"
+      ],
+      "soundcheck_backend_runtime_wip": [
+        "backend/handlers/meter_stream_handlers.py",
+        "backend/handlers/__init__.py",
+        "backend/operator_product_state.py",
+        "backend/write_surface_inventory.py",
+        "Docs/adr/soundcheck-runtime-observation-runner-20260704.md",
+        "Docs/adr/soundcheck-long-run-drift-audit-20260704.md",
+        "Docs/adr/operator-review-proposal-coverage-20260704.md",
+        "tools/soundcheck_runtime_observation_runner.py",
+        "tools/soundcheck_long_run_drift_audit.py",
+        "tests/test_meter_stream.py",
+        "tests/test_soundcheck_runtime_observation_runner.py",
+        "tests/test_soundcheck_long_run_drift_audit.py",
+        "tests/test_operator_product_state.py",
+        "artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/summary.json",
+        "artifacts/soundcheck_long_run_drift_audit/20260704T183743Z_soundcheck_long_run_drift_audit/summary.json"
+      ],
+      "frontend_runtime_binding_wip": [
+        "frontend/src/services/websocket.js",
+        "frontend/src/services/useOperatorBackend.ts"
+      ],
+      "frontend_ui_restyle_wip_keep_separate": [
+        "frontend/src/components/dashboard/AutomixerDashboard.tsx",
+        "frontend/src/components/prototype/AutomixerComponents.tsx",
+        "frontend/src/views/DirectorPanel.tsx",
+        "Docs/reports/screenshots_frontend_restyle_20260704.png"
+      ],
+      "m006_owner_review_packet_wip": [
+        "Docs/reports/WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md",
+        "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json"
+      ],
+      "state_docs_wip": [
+        "Docs/CURRENT_STATE.md",
+        "ops/autopilot/STATE.json",
+        "ops/autopilot/BLOCKERS.md"
+      ],
+      "worktree_split_evidence": [
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/summary.json",
+        "Docs/reports/WORKTREE_SPLIT_20260704.md"
+      ],
+      "worktree_split_patch_bundle": [
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/01-wing-proof-readiness-wip.patch",
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/02-soundcheck-backend-runtime-wip.patch",
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/03-frontend-runtime-binding-wip.patch",
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/04-frontend-ui-restyle-wip.patch",
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/05-truth-surfaces-and-split-handoff.patch",
+        "artifacts/worktree_split/20260704T185842Z_worktree_split/patches/06-m006-owner-readiness-review-packet.patch"
+      ],
+      "excluded_large_local_evidence": [
+        {
+          "path": "artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/events.jsonl",
+          "bytes": 60032994,
+          "sha256": "c628116a717ddef3a309b095d0bdbda8f3cc807c18d575e2219de6f6f5517bdb",
+          "reason": "kept as local runtime evidence; too large for the review patch bundle"
+        }
+      ],
+      "superseded_local_artifacts_not_in_commit_groups": [
+        "artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/summary.json",
+        "artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/summary.json"
+      ],
+      "patch_bundle_validation": "Pre-landing review patches 01-04 and 06 passed git apply --check on a temporary clean detached worktree at 22ece58e0; post-landing truth patch 05 is validated against the current landed split head; JSON checks passed; git diff --check passed; tests/test_wing_mvp_rails.py: 133 passed",
+      "landed_commits": [
+        "7a792457e Add read-only soundcheck runtime evidence",
+        "3cf9b53a1 Wire frontend to read-only meter stream",
+        "e745438ab Restyle frontend soundcheck dashboard",
+        "3f5d5c0eb Add supervised WING disconnect proof runner",
+        "9ce9e29ba Prepare M006 owner readiness packet"
+      ],
+      "latest_validation_after_landing": "python3 json.tool checks passed; git diff --check passed; PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py tests/test_wing_timeout_disconnect_proof_runner.py tests/test_meter_stream.py tests/test_soundcheck_runtime_observation_runner.py tests/test_soundcheck_long_run_drift_audit.py tests/test_operator_product_state.py -q: 307 passed; npm --prefix frontend test: 96 passed; npm --prefix frontend run build: passed; M006 packet cross-check passed; pre-landing review patches 01-04 and 06 apply against 22ece58e0; post-landing truth patch 05 applies against the current landed split head",
+      "ignored_local_evidence": [
+        "artifacts/soundcheck_runtime_observation/*/events.jsonl",
+        "artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/",
+        "artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/"
+      ],
+      "split_policy": "Do not mix the frontend UI restyle/screenshot with WING readiness proof commits; meter stream backend plus frontend subscription are soundcheck runtime WIP and remain read-only."
+    }
+  },
+  "m006_owner_readiness_review_packet": {
+    "generated_at_utc": "2026-07-04T19:11:01Z",
+    "status": "ready_for_owner_review_after_m005",
+    "scope": "owner_review_packet_only_no_readiness_update",
+    "summary_artifact": "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json",
+    "report": "Docs/reports/WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md",
+    "input_proof_artifacts": [
+      "artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
+      "artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json"
+    ],
+    "pending_external_gates": [
+      "M005 supervised physical disconnect/timeout/stale-state proof with operator present",
+      "M006 owner readiness review decision after M005 evidence is accepted"
+    ],
+    "live_authority_granted": false,
+    "readiness_closure_allowed": false,
+    "readiness_matrix_update_allowed": false,
+    "contacts_wing": false,
+    "contacts_backend": false,
+    "live_write": false
+  },
   "strict_pre_release_review": {
     "score": 95,
     "release_threshold": 95,

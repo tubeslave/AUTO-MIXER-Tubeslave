@@ -113,6 +113,23 @@ Generated: 2026-07-04T08:04:59Z
   non-dry-run acknowledgement guard before config, WING client or audio-device
   context. This is a generic static contract for future broad live soundcheck
   tools and grants no WING live authority.
+- `tools/soundcheck_long_run_drift_audit.py` now performs an offline-only
+  long-run drift/proposal audit over existing soundcheck JSONL evidence and is
+  inventoried as read-only proof tooling. Its current audit artifact
+  `artifacts/soundcheck_long_run_drift_audit/20260704T183743Z_soundcheck_long_run_drift_audit/summary.json`
+  rejects `reports/soundcheck_daemon_log_20260703T221457.jsonl`: the source
+  covers only 188.9 seconds, has 287 live executor actions, 73 positive
+  gain/trim boosts, 422 relative-only fader/trim/gain targets and 28
+  cumulative relative-drift surfaces. This is negative offline evidence only;
+  it grants no live WING authority, readiness closure or readiness matrix
+  update.
+- `build_decision_queue()` now includes a read-only
+  `summary.operator_review_contract` that checks whether pending proposals carry
+  the operator-visible fields required for review: `reason`, `risk`,
+  `requested_change`, `old_value`, `new_value` and `rollback`. Incomplete
+  proposals are surfaced as coverage gaps only; this does not mutate queue
+  state, does not run preflight, does not call `apply_operator_proposal` and
+  does not grant live WING authority.
 - The write-surface static scan now treats direct raw `send(..., value)`
   OSC calls as write-adjacent. The inventory declares WING meter subscription
   transport, legacy enhanced gain direct apply, legacy snapshot navigation
@@ -247,6 +264,74 @@ Generated: 2026-07-04T08:04:59Z
 - Current external validation requirements:
   Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present;
   Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006).
+- A report-only M006 owner readiness review packet is prepared at
+  `artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json`
+  and `Docs/reports/WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md`.
+  It inventories the accepted CH3 fader and gain-down proof artifacts, notes
+  that `backend/safety_coverage_matrix.py` now sees the two narrow rows as
+  `hardware_proven_narrow` while `live_allowed=false`, and keeps
+  `Docs/reports/WING_CORRECTION_APPLY_READINESS_20260703.md` at release-ready
+  live families `0` until M005 and owner acceptance are complete. This packet
+  is not an owner decision, does not update readiness rows, does not contact
+  WING/backend and grants no live authority.
+- Local runtime/tooling verification on 2026-07-04 advanced the soundcheck
+  runtime slice without closing M005/M006. The reusable observation artifact
+  `artifacts/soundcheck_runtime_observation/20260704T180231Z_soundcheck_runtime_observation/summary.json`
+  ran for 600.005 seconds against the existing backend listener on port
+  `8765`: 119 dashboard snapshots, 119 channel inventories, 119 decision queue
+  snapshots, 119 safety monitor snapshots, 119 operator-mode statuses and 2491
+  meter frames were collected. Dashboard snapshots exposed `connection`,
+  `master_bus` and `analyzer`; all 2491 meter frames were read-only, 2491 were
+  available, `max_channel_count` was 48, `meter_live_write_frames` was 0,
+  `unexpected_live_event_count` was 0, no forbidden request types were sent,
+  `write_request_sent=false` and `live_apply_request_sent=false`. Frontend
+  checks passed (`npm --prefix frontend test`: 96 passed;
+  `npm --prefix frontend run build`: passed). Targeted backend checks passed
+  for meter stream, runtime observation, the M005 timeout/disconnect proof
+  runner, supervised proposal runner, operator review coverage and the
+  long-run drift audit. Full backend validation also passed:
+  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5453
+  passed, 1 skipped, 1 warning. The no-WING quick gate failed closed on
+  `backend_port_free` because an existing backend listener requires operator
+  confirmation; no live authority, readiness closure or current supervised
+  live-write kind changed.
+- Baseline split for the dirty worktree was recorded on
+  `2026-07-04T18:27:09Z`: HEAD is `22ece58e09`, no
+  `ops/autopilot/WRITER_LEASE/owner.json` is present, and `ops/autopilot/STOP`
+  is absent. The WING proof/readiness WIP is the M005 disconnect runner,
+  tests, ADR and active plan updates. The soundcheck runtime WIP is the
+  read-only meter stream backend, runtime observation runner/tests/artifact and
+  frontend WebSocket meter subscription. The frontend UI restyle WIP is
+  `AutomixerDashboard.tsx`, `AutomixerComponents.tsx`, `DirectorPanel.tsx` and
+  `Docs/reports/screenshots_frontend_restyle_20260704.png`; keep that restyle
+  separate from any WING readiness proof commit. `useOperatorBackend.ts` now
+  unsubscribes from the read-only meter stream during hook cleanup when the
+  WebSocket is still open. Frontend verification after that cleanup passed:
+  `npm --prefix frontend test`: 96 passed; `npm --prefix frontend run build`:
+  passed. A reproducible split artifact/report now records the intended commit
+  groups at
+  `artifacts/worktree_split/20260704T185842Z_worktree_split/summary.json` and
+  `Docs/reports/WORKTREE_SPLIT_20260704.md`. The split now also has generated
+  review patches under
+  `artifacts/worktree_split/20260704T185842Z_worktree_split/patches/` for WING
+  proof/readiness WIP, soundcheck backend/runtime WIP, frontend runtime binding
+  and frontend UI restyle. The patch bundle is not fully self-contained: the
+  60,032,994-byte runtime observation `events.jsonl` remains local evidence
+  tracked by SHA-256 only, and two earlier drift-audit summaries are marked
+  superseded by `20260704T183743Z`. This split evidence does not close M005 or
+  M006, does not grant live authority and does not update readiness matrix
+  rows. Pre-landing review patches 01-04 and 06 passed `git apply --check` on
+  a temporary clean detached worktree at `22ece58e0`; post-landing truth patch
+  05 is validated against the current landed split head. JSON checks, `git
+  diff --check` and WING MVP rails also passed.
+- The dirty split has now been landed as separate local commits:
+  `7a792457e` for read-only soundcheck runtime evidence, `3cf9b53a1` for
+  frontend read-only meter binding, `e745438ab` for frontend UI restyle,
+  `3f5d5c0eb` for the M005 disconnect proof runner, and `9ce9e29ba` for the
+  report-only M006 owner readiness packet. The remaining local-only evidence
+  is intentionally ignored: the large runtime observation `events.jsonl` and
+  two superseded drift-audit attempts. This commit split does not close M005 or
+  M006 and grants no live authority.
 - The strict pre-release score is `95/100`; the threshold remains `95/100`,
   public release ready: `true` (scope: supervised narrow WING fader/gain-down MVP only). Score 95/100 is evidence-backed: supervised CH3 fader and gain-down proofs passed with apply, physical readback, rollback and emergency-stop/block evidence; the earlier rollback_not_applied failure is closed, and a release-ready live correction family review (M006) plus the M005 timeout/disconnect proof remain the next gates. This score grants no autonomy, no non-fader/gain live family and no readiness-matrix closure by itself.
 - `ops/autopilot/STATE.json` now exposes the same safe handoff text as
