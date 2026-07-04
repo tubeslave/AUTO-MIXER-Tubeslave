@@ -91,3 +91,17 @@ reported.
 
 Rollback is a normal git revert of the runner, tests, and ADR. M005 should then
 remain blocked rather than returning to ad hoc proof scripts.
+
+## 2026-07-04 Contract Hardening Update
+
+M005 completion now requires reconnect recovery to include a fresh physical
+readback in the reconnect phase, not only `status=passed` and
+`unchanged_from_baseline=true`. The M006 owner-readiness verifier also
+independently checks the M005 phase details: physical cable-loss confirmation
+token, unavailable stale-readback payload, safe blocked-write reason, connected
+reconnect status and physical reconnect readback.
+
+This keeps summary booleans from becoming sufficient owner-review evidence by
+themselves. The update is offline verifier hardening only; it grants no WING
+contact, no live apply authority and no readiness closure without the
+operator-present M005 proof and owner M006 decision.

@@ -256,7 +256,20 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
         if isinstance(phases.get("reconnect_recovery"), dict)
         else {}
     )
-    if reconnect.get("status") == "passed" and reconnect.get("unchanged_from_baseline") is True:
+    reconnect_readback = (
+        reconnect.get("readback") if isinstance(reconnect.get("readback"), dict) else {}
+    )
+    reconnect_status = (
+        reconnect.get("connection_status")
+        if isinstance(reconnect.get("connection_status"), dict)
+        else {}
+    )
+    if (
+        reconnect.get("status") == "passed"
+        and reconnect_status.get("connected") is True
+        and reconnect.get("unchanged_from_baseline") is True
+        and _readback_is_physical(reconnect_readback)
+    ):
         completed.append("reconnect_recovery_verified")
 
     return completed

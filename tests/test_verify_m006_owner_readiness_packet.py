@@ -57,15 +57,30 @@ def complete_m005_summary() -> dict:
         "phases": {
             "disconnect": {
                 "status": "operator_confirmed_physical_cable_loss",
+                "confirmation": "WING_CABLE_PULLED_BY_OPERATOR",
             },
             "stale_readback": {
                 "status": "passed",
+                "readback": {
+                    "type": "mixer_parameter_value",
+                    "status": "readback_unavailable",
+                    "source": "unavailable",
+                    "value": None,
+                },
             },
             "blocked_write_while_disconnected": {
                 "status": "passed",
+                "block_reason": "mixer_not_connected",
             },
             "reconnect_recovery": {
                 "status": "passed",
+                "connection_status": {"connected": True},
+                "readback": {
+                    "type": "mixer_parameter_value",
+                    "status": "verified_from_physical_readback",
+                    "source": "physical_readback",
+                    "value": 0.0,
+                },
                 "unchanged_from_baseline": True,
             },
         },
@@ -165,6 +180,31 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["contacts_wing"] is False
     assert result["contacts_backend"] is False
     assert result["live_write"] is False
+
+
+def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["phases"]["reconnect_recovery"]["readback"] = {
+        "type": "mixer_parameter_value",
+        "status": "readback_unavailable",
+        "source": "unavailable",
+        "value": None,
+    }
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_reconnect_recovery_physical_readback" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
 
 
 def test_packet_attempting_to_grant_authority_fails_closed() -> None:

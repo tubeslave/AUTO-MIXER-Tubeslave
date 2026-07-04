@@ -23,6 +23,7 @@ DEFAULT_ARTIFACT_ROOT = "artifacts/wing_owner_readiness_review_verifier"
 EXPECTED_PACKET_SCHEMA = "automixer.m006_owner_readiness_review_packet.v1"
 EXPECTED_M005_SCHEMA = "wing_timeout_disconnect_proof.v1"
 EXPECTED_M005_SUMMARY_GLOB = "artifacts/wing_timeout_disconnect_proof/*/summary.json"
+EXPECTED_M005_PHYSICAL_CABLE_CONFIRMATION = "WING_CABLE_PULLED_BY_OPERATOR"
 EXPECTED_PROOF_SCHEMA = "wing_operator_proposal_validation.v2"
 EXPECTED_PROOF_REASON = "proposal_apply_readback_rollback_complete"
 EXPECTED_M005_EVIDENCE = [
@@ -32,6 +33,13 @@ EXPECTED_M005_EVIDENCE = [
     "blocked_write_while_disconnected",
     "reconnect_recovery_verified",
 ]
+EXPECTED_M005_SAFE_BLOCK_REASONS = {
+    "manual_write_exception",
+    "mixer_not_connected",
+    "mixer_write_failed",
+    "pre_read_cache_not_fresh",
+    "pre_read_unavailable",
+}
 AUTHORITY_DENIAL_FLAGS = {
     "live_authority_granted": False,
     "readiness_closure_allowed": False,
@@ -94,6 +102,26 @@ def _same_value(left: Any, right: Any) -> bool:
     if isinstance(left, (int, float)) and isinstance(right, (int, float)):
         return abs(float(left) - float(right)) <= 1e-6
     return left == right
+
+
+def _m005_readback_is_physical(readback: Mapping[str, Any]) -> bool:
+    return (
+        readback.get("type") == "mixer_parameter_value"
+        and readback.get("status") == PHYSICAL_READBACK_STATUS
+        and readback.get("source") == PHYSICAL_READBACK_SOURCE
+        and readback.get("value") is not None
+    )
+
+
+def _m005_readback_is_unavailable(readback: Mapping[str, Any]) -> bool:
+    if readback.get("type") == "mixer_parameter_read_blocked":
+        return True
+    return (
+        readback.get("type") == "mixer_parameter_value"
+        and readback.get("status") == "readback_unavailable"
+        and readback.get("value") is None
+        and readback.get("source") in {"physical_readback", "unavailable"}
+    )
 
 
 def _is_repo_relative_proof_path(path_text: Any) -> bool:
@@ -468,12 +496,21 @@ def _record_m005_checks(
     stale = _get_mapping(phases, "stale_readback")
     blocked_write = _get_mapping(phases, "blocked_write_while_disconnected")
     reconnect = _get_mapping(phases, "reconnect_recovery")
+    stale_readback = _get_mapping(stale, "readback")
+    reconnect_status = _get_mapping(reconnect, "connection_status")
+    reconnect_readback = _get_mapping(reconnect, "readback")
     _record(
         checks,
         "m005_disconnect_phase_operator_confirmed_physical_loss",
-        disconnect.get("status") == "operator_confirmed_physical_cable_loss",
+        disconnect.get("status") == "operator_confirmed_physical_cable_loss"
+        and disconnect.get("confirmation") == EXPECTED_M005_PHYSICAL_CABLE_CONFIRMATION,
     )
     _record(checks, "m005_stale_readback_phase_passed", stale.get("status") == "passed")
+    _record(
+        checks,
+        "m005_stale_readback_unavailable",
+        stale.get("status") == "passed" and _m005_readback_is_unavailable(stale_readback),
+    )
     _record(
         checks,
         "m005_blocked_write_phase_passed",
@@ -481,9 +518,21 @@ def _record_m005_checks(
     )
     _record(
         checks,
+        "m005_blocked_write_reason_safe",
+        blocked_write.get("status") == "passed"
+        and blocked_write.get("block_reason") in EXPECTED_M005_SAFE_BLOCK_REASONS,
+    )
+    _record(
+        checks,
         "m005_reconnect_recovery_phase_passed",
         reconnect.get("status") == "passed"
+        and reconnect_status.get("connected") is True
         and reconnect.get("unchanged_from_baseline") is True,
+    )
+    _record(
+        checks,
+        "m005_reconnect_recovery_physical_readback",
+        reconnect.get("status") == "passed" and _m005_readback_is_physical(reconnect_readback),
     )
 
 
