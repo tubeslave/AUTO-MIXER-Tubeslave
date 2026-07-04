@@ -92,6 +92,11 @@ def complete_m005_summary() -> dict:
             "blocked_write_while_disconnected": {
                 "status": "passed",
                 "block_reason": "mixer_not_connected",
+                "apply_result": {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "apply_blocked",
+                    "apply_result": {"status": "blocked", "reason": "mixer_not_connected"},
+                },
             },
             "reconnect_recovery": {
                 "status": "passed",
@@ -228,6 +233,29 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["live_write"] is False
 
 
+def test_packet_contract_must_require_blocked_apply_result() -> None:
+    packet = load_packet()
+    packet["m005_completion_contract"].pop("required_blocked_write_apply_result_type")
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(load_packet()),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_contract_requires_blocked_apply_result" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
 def test_m005_missing_request_audit_blocks_owner_review() -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
@@ -298,6 +326,33 @@ def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
     assert result["status"] == "blocked"
     assert result["reason"] == "m006_owner_review_inputs_failed"
     assert "m005_reconnect_recovery_physical_readback" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_blocked_write_apply_result_must_be_blocked() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["phases"]["blocked_write_while_disconnected"]["apply_result"] = {
+        "type": "operator_proposal_apply_result",
+        "status": "applied",
+        "apply_result": {"status": "applied", "reason": "mixer_not_connected"},
+    }
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_blocked_write_apply_result_blocked" in result["failed_checks"]
     assert result["owner_review_input_ready"] is False
     assert result["live_authority_granted"] is False
     assert result["readiness_matrix_update_allowed"] is False

@@ -203,6 +203,22 @@ def _m005_readback_is_unavailable(readback: Mapping[str, Any]) -> bool:
     )
 
 
+def _m005_apply_block_reason(payload: Mapping[str, Any]) -> str | None:
+    result = payload.get("apply_result")
+    if isinstance(result, Mapping) and result.get("reason"):
+        return str(result.get("reason"))
+    if payload.get("reason"):
+        return str(payload.get("reason"))
+    return None
+
+
+def _m005_apply_probe_blocked(payload: Mapping[str, Any]) -> bool:
+    return (
+        payload.get("type") == "operator_proposal_apply_blocked"
+        and _m005_apply_block_reason(payload) in EXPECTED_M005_SAFE_BLOCK_REASONS
+    )
+
+
 def _is_repo_relative_proof_path(path_text: Any) -> bool:
     if not isinstance(path_text, str):
         return False
@@ -371,6 +387,12 @@ def _record_packet_checks(checks: dict[str, bool], packet: Mapping[str, Any]) ->
         checks,
         "m005_contract_required_evidence_matches",
         contract.get("required_completed_m005_evidence") == EXPECTED_M005_EVIDENCE,
+    )
+    _record(
+        checks,
+        "m005_contract_requires_blocked_apply_result",
+        contract.get("required_blocked_write_apply_result_type")
+        == "operator_proposal_apply_blocked",
     )
     _record(
         checks,
@@ -748,6 +770,7 @@ def _record_m005_checks(
     blocked_write = _get_mapping(phases, "blocked_write_while_disconnected")
     reconnect = _get_mapping(phases, "reconnect_recovery")
     stale_readback = _get_mapping(stale, "readback")
+    blocked_apply_result = _get_mapping(blocked_write, "apply_result")
     reconnect_status = _get_mapping(reconnect, "connection_status")
     reconnect_readback = _get_mapping(reconnect, "readback")
     _record(
@@ -772,6 +795,12 @@ def _record_m005_checks(
         "m005_blocked_write_reason_safe",
         blocked_write.get("status") == "passed"
         and blocked_write.get("block_reason") in EXPECTED_M005_SAFE_BLOCK_REASONS,
+    )
+    _record(
+        checks,
+        "m005_blocked_write_apply_result_blocked",
+        blocked_write.get("status") == "passed"
+        and _m005_apply_probe_blocked(blocked_apply_result),
     )
     _record(
         checks,

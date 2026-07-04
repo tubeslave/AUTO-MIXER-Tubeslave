@@ -169,6 +169,11 @@ def test_m005_completion_requires_physical_reconnect_readback() -> None:
             "blocked_write_while_disconnected": {
                 "status": "passed",
                 "block_reason": "mixer_not_connected",
+                "apply_result": {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "apply_blocked",
+                    "apply_result": {"status": "blocked", "reason": "mixer_not_connected"},
+                },
             },
             "reconnect_recovery": {
                 "status": "passed",
@@ -184,6 +189,47 @@ def test_m005_completion_requires_physical_reconnect_readback() -> None:
     assert annotated["m005_complete"] is False
     assert "reconnect_recovery_verified" not in annotated["completed_m005_evidence"]
     assert annotated["missing_m005_evidence"] == ["reconnect_recovery_verified"]
+
+
+def test_m005_completion_requires_blocked_apply_result_payload() -> None:
+    summary = {
+        "disconnect_mode": "physical-cable-loss",
+        "phases": {
+            "baseline": {
+                "status": "passed",
+                "readback": physical_readback(0.0),
+            },
+            "disconnect": {
+                "status": "operator_confirmed_physical_cable_loss",
+                "confirmation": runner.PHYSICAL_CABLE_CONFIRMATION,
+            },
+            "stale_readback": {
+                "status": "passed",
+                "readback": unavailable_readback(),
+            },
+            "blocked_write_while_disconnected": {
+                "status": "passed",
+                "block_reason": "mixer_not_connected",
+                "apply_result": {
+                    "type": "operator_proposal_apply_result",
+                    "status": "applied",
+                    "apply_result": {"status": "applied", "reason": "mixer_not_connected"},
+                },
+            },
+            "reconnect_recovery": {
+                "status": "passed",
+                "connection_status": {"connected": True},
+                "readback": physical_readback(0.0),
+                "unchanged_from_baseline": True,
+            },
+        },
+    }
+
+    annotated = runner._annotate_m005_evidence(summary)
+
+    assert annotated["m005_complete"] is False
+    assert "blocked_write_while_disconnected" not in annotated["completed_m005_evidence"]
+    assert annotated["missing_m005_evidence"] == ["blocked_write_while_disconnected"]
 
 
 def standard_prefix_responses() -> list[dict[str, Any]]:

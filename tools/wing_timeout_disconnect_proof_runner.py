@@ -204,6 +204,19 @@ def _apply_probe_blocked(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _blocked_write_phase_is_safe(blocked_write: Dict[str, Any]) -> bool:
+    apply_result = (
+        blocked_write.get("apply_result")
+        if isinstance(blocked_write.get("apply_result"), dict)
+        else {}
+    )
+    return (
+        blocked_write.get("status") == "passed"
+        and blocked_write.get("block_reason") in SAFE_BLOCK_REASONS
+        and _apply_probe_blocked(apply_result)
+    )
+
+
 def _unexpected_apply(payload: Dict[str, Any]) -> bool:
     result = payload.get("apply_result")
     if not isinstance(result, dict):
@@ -245,10 +258,7 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
         if isinstance(phases.get("blocked_write_while_disconnected"), dict)
         else {}
     )
-    if (
-        blocked_write.get("status") == "passed"
-        and blocked_write.get("block_reason") in SAFE_BLOCK_REASONS
-    ):
+    if _blocked_write_phase_is_safe(blocked_write):
         completed.append("blocked_write_while_disconnected")
 
     reconnect = (

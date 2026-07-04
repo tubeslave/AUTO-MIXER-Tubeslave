@@ -69,7 +69,10 @@ Acceptance prerequisites:
 2. M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`.
 3. M005 proves physical cable-loss, stale readback denial, blocked write while
    disconnected and reconnect recovery.
-4. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+4. The blocked-write phase includes the nested backend
+   `operator_proposal_apply_blocked` response, not only a phase-level safe
+   reason.
+5. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
 
 The M005 summary must also keep `live_authority_granted=false`,
 `readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.

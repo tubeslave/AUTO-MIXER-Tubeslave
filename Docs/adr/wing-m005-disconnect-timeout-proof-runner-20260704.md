@@ -162,3 +162,17 @@ This prevents hand-edited or reordered M005 evidence from becoming
 owner-review input. The update is offline verifier hardening only; it does not
 run M005, does not contact the backend or WING, and does not grant readiness
 closure or live authority.
+
+## 2026-07-04 Blocked Apply Result Binding Update
+
+M005 completion now requires the blocked-write phase to include the actual
+backend response payload proving `operator_proposal_apply_blocked`, not just a
+phase-level `status=passed` and safe `block_reason`. The M006
+owner-readiness verifier independently checks the same nested apply result
+before accepting a complete M005 artifact as owner-review input.
+
+This prevents a hand-edited summary from claiming that a disconnected
+`apply_operator_proposal` probe was blocked when the recorded backend response
+was missing or applied. The update is offline verifier hardening only; it does
+not run M005, does not contact the backend or WING, and does not grant
+readiness closure or live authority.

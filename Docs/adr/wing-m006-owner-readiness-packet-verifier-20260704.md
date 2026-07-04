@@ -50,7 +50,8 @@ the handoff auditable without contacting backend or WING.
 - Require a supplied M005 summary before owner-review readiness can be true.
 - Verify M005 schema, `status=passed`, `m005_complete=true`, empty missing and
   remaining evidence, all required evidence keys, physical cable-loss mode,
-  key proof phases and denied authority flags.
+  key proof phases, the nested blocked-write `operator_proposal_apply_blocked`
+  response, and denied authority flags.
 - Return a JSON verifier report with `owner_review_input_ready=false` unless
   all checks pass.
 - Support `--write-artifact` so the verifier can persist `summary.json` under
@@ -66,6 +67,8 @@ the handoff auditable without contacting backend or WING.
   fader/gain proof summaries match.
 - Unit test that a missing referenced proof artifact fails closed.
 - Unit test that a stale or mutated referenced proof artifact fails closed.
+- Unit test that a forged M005 blocked-write phase with an applied nested
+  result fails closed.
 - Unit test that packet-level authority widening fails closed.
 - Unit test that persisted verifier artifacts preserve blocked status and
   authority denial.
@@ -79,3 +82,14 @@ returning only `ready_for_owner_review`, never readiness closure, and by keeping
 
 Rollback is a normal git revert of the verifier, tests and ADR. M006 remains
 blocked without the verifier.
+
+## 2026-07-04 Blocked Apply Result Binding Update
+
+The verifier now requires the M005 `blocked_write_while_disconnected` phase to
+carry a nested backend response with `type=operator_proposal_apply_blocked` and
+a safe block reason. A phase-level `status=passed` and `block_reason` are not
+enough to make owner-review input ready.
+
+This keeps M006 report-only and fail-closed. The update does not contact
+backend or WING, does not run the physical disconnect proof, and does not grant
+readiness closure or live authority.

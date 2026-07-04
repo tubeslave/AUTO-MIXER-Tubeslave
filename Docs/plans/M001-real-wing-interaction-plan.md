@@ -42,8 +42,10 @@ Current gate state:
 - M006 owner-review verifier input now also requires complete M005
   request/event ordering evidence: stale-state query before the blocked
   `apply_operator_proposal` probe, then observation-only reconnect and final
-  query after the blocked probe. This is offline artifact verification only
-  and does not run M005 or grant live authority.
+  query after the blocked probe. The blocked-write phase must also carry the
+  nested backend `operator_proposal_apply_blocked` response, not just a
+  phase-level safe reason. This is offline artifact verification only and does
+  not run M005 or grant live authority.
 
 ## Hard Safety Boundary
 
@@ -363,8 +365,9 @@ operator/owner action, unattended Codex work may execute only the safe slice:
 11. report-only M006 owner review packets and offline verifiers that inventory
    accepted fader/gain proof artifacts, cross-check packet proof rows against
    the referenced proof summaries, require a complete M005 summary contract,
-   require M005 request/event sequence ordering, and keep readiness updates
-   blocked until M005 and owner acceptance.
+   require M005 request/event sequence ordering, require the nested blocked
+   apply result to prove `operator_proposal_apply_blocked`, and keep readiness
+   updates blocked until M005 and owner acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
 includes the M005 physical cable-loss proof, reconnect proof and any supervised
