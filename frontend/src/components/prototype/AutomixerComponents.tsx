@@ -60,9 +60,9 @@ function statusToneForAgent(status: Agent['status']): Tone {
 
 export function StatusBadge({ children, tone = 'green' }: { children: ReactNode; tone?: Tone }) {
   return (
-    <span className={`inline-flex items-center gap-1 rounded-[4px] border px-1.5 py-0.5 text-[10px] font-semibold uppercase ${toneClass[tone]}`}>
-      <i className="h-1.5 w-1.5 rounded-full bg-current" />
-      {children}
+    <span className={`inline-flex min-w-0 max-w-full items-center gap-1 whitespace-nowrap rounded-[4px] border px-1.5 py-0.5 text-[9.5px] font-semibold uppercase ${toneClass[tone]}`}>
+      <i className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+      <span className="truncate">{children}</span>
     </span>
   );
 }
@@ -587,13 +587,13 @@ export function TopStatusBar({
 
   return (
     <header className="col-span-2 flex items-center justify-between border-b border-line bg-[#060a10] px-3">
-      <div className="flex min-w-0 items-center gap-5">
+      <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
         <div>
           <div className="text-[13px] font-black uppercase tracking-[0.08em] text-text">{title}</div>
           <div className="text-[9px] text-muted">{subtitle}</div>
         </div>
         <div className="hidden h-7 w-px bg-line lg:block" />
-        <div className="hidden items-center gap-4 lg:flex">
+        <div className="hidden min-w-0 items-center gap-3 overflow-hidden lg:flex">
           {statusItems.map(item => (
             <div key={item.label}>
               <div className="mb-0.5 text-[7px] font-black uppercase tracking-[0.13em] text-dim">{item.label}</div>
@@ -683,8 +683,8 @@ export function BottomTransportBar({ ui, actions, dashboardMode = false }: { ui:
         <div className="am-label">Automation</div>
         <div className="mt-1 flex min-w-0 items-center gap-2">
           <StatusBadge tone={policy.tone}>{getModeDisplayLabel(ui.mode)}</StatusBadge>
-          <span className="truncate text-text">Ride On</span>
-          <span className="text-muted">Writes <b className={ui.backend.canApplyToConsole ? 'text-warn' : 'text-danger'}>{writesLabel}</b></span>
+          <span className="whitespace-nowrap text-text">Ride On</span>
+          <span className="whitespace-nowrap text-muted">Writes <b className={ui.backend.canApplyToConsole ? 'text-warn' : 'text-danger'}>{writesLabel}</b></span>
         </div>
       </div>
       <div className="border-r border-line px-3"><div className="am-label">Safe Limit</div><div className="mt-1 font-bold text-online">-1.0 dBTP</div></div>
@@ -866,7 +866,7 @@ export function AppShell({ items, active, onNavigate, view, mode, onModeChange, 
       <div className="lg:hidden">
         <CompactOperatorView items={items} active={active} onNavigate={onNavigate} mode={mode} onModeChange={onModeChange} ui={ui} actions={actions} runtime={shellRuntime} />
       </div>
-      <div className={`relative hidden h-screen w-screen overflow-hidden bg-bg font-ui text-text lg:grid ${dashboardMode ? 'min-w-[1280px] grid-cols-[128px_minmax(0,1fr)_256px] grid-rows-[48px_minmax(0,1fr)_78px]' : 'min-w-[1280px] grid-cols-[150px_minmax(0,1fr)_318px] grid-rows-[50px_minmax(0,1fr)_62px]'}`}>
+      <div className={`relative hidden h-screen w-screen overflow-hidden bg-bg font-ui text-text lg:grid ${dashboardMode ? 'min-w-[1280px] grid-cols-[146px_minmax(0,1fr)_260px] grid-rows-[48px_minmax(0,1fr)_78px]' : 'min-w-[1280px] grid-cols-[150px_minmax(0,1fr)_318px] grid-rows-[50px_minmax(0,1fr)_62px]'}`}>
         <Sidebar items={items} active={active} onNavigate={onNavigate} runtime={shellRuntime} dashboardMode={dashboardMode} />
         <TopStatusBar title={view.title} subtitle={view.subtitle} mode={mode} onModeChange={onModeChange} ui={ui} actions={actions} mockDataOnly={view.mockDataOnly} />
         <main className={`min-h-0 min-w-0 overflow-hidden bg-bg2 ${dashboardMode ? 'p-1.5' : 'p-2'}`}>{view.content}</main>

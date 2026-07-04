@@ -20,6 +20,9 @@ const toneColors: Record<Tone, string> = {
   muted: '#5f6b78'
 };
 
+const spectralBandLabels = ['Sub', 'Bass', 'Low M', 'Mid', 'High M', 'Presence', 'Brilliance'];
+const dynamicsGroupLabels = ['Drums', 'Bass', 'Guitars', 'Vocals', 'Other'];
+
 function safeStateTextClass(safeState: string) {
   if (safeState === 'MUTE' || safeState === 'CLIP') return 'text-danger';
   if (safeState === 'HOT') return 'text-warn';
@@ -37,50 +40,94 @@ function meterPercent(value: number) {
   return Math.max(3, Math.min(100, ((value + 60) / 60) * 100));
 }
 
-function MiniTrace({ values, tone = 'green', filled = false }: { values: number[]; tone?: Tone; filled?: boolean }) {
+function MiniTrace({ values, tone = 'green', filled = false, ghost = false }: { values: number[]; tone?: Tone; filled?: boolean; ghost?: boolean }) {
   const color = toneColors[tone];
   const points = values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${100 - value}`).join(' ');
+  const ghostPoints = values.map((value, index) => `${(index / Math.max(values.length - 1, 1)) * 100},${100 - Math.min(100, value * 1.06)}`).join(' ');
   const fillPoints = `0,100 ${points} 100,100`;
   return (
     <svg className="h-full w-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
-      {filled && <polygon fill={color} opacity="0.18" points={fillPoints} />}
-      <polyline fill="none" points={points} stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.4" />
+      {filled && <polygon fill={color} opacity="0.2" points={fillPoints} />}
+      {ghost && <polyline fill="none" opacity="0.45" points={ghostPoints} stroke="#9fb6c9" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.2" />}
+      <polyline fill="none" points={points} stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" />
     </svg>
   );
 }
 
-function VerticalMeter({ value, secondary }: { value: number; secondary: number }) {
+function GridLines() {
   return (
-    <div className="flex h-full w-6 items-end gap-1 rounded-[4px] border border-line bg-[#070b10] p-1">
+    <div className="pointer-events-none absolute inset-2 flex flex-col justify-between">
+      {[0, 1, 2, 3, 4].map(line => (
+        <span className="h-px w-full bg-line/40" key={line} />
+      ))}
+    </div>
+  );
+}
+
+function SegmentedMeter({ value, secondary }: { value: number; secondary: number }) {
+  return (
+    <div className="flex h-full w-[19px] items-end gap-[2px] rounded-[4px] border border-line bg-[#05080d] p-[2px]">
       {[value, secondary].map((item, index) => (
-        <span
-          className="block flex-1 rounded-t-[3px] bg-gradient-to-t from-online via-warn to-danger"
-          key={`${item}-${index}`}
-          style={{ height: `${meterPercent(item)}%` }}
-        />
+        <span className="relative block h-full flex-1 overflow-hidden rounded-[2px]" key={`${item}-${index}`}>
+          <span
+            className="absolute inset-x-0 bottom-0"
+            style={{
+              height: `${meterPercent(item)}%`,
+              background: 'linear-gradient(to top, #00d26a 0%, #00d26a 74%, #ffb020 74%, #ffb020 91%, #ff4d4f 91%, #ff4d4f 100%)'
+            }}
+          />
+          <span
+            className="absolute inset-0"
+            style={{ background: 'repeating-linear-gradient(to top, transparent 0 3px, #05080d 3px 4px)' }}
+          />
+        </span>
       ))}
     </div>
   );
 }
 
 function FaderTrack({ value }: { value: number }) {
-  const bottom = Math.max(9, Math.min(88, 74 + value));
+  const bottom = Math.max(8, Math.min(86, 74 + value));
   return (
-    <div className="relative mx-auto h-full w-[18px] rounded-full border border-line bg-[#070b10] shadow-[inset_0_0_12px_rgba(0,0,0,.55)]">
-      <span className="absolute left-1/2 top-2 h-[calc(100%-16px)] w-px -translate-x-1/2 bg-line2" />
+    <div className="relative mx-auto h-full w-[20px]">
+      <div className="absolute inset-y-1 left-1/2 w-[6px] -translate-x-1/2 rounded-full border border-line bg-[#04070b] shadow-[inset_0_0_8px_rgba(0,0,0,.7)]" />
+      <div className="pointer-events-none absolute inset-y-2 left-0 flex flex-col justify-between">
+        {[0, 1, 2, 3, 4, 5, 6, 7, 8].map(tick => (
+          <span className="h-px w-1.5 bg-line2/70" key={tick} />
+        ))}
+      </div>
       <span
-        className="absolute left-1/2 h-3 w-9 -translate-x-1/2 rounded-[3px] border border-[#d9e4ef] bg-[#d9e4ef] shadow-[0_0_12px_rgba(230,237,243,.18)]"
+        className="absolute left-1/2 h-[12px] w-[17px] -translate-x-1/2 rounded-[2.5px] border border-[#e8eef5] bg-gradient-to-b from-[#f2f6fa] via-[#c7d2dd] to-[#eef3f8] shadow-[0_2px_8px_rgba(0,0,0,.55),0_0_14px_rgba(230,237,243,.14)]"
         style={{ bottom: `${bottom}%` }}
-      />
+      >
+        <i className="absolute inset-x-1 top-1/2 h-px -translate-y-1/2 bg-[#31404f]" />
+      </span>
     </div>
   );
+}
+
+function MiniKnob({ seed, tone = 'muted' }: { seed: number; tone?: Tone }) {
+  const angle = -135 + (Math.abs(seed) % 100) * 2.7;
+  return (
+    <span className="relative inline-block h-[15px] w-[15px] rounded-full border border-line2 bg-[#0a1219] shadow-[inset_0_1px_2px_rgba(0,0,0,.6)]">
+      <i
+        className="absolute left-1/2 top-1/2 h-[6px] w-px origin-bottom rounded-full"
+        style={{ transform: `translate(-50%, -100%) rotate(${angle}deg)`, backgroundColor: toneColors[tone] }}
+      />
+    </span>
+  );
+}
+
+function parseLabelNumber(label: string, fallback: number) {
+  const match = label.match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : fallback;
 }
 
 function SourcePill({ label, tone = 'blue' }: { label: string; tone?: Tone }) {
   const color = toneColors[tone];
   return (
     <span
-      className="max-w-[94px] truncate rounded-[3px] border px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.08em]"
+      className="max-w-[64px] shrink-0 truncate rounded-[3px] border px-1 py-[2px] text-[6px] font-black uppercase tracking-[0.04em]"
       style={{ borderColor: `${color}70`, color, backgroundColor: `${color}18` }}
       title={label}
     >
@@ -113,19 +160,36 @@ function MetricShell({
   children: ReactNode;
 }) {
   return (
-    <section className="min-h-0 overflow-hidden rounded-[4px] border border-line bg-panel p-2 shadow-panel">
-      <header className="mb-1.5 flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.13em] text-muted">{title}</h3>
-          <p className="mt-0.5 truncate text-[8px] text-dim">{caption}</p>
+    <section className="min-h-0 overflow-hidden rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <header className="mb-1.5">
+        <div className="flex items-center justify-between gap-1.5">
+          <h3 className="truncate text-[9px] font-black uppercase tracking-[0.09em] text-muted">{title}</h3>
+          <span className="h-2 w-2 shrink-0 rounded-full shadow-[0_0_14px_currentColor]" style={{ backgroundColor: toneColors[accent], color: toneColors[accent] }} />
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="mt-0.5 flex items-center justify-between gap-1.5">
+          <p className="truncate text-[7.5px] text-dim">{caption}</p>
           {sourceLabel ? <SourcePill label={sourceLabel} tone={sourceTone} /> : null}
-          <span className="h-2 w-2 rounded-full shadow-[0_0_14px_currentColor]" style={{ backgroundColor: toneColors[accent], color: toneColors[accent] }} />
         </div>
       </header>
       {children}
     </section>
+  );
+}
+
+function ConfidenceRing({ percent }: { percent: number }) {
+  const clamped = Math.max(0, Math.min(100, percent));
+  return (
+    <div
+      className="grid h-[66px] w-[66px] place-items-center rounded-full"
+      style={{ background: `conic-gradient(#00d26a ${clamped * 3.6}deg, #12202b ${clamped * 3.6}deg 360deg)` }}
+    >
+      <div className="grid h-[52px] w-[52px] place-items-center rounded-full bg-panel shadow-[0_0_24px_rgba(0,210,106,.1)]">
+        <div className="text-center leading-none">
+          <div className="text-[14px] font-black text-text">{clamped}%</div>
+          <div className="mt-0.5 text-[7px] font-bold uppercase tracking-[0.1em] text-online">High</div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -139,53 +203,63 @@ function AnalyticsRow({ runtime }: { runtime: DashboardRuntime }) {
   const spectrumTrace = dashboardSpectrumTrace(runtime, spectrumBins);
 
   return (
-    <div className="grid h-[145px] grid-cols-[172px_250px_128px_188px_minmax(0,1fr)] gap-1">
+    <div className="am-scrollbar grid h-[150px] min-w-0 grid-cols-[178px_minmax(210px,1.2fr)_132px_192px_minmax(196px,1fr)] gap-1.5 overflow-x-auto">
       <MetricShell title="Master Bus" caption="Main L/R safety window" accent="green" sourceLabel={runtimeSource.label} sourceTone={runtimeSource.tone}>
         <div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          <div className="flex items-end gap-4 pt-1.5">
             <div>
-              <div className="text-[26px] font-black leading-none text-text">{formatNumber(runtime.integratedLufs)} <span className="text-[10px] text-muted">LUFS</span></div>
-              <div className="mt-1 text-[9px] text-muted">Integrated</div>
+              <div className="text-[27px] font-black leading-none text-text">{formatNumber(runtime.integratedLufs)} <span className="text-[10px] font-bold text-muted">LUFS</span></div>
+              <div className="mt-1 text-[8px] uppercase tracking-[0.08em] text-dim">Integrated</div>
             </div>
-            <div>
-              <div className="text-[17px] font-black leading-none text-text">{formatNumber(runtime.truePeakDb)} <span className="text-[9px] text-muted">dBTP</span></div>
-              <div className="mt-1 text-[9px] text-muted">True Peak</div>
+            <div className="pb-0.5">
+              <div className="whitespace-nowrap text-[15px] font-black leading-none text-text">{formatNumber(runtime.truePeakDb)} <span className="text-[8px] font-bold text-muted">dBTP</span></div>
+              <div className="mt-1 whitespace-nowrap text-[7px] uppercase tracking-[0.06em] text-dim">True Peak</div>
             </div>
           </div>
-          <div className="mt-2.5 h-3 rounded-sm bg-gradient-to-r from-[#134ad8] via-[#00d26a] via-55% to-[#ff4d4f]" />
-          <div className="mt-1 flex justify-between font-mono text-[8px] text-dim"><span>-60</span><span>-48</span><span>-36</span><span>-24</span><span>-12</span><span>0</span></div>
-          <div className="mt-1 text-right font-mono text-[9px] text-danger">{formatNumber(runtime.truePeakDb)}</div>
+          <div className="relative mt-3 h-[11px] overflow-hidden rounded-[3px] border border-line/60 bg-[#05080d]">
+            <span className="absolute inset-0 bg-gradient-to-r from-[#134ad8] via-[#00d26a] via-55% to-[#ff4d4f]" />
+            <span className="absolute inset-0" style={{ background: 'repeating-linear-gradient(to right, transparent 0 3px, #05080d 3px 4px)' }} />
+          </div>
+          <div className="mt-1 flex justify-between font-mono text-[7px] text-dim"><span>-60</span><span>-48</span><span>-36</span><span>-24</span><span>-12</span><span>-6</span><span>0</span></div>
         </div>
       </MetricShell>
 
       <MetricShell title="Spectrum" caption={spectrumTrace.caption} accent="blue" sourceLabel={spectrumTrace.sourceLabel} sourceTone={spectrumTrace.sourceTone}>
-        <div className="relative h-[102px] rounded-[3px] border border-line/60 bg-[#07101a] p-2">
-          <div className="absolute inset-y-2 left-2 flex flex-col justify-between font-mono text-[7px] text-dim"><span>-12</span><span>-24</span><span>-36</span><span>-48</span><span>-60</span></div>
-          <div className="ml-6 h-full">
-            <MiniTrace values={spectrumTrace.values} tone="purple" filled />
+        <div className="relative h-[104px] rounded-[5px] border border-line/60 bg-[#060c14] p-2">
+          <GridLines />
+          <div className="absolute inset-y-2 left-2 z-10 flex flex-col justify-between font-mono text-[7px] text-dim"><span>-12</span><span>-24</span><span>-36</span><span>-48</span><span>-60</span></div>
+          <div className="ml-6 h-[calc(100%-10px)]">
+            <MiniTrace values={spectrumTrace.values} tone="purple" filled ghost />
           </div>
-          <div className="absolute bottom-1 left-8 right-2 flex justify-between font-mono text-[7px] text-dim"><span>20</span><span>50</span><span>100</span><span>200</span><span>500</span><span>1k</span><span>2k</span><span>5k</span><span>10k</span><span>20k</span></div>
+          <div className="absolute bottom-1 left-8 right-2 flex justify-between font-mono text-[7px] text-dim"><span>20</span><span>100</span><span>500</span><span>2k</span><span>10k</span><span>20k</span></div>
         </div>
       </MetricShell>
 
-      <MetricShell title="Loudness" caption="Product Layer loudness when connected" accent="yellow" sourceLabel={runtimeSource.label} sourceTone={runtimeSource.tone}>
-        <div className="space-y-2 pt-1 text-[11px]">
-          <div className="flex justify-between"><span className="text-muted">Short Term</span><b>{formatNumber(runtime.shortTermLufs)} LUFS</b></div>
-          <div className="flex justify-between"><span className="text-muted">Momentary</span><b>{formatNumber(runtime.momentaryLufs)} LUFS</b></div>
-          <div className="h-8 rounded-[5px] border border-line bg-[#070b10] p-1">
-            <span className="block h-full rounded-[4px] bg-gradient-to-r from-online via-warn to-danger" style={{ width: `${meterPercent(runtime.shortTermLufs)}%` }} />
+      <MetricShell title="Loudness" caption="Product Layer loudness" accent="yellow" sourceLabel={runtimeSource.label} sourceTone={runtimeSource.tone}>
+        <div className="space-y-[4px]">
+          <div className="border-b border-line/50 pb-[3px]">
+            <div className="text-[7px] uppercase tracking-[0.06em] text-dim">Short Term</div>
+            <div className="text-[12px] font-black leading-tight text-text">{formatNumber(runtime.shortTermLufs)} <span className="text-[7px] font-bold text-muted">LUFS</span></div>
+          </div>
+          <div className="border-b border-line/50 pb-[3px]">
+            <div className="text-[7px] uppercase tracking-[0.06em] text-dim">Momentary</div>
+            <div className="text-[12px] font-black leading-tight text-text">{formatNumber(runtime.momentaryLufs)} <span className="text-[7px] font-bold text-muted">LUFS</span></div>
+          </div>
+          <div>
+            <div className="text-[7px] uppercase tracking-[0.06em] text-dim">LRA</div>
+            <div className="text-[12px] font-black leading-tight text-text">{formatNumber(runtime.lraLu)} <span className="text-[7px] font-bold text-muted">LU</span></div>
           </div>
         </div>
       </MetricShell>
 
-      <MetricShell title="Mix Balance" caption="Runtime channel count, static group split" accent="purple" sourceLabel="Mixed source" sourceTone="yellow">
-        <div className="grid grid-cols-[78px_1fr] gap-3 pt-1">
-          <div className="grid h-[78px] w-[78px] place-items-center rounded-full p-[10px]" style={{ background: `conic-gradient(${conic})` }}>
-            <div className="grid h-full w-full place-items-center rounded-full bg-panel text-[11px] font-black text-text">{runtime.activeChannels}/{runtime.totalChannels}</div>
+      <MetricShell title="Mix Balance" caption="Runtime channel split" accent="purple" sourceLabel="Mixed source" sourceTone="yellow">
+        <div className="grid grid-cols-[84px_1fr] items-center gap-3 pt-1">
+          <div className="grid h-[84px] w-[84px] place-items-center rounded-full p-[11px]" style={{ background: `conic-gradient(${conic})` }}>
+            <div className="grid h-full w-full place-items-center rounded-full bg-panel text-[10px] font-black text-text">{runtime.activeChannels}/{runtime.totalChannels}</div>
           </div>
-          <div className="space-y-1.5 text-[9px]">
+          <div className="space-y-[5px] text-[9px]">
             {mixBalanceSegments.map(segment => (
-              <div className="grid grid-cols-[9px_1fr_24px] items-center gap-1.5" key={segment.label}>
+              <div className="grid grid-cols-[9px_1fr_26px] items-center gap-1.5" key={segment.label}>
                 <i className="h-2 w-2 rounded-full" style={{ backgroundColor: segment.color }} />
                 <span className="truncate text-muted">{segment.label}</span>
                 <b className="text-right text-text">{segment.value}%</b>
@@ -196,16 +270,12 @@ function AnalyticsRow({ runtime }: { runtime: DashboardRuntime }) {
       </MetricShell>
 
       <MetricShell title="AI Confidence" caption="Runtime value, display trend" accent="green" sourceLabel={runtimeSource.label} sourceTone={runtimeSource.tone}>
-        <div className="grid grid-cols-[76px_1fr] items-center gap-3 pt-2">
-          <div className="grid h-[76px] w-[76px] place-items-center rounded-full border-[8px] border-online bg-online/10 shadow-[0_0_24px_rgba(0,210,106,.12)]">
-            <span className="text-[18px] font-black text-text">{runtime.aiConfidencePercent}%</span>
-          </div>
-          <div className="space-y-1 text-[10px] text-muted">
-            <div className="text-right font-bold text-text">High</div>
-            <div className="text-right font-bold text-muted">High</div>
-            <div className="mt-2 h-7"><MiniTrace values={[38, 41, 39, 46, 43, 49, 45, 52, 48, 55, 51, 58]} tone="green" /></div>
-            <div className="flex justify-between font-mono text-[7px] text-dim"><span>-5m</span><span>-4m</span><span>-3m</span><span>-2m</span><span>-1m</span><span>Now</span></div>
-            <div className="text-right text-[7px] uppercase tracking-[0.08em] text-dim">trend display-only</div>
+        <div className="grid grid-cols-[66px_1fr] items-center gap-2.5 pt-1">
+          <ConfidenceRing percent={runtime.aiConfidencePercent} />
+          <div className="min-w-0">
+            <div className="h-9"><MiniTrace values={[38, 41, 39, 46, 43, 49, 45, 52, 48, 55, 51, 58]} tone="green" filled /></div>
+            <div className="mt-1 flex justify-between font-mono text-[7px] text-dim"><span>-5m</span><span>-2m</span><span>Now</span></div>
+            <div className="mt-0.5 whitespace-nowrap text-right text-[6.5px] uppercase tracking-[0.06em] text-dim">trend display-only</div>
           </div>
         </div>
       </MetricShell>
@@ -225,42 +295,48 @@ function DashboardChannelStrip({
   onSelect: (id: number) => void;
 }) {
   const accent = toneColors[telemetry.accent];
+  const gateSeed = parseLabelNumber(telemetry.gateLabel, channel.id * 7);
+  const compSeed = parseLabelNumber(telemetry.compLabel, channel.id * 11);
   return (
     <button
-      className={`flex min-w-0 flex-col overflow-hidden rounded-[4px] border bg-[#0b1118] p-1.5 text-left transition hover:border-audio hover:bg-[#101820] ${
-        selected ? 'border-ai shadow-[0_0_0_1px_rgba(168,85,247,.82),0_0_22px_rgba(168,85,247,.2)]' : 'border-line'
+      className={`flex min-w-0 flex-col overflow-hidden rounded-[7px] border bg-[#0a1017] p-1.5 text-left transition hover:border-audio/70 hover:bg-[#0e1620] ${
+        selected ? 'border-ai shadow-[0_0_0_1px_rgba(168,85,247,.82),0_0_22px_rgba(168,85,247,.22)]' : 'border-line'
       }`}
       onClick={() => onSelect(channel.id)}
       type="button"
     >
-      <div className="mb-1 min-h-[33px] border-b border-line/70 pb-0.5">
+      <div className="min-h-[30px]">
         <div className="flex items-center justify-between gap-1">
-          <span className="font-mono text-[9px] text-dim">{String(channel.id).padStart(2, '0')}</span>
-          <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 10px ${accent}` }} />
+          <span className="min-w-0 flex-1 truncate text-[9.5px] font-bold leading-tight text-text">{channel.name}</span>
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: accent, boxShadow: `0 0 10px ${accent}` }} />
         </div>
-        <div className="mt-0.5 truncate text-[10px] font-black text-text">{channel.name}</div>
-        <div className="truncate text-[8px] uppercase tracking-[0.06em] text-muted">{channel.type}</div>
+        <div className="truncate text-[7.5px] uppercase tracking-[0.07em] text-dim">{channel.type}</div>
       </div>
 
-      <div className="mb-0.5 flex items-center justify-between text-[9px]">
-        <span className="font-mono font-bold text-text">{channel.fader.toFixed(1)} dB</span>
-        <span className={safeStateTextClass(telemetry.safeState)}>{telemetry.safeState}</span>
+      <div className="mb-1 flex items-baseline justify-between gap-0.5 whitespace-nowrap">
+        <span className="font-mono text-[9.5px] font-bold text-text">{channel.fader.toFixed(1)}<span className="ml-0.5 text-[6.5px] text-muted">dB</span></span>
+        <span className={`text-[7px] font-bold ${safeStateTextClass(telemetry.safeState)}`}>{telemetry.safeState}</span>
       </div>
 
-      <div className="relative h-7 rounded-[4px] border border-line/70 bg-[#070b10] p-0.5">
-        <span className="absolute right-1 top-0.5 z-10 rounded-[2px] bg-[#070b10]/85 px-1 text-[6px] font-black uppercase tracking-[0.08em] text-dim">display</span>
+      <div className="relative h-7 overflow-hidden rounded-[4px] border border-line/60 bg-[#05080d] p-0.5">
         <MiniTrace values={telemetry.waveform} tone={telemetry.accent} filled />
       </div>
 
-      <div className="my-0.5 grid grid-cols-2 gap-1 text-[8px] font-bold uppercase tracking-[0.04em]">
-        <span className="rounded border border-line bg-panel2 px-1 py-0.5 text-muted">{telemetry.gateLabel}</span>
-        <span className="rounded border border-line bg-panel2 px-1 py-0.5 text-muted">{telemetry.compLabel}</span>
+      <div className="my-1 grid grid-cols-2 gap-1">
+        <span className="flex flex-col items-center gap-0.5">
+          <span className="w-full rounded-[3px] border border-line bg-panel2 px-0.5 py-[2px] text-center text-[6.5px] font-black uppercase tracking-[0.05em] text-muted" title={telemetry.gateLabel}>Gate</span>
+          <MiniKnob seed={gateSeed} tone="blue" />
+        </span>
+        <span className="flex flex-col items-center gap-0.5">
+          <span className="w-full rounded-[3px] border border-line bg-panel2 px-0.5 py-[2px] text-center text-[6.5px] font-black uppercase tracking-[0.05em] text-muted" title={telemetry.compLabel}>Comp</span>
+          <MiniKnob seed={compSeed} tone="yellow" />
+        </span>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[24px_1fr] gap-1.5">
-        <VerticalMeter value={telemetry.meterL} secondary={telemetry.meterR} />
-        <div className="grid min-h-0 grid-cols-[14px_1fr] gap-1">
-          <div className="flex h-full flex-col justify-between py-1 text-right font-mono text-[7px] text-dim">
+      <div className="grid min-h-0 flex-1 grid-cols-[19px_1fr] gap-0.5">
+        <SegmentedMeter value={telemetry.meterL} secondary={telemetry.meterR} />
+        <div className="grid min-h-0 grid-cols-[11px_1fr] gap-0.5">
+          <div className="flex h-full flex-col justify-between py-1 text-right font-mono text-[6px] leading-none text-dim">
             <span>10</span><span>0</span><span>-10</span><span>-20</span><span>-40</span><span>-60</span>
           </div>
           <FaderTrack value={channel.fader} />
@@ -268,13 +344,27 @@ function DashboardChannelStrip({
       </div>
 
       <div className="mt-1 grid grid-cols-2 gap-1">
-        <span className={`grid h-5 place-items-center rounded-[3px] border text-[10px] font-black ${telemetry.muted ? 'border-danger bg-danger text-white' : 'border-danger/45 bg-danger/18 text-danger'}`}>M</span>
-        <span className={`grid h-5 place-items-center rounded-[3px] border text-[10px] font-black ${telemetry.solo ? 'border-warn bg-warn text-[#070b10]' : 'border-warn/45 bg-warn/15 text-warn'}`}>S</span>
+        <span className={`grid h-[18px] place-items-center rounded-[3px] border text-[9px] font-black ${telemetry.muted ? 'border-danger bg-danger text-white shadow-[0_0_10px_rgba(255,77,79,.4)]' : 'border-danger/40 bg-danger/12 text-danger'}`}>M</span>
+        <span className={`grid h-[18px] place-items-center rounded-[3px] border text-[9px] font-black ${telemetry.solo ? 'border-warn bg-warn text-[#070b10] shadow-[0_0_10px_rgba(255,159,26,.4)]' : 'border-warn/40 bg-warn/12 text-warn'}`}>S</span>
       </div>
 
-      <div className="mt-1 h-1 rounded-full bg-[#070b10]">
-        <span className="block h-full rounded-full bg-audio" style={{ width: `${50 + telemetry.pan}%` }} />
+      <div className="mt-1 h-[3px] rounded-full bg-[#05080d]">
+        <span className="block h-full rounded-full bg-audio/80" style={{ width: `${50 + telemetry.pan}%` }} />
       </div>
+      <div className="mt-0.5 text-center font-mono text-[7.5px] text-dim">{String(channel.id).padStart(2, '0')}</div>
+    </button>
+  );
+}
+
+function ViewChip({ label, onInfo }: { label: string; onInfo?: (message: string) => void }) {
+  return (
+    <button
+      className="flex items-center gap-1 rounded-[4px] border border-line bg-panel2 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.05em] text-muted transition hover:border-line2 hover:text-text"
+      onClick={() => onInfo?.(`${label} view control is display-only.`)}
+      type="button"
+    >
+      {label}
+      <span className="text-[7px] text-dim">▾</span>
     </button>
   );
 }
@@ -286,13 +376,15 @@ function MixerArea({ channels, runtime, ui, actions }: { channels: Channel[]; ru
   const suppressMockSolo = runtime.sourceLabel.toLowerCase().includes('backend');
 
   return (
-    <section className="min-h-0 overflow-hidden rounded-[4px] border border-line bg-panel shadow-panel">
-      <header className="flex h-[38px] items-center justify-between border-b border-line bg-[#0d151e] px-3">
+    <section className="min-h-0 overflow-hidden rounded-[9px] border border-line bg-panel shadow-panel">
+      <header className="flex h-[38px] items-center justify-between border-b border-line bg-[#0c141d] px-2.5">
         <div className="flex min-w-0 gap-1">
           {dashboardTabs.map(tab => (
             <button
-              className={`rounded-[5px] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.06em] transition ${
-                activeTab === tab ? 'bg-audio/10 text-audio shadow-[inset_0_-2px_0_#1687ff]' : 'text-muted hover:bg-panel2 hover:text-text'
+              className={`whitespace-nowrap rounded-[5px] px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.05em] transition ${
+                activeTab === tab
+                  ? 'border border-audio/45 bg-audio/12 text-audio shadow-[0_0_14px_rgba(22,135,255,.14)]'
+                  : 'border border-transparent text-muted hover:bg-panel2 hover:text-text'
               }`}
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -302,14 +394,17 @@ function MixerArea({ channels, runtime, ui, actions }: { channels: Channel[]; ru
             </button>
           ))}
         </div>
-        <div className="hidden items-center gap-3 text-[10px] uppercase text-muted xl:flex">
-          <span>{visibleChannels.length} strips</span>
-          <span>Small fader step</span>
-          <span className="text-ai">Selected: {selectedChannel ? `CH ${String(selectedChannel.id).padStart(2, '0')}` : 'None'}</span>
+        <div className="hidden items-center gap-1.5 xl:flex">
+          <span className="mr-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-dim">View</span>
+          <ViewChip label="Small" onInfo={message => actions.pushToast(message, 'blue')} />
+          <ViewChip label="All" onInfo={message => actions.pushToast(message, 'blue')} />
+          <span className="mx-1 h-4 w-px bg-line" />
+          <span className="whitespace-nowrap text-[9px] uppercase text-muted">{visibleChannels.length} strips</span>
+          <span className="whitespace-nowrap text-[9px] uppercase text-ai">Selected: {selectedChannel ? `CH ${String(selectedChannel.id).padStart(2, '0')}` : 'None'}</span>
         </div>
       </header>
 
-      <div className="grid h-[calc(100%-38px)] grid-cols-[repeat(14,minmax(48px,1fr))] gap-1 p-1">
+      <div className="am-scrollbar grid h-[calc(100%-38px)] min-w-0 grid-flow-col auto-cols-[minmax(68px,1fr)] gap-1 overflow-x-auto p-1">
         {visibleChannels.map(channel => (
           <DashboardChannelStrip
             channel={channel}
@@ -324,63 +419,156 @@ function MixerArea({ channels, runtime, ui, actions }: { channels: Channel[]; ru
   );
 }
 
-function AnalysisCard({ card }: { card: AnalysisCardMock }) {
-  const color = toneColors[card.accent];
-
-  if (card.id === 'phase') {
-    return (
-      <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-          <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
-        </div>
-        <div className="grid grid-cols-[62px_1fr] items-center gap-3">
-          <div className="grid h-[62px] w-[62px] place-items-center rounded-full border border-online/40 bg-[repeating-conic-gradient(rgba(0,210,106,.28)_0_8deg,transparent_8deg_16deg)]">
-            <span className="h-8 w-8 rounded-full border border-online/50" />
-          </div>
-          <div className="min-w-0 text-[10px]">
-            <div className="truncate font-bold text-text">{card.primary}</div>
-            <div className="truncate text-muted">{card.secondary}</div>
-          </div>
-        </div>
-      </section>
-    );
-  }
-
-  if (card.id === 'spectral' || card.id === 'dynamics') {
-    return (
-      <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-          <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
-        </div>
-        <div className="flex h-12 items-end gap-1">
-          {card.values.map((value, index) => (
-            <span className="flex-1 rounded-t-[3px]" key={`${card.id}-${index}`} style={{ height: `${value}%`, background: `linear-gradient(180deg, ${color}, #101820)` }} />
-          ))}
-        </div>
-        <div className="mt-2 flex justify-between gap-2 text-[9px]"><b className="truncate text-text">{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
-      </section>
-    );
-  }
-
+function AnalysisCardHeader({ card }: { card: AnalysisCardMock }) {
   return (
-    <section className="rounded-[4px] border border-line bg-panel p-2.5 shadow-panel">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h3 className="min-w-0 truncate text-[10px] font-black uppercase tracking-[0.13em] text-muted">{card.title}</h3>
-        <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
+    <div className="mb-1.5 flex items-center justify-between gap-2">
+      <h3 className="min-w-0 truncate text-[8.5px] font-black uppercase tracking-[0.07em] text-muted">{card.title}</h3>
+      <SourcePill label={card.sourceLabel ?? 'Display-only'} tone={card.sourceTone ?? 'yellow'} />
+    </div>
+  );
+}
+
+function PhaseScopeCard({ card }: { card: AnalysisCardMock }) {
+  const points = card.values
+    .map((value, index) => {
+      const theta = (index / card.values.length) * Math.PI * 2;
+      const radius = 8 + (value / 100) * 20;
+      const x = 31 + Math.cos(theta) * radius * 0.55;
+      const y = 31 - Math.sin(theta) * radius;
+      return `${x},${y}`;
+    })
+    .join(' ');
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
+      <div className="grid grid-cols-[64px_1fr] items-center gap-3">
+        <div className="relative h-[64px] w-[64px] overflow-hidden rounded-[5px] border border-line/70 bg-[#04110a]">
+          <svg className="h-full w-full" viewBox="0 0 62 62">
+            <line stroke="#0f3d26" strokeWidth="0.8" x1="31" x2="31" y1="4" y2="58" />
+            <line stroke="#0f3d26" strokeWidth="0.8" x1="4" x2="58" y1="31" y2="31" />
+            <line stroke="#0f3d26" strokeDasharray="2 2" strokeWidth="0.6" x1="10" x2="52" y1="52" y2="10" />
+            <line stroke="#0f3d26" strokeDasharray="2 2" strokeWidth="0.6" x1="10" x2="52" y1="10" y2="52" />
+            <polygon fill="#00d26a" opacity="0.14" points={points} />
+            <polyline fill="none" points={`${points} ${points.split(' ')[0]}`} stroke="#00d26a" strokeWidth="1" opacity="0.85" />
+          </svg>
+          <span className="absolute bottom-0.5 left-1 font-mono text-[7px] text-dim">L</span>
+          <span className="absolute bottom-0.5 right-1 font-mono text-[7px] text-dim">R</span>
+        </div>
+        <div className="min-w-0 text-[9.5px]">
+          <div className="truncate font-bold text-text">{card.primary}</div>
+          <div className="truncate text-muted">{card.secondary}</div>
+        </div>
       </div>
+    </section>
+  );
+}
+
+function CorrelationCard({ card }: { card: AnalysisCardMock }) {
+  const value = parseLabelNumber(card.primary, 0.28);
+  const position = Math.max(2, Math.min(98, ((value + 1) / 2) * 100));
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
+      <div className="pt-1 text-center">
+        <div className="text-[21px] font-black leading-none text-text">{value > 0 ? `+${value.toFixed(2)}` : value.toFixed(2)}</div>
+        <div className="relative mt-2.5 h-[9px] overflow-hidden rounded-full border border-line/60 bg-[#05080d]">
+          <span className="absolute inset-0 bg-gradient-to-r from-danger via-warn to-online" />
+          <span className="absolute top-1/2 h-[13px] w-[3px] -translate-y-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,.8)]" style={{ left: `calc(${position}% - 1px)` }} />
+        </div>
+        <div className="mt-1 flex justify-between font-mono text-[7px] text-dim"><span>-1</span><span>0</span><span>+1</span></div>
+        <div className="mt-1 truncate text-[9px] text-muted">{card.secondary}</div>
+      </div>
+    </section>
+  );
+}
+
+function SpectralBalanceCard({ card }: { card: AnalysisCardMock }) {
+  const bars = card.values.slice(0, spectralBandLabels.length);
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
+      <div className="flex h-[52px] items-end gap-1">
+        {bars.map((value, index) => (
+          <span
+            className="flex-1 rounded-t-[3px]"
+            key={spectralBandLabels[index]}
+            style={{ height: `${value}%`, background: 'linear-gradient(180deg, #37a8ff, #135a9e 78%, #0d2136)' }}
+          />
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between gap-0.5">
+        {spectralBandLabels.map(label => (
+          <span className="flex-1 truncate text-center text-[6px] uppercase tracking-[0.02em] text-dim" key={label}>{label}</span>
+        ))}
+      </div>
+      <div className="mt-1 flex justify-between gap-2 text-[8.5px]"><b className="truncate text-text">{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
+    </section>
+  );
+}
+
+function DynamicsOverviewCard({ card }: { card: AnalysisCardMock }) {
+  const rows = card.values.slice(0, dynamicsGroupLabels.length);
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
+      <div className="space-y-[4px]">
+        {rows.map((value, index) => (
+          <div className="grid grid-cols-[34px_1fr] items-center gap-1.5" key={dynamicsGroupLabels[index]}>
+            <span className="truncate text-[7px] uppercase tracking-[0.03em] text-muted">{dynamicsGroupLabels[index]}</span>
+            <div className="h-[7px] overflow-hidden rounded-[2px] border border-line/50 bg-[#05080d]">
+              <span
+                className="block h-full rounded-[2px]"
+                style={{ width: `${Math.max(6, value)}%`, background: 'linear-gradient(90deg, #00d26a, #ffb020 70%, #ff4d4f)' }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="ml-[40px] mt-1 flex justify-between font-mono text-[6.5px] text-dim"><span>0</span><span>6</span><span>12</span><span>18</span><span>24 dB</span></div>
+      <div className="mt-0.5 flex justify-between gap-2 text-[8.5px]"><b className="truncate text-text">{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
+    </section>
+  );
+}
+
+function LoudnessHistoryCard({ card }: { card: AnalysisCardMock }) {
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
+      <div className="relative h-[46px] rounded-[4px] border border-line/50 bg-[#060c14] p-1">
+        <GridLines />
+        <MiniTrace values={card.values} tone="green" filled />
+      </div>
+      <div className="mt-1 flex justify-between font-mono text-[7px] text-dim"><span>-30m</span><span>-20m</span><span>-10m</span><span>Now</span></div>
+      <div className="mt-1 flex items-center justify-between gap-2 text-[8.5px]">
+        <span className="flex items-center gap-1 truncate text-muted"><i className="h-1.5 w-1.5 rounded-full bg-online" />{card.primary}</span>
+        <span className="truncate text-dim">-- {card.secondary}</span>
+      </div>
+    </section>
+  );
+}
+
+function AnalysisCard({ card }: { card: AnalysisCardMock }) {
+  if (card.id === 'phase') return <PhaseScopeCard card={card} />;
+  if (card.id === 'correlation') return <CorrelationCard card={card} />;
+  if (card.id === 'spectral') return <SpectralBalanceCard card={card} />;
+  if (card.id === 'dynamics') return <DynamicsOverviewCard card={card} />;
+  if (card.id === 'loudness') return <LoudnessHistoryCard card={card} />;
+
+  const color = toneColors[card.accent];
+  return (
+    <section className="min-h-0 rounded-[9px] border border-line bg-panel p-2.5 shadow-panel">
+      <AnalysisCardHeader card={card} />
       <div className="h-12"><MiniTrace values={card.values} tone={card.accent} filled /></div>
-      <div className="mt-2 flex justify-between gap-2 text-[9px]"><b className="truncate text-text">{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
+      <div className="mt-2 flex justify-between gap-2 text-[9px]"><b className="truncate text-text" style={{ color }}>{card.primary}</b><span className="truncate text-muted">{card.secondary}</span></div>
     </section>
   );
 }
 
 function AnalysisRow({ runtime }: { runtime: DashboardRuntime }) {
-  const cards = dashboardAnalysisCards(runtime, analysisCards);
+  const cards = dashboardAnalysisCards(runtime, analysisCards).filter(card => card.id !== 'suggestions');
 
   return (
-    <div className="grid h-[100px] grid-cols-6 gap-1">
+    <div className="am-scrollbar grid h-[128px] min-w-0 grid-flow-col auto-cols-[minmax(186px,1fr)] gap-1.5 overflow-x-auto">
       {cards.map(card => <AnalysisCard card={card} key={card.id} />)}
     </div>
   );
@@ -400,7 +588,7 @@ export function AutomixerDashboard({
   const normalizedChannels = useMemo(() => channels.slice(0, 14), [channels]);
 
   return (
-    <div className="grid h-full min-h-0 grid-rows-[145px_333px_100px] gap-1">
+    <div className="grid h-full min-h-0 grid-rows-[150px_minmax(0,1fr)_128px] gap-1.5">
       <AnalyticsRow runtime={runtime} />
       <MixerArea actions={actions} channels={normalizedChannels} runtime={runtime} ui={ui} />
       <AnalysisRow runtime={runtime} />
