@@ -10,7 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T23:18:10Z.
+- Latest heartbeat: 2026-07-04T23:41:50Z.
+- Latest verified full suite passed with `5490 passed, 1 skipped`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -39,6 +40,13 @@
   `rollback_last_manual_write` in the request audit. This grants no
   backend/WING contact, proposal creation, live write, readiness update or
   live authority.
+- Latest M006 owner decision hardening: `cca9fb447` adds a separate offline
+  owner decision verifier and pending decision template. The current template
+  returns `blocked` with `reason=m006_owner_decision_pending`; an accepted
+  decision must bind to the report-only M006 packet, a ready packet-verifier
+  report and the accepted M005 summary path, and it can only name
+  `fader_supervised`/`gain_supervised`. This grants no backend/WING contact,
+  proposal creation, live write, readiness update or live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
   `operator_runtime_contract` before a runtime observation can pass: operator

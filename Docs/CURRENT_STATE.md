@@ -1,22 +1,22 @@
 # Current State
 
-Generated: 2026-07-04T23:18:10Z
+Generated: 2026-07-04T23:41:50Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `f10894198 Require rollback-free M005 owner evidence`
+  `cca9fb447 Add M006 owner decision verifier`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the offline M005/M006
-  rollback-free owner-evidence verifier contract commit `f10894198`; ignored
-  large/superseded local evidence remains local-only.
+- Tracked worktree state before this sync: clean after the offline M006 owner
+  decision verifier commit `cca9fb447`; ignored large/superseded local
+  evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
-- Complete tracked file count from `rg --files`: 14140.
+- Complete tracked file count from `rg --files`: 24825.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
   same tree, but new durable files are written as `Docs/...`.
@@ -127,6 +127,15 @@ Generated: 2026-07-04T23:18:10Z
   evidence still blocks owner review. This is offline verifier hardening only
   and grants no backend/WING contact, proposal creation, live apply, readiness
   closure or live authority.
+- `cca9fb447` adds a separate offline M006 owner decision verifier. It checks
+  a filled owner decision against the report-only M006 packet, a ready packet
+  verifier summary and the accepted M005 summary path, then allows only a
+  future readiness-matrix candidate for exactly `fader_supervised` and
+  `gain_supervised`. The current template remains `pending_owner_review`, the
+  decision verifier returns `blocked` with
+  `reason=m006_owner_decision_pending`, and no WING/backend contact, proposal
+  creation, live apply, readiness closure, readiness-matrix update or live
+  authority is granted.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2066,10 +2075,10 @@ Generated: 2026-07-04T23:18:10Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `f10894198` passed with
-  `5482 passed, 1 skipped`. This includes the M005 rollback-free
-  owner-evidence binding, the M005 blocked-apply response owner-verifier
-  binding, the soundcheck runtime
+- The latest verified full-suite run for `cca9fb447` passed with
+  `5490 passed, 1 skipped`. This includes the M006 owner decision verifier,
+  the M005 rollback-free owner-evidence binding, the M005 blocked-apply
+  response owner-verifier binding, the soundcheck runtime
   `operator_runtime_contract` binding, the M005 event-sequence
   owner-verifier binding, the M005 canonical artifact-path owner-verifier
   binding, the M005 event-log owner-verifier binding, the M005 request-audit

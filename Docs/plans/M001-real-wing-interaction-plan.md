@@ -47,6 +47,12 @@ Current gate state:
   phase-level safe reason, and the summary/events request audits must not
   contain `rollback_last_manual_write`. This is offline artifact verification
   only and does not run M005 or grant live authority.
+- M006 owner decision verification now has a separate offline gate:
+  `tools/verify_m006_owner_readiness_decision.py` must see an accepted owner
+  decision, a ready packet-verifier report, the accepted M005 summary path and
+  exactly `fader_supervised`/`gain_supervised`. The current decision template
+  is still `pending_owner_review`, so the verifier blocks and grants no
+  readiness-matrix update or live authority.
 
 ## Hard Safety Boundary
 

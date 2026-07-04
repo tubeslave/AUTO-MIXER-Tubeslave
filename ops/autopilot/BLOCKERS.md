@@ -58,6 +58,16 @@
   prepares the owner review from the accepted CH3 fader/gain-down artifacts but
   is not an owner decision: M005 is still missing, readiness matrix updates are
   still disallowed, and live authority remains denied.
+- `cca9fb447` adds `tools/verify_m006_owner_readiness_decision.py` and a
+  pending owner decision template at
+  `artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json`.
+  The decision verifier blocks the current template with
+  `reason=m006_owner_decision_pending`; an accepted decision can only become a
+  readiness-matrix update candidate for exactly `fader_supervised` and
+  `gain_supervised` after a ready packet-verifier report and accepted M005
+  summary path are supplied. This is offline verification only and grants no
+  backend/WING contact, proposal creation, live apply, readiness update or live
+  authority.
 - The M005/M006 verifier contract is now stricter: `f10894198` requires clean
   M005 owner-review input to be rollback-free. The M006 packet contract
   declares `required_rollback_request_sent=false` and forbids
@@ -139,8 +149,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_rollback_free_owner_verifier_bound` at
-  `2026-07-04T23:18:10Z`. That row preserves the same `current_blocker`,
+  `m006_owner_decision_verifier_bound` at
+  `2026-07-04T23:41:50Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain
