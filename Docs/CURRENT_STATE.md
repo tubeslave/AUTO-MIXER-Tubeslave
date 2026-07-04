@@ -1,18 +1,18 @@
 # Current State
 
-Generated: 2026-07-04T21:55:43Z
+Generated: 2026-07-04T22:09:42Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `6cf8c8800 Bind M005 event log to owner verifier`
+  `223b8d433 Bind M005 canonical artifact path to verifier`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M005 event-log
-  owner-verifier binding commit `6cf8c8800`; ignored large/superseded
-  local evidence remains local-only.
+- Tracked worktree state before this sync: clean after the M005 canonical
+  artifact-path owner-verifier binding commit `223b8d433`; ignored
+  large/superseded local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -95,6 +95,14 @@ Generated: 2026-07-04T21:55:43Z
   in the event stream and contain no forbidden direct write request types
   there. This prevents a clean summary from hiding write-adjacent event-log
   evidence and still grants no backend/WING contact or live authority.
+- `223b8d433` binds M005 owner-review input to the canonical M005 proof
+  root: the supplied summary must be repo-relative under
+  `artifacts/wing_timeout_disconnect_proof/*/summary.json`, the summary
+  declared `summary_path` must match that input, the declared
+  `events_path` must match the loaded event log and the event log must be
+  sibling `events.jsonl` in the same run directory. This prevents temp-root
+  or copied M005 summaries from becoming owner-review input and grants no
+  backend/WING contact or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2029,9 +2037,9 @@ Generated: 2026-07-04T21:55:43Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `6cf8c8800` passed with
-  `5471 passed, 1 skipped`. This includes the M005 event-log owner-verifier
-  binding, the M005 request-audit owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness
+- The latest verified full-suite run for `223b8d433` passed with
+  `5474 passed, 1 skipped`. This includes the M005 canonical artifact-path
+  owner-verifier binding, the M005 event-log owner-verifier binding, the M005 request-audit owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness
   packet verifier phase-detail checks plus the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
