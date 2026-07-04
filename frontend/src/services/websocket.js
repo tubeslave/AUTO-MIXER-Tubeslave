@@ -230,6 +230,18 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
+  subscribeMeters() {
+    this.send({
+      type: 'subscribe_meters'
+    });
+  }
+
+  unsubscribeMeters() {
+    this.send({
+      type: 'unsubscribe_meters'
+    });
+  }
+
   getChannelInventory(totalChannels = 24) {
     this.send({
       type: 'get_channel_inventory',
