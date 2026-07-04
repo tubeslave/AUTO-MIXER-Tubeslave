@@ -225,6 +225,57 @@ Stop if:
 - proof proposal bypasses `apply_operator_proposal`;
 - emergency stop cannot block a later apply.
 
+## Stage 3.5 - M005 Disconnect/Timeout/Stale-State Proof
+
+Goal: prove that loss of WING connectivity fails closed before any stale data
+or disconnected write can be treated as safe.
+
+Required operator approval:
+
+- WING Rack is the intended console and the operator is physically present;
+- proof channel, value type and negative delta match the command;
+- physical cable-loss confirmation token is entered only after the operator has
+  actually pulled the WING network link for this proof;
+- accepted read-only source id is the current operator-accepted preflight
+  artifact.
+
+The reusable runner is:
+
+```bash
+python3 tools/wing_timeout_disconnect_proof_runner.py \
+  --url ws://localhost:8765 \
+  --channel 3 \
+  --value-type fader \
+  --delta-db -0.25 \
+  --operator-confirm-channel 3 \
+  --operator-confirm-value-type fader \
+  --operator-confirm-delta-db -0.25 \
+  --accepted-readonly-source-id artifacts/wing_readonly_preflight/<run_id>/summary.json \
+  --disconnect-mode physical-cable-loss \
+  --operator-confirm-physical-cable-loss WING_CABLE_PULLED_BY_OPERATOR \
+  --reconnect-wing-ip <WING_IP> \
+  --execute \
+  --artifact-root artifacts/wing_timeout_disconnect_proof \
+  --reason "m005_disconnect_timeout_stale_state_proof"
+```
+
+Expected evidence:
+
+- physical baseline readback before loss;
+- operator-confirmed physical cable loss;
+- stale-state query reports readback unavailable, not cache-fresh;
+- `apply_operator_proposal` is blocked while disconnected;
+- reconnect recovery confirms the channel value is unchanged from baseline;
+- `live_authority_granted=false` and `readiness_closure_allowed=false` remain
+  in the artifact.
+
+Stop if:
+
+- the runner observes live or stale physical readback after disconnect;
+- any direct write request type appears in the event log;
+- blocked-write probe applies unexpectedly without rollback/manual review;
+- reconnect readback is unavailable or differs from baseline.
+
 ## Stage 4 - Readiness Update
 
 Goal: update readiness only from accepted real proof.
@@ -279,20 +330,37 @@ On any unexpected state:
 
 ## Current Executable Slice
 
-Because the read-only decision gate is accepted-ready but the latest supervised
-fader proof failed rollback, unattended Codex work may execute only the safe
-slice:
+Because the read-only decision gate is accepted-ready and the supervised CH3
+fader/gain-down proofs have passed, but M005 and M006 still require
+operator/owner action, unattended Codex work may execute only the safe slice:
 
 1. no-WING quick safety gate;
 2. decision review status refresh;
 3. backend/frontend listener check;
 4. dashboard safety snapshot;
-5. optional read-only scans/preflights with `observation_only=true`.
+5. optional read-only scans/preflights with `observation_only=true`;
+6. M005 runner dry-runs or offline tests that do not contact WING or send
+   `apply_operator_proposal`;
+7. read-only soundcheck runtime observation artifacts that subscribe to meters
+   and request dashboard/channel/decision/safety snapshots without creating or
+   applying proposals;
+8. offline long-run drift audits of existing soundcheck logs, provided the
+   audit reads evidence only and cannot create, apply or retry corrections;
+9. read-only operator review coverage checks that surface whether pending
+   proposals include `reason`, `risk`, old/new value and rollback context,
+   without mutating queue state or granting apply authority;
+10. dirty-worktree split handoffs that record WING proof WIP, soundcheck
+   runtime WIP and frontend UI restyle WIP as separate commit groups and
+   generated review patches before the next soundcheck cycle;
+11. report-only M006 owner review packets that inventory accepted fader/gain
+   proof artifacts while keeping readiness updates blocked until M005 and owner
+   acceptance.
 
-Codex must not execute or retry the supervised proof unattended. The CH3 fader
-and gain-down proofs are complete: the operator verified CH3 state by read-only
-physical readback, then approved the exact channel, value type and negative
-delta for each proof before it ran. The next steps are the M005 supervised
-disconnect/timeout/stale-state protection proof with the operator present and
-the M006 owner readiness review that updates the readiness matrix from the
-accepted proof artifacts.
+Codex must not execute or retry the supervised proof unattended; this now also
+includes the M005 physical cable-loss proof, reconnect proof and any supervised
+`apply_operator_proposal` probe. The CH3 fader and gain-down proofs are
+complete: the operator verified CH3 state by read-only physical readback, then
+approved the exact channel, value type and negative delta for each proof before
+it ran. The next steps are the M005 supervised disconnect/timeout/stale-state
+protection proof with the operator present and the M006 owner readiness review
+that updates the readiness matrix from the accepted proof artifacts.
