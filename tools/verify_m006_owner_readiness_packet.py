@@ -40,6 +40,13 @@ EXPECTED_M005_SAFE_BLOCK_REASONS = {
     "pre_read_cache_not_fresh",
     "pre_read_unavailable",
 }
+EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES = {
+    "load_" + "snap",
+    "route_" + "output",
+    "save_" + "snap",
+    "set_" + "fader",
+    "set_" + "gain",
+}
 AUTHORITY_DENIAL_FLAGS = {
     "live_authority_granted": False,
     "readiness_closure_allowed": False,
@@ -480,6 +487,36 @@ def _record_m005_checks(
     )
     for field_name, expected in AUTHORITY_DENIAL_FLAGS.items():
         _record(checks, f"m005_summary_{field_name}_denied", m005_summary.get(field_name) is expected)
+    sent_request_types = m005_summary.get("sent_request_types")
+    if isinstance(sent_request_types, list):
+        m005_sent_request_types = [str(item) for item in sent_request_types]
+    else:
+        m005_sent_request_types = []
+    forbidden_from_sent = [
+        request_type
+        for request_type in m005_sent_request_types
+        if request_type in EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES
+    ]
+    _record(
+        checks,
+        "m005_summary_sent_request_types_present",
+        isinstance(sent_request_types, list) and bool(m005_sent_request_types),
+    )
+    _record(
+        checks,
+        "m005_summary_apply_probe_sent",
+        "apply_operator_proposal" in m005_sent_request_types,
+    )
+    _record(
+        checks,
+        "m005_summary_no_forbidden_direct_request_types",
+        forbidden_from_sent == [],
+    )
+    _record(
+        checks,
+        "m005_summary_forbidden_requests_match_sent_audit",
+        m005_summary.get("forbidden_request_types_sent") == forbidden_from_sent,
+    )
     _record(
         checks,
         "m005_summary_direct_live_write_denied",

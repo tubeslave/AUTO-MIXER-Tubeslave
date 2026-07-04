@@ -105,3 +105,17 @@ This keeps summary booleans from becoming sufficient owner-review evidence by
 themselves. The update is offline verifier hardening only; it grants no WING
 contact, no live apply authority and no readiness closure without the
 operator-present M005 proof and owner M006 decision.
+
+## 2026-07-04 Request Audit Binding Update
+
+The M006 owner-readiness verifier now treats the M005 summary request audit as
+part of the owner-review input contract. A complete M005 summary must expose
+`sent_request_types`, must show the blocked `apply_operator_proposal` probe,
+and must not contain direct forbidden request types such as `set_fader`,
+`set_gain`, `route_output`, `load_snap` or `save_snap`. The verifier also
+cross-checks `forbidden_request_types_sent` against the request audit list, so
+manually clean summary flags cannot hide a direct write request.
+
+This is still offline verifier hardening only. It validates the artifact
+contract before owner review and grants no WING contact, live apply authority
+or readiness closure.

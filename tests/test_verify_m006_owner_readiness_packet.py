@@ -50,6 +50,17 @@ def complete_m005_summary() -> dict:
         "readiness_matrix_update_allowed": False,
         "direct_live_write_request_sent": False,
         "forbidden_request_types_sent": [],
+        "sent_request_types": [
+            "get_operator_mode",
+            "get_state",
+            "query_mixer_parameter",
+            "set_operator_mode",
+            "create_operator_proposal",
+            "query_mixer_parameter",
+            "apply_operator_proposal",
+            "connect_wing",
+            "query_mixer_parameter",
+        ],
         "required_m005_evidence": list(verifier.EXPECTED_M005_EVIDENCE),
         "completed_m005_evidence": list(verifier.EXPECTED_M005_EVIDENCE),
         "missing_m005_evidence": [],
@@ -180,6 +191,50 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["contacts_wing"] is False
     assert result["contacts_backend"] is False
     assert result["live_write"] is False
+
+
+def test_m005_missing_request_audit_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005.pop("sent_request_types")
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_sent_request_types_present" in result["failed_checks"]
+    assert "m005_summary_apply_probe_sent" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_forbidden_request_type_blocks_owner_review_even_if_flags_claim_clean() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["sent_request_types"].append("set_fader")
+    m005["forbidden_request_types_sent"] = []
+    m005["direct_live_write_request_sent"] = False
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_summary_no_forbidden_direct_request_types" in result["failed_checks"]
+    assert "m005_summary_forbidden_requests_match_sent_audit" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
 
 
 def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
