@@ -183,8 +183,10 @@ class TestAutoGateControllerWritePolicy:
         assert correction["objective_family"] == "gate_expander"
         assert correction["future_wing_readback_contract"]["target_kind"] == "channel_gate"
         assert correction["bounded_delta"]["action_type"] == "auto_gate_caig_write_blocked"
-        assert correction["bounded_delta"]["delta_db"] == -80.0
-        assert correction["bounded_delta"]["parameter_deltas"]["range_db"] == -80.0
+        # Барабанный range −20 дБ (не полное закрытие): сохраняем
+        # естественный хвост барабана — live-правило FOH-документа.
+        assert correction["bounded_delta"]["delta_db"] == -20.0
+        assert correction["bounded_delta"]["parameter_deltas"]["range_db"] == -20.0
         assert correction["bounded_delta"]["parameter_deltas"]["hysteresis_db"] == 3.0
         assert correction["bounded_delta"]["parameter_deltas"]["attack_ms"] == 0.05
         assert correction["live_apply_allowed"] is False

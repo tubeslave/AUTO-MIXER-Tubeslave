@@ -104,10 +104,39 @@ class PanningDecision:
         }
 
 
+LCR_LOW_FREQ_CUTOFF_HZ = 120.0
+LCR_LOW_ENERGY_RATIO_THRESHOLD = 0.5
+
+
+def lf_energy_ratio(
+    x: np.ndarray, sample_rate: int, cutoff_hz: float = LCR_LOW_FREQ_CUTOFF_HZ
+) -> float:
+    """Доля мощности ниже cutoff_hz (0..1)."""
+    x = np.asarray(x, dtype=np.float64)
+    if len(x) < 256:
+        return 0.0
+    spectrum = np.abs(np.fft.rfft(x * np.hanning(len(x)))) ** 2
+    freqs = np.fft.rfftfreq(len(x), 1.0 / sample_rate)
+    total = float(spectrum.sum())
+    if total <= 0.0:
+        return 0.0
+    return float(np.clip(spectrum[freqs < cutoff_hz].sum() / total, 0.0, 1.0))
+
+
+def should_center_low_frequency(
+    low_energy_ratio: float,
+    threshold: float = LCR_LOW_ENERGY_RATIO_THRESHOLD,
+) -> bool:
+    """LCR-правило: всё, у чего энергия сосредоточена ниже ~120 Гц (kick,
+    bass, суб-контент), — в центр: энергия и фазовая устойчивость системы
+    важнее стереокартины. Панорамирование такого канала шаблоном отменяется."""
+    return float(low_energy_ratio) >= float(threshold)
+
+
 class LinkwitzRileyCrossover:
     """
     Linkwitz-Riley 4th order crossover for 3-band splitting.
-    
+
     Frequencies:
     - Low: < 250 Hz (center pan)
     - Mid: 250 - 4000 Hz (position-based pan)

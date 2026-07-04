@@ -150,6 +150,19 @@ class FeedbackDetectorConfig:
     fader_reduction_floor_db: float = -18.0
     notch_stale_age_sec: float = 30.0
     freq_tolerance_cents: float = 50.0
+    # Тональные критерии van Waterschoot & Moonen (JAES 58(11), 2010).
+    # У заводки нет гармонической структуры (PHPR высок), тон доминирует над
+    # соседними полосами (PNPR) и растёт экспоненциально (IMSD ~ постоянный
+    # наклон dB/кадр). У ноты инструмента гармоники 2f/3f лежат в пределах
+    # ~25 dB от пика — PHPR её отсекает. Пороги калибруются под зал: 44 dB
+    # из демо-конфигураций авторов слишком строг для живого захвата с bleed.
+    require_tonality_criteria: bool = True
+    phpr_threshold_db: float = 30.0
+    subharmonic_threshold_db: float = 12.0
+    pnpr_threshold_db: float = 12.0
+    imsd_slope_deviation_db: float = 0.5
+    imsd_min_frames: int = 4
+    notch_deepen_step_db: float = 1.5
 
 
 @dataclass
@@ -194,12 +207,13 @@ class _ChannelFeedbackState:
 
         Returns the NotchFilter, or None if max reached.
         """
+        # NHS-стратегия (van Waterschoot & Moonen): существующий notch около
+        # частоты углубляется, новый создаётся только для новой частоты.
         for nf in self.notch_filters:
             if _freq_close(nf.frequency, frequency, self.config.freq_tolerance_cents):
-                old_gain = nf.gain_db
                 nf.gain_db = max(
                     self.config.max_notch_depth_db,
-                    nf.gain_db - 1.5,
+                    nf.gain_db - self.config.notch_deepen_step_db,
                 )
                 nf.applied_at = now
                 return nf
@@ -250,6 +264,89 @@ class _ChannelFeedbackState:
             nf for nf in self.notch_filters
             if (now - nf.applied_at) > max_age_sec
         ]
+
+
+# ── Тональные критерии (van Waterschoot & Moonen, 2010) ─────────
+
+def compute_phpr_db(
+    magnitude_db: np.ndarray,
+    peak_bin: int,
+    freq_resolution: float,
+    search_bins: int = 2,
+) -> Optional[float]:
+    """Peak-to-Harmonic Power Ratio: пик минус сильнейшая из гармоник 2f/3f.
+
+    У ноты инструмента гармоники близко к пику (PHPR мал), у заводки —
+    чистый синус (PHPR велик). None — гармоники вне спектра (нет данных,
+    критерий считается пройденным).
+    """
+    n = len(magnitude_db)
+    harmonic_db: List[float] = []
+    for mult in (2, 3):
+        k = peak_bin * mult
+        if k + search_bins >= n:
+            continue
+        lo, hi = max(0, k - search_bins), min(n, k + search_bins + 1)
+        harmonic_db.append(float(np.max(magnitude_db[lo:hi])))
+    if not harmonic_db:
+        return None
+    return float(magnitude_db[peak_bin]) - max(harmonic_db)
+
+
+def compute_subharmonic_ratio_db(
+    magnitude_db: np.ndarray,
+    peak_bin: int,
+    search_bins: int = 2,
+) -> Optional[float]:
+    """Пик минус сильнейшая из СУБ-гармоник f/2, f/3.
+
+    Пик на 2f/3f ноты сам не имеет гармоник выше (PHPR его пропускает),
+    но у него есть фундаментал ниже — этот критерий отсекает члены
+    гармонического ряда. У заводки на f/2 и f/3 пусто (ratio велик).
+    None — суб-гармоники ниже разрешения FFT.
+    """
+    harmonic_db: List[float] = []
+    for div in (2, 3):
+        k = peak_bin // div
+        if k <= search_bins:
+            continue
+        lo, hi = max(0, k - search_bins), k + search_bins + 1
+        harmonic_db.append(float(np.max(magnitude_db[lo:hi])))
+    if not harmonic_db:
+        return None
+    return float(magnitude_db[peak_bin]) - max(harmonic_db)
+
+
+def compute_pnpr_db(
+    magnitude_db: np.ndarray,
+    peak_bin: int,
+    skirt_bins: int = 3,
+    neighborhood_bins: int = 12,
+) -> Optional[float]:
+    """Peak-to-Neighboring Power Ratio: пик минус медиана соседних бинов
+    (вне собственной «юбки» пика). Тон заводки доминирует над соседями."""
+    n = len(magnitude_db)
+    left = magnitude_db[max(0, peak_bin - neighborhood_bins):max(0, peak_bin - skirt_bins)]
+    right = magnitude_db[min(n, peak_bin + skirt_bins + 1):min(n, peak_bin + neighborhood_bins + 1)]
+    neighbors = np.concatenate([left, right]) if len(left) or len(right) else np.array([])
+    if neighbors.size == 0:
+        return None
+    return float(magnitude_db[peak_bin]) - float(np.median(neighbors))
+
+
+def compute_imsd_db(magnitude_history: List[float], min_frames: int = 4) -> Optional[Tuple[float, float]]:
+    """Interframe Magnitude Slope Deviation.
+
+    Возвращает (средний наклон дБ/кадр, отклонение наклона). Экспоненциальный
+    разгон заводки = положительный наклон с малым отклонением. None — мало
+    кадров.
+    """
+    if len(magnitude_history) < min_frames:
+        return None
+    deltas = np.diff(np.asarray(magnitude_history[-min_frames * 2:], dtype=np.float64))
+    if deltas.size < 2:
+        return None
+    return float(np.mean(deltas)), float(np.std(deltas))
 
 
 # ── Main detector ────────────────────────────────────────────────
@@ -327,6 +424,39 @@ class FeedbackDetector:
                 channel_id=channel, config=self.config
             )
         return self._channel_states[channel]
+
+    def _tonality_criteria(
+        self, peak: _PeakState, magnitude_db: np.ndarray
+    ) -> Dict[str, Any]:
+        """PHPR/PNPR/IMSD-оценка кандидата (van Waterschoot & Moonen)."""
+        peak_bin = int(round(peak.frequency / self.freq_resolution))
+        peak_bin = max(0, min(len(magnitude_db) - 1, peak_bin))
+
+        phpr = compute_phpr_db(magnitude_db, peak_bin, self.freq_resolution)
+        sub = compute_subharmonic_ratio_db(magnitude_db, peak_bin)
+        pnpr = compute_pnpr_db(magnitude_db, peak_bin)
+        imsd = compute_imsd_db(peak.magnitude_history, self.config.imsd_min_frames)
+
+        phpr_ok = phpr is None or phpr >= self.config.phpr_threshold_db
+        sub_ok = sub is None or sub >= self.config.subharmonic_threshold_db
+        pnpr_ok = pnpr is None or pnpr >= self.config.pnpr_threshold_db
+        imsd_exponential = (
+            imsd is not None
+            and imsd[0] > 0.0
+            and imsd[1] <= self.config.imsd_slope_deviation_db
+        )
+        return {
+            "phpr_db": phpr,
+            "subharmonic_ratio_db": sub,
+            "pnpr_db": pnpr,
+            "imsd_slope_db": imsd[0] if imsd else None,
+            "imsd_deviation_db": imsd[1] if imsd else None,
+            "phpr_ok": phpr_ok,
+            "subharmonic_ok": sub_ok,
+            "pnpr_ok": pnpr_ok,
+            "imsd_exponential": imsd_exponential,
+            "passed": phpr_ok and sub_ok and pnpr_ok,
+        }
 
     def process_audio(
         self, channel: int, samples: np.ndarray
@@ -418,10 +548,20 @@ class FeedbackDetector:
         ]
         candidates.sort(key=lambda p: p.magnitude_db, reverse=True)
         for peak in candidates:
+            # Тональные AND-критерии: устойчивый растущий пик подтверждается
+            # как заводка только если у него НЕТ гармонической структуры
+            # (PHPR) и он доминирует над соседними полосами (PNPR). Нота
+            # аккордеона/органа/гитары проваливает PHPR — notch не ставится.
+            criteria = self._tonality_criteria(peak, magnitude_db)
+            if self.config.require_tonality_criteria and not criteria["passed"]:
+                continue
+
             confidence = min(
                 1.0,
                 peak.persistence / (self.config.persistence_frames * 2),
             )
+            if criteria.get("imsd_exponential"):
+                confidence = min(1.0, confidence + 0.2)
             if confidence < self.config.min_confidence:
                 continue
 
@@ -538,3 +678,86 @@ class FeedbackDetector:
             commands.append((f"/ch/{channel}/peq/{band}f", 1000.0))
             commands.append((f"/ch/{channel}/peq/{band}q", 1.0))
         return commands
+
+
+# ── Ring-out (процедура саундчека) ───────────────────────────────
+
+@dataclass
+class RingFrequency:
+    """Подтверждённая звонкая частота канала/монитора."""
+    frequency_hz: float
+    magnitude_db: float
+    confidence: float
+    detected_at: float = 0.0
+
+
+class RingOutPlanner:
+    """Саундчек ring-out: оператор ступенчато поднимает гейн, планировщик
+    подтверждает звонкие частоты по тем же PHPR/PNPR/росту и выдаёт план
+    ФИКСИРОВАННЫХ notch для baseline-снапшота.
+
+    Proposal-only: сам гейн не трогает и OSC не шлёт — вывод идёт в
+    operator-proposal путь. Типичные проблемные частоты залов (250 Гц,
+    500 Гц, 1 кГц, 2 кГц) ловятся этой процедурой до концерта, чтобы в
+    лайве динамическим notch оставалась только новая заводка.
+    """
+
+    def __init__(
+        self,
+        config: Optional[FeedbackDetectorConfig] = None,
+        max_fixed_notches: int = 6,
+        initial_notch_db: float = -3.0,
+    ):
+        # Более чуткая конфигурация, чем в лайве: зал пуст, сигнал чистый.
+        self.config = config or FeedbackDetectorConfig(
+            persistence_frames=4,
+            min_confidence=0.4,
+        )
+        self.max_fixed_notches = max_fixed_notches
+        self.initial_notch_db = float(initial_notch_db)
+        self._detector = FeedbackDetector(config=self.config)
+        self._rings: List[RingFrequency] = []
+
+    def observe_block(self, samples: np.ndarray) -> Optional[RingFrequency]:
+        """Скормить блок аудио во время ступенчатого подъёма гейна."""
+        event = self._detector.process_audio(0, samples)
+        if event is None or event.action not in ("notch", "fader_reduce"):
+            return None
+        for ring in self._rings:
+            if _freq_close(ring.frequency_hz, event.frequency_hz,
+                           self.config.freq_tolerance_cents):
+                ring.magnitude_db = max(ring.magnitude_db, event.magnitude_db)
+                ring.confidence = max(ring.confidence, event.confidence)
+                return ring
+        ring = RingFrequency(
+            frequency_hz=event.frequency_hz,
+            magnitude_db=event.magnitude_db,
+            confidence=event.confidence,
+            detected_at=event.timestamp,
+        )
+        self._rings.append(ring)
+        return ring
+
+    def ring_frequencies(self) -> List[RingFrequency]:
+        return sorted(self._rings, key=lambda r: -r.confidence)
+
+    def fixed_notch_plan(self) -> List[Dict[str, Any]]:
+        """План фиксированных notch для baseline (без OSC, для proposal).
+
+        Глубина стартовая −3 дБ; углубление — итеративно оператором при
+        повторном звоне на удержанном гейне (NHS-стратегия).
+        """
+        plan = []
+        for ring in self.ring_frequencies()[: self.max_fixed_notches]:
+            plan.append({
+                "frequency_hz": round(ring.frequency_hz, 1),
+                "gain_db": self.initial_notch_db,
+                "q": _q_for_feedback(ring.confidence),
+                "confidence": round(ring.confidence, 3),
+                "kind": "fixed_ring_out_notch",
+            })
+        return plan
+
+    def reset(self):
+        self._rings.clear()
+        self._detector.reset_all()

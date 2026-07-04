@@ -2192,7 +2192,15 @@ class SignalStats:
                 "confident": False,
                 "policy": body_reference_policy,
             }
-        peak_error = self.target_peak_db - self.max_true_peak_db
+        # P95 пиков вместо абсолютного максимума: устойчивее к единичным
+        # выбросам (случайный щелчок не должен управлять trim-целью).
+        # Headroom/clip-гарды ниже по-прежнему считаются от max_true_peak_db.
+        robust_peak_db = (
+            float(np.percentile(self.peak_values, 95))
+            if len(self.peak_values) >= 8
+            else float(self.max_true_peak_db)
+        )
+        peak_error = self.target_peak_db - robust_peak_db
         deadband = max(0.1, profile.target_deadband_db)
         desired_delta = 0.0
         reason = "within_input_headroom_window"

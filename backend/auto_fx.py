@@ -320,6 +320,15 @@ class AutoFXPlanner:
     def _default_buses(self) -> list[FXBusDecision]:
         quarter_ms = 60000.0 / self.tempo_bpm
         dotted_eighth_ms = quarter_ms * 0.75
+        # Pre-delay/decay от темпа: pre-delay = короткая доля (1/32 для
+        # plate, 1/64 для room), decay = длительность ноты − pre-delay
+        # (быстрее темп — короче хвост). Клампы держат музыкальный диапазон.
+        plate_predelay_ms = min(max(quarter_ms / 8.0, 20.0), 80.0)
+        plate_decay_s = min(max(
+            4.0 * quarter_ms / 1000.0 - plate_predelay_ms / 1000.0, 1.0), 2.6)
+        room_predelay_ms = min(max(quarter_ms / 16.0, 5.0), 25.0)
+        room_decay_s = min(max(
+            2.0 * quarter_ms / 1000.0 - room_predelay_ms / 1000.0, 0.4), 1.2)
         return [
             FXBusDecision(
                 bus_id=13,
@@ -328,7 +337,8 @@ class AutoFXPlanner:
                 fx_slot="FX1",
                 model="PLATE",
                 return_level_db=-4.0,
-                params={"decay_s": 1.55, "predelay_ms": 42.0, "density": 0.72, "brightness": 0.58},
+                params={"decay_s": plate_decay_s, "predelay_ms": plate_predelay_ms,
+                        "density": 0.72, "brightness": 0.58},
                 hpf_hz=220.0,
                 lpf_hz=7800.0,
                 duck_source="lead_vocal" if self.vocal_priority else None,
@@ -342,7 +352,8 @@ class AutoFXPlanner:
                 fx_slot="FX2",
                 model="ROOM",
                 return_level_db=-4.0,
-                params={"decay_s": 0.72, "predelay_ms": 10.0, "density": 0.86, "brightness": 0.42},
+                params={"decay_s": room_decay_s, "predelay_ms": room_predelay_ms,
+                        "density": 0.86, "brightness": 0.42},
                 hpf_hz=180.0,
                 lpf_hz=5600.0,
                 reason="Short dense drum space supports snare/toms without washing overheads.",

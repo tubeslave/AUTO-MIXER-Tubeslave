@@ -39,6 +39,11 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.processing_proposal_adapters import build_operator_correction_payload
 
+try:
+    from comp_params_ma2015 import Ma2015Params, ma2015_params_from_audio
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.comp_params_ma2015 import Ma2015Params, ma2015_params_from_audio
+
 logger = logging.getLogger(__name__)
 
 AUTO_COMPRESSOR_CF_METHOD_ID = "auto_compressor_cf"
@@ -299,7 +304,8 @@ class CFCompressorCalculator:
         cf_db: float,
         lufs_momentary: float,
         peak_db: float,
-        cf_class: Optional[CFClass] = None
+        cf_class: Optional[CFClass] = None,
+        ma2015: Optional["Ma2015Params"] = None,
     ) -> CFCompressorParams:
         """
         Calculate compressor parameters based on CF and LUFS.
@@ -353,10 +359,25 @@ class CFCompressorCalculator:
         # Threshold should be below peak but above target
         threshold_db = min(peak_db - self.headroom_db, lufs_momentary + 3)
         
+        # Регрессии Ma et al. 2015 (JAES 63(6)) как literature-backed источник:
+        # блендим 50/50 с CF-эвристикой — регрессии выведены на другой
+        # топологии компрессора, CF-классы дают live-ориентированный прижим.
+        if ma2015 is not None:
+            ratio = float(np.clip(0.5 * ratio + 0.5 * ma2015.ratio,
+                                  self.MIN_RATIO, self.MAX_RATIO))
+            threshold_db = 0.5 * threshold_db + 0.5 * ma2015.threshold_db
+            attack_ms = np.clip(0.5 * attack_ms + 0.5 * ma2015.attack_ms,
+                                self.MIN_ATTACK, self.MAX_ATTACK)
+            release_ms = np.clip(0.5 * release_ms + 0.5 * ma2015.release_ms,
+                                 self.MIN_RELEASE, self.MAX_RELEASE)
+
         # Calculate makeup gain
         # Compensate for gain reduction to maintain LUFS
         estimated_gr = self._estimate_gr(lufs_momentary, threshold_db, ratio)
         makeup_gain_db = min(estimated_gr * 0.7, 6.0)  # Compensate 70% of GR, max +6dB
+        if ma2015 is not None:
+            # bounded makeup правило: не выше оценки Ma-модуля (headroom-aware)
+            makeup_gain_db = min(makeup_gain_db, ma2015.makeup_db)
         
         return CFCompressorParams(
             attack_ms=attack_ms,
@@ -432,6 +453,8 @@ class AutoCFCompressorController:
         # Components
         self.cf_analyzer = CFAnalyzer(sample_rate)
         self.calculator = CFCompressorCalculator(target_lufs)
+        self.use_ma2015 = True
+        self.last_ma2015: Optional[Dict[str, Any]] = None
         
         # State
         self.is_active = False
@@ -515,13 +538,25 @@ class AutoCFCompressorController:
         # Analyze CF
         cf_db = self.cf_analyzer.process(audio)
         cf_class = self.cf_analyzer.classify_cf(cf_db)
-        
+
+        # Literature-backed уточнение (Ma et al. 2015): w_p/w_f от сырого аудио
+        ma_params = None
+        if self.use_ma2015 and audio is not None and len(audio) >= 2048:
+            try:
+                ma_params = ma2015_params_from_audio(
+                    audio, self.sample_rate, true_peak_dbtp=peak_db,
+                )
+                self.last_ma2015 = ma_params.to_dict()
+            except Exception:
+                logger.exception("ma2015 param estimation failed; using CF-only path")
+
         # Calculate new params
         new_params = self.calculator.calculate_params(
             cf_db=cf_db,
             lufs_momentary=lufs_momentary,
             peak_db=peak_db,
-            cf_class=cf_class
+            cf_class=cf_class,
+            ma2015=ma_params,
         )
         
         # Check if params changed significantly

@@ -78,11 +78,17 @@ class GateSettings:
     hold_ms: float = 100.0
     range_db: float = -80.0  # Max attenuation when closed
     hysteresis_db: float = 3.0
-    
+
     # Adaptive settings
     adaptive_threshold: bool = True
     noise_floor_db: float = -70.0
     noise_floor_margin_db: float = 6.0
+
+    # Sidechain-фильтрация детектора: гейт реагирует на тело+атаку СВОЕГО
+    # барабана и игнорирует пролезание (kick: HPF 200 Гц + LPF ~4 кГц).
+    # None = детектор без фильтрации (широкополосный).
+    sidechain_hpf_hz: Optional[float] = None
+    sidechain_lpf_hz: Optional[float] = None
 
 
 DRUM_GATE_INSTRUMENTS = frozenset({
@@ -115,13 +121,17 @@ def live_gate_settings_for_instrument(
             threshold = float(nearest_source_db) + 6.0
         elif target_peak_db is not None:
             threshold = float(target_peak_db) - 6.0
+        # Range −20 дБ, НЕ полное закрытие: сохраняем естественный хвост
+        # барабана вместо «мёртвого» звука (live-практика FOH).
         return GateSettings(
             threshold_db=threshold,
             attack_ms=0.05,
             hold_ms=180.0,
             release_ms=180.0,
-            range_db=-80.0,
+            range_db=-20.0,
             noise_floor_db=noise_floor_db,
+            sidechain_hpf_hz=200.0,
+            sidechain_lpf_hz=4000.0,
         )
 
     if normalized in OVERHEAD_GATE_INSTRUMENTS:
@@ -443,6 +453,10 @@ class DrumKitRules:
         """Get minimum gain for instrument (overheads never fully closed)."""
         if instrument == 'overheads':
             return -10.0  # Never fully closed
+        if instrument in self.PRIORITIES:
+            # Барабаны: range −20 дБ, не полное закрытие — естественный
+            # хвост важнее «стерильной» тишины между ударами.
+            return -20.0
         return -80.0  # Full range
 
 

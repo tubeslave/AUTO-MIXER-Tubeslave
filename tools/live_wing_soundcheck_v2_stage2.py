@@ -47,7 +47,13 @@ import sounddevice as sd  # noqa: E402
 from wing_client import WingClient  # noqa: E402
 from lufs_gain_staging import LUFSMeter, TruePeakMeter  # noqa: E402
 from auto_phase_gcc_phat import GCCPHATAnalyzer  # noqa: E402
-from auto_panner_adaptive import Genre, GenreTemplate, PanPosition  # noqa: E402
+from auto_panner_adaptive import (  # noqa: E402
+    Genre,
+    GenreTemplate,
+    PanPosition,
+    lf_energy_ratio,
+    should_center_low_frequency,
+)
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 from heuristics.spectral_ceiling_eq import (  # noqa: E402
     SpectralCeilingEQAnalyzer,
@@ -349,6 +355,14 @@ def main() -> int:
             v = float(spec[0]) if isinstance(spec, tuple) else float(spec)
             for ch in chans:
                 pan_plan.append((ch, v))
+    # LCR-правило: канал с энергией преимущественно ниже ~120 Гц — в центр
+    # (энергия и фазовая устойчивость важнее стереокартины), независимо от
+    # роли-шаблона (например, суб-контент в playback/floor tom).
+    pan_plan = [
+        (ch, 0.0 if should_center_low_frequency(
+            lf_energy_ratio(active[ch]["x"], SR)) else pan)
+        for ch, pan in pan_plan
+    ]
     for ch, pan in pan_plan:
         decisions.append(ActionDecision(
             id=f"pan.ch{ch}", action_type=ACTION_PAN, target=f"ch{ch}",

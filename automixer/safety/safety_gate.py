@@ -48,6 +48,17 @@ class SafetyGateConfig:
     true_peak_ceiling_dbtp: float = -1.0
     dry_run: bool = False
     emergency_bypass: bool = False
+    # Anti-oscillation лимиты (0.0 = выключено, поведение как раньше):
+    # max_rate_db_per_sec — скорость изменения в дБ/с (а не дБ/цикл: при
+    # смене периода цикла лимит в дБ/цикл молча меняется);
+    # correction_budget_db — суммарный |бюджет| коррекций на target в окне
+    # budget_window_sec, при исчерпании — стоп до релаксации;
+    # min_hold_sec — минимальное время удержания решения: реверс направления
+    # (буст после ката и наоборот) блокируется, пока hold не истёк.
+    max_rate_db_per_sec: float = 0.0
+    correction_budget_db: float = 0.0
+    budget_window_sec: float = 60.0
+    min_hold_sec: float = 0.0
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any] | None) -> "SafetyGateConfig":
@@ -76,6 +87,10 @@ class SafetyGateConfig:
             true_peak_ceiling_dbtp=float(payload.get("true_peak_ceiling_dbtp", -1.0)),
             dry_run=bool(payload.get("dry_run", False)),
             emergency_bypass=bool(payload.get("emergency_bypass", False)),
+            max_rate_db_per_sec=float(payload.get("max_rate_db_per_sec", 0.0)),
+            correction_budget_db=float(payload.get("correction_budget_db", 0.0)),
+            budget_window_sec=float(payload.get("budget_window_sec", 60.0)),
+            min_hold_sec=float(payload.get("min_hold_sec", 0.0)),
         )
 
 
@@ -119,6 +134,10 @@ class SafetyGate:
         self.config = config if isinstance(config, SafetyGateConfig) else SafetyGateConfig.from_mapping(config)
         self.time_provider = time_provider or time.monotonic
         self._last_allowed_at: Dict[Tuple[str, str], float] = {}
+        # (target, action_type) -> [(t, |change_db|)] для бюджета коррекций
+        self._change_history: Dict[Tuple[str, str], list] = {}
+        # (target, action_type) -> (t, sign) для min-hold (запрет реверса)
+        self._last_change_sign: Dict[Tuple[str, str], Tuple[float, float]] = {}
 
     def evaluate_plan(
         self,
@@ -156,7 +175,12 @@ class SafetyGate:
                 continue
             allowed.append(checked)
             if checked.action_type != ACTION_NO_ACTION and not dry:
-                self._last_allowed_at[(checked.target, checked.action_type)] = now
+                key = (checked.target, checked.action_type)
+                self._last_allowed_at[key] = now
+                change_db = _number(checked.parameters.get("gain_db"), None)
+                if change_db is not None and change_db != 0.0:
+                    self._change_history.setdefault(key, []).append((now, abs(change_db)))
+                    self._last_change_sign[key] = (now, 1.0 if change_db > 0 else -1.0)
 
         allowed_plan = ActionPlan(
             plan_id=f"{plan.plan_id}.safety_gate",
@@ -197,6 +221,9 @@ class SafetyGate:
             if decision.risk_level in {RISK_HIGH, RISK_CRITICAL}:
                 return None, f"risk_level_{decision.risk_level}"
             limited = self._rate_or_cooldown_limited(decision, now)
+            if limited:
+                return None, limited
+            limited = self._anti_oscillation_limited(decision, now)
             if limited:
                 return None, limited
 
@@ -302,6 +329,45 @@ class SafetyGate:
         ):
             return None, "pan_step_exceeds_limit"
         return self._mark_allowed(decision, "pan_allowed", dry_run), "pan allowed"
+
+    def _anti_oscillation_limited(self, decision: ActionDecision, now: float) -> str:
+        """Бюджет коррекций, min-hold (запрет реверса) и лимит дБ/с.
+
+        Применяется к решениям с дельтой в дБ (gain/eq). Все три лимита
+        по умолчанию выключены (0.0) и включаются live-конфигом.
+        """
+        if decision.action_type not in (ACTION_GAIN, ACTION_EQ):
+            return ""
+        change_db = _number(decision.parameters.get("gain_db"), None)
+        if change_db is None or change_db == 0.0:
+            return ""
+        key = (decision.target, decision.action_type)
+
+        if self.config.max_rate_db_per_sec > 0.0:
+            last = self._last_allowed_at.get(key)
+            if last is not None:
+                dt = now - last
+                if dt <= 0.0 or abs(change_db) / dt > self.config.max_rate_db_per_sec:
+                    return "rate_db_per_sec_exceeded"
+
+        if self.config.min_hold_sec > 0.0:
+            held = self._last_change_sign.get(key)
+            if held is not None:
+                held_at, held_sign = held
+                new_sign = 1.0 if change_db > 0 else -1.0
+                if new_sign == -held_sign and (now - held_at) < self.config.min_hold_sec:
+                    return "min_hold_reversal_blocked"
+
+        if self.config.correction_budget_db > 0.0:
+            history = self._change_history.get(key, [])
+            horizon = now - self.config.budget_window_sec
+            history = [(t, c) for t, c in history if t >= horizon]
+            self._change_history[key] = history
+            spent = sum(c for _, c in history)
+            if spent + abs(change_db) > self.config.correction_budget_db:
+                return "correction_budget_exhausted"
+
+        return ""
 
     def _rate_or_cooldown_limited(self, decision: ActionDecision, now: float) -> str:
         last = self._last_allowed_at.get((decision.target, decision.action_type))
