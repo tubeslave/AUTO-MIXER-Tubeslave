@@ -45,6 +45,9 @@ the handoff auditable without contacting backend or WING.
   key proof phases and denied authority flags.
 - Return a JSON verifier report with `owner_review_input_ready=false` unless
   all checks pass.
+- Support `--write-artifact` so the verifier can persist `summary.json` under
+  `artifacts/wing_owner_readiness_review_verifier/<run_id>/` for owner-review
+  audit without contacting backend or WING.
 
 ## Test plan
 
@@ -53,6 +56,8 @@ the handoff auditable without contacting backend or WING.
 - Unit test that a complete M005 summary makes owner-review input ready while
   keeping live authority and readiness updates false.
 - Unit test that packet-level authority widening fails closed.
+- Unit test that persisted verifier artifacts preserve blocked status and
+  authority denial.
 
 ## Risks and rollback
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -18,6 +19,7 @@ DEFAULT_PACKET_SUMMARY = (
     "artifacts/wing_owner_readiness_review/"
     "20260704T191101Z_m006_owner_readiness_review_packet/summary.json"
 )
+DEFAULT_ARTIFACT_ROOT = "artifacts/wing_owner_readiness_review_verifier"
 EXPECTED_PACKET_SCHEMA = "automixer.m006_owner_readiness_review_packet.v1"
 EXPECTED_M005_SCHEMA = "wing_timeout_disconnect_proof.v1"
 EXPECTED_M005_SUMMARY_GLOB = "artifacts/wing_timeout_disconnect_proof/*/summary.json"
@@ -47,6 +49,14 @@ def _resolve(path_text: str | Path) -> Path:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _iso_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _utc_stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _get_mapping(data: Mapping[str, Any], key: str) -> Mapping[str, Any]:
@@ -256,6 +266,7 @@ def verify_packet(
 
     return {
         "schema": "automixer.m006_owner_readiness_packet_verifier.v1",
+        "generated_at_utc": _iso_now(),
         "status": "ready_for_owner_review" if ready else "blocked",
         "reason": reason,
         "packet_summary": packet_summary_path,
@@ -285,6 +296,38 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
     )
 
 
+def write_verifier_artifact(
+    result: Mapping[str, Any],
+    *,
+    artifact_root: Path,
+    run_id: str | None = None,
+) -> dict[str, Any]:
+    resolved_root = _resolve(artifact_root)
+    effective_run_id = run_id or f"{_utc_stamp()}_m006_owner_readiness_packet_verifier"
+    run_dir = resolved_root / effective_run_id
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    summary_path = run_dir / "summary.json"
+    if artifact_root.is_absolute():
+        display_summary_path = str(summary_path)
+        display_artifact_root = str(resolved_root)
+    else:
+        display_summary_path = str(artifact_root / effective_run_id / "summary.json")
+        display_artifact_root = str(artifact_root)
+
+    output = dict(result)
+    output.update(
+        {
+            "artifact_root": display_artifact_root,
+            "run_id": effective_run_id,
+            "summary_path": display_summary_path,
+            "artifact_written": True,
+        }
+    )
+    summary_path.write_text(json.dumps(output, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return output
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Offline fail-closed verifier for the M006 owner readiness packet."
@@ -297,6 +340,13 @@ def build_parser() -> argparse.ArgumentParser:
             "disconnect/timeout/stale-state summary artifact."
         ),
     )
+    parser.add_argument(
+        "--write-artifact",
+        action="store_true",
+        help="Write verifier summary.json under --artifact-root/<run-id>/.",
+    )
+    parser.add_argument("--artifact-root", default=DEFAULT_ARTIFACT_ROOT)
+    parser.add_argument("--run-id", help="Optional deterministic run id for artifact output.")
     return parser
 
 
@@ -306,6 +356,12 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.packet_summary),
         Path(args.m005_summary) if args.m005_summary else None,
     )
+    if args.write_artifact:
+        result = write_verifier_artifact(
+            result,
+            artifact_root=Path(args.artifact_root),
+            run_id=args.run_id,
+        )
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0 if result["status"] == "ready_for_owner_review" else 2
 

@@ -169,3 +169,28 @@ def test_packet_attempting_to_grant_authority_fails_closed() -> None:
     assert "packet_live_authority_granted_denied" in result["failed_checks"]
     assert result["live_authority_granted"] is False
     assert result["readiness_closure_allowed"] is False
+
+
+def test_write_artifact_preserves_blocked_authority_denial(tmp_path: Path) -> None:
+    result = verifier.verify_packet(load_packet())
+
+    output = verifier.write_verifier_artifact(
+        result,
+        artifact_root=tmp_path / "m006_verifier",
+        run_id="unit_m006_verifier",
+    )
+
+    summary_path = Path(output["summary_path"])
+    assert summary_path.exists()
+    saved = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert saved["artifact_written"] is True
+    assert saved["run_id"] == "unit_m006_verifier"
+    assert saved["status"] == "blocked"
+    assert saved["reason"] == "m005_summary_required_for_owner_review"
+    assert saved["owner_review_input_ready"] is False
+    assert saved["live_authority_granted"] is False
+    assert saved["readiness_closure_allowed"] is False
+    assert saved["readiness_matrix_update_allowed"] is False
+    assert saved["contacts_wing"] is False
+    assert saved["contacts_backend"] is False
+    assert saved["live_write"] is False
