@@ -1,0 +1,132 @@
+{
+  "schema": "automixer.m006_owner_readiness_review_packet.v1",
+  "generated_at_utc": "2026-07-04T19:11:01Z",
+  "status": "ready_for_owner_review_after_m005",
+  "scope": "owner_review_packet_only_no_readiness_update",
+  "live_authority_granted": false,
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "contacts_wing": false,
+  "contacts_backend": false,
+  "live_write": false,
+  "accepted_readonly_source_id": "artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json",
+  "input_proof_artifacts": [
+    "artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
+    "artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json"
+  ],
+  "pending_external_gates": [
+    "M005 supervised physical disconnect/timeout/stale-state proof with operator present",
+    "M006 owner readiness review decision after M005 evidence is accepted"
+  ],
+  "proofs": [
+    {
+      "kind": "fader",
+      "family_id": "fader_balance",
+      "safety_row_id": "fader_supervised",
+      "artifact": "artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
+      "artifact_status": "passed",
+      "artifact_reason": "proposal_apply_readback_rollback_complete",
+      "channel": 3,
+      "wing_surface": "channel_fader",
+      "wing_address": "/ch/3/fdr",
+      "proof_direction": "negative_db_move_only",
+      "method": "set_channel_fader",
+      "old_value": 0.0,
+      "requested_value": -0.25,
+      "effective_value": -0.25,
+      "apply_readback_value": -0.2499980926513672,
+      "physical_pre_read": "verified_from_physical_readback",
+      "physical_apply_readback": "verified_from_physical_readback",
+      "physical_rollback_readback": "verified_from_physical_readback",
+      "rollback_status": "applied",
+      "rollback_request_sent": true,
+      "emergency_stop_status": "stopped",
+      "post_emergency_apply_status": "blocked",
+      "post_emergency_apply_reason": "emergency_stop_active",
+      "blocked_apply_before_supervised": "apply_blocked",
+      "via_apply_operator_proposal": true,
+      "direct_live_write_request_sent": false,
+      "operator_approval_required": true
+    },
+    {
+      "kind": "gain",
+      "family_id": "gain_trim",
+      "safety_row_id": "gain_supervised",
+      "artifact": "artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json",
+      "artifact_status": "passed",
+      "artifact_reason": "proposal_apply_readback_rollback_complete",
+      "channel": 3,
+      "wing_surface": "input_trim",
+      "wing_address": "/ch/3/in/set/trim",
+      "proof_direction": "negative_input_trim_move_only",
+      "method": "set_channel_gain",
+      "old_value": 0.0,
+      "requested_value": -0.25,
+      "effective_value": -0.25,
+      "apply_readback_value": -0.1999988555908203,
+      "physical_pre_read": "verified_from_physical_readback",
+      "physical_apply_readback": "verified_from_physical_readback",
+      "physical_rollback_readback": "verified_from_physical_readback",
+      "rollback_status": "applied",
+      "rollback_request_sent": true,
+      "emergency_stop_status": "stopped",
+      "post_emergency_apply_status": "blocked",
+      "post_emergency_apply_reason": "emergency_stop_active",
+      "blocked_apply_before_supervised": "apply_blocked",
+      "via_apply_operator_proposal": true,
+      "direct_live_write_request_sent": false,
+      "operator_approval_required": true,
+      "gain_up_allowed": false
+    }
+  ],
+  "current_matrix_state": {
+    "safety_coverage_matrix": {
+      "hardware_proven_narrow_rows": [
+        "fader_supervised",
+        "gain_supervised"
+      ],
+      "live_allowed_row_ids": [],
+      "live_apply_policy": "supervised_fader_gain_policy_only_release_live_blocked"
+    },
+    "wing_correction_apply_readiness": {
+      "report": "Docs/reports/WING_CORRECTION_APPLY_READINESS_20260703.md",
+      "supervised_policy_family_ids": [
+        "fader_balance",
+        "gain_trim"
+      ],
+      "live_allowed_family_count": 0,
+      "live_allowed_family_ids": [],
+      "known_stale_before_owner_review": true,
+      "reason": "The report still says release-ready live families are 0 until M005 and the M006 owner review accept the proof artifacts."
+    }
+  },
+  "owner_decision_template": {
+    "decision": "pending_owner_review",
+    "reviewed_by": null,
+    "reviewed_at_utc": null,
+    "allowed_update_after_acceptance": [
+      "fader_supervised hardware_proven_narrow evidence may be accepted for the narrow supervised fader path only",
+      "gain_supervised hardware_proven_narrow evidence may be accepted for the narrow supervised gain-down/input-trim path only"
+    ],
+    "must_remain_blocked": [
+      "EQ",
+      "compressor",
+      "gate",
+      "FX",
+      "routing",
+      "mute",
+      "pan",
+      "master",
+      "scene",
+      "full auto apply",
+      "fader boosts",
+      "gain-up from short soundcheck material"
+    ],
+    "acceptance_prerequisites": [
+      "M005 artifact exists under artifacts/wing_timeout_disconnect_proof",
+      "M005 proves physical cable-loss, stale readback denial, blocked write while disconnected and reconnect recovery",
+      "Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts"
+    ]
+  },
+  "recommended_next_action": "Run M005 with the operator present, then use this packet for M006 owner review. Do not update readiness rows or live authority before both gates are satisfied."
+}
