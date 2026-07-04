@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-04T21:16:22Z
+Generated: 2026-07-04T21:38:23Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `ad7f0da18 Harden M005 reconnect evidence checks`
+  `f0ccd9842 Bind M005 request audit to owner verifier`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M005 reconnect
-  evidence contract hardening commit `ad7f0da18`; ignored large/superseded
+- Tracked worktree state before this sync: clean after the M005 request-audit
+  owner-verifier binding commit `f0ccd9842`; ignored large/superseded
   local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -82,6 +82,12 @@ Generated: 2026-07-04T21:16:22Z
   now independently requires the M005 cable-loss token, unavailable stale
   readback, safe blocked-write reason and physical reconnect readback. This
   is still offline verifier hardening only; M005/M006 remain open.
+- `f0ccd9842` binds M005 request-audit evidence into the M006 owner-review
+  verifier: complete M005 input must expose `sent_request_types`, include
+  the blocked `apply_operator_proposal` probe, contain no forbidden direct
+  write request types, and keep `forbidden_request_types_sent` consistent
+  with that audit. This prevents clean summary flags from hiding
+  write-adjacent M005 evidence and still grants no live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2016,10 +2022,10 @@ Generated: 2026-07-04T21:16:22Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `ad7f0da18` passed with
-  `5466 passed, 1 skipped`. This includes the M005 reconnect evidence contract
-  hardening, M006 owner-readiness packet verifier phase-detail checks plus
-  the local SmartDSP
+- The latest verified full-suite run for `f0ccd9842` passed with
+  `5468 passed, 1 skipped`. This includes the M005 request-audit owner-verifier
+  binding, M005 reconnect evidence contract hardening, M006 owner-readiness
+  packet verifier phase-detail checks plus the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
   the active milestone waiting-reason/timestamp rails plus the repo-local
