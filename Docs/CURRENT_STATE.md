@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-04T22:24:01Z
+Generated: 2026-07-04T22:37:52Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `b605b20f4 Bind M005 event sequence to owner verifier`
+  `f8eb799c6 Require complete soundcheck runtime observation`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M005 event-sequence
-  owner-verifier binding commit `b605b20f4`; ignored
+- Tracked worktree state before this sync: clean after the read-only
+  soundcheck runtime observation contract commit `f8eb799c6`; ignored
   large/superseded local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -335,9 +335,14 @@ Generated: 2026-07-04T22:24:01Z
   `npm --prefix frontend run build`: passed). Targeted backend checks passed
   for meter stream, runtime observation, the M005 timeout/disconnect proof
   runner, supervised proposal runner, operator review coverage and the
-  long-run drift audit. Full backend validation also passed:
-  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5453
-  passed, 1 skipped, 1 warning. The no-WING quick gate failed closed on
+  long-run drift audit. `f8eb799c6` now requires future runtime observation
+  summaries to include a complete `operator_runtime_contract`: operator mode,
+  connection state, dashboard snapshot, channel inventory, decision queue,
+  safety monitor, meter subscription, read-only channel-level meters, analyzer
+  status and master-bus status. The existing 600.005 second artifact
+  recomputes as complete with no missing surfaces. Full backend validation
+  also passed: `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`:
+  5476 passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because an existing backend listener requires operator
   confirmation; no live authority, readiness closure or current supervised
   live-write kind changed.
@@ -2044,8 +2049,9 @@ Generated: 2026-07-04T22:24:01Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `b605b20f4` passed with
-  `5475 passed, 1 skipped`. This includes the M005 event-sequence
+- The latest verified full-suite run for `f8eb799c6` passed with
+  `5476 passed, 1 skipped`. This includes the soundcheck runtime
+  `operator_runtime_contract` binding, the M005 event-sequence
   owner-verifier binding, the M005 canonical artifact-path owner-verifier
   binding, the M005 event-log owner-verifier binding, the M005 request-audit
   owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness

@@ -348,7 +348,10 @@ operator/owner action, unattended Codex work may execute only the safe slice:
    `apply_operator_proposal`;
 7. read-only soundcheck runtime observation artifacts that subscribe to meters
    and request dashboard/channel/decision/safety snapshots without creating or
-   applying proposals;
+   applying proposals, and that pass the complete `operator_runtime_contract`
+   for operator mode, connection state, dashboard, channel inventory, decision
+   queue, safety monitor, meter subscription, read-only channel-level meters,
+   analyzer status and master-bus status;
 8. offline long-run drift audits of existing soundcheck logs, provided the
    audit reads evidence only and cannot create, apply or retry corrections;
 9. read-only operator review coverage checks that surface whether pending

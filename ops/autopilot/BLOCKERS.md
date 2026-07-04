@@ -76,8 +76,13 @@
   meter frames, 0 unexpected live events, no forbidden sent request types and
   no live apply request sent. Frontend test/build passed, targeted backend
   meter/runtime-observation/M005-runner/proposal tests passed, and WING MVP
-  rails passed. Full backend validation also passed:
-  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5475
+  rails passed. `f8eb799c6` now requires future runtime observation summaries
+  to include a complete `operator_runtime_contract` covering operator mode,
+  connection state, dashboard, channel inventory, decision queue, safety
+  monitor, meter subscription, read-only channel-level meters, analyzer status
+  and master-bus status; the existing 600.005 second artifact recomputes as
+  complete with no missing surfaces. Full backend validation also passed:
+  `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`: 5476
   passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because the existing listener still needs operator
   confirmation. M005 still requires the operator-present physical cable-loss,
@@ -134,8 +139,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_event_sequence_owner_verifier_bound` at
-  `2026-07-04T22:24:01Z`. That row preserves the same `current_blocker`,
+  `soundcheck_runtime_operator_contract_bound` at
+  `2026-07-04T22:37:52Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

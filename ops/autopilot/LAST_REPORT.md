@@ -10,7 +10,7 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T22:24:01Z.
+- Latest heartbeat: 2026-07-04T22:37:52Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -39,6 +39,14 @@
   observation-only reconnect and final query after that blocked probe. This
   grants no backend/WING contact, live write, readiness update or live
   authority.
+- Latest soundcheck runtime hardening: `f8eb799c6` makes
+  `tools/soundcheck_runtime_observation_runner.py` require a complete
+  `operator_runtime_contract` before a runtime observation can pass: operator
+  mode, connection state, dashboard, channel inventory, decision queue, safety
+  monitor, meter subscription, read-only channel-level meters, analyzer status
+  and master-bus status. The existing 600.005 second observation artifact
+  recomputes as complete with no missing surfaces. This creates no proposal,
+  applies no proposal, updates no readiness row and grants no live authority.
 - Status marker: read-only decision gate is accepted-ready; release readiness
   remains blocked on M005/M006.
 - External validation requirements:
@@ -567,7 +575,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   artifact summaries against packet rows, `ad7f0da18` requires physical
   reconnect evidence, and `f0ccd9842` binds M005 request-audit evidence before
   owner-review input can be ready. The latest verified full suite passed with
-  `5475 passed, 1 skipped`;
+  `5476 passed, 1 skipped`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,
