@@ -47,6 +47,9 @@ EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES = {
     "set_" + "fader",
     "set_" + "gain",
 }
+EXPECTED_M005_FORBIDDEN_REMEDIATION_REQUEST_TYPES = {
+    "rollback_last_manual_write",
+}
 AUTHORITY_DENIAL_FLAGS = {
     "live_authority_granted": False,
     "readiness_closure_allowed": False,
@@ -396,6 +399,17 @@ def _record_packet_checks(checks: dict[str, bool], packet: Mapping[str, Any]) ->
     )
     _record(
         checks,
+        "m005_contract_requires_no_rollback_request",
+        contract.get("required_rollback_request_sent") is False,
+    )
+    _record(
+        checks,
+        "m005_contract_forbids_remediation_request_types",
+        contract.get("forbidden_remediation_request_types")
+        == sorted(EXPECTED_M005_FORBIDDEN_REMEDIATION_REQUEST_TYPES),
+    )
+    _record(
+        checks,
         "m005_contract_keeps_authority_denied",
         contract.get("must_keep_authority_denied") == AUTHORITY_DENIAL_FLAGS,
     )
@@ -684,6 +698,7 @@ def _record_m005_checks(
     for field_name, expected in AUTHORITY_DENIAL_FLAGS.items():
         _record(checks, f"m005_summary_{field_name}_denied", m005_summary.get(field_name) is expected)
     sent_request_types = m005_summary.get("sent_request_types")
+    rollback_request_sent = m005_summary.get("rollback_request_sent")
     if isinstance(sent_request_types, list):
         m005_sent_request_types = [str(item) for item in sent_request_types]
     else:
@@ -693,6 +708,11 @@ def _record_m005_checks(
         for request_type in m005_sent_request_types
         if request_type in EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES
     ]
+    remediation_from_sent = [
+        request_type
+        for request_type in m005_sent_request_types
+        if request_type in EXPECTED_M005_FORBIDDEN_REMEDIATION_REQUEST_TYPES
+    ]
     if isinstance(m005_event_request_types, list):
         event_request_types = [str(item) for item in m005_event_request_types]
     else:
@@ -701,6 +721,11 @@ def _record_m005_checks(
         request_type
         for request_type in event_request_types
         if request_type in EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES
+    ]
+    remediation_from_events = [
+        request_type
+        for request_type in event_request_types
+        if request_type in EXPECTED_M005_FORBIDDEN_REMEDIATION_REQUEST_TYPES
     ]
     _record(
         checks,
@@ -724,8 +749,24 @@ def _record_m005_checks(
     )
     _record(
         checks,
+        "m005_summary_no_forbidden_remediation_request_types",
+        remediation_from_sent == [],
+    )
+    _record(
+        checks,
         "m005_summary_forbidden_requests_match_sent_audit",
         m005_summary.get("forbidden_request_types_sent") == forbidden_from_sent,
+    )
+    _record(
+        checks,
+        "m005_summary_rollback_request_not_sent",
+        rollback_request_sent is False,
+    )
+    _record(
+        checks,
+        "m005_summary_rollback_request_matches_sent_audit",
+        isinstance(rollback_request_sent, bool)
+        and rollback_request_sent == bool(remediation_from_sent),
     )
     _record(
         checks,
@@ -762,6 +803,11 @@ def _record_m005_checks(
         checks,
         "m005_events_no_forbidden_direct_request_types",
         forbidden_from_events == [],
+    )
+    _record(
+        checks,
+        "m005_events_no_forbidden_remediation_request_types",
+        remediation_from_events == [],
     )
 
     phases = _get_mapping(m005_summary, "phases")

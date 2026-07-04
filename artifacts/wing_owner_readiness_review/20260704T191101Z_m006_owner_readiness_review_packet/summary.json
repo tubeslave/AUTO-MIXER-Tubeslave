@@ -32,6 +32,10 @@
       "reconnect_recovery_verified"
     ],
     "required_blocked_write_apply_result_type": "operator_proposal_apply_blocked",
+    "required_rollback_request_sent": false,
+    "forbidden_remediation_request_types": [
+      "rollback_last_manual_write"
+    ],
     "must_keep_authority_denied": {
       "live_authority_granted": false,
       "readiness_closure_allowed": false,
@@ -147,6 +151,7 @@
       "M005 summary has m005_complete=true and missing_m005_evidence=[]",
       "M005 proves physical cable-loss, stale readback denial, blocked write while disconnected and reconnect recovery",
       "M005 blocked-write phase includes nested operator_proposal_apply_blocked backend response",
+      "M005 rollback_request_sent=false and request/event audits contain no rollback_last_manual_write",
       "Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts"
     ]
   },

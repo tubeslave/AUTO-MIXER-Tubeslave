@@ -176,3 +176,16 @@ This prevents a hand-edited summary from claiming that a disconnected
 was missing or applied. The update is offline verifier hardening only; it does
 not run M005, does not contact the backend or WING, and does not grant
 readiness closure or live authority.
+
+## 2026-07-04 M005 Rollback-Free Owner-Review Binding Update
+
+The M006 owner-readiness verifier now rejects M005 owner-review input when the
+M005 summary says `rollback_request_sent=true` or when the summary/events
+request audit contains `rollback_last_manual_write`.
+
+The M005 runner can still send `rollback_last_manual_write` as emergency
+remediation if the blocked-write probe unexpectedly applies. That path remains
+`manual_review_required`; it is not clean disconnect-proof evidence for M006.
+This binding is offline verifier hardening only. It does not run M005, does not
+contact backend or WING, and does not grant readiness closure or live
+authority.

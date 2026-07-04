@@ -51,7 +51,7 @@ the handoff auditable without contacting backend or WING.
 - Verify M005 schema, `status=passed`, `m005_complete=true`, empty missing and
   remaining evidence, all required evidence keys, physical cable-loss mode,
   key proof phases, the nested blocked-write `operator_proposal_apply_blocked`
-  response, and denied authority flags.
+  response, rollback-free request audits, and denied authority flags.
 - Return a JSON verifier report with `owner_review_input_ready=false` unless
   all checks pass.
 - Support `--write-artifact` so the verifier can persist `summary.json` under
@@ -69,6 +69,8 @@ the handoff auditable without contacting backend or WING.
 - Unit test that a stale or mutated referenced proof artifact fails closed.
 - Unit test that a forged M005 blocked-write phase with an applied nested
   result fails closed.
+- Unit test that rollback remediation in the M005 summary or event request
+  audit fails closed.
 - Unit test that packet-level authority widening fails closed.
 - Unit test that persisted verifier artifacts preserve blocked status and
   authority denial.
@@ -93,3 +95,18 @@ enough to make owner-review input ready.
 This keeps M006 report-only and fail-closed. The update does not contact
 backend or WING, does not run the physical disconnect proof, and does not grant
 readiness closure or live authority.
+
+## 2026-07-04 M005 Rollback-Free Evidence Binding Update
+
+The verifier now requires the M006 packet contract to declare
+`required_rollback_request_sent=false` and
+`forbidden_remediation_request_types=["rollback_last_manual_write"]`. It also
+checks the supplied M005 summary and loaded M005 event request audit for the
+same boundary.
+
+This prevents rollback-remediated disconnect artifacts from being accepted as
+clean M005 owner-review input. A valid blocked-write probe should be blocked
+before any mixer mutation, so a rollback request inside the M005 proof means the
+artifact needs manual review instead of M006 acceptance. This update is offline
+only: it does not contact backend or WING, does not run M005, does not create or
+apply proposals, and does not grant readiness closure or live authority.

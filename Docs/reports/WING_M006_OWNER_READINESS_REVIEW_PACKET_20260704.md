@@ -72,7 +72,9 @@ Acceptance prerequisites:
 4. The blocked-write phase includes the nested backend
    `operator_proposal_apply_blocked` response, not only a phase-level safe
    reason.
-5. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+5. M005 summary has `rollback_request_sent=false`, and the summary/events
+   request audits contain no `rollback_last_manual_write`.
+6. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
 
 The M005 summary must also keep `live_authority_granted=false`,
 `readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.
@@ -100,6 +102,11 @@ this packet and cross-checks the packet proof rows against those artifacts. It
 does not glob for substitute artifacts. If a referenced proof summary is
 missing, stale, path-unsafe or inconsistent with the packet row, owner-review
 input remains `blocked`.
+
+The verifier also treats rollback remediation inside M005 as contaminated
+disconnect-proof evidence. If `rollback_request_sent=true` or either M005
+request audit contains `rollback_last_manual_write`, owner-review input remains
+`blocked`; a clean blocked-write probe should need no rollback.
 
 Allowed after owner acceptance:
 
