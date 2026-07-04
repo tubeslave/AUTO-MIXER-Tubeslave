@@ -66,9 +66,13 @@ Decision: `pending_owner_review`
 Acceptance prerequisites:
 
 1. M005 artifact exists under `artifacts/wing_timeout_disconnect_proof`.
-2. M005 proves physical cable-loss, stale readback denial, blocked write while
+2. M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`.
+3. M005 proves physical cable-loss, stale readback denial, blocked write while
    disconnected and reconnect recovery.
-3. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+4. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+
+The M005 summary must also keep `live_authority_granted=false`,
+`readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.
 
 Allowed after owner acceptance:
 

@@ -18,6 +18,25 @@
     "M005 supervised physical disconnect/timeout/stale-state proof with operator present",
     "M006 owner readiness review decision after M005 evidence is accepted"
   ],
+  "m005_completion_contract": {
+    "required_summary_glob": "artifacts/wing_timeout_disconnect_proof/*/summary.json",
+    "required_schema": "wing_timeout_disconnect_proof.v1",
+    "required_status": "passed",
+    "required_m005_complete": true,
+    "required_missing_m005_evidence": [],
+    "required_completed_m005_evidence": [
+      "physical_baseline_readback",
+      "operator_confirmed_physical_cable_loss",
+      "stale_readback_unavailable",
+      "blocked_write_while_disconnected",
+      "reconnect_recovery_verified"
+    ],
+    "must_keep_authority_denied": {
+      "live_authority_granted": false,
+      "readiness_closure_allowed": false,
+      "readiness_matrix_update_allowed": false
+    }
+  },
   "proofs": [
     {
       "kind": "fader",
@@ -124,6 +143,7 @@
     ],
     "acceptance_prerequisites": [
       "M005 artifact exists under artifacts/wing_timeout_disconnect_proof",
+      "M005 summary has m005_complete=true and missing_m005_evidence=[]",
       "M005 proves physical cable-loss, stale readback denial, blocked write while disconnected and reconnect recovery",
       "Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts"
     ]

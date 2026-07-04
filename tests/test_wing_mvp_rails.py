@@ -317,6 +317,16 @@ AUTOPILOT_HEARTBEAT = PROJECT_ROOT / "ops" / "autopilot" / "HEARTBEAT.md"
 AUTOPILOT_LAST_REPORT = PROJECT_ROOT / "ops" / "autopilot" / "LAST_REPORT.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
 AUTOPILOT_RUN_LEDGER = PROJECT_ROOT / "ops" / "autopilot" / "RUN_LEDGER.jsonl"
+M006_OWNER_REVIEW_PACKET_SUMMARY = (
+    PROJECT_ROOT
+    / "artifacts"
+    / "wing_owner_readiness_review"
+    / "20260704T191101Z_m006_owner_readiness_review_packet"
+    / "summary.json"
+)
+M006_OWNER_REVIEW_PACKET_REPORT = (
+    PROJECT_ROOT / "Docs" / "reports" / "WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md"
+)
 REAL_WING_ARTIFACT_ROOT = PROJECT_ROOT / "artifacts" / "wing_readonly_preflight"
 VALIDATE_INPUTS_READY_SUMMARY = (
     PROJECT_ROOT
@@ -2254,6 +2264,56 @@ def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
     assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
     assert "MVP readiness/operator evidence update is now covered" in current
     assert "readiness/operator evidence update gate rail is now automated" in report
+
+
+def test_m006_owner_review_packet_requires_complete_m005_summary_contract():
+    packet = json.loads(M006_OWNER_REVIEW_PACKET_SUMMARY.read_text(encoding="utf-8"))
+    report = M006_OWNER_REVIEW_PACKET_REPORT.read_text(encoding="utf-8")
+
+    assert packet["status"] == "ready_for_owner_review_after_m005"
+    assert packet["scope"] == "owner_review_packet_only_no_readiness_update"
+    assert packet["live_authority_granted"] is False
+    assert packet["readiness_closure_allowed"] is False
+    assert packet["readiness_matrix_update_allowed"] is False
+    assert packet["contacts_wing"] is False
+    assert packet["contacts_backend"] is False
+    assert packet["live_write"] is False
+
+    contract = packet["m005_completion_contract"]
+    assert contract["required_summary_glob"] == (
+        "artifacts/wing_timeout_disconnect_proof/*/summary.json"
+    )
+    assert contract["required_schema"] == "wing_timeout_disconnect_proof.v1"
+    assert contract["required_status"] == "passed"
+    assert contract["required_m005_complete"] is True
+    assert contract["required_missing_m005_evidence"] == []
+    assert contract["required_completed_m005_evidence"] == [
+        "physical_baseline_readback",
+        "operator_confirmed_physical_cable_loss",
+        "stale_readback_unavailable",
+        "blocked_write_while_disconnected",
+        "reconnect_recovery_verified",
+    ]
+    assert contract["must_keep_authority_denied"] == {
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "readiness_matrix_update_allowed": False,
+    }
+
+    prerequisites = packet["owner_decision_template"]["acceptance_prerequisites"]
+    assert "M005 artifact exists under artifacts/wing_timeout_disconnect_proof" in prerequisites
+    assert "M005 summary has m005_complete=true and missing_m005_evidence=[]" in prerequisites
+    assert (
+        "M005 proves physical cable-loss, stale readback denial, blocked write while "
+        "disconnected and reconnect recovery"
+    ) in prerequisites
+
+    assert "M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`." in report
+    assert "`live_authority_granted=false`" in report
+    assert "`readiness_closure_allowed=false`" in report
+    assert "`readiness_matrix_update_allowed=false`" in report
+    assert "does not close M005 or M006" in report
+    assert "does not update\nthe readiness matrix and does not grant live authority" in report
 
 
 def test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansion():
