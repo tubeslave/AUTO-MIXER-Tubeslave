@@ -353,9 +353,9 @@ operator/owner action, unattended Codex work may execute only the safe slice:
    runtime WIP and frontend UI restyle WIP as separate commit groups and
    generated review patches before the next soundcheck cycle;
 11. report-only M006 owner review packets and offline verifiers that inventory
-   accepted fader/gain proof artifacts, require a complete M005 summary
-   contract, and keep readiness updates blocked until M005 and owner
-   acceptance.
+   accepted fader/gain proof artifacts, cross-check packet proof rows against
+   the referenced proof summaries, require a complete M005 summary contract,
+   and keep readiness updates blocked until M005 and owner acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
 includes the M005 physical cable-loss proof, reconnect proof and any supervised

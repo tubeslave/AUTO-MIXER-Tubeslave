@@ -36,6 +36,10 @@ def load_packet() -> dict:
     return json.loads(PACKET_SUMMARY.read_text(encoding="utf-8"))
 
 
+def load_packet_proofs(packet: dict | None = None) -> dict:
+    return verifier.load_packet_proof_summaries(packet or load_packet())
+
+
 def complete_m005_summary() -> dict:
     return {
         "proof_artifact_schema": "wing_timeout_disconnect_proof.v1",
@@ -117,6 +121,7 @@ def test_current_partial_m005_artifact_keeps_owner_review_blocked() -> None:
     result = verifier.verify_packet(
         packet,
         m005_summary=partial_m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=str(PARTIAL_M005_SUMMARY.relative_to(PROJECT_ROOT)),
     )
 
@@ -140,14 +145,20 @@ def test_current_partial_m005_artifact_keeps_owner_review_blocked() -> None:
 def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
+    packet = load_packet()
 
-    result = verifier.verify_packet(load_packet(), m005_summary=m005)
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
 
     assert result["status"] == "ready_for_owner_review"
     assert result["reason"] == "m006_owner_review_inputs_verified"
     assert result["owner_review_input_ready"] is True
     assert result["failed_checks"] == []
     assert all(result["checks"].values())
+    assert result["proof_artifact_summaries"] == packet["input_proof_artifacts"]
     assert result["live_authority_granted"] is False
     assert result["readiness_closure_allowed"] is False
     assert result["readiness_matrix_update_allowed"] is False
@@ -162,11 +173,62 @@ def test_packet_attempting_to_grant_authority_fails_closed() -> None:
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
 
-    result = verifier.verify_packet(packet, m005_summary=m005)
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
 
     assert result["status"] == "blocked"
     assert result["reason"] == "m006_owner_review_inputs_failed"
     assert "packet_live_authority_granted_denied" in result["failed_checks"]
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+
+
+def test_missing_referenced_proof_artifact_blocks_owner_review() -> None:
+    packet = load_packet()
+    packet["proofs"][0]["artifact"] = (
+        "artifacts/wing_operator_proposal_validation/"
+        "missing_wing_operator_proposal_ch3_fader/summary.json"
+    )
+    packet["input_proof_artifacts"][0] = packet["proofs"][0]["artifact"]
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "fader_supervised_artifact_summary_loaded" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_proof_artifact_summary_mismatch_blocks_owner_review() -> None:
+    packet = load_packet()
+    proofs = dict(load_packet_proofs(packet))
+    first_artifact = packet["proofs"][0]["artifact"]
+    proofs[first_artifact] = copy.deepcopy(proofs[first_artifact])
+    proofs[first_artifact]["reason"] = "stale_or_mutated_summary"
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=proofs,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "fader_supervised_artifact_reason_complete" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
     assert result["live_authority_granted"] is False
     assert result["readiness_closure_allowed"] is False
 

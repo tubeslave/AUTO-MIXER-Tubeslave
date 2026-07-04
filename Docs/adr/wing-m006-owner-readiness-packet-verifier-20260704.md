@@ -18,7 +18,10 @@ misread during handoff.
 
 Use option 3. Add `tools/verify_m006_owner_readiness_packet.py` as an offline
 fail-closed verifier. It reads the M006 packet and, when supplied, the M005
-summary artifact. Without a complete M005 summary it reports `blocked`.
+summary artifact. It also loads the fader/gain proof summaries referenced by
+the packet's proof rows and cross-checks them against the packet. Without a
+complete M005 summary, or if a referenced proof artifact is missing or stale,
+it reports `blocked`.
 
 ## Why this won
 
@@ -39,6 +42,11 @@ the handoff auditable without contacting backend or WING.
 
 - Verify the tracked M006 packet schema, scope, authority denial flags and
   fader/gain proof rows.
+- Load the exact fader/gain proof artifact paths declared in the packet, without
+  globbing for substitutes, and verify their schema, status, reason, surface,
+  address, direction, `apply_operator_proposal` path, physical readbacks,
+  rollback, emergency-stop block and direct-write denial against the packet
+  rows.
 - Require a supplied M005 summary before owner-review readiness can be true.
 - Verify M005 schema, `status=passed`, `m005_complete=true`, empty missing and
   remaining evidence, all required evidence keys, physical cable-loss mode,
@@ -54,7 +62,10 @@ the handoff auditable without contacting backend or WING.
 - Unit test that the current packet without M005 summary fails closed.
 - Unit test that a partial M005 summary fails closed.
 - Unit test that a complete M005 summary makes owner-review input ready while
-  keeping live authority and readiness updates false.
+  keeping live authority and readiness updates false only when the referenced
+  fader/gain proof summaries match.
+- Unit test that a missing referenced proof artifact fails closed.
+- Unit test that a stale or mutated referenced proof artifact fails closed.
 - Unit test that packet-level authority widening fails closed.
 - Unit test that persisted verifier artifacts preserve blocked status and
   authority denial.

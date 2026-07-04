@@ -92,6 +92,12 @@ also saves `summary.json` under
 `artifacts/wing_owner_readiness_review_verifier/<run_id>/` for owner-review
 audit.
 
+The verifier also loads the exact fader/gain `summary.json` paths referenced by
+this packet and cross-checks the packet proof rows against those artifacts. It
+does not glob for substitute artifacts. If a referenced proof summary is
+missing, stale, path-unsafe or inconsistent with the packet row, owner-review
+input remains `blocked`.
+
 Allowed after owner acceptance:
 
 - accept `fader_supervised` evidence for the narrow supervised fader path only;
