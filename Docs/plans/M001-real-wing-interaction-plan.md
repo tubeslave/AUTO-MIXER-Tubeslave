@@ -352,8 +352,9 @@ operator/owner action, unattended Codex work may execute only the safe slice:
 10. dirty-worktree split handoffs that record WING proof WIP, soundcheck
    runtime WIP and frontend UI restyle WIP as separate commit groups and
    generated review patches before the next soundcheck cycle;
-11. report-only M006 owner review packets that inventory accepted fader/gain
-   proof artifacts while keeping readiness updates blocked until M005 and owner
+11. report-only M006 owner review packets and offline verifiers that inventory
+   accepted fader/gain proof artifacts, require a complete M005 summary
+   contract, and keep readiness updates blocked until M005 and owner
    acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
