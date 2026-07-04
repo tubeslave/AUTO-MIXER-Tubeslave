@@ -308,54 +308,6 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         ),
     ),
     WriteSurface(
-        id="broad_live_wing_correction_test_tool",
-        label="Broad live WING correction test tool",
-        status="blocked",
-        paths=("tools/live_wing_correction_test.py",),
-        entrypoints=("live_wing_correction_test main",),
-        write_kinds=("fader", "gain", "mute", "eq", "hpf", "compressor", "pan", "phase", "delay"),
-        allowed_live=False,
-        gate=(
-            "Blocked from automation and release readiness. Manual execution requires "
-            "the explicit --confirm-live-wing-write acknowledgement plus operator "
-            "supervision, physical readback, and restoration review."
-        ),
-        current_policy=(
-            "This script can write a broad set of WING channel parameters and is not "
-            "part of the supervised MVP fader/gain apply path."
-        ),
-        next_action=(
-            "Prefer the narrow supervised fader/gain proof runbook. Keep this broad "
-            "test quarantined unless a future operator runbook gives it separate "
-            "readback, rollback, and emergency-stop proof requirements."
-        ),
-        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
-    ),
-    WriteSurface(
-        id="broad_live_wing_soundcheck_setup_tool",
-        label="Broad live WING soundcheck setup tool",
-        status="blocked",
-        paths=("tools/live_wing_soundcheck_setup.py",),
-        entrypoints=("live_wing_soundcheck_setup main",),
-        write_kinds=("fader", "gain", "hpf", "compressor", "gate"),
-        allowed_live=False,
-        gate=(
-            "Blocked from automation and release readiness. Non-dry-run execution "
-            "requires the explicit --confirm-live-wing-write acknowledgement plus "
-            "operator supervision, physical readback, and rollback review."
-        ),
-        current_policy=(
-            "This script can write broad WING soundcheck settings across active "
-            "channels and is not part of the supervised MVP fader/gain apply path."
-        ),
-        next_action=(
-            "Prefer the narrow supervised fader/gain proof runbook. Keep this "
-            "setup tool blocked unless a future operator runbook gives it separate "
-            "readback, rollback, and emergency-stop proof requirements."
-        ),
-        notes=("requires_explicit_live_write_ack", "not_mvp_release_authority"),
-    ),
-    WriteSurface(
         id="broad_live_wing_soundcheck_v2_tool",
         label="Broad live WING soundcheck v2 tool",
         status="blocked",
