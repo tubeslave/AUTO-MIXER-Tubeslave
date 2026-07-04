@@ -16,9 +16,11 @@ Status values:
 
 ## Current external validation handoff
 
-The canonical read-only decision is `accepted_decision_ready`, but M001 still
-waits for external WING/operator proof because the supervised CH3 fader proof
-failed rollback with `rollback_not_applied`.
+The canonical read-only decision is `accepted_decision_ready`, and the
+supervised CH3 fader/gain-down proofs have passed with apply, physical
+readback, rollback and emergency-stop/block evidence. The earlier
+`rollback_not_applied` artifact remains closed audit history; M001 now waits
+for M005 disconnect/timeout/stale-state proof and M006 owner readiness review.
 
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
@@ -26,8 +28,8 @@ failed rollback with `rollback_not_applied`.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`supervised_m005_software_disconnect_partial_evidence_recorded` at
-`2026-07-04T08:04:59Z`. No live authority changed; release-ready live
+`landed_split_handoff_truth_surfaces_synced` at
+`2026-07-04T19:31:13Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
 

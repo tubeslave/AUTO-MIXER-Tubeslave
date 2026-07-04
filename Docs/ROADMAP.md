@@ -139,11 +139,11 @@ Exactly one milestone is active: `M001`, currently
 `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
 
 Current M001 waiting reason: the canonical WING read-only decision is
-`accepted_decision_ready`, but the latest supervised CH3 fader proof failed
-rollback with `rollback_not_applied`. No roadmap row advances to readiness or
-live authority until the operator restores/verifies CH3 fader state and a clean
-supervised proof rerun supplies apply, physical readback, rollback and
-emergency-stop/block evidence.
+`accepted_decision_ready`, and the supervised CH3 fader/gain-down proofs have
+passed with apply, physical readback, rollback and emergency-stop/block
+evidence. The earlier `rollback_not_applied` artifact remains closed audit
+history. No roadmap row advances to readiness or standing live authority until
+M005 disconnect/timeout/stale-state proof and M006 owner readiness review pass.
 
 ## Current external validation requirements
 
@@ -153,7 +153,7 @@ emergency-stop/block evidence.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`supervised_m005_software_disconnect_partial_evidence_recorded` at
-`2026-07-04T08:04:59Z`. No live authority changed; release-ready live
+`landed_split_handoff_truth_surfaces_synced` at
+`2026-07-04T19:31:13Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.

@@ -22,11 +22,15 @@
 
 M001-CP05 completed. M001 remains `WAITING_FOR_EXTERNAL_VALIDATION` because the
 accepted read-only decision does not close release readiness. Its current
-machine status is `accepted_decision_ready`. The current external blocker is
-the failed CH3 fader rollback proof with reason `rollback_not_applied`; the
-operator must restore or verify CH3 fader state, then rerun the narrow
-supervised proof with apply, physical readback, rollback and
-emergency-stop/block evidence.
+machine status is `accepted_decision_ready`. The earlier failed CH3 fader
+rollback proof with reason `rollback_not_applied` remains audit history, and
+CH3 fader state restoration/verification plus the narrow fader/gain-down proof
+rerun have passed with apply, physical readback, rollback and
+emergency-stop/block evidence. The current external blockers are M005
+disconnect/timeout/stale-state protection and M006 owner readiness review.
+
+Audit marker: failed CH3 fader rollback proof is closed by the passed rerun;
+it does not grant release readiness.
 
 ## Current external validation requirements
 
@@ -36,7 +40,7 @@ emergency-stop/block evidence.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`supervised_m005_software_disconnect_partial_evidence_recorded` at
-`2026-07-04T08:04:59Z`. No live authority changed; release-ready live
+`landed_split_handoff_truth_surfaces_synced` at
+`2026-07-04T19:31:13Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.

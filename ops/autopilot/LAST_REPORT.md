@@ -5,11 +5,12 @@
 - Milestone: M001, WING read-only preflight evidence gate.
 - Checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT.
 - Status: WAITING_FOR_EXTERNAL_VALIDATION.
-- Hardware input required now: yes. The real WING Rack is reported connected
-  and waiting for tests; the read-only decision gate is accepted-ready, but the
-  next proof still requires operator restoration/verification after failed CH3
-  fader rollback before any release-readiness claim.
-- Latest heartbeat: 2026-07-04T08:04:59Z.
+- Hardware input required now: yes for M005/M006 only. The read-only decision
+  gate is accepted-ready and CH3 fader/gain-down proofs passed with physical
+  readback, rollback and emergency-stop/block evidence, but physical
+  disconnect/timeout/stale-state proof and owner readiness review still require
+  operator/owner action before any readiness-matrix update.
+- Latest heartbeat: 2026-07-04T19:31:13Z.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -26,9 +27,12 @@
   helpers now re-check that nested flag packet before preserving a reported
   source-authority-denied boolean, and require that boolean to be explicitly
   present.
-- Active supervised proof blocker:
-  `artifacts/wing_operator_proposal_validation/20260702T210956Z_wing_operator_proposal_ch3_fader/summary.json`
-  failed with reason `rollback_not_applied`.
+- Active supervised proof blocker: M005 physical disconnect/timeout/stale-state
+  proof and M006 owner readiness review remain open. The earlier
+  `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
+  remains audit history only.
+- Status marker: read-only decision gate is accepted-ready; release readiness
+  remains blocked on M005/M006.
 - External validation requirements:
   Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present;
   Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006).
@@ -36,15 +40,13 @@
   threshold remains `95/100`, public release ready: `true` (scope: supervised narrow WING fader/gain-down MVP only). Score 95/100 is evidence-backed: supervised CH3 fader and gain-down proofs passed with apply, physical readback, rollback and emergency-stop/block evidence; the earlier rollback_not_applied failure is closed, and a release-ready live correction family review (M006) plus the M005 timeout/disconnect proof remain the next gates. This score grants no autonomy, no non-fader/gain live family and no readiness-matrix closure by itself.
 - Correction apply readiness:
   `Docs/reports/WING_CORRECTION_APPLY_READINESS_20260703.md` reports 0
-  release-ready live families. Fader and gain are supervised policy candidates
-  only until apply, physical readback, rollback and emergency-stop/block
-  evidence all pass.
+  release-ready live families. Fader and gain have accepted proof artifacts,
+  but remain blocked from standing live authority until M005 and M006 pass.
 - Safety coverage matrix:
-  `backend/safety_coverage_matrix.py` now keeps `live_allowed_row_ids` empty.
-  The `fader_supervised` row is `supervised_candidate`, with
-  `rollback_readback=failed` and `emergency_stop_proof=missing`, so the
-  autonomy mode transition gate reports no supervised current live write kinds
-  until the rollback proof is repaired.
+  `backend/safety_coverage_matrix.py` keeps `live_allowed_row_ids` empty.
+  The fader/gain rows have narrow hardware proof evidence, but `live_allowed`
+  stays false and the autonomy mode-transition gate reports no current
+  supervised live write kinds until M005 and M006 pass.
 - Operator product-state autonomy overlay:
   `backend/operator_product_state.py` now normalizes
   `supervised_live_allowed_static` to `false`, and
@@ -473,8 +475,9 @@ After CP05, verified no-WING safety-scope hardening commits were added:
 - `ops/autopilot/BLOCKERS.md` was synchronized to the same truth boundary:
   the blocker file no longer says real WING evidence or read-only decisions
   are unavailable, but it still blocks release readiness and supervised live
-  claims until the failed CH3 fader rollback proof is repaired and fader/gain
-  proof has complete apply/readback/rollback/emergency-stop evidence.
+  claims until M005 disconnect/timeout/stale-state proof and M006 owner
+  readiness review pass. The earlier `rollback_not_applied` fader artifact is
+  closed by the passed CH3 rerun and separate gain-down proof.
 
 - SmartDSP strategy evidence now exposes mode-specific weighted score
   contributions and WING-native strategy-fit evidence for selected and

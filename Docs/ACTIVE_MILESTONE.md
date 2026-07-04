@@ -8,11 +8,13 @@ Status: WAITING_FOR_EXTERNAL_VALIDATION
 
 ## Desired end state
 
-The project can resume autonomous work from a clean, finite plan that verifies
-the no-WING prestart and read-only preflight input gate before any real WING
-contact. The canonical read-only decision is now accepted-ready, but the
-remaining supervised proof/rollback run remains external validation and must
-not be simulated.
+The project can resume autonomous work from a clean, finite plan that keeps
+the supervised WING Rack MVP externally gated. The canonical read-only decision
+is now accepted-ready, and CH3 fader/gain-down proof artifacts are available,
+but M005 physical disconnect/timeout/stale-state proof and M006 owner readiness
+review remain external validation and must not be simulated.
+
+Status marker: canonical read-only decision is now accepted-ready; CH3 fader state restoration/verification is complete, but M005/M006 remain open.
 
 ## Why this advances the project goal
 
@@ -72,14 +74,17 @@ be trusted.
   with `websocket_opened: false` and `write_request_sent: false`.
 - CP05 milestone review:
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP05_MILESTONE_REVIEW_20260618.md`.
-- M001 autonomous pre-hardware work is complete, and the canonical read-only
-  decision is `accepted_decision_ready`. The current required external proof is
-  the failed CH3 fader rollback recovery and rerun, followed by separate
-  headroom-safe gain-down proof evidence.
+- M001 autonomous pre-hardware work is complete, the canonical read-only
+  decision is `accepted_decision_ready`, and CH3 fader state
+  restoration/verification plus the fader/gain-down proof rerun have passed
+  with physical readback, rollback and emergency-stop/block evidence. The
+  earlier `rollback_not_applied` artifact remains closed audit history; the
+  current required external proof is M005 disconnect/timeout/stale-state
+  protection, followed by M006 owner readiness review.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `supervised_m005_software_disconnect_partial_evidence_recorded` at
-  `2026-07-04T08:04:59Z`. No live authority changed; release-ready live
+  `landed_split_handoff_truth_surfaces_synced` at
+  `2026-07-04T19:31:13Z`. No live authority changed; release-ready live
   correction families remain `0`, live-allowed safety rows remain `0`, and
   current supervised live-write kinds remain `0`.
 
@@ -96,10 +101,10 @@ See `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
 
 The full operator/backend route for real-console work is
 `Docs/plans/M001-real-wing-interaction-plan.md`. It now starts from the
-accepted read-only decision gate and keeps supervised writes blocked until the
-operator restores or verifies CH3 fader state after `rollback_not_applied`.
-Only the explicit supervised `fader`/`gain-down` proof path with physical
-readback, rollback and emergency-stop evidence can move the milestone forward.
+accepted read-only decision gate and passed CH3 fader/gain-down proof
+artifacts, while preserving the earlier `rollback_not_applied` artifact as
+closed audit history. Only the M005 operator-present disconnect proof and the
+M006 owner readiness review can move the milestone forward.
 
 ## Rollback
 
@@ -114,8 +119,9 @@ or if no-WING evidence unexpectedly grants live authority.
 
 ## External blockers
 
-Real hardware proof now requires WING Rack, intended backend session, operator
-presence, CH3 fader state restoration/verification after `rollback_not_applied`,
-and a clean supervised proof rerun. The accepted read-only decision is
-necessary evidence, but it does not close readiness or grant live authority, so
-the milestone remains `WAITING_FOR_EXTERNAL_VALIDATION`.
+Real hardware proof now requires WING Rack, intended backend session and
+operator presence for M005 physical disconnect/timeout/stale-state protection.
+The accepted read-only decision plus passed CH3 fader/gain-down proofs are
+necessary evidence, and the earlier `rollback_not_applied` artifact is closed
+by the rerun, but they do not close readiness or grant standing live authority;
+the milestone remains `WAITING_FOR_EXTERNAL_VALIDATION` until M005 and M006 pass.

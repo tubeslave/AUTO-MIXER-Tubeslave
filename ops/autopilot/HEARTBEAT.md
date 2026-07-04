@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-04T08:04:59Z
+Last heartbeat UTC: 2026-07-04T19:31:13Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -11,31 +11,24 @@ Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 Writer lease: none; `ops/autopilot/WRITER_LEASE/owner.json` is absent and
 `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
 
-Next action: do not widen live authority. The decision report is now
-`accepted_decision_ready`, but the CH3 fader proof failed rollback with reason
-`rollback_not_applied`. Operator must restore or verify CH3 fader state, then
-rerun the narrow fader proof until apply, physical readback, rollback and
-emergency-stop/block evidence all pass. Gain proof must be separate and
-headroom-safe.
+Next action: do not widen live authority. The decision report is
+`accepted_decision_ready`, and the CH3 fader/gain-down proofs have passed
+with apply, physical readback, rollback and emergency-stop/block evidence.
+The earlier `rollback_not_applied` artifact is closed by the rerun, but M005
+physical disconnect/timeout/stale-state proof and M006 owner readiness review
+remain external gates.
 
 External validation requirements:
 
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: the control-plane state, safety coverage matrix and operator
-product-state autonomy overlay are synchronized to the current WING
-decision/apply-readiness reports. `Docs/plans/M001-real-wing-interaction-plan.md`
-now also mirrors the same accepted decision ledger and failed CH3 rollback
-blocker instead of the stale `operator_review_required` gate wording.
-`Docs/ACTIVE_MILESTONE.md`, `Docs/ROADMAP.md` and the M001 plan now also state
-that the open external requirement is no longer read-only artifact review; it is
-CH3 fader restoration/verification after `rollback_not_applied`, a clean
-supervised fader proof rerun, and then a separate headroom-safe gain-down proof.
-`Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
-that it is read-only preflight evidence handoff only, and that current
-next-action authority after `accepted_decision_ready` comes from current state
-and the active real-WING plan, not from the old handoff packet by itself.
+Latest check: the split was landed as separate local commits through
+`d466d13135`, the tracked worktree was clean before this sync, and truth
+surfaces now point to the current M005/M006 external gates. This heartbeat
+records no WING/backend contact, no live apply, no readiness-matrix update and
+no authority widening. The earlier `rollback_not_applied` artifact remains
+closed audit history, not the active blocker.
 Latest verified full pytest passed with `5434 passed, 1 skipped, 1 warning`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or
@@ -175,15 +168,15 @@ readback values through the existing backend session, with no proposal request,
 no write request, no live authority and no readiness closure. It is not a
 canonical readiness candidate because its artifact root is under `/tmp`, not
 `artifacts/wing_readonly_preflight`.
-Latest blocker truth sync: `ops/autopilot/BLOCKERS.md` now reflects that the
+Latest blocker truth sync: `ops/autopilot/BLOCKERS.md` reflects that the
 canonical read-only decision ledger is accepted-ready with 1 accepted, 2
-rejected, 0 invalid and 0 unreviewed records, while release readiness remains
-blocked by failed CH3 fader rollback proof and zero release-ready live
-correction families. The safety coverage matrix now has
-`live_allowed_row_ids: []`; `fader_supervised` is `supervised_candidate` with
-`rollback_readback: failed` and `emergency_stop_proof: missing`. Product-state
-autonomy overlays now also normalize `supervised_live_allowed_static` to
-`false`, and the no-WING release gate rejects rows that try to set it true.
+rejected, 0 invalid and 0 unreviewed records, and that the earlier failed CH3
+fader rollback proof is closed by the passed rerun. Release readiness remains
+blocked by M005/M006 and zero release-ready live correction families. The
+safety coverage matrix still has `live_allowed_row_ids: []`, and product-state
+autonomy overlays normalize `supervised_live_allowed_static` to `false`.
+Current marker: release readiness remains
+blocked until M005 and M006 pass.
 no-WING gap-rollup validation now also requires
 `supervised_current_live_write_kinds` and surfaces to match the mode-transition
 gate, and the helper API now names that split explicitly:
@@ -273,9 +266,9 @@ readiness candidates from `artifacts/wing_readonly_preflight`. See
 The latest real WING read-only candidate remains
 `candidate_ready_for_manual_review`, and the decision report is now
 `accepted_decision_ready` for the canonical `20260702T095758Z` source id. This
-does not grant live authority or release readiness; the next blocker is the
-failed CH3 fader rollback proof and the lack of any release-ready live
-correction family.
+does not grant live authority or release readiness; the next blockers are M005
+disconnect/timeout/stale-state proof, M006 owner readiness review and the lack
+of any release-ready live correction family.
 
 This heartbeat includes one local product/runtime change: SmartDSP strategy
 search now reports mode-specific weighted score contributions, WING-native

@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-04T08:04:59Z
+Generated: 2026-07-04T19:31:13Z
 
 ## Repository snapshot
 
@@ -10,8 +10,9 @@ Generated: 2026-07-04T08:04:59Z
   `22852a7e8 Ignore validate-only WING preflight traces`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked/untracked worktree state: dirty during the current WING rollback
-  blocker review and report sync.
+- Tracked worktree state before this sync: clean after the split was landed as
+  separate commits through `d466d13135`; ignored large/superseded local
+  evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -58,23 +59,26 @@ Generated: 2026-07-04T08:04:59Z
   readiness and no-WING summaries, and no-WING summary helpers re-check the
   full nested flag packet plus require an explicit reported
   `source_authority_denied=true` before surfacing candidate readiness.
-- A supervised CH3 fader proof artifact exists, but it failed rollback with
-  reason `rollback_not_applied`. Fader and gain remain supervised policy
-  candidates only; release-ready live correction families remain `0`.
-- `Docs/plans/M001-real-wing-interaction-plan.md` now mirrors that current
+- The earlier supervised CH3 fader proof artifact failed rollback with reason
+  `rollback_not_applied`, but that blocker is closed by the passed CH3 fader
+  rerun and separate gain-down proof. Fader and gain still remain supervised
+  policy candidates only; release-ready live correction families remain `0`
+  until M005 and M006 pass.
+- `Docs/plans/M001-real-wing-interaction-plan.md` now mirrors the current
   gate: the read-only decision ledger is `accepted_decision_ready` with 1
-  accepted, 2 rejected, 0 invalid and 0 unreviewed records, while supervised
-  proof remains blocked on `rollback_not_applied` until the operator restores
-  or verifies CH3 fader state and approves the exact next negative proof.
+  accepted, 2 rejected, 0 invalid and 0 unreviewed records; CH3 fader state
+  restoration/verification plus fader/gain-down proof rerun passed; and the
+  open external items are M005 disconnect/timeout/stale-state proof and M006
+  readiness review.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
   `Docs/plans/M001-real-wing-interaction-plan.md` and
   `ops/autopilot/STATE.json` after `accepted_decision_ready`.
-- `backend/safety_coverage_matrix.py` now mirrors that blocker: the
-  `fader_supervised` row is `supervised_candidate`, not
-  `hardware_proven_narrow`; `live_allowed_row_ids` is empty until rollback and
-  emergency-stop/block proof pass.
+- `backend/safety_coverage_matrix.py` keeps `live_allowed_row_ids` empty even
+  though fader/gain proof rows have narrow hardware evidence. The mode gate
+  still exposes no current supervised live-write kinds until M005 and M006
+  pass.
 - `backend/operator_product_state.py` now mirrors the same blocker for
   product-facing autonomy overlays: `supervised_live_allowed_static` is
   normalized to `false`, and no-WING validation rejects overlay rows that claim
@@ -243,8 +247,8 @@ Generated: 2026-07-04T08:04:59Z
   are not canonical supervised fader/gain release proof and require
   operator review/rollback decision before any readiness claim.
 - No real hardware evidence was produced in this state-sync cycle that closes
-  release readiness; the accepted read-only decision and failed rollback proof
-  do not grant live authority.
+  release readiness; the accepted read-only decision plus passed fader/gain
+  proofs still do not grant standing live authority before M005 and M006.
 - A supporting real WING read-only tmp capture is documented in
   `Docs/reports/WING_REAL_HARDWARE_READONLY_20260702.md`. It read 15 channel-3
   values through the existing backend session with `write_request_sent: false`,
@@ -257,9 +261,11 @@ Generated: 2026-07-04T08:04:59Z
 - M001 autonomous pre-hardware work is complete, and the canonical read-only
   decision is accepted-ready. M001 remains waiting for external WING/operator
   validation because the current external blocker is no longer read-only
-  artifact review; it is CH3 fader state restoration/verification after
-  `rollback_not_applied`, then a clean supervised fader proof rerun and
-  separate headroom-safe gain-down proof. The original real-run handoff remains
+  artifact review; CH3 fader state restoration/verification after
+  `rollback_not_applied`, the clean supervised fader proof rerun and the
+  separate headroom-safe gain-down proof have passed. The open external
+  requirements are now M005 disconnect/timeout/stale-state protection and M006
+  owner readiness review. The original real-run handoff remains
   `Docs/reports/AUTOMIXER_AUTOPILOT_M001_CP04_WING_READONLY_HANDOFF_20260618.md`.
 - Current external validation requirements:
   Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present;
@@ -327,8 +333,9 @@ Generated: 2026-07-04T08:04:59Z
 - The dirty split has now been landed as separate local commits:
   `7a792457e` for read-only soundcheck runtime evidence, `3cf9b53a1` for
   frontend read-only meter binding, `e745438ab` for frontend UI restyle,
-  `3f5d5c0eb` for the M005 disconnect proof runner, and `9ce9e29ba` for the
-  report-only M006 owner readiness packet. The remaining local-only evidence
+  `3f5d5c0eb` for the M005 disconnect proof runner, `9ce9e29ba` for the
+  report-only M006 owner readiness packet, and `d466d13135` for the split
+  handoff/blocker truth surfaces. The remaining local-only evidence
   is intentionally ignored: the large runtime observation `events.jsonl` and
   two superseded drift-audit attempts. This commit split does not close M005 or
   M006 and grants no live authority.
@@ -1992,9 +1999,9 @@ Generated: 2026-07-04T08:04:59Z
 
 - Exact current validity of every generated no-WING artifact under
   `artifacts/no_wing_release_check/` is not assumed.
-- Current WING Rack availability is reported connected for tests, but the
-  operator must still confirm readiness at the moment of any supervised proof
-  command.
+- Current WING Rack availability is not assumed by this sync. The operator must
+  still confirm readiness at the moment of any M005/M006 supervised proof or
+  review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `22852a7e8` passed with

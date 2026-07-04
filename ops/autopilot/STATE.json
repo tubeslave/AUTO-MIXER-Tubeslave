@@ -5,7 +5,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "22852a7e8",
-  "last_heartbeat_utc": "2026-07-04T08:04:59Z",
+  "last_heartbeat_utc": "2026-07-04T19:31:13Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Supervised CH3 fader and gain-down proofs passed on the real WING Rack with apply, physical readback, rollback and emergency-stop/block evidence (artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json and artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json); the earlier rollback_not_applied failure is closed by the passed rerun. The read-only decision ledger remains accepted_decision_ready. Release-ready live correction families remain 0 until the M006 owner readiness review accepts the proof artifacts, live-allowed safety rows remain 0, and current supervised live-write kinds remain 0; the remaining external items are the M005 supervised disconnect/timeout/stale-state protection proof and the M006 readiness review.",
@@ -168,15 +168,42 @@
         "3cf9b53a1 Wire frontend to read-only meter stream",
         "e745438ab Restyle frontend soundcheck dashboard",
         "3f5d5c0eb Add supervised WING disconnect proof runner",
-        "9ce9e29ba Prepare M006 owner readiness packet"
+        "9ce9e29ba Prepare M006 owner readiness packet",
+        "d466d13135 Record split handoff and blocker truth"
       ],
-      "latest_validation_after_landing": "python3 json.tool checks passed; git diff --check passed; PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py tests/test_wing_timeout_disconnect_proof_runner.py tests/test_meter_stream.py tests/test_soundcheck_runtime_observation_runner.py tests/test_soundcheck_long_run_drift_audit.py tests/test_operator_product_state.py -q: 307 passed; npm --prefix frontend test: 96 passed; npm --prefix frontend run build: passed; M006 packet cross-check passed; pre-landing review patches 01-04 and 06 apply against 22ece58e0; post-landing truth patch 05 applies against the current landed split head",
+      "latest_validation_after_landing": "python3 json.tool checks passed; git diff --check passed; PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py tests/test_wing_timeout_disconnect_proof_runner.py tests/test_meter_stream.py tests/test_soundcheck_runtime_observation_runner.py tests/test_soundcheck_long_run_drift_audit.py tests/test_operator_product_state.py -q: 307 passed; npm --prefix frontend test: 96 passed; npm --prefix frontend run build: passed; M006 packet cross-check passed; pre-landing review patches 01-04 and 06 apply against 22ece58e0; post-landing truth patch 05 applies against the current landed split head; final handoff commit d466d13135 recorded; selected handoff rails passed before sync; no WING/backend contact or apply path executed; post-sync WING MVP rails passed: 133 passed in 2.55s",
       "ignored_local_evidence": [
         "artifacts/soundcheck_runtime_observation/*/events.jsonl",
         "artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/",
         "artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/"
       ],
-      "split_policy": "Do not mix the frontend UI restyle/screenshot with WING readiness proof commits; meter stream backend plus frontend subscription are soundcheck runtime WIP and remain read-only."
+      "split_policy": "Do not mix the frontend UI restyle/screenshot with WING readiness proof commits; meter stream backend plus frontend subscription are soundcheck runtime WIP and remain read-only.",
+      "final_handoff_commit": "d466d13135 Record split handoff and blocker truth",
+      "post_landing_sync": "2026-07-04T19:31:13Z: tracked worktree clean after split landing; ignored local evidence remains local only; M005/M006 remain external gates and live authority remains denied"
+    },
+    "post_landing_truth_surface_sync": {
+      "validated_at_utc": "2026-07-04T19:31:13Z",
+      "head": "d466d13135",
+      "scope": "post-landing handoff truth sync only; no WING/backend contact and no apply path executed",
+      "git_status_before_sync": "clean tracked worktree on codex/automixer-autopilot-control-plane",
+      "writer_lease_owner_present_before_sync": false,
+      "stop_file_present_before_sync": false,
+      "selected_rails_before_sync": "PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence tests/test_wing_mvp_rails.py::test_autopilot_latest_ledger_timestamp_matches_current_state_surfaces tests/test_wing_mvp_rails.py::test_autopilot_operator_reports_match_latest_full_suite_evidence tests/test_wing_mvp_rails.py::test_autopilot_latest_ledger_records_external_validation_handoff -q: 4 passed",
+      "authority": {
+        "contacts_backend": false,
+        "contacts_wing": false,
+        "live_authority_granted": false,
+        "live_write": false,
+        "readiness_closure_allowed": false,
+        "readiness_matrix_update_allowed": false,
+        "release_ready_live_family_count": 0,
+        "safety_coverage_live_allowed_row_count": 0,
+        "supervised_current_live_write_kind_count": 0,
+        "unrestricted_live_or_soundcheck_authority": false
+      },
+      "wing_mvp_rails_after_sync": "PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py -q: 133 passed in 2.55s",
+      "latest_status": "truth surfaces synchronized to landed split head; M005/M006 remain open; live authority remains denied",
+      "targeted_backend_after_sync": "PYTHONPATH=backend python3 -m pytest tests/test_wing_mvp_rails.py tests/test_wing_timeout_disconnect_proof_runner.py tests/test_meter_stream.py tests/test_soundcheck_runtime_observation_runner.py tests/test_soundcheck_long_run_drift_audit.py tests/test_operator_product_state.py -q: 307 passed in 37.10s"
     }
   },
   "m006_owner_readiness_review_packet": {
@@ -686,5 +713,16 @@
   ],
   "stop_file": "ops/autopilot/STOP",
   "writer_lease_dir": "ops/autopilot/WRITER_LEASE",
-  "writer_lease_stale_after_minutes": 30
+  "writer_lease_stale_after_minutes": 30,
+  "latest_landed_split_handoff_commit": {
+    "commit": "d466d13135",
+    "full_commit": "d466d131358304e8ffafe3bdea0bce4588808e5f",
+    "subject": "Record split handoff and blocker truth",
+    "recorded_at_utc": "2026-07-04T19:31:13Z",
+    "scope": "truth-surface and split handoff only; no live WING contact, no live apply, no readiness closure",
+    "git_status": "clean except ignored local evidence and active runtime writer lease during this sync",
+    "live_authority_granted": false,
+    "readiness_closure_allowed": false,
+    "readiness_matrix_update_allowed": false
+  }
 }
