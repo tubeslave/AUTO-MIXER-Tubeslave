@@ -124,6 +124,7 @@
       "reason": "The report still says release-ready live families are 0 until M005 and the M006 owner review accept the proof artifacts."
     }
   },
+  "owner_decision_template_path": "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json",
   "owner_decision_template": {
     "decision": "pending_owner_review",
     "reviewed_by": null,
