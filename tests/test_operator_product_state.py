@@ -8596,6 +8596,82 @@ async def test_operator_proposal_without_complete_change_is_analysis_only(server
 
 
 @pytest.mark.asyncio
+async def test_decision_queue_reports_operator_review_field_coverage(server):
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "complete-operator-review",
+            "title": "Lead Vocal: lower fader with rollback",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -9.5,
+            "severity": "low",
+            "reason": "Peak headroom recovery with physical readback required.",
+            "requested_change": {
+                "value_type": "fader",
+                "channel": 2,
+                "value": -9.5,
+                "old_value": -8.0,
+                "rollback_value": -8.0,
+                "delta_db": -1.5,
+            },
+        },
+    )
+
+    queue = build_decision_queue(server)
+    contract = queue["summary"]["operator_review_contract"]
+
+    assert queue["summary"]["operator_review_contract_status"] == "complete"
+    assert queue["summary"]["operator_review_contract_complete_count"] == 1
+    assert queue["summary"]["operator_review_contract_incomplete_count"] == 0
+    assert queue["summary"]["operator_review_contract_live_write"] is False
+    assert contract["read_only"] is True
+    assert contract["live_write"] is False
+    assert contract["mutates_console_state"] is False
+    assert contract["operator_review_required"] is True
+    assert contract["required_fields"] == [
+        "reason",
+        "risk",
+        "requested_change",
+        "old_value",
+        "new_value",
+        "rollback",
+    ]
+    assert contract["proposal_field_coverage"][0]["proposal_id"] == "complete-operator-review"
+    assert contract["proposal_field_coverage"][0]["status"] == "complete"
+
+
+@pytest.mark.asyncio
+async def test_decision_queue_marks_operator_review_incomplete_fields(server):
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "missing-operator-review-fields",
+            "title": "Lead Vocal: lower fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -1.5,
+            "reason": "unit",
+        },
+    )
+
+    queue = build_decision_queue(server)
+    contract = queue["summary"]["operator_review_contract"]
+    coverage = contract["proposal_field_coverage"][0]
+
+    assert queue["summary"]["operator_review_contract_status"] == "incomplete"
+    assert queue["summary"]["operator_review_contract_complete_count"] == 0
+    assert queue["summary"]["operator_review_contract_incomplete_count"] == 1
+    assert contract["incomplete_pending_proposal_ids"] == ["missing-operator-review-fields"]
+    assert coverage["missing_fields"] == ["old_value", "rollback"]
+    assert coverage["can_apply"] is True
+
+
+@pytest.mark.asyncio
 async def test_decision_queue_summarizes_apply_preflight_candidates(server):
     server.mixer_client = MagicMock()
     server.mixer_client.set_fader = MagicMock()

@@ -263,6 +263,8 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "tools/wing_method_proof_runner.py",
             "tools/wing_supervised_smoke_runner.py",
             "tools/wing_readonly_preflight_runner.py",
+            "tools/soundcheck_runtime_observation_runner.py",
+            "tools/soundcheck_long_run_drift_audit.py",
             "tools/build_wing_readonly_preflight_handoff_packet.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
             "backend/tub345_supervised_write_runner.py",
@@ -275,6 +277,8 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "method proof runner",
             "supervised WING smoke runner",
             "read-only WING preflight runner",
+            "read-only soundcheck runtime observation runner",
+            "offline soundcheck long-run drift audit",
             "read-only WING preflight handoff packet builder",
             "read-only WING preflight artifact review",
             "TUB supervised WING write runner",
@@ -293,7 +297,10 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "state/readback only and must not send write, proposal, connect, "
             "disconnect, rollback, or emergency-stop messages. Evidence intake may "
             "contain forbidden request names only as audit tokens and never as "
-            "transport calls."
+            "transport calls. Runtime observation may subscribe to meters and "
+            "request dashboard/channel/decision/safety snapshots only. Long-run "
+            "drift audit reads existing logs only and cannot create or apply "
+            "corrections."
         ),
         next_action=(
             "Keep proof artifacts separate from live readiness claims until physical "

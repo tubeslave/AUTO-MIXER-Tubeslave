@@ -138,6 +138,14 @@ SOURCE_IDENTITY_QUEUE_IMPORTER_SOURCE = "source_identity_proposal_queue_importer
 SEQUENCE_POLICY_QUEUE_IMPORTER_SOURCE = (
     "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
 )
+OPERATOR_REVIEW_CONTRACT_REQUIRED_FIELDS = (
+    "reason",
+    "risk",
+    "requested_change",
+    "old_value",
+    "new_value",
+    "rollback",
+)
 
 FX_PARAMETER_SCHEMA_BY_FAMILY: Mapping[str, Dict[int, Dict[str, Any]]] = {
     "reverb": {
@@ -3276,6 +3284,103 @@ def _action_id(action: Mapping[str, Any]) -> str:
     return str(value) if value is not None else ""
 
 
+def _action_source_mapping(action: Mapping[str, Any]) -> Dict[str, Any]:
+    source = dict(action)
+    raw = action.get("raw")
+    if isinstance(raw, Mapping):
+        for key, value in raw.items():
+            source.setdefault(str(key), value)
+    return source
+
+
+def _action_requested_changes(action: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    source = _action_source_mapping(action)
+    changes = source.get("requested_changes")
+    if isinstance(changes, list):
+        normalized = [dict(change) for change in changes if isinstance(change, Mapping)]
+        if normalized:
+            return normalized
+    change = source.get("requested_change")
+    if isinstance(change, Mapping):
+        return [dict(change)]
+    return []
+
+
+def _has_any_key(mapping: Mapping[str, Any], keys: Iterable[str]) -> bool:
+    return any(mapping.get(key) is not None for key in keys)
+
+
+def _operator_review_missing_fields_for_action(action: Mapping[str, Any]) -> List[str]:
+    source = _action_source_mapping(action)
+    changes = _action_requested_changes(action)
+    missing: List[str] = []
+    if not str(source.get("reason") or source.get("rationale") or "").strip():
+        missing.append("reason")
+    if not str(
+        source.get("risk")
+        or source.get("risk_level")
+        or source.get("safety_risk")
+        or source.get("severity")
+        or ""
+    ).strip():
+        missing.append("risk")
+    if not changes:
+        missing.append("requested_change")
+    else:
+        if not all(
+            _has_any_key(change, ("old_value", "current_value", "previous_value"))
+            for change in changes
+        ):
+            missing.append("old_value")
+        if not all(
+            _has_any_key(change, ("value", "proposed_value", "target_value", "new_value"))
+            for change in changes
+        ):
+            missing.append("new_value")
+        if not all(
+            _has_any_key(change, ("rollback_value", "old_value", "current_value", "previous_value"))
+            for change in changes
+        ):
+            missing.append("rollback")
+    return missing
+
+
+def _operator_review_contract_summary(actions: Iterable[Mapping[str, Any]]) -> Dict[str, Any]:
+    rows = []
+    for action in actions:
+        if not isinstance(action, Mapping):
+            continue
+        proposal_id = _action_id(action) or str(action.get("id") or "")
+        missing = _operator_review_missing_fields_for_action(action)
+        rows.append(
+            {
+                "proposal_id": proposal_id,
+                "title": action.get("title"),
+                "status": "complete" if not missing else "incomplete",
+                "missing_fields": missing,
+                "requested_change_count": len(_action_requested_changes(action)),
+                "can_apply": bool(action.get("can_apply")),
+            }
+        )
+    incomplete = [row for row in rows if row["missing_fields"]]
+    status = "complete" if rows and not incomplete else ("missing" if not rows else "incomplete")
+    return {
+        "status": status,
+        "read_only": True,
+        "live_write": False,
+        "mutates_console_state": False,
+        "operator_review_required": True,
+        "required_fields": list(OPERATOR_REVIEW_CONTRACT_REQUIRED_FIELDS),
+        "pending_proposal_count": len(rows),
+        "complete_pending_proposal_count": len(rows) - len(incomplete),
+        "incomplete_pending_proposal_count": len(incomplete),
+        "incomplete_pending_proposal_ids": [
+            row["proposal_id"] for row in incomplete if row["proposal_id"]
+        ],
+        "proposal_field_coverage": rows,
+    }
+
+
 def _source_identity_queue_import_summary(
     pending: Iterable[Mapping[str, Any]],
     history: Iterable[Mapping[str, Any]],
@@ -3695,6 +3800,7 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
         apply_preflight = _decision_queue_apply_preflight_summary([], [])
         batch_preflight = _decision_queue_batch_preflight_summary([])
         apply_sequence_plan = _decision_queue_apply_sequence_plan_summary([])
+        operator_review_contract = _operator_review_contract_summary([])
         return {
             "type": "decision_queue",
             "generated_at": _utc_now(),
@@ -3719,6 +3825,11 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
                 "apply_sequence_plan_candidate_count": 0,
                 "apply_sequence_plan_live_write": False,
                 "apply_sequence_plan": apply_sequence_plan,
+                "operator_review_contract_status": operator_review_contract["status"],
+                "operator_review_contract_complete_count": 0,
+                "operator_review_contract_incomplete_count": 0,
+                "operator_review_contract_live_write": False,
+                "operator_review_contract": operator_review_contract,
                 "source_identity_queue_import_pending_count": 0,
                 "source_identity_queue_import_applyable_pending_count": 0,
                 "source_identity_queue_import_analysis_only_pending_count": 0,
@@ -3768,6 +3879,7 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     apply_preflight = _decision_queue_apply_preflight_summary(pending, history)
     batch_preflight = _decision_queue_batch_preflight_summary(pending)
     apply_sequence_plan = _decision_queue_apply_sequence_plan_summary(pending)
+    operator_review_contract = _operator_review_contract_summary(pending)
     applied_count = int(queue_summary.get("applied_count", 0)) + sum(
         1 for item in agent_history if item.get("status") in {"applied", "approved", "done"}
     )
@@ -3813,6 +3925,15 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
             ),
             "apply_sequence_plan_live_write": False,
             "apply_sequence_plan": apply_sequence_plan,
+            "operator_review_contract_status": operator_review_contract["status"],
+            "operator_review_contract_complete_count": (
+                operator_review_contract["complete_pending_proposal_count"]
+            ),
+            "operator_review_contract_incomplete_count": (
+                operator_review_contract["incomplete_pending_proposal_count"]
+            ),
+            "operator_review_contract_live_write": False,
+            "operator_review_contract": operator_review_contract,
             "source_identity_queue_import_pending_count": source_identity_import["pending_count"],
             "source_identity_queue_import_applyable_pending_count": (
                 source_identity_import["applyable_pending_count"]
@@ -3897,6 +4018,115 @@ def _master_bus_metrics(server: Any) -> Dict[str, Any]:
     }
 
 
+SPECTRUM_BIN_COUNT = 24
+SPECTRUM_MIN_HZ = 20.0
+SPECTRUM_MAX_HZ = 20000.0
+SPECTRUM_FLOOR_DB = -60.0
+METER_FRAME_MAX_CHANNELS = 48
+
+
+def _capture_master_channels(capture: Any) -> List[int]:
+    num_channels = int(getattr(capture, "num_channels", 0) or 0)
+    master_channels = [channel for channel in (49, 50) if channel <= num_channels]
+    if not master_channels and num_channels >= 1:
+        master_channels = [1]
+    return master_channels
+
+
+def _analyzer_metrics(server: Any) -> Dict[str, Any]:
+    """Read-only master spectrum bins for the dashboard analyzer trace.
+
+    Bins are log-spaced 20 Hz..20 kHz and normalized to a 0..100 display
+    scale from a -60 dB floor, matching the frontend trace contract.
+    """
+    unavailable = {"available": False, "spectrum_bins": [], "read_only": True}
+    capture = getattr(server, "audio_capture", None)
+    if not capture or not getattr(capture, "running", False):
+        return unavailable
+    master_channels = _capture_master_channels(capture)
+    if not master_channels:
+        return unavailable
+    get_spectrum = getattr(capture, "get_spectrum", None)
+    if not callable(get_spectrum):
+        return unavailable
+    spectrum = _safe_call(get_spectrum, master_channels[0], default=None)
+    if not spectrum:
+        return unavailable
+    try:
+        freqs = [float(value) for value in spectrum.get("frequencies", [])]
+        mags = [float(value) for value in spectrum.get("magnitude_db", [])]
+    except (TypeError, ValueError):
+        return unavailable
+    if len(freqs) != len(mags) or len(freqs) < 8:
+        return unavailable
+
+    import math
+
+    log_min = math.log10(SPECTRUM_MIN_HZ)
+    log_max = math.log10(SPECTRUM_MAX_HZ)
+    sums = [0.0] * SPECTRUM_BIN_COUNT
+    counts = [0] * SPECTRUM_BIN_COUNT
+    for freq, mag in zip(freqs, mags):
+        if freq < SPECTRUM_MIN_HZ or freq > SPECTRUM_MAX_HZ:
+            continue
+        position = (math.log10(freq) - log_min) / (log_max - log_min)
+        index = min(SPECTRUM_BIN_COUNT - 1, max(0, int(position * SPECTRUM_BIN_COUNT)))
+        sums[index] += mag
+        counts[index] += 1
+    bins: List[float] = []
+    for index in range(SPECTRUM_BIN_COUNT):
+        if not counts[index]:
+            bins.append(0.0)
+            continue
+        avg_db = sums[index] / counts[index]
+        display = (avg_db - SPECTRUM_FLOOR_DB) / abs(SPECTRUM_FLOOR_DB) * 100.0
+        bins.append(round(max(0.0, min(100.0, display)), 1))
+    return {
+        "available": True,
+        "spectrum_bins": bins,
+        "bin_count": SPECTRUM_BIN_COUNT,
+        "source_channel": master_channels[0],
+        "scale": "display_0_100_from_-60db_floor",
+        "read_only": True,
+    }
+
+
+def build_meter_frame(server: Any, max_channels: int = METER_FRAME_MAX_CHANNELS) -> Dict[str, Any]:
+    """Read-only realtime meter frame for websocket streaming.
+
+    Carries per-channel rms/peak, master loudness and analyzer bins. It is
+    telemetry only: no console contact beyond the existing capture buffers,
+    no authority fields, no write surface.
+    """
+    capture = getattr(server, "audio_capture", None)
+    running = bool(capture and getattr(capture, "running", False))
+    channels: List[Dict[str, Any]] = []
+    if running:
+        num_channels = min(int(getattr(capture, "num_channels", 0) or 0), max_channels)
+        for channel in range(1, num_channels + 1):
+            meter = _meter_for_channel(capture, channel)
+            if not meter.get("available"):
+                continue
+            channels.append(
+                {
+                    "channel": channel,
+                    "rms_db": meter.get("rms_db"),
+                    "peak_db": meter.get("peak_db"),
+                    "lufs": meter.get("lufs"),
+                }
+            )
+    return {
+        "type": "meter_frame",
+        "generated_at": _utc_now(),
+        "available": running and bool(channels),
+        "read_only": True,
+        "live_write": False,
+        "channels": channels,
+        "master_bus": _master_bus_metrics(server),
+        "analyzer": _analyzer_metrics(server),
+    }
+
+
 def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
     operator_mode = server.get_operator_mode_status()
     channel_inventory = build_channel_inventory(server)
@@ -3934,6 +4164,7 @@ def build_dashboard_snapshot(server: Any) -> Dict[str, Any]:
         "connection": _connection_summary(server),
         "audio_capture": _audio_capture_status(server),
         "master_bus": _master_bus_metrics(server),
+        "analyzer": _analyzer_metrics(server),
         "channel_summary": channel_inventory["summary"],
         "decision_summary": decision_queue["summary"],
         "safety": {

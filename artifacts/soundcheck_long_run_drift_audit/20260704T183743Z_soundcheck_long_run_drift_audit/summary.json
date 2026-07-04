@@ -1,0 +1,1011 @@
+{
+  "action_count": 443,
+  "action_counts_by_collection": {
+    "applied": 287,
+    "blocked.decision": 156
+  },
+  "action_counts_by_surface": {
+    "eq.ch1.b2": 1,
+    "eq.ch10.b2": 1,
+    "eq.ch11.b3": 1,
+    "eq.ch12.b3": 1,
+    "eq.ch16.b2": 1,
+    "eq.ch2.b2": 1,
+    "eq.ch2.b3": 1,
+    "eq.ch3.b2": 1,
+    "eq.ch3.b3": 1,
+    "eq.ch4.b2": 1,
+    "eq.ch4.b4": 2,
+    "eq.ch5.b2": 1,
+    "eq.ch6.b1": 1,
+    "eq.ch6.b3": 1,
+    "eq.ch7.b1": 1,
+    "eq.ch8.b1": 1,
+    "eq.ch8.b2": 2,
+    "eq.ch9.b2": 1,
+    "eq.ch9.b3": 1,
+    "fader.ch1": 15,
+    "fader.ch10": 15,
+    "fader.ch11": 15,
+    "fader.ch12": 15,
+    "fader.ch13": 15,
+    "fader.ch14": 2,
+    "fader.ch15": 2,
+    "fader.ch16": 13,
+    "fader.ch2": 15,
+    "fader.ch3": 15,
+    "fader.ch4": 14,
+    "fader.ch5": 15,
+    "fader.ch6": 15,
+    "fader.ch7": 15,
+    "fader.ch8": 15,
+    "fader.ch9": 15,
+    "trim.ch1": 15,
+    "trim.ch10": 15,
+    "trim.ch11": 15,
+    "trim.ch12": 15,
+    "trim.ch13": 15,
+    "trim.ch14": 2,
+    "trim.ch15": 2,
+    "trim.ch16": 13,
+    "trim.ch2": 15,
+    "trim.ch3": 15,
+    "trim.ch4": 14,
+    "trim.ch5": 15,
+    "trim.ch6": 15,
+    "trim.ch7": 15,
+    "trim.ch8": 15,
+    "trim.ch9": 15
+  },
+  "applied_action_count": 287,
+  "cumulative_drift_surface_count": 28,
+  "cumulative_relative_drift": [
+    {
+      "cumulative_relative_db": -22.5,
+      "surface": "fader.ch1"
+    },
+    {
+      "cumulative_relative_db": -22.07,
+      "surface": "fader.ch10"
+    },
+    {
+      "cumulative_relative_db": -22.5,
+      "surface": "fader.ch11"
+    },
+    {
+      "cumulative_relative_db": -22.5,
+      "surface": "fader.ch12"
+    },
+    {
+      "cumulative_relative_db": -18.49,
+      "surface": "fader.ch13"
+    },
+    {
+      "cumulative_relative_db": -15.45,
+      "surface": "fader.ch16"
+    },
+    {
+      "cumulative_relative_db": -22.5,
+      "surface": "fader.ch2"
+    },
+    {
+      "cumulative_relative_db": -22.5,
+      "surface": "fader.ch3"
+    },
+    {
+      "cumulative_relative_db": -11.82,
+      "surface": "fader.ch4"
+    },
+    {
+      "cumulative_relative_db": -13.94,
+      "surface": "fader.ch5"
+    },
+    {
+      "cumulative_relative_db": -15.88,
+      "surface": "fader.ch6"
+    },
+    {
+      "cumulative_relative_db": -12.85,
+      "surface": "fader.ch7"
+    },
+    {
+      "cumulative_relative_db": -22.01,
+      "surface": "fader.ch8"
+    },
+    {
+      "cumulative_relative_db": -22.09,
+      "surface": "fader.ch9"
+    },
+    {
+      "cumulative_relative_db": -166.79,
+      "surface": "trim.ch1"
+    },
+    {
+      "cumulative_relative_db": -130.35,
+      "surface": "trim.ch10"
+    },
+    {
+      "cumulative_relative_db": -100.76,
+      "surface": "trim.ch11"
+    },
+    {
+      "cumulative_relative_db": -97.7,
+      "surface": "trim.ch12"
+    },
+    {
+      "cumulative_relative_db": 11.1,
+      "surface": "trim.ch13"
+    },
+    {
+      "cumulative_relative_db": -18.25,
+      "surface": "trim.ch16"
+    },
+    {
+      "cumulative_relative_db": -129.8,
+      "surface": "trim.ch2"
+    },
+    {
+      "cumulative_relative_db": -190.34,
+      "surface": "trim.ch3"
+    },
+    {
+      "cumulative_relative_db": 14.0,
+      "surface": "trim.ch4"
+    },
+    {
+      "cumulative_relative_db": 7.03,
+      "surface": "trim.ch5"
+    },
+    {
+      "cumulative_relative_db": 13.6,
+      "surface": "trim.ch6"
+    },
+    {
+      "cumulative_relative_db": -8.6,
+      "surface": "trim.ch7"
+    },
+    {
+      "cumulative_relative_db": -12.63,
+      "surface": "trim.ch8"
+    },
+    {
+      "cumulative_relative_db": -137.5,
+      "surface": "trim.ch9"
+    }
+  ],
+  "cycle_count": 15,
+  "cycle_max": 92,
+  "cycle_min": 78,
+  "duration_sec": 188.9,
+  "event_count": 15,
+  "evidence_paths": [
+    "reports/soundcheck_daemon_log_20260703T221457.jsonl"
+  ],
+  "failures": [
+    "duration_below_minimum",
+    "live_executor_actions_present",
+    "positive_gain_or_trim_boosts_present",
+    "relative_only_targets_present",
+    "cumulative_relative_drift_present"
+  ],
+  "generated_at": "2026-07-04T18:37:43Z",
+  "live_authority_granted": false,
+  "live_executor_action_count": 287,
+  "max_cumulative_db": 3.0,
+  "min_duration_sec": 600.0,
+  "parse_errors": [],
+  "positive_fader_boost_count": 0,
+  "positive_fader_boosts": [],
+  "positive_gain_or_trim_boost_count": 73,
+  "positive_gain_or_trim_boosts": [
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 0.26,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 3,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 3,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 3,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 3,
+      "move_db": 0.96,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 3,
+      "move_db": 0.95,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 4,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 4,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 4,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 4,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 4,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch16"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 5,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 5,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 5,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 5,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 5,
+      "move_db": 0.01,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 6,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 6,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 6,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 6,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch16"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 7,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 7,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 7,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 7,
+      "move_db": 0.13,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch16"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 8,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 8,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 8,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 8,
+      "move_db": 0.77,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 8,
+      "move_db": 0.38,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch14"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch15"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 0.65,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch16"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 9,
+      "move_db": 0.02,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch8"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 0.95,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch14"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 10,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch15"
+    }
+  ],
+  "proof_scope": "offline_log_audit_only_no_wing_readiness",
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "relative_only_target_count": 422,
+  "relative_only_targets": [
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -0.56,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch8"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 1,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch1"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch2"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch3"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch8"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch9"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch10"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch11"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch12"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch16"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -9.36,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch1"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -8.48,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch2"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -12.61,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch3"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -1.85,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -7.33,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch9"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -7.34,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch10"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -6.85,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch11"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -7.28,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch12"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 1,
+      "move_db": -2.45,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch16"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "fader",
+      "line": 1,
+      "move_db": 0.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch4"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "fader",
+      "line": 1,
+      "move_db": -0.36,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch4"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": 1.0,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -1.32,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch8"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch1"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch2"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch3"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.22,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch5"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch6"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -0.8,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch7"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch8"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch9"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch10"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch11"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch12"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch13"
+    },
+    {
+      "collection": "applied",
+      "kind": "fader",
+      "line": 2,
+      "move_db": -1.5,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "fader.ch16"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -12.82,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch1"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -8.87,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch2"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -12.77,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch3"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -3.31,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch7"
+    },
+    {
+      "collection": "blocked.decision",
+      "kind": "trim",
+      "line": 2,
+      "move_db": -11.81,
+      "path": "reports/soundcheck_daemon_log_20260703T221457.jsonl",
+      "surface": "trim.ch9"
+    }
+  ],
+  "schema": "soundcheck_long_run_drift_audit.v1",
+  "status": "failed",
+  "summary_path": "artifacts/soundcheck_long_run_drift_audit/20260704T183743Z_soundcheck_long_run_drift_audit/summary.json"
+}
