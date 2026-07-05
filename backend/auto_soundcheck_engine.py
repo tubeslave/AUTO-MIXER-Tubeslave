@@ -32,6 +32,9 @@ from heuristics.balance_v3 import (
     target_vector_lufs,
 )
 from heuristics.gain_v3 import CLASS_GAIN_PROFILE as GAIN_V3_CLASS_PROFILE
+from heuristics.phase_v3 import (
+    pair_alignment_allowed as phase_pair_alignment_allowed,
+)
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -5164,6 +5167,19 @@ class AutoSoundcheckEngine:
 
         for ch_a, ch_b, pair_type in pairs:
             try:
+                # Phase v3, жёсткий белый список: стереопары не выравниваются
+                # друг к другу (межканальная задержка = стереоинформация),
+                # вокал/подвижные источники и room — никогда.
+                info_a0 = self.channels.get(ch_a)
+                info_b0 = self.channels.get(ch_b)
+                role_a = info_a0.source_role if info_a0 else "line"
+                role_b = info_b0.source_role if info_b0 else "line"
+                allowed, deny_reason = phase_pair_alignment_allowed(role_a, role_b)
+                if not allowed:
+                    logger.info(
+                        f"Phase: пара ch{ch_a}/{ch_b} пропущена ({deny_reason})")
+                    continue
+
                 buf_a = self.audio_capture.get_buffer(ch_a, self.sample_rate * 2)
                 buf_b = self.audio_capture.get_buffer(ch_b, self.sample_rate * 2)
 

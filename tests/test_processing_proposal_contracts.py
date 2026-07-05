@@ -126,7 +126,7 @@ OBJECTIVE_FAMILY_METHODS = {
     "gate_expander_deesser": ("deesser_vocal_sibilance",),
     "fx_sends": ("auto_fx", "fx_send_proposal"),
     "pan_stereo": ("auto_panner", "pan_spatial_proposal"),
-    "phase_alignment": ("phase_alignment", "phase_aware_eq_guard"),
+    "phase_alignment": ("phase_v3", "phase_alignment", "phase_aware_eq_guard"),
     "routing_groups_scenes": (
         "routing_management_proposal",
         "scene_preset_management_proposal",
@@ -147,7 +147,7 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "fx_direct_apply",
 )
 
-EXPECTED_METHOD_REVIEW_CARD_COUNT = 40
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 41
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",

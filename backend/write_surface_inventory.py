@@ -611,6 +611,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "backend/auto_panner.py",
             "backend/auto_panner_adaptive.py",
             "backend/auto_fader_v2/controller.py",
+            "backend/heuristics/phase_v3.py",
             "backend/phase_alignment.py",
             "backend/autofoh_safety.py",
         ),

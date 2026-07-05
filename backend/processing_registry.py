@@ -5437,6 +5437,51 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
     ),
     ProcessingMethod(
+        id="phase_v3",
+        label="Phase v3 Cluster Polarity and Delay Alignment",
+        domain="phase",
+        status="proposal_only",
+        summary=(
+            "Cluster-based polarity/delay alignment: priority triad "
+            "(polarity always, coarse 2-10 ms cluster delays at "
+            "soundcheck, sub-ms tuning has diminishing live returns); "
+            "alignment clusters with farthest/closest/manual reference "
+            "policy, per-cluster caps and console-step quantization; hard "
+            "whitelist — stereo-pair interiors, room mics and vocals/"
+            "moving sources are never aligned (vocal added delay 0 for "
+            "IEM comfort); isolated-hit gating (no kick within 30 ms), "
+            "median over >=8 hits with MAD <= 0.5 ms apply rule and IQR "
+            "sanity; low-band sum-energy verification with rollback; "
+            "LIVE is detection only — delay drift (>1.5 ms, 2 windows) "
+            "and polarity-flip alerts, application allowed only in "
+            "detected silence with an armed operator confirmation."
+        ),
+        module="backend/heuristics/phase_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "phase_v3_live_writes_need_supervised_delay_polarity_apply_"
+            "gate_readback_rollback_and_silence_window_evidence"
+        ),
+        promotion_next=(
+            "route polarity/delay proposals to operator review; never "
+            "auto-write delays during performance — apply only in "
+            "silence windows after supervised proof of the family"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "polarity_first_priority_triad",
+            "alignment_clusters_with_caps",
+            "stereo_pair_interior_never_aligned",
+            "vocal_zero_added_delay_iem",
+            "mad_0_5ms_apply_rule",
+            "sum_energy_verification_rollback",
+            "live_detection_only_silence_apply",
+        ),
+    ),
+    ProcessingMethod(
         id="phase_alignment",
         label="Phase / Delay Alignment",
         domain="phase",
