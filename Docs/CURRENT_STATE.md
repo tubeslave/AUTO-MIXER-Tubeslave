@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-05T01:07:32Z
+Generated: 2026-07-05T01:22:54Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `0936030c5 Require M005 stale event packet checks`
+  `69cc3cbe4 Bind M006 latest verifier handoff surfaces`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M006 owner-decision
-  packet-check binding commit `0936030c5`; ignored large/superseded local
+- Tracked worktree state before this sync: clean after the M006 latest-verifier
+  handoff surface binding commit `69cc3cbe4`; ignored large/superseded local
   evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -143,6 +143,13 @@ Generated: 2026-07-05T01:07:32Z
   `events.jsonl` stale-payload binding and still grants no WING/backend
   contact, proposal creation, live apply, readiness closure, readiness-matrix
   update or live authority.
+- `69cc3cbe4` binds active M006 handoff surfaces to that latest hardened
+  verifier commit: the active milestone, roadmap, M001 evidence-gate plan and
+  project blocker handoff text now name `0936030c5` and the packet-verifier
+  stale-readback event-check requirement, with WING MVP rail coverage to reject
+  stale latest-verifier mentions. This is offline docs/test rail hardening only
+  and grants no WING/backend contact, live apply, readiness closure,
+  readiness-matrix update or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2109,8 +2116,11 @@ Generated: 2026-07-05T01:07:32Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `0936030c5` passed with
-  `5499 passed, 1 skipped, 1 warning`. This includes the M006 owner-decision packet-verifier stale-event check binding, the M005 stale-readback event-evidence binding, the M005 stale-readback verifier hardening, the M005 stale-readback timeout evidence binding, the M006 owner decision verifier,
+- The latest verified full-suite run for `69cc3cbe4` passed with
+  `5500 passed, 1 skipped, 1 warning`. This includes the M006 latest-verifier
+  handoff surface guard, the M006 owner-decision packet-verifier stale-event
+  check binding, the M005 stale-readback event-evidence binding, the M005
+  stale-readback verifier hardening, the M005 stale-readback timeout evidence binding, the M006 owner decision verifier,
   the M005 rollback-free owner-evidence binding, the M005 blocked-apply
   response owner-verifier binding, the soundcheck runtime
   `operator_runtime_contract` binding, the M005 event-sequence

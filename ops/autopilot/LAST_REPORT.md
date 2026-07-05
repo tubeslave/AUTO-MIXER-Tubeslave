@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T01:07:32Z.
-- Latest verified full suite passed with `5499 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T01:22:54Z.
+- Latest verified full suite passed with `5500 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -60,6 +60,11 @@
   event-evidence checks before an accepted owner decision can become a
   readiness-matrix candidate. This blocks stale ready reports created before
   `events.jsonl` stale-payload binding and grants no backend/WING contact,
+  proposal creation, live write, readiness update or live authority.
+- Latest M006 handoff surface rail: `69cc3cbe4` binds active handoff text to
+  the latest hardened M006 owner-decision verifier commit `0936030c5` and adds
+  a WING MVP rail that rejects stale latest-verifier mentions. This is
+  offline docs/test rail hardening only and grants no backend/WING contact,
   proposal creation, live write, readiness update or live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
