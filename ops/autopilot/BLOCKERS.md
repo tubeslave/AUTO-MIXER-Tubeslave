@@ -58,6 +58,54 @@
   prepares the owner review from the accepted CH3 fader/gain-down artifacts but
   is not an owner decision: M005 is still missing, readiness matrix updates are
   still disallowed, and live authority remains denied.
+- `cca9fb447` adds `tools/verify_m006_owner_readiness_decision.py` and a
+  pending owner decision template at
+  `artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json`.
+  The decision verifier blocks the current template with
+  `reason=m006_owner_decision_pending`; an accepted decision can only become a
+  readiness-matrix update candidate for exactly `fader_supervised` and
+  `gain_supervised` after a ready packet-verifier report and accepted M005
+  summary path are supplied. This is offline verification only and grants no
+  backend/WING contact, proposal creation, live apply, readiness update or live
+  authority.
+- `0936030c5` tightens that owner-decision gate: the ready packet-verifier
+  report must include the current M005 stale-readback event-evidence checks
+  before any accepted owner decision can become a readiness-matrix candidate.
+  This prevents M006 from relying on stale packet-verifier reports created
+  before `events.jsonl` stale-payload binding; it is offline verification only
+  and does not close M005 or M006.
+- `46f809911` tightens that owner-decision gate again: the ready
+  packet-verifier report must also include the current M005 reconnect-readback
+  event-evidence checks before any accepted owner decision can become a
+  readiness-matrix candidate. This prevents M006 from relying on stale
+  packet-verifier reports created before `events.jsonl` reconnect-readback
+  binding; it is offline verification only and does not close M005 or M006.
+- `5eda78126` binds that owner-decision gate to the exact M005 event-log path:
+  the ready packet-verifier report must carry `m005_events` equal to the
+  accepted M005 summary sibling `events.jsonl`. This prevents M006 from relying
+  on missing, copied or mismatched event logs and still does not close M005 or
+  M006.
+- Latest M005 physical reconnect target guard: `bbf7833e2` hardens the M005
+  runner before the next operator-present proof:
+  executed `physical-cable-loss` mode now requires `--reconnect-wing-ip` before
+  backend/WebSocket contact. This prevents a cable-loss proof attempt from
+  producing a partial disconnected-write artifact without reconnect recovery
+  and still does not close M005 or M006.
+- `3ea749d70` tightens the packet-verifier side again: the M005
+  reconnect-recovery physical readback summary must match a post-reconnect
+  `events.jsonl` `recv` payload before owner-review input can be ready. This
+  prevents hand-edited reconnect summary claims from satisfying M006 and still
+  does not close M005 or M006.
+- The M005/M006 verifier contract is now stricter: `f10894198` requires clean
+  M005 owner-review input to be rollback-free. The M006 packet contract
+  declares `required_rollback_request_sent=false` and forbids
+  `rollback_last_manual_write` as a M005 remediation request type; the verifier
+  rejects M005 summaries/events that contain rollback remediation. The previous
+  `455a4028c` nested `operator_proposal_apply_blocked` response check,
+  `b605b20f4` request/event sequence ordering, `223b8d433` canonical-path
+  audit, `6cf8c8800` event-log audit, `f0ccd9842` request audit and
+  `ad7f0da18` reconnect physical-readback checks remain in force. This is
+  offline verification only; it does not close M005 or M006.
 - Local runtime/tooling verification on 2026-07-04 is green but does not close
   the blocker: the current backend listener completed the 600.005 second
   read-only observation artifact
@@ -66,9 +114,14 @@
   meter frames, 0 unexpected live events, no forbidden sent request types and
   no live apply request sent. Frontend test/build passed, targeted backend
   meter/runtime-observation/M005-runner/proposal tests passed, and WING MVP
-  rails passed. Full backend validation also passed:
-  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5453
-  passed, 1 skipped, 1 warning. The no-WING quick gate failed closed on
+  rails passed. `f8eb799c6` now requires future runtime observation summaries
+  to include a complete `operator_runtime_contract` covering operator mode,
+  connection state, dashboard, channel inventory, decision queue, safety
+  monitor, meter subscription, read-only channel-level meters, analyzer status
+  and master-bus status; the existing 600.005 second artifact recomputes as
+  complete with no missing surfaces. Full backend validation also passed:
+  `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`: 5482
+  passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because the existing listener still needs operator
   confirmation. M005 still requires the operator-present physical cable-loss,
   stale-readback, blocked-write and reconnect proof, and M006 still requires
@@ -88,6 +141,10 @@
   without granting apply authority: it does not mutate the queue, does not run
   preflight, does not call `apply_operator_proposal`, and keeps
   `live_authority_granted=false`.
+- Frontend task safety evidence now renders the same proposal review context
+  before generic safety evidence: old value, new value, delta, rollback and
+  review-field completeness. This is display-only operator visibility and does
+  not grant apply authority, readiness closure or live WING authority.
 - Dirty worktree split was recorded on `2026-07-04T18:27:09Z`: HEAD is
   `22ece58e09`, `ops/autopilot/WRITER_LEASE/owner.json` is absent, and
   `ops/autopilot/STOP` is absent. Keep WING proof/readiness WIP
@@ -124,8 +181,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `landed_split_handoff_truth_surfaces_synced` at
-  `2026-07-04T19:31:13Z`. That row preserves the same `current_blocker`,
+  `m005_physical_reconnect_target_required` at
+  `2026-07-05T02:25:32Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

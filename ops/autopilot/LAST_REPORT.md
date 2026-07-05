@@ -10,7 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T19:31:13Z.
+- Latest heartbeat: 2026-07-05T02:25:32Z.
+- Latest verified full suite passed with `5507 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -31,6 +32,73 @@
   proof and M006 owner readiness review remain open. The earlier
   `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
   remains audit history only.
+- Latest M005 physical reconnect target guard: `bbf7833e2` makes executed
+  `physical-cable-loss` M005 proof runs require `--reconnect-wing-ip` before
+  backend/WebSocket contact. This prevents an operator-present cable-loss
+  proof from continuing without reconnect-recovery target evidence and grants
+  no backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
+- Latest M005/M006 verifier hardening: `f10894198` makes clean M005
+  owner-review input rollback-free. The M006 packet contract now requires
+  `required_rollback_request_sent=false` and forbids
+  `rollback_last_manual_write` as a M005 remediation request type; the verifier
+  rejects M005 summaries/events with `rollback_request_sent=true` or
+  `rollback_last_manual_write` in the request audit. This grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
+- Latest M005 stale-readback verifier sync: `b4b2b69e9` binds M005
+  stale-readback summary evidence to `events.jsonl` for path-based M006
+  owner-review verification. The event log must contain the same unavailable
+  stale-readback payload between the stale query and the blocked
+  `apply_operator_proposal` probe; missing, mismatched or out-of-window
+  stale-readback event evidence blocks owner-review input. This grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
+- Latest M006 owner decision hardening: `cca9fb447` adds a separate offline
+  owner decision verifier and pending decision template. The current template
+  returns `blocked` with `reason=m006_owner_decision_pending`; an accepted
+  decision must bind to the report-only M006 packet, a ready packet-verifier
+  report and the accepted M005 summary path, and it can only name
+  `fader_supervised`/`gain_supervised`. This grants no backend/WING contact,
+  proposal creation, live write, readiness update or live authority.
+- Latest M006 owner decision packet-check hardening: `0936030c5` requires a
+  ready packet-verifier summary to include the current M005 stale-readback
+  event-evidence checks before an accepted owner decision can become a
+  readiness-matrix candidate. This blocks stale ready reports created before
+  `events.jsonl` stale-payload binding and grants no backend/WING contact,
+  proposal creation, live write, readiness update or live authority.
+- Latest M006 owner decision reconnect-check hardening: `46f809911` requires
+  that same ready packet-verifier summary to also include the current M005
+  reconnect-readback event-evidence checks before an accepted owner decision
+  can become a readiness-matrix candidate. This blocks stale ready reports
+  created before `events.jsonl` reconnect-readback binding and grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
+- Latest M006 owner decision event-path hardening: `5eda78126` requires that
+  same ready packet-verifier summary to carry `m005_events` matching the
+  accepted M005 summary sibling `events.jsonl` before an accepted owner
+  decision can become a readiness-matrix candidate. This blocks missing, copied
+  or mismatched event logs and grants no backend/WING contact, proposal
+  creation, live write, readiness update or live authority.
+- Latest M006 packet verifier hardening: `3ea749d70` requires the M005
+  reconnect-recovery physical readback summary to match a post-reconnect
+  `events.jsonl` `recv` payload before owner-review input can be ready. This
+  blocks hand-edited reconnect summary claims and grants no backend/WING
+  contact, proposal creation, live write, readiness update or live authority.
+- Latest M006 handoff surface rail now points active handoff text at the
+  latest hardened M006 owner-decision verifier commit `5eda78126`, including
+  stale-readback, reconnect-readback and accepted M005 sibling `events.jsonl`
+  packet-verifier requirements. This is offline docs/test rail hardening only
+  and grants no backend/WING contact, proposal creation, live write,
+  readiness update or live authority.
+- Latest soundcheck runtime hardening: `f8eb799c6` makes
+  `tools/soundcheck_runtime_observation_runner.py` require a complete
+  `operator_runtime_contract` before a runtime observation can pass: operator
+  mode, connection state, dashboard, channel inventory, decision queue, safety
+  monitor, meter subscription, read-only channel-level meters, analyzer status
+  and master-bus status. The existing 600.005 second observation artifact
+  recomputes as complete with no missing surfaces. This creates no proposal,
+  applies no proposal, updates no readiness row and grants no live authority.
 - Status marker: read-only decision gate is accepted-ready; release readiness
   remains blocked on M005/M006.
 - External validation requirements:
@@ -555,8 +623,14 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   coverage before a proposed correction is trusted. `0dd5687f8` blocks positive
   WING proof-direction moves even for operator-authored proof proposals, and
   `22852a7e8` ignores validate-only/no-transport WING preflight traces in real
-  artifact roots. The latest verified full suite passed with
-  `5434 passed, 1 skipped, 1 warning`;
+  artifact roots, `feeed92e7` cross-checks M006 owner-readiness proof
+  artifact summaries against packet rows, `ad7f0da18` requires physical
+  reconnect evidence, `f0ccd9842` binds M005 request-audit evidence,
+  `455a4028c` requires the nested `operator_proposal_apply_blocked` backend
+  response before M005 blocked-write evidence or M006 owner-review input can
+  be ready, and `f10894198` requires clean M005 owner-review input to be
+  rollback-free. The latest verified full suite passed with
+  `5499 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

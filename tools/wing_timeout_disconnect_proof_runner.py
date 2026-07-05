@@ -162,6 +162,8 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
                 "--operator-confirm-physical-cable-loss must equal "
                 f"{PHYSICAL_CABLE_CONFIRMATION}"
             )
+        if args.execute and not args.reconnect_wing_ip:
+            return "--reconnect-wing-ip is required for executed physical-cable-loss proof"
     return None
 
 
@@ -178,6 +180,49 @@ def _readback_is_physical(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _payload_target_field(payload: Dict[str, Any], field_name: str) -> Any:
+    if field_name in payload:
+        return payload.get(field_name)
+    request = payload.get("request")
+    if isinstance(request, dict):
+        return request.get(field_name)
+    return None
+
+
+def _readback_matches_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    payload_channel = _payload_target_field(payload, "channel")
+    try:
+        channel_matches = int(payload_channel) == int(channel)
+    except (TypeError, ValueError):
+        channel_matches = False
+    return (
+        channel_matches
+        and _payload_target_field(payload, "value_type") == value_type
+        and _payload_target_field(payload, "address") == address
+    )
+
+
+def _readback_is_physical_for_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    return _readback_is_physical(payload) and _readback_matches_target(
+        payload,
+        channel=channel,
+        value_type=value_type,
+        address=address,
+    )
+
+
 def _readback_is_unavailable(payload: Dict[str, Any]) -> bool:
     if payload.get("type") == "mixer_parameter_read_blocked":
         return True
@@ -187,6 +232,48 @@ def _readback_is_unavailable(payload: Dict[str, Any]) -> bool:
         and payload.get("value") is None
         and payload.get("source") in {"unavailable", "physical_readback"}
     )
+
+
+def _readback_is_unavailable_for_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    return _readback_is_unavailable(payload) and _readback_matches_target(
+        payload,
+        channel=channel,
+        value_type=value_type,
+        address=address,
+    )
+
+
+def _timeout_readback_unavailable(
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+    request_id: str,
+    timeout: float,
+    error: BaseException,
+) -> Dict[str, Any]:
+    return {
+        "type": "mixer_parameter_read_blocked",
+        "status": "readback_timeout",
+        "source": "timeout",
+        "reason": "stale_readback_timeout_after_disconnect",
+        "address": address,
+        "channel": channel,
+        "value_type": value_type,
+        "value": None,
+        "request_id": request_id,
+        "timeout_sec": timeout,
+        "transport_failure": {
+            "type": type(error).__name__,
+            "message": str(error),
+        },
+    }
 
 
 def _apply_block_reason(payload: Dict[str, Any]) -> Optional[str]:
@@ -204,6 +291,19 @@ def _apply_probe_blocked(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _blocked_write_phase_is_safe(blocked_write: Dict[str, Any]) -> bool:
+    apply_result = (
+        blocked_write.get("apply_result")
+        if isinstance(blocked_write.get("apply_result"), dict)
+        else {}
+    )
+    return (
+        blocked_write.get("status") == "passed"
+        and blocked_write.get("block_reason") in SAFE_BLOCK_REASONS
+        and _apply_probe_blocked(apply_result)
+    )
+
+
 def _unexpected_apply(payload: Dict[str, Any]) -> bool:
     result = payload.get("apply_result")
     if not isinstance(result, dict):
@@ -218,10 +318,21 @@ def _unexpected_apply(payload: Dict[str, Any]) -> bool:
 def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
     phases = summary.get("phases") if isinstance(summary.get("phases"), dict) else {}
     completed: list[str] = []
+    try:
+        channel = int(summary.get("channel"))
+    except (TypeError, ValueError):
+        channel = 0
+    value_type = str(summary.get("value_type") or "")
+    address = str(summary.get("address") or "")
 
     baseline = phases.get("baseline") if isinstance(phases.get("baseline"), dict) else {}
     baseline_readback = baseline.get("readback") if isinstance(baseline.get("readback"), dict) else {}
-    if baseline.get("status") == "passed" and _readback_is_physical(baseline_readback):
+    if baseline.get("status") == "passed" and _readback_is_physical_for_target(
+        baseline_readback,
+        channel=channel,
+        value_type=value_type,
+        address=address,
+    ):
         completed.append("physical_baseline_readback")
 
     disconnect = phases.get("disconnect") if isinstance(phases.get("disconnect"), dict) else {}
@@ -237,6 +348,11 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
     )
     if stale_readback.get("status") == "passed" and _readback_is_unavailable(
         stale_readback.get("readback") if isinstance(stale_readback.get("readback"), dict) else {}
+    ) and _readback_matches_target(
+        stale_readback.get("readback") if isinstance(stale_readback.get("readback"), dict) else {},
+        channel=channel,
+        value_type=value_type,
+        address=address,
     ):
         completed.append("stale_readback_unavailable")
 
@@ -245,10 +361,7 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
         if isinstance(phases.get("blocked_write_while_disconnected"), dict)
         else {}
     )
-    if (
-        blocked_write.get("status") == "passed"
-        and blocked_write.get("block_reason") in SAFE_BLOCK_REASONS
-    ):
+    if _blocked_write_phase_is_safe(blocked_write):
         completed.append("blocked_write_while_disconnected")
 
     reconnect = (
@@ -256,7 +369,25 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
         if isinstance(phases.get("reconnect_recovery"), dict)
         else {}
     )
-    if reconnect.get("status") == "passed" and reconnect.get("unchanged_from_baseline") is True:
+    reconnect_readback = (
+        reconnect.get("readback") if isinstance(reconnect.get("readback"), dict) else {}
+    )
+    reconnect_status = (
+        reconnect.get("connection_status")
+        if isinstance(reconnect.get("connection_status"), dict)
+        else {}
+    )
+    if (
+        reconnect.get("status") == "passed"
+        and reconnect_status.get("connected") is True
+        and reconnect.get("unchanged_from_baseline") is True
+        and _readback_is_physical_for_target(
+            reconnect_readback,
+            channel=channel,
+            value_type=value_type,
+            address=address,
+        )
+    ):
         completed.append("reconnect_recovery_verified")
 
     return completed
@@ -475,11 +606,16 @@ async def run(args: argparse.Namespace) -> int:
                 request_id=f"{run_id}:baseline",
             )
             summary["phases"]["baseline"] = {"status": "passed", "readback": baseline}
-            if not _readback_is_physical(baseline):
+            if not _readback_is_physical_for_target(
+                baseline,
+                channel=args.channel,
+                value_type=args.value_type,
+                address=address,
+            ):
                 summary.update(
                     {
                         "status": "blocked",
-                        "reason": "baseline_not_verified_from_physical_readback",
+                        "reason": "baseline_not_verified_from_target_physical_readback",
                         "fail_closed": True,
                     }
                 )
@@ -556,20 +692,46 @@ async def run(args: argparse.Namespace) -> int:
                     "wait_sec": args.physical_loss_wait_sec,
                 }
 
-            stale_probe = await _query_parameter(
-                ws,
-                recorder,
+            stale_request_id = f"{run_id}:stale-probe"
+            try:
+                stale_probe = await _query_parameter(
+                    ws,
+                    recorder,
+                    channel=args.channel,
+                    value_type=args.value_type,
+                    address=address,
+                    timeout=args.timeout,
+                    request_id=stale_request_id,
+                )
+            except TimeoutError as exc:
+                stale_probe = _timeout_readback_unavailable(
+                    channel=args.channel,
+                    value_type=args.value_type,
+                    address=address,
+                    request_id=stale_request_id,
+                    timeout=args.timeout,
+                    error=exc,
+                )
+                recorder.record("synthetic_recv_timeout", stale_probe)
+            summary["phases"]["stale_readback"] = {
+                "status": (
+                    "passed"
+                    if _readback_is_unavailable_for_target(
+                        stale_probe,
+                        channel=args.channel,
+                        value_type=args.value_type,
+                        address=address,
+                    )
+                    else "failed"
+                ),
+                "readback": stale_probe,
+            }
+            if not _readback_is_unavailable_for_target(
+                stale_probe,
                 channel=args.channel,
                 value_type=args.value_type,
                 address=address,
-                timeout=args.timeout,
-                request_id=f"{run_id}:stale-probe",
-            )
-            summary["phases"]["stale_readback"] = {
-                "status": "passed" if _readback_is_unavailable(stale_probe) else "failed",
-                "readback": stale_probe,
-            }
-            if not _readback_is_unavailable(stale_probe):
+            ):
                 summary.update(
                     {
                         "status": "blocked",
@@ -661,7 +823,12 @@ async def run(args: argparse.Namespace) -> int:
                 )
                 recovered_value = recovery_readback.get("value")
                 unchanged = (
-                    _readback_is_physical(recovery_readback)
+                    _readback_is_physical_for_target(
+                        recovery_readback,
+                        channel=args.channel,
+                        value_type=args.value_type,
+                        address=address,
+                    )
                     and abs(float(recovered_value) - old_value) <= 0.06
                 )
                 summary["phases"]["reconnect_recovery"] = {

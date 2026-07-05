@@ -1,22 +1,22 @@
 # Current State
 
-Generated: 2026-07-04T19:31:13Z
+Generated: 2026-07-05T02:25:32Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `22852a7e8 Ignore validate-only WING preflight traces`
+  `bbf7833e2 Require M005 physical reconnect target`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the split was landed as
-  separate commits through `d466d13135`; ignored large/superseded local
+  `df54ea7ec Sync M006 event log path truth surfaces`
+- Tracked worktree state before this sync: clean after the M005 physical
+  reconnect-target guard commit `bbf7833e2`; ignored large/superseded local
   evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
-- Complete tracked file count from `rg --files`: 14140.
+- Complete tracked file count from `rg --files`: 24825.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
   same tree, but new durable files are written as `Docs/...`.
@@ -70,6 +70,112 @@ Generated: 2026-07-04T19:31:13Z
   restoration/verification plus fader/gain-down proof rerun passed; and the
   open external items are M005 disconnect/timeout/stale-state proof and M006
   readiness review.
+- `tools/verify_m006_owner_readiness_packet.py` now verifies the M006 review
+  packet against the exact fader/gain proof summaries referenced by the packet
+  rows. It does not glob for substitute artifacts, and it keeps owner-review
+  input blocked if a referenced proof summary is missing, path-unsafe, stale
+  or inconsistent. This is offline verifier hardening only: M005 remains
+  incomplete and M006 is still not an owner decision.
+- `ad7f0da18` further hardens the M005/M006 contract: M005 reconnect
+  recovery is complete only when the reconnect phase carries connected
+  status, unchanged value and fresh physical readback, and the M006 verifier
+  now independently requires the M005 cable-loss token, unavailable stale
+  readback, safe blocked-write reason and physical reconnect readback. This
+  is still offline verifier hardening only; M005/M006 remain open.
+- `f0ccd9842` binds M005 request-audit evidence into the M006 owner-review
+  verifier: complete M005 input must expose `sent_request_types`, include
+  the blocked `apply_operator_proposal` probe, contain no forbidden direct
+  write request types, and keep `forbidden_request_types_sent` consistent
+  with that audit. This prevents clean summary flags from hiding
+  write-adjacent M005 evidence and still grants no live authority.
+- `6cf8c8800` binds M005 event-log evidence into the same M006
+  owner-review verifier: complete M005 input must load `events.jsonl` from
+  the same artifact run directory, match event-log send rows against
+  `sent_request_types`, include the blocked `apply_operator_proposal` probe
+  in the event stream and contain no forbidden direct write request types
+  there. This prevents a clean summary from hiding write-adjacent event-log
+  evidence and still grants no backend/WING contact or live authority.
+- `223b8d433` binds M005 owner-review input to the canonical M005 proof
+  root: the supplied summary must be repo-relative under
+  `artifacts/wing_timeout_disconnect_proof/*/summary.json`, the summary
+  declared `summary_path` must match that input, the declared
+  `events_path` must match the loaded event log and the event log must be
+  sibling `events.jsonl` in the same run directory. This prevents temp-root
+  or copied M005 summaries from becoming owner-review input and grants no
+  backend/WING contact or live authority.
+- `b605b20f4` binds M005 owner-review input to the request sequence proven by
+  both `sent_request_types` and `events.jsonl` send rows: baseline query must
+  precede supervised proposal setup, stale-state query must precede the
+  blocked `apply_operator_proposal` probe, and observation-only reconnect plus
+  the final query must happen after that blocked probe. This prevents
+  reordered or hand-edited M005 evidence from becoming owner-review input and
+  grants no backend/WING contact or live authority.
+- `455a4028c` binds M005 blocked-write completion and M006 owner-review input
+  to the nested backend `operator_proposal_apply_blocked` response. A
+  phase-level `status=passed` and safe `block_reason` are not enough; the
+  M006 packet artifact now also declares
+  `required_blocked_write_apply_result_type=operator_proposal_apply_blocked`.
+  Current partial M005 evidence still blocks owner review. This is offline
+  verifier hardening only and grants no backend/WING contact, proposal
+  creation, live apply, readiness closure or live authority.
+- `f10894198` binds clean M005 owner-review input to rollback-free request
+  evidence. The M006 packet contract now declares
+  `required_rollback_request_sent=false` and
+  `forbidden_remediation_request_types=["rollback_last_manual_write"]`, and
+  the verifier rejects M005 summaries/events with `rollback_request_sent=true`
+  or `rollback_last_manual_write` in the request audit. Current partial M005
+  evidence still blocks owner review. This is offline verifier hardening only
+  and grants no backend/WING contact, proposal creation, live apply, readiness
+  closure or live authority.
+- `cca9fb447` adds a separate offline M006 owner decision verifier. It checks
+  a filled owner decision against the report-only M006 packet, a ready packet
+  verifier summary and the accepted M005 summary path, then allows only a
+  future readiness-matrix candidate for exactly `fader_supervised` and
+  `gain_supervised`. The current template remains `pending_owner_review`, the
+  decision verifier returns `blocked` with
+  `reason=m006_owner_decision_pending`, and no WING/backend contact, proposal
+  creation, live apply, readiness closure, readiness-matrix update or live
+  authority is granted.
+- `0936030c5` tightens that M006 owner decision verifier: a ready packet
+  verifier summary must now contain the current M005 stale-readback
+  event-evidence checks before an accepted owner decision can become a
+  readiness-matrix candidate. This blocks stale ready reports created before
+  `events.jsonl` stale-payload binding and still grants no WING/backend
+  contact, proposal creation, live apply, readiness closure, readiness-matrix
+  update or live authority.
+- `69cc3cbe4` binds active M006 handoff surfaces to that latest hardened
+  verifier commit: the active milestone, roadmap, M001 evidence-gate plan and
+  project blocker handoff text now name `0936030c5` and the packet-verifier
+  stale-readback event-check requirement, with WING MVP rail coverage to reject
+  stale latest-verifier mentions. This is offline docs/test rail hardening only
+  and grants no WING/backend contact, live apply, readiness closure,
+  readiness-matrix update or live authority.
+- `3ea749d70` tightens the offline M006 packet verifier again: a ready
+  owner-review input now requires `events.jsonl` to contain a post-reconnect
+  `recv` payload that exactly matches the M005 reconnect-recovery physical
+  readback summary, in addition to the stale-readback event-payload binding.
+  This blocks hand-edited reconnect summary claims from reaching owner-review
+  readiness and grants no WING/backend contact, proposal creation, live apply,
+  readiness closure, readiness-matrix update or live authority.
+- `46f809911` tightens the offline M006 owner-decision verifier to require the
+  ready packet-verifier report to include those current reconnect-readback
+  event checks as true, alongside the stale-readback event checks. This blocks
+  accepted owner decisions from relying on older ready packet-verifier reports
+  that predate `events.jsonl` reconnect-readback binding and grants no
+  WING/backend contact, proposal creation, live apply, readiness closure,
+  readiness-matrix update or live authority.
+- `5eda78126` binds the offline M006 owner-decision verifier to the exact M005
+  event-log path: the ready packet-verifier report must carry `m005_events`
+  equal to the accepted M005 summary sibling `events.jsonl`. This blocks
+  accepted owner decisions from relying on missing, copied or mismatched event
+  logs and grants no WING/backend contact, proposal creation, live apply,
+  readiness closure, readiness-matrix update or live authority.
+- `bbf7833e2` makes executed physical-cable-loss M005 proof runs require
+  `--reconnect-wing-ip` before backend/WebSocket contact. This prevents an
+  operator-present cable-loss run from accidentally producing only a partial
+  disconnected-write artifact without reconnect-recovery proof, and grants no
+  WING/backend contact, proposal creation, live apply, readiness closure,
+  readiness-matrix update or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -134,6 +240,33 @@ Generated: 2026-07-04T19:31:13Z
   proposals are surfaced as coverage gaps only; this does not mutate queue
   state, does not run preflight, does not call `apply_operator_proposal` and
   does not grant live WING authority.
+- `3c3a90c7c` carries that backend operator-review coverage through the
+  frontend task adapter as display-only safety evidence: old value, new value,
+  delta, rollback and review-field completeness are shown before generic
+  evidence rows. This is operator visibility only; it does not contact backend
+  or WING, create proposals, call apply paths, update readiness rows or grant
+  live authority.
+- `ff4097541` makes the M005 disconnect/timeout runner treat a stale-readback
+  WebSocket timeout after confirmed disconnect as explicit readback-unavailable
+  evidence before the blocked-write probe. Baseline, apply and reconnect
+  timeouts still fail closed. This is offline runner/test hardening only; it
+  does not contact backend or WING, create proposals, call apply paths, update
+  readiness rows or grant live authority.
+- `30528e41a` hardens the M006 owner-review verifier for M005 stale-readback
+  evidence: arbitrary `mixer_parameter_read_blocked` payloads no longer
+  satisfy disconnect/stale-state proof, blocked readbacks need a safe
+  disconnect reason, and timeout evidence must use the canonical
+  `readback_timeout`/`source=timeout`/`stale_readback_timeout_after_disconnect`
+  shape with `TimeoutError` transport evidence. This is offline verifier/test
+  hardening only; it does not contact backend or WING, create proposals, call
+  apply paths, update readiness rows or grant live authority.
+- `b4b2b69e9` binds M005 stale-readback summary evidence to `events.jsonl`:
+  path-based M006 owner-review verification now requires the same unavailable
+  stale-readback payload to be recorded between the stale query and the blocked
+  `apply_operator_proposal` probe. Missing, mismatched or out-of-window
+  stale-readback event evidence blocks owner-review input. This is offline
+  verifier/test hardening only; it does not contact backend or WING, create
+  proposals, call apply paths, update readiness rows or grant live authority.
 - The write-surface static scan now treats direct raw `send(..., value)`
   OSC calls as write-adjacent. The inventory declares WING meter subscription
   transport, legacy enhanced gain direct apply, legacy snapshot navigation
@@ -295,9 +428,14 @@ Generated: 2026-07-04T19:31:13Z
   `npm --prefix frontend run build`: passed). Targeted backend checks passed
   for meter stream, runtime observation, the M005 timeout/disconnect proof
   runner, supervised proposal runner, operator review coverage and the
-  long-run drift audit. Full backend validation also passed:
-  `PYTHONPATH=backend python3 -m pytest tests/ -x --tb=short -q`: 5453
-  passed, 1 skipped, 1 warning. The no-WING quick gate failed closed on
+  long-run drift audit. `f8eb799c6` now requires future runtime observation
+  summaries to include a complete `operator_runtime_contract`: operator mode,
+  connection state, dashboard snapshot, channel inventory, decision queue,
+  safety monitor, meter subscription, read-only channel-level meters, analyzer
+  status and master-bus status. The existing 600.005 second artifact
+  recomputes as complete with no missing surfaces. Full backend validation
+  also passed: `PYTHONPATH=backend python -m pytest tests/ -x --tb=short -q`:
+  5482 passed, 1 skipped. The no-WING quick gate failed closed on
   `backend_port_free` because an existing backend listener requires operator
   confirmation; no live authority, readiness closure or current supervised
   live-write kind changed.
@@ -2004,8 +2142,22 @@ Generated: 2026-07-04T19:31:13Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `22852a7e8` passed with
-  `5434 passed, 1 skipped, 1 warning`. This includes the local SmartDSP
+- The latest verified full-suite run for `bbf7833e2` passed with
+  `5507 passed, 1 skipped, 1 warning`. This includes the M005 physical
+  reconnect-target guard, the M006 owner-decision
+  M005 event-log path binding, the M006 owner-decision reconnect-event
+  packet-check binding, the M006 packet-verifier
+  reconnect-readback event binding, the M006 latest-verifier
+  handoff surface guard, the M006 owner-decision packet-verifier stale-event
+  check binding, the M005 stale-readback event-evidence binding, the M005
+  stale-readback verifier hardening, the M005 stale-readback timeout evidence binding, the M006 owner decision verifier,
+  the M005 rollback-free owner-evidence binding, the M005 blocked-apply
+  response owner-verifier binding, the soundcheck runtime
+  `operator_runtime_contract` binding, the M005 event-sequence
+  owner-verifier binding, the M005 canonical artifact-path owner-verifier
+  binding, the M005 event-log owner-verifier binding, the M005 request-audit
+  owner-verifier binding, M005 reconnect evidence contract hardening, M006 owner-readiness
+  packet verifier phase-detail checks plus the local SmartDSP
   WING-native fit, DSP-parameter calculation summary, problem-first action
   decision summary evidence tests, the current read-only handoff scope rail and
   the active milestone waiting-reason/timestamp rails plus the repo-local

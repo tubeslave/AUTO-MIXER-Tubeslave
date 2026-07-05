@@ -40,7 +40,22 @@ it does not grant release readiness.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`landed_split_handoff_truth_surfaces_synced` at
-`2026-07-04T19:31:13Z`. No live authority changed; release-ready live
+`m005_physical_reconnect_target_required` at
+`2026-07-05T02:25:32Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
+
+Latest M005 physical reconnect target guard: `bbf7833e2`; executed `physical-cable-loss` M005 proofs now fail closed before backend/WebSocket contact unless `--reconnect-wing-ip` is supplied. This keeps the operator-present cable-loss proof bound to reconnect-recovery evidence and grants no backend/WING contact, proposal creation, live apply, readiness-matrix update or live authority.
+
+Latest M006 packet verifier hardening: `3ea749d70`; it requires a ready
+packet-verifier report with the current M005 stale-readback event-evidence
+checks and matching reconnect-recovery physical readback event checks from
+`events.jsonl`.
+
+Latest M006 owner decision verifier: `5eda78126`; it requires a ready
+packet-verifier report with the current M005 stale-readback event-evidence
+checks, matching reconnect-recovery physical readback event checks and the
+accepted M005 summary sibling `events.jsonl` path. The current pending template
+blocks with
+`reason=m006_owner_decision_pending` and does not grant a readiness-matrix
+update.

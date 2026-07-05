@@ -91,3 +91,101 @@ reported.
 
 Rollback is a normal git revert of the runner, tests, and ADR. M005 should then
 remain blocked rather than returning to ad hoc proof scripts.
+
+## 2026-07-04 Contract Hardening Update
+
+M005 completion now requires reconnect recovery to include a fresh physical
+readback in the reconnect phase, not only `status=passed` and
+`unchanged_from_baseline=true`. The M006 owner-readiness verifier also
+independently checks the M005 phase details: physical cable-loss confirmation
+token, unavailable stale-readback payload, safe blocked-write reason, connected
+reconnect status and physical reconnect readback.
+
+This keeps summary booleans from becoming sufficient owner-review evidence by
+themselves. The update is offline verifier hardening only; it grants no WING
+contact, no live apply authority and no readiness closure without the
+operator-present M005 proof and owner M006 decision.
+
+## 2026-07-04 Request Audit Binding Update
+
+The M006 owner-readiness verifier now treats the M005 summary request audit as
+part of the owner-review input contract. A complete M005 summary must expose
+`sent_request_types`, must show the blocked `apply_operator_proposal` probe,
+and must not contain direct forbidden request types such as `set_fader`,
+`set_gain`, `route_output`, `load_snap` or `save_snap`. The verifier also
+cross-checks `forbidden_request_types_sent` against the request audit list, so
+manually clean summary flags cannot hide a direct write request.
+
+This is still offline verifier hardening only. It validates the artifact
+contract before owner review and grants no WING contact, live apply authority
+or readiness closure.
+
+## 2026-07-04 Event Log Audit Binding Update
+
+The M006 owner-readiness verifier now cross-checks the M005 summary request
+audit against the runner `events.jsonl` send rows from the same artifact run
+directory. A complete M005 summary is not enough if the event log is missing,
+malformed, points outside the summary run directory, differs from
+`sent_request_types`, lacks the blocked `apply_operator_proposal` probe, or
+contains a forbidden direct write request.
+
+This keeps the append-only event stream as the authoritative request audit for
+owner-review input. The update is offline verifier hardening only; it does not
+run M005, does not contact the backend or WING, and does not grant readiness
+closure or live authority.
+
+## 2026-07-04 M005 Artifact Path Binding Update
+
+The M006 owner-readiness verifier now also binds the supplied M005 summary to
+the canonical M005 proof root. Owner-review input must use a repo-relative
+`artifacts/wing_timeout_disconnect_proof/*/summary.json` path, the summary's
+declared `summary_path` must match that input path, the declared `events_path`
+must match the loaded event log, and the event log must be the sibling
+`events.jsonl` in the same run directory.
+
+This prevents temporary-root, copied or path-mutated M005 summaries from
+becoming owner-review input. The update is offline verifier hardening only; it
+does not run M005, does not contact the backend or WING, and does not grant
+readiness closure or live authority.
+
+## 2026-07-04 M005 Event Sequence Binding Update
+
+The M006 owner-readiness verifier now requires the M005 request audit and
+matching `events.jsonl` send rows to prove the disconnect proof order:
+physical baseline query, supervised proposal setup, stale-state query,
+blocked `apply_operator_proposal` probe, observation-only reconnect, and
+final physical readback query. A complete-looking summary is blocked if the
+request sequence applies before the stale-state query or reconnects before the
+blocked-write probe.
+
+This prevents hand-edited or reordered M005 evidence from becoming
+owner-review input. The update is offline verifier hardening only; it does not
+run M005, does not contact the backend or WING, and does not grant readiness
+closure or live authority.
+
+## 2026-07-04 Blocked Apply Result Binding Update
+
+M005 completion now requires the blocked-write phase to include the actual
+backend response payload proving `operator_proposal_apply_blocked`, not just a
+phase-level `status=passed` and safe `block_reason`. The M006
+owner-readiness verifier independently checks the same nested apply result
+before accepting a complete M005 artifact as owner-review input.
+
+This prevents a hand-edited summary from claiming that a disconnected
+`apply_operator_proposal` probe was blocked when the recorded backend response
+was missing or applied. The update is offline verifier hardening only; it does
+not run M005, does not contact the backend or WING, and does not grant
+readiness closure or live authority.
+
+## 2026-07-04 M005 Rollback-Free Owner-Review Binding Update
+
+The M006 owner-readiness verifier now rejects M005 owner-review input when the
+M005 summary says `rollback_request_sent=true` or when the summary/events
+request audit contains `rollback_last_manual_write`.
+
+The M005 runner can still send `rollback_last_manual_write` as emergency
+remediation if the blocked-write probe unexpectedly applies. That path remains
+`manual_review_required`; it is not clean disconnect-proof evidence for M006.
+This binding is offline verifier hardening only. It does not run M005, does not
+contact backend or WING, and does not grant readiness closure or live
+authority.

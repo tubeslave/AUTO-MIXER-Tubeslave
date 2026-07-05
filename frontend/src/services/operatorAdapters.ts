@@ -349,6 +349,99 @@ function adaptSafetyEvidence(value: unknown): SafetyEvidenceItem[] | undefined {
   });
 }
 
+function firstPresent(record: UnknownRecord, keys: string[]): unknown {
+  for (const key of keys) {
+    const value = record[key];
+    if (value !== null && value !== undefined && value !== '') return value;
+  }
+  return undefined;
+}
+
+function formatOperatorReviewValue(value: unknown, valueType: string): string {
+  const raw = str(value);
+  if (!raw) return 'missing';
+  const normalizedType = valueType.toLowerCase();
+  if (['fader', 'gain', 'trim', 'input_gain', 'preamp_gain'].includes(normalizedType)) {
+    return `${raw} dB`;
+  }
+  return raw.replace(/_/g, ' ');
+}
+
+function operatorReviewCoverageById(payload: UnknownRecord): Map<string, UnknownRecord> {
+  const summary = asRecord(payload.summary);
+  const contract = asRecord(summary.operator_review_contract);
+  return new Map(
+    asArray(contract.proposal_field_coverage)
+      .map(row => [str(row.proposal_id), row] as [string, UnknownRecord])
+      .filter(([proposalId]) => proposalId !== '')
+  );
+}
+
+function operatorReviewEvidenceRows(
+  requestedChange: UnknownRecord,
+  coverage: UnknownRecord
+): SafetyEvidenceItem[] {
+  const missingFields = stringList(coverage.missing_fields).map(item => item.toLowerCase());
+  const hasCoverage = Object.keys(coverage).length > 0;
+  const hasReviewValues = [
+    'old_value',
+    'current_value',
+    'previous_value',
+    'proposed_value',
+    'target_value',
+    'new_value',
+    'rollback_value',
+    'delta_db'
+  ].some(key => requestedChange[key] !== null && requestedChange[key] !== undefined && requestedChange[key] !== '');
+  if (!hasCoverage && !hasReviewValues) return [];
+
+  const valueType = str(requestedChange.value_type);
+  const rows: SafetyEvidenceItem[] = [];
+  const oldValue = firstPresent(requestedChange, ['old_value', 'current_value', 'previous_value']);
+  const newValue = firstPresent(requestedChange, ['proposed_value', 'target_value', 'new_value', 'value']);
+  const rollbackValue = firstPresent(requestedChange, ['rollback_value', 'rollback', 'old_value', 'current_value', 'previous_value']);
+  const deltaValue = firstPresent(requestedChange, ['delta_db', 'delta']);
+
+  if (oldValue !== undefined || missingFields.includes('old_value')) {
+    const value = oldValue === undefined ? 'missing' : formatOperatorReviewValue(oldValue, valueType);
+    rows.push({ label: 'Old value', value, tone: toneForSafetyEvidence('Old value', value) });
+  }
+  if (newValue !== undefined || missingFields.includes('new_value')) {
+    const value = newValue === undefined ? 'missing' : formatOperatorReviewValue(newValue, valueType);
+    rows.push({ label: 'New value', value, tone: toneForSafetyEvidence('New value', value) });
+  }
+  if (deltaValue !== undefined) {
+    const value = `${str(deltaValue)} dB`;
+    rows.push({ label: 'Delta', value, tone: toneForSafetyEvidence('Delta', value) });
+  }
+  if (rollbackValue !== undefined || missingFields.includes('rollback')) {
+    const value = rollbackValue === undefined ? 'missing' : formatOperatorReviewValue(rollbackValue, valueType);
+    rows.push({ label: 'Rollback', value, tone: toneForSafetyEvidence('Rollback', value) });
+  }
+  if (hasCoverage) {
+    const status = str(coverage.status, missingFields.length ? 'incomplete' : 'complete');
+    const value = missingFields.length
+      ? `missing ${missingFields.map(item => item.replace(/_/g, ' ')).join(', ')}`
+      : status.replace(/_/g, ' ');
+    rows.push({ label: 'Review fields', value, tone: toneForSafetyEvidence('Review fields', value) });
+  }
+  return rows;
+}
+
+function mergeSafetyEvidence(...groups: Array<SafetyEvidenceItem[] | undefined>): SafetyEvidenceItem[] | undefined {
+  const merged: SafetyEvidenceItem[] = [];
+  const seen = new Set<string>();
+  for (const group of groups) {
+    for (const row of group ?? []) {
+      const key = row.label.trim().toLowerCase();
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      merged.push(row);
+    }
+  }
+  return merged.length ? merged : undefined;
+}
+
 function cleanToken(value: unknown, fallback = ''): string {
   return str(value, fallback).replace(/_/g, ' ');
 }
@@ -3444,6 +3537,7 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
   const history = asArray(data.history).slice(-10).reverse();
   const rows = [...pending, ...history];
   if (!rows.length) return fallback;
+  const reviewCoverageById = operatorReviewCoverageById(data);
 
   return rows.map((row, index) => {
     const base = fallback[index] ?? fallback[fallback.length - 1];
@@ -3451,6 +3545,10 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
     const requestedChange = asRecord(row.requested_change);
     const canApply = Boolean(row.can_apply ?? requestedChange.value_type);
     const id = str(row.id, base?.id ?? `P-${index + 1}`);
+    const rowReviewCoverage = asRecord(row.operator_review_field_coverage);
+    const reviewCoverage = Object.keys(rowReviewCoverage).length
+      ? rowReviewCoverage
+      : reviewCoverageById.get(id) ?? {};
     return {
       id,
       proposalId: id,
@@ -3467,7 +3565,10 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
         ? row.apply_blockers.map(item => String(item)).filter(Boolean)
         : undefined,
       requestedValueType: str(requestedChange.value_type),
-      safetyEvidence: adaptSafetyEvidence(requestedChange.safety_evidence)
+      safetyEvidence: mergeSafetyEvidence(
+        operatorReviewEvidenceRows(requestedChange, reviewCoverage),
+        adaptSafetyEvidence(requestedChange.safety_evidence)
+      )
     };
   });
 }

@@ -63,12 +63,87 @@ not be updated automatically from this packet.
 
 Decision: `pending_owner_review`
 
+Standalone template:
+`artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json`
+
 Acceptance prerequisites:
 
 1. M005 artifact exists under `artifacts/wing_timeout_disconnect_proof`.
-2. M005 proves physical cable-loss, stale readback denial, blocked write while
+2. M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`.
+3. M005 proves physical cable-loss, stale readback denial, blocked write while
    disconnected and reconnect recovery.
-3. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+4. The blocked-write phase includes the nested backend
+   `operator_proposal_apply_blocked` response, not only a phase-level safe
+   reason.
+5. M005 summary has `rollback_request_sent=false`, and the summary/events
+   request audits contain no `rollback_last_manual_write`.
+6. M005 baseline, stale-readback and reconnect-readback payloads, including
+   `events.jsonl` stale/reconnect payloads, are bound to the same
+   `channel`, `value_type` and WING `address`.
+7. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+
+The M005 summary must also keep `live_authority_granted=false`,
+`readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.
+
+## Packet Verifier
+
+Before owner review, run:
+
+```bash
+python3 tools/verify_m006_owner_readiness_packet.py \
+  --packet-summary artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json \
+  --m005-summary artifacts/wing_timeout_disconnect_proof/<accepted_m005_run>/summary.json \
+  --write-artifact
+```
+
+Until the M005 summary is complete, the verifier must return `blocked` and keep
+`live_authority_granted=false`, `readiness_closure_allowed=false`, and
+`readiness_matrix_update_allowed=false`. With `--write-artifact`, the verifier
+also saves `summary.json` under
+`artifacts/wing_owner_readiness_review_verifier/<run_id>/` for owner-review
+audit.
+
+The verifier also loads the exact fader/gain `summary.json` paths referenced by
+this packet and cross-checks the packet proof rows against those artifacts. It
+does not glob for substitute artifacts. If a referenced proof summary is
+missing, stale, path-unsafe or inconsistent with the packet row, owner-review
+input remains `blocked`.
+
+The verifier also treats rollback remediation inside M005 as contaminated
+disconnect-proof evidence. If `rollback_request_sent=true` or either M005
+request audit contains `rollback_last_manual_write`, owner-review input remains
+`blocked`; a clean blocked-write probe should need no rollback.
+
+The verifier also rejects M005 summaries/events where baseline, stale-state or
+reconnect readback payloads are not for the requested M005 `channel`,
+`value_type` and WING `address`; a physical readback for a different parameter
+cannot satisfy disconnect/reconnect proof.
+
+## Decision Verifier
+
+After the owner fills an accepted decision artifact, run:
+
+```bash
+python3 tools/verify_m006_owner_readiness_decision.py \
+  --decision-summary artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision.json \
+  --packet-summary artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json \
+  --packet-verifier-summary artifacts/wing_owner_readiness_review_verifier/<accepted_packet_verifier_run>/summary.json \
+  --m005-summary artifacts/wing_timeout_disconnect_proof/<accepted_m005_run>/summary.json \
+  --write-artifact
+```
+
+The current template must return `blocked` with
+`reason=m006_owner_decision_pending`. An accepted decision can only become
+`ready_for_readiness_matrix_update` if it names exactly `fader_supervised` and
+`gain_supervised`, exactly `fader` and `gain`, matches the packet proof
+artifacts, binds to the ready packet-verifier summary, and keeps
+`live_authority_granted=false`, `readiness_closure_allowed=false`,
+`readiness_matrix_update_allowed=false`, `contacts_wing=false`,
+`contacts_backend=false`, and `live_write=false`.
+
+The decision verifier is still offline and report-only. It can create a
+candidate for a future readiness-matrix update, but it does not edit the matrix
+and does not grant live authority.
 
 Allowed after owner acceptance:
 

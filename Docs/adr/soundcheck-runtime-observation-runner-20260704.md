@@ -71,3 +71,16 @@ claim a quiet runtime if other live activity occurred.
 
 Rollback is a normal git revert of the runner, tests, ADR and state/doc
 references. M005 and M006 remain externally blocked either way.
+
+## 2026-07-04 Operator Runtime Contract Update
+
+The runtime observation runner now records an `operator_runtime_contract` and
+blocks a `passed` result unless the observation sees the full operator-facing
+runtime slice: operator mode status, connection state, dashboard snapshot,
+channel inventory, decision queue, safety monitor, meter subscription, read-only
+meter frames with channel levels, analyzer status and master-bus status.
+
+This prevents a partial telemetry session with only dashboard and meter frames
+from being treated as reproducible soundcheck runtime evidence. The update is
+read-only artifact hardening only; it creates no proposal, applies no proposal,
+contacts no WING directly and grants no readiness closure or live authority.

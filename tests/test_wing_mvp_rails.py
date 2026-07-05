@@ -317,6 +317,16 @@ AUTOPILOT_HEARTBEAT = PROJECT_ROOT / "ops" / "autopilot" / "HEARTBEAT.md"
 AUTOPILOT_LAST_REPORT = PROJECT_ROOT / "ops" / "autopilot" / "LAST_REPORT.md"
 AUTOPILOT_STATE = PROJECT_ROOT / "ops" / "autopilot" / "STATE.json"
 AUTOPILOT_RUN_LEDGER = PROJECT_ROOT / "ops" / "autopilot" / "RUN_LEDGER.jsonl"
+M006_OWNER_REVIEW_PACKET_SUMMARY = (
+    PROJECT_ROOT
+    / "artifacts"
+    / "wing_owner_readiness_review"
+    / "20260704T191101Z_m006_owner_readiness_review_packet"
+    / "summary.json"
+)
+M006_OWNER_REVIEW_PACKET_REPORT = (
+    PROJECT_ROOT / "Docs" / "reports" / "WING_M006_OWNER_READINESS_REVIEW_PACKET_20260704.md"
+)
 REAL_WING_ARTIFACT_ROOT = PROJECT_ROOT / "artifacts" / "wing_readonly_preflight"
 VALIDATE_INPUTS_READY_SUMMARY = (
     PROJECT_ROOT
@@ -732,7 +742,7 @@ def test_current_state_doc_matches_autopilot_state_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_full_suite = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
@@ -845,6 +855,7 @@ def test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed():
 
 def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    latest_m005_guard = state["latest_m005_physical_reconnect_target_guard_commit"]
     active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
     roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
     capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
@@ -863,12 +874,16 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert "M001 autonomous pre-hardware work is complete" in active
     assert "Real hardware proof now requires WING Rack" in active
     assert "rollback_not_applied" in active
+    assert latest_m005_guard["commit"] in active
+    assert "Latest M005 physical reconnect target guard" in active
 
     assert "Exactly one milestone is active: `M001`" in roadmap
     assert "`WAITING_FOR_EXTERNAL_VALIDATION`" in roadmap
     assert "Current M001 waiting reason" in roadmap
     assert "accepted_decision_ready" in roadmap
     assert "rollback_not_applied" in roadmap
+    assert latest_m005_guard["commit"] in roadmap
+    assert "Latest M005 physical reconnect target guard" in roadmap
     assert markdown_table_row(roadmap, "M001")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert markdown_table_row(roadmap, "M002")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     for milestone in ("M003", "M004", "M005", "M006"):
@@ -898,6 +913,8 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert "WING_REAL_HARDWARE_READONLY_20260702.md" in blockers
     assert "temporary-root capture only" in blockers
     assert "cannot close readiness" in blockers
+    assert latest_m005_guard["commit"] in blockers
+    assert "Latest M005 physical reconnect target guard" in blockers
     assert "Real WING Rack hardware evidence is not available from this setup run" not in blockers
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 
@@ -1299,6 +1316,40 @@ def test_mvp_progress_report_records_external_validation_handoff():
         assert marker in normalized_progress
 
 
+def test_m006_owner_decision_handoff_surfaces_track_latest_verifier_commit():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    latest_verifier = state["latest_m006_owner_decision_verifier_commit"]
+    latest_packet_check = state["latest_m006_owner_decision_stale_event_packet_check_commit"]
+    expected_commit = latest_verifier["commit"]
+
+    assert expected_commit == latest_packet_check["commit"]
+    assert latest_verifier["requires_packet_verifier_m005_stale_event_checks"] is True
+    assert latest_verifier["requires_packet_verifier_m005_reconnect_event_checks"] is True
+    assert latest_verifier["requires_packet_verifier_m005_events_path_binding"] is True
+    assert latest_packet_check["requires_packet_verifier_m005_reconnect_event_checks"] is True
+    assert latest_packet_check["requires_packet_verifier_m005_events_path_binding"] is True
+
+    for surface_path in (
+        ACTIVE_MILESTONE_DOC,
+        M001_PLAN,
+        ROADMAP_DOC,
+        BLOCKERS_DOC,
+    ):
+        surface = surface_path.read_text(encoding="utf-8")
+        latest_mentions = re.findall(
+            r"Latest M006 owner decision verifier: `([0-9a-f]+)`",
+            surface,
+        )
+        assert latest_mentions == [expected_commit]
+        normalized_surface = re.sub(r"\s+", " ", surface)
+        assert "current M005 stale-readback event-evidence checks" in normalized_surface
+        assert "matching reconnect-recovery physical readback event checks" in normalized_surface
+        assert "accepted M005 summary sibling `events.jsonl`" in normalized_surface
+        assert "packet-verifier" in normalized_surface
+        assert "reason=m006_owner_decision_pending" in normalized_surface
+        assert "readiness-matrix update" in normalized_surface
+
+
 def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
     state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
     progress_report = MVP_PROGRESS_REPORT.read_text(encoding="utf-8")
@@ -1383,7 +1434,7 @@ def test_autopilot_operator_reports_match_latest_full_suite_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped, 1 warning(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_result = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
@@ -2254,6 +2305,74 @@ def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
     assert "Offline, shadow, replay, mock и simulator evidence не являются hardware proof." in goal
     assert "MVP readiness/operator evidence update is now covered" in current
     assert "readiness/operator evidence update gate rail is now automated" in report
+
+
+def test_m006_owner_review_packet_requires_complete_m005_summary_contract():
+    packet = json.loads(M006_OWNER_REVIEW_PACKET_SUMMARY.read_text(encoding="utf-8"))
+    report = M006_OWNER_REVIEW_PACKET_REPORT.read_text(encoding="utf-8")
+
+    assert packet["status"] == "ready_for_owner_review_after_m005"
+    assert packet["scope"] == "owner_review_packet_only_no_readiness_update"
+    assert packet["live_authority_granted"] is False
+    assert packet["readiness_closure_allowed"] is False
+    assert packet["readiness_matrix_update_allowed"] is False
+    assert packet["contacts_wing"] is False
+    assert packet["contacts_backend"] is False
+    assert packet["live_write"] is False
+
+    contract = packet["m005_completion_contract"]
+    assert contract["required_summary_glob"] == (
+        "artifacts/wing_timeout_disconnect_proof/*/summary.json"
+    )
+    assert contract["required_schema"] == "wing_timeout_disconnect_proof.v1"
+    assert contract["required_status"] == "passed"
+    assert contract["required_m005_complete"] is True
+    assert contract["required_missing_m005_evidence"] == []
+    assert contract["required_completed_m005_evidence"] == [
+        "physical_baseline_readback",
+        "operator_confirmed_physical_cable_loss",
+        "stale_readback_unavailable",
+        "blocked_write_while_disconnected",
+        "reconnect_recovery_verified",
+    ]
+    assert contract["required_readback_target_binding"] == [
+        "baseline_readback",
+        "stale_readback",
+        "reconnect_readback",
+        "events_stale_readback",
+        "events_reconnect_readback",
+    ]
+    assert contract["must_keep_authority_denied"] == {
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "readiness_matrix_update_allowed": False,
+    }
+
+    prerequisites = packet["owner_decision_template"]["acceptance_prerequisites"]
+    assert "M005 artifact exists under artifacts/wing_timeout_disconnect_proof" in prerequisites
+    assert "M005 summary has m005_complete=true and missing_m005_evidence=[]" in prerequisites
+    assert (
+        "M005 proves physical cable-loss, stale readback denial, blocked write while "
+        "disconnected and reconnect recovery"
+    ) in prerequisites
+    assert any(
+        "channel" in item and "value_type" in item and "address" in item
+        for item in prerequisites
+    )
+
+    assert "M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`." in report
+    assert "baseline, stale-state or\nreconnect readback payloads" in report
+    assert "`live_authority_granted=false`" in report
+    assert "`readiness_closure_allowed=false`" in report
+    assert "`readiness_matrix_update_allowed=false`" in report
+    assert "python3 tools/verify_m006_owner_readiness_packet.py" in report
+    assert "--packet-summary artifacts/wing_owner_readiness_review/" in report
+    assert "--m005-summary artifacts/wing_timeout_disconnect_proof/<accepted_m005_run>/summary.json" in report
+    assert "--write-artifact" in report
+    assert "artifacts/wing_owner_readiness_review_verifier/<run_id>/" in report
+    assert "the verifier must return `blocked`" in report
+    assert "does not close M005 or M006" in report
+    assert "does not update\nthe readiness matrix and does not grant live authority" in report
 
 
 def test_m007_offline_promotion_framework_stays_replay_bound_before_live_expansion():

@@ -39,6 +39,25 @@ Current gate state:
   supervised proof step;
 - allowed current WING live-write proof types: `fader` and `gain` only;
 - allowed current write direction: small negative move only.
+- M006 owner-review verifier input now also requires complete M005
+  request/event ordering evidence: stale-state query before the blocked
+  `apply_operator_proposal` probe, then observation-only reconnect and final
+  query after the blocked probe. The blocked-write phase must also carry the
+  nested backend `operator_proposal_apply_blocked` response, not just a
+  phase-level safe reason, and the summary/events request audits must not
+  contain `rollback_last_manual_write`. This is offline artifact verification
+  only and does not run M005 or grant live authority.
+- M006 owner decision verification now has a separate offline gate:
+  `tools/verify_m006_owner_readiness_decision.py` must see an accepted owner
+  decision, a ready packet-verifier report with the current M005
+  stale-readback event-evidence checks, the accepted M005 summary path and
+  exactly `fader_supervised`/`gain_supervised`. The current decision template
+  is still `pending_owner_review`, so the verifier blocks and grants no
+  readiness-matrix update or live authority.
+- Frontend operator-review evidence now shows old value, new value, delta,
+  rollback and review-field completeness for decision-queue proposals before
+  generic evidence rows. This satisfies the operator-visibility slice only; it
+  does not run M005, make an M006 owner decision or grant live authority.
 
 ## Hard Safety Boundary
 
@@ -238,6 +257,9 @@ Required operator approval:
   actually pulled the WING network link for this proof;
 - accepted read-only source id is the current operator-accepted preflight
   artifact.
+- executed `physical-cable-loss` mode includes a reconnect target; the runner
+  fails closed before backend/WebSocket contact if `--reconnect-wing-ip` is
+  omitted.
 
 The reusable runner is:
 
@@ -259,6 +281,8 @@ python3 tools/wing_timeout_disconnect_proof_runner.py \
   --reason "m005_disconnect_timeout_stale_state_proof"
 ```
 
+Executed `physical-cable-loss` mode now fails closed before backend/WebSocket contact unless `--reconnect-wing-ip` is supplied.
+
 Expected evidence:
 
 - physical baseline readback before loss;
@@ -274,7 +298,8 @@ Stop if:
 - the runner observes live or stale physical readback after disconnect;
 - any direct write request type appears in the event log;
 - blocked-write probe applies unexpectedly without rollback/manual review;
-- reconnect readback is unavailable or differs from baseline.
+- reconnect readback is unavailable or differs from baseline;
+- `--reconnect-wing-ip` is missing for an executed physical cable-loss proof.
 
 ## Stage 4 - Readiness Update
 
@@ -343,7 +368,10 @@ operator/owner action, unattended Codex work may execute only the safe slice:
    `apply_operator_proposal`;
 7. read-only soundcheck runtime observation artifacts that subscribe to meters
    and request dashboard/channel/decision/safety snapshots without creating or
-   applying proposals;
+   applying proposals, and that pass the complete `operator_runtime_contract`
+   for operator mode, connection state, dashboard, channel inventory, decision
+   queue, safety monitor, meter subscription, read-only channel-level meters,
+   analyzer status and master-bus status;
 8. offline long-run drift audits of existing soundcheck logs, provided the
    audit reads evidence only and cannot create, apply or retry corrections;
 9. read-only operator review coverage checks that surface whether pending
@@ -352,9 +380,14 @@ operator/owner action, unattended Codex work may execute only the safe slice:
 10. dirty-worktree split handoffs that record WING proof WIP, soundcheck
    runtime WIP and frontend UI restyle WIP as separate commit groups and
    generated review patches before the next soundcheck cycle;
-11. report-only M006 owner review packets that inventory accepted fader/gain
-   proof artifacts while keeping readiness updates blocked until M005 and owner
-   acceptance.
+11. report-only M006 owner review packets and offline verifiers that inventory
+   accepted fader/gain proof artifacts, cross-check packet proof rows against
+   the referenced proof summaries, require a complete M005 summary contract,
+   require M005 request/event sequence ordering, require the nested blocked
+   apply result to prove `operator_proposal_apply_blocked`, require
+   rollback-free M005 request/event audits, require owner-decision input to
+   consume packet-verifier stale-readback event checks, and keep readiness
+   updates blocked until M005 and owner acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
 includes the M005 physical cable-loss proof, reconnect proof and any supervised

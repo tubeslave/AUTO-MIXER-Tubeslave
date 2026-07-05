@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-04T02:46:56Z`
+Generated: `2026-07-05T02:04:44Z`
 
 ## Current MVP
 
@@ -25,7 +25,8 @@ Supervised WING Rack proof.
 - Strict pre-release review score: `95/100`
 - Pre-release score threshold: `95/100`
 - Public release ready from score gate: `true` (supervised narrow WING fader/gain-down MVP scope only)
-- Score gate: score `95/100` is evidence-backed by the passed supervised CH3 fader and gain-down proof artifacts (`artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json`, `artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json`). Public release readiness is scoped to the supervised narrow WING fader/gain-down MVP only; it grants no autonomy, no non-fader/gain live family and no readiness-matrix closure.
+- Score gate summary: score `95/100` is evidence-backed by the passed supervised CH3 fader and gain-down proof artifacts; M005 and M006 remain external gates before any readiness-matrix update.
+- Score gate: do not report `95/100` or public-release readiness while these external WING requirements remain open.
 - Canonical read-only decision marker: `accepted_decision_ready`
 - Current blocker from `STATE.json`: Supervised CH3 fader and gain-down proofs passed on the real WING Rack with apply, physical readback, rollback and emergency-stop/block evidence (artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json and artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json); the earlier rollback_not_applied failure is closed by the passed rerun. The read-only decision ledger remains accepted_decision_ready. Release-ready live correction families remain 0 until the M006 owner readiness review accepts the proof artifacts, live-allowed safety rows remain 0, and current supervised live-write kinds remain 0; the remaining external items are the M005 supervised disconnect/timeout/stale-state protection proof and the M006 readiness review.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
@@ -33,7 +34,10 @@ Supervised WING Rack proof.
 - External validation requirements:
   - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
   - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
-- Latest ledger handoff row: `landed_split_handoff_truth_surfaces_synced` at `2026-07-04T19:31:13Z`
+- Latest ledger handoff row: `m005_physical_reconnect_target_required` at `2026-07-05T02:25:32Z`
+- Latest M005 physical reconnect target guard: `bbf7833e2` requires `--reconnect-wing-ip` before any executed `physical-cable-loss` M005 proof can contact backend/WebSocket, so the operator-present cable-loss proof remains bound to reconnect-recovery evidence and grants no live authority.
+- Latest M006 packet verifier hardening: `3ea749d70` requires matching reconnect-recovery physical readback event checks from `events.jsonl` before owner-review input can be ready.
+- Latest M006 owner decision verifier: `5eda78126` now also requires those matching reconnect-recovery physical readback event checks and the accepted M005 summary sibling `events.jsonl` path before an accepted owner decision can become a readiness-matrix candidate.
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 
