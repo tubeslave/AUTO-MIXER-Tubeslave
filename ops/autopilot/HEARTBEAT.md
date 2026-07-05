@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-05T00:23:10Z
+Last heartbeat UTC: 2026-07-05T00:39:07Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,8 +23,8 @@ External validation requirements:
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: `ff4097541` makes the M005 disconnect/timeout runner treat a stale-readback WebSocket timeout after confirmed disconnect as explicit readback-unavailable evidence before the blocked-write probe. Baseline, apply and reconnect timeouts still fail closed. This heartbeat records offline runner/test hardening only: no WING/backend contact during this checkpoint, no proposal creation, no live apply, no readiness-matrix update and no authority widening.
-Latest verified full pytest passed with `5491 passed, 1 skipped, 1 warning`.
+Latest check: `30528e41a` hardens the M006 owner-review verifier for M005 stale-readback evidence. Arbitrary `mixer_parameter_read_blocked` payloads no longer satisfy disconnect/stale-state proof; blocked readbacks need a safe disconnect reason, and timeout evidence must have the canonical `readback_timeout`/`source=timeout`/`stale_readback_timeout_after_disconnect` shape with `TimeoutError` transport evidence. This heartbeat records offline verifier/test hardening only: no WING/backend contact during this checkpoint, no proposal creation, no live apply, no readiness-matrix update and no authority widening.
+Latest verified full pytest passed with `5494 passed, 1 skipped, 1 warning`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or
 unparseable mute values before mixer writes, and direct `set_pan` rejects
