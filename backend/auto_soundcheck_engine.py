@@ -25,6 +25,7 @@ from audio_capture import (
 )
 from heuristics.eq_v3 import soundcheck_eq_v3
 from heuristics.comp_v3 import soundcheck_comp_v3
+from heuristics.balance_v3 import solve_faders, target_vector_lufs
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -528,6 +529,8 @@ class AutoSoundcheckEngine:
         self.buffer_seconds = buffer_seconds
         self._eq_v3_proposals: Dict[int, Any] = {}
         self._comp_v3_proposals: Dict[int, Any] = {}
+        self._balance_v3_solution: Optional[Any] = None
+        self.balance_genre = "pop_rock"
         self.auto_apply = bool(auto_apply)
         self.observe_only = bool(observe_only)
         self.feedback_emergency_apply = bool(feedback_emergency_apply)
@@ -4332,6 +4335,7 @@ class AutoSoundcheckEngine:
         # считаются по всем буферам сразу.
         self._eq_v3_proposals = self._compute_eq_v3_proposals()
         self._comp_v3_proposals = self._compute_comp_v3_proposals()
+        self._balance_v3_solution = self._compute_balance_v3_solution()
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -4617,6 +4621,45 @@ class AutoSoundcheckEngine:
                             proposal.decision.get("reason"))
         return proposals
 
+    def _compute_balance_v3_solution(self):
+        """Решение баланса v3: вектор целей от вокала + итеративный решатель.
+
+        None — недостаточно измерений (< 2 активных каналов с LUFS):
+        fallback на пресетную таблицу в _apply_fader.
+        """
+        measured: Dict[int, float] = {}
+        roles: Dict[int, str] = {}
+        current: Dict[int, float] = {}
+        for ch, info in self.channels.items():
+            if not info.has_signal or not info.auto_corrections_enabled:
+                continue
+            lufs = -120.0
+            if info.metrics and info.metrics.level.lufs_integrated > -90:
+                lufs = float(info.metrics.level.lufs_integrated)
+            elif info.lufs > -90:
+                lufs = float(info.lufs)
+            if lufs <= -90:
+                continue
+            measured[ch] = lufs
+            roles[ch] = (info.source_role if info.source_role != "unknown"
+                         else (info.preset or "line"))
+            current[ch] = float(info.fader_db) if info.fader_db > -140 else 0.0
+        if len(measured) < 2:
+            return None
+        try:
+            genre = str(getattr(self, "balance_genre", "pop_rock"))
+            targets = target_vector_lufs(roles, genre)
+            solution = solve_faders(measured, targets, current_faders_db=current)
+            logger.info(
+                "balance_v3 (%s): %d каналов, converged=%s, passes=%d%s",
+                genre, len(measured), solution.converged, solution.passes,
+                f", notes={solution.notes}" if solution.notes else "",
+            )
+            return solution
+        except Exception:
+            logger.exception("balance_v3 solve failed; falling back to preset faders")
+            return None
+
     def _apply_eq(
         self,
         ch: int,
@@ -4873,6 +4916,37 @@ class AutoSoundcheckEngine:
                 f"Ch {ch} '{info.name}': fader correction skipped "
                 f"(current={current_fader:.1f}dB, muted={is_muted})"
             )
+            return
+
+        # Balance v3 (основной путь): вектор целей от ведущего вокала на
+        # Ayaic-якоре (жанровый пресет) + итеративный решатель с потолком
+        # 0 dBFS и нормализацией вниз — вместо сравнения с самым громким
+        # каналом. Пресетная таблица ниже — fallback без v3-решения.
+        v3_solution = getattr(self, "_balance_v3_solution", None)
+        if v3_solution is not None and ch in v3_solution.faders_db:
+            fader_db = float(v3_solution.faders_db[ch])
+            fader_db = max(-144.0, min(0.0, fader_db))
+            previous_fader_db = current_fader
+            try:
+                decision = self._execute_action(
+                    ChannelFaderMove(
+                        channel_id=ch,
+                        target_db=fader_db,
+                        is_lead=info.source_role == "lead_vocal",
+                        reason=f"Balance v3 target for {preset} (genre preset)",
+                    ),
+                    phase_guard_context=phase_guard_context,
+                )
+                if decision and decision.sent:
+                    info.fader_db = getattr(decision.action, "target_db", fader_db)
+                    logger.info(
+                        f"Ch {ch} '{info.name}': fader {current_fader:.1f}→{fader_db:.1f}dB "
+                        f"(balance_v3, residual {v3_solution.residual_lu.get(ch, 0.0):+.1f} LU)"
+                    )
+                else:
+                    info.fader_db = previous_fader_db
+            except Exception as e:
+                logger.warning(f"Ch {ch}: balance_v3 fader set failed: {e}")
             return
 
         # Start with the operator's current fader and apply only a correction.

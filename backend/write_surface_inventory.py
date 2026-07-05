@@ -132,10 +132,11 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="Gain/fader proposal generators",
         status="proposal_only",
         paths=(
+            "backend/heuristics/balance_v3.py",
+            "backend/heuristics/bleed_leakage.py",
             "backend/auto_soundcheck_engine.py",
             "backend/agents/fader_agent.py",
             "backend/agents/gain_agent.py",
-            "backend/enhanced_gain_agent.py",
             "backend/lufs_gain_staging.py",
             "backend/auto_fader.py",
             "backend/live_shared_mix.py",
@@ -480,29 +481,6 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         next_action=(
             "Keep meter transport behind explicit supervised/read-only flows "
             "and preserve untrusted/stale readings as fail-closed evidence."
-        ),
-    ),
-    WriteSurface(
-        id="legacy_enhanced_gain_agent_direct_apply",
-        label="Legacy enhanced gain agent direct apply",
-        status="quarantined",
-        paths=("backend/enhanced_gain_agent.py",),
-        entrypoints=("apply_to_mixer", "osc_client.send"),
-        write_kinds=("gain", "hpf"),
-        allowed_live=False,
-        gate=(
-            "Legacy direct OSC apply path is quarantined; gain/HPF outputs must "
-            "flow through proposal evidence and the Product Layer supervised "
-            "fader/gain boundary."
-        ),
-        current_policy=(
-            "Do not call apply_to_mixer for WING deployment. The agent may "
-            "produce analysis/proposals only unless a future proof creates a "
-            "narrow supervised apply contract."
-        ),
-        next_action=(
-            "Replace legacy direct apply with proposal DTOs and physical "
-            "readback/rollback requirements before any live use."
         ),
     ),
     WriteSurface(

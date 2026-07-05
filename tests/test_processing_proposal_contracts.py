@@ -104,6 +104,7 @@ OBJECTIVE_FAMILY_METHODS = {
     ),
     "source_identity": ("source_identity_confidence_proposal",),
     "fader_balance": (
+        "balance_v3",
         "auto_fader_v1",
         "bus_group_balance_proposal",
         "live_shared_mix",
@@ -146,7 +147,7 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "fx_direct_apply",
 )
 
-EXPECTED_METHOD_REVIEW_CARD_COUNT = 38
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 39
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",
@@ -5838,7 +5839,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "Master / Output",
     ]
     assert decision_template_summary["priority_method_decision_counts"] == {
-        "1": 6,
+        "1": 7,
         "2": 9,
         "3": 3,
         "4": 3,
@@ -5851,7 +5852,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     ]["1"] == 47
     assert decision_template_summary[
         "priority_operator_evidence_required_field_counts"
-    ]["1"] == 38
+    ]["1"] == 45
     assert decision_template_summary[
         "priority_operator_problem_review_summary_counts"
     ]["1"] == len(REQUIRED_OPERATOR_PROBLEM_REVIEW_SUMMARY)
@@ -5866,7 +5867,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     )
     assert decision_template_summary[
         "priority_future_wing_readback_contract_summary_counts"
-    ]["1"] == 23
+    ]["1"] == 26
     assert decision_template_summary["priority_test_evidence_counts"]["1"] == 4
     assert decision_template_summary[
         "priority_live_authority_boundary_summary_counts"
@@ -6042,7 +6043,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     }
     assert packet_priority_sections[1]["operator_payload_required_fields"]
     assert len(packet_priority_sections[1]["operator_payload_required_fields"]) == 47
-    assert len(packet_priority_sections[1]["operator_evidence_required_fields"]) == 38
+    assert len(packet_priority_sections[1]["operator_evidence_required_fields"]) == 45
     assert sorted(packet_priority_sections[1]["operator_problem_review_summary"]) == (
         sorted(REQUIRED_OPERATOR_PROBLEM_REVIEW_SUMMARY)
     )
@@ -6094,7 +6095,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     )
     assert len(
         packet_priority_sections[1]["future_wing_readback_contract_summary"]
-    ) == 23
+    ) == 26
     assert len(packet_priority_sections[1]["live_authority_boundary_summary"]) == 7
     assert len(
         packet_priority_sections[1]["operator_review_record_required_fields"]
@@ -6513,7 +6514,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "Routing / Groups / Scenes",
         "Master / Output",
     ]
-    assert priority_decision_sections[1]["method_decision_count"] == 6
+    assert priority_decision_sections[1]["method_decision_count"] == 7
     assert priority_decision_sections[2]["method_decision_count"] == 9
     assert priority_decision_sections[7]["method_decision_count"] == 1
     for section in priority_decision_sections.values():

@@ -4784,6 +4784,48 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
     ),
     ProcessingMethod(
+        id="balance_v3",
+        label="Balance v3 Two-Loop Level Balancing",
+        domain="gain_fader",
+        status="proposal_only",
+        summary=(
+            "Two-loop level balance: soundcheck loop builds a lead-vocal-"
+            "referenced target vector (the only strongly measured balance "
+            "heuristic: vocal about -3 LU vs mix sum, De Man ISMIR 2014) "
+            "with genre presets anchored on the project Ayaic planes, then "
+            "solves faders iteratively (0.5 LU convergence, 0 dBFS ceiling "
+            "with downward normalization); live loop is layered and "
+            "conservative — vocal intelligibility guard, slow drift "
+            "correction with a JND-based deadband frozen by a correlated-"
+            "drop musical-dynamics detector, Dugan gain-sharing for speech "
+            "only; bleed-robust measurement via bleed floors and an NNLS "
+            "leakage matrix; preamp is never touched live."
+        ),
+        module="backend/heuristics/balance_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "balance_v3_live_writes_need_supervised_fader_apply_gate_"
+            "readback_rollback_and_emergency_stop_evidence"
+        ),
+        promotion_next=(
+            "route balance_v3 fader vectors to operator review through the "
+            "supervised fader/gain apply gate; enable live layers one at a "
+            "time starting with the vocal guard"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "lead_vocal_referenced_targets",
+            "ayaic_plane_anchor",
+            "fader_ceiling_downward_normalization",
+            "bleed_floor_and_leakage_matrix",
+            "musical_dynamics_freeze",
+            "preamp_frozen_live",
+        ),
+    ),
+    ProcessingMethod(
         id="auto_fader_v1",
         label="Auto Fader v1",
         domain="gain_fader",
