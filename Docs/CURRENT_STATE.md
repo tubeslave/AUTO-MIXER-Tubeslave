@@ -1,17 +1,18 @@
 # Current State
 
-Generated: 2026-07-05T00:39:07Z
+Generated: 2026-07-05T00:55:53Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `30528e41a Harden M005 stale readback verification`
+  `b4b2b69e9 Bind M005 stale readback event evidence`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the M005 stale-readback verifier hardening commit
-  `30528e41a`; ignored large/superseded local evidence remains local-only.
+- Tracked worktree state before this sync: clean after the M005 stale-readback
+  event-evidence binding commit `b4b2b69e9`; ignored large/superseded local
+  evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -219,6 +220,13 @@ Generated: 2026-07-05T00:39:07Z
   shape with `TimeoutError` transport evidence. This is offline verifier/test
   hardening only; it does not contact backend or WING, create proposals, call
   apply paths, update readiness rows or grant live authority.
+- `b4b2b69e9` binds M005 stale-readback summary evidence to `events.jsonl`:
+  path-based M006 owner-review verification now requires the same unavailable
+  stale-readback payload to be recorded between the stale query and the blocked
+  `apply_operator_proposal` probe. Missing, mismatched or out-of-window
+  stale-readback event evidence blocks owner-review input. This is offline
+  verifier/test hardening only; it does not contact backend or WING, create
+  proposals, call apply paths, update readiness rows or grant live authority.
 - The write-surface static scan now treats direct raw `send(..., value)`
   OSC calls as write-adjacent. The inventory declares WING meter subscription
   transport, legacy enhanced gain direct apply, legacy snapshot navigation
@@ -2094,8 +2102,8 @@ Generated: 2026-07-05T00:39:07Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `30528e41a` passed with
-  `5494 passed, 1 skipped, 1 warning`. This includes the M005 stale-readback verifier hardening, the M005 stale-readback timeout evidence binding, the M006 owner decision verifier,
+- The latest verified full-suite run for `b4b2b69e9` passed with
+  `5498 passed, 1 skipped, 1 warning`. This includes the M005 stale-readback event-evidence binding, the M005 stale-readback verifier hardening, the M005 stale-readback timeout evidence binding, the M006 owner decision verifier,
   the M005 rollback-free owner-evidence binding, the M005 blocked-apply
   response owner-verifier binding, the soundcheck runtime
   `operator_runtime_contract` binding, the M005 event-sequence

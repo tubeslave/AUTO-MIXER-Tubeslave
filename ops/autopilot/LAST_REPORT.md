@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T00:39:07Z.
-- Latest verified full suite passed with `5494 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T00:55:53Z.
+- Latest verified full suite passed with `5498 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -40,11 +40,12 @@
   `rollback_last_manual_write` in the request audit. This grants no
   backend/WING contact, proposal creation, live write, readiness update or
   live authority.
-- Latest M005 stale-readback verifier sync: `30528e41a` hardens the M006
-  owner-review verifier so arbitrary `mixer_parameter_read_blocked` payloads
-  cannot satisfy M005 disconnect/stale-state proof. Blocked readbacks need a
-  safe disconnect reason, and timeout evidence must use the canonical
-  readback-timeout shape with TimeoutError transport evidence. This grants no
+- Latest M005 stale-readback verifier sync: `b4b2b69e9` binds M005
+  stale-readback summary evidence to `events.jsonl` for path-based M006
+  owner-review verification. The event log must contain the same unavailable
+  stale-readback payload between the stale query and the blocked
+  `apply_operator_proposal` probe; missing, mismatched or out-of-window
+  stale-readback event evidence blocks owner-review input. This grants no
   backend/WING contact, proposal creation, live write, readiness update or
   live authority.
 - Latest M006 owner decision hardening: `cca9fb447` adds a separate offline
@@ -593,7 +594,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   response before M005 blocked-write evidence or M006 owner-review input can
   be ready, and `f10894198` requires clean M005 owner-review input to be
   rollback-free. The latest verified full suite passed with
-  `5494 passed, 1 skipped, 1 warning`;
+  `5498 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,
