@@ -31,6 +31,7 @@ from heuristics.balance_v3 import (
     solve_faders,
     target_vector_lufs,
 )
+from heuristics.gain_v3 import CLASS_GAIN_PROFILE as GAIN_V3_CLASS_PROFILE
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -5061,14 +5062,23 @@ class AutoSoundcheckEngine:
         if true_peak <= -90.0:
             return
 
-        target_peak = INSTRUMENT_TARGET_INPUT_DB.get(preset, -12.0)
+        # Gain v3 (основной путь): класс-зависимая цель пика уже включает
+        # show margin (эффект шоу) и true-peak allowance — ad-hoc поправки
+        # по crest в v3-ветке не нужны. Пресетная таблица — fallback.
+        v3_role = (info.source_role if info.source_role != "unknown"
+                   else str(preset))
+        v3_profile = GAIN_V3_CLASS_PROFILE.get(v3_role)
+        if v3_profile is not None:
+            target_peak = float(v3_profile["target_peak_dbfs"])
+        else:
+            target_peak = INSTRUMENT_TARGET_INPUT_DB.get(preset, -12.0)
 
-        # For high-crest signals (drums), target peak can be higher
-        # because perceived loudness is lower
-        if crest > 18.0:
-            target_peak += 3.0
-        elif crest < 6.0:
-            target_peak -= 2.0
+            # For high-crest signals (drums), target peak can be higher
+            # because perceived loudness is lower
+            if crest > 18.0:
+                target_peak += 3.0
+            elif crest < 6.0:
+                target_peak -= 2.0
 
         diff = target_peak - true_peak
         correction = max(-20.0, min(20.0, diff))

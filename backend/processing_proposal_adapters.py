@@ -57,6 +57,25 @@ FUTURE_LIVE_REQUIRED_PROOFS = [
     "safety_kernel_trace_for_target_action",
 ]
 PROPOSAL_ONLY_CONTRACTS = {
+    "gain_v3": {
+        "value_type": "gain_trim",
+        "target_kind": "channel_input_trim_or_preamp_gain",
+        "old_value_source": "cached_or_physical_input_trim_read_required_before_promotion",
+        "safety_evidence": [
+            "class_peak_target_with_show_margin",
+            "true_peak_allowance",
+            "quantize_toward_headroom",
+            "pad_rule_precheck",
+            "noise_floor_snr_verification",
+            "gain_lock_dependency_graph",
+            "trim_compensation_law",
+            "no_agc_on_input_gain",
+            "trim_down_only_boost_operator_opt_in",
+            "shared_preamps_hard_lock",
+            "old_value_source",
+            "rollback_gain",
+        ],
+    },
     "lufs_gain_staging": {
         "value_type": "gain_trim",
         "target_kind": "channel_input_trim_or_preamp_gain",
@@ -9877,6 +9896,7 @@ def build_correction_method_goal_operator_review_packet(
         "eq_v3": ("tests/test_eq_v3.py",),
         "comp_v3": ("tests/test_comp_v3.py",),
         "balance_v3": ("tests/test_balance_v3.py",),
+        "gain_v3": ("tests/test_gain_v3.py",),
         "auto_eq": ("tests/test_auto_eq_fail_closed.py",),
         "auto_fader_v1": ("tests/test_auto_fader_level_plane.py",),
         "auto_fx": ("tests/test_auto_fx.py",),

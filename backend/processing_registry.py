@@ -4838,6 +4838,51 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         promotion_next="fake_mixer_proposal_adapter_tests",
     ),
     ProcessingMethod(
+        id="gain_v3",
+        label="Gain v3 Soundcheck Gain-Set and Live Supervision",
+        domain="gain_fader",
+        status="proposal_only",
+        summary=(
+            "Two-mode input gain method: soundcheck gain-set with "
+            "class-dependent peak targets (show margin + true-peak "
+            "allowance), pad rules, quantization toward headroom and "
+            "noise-floor SNR verification (stage noise dominates preamp "
+            "noise by 40+ dB, so conservative headroom is nearly free); "
+            "GAIN LOCK with a dependency graph (gate/comp thresholds, "
+            "monitor sends, meters) and the trim compensation law "
+            "trim += -dGain (Gain Tracking); live mode is monitoring only "
+            "- clip, crest-collapse, too-quiet, floor-jump and DC "
+            "detectors with an alert ladder, opt-in digital trim capped "
+            "at +/-6 dB moving DOWN only on sustained clip; continuous "
+            "AGC on input gain and any automatic preamp/pad moves are "
+            "forbidden by construction; shared_preamps hard-locks the "
+            "preamp."
+        ),
+        module="backend/heuristics/gain_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "gain_v3_live_writes_need_supervised_gain_apply_gate_readback_"
+            "rollback_and_operator_opt_in_for_any_boost"
+        ),
+        promotion_next=(
+            "route gain-set proposals to operator review through the "
+            "supervised gain apply gate (gain-down proven family); enable "
+            "live detectors in log/alert mode first, auto-trim-down last"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "gain_locked_after_soundcheck",
+            "trim_compensation_law",
+            "no_agc_on_input_gain",
+            "no_auto_preamp_no_auto_pad",
+            "trim_down_only_boost_requires_operator_opt_in",
+            "shared_preamps_hard_lock",
+        ),
+    ),
+    ProcessingMethod(
         id="lufs_gain_staging",
         label="Input Trim Autogain",
         domain="gain_fader",

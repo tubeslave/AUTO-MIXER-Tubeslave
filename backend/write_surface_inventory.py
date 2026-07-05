@@ -132,6 +132,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="Gain/fader proposal generators",
         status="proposal_only",
         paths=(
+            "backend/heuristics/gain_v3.py",
             "backend/heuristics/balance_v3.py",
             "backend/heuristics/bleed_leakage.py",
             "backend/auto_soundcheck_engine.py",
