@@ -104,6 +104,92 @@ test('adaptTasks preserves SafeGain ensemble evidence for read-only cockpit disp
   assert.equal(task.safetyEvidence[5].tone, 'green');
 });
 
+test('adaptTasks surfaces operator review old-new-rollback fields before generic evidence', async () => {
+  const { adaptTasks } = await importTypeScript('services/operatorAdapters.ts');
+
+  const tasks = adaptTasks(
+    {
+      summary: {
+        operator_review_contract: {
+          proposal_field_coverage: [
+            {
+              proposal_id: 'proposal-review-complete',
+              status: 'complete',
+              missing_fields: [],
+            },
+            {
+              proposal_id: 'proposal-review-incomplete',
+              status: 'incomplete',
+              missing_fields: ['old_value', 'rollback'],
+            },
+          ],
+        },
+      },
+      pending_actions: [
+        {
+          id: 'proposal-review-complete',
+          title: 'Lead Vocal: lower fader with rollback',
+          target: 'CH 02',
+          severity: 'low',
+          status: 'pending',
+          source: 'operator_proposal_queue',
+          reason: 'Peak headroom recovery with physical readback required.',
+          requested_change: {
+            value_type: 'fader',
+            channel: 2,
+            value: -9.5,
+            old_value: -8,
+            rollback_value: -8,
+            delta_db: -1.5,
+            safety_evidence: [
+              { label: 'Headroom', value: 'ready' },
+            ],
+          },
+          can_apply: true,
+        },
+        {
+          id: 'proposal-review-incomplete',
+          title: 'Lead Vocal: lower fader without rollback',
+          target: 'CH 02',
+          severity: 'medium',
+          status: 'pending',
+          source: 'operator_proposal_queue',
+          reason: 'Unit test incomplete review fields.',
+          requested_change: {
+            value_type: 'fader',
+            channel: 2,
+            value: -1.5,
+          },
+          can_apply: true,
+        },
+      ],
+    },
+    [],
+  );
+
+  const complete = tasks[0];
+  assert.deepEqual(
+    complete.safetyEvidence.map(row => row.label),
+    ['Old value', 'New value', 'Delta', 'Rollback', 'Review fields', 'Headroom'],
+  );
+  assert.deepEqual(
+    complete.safetyEvidence.map(row => row.value),
+    ['-8 dB', '-9.5 dB', '-1.5 dB', '-8 dB', 'complete', 'ready'],
+  );
+
+  const incomplete = tasks[1];
+  assert.deepEqual(
+    incomplete.safetyEvidence.map(row => row.label),
+    ['Old value', 'New value', 'Rollback', 'Review fields'],
+  );
+  assert.deepEqual(
+    incomplete.safetyEvidence.map(row => row.value),
+    ['missing', '-1.5 dB', 'missing', 'missing old value, rollback'],
+  );
+  assert.equal(incomplete.safetyEvidence[0].tone, 'yellow');
+  assert.equal(incomplete.safetyEvidence[3].tone, 'yellow');
+});
+
 test('toUiMode normalizes known aliases to canonical operator modes', async () => {
   const { toUiMode } = await importTypeScript('services/operatorAdapters.ts');
 
