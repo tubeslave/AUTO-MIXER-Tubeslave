@@ -79,7 +79,9 @@ SPL_LIMITS: Dict[str, Dict[str, Any]] = {
 # Целевые кривые — предложения отчёта (настраиваемые), НЕ «истина»
 TARGET_CURVE_PRESETS = ("flat_tilt", "live_standard", "edm")
 
-# Карта выходных OSC-путей WING (FW 3.0.6, Maillot; verify per firmware).
+# Карта выходных OSC-путей WING. Подтверждена на реальном пульте
+# 2026-07-05 (read-only опрос /main/1 и /mtx/1 + write/rollback leq:
+# LR24/LR48 принимаются и откатываются к SHV).
 # Доктрина: системные параметры исключаются из песенных сцен.
 WING_OUTPUT_OSC = {
     "eq_on": "/{root}/{n}/eq/on",
@@ -89,13 +91,13 @@ WING_OUTPUT_OSC = {
     "eq_low_type": "/{root}/{n}/eq/leq",     # PEQ,SHV,CUT,BW..,LR.. (кроссовер!)
     "eq_high_type": "/{root}/{n}/eq/heq",
     "delay_on": "/{root}/{n}/dly/on",
-    "delay_ms": "/{root}/{n}/dly/dly",       # до ~500 мс
+    "delay_ms": "/{root}/{n}/dly/dly",       # до ~500 мс, шаг 0.1 мс
     "dyn_on": "/{root}/{n}/dyn/on",
     "dyn_threshold": "/{root}/{n}/dyn/thr",
     "dyn_ratio": "/{root}/{n}/dyn/ratio",    # до 100 = лимитер
     "polarity": "/{root}/{n}/in/set/inv",
     "fader": "/{root}/{n}/fdr",
-    "verify_per_firmware": True,
+    "verify_per_firmware": False,            # verified 2026-07-05, live console
 }
 
 

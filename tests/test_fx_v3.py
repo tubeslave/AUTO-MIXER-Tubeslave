@@ -9,6 +9,7 @@ from heuristics.fx_v3 import (
     FX_TOKEN_LIVE_POLICY,
     calibrate_send_step,
     ducking_config,
+    fx_slot_accepts_model,
     estimate_rt60_schroeder,
     masking_recheck_adjustment,
     mdl_change_allowed,
@@ -207,3 +208,11 @@ class TestWingDoctrines:
         assert FX_TOKEN_LIVE_POLICY["mdl"] == "silence_only"
         assert FX_TOKEN_LIVE_POLICY["fxmix"] == "keep_100_percent"
         assert FX_TOKEN_LIVE_POLICY["send_level"] == "safe_rate_limited"
+
+    def test_premium_slot_rule(self):
+        # подтверждено на реальном пульте 2026-07-05: премиум-mdl в слот
+        # 9-16 = тихий отказ (readback NONE)
+        assert fx_slot_accepts_model(8, premium=True)
+        assert not fx_slot_accepts_model(16, premium=True)
+        assert fx_slot_accepts_model(16, premium=False)
+        assert not fx_slot_accepts_model(0, premium=False)

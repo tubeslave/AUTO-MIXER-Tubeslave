@@ -45,7 +45,8 @@ if _BACKEND_DIR not in sys.path:  # pragma: no cover - import wiring
 from auto_phase_gcc_phat import GCCPHATAnalyzer  # noqa: E402
 
 SPEED_OF_SOUND_MS_PER_M = 2.915        # при 20 °C (c ≈ 343 м/с)
-CONSOLE_DELAY_STEP_MS = 0.1            # X32/WING-класс; verify per console
+CONSOLE_DELAY_STEP_MS = 0.1            # подтверждено на WING 2026-07-05:
+                                       # 1.23 -> /ch/N/in/set/dly -> 1.2
 POLARITY_R_MIN = 0.4
 COHERENCE_MIN = 0.6
 MIN_HITS = 8

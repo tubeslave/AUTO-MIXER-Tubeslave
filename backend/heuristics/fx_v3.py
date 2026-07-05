@@ -54,6 +54,30 @@ MDL_GLITCH_THRESHOLD_DBFS = -60.0
 STI_MIN = 0.50                    # IEC 60849 / EN 54-16
 MASKING_RECHECK_LIMIT_DB = 1.0    # рост маскировки вокала 1–4 кГц с FX
 
+# Правила слотов FX-рэка WING (подтверждено на реальном пульте 2026-07-05):
+# премиум-модели (HALL, ST-DL, ROOM, ...) грузятся ТОЛЬКО в слоты 1–8;
+# запись премиум-mdl в слоты 9–16 молча отвергается (readback остаётся
+# NONE — тихий отказ, как у OSC-троттла). Стандартные модели (SPKMAN)
+# принимаются в 9–16. Параметрические токены существуют только при
+# загруженной модели (без mdl запрос /fx/N/<tok> — таймаут). Загрузка
+# модели ~0.6 с до валидного readback.
+PREMIUM_FX_SLOTS = tuple(range(1, 9))
+STANDARD_FX_SLOTS = tuple(range(9, 17))
+
+# Токены, подтверждённые readback'ом на реальном пульте 2026-07-05:
+#   HALL:  pdel size dcy mult damp lc hc shp diff (+fxmix)
+#   ST-DL: time mode fact pat feed flc fhc (+fxmix)
+#   SPKMAN (Speaker Manager): hpf lpf dist lim phase (+fxmix)
+SPKMAN_TOKENS = ("hpf", "lpf", "dist", "lim", "phase")
+
+
+def fx_slot_accepts_model(slot: int, premium: bool) -> bool:
+    """Премиум-модель в стандартный слот 9–16 = тихий отказ прошивки."""
+    if premium:
+        return slot in PREMIUM_FX_SLOTS
+    return slot in PREMIUM_FX_SLOTS or slot in STANDARD_FX_SLOTS
+
+
 # Live-изменяемость токенов WING (поверять по firmware)
 FX_TOKEN_LIVE_POLICY: Dict[str, str] = {
     "mdl": "silence_only",
