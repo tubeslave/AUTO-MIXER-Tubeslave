@@ -34,6 +34,10 @@ M005_SUMMARY_REL = (
     "artifacts/wing_timeout_disconnect_proof/"
     "unit_m005_disconnect_timeout_stale_proof/summary.json"
 )
+M005_EVENTS_REL = (
+    "artifacts/wing_timeout_disconnect_proof/"
+    "unit_m005_disconnect_timeout_stale_proof/events.jsonl"
+)
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_decision", TOOL_PATH)
 assert SPEC is not None
@@ -58,6 +62,7 @@ def ready_packet_verifier_report() -> dict:
         "reason": "m006_owner_review_inputs_verified",
         "packet_summary": PACKET_SUMMARY_REL,
         "m005_summary": M005_SUMMARY_REL,
+        "m005_events": M005_EVENTS_REL,
         "proof_artifact_summaries": list(packet["input_proof_artifacts"]),
         "owner_review_input_ready": True,
         "live_authority_granted": False,
@@ -225,6 +230,41 @@ def test_packet_verifier_must_include_m005_reconnect_event_checks() -> None:
         "packet_verifier_m005_events_reconnect_readback_matches_summary"
         in result["failed_checks"]
     )
+    assert result["owner_decision_accepted"] is False
+    assert result["readiness_matrix_update_candidate_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_packet_verifier_m005_events_path_must_match_m005_summary() -> None:
+    packet_verifier = ready_packet_verifier_report()
+    packet_verifier["m005_events"] = (
+        "artifacts/wing_timeout_disconnect_proof/"
+        "different_m005_disconnect_timeout_stale_proof/events.jsonl"
+    )
+
+    result = verify(accepted_decision(), packet_verifier=packet_verifier)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_decision_failed_closed"
+    assert "packet_verifier_m005_events_matches_summary_sibling" in result["failed_checks"]
+    assert "packet_verifier_m005_events_path_repo_relative" not in result["failed_checks"]
+    assert result["owner_decision_accepted"] is False
+    assert result["readiness_matrix_update_candidate_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_packet_verifier_m005_events_path_required() -> None:
+    packet_verifier = ready_packet_verifier_report()
+    packet_verifier.pop("m005_events")
+
+    result = verify(accepted_decision(), packet_verifier=packet_verifier)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_decision_failed_closed"
+    assert "packet_verifier_m005_events_path_repo_relative" in result["failed_checks"]
+    assert "packet_verifier_m005_events_matches_summary_sibling" in result["failed_checks"]
     assert result["owner_decision_accepted"] is False
     assert result["readiness_matrix_update_candidate_ready"] is False
     assert result["live_authority_granted"] is False

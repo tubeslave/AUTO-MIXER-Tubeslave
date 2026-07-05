@@ -199,6 +199,20 @@ def _is_repo_relative_m005_summary(path_text: Any) -> bool:
     )
 
 
+def _is_repo_relative_m005_events(path_text: Any) -> bool:
+    return _is_repo_relative_path(
+        path_text,
+        required_parts=("artifacts", "wing_timeout_disconnect_proof"),
+        filename="events.jsonl",
+    )
+
+
+def _m005_events_path_for_summary(path_text: Any) -> str | None:
+    if not _is_repo_relative_m005_summary(path_text):
+        return None
+    return str(Path(path_text).with_name("events.jsonl"))
+
+
 def _is_utc_z_timestamp(value: Any) -> bool:
     if not isinstance(value, str) or not value.endswith("Z"):
         return False
@@ -369,6 +383,16 @@ def _record_packet_verifier_checks(
         checks,
         "packet_verifier_m005_summary_matches",
         packet_verifier.get("m005_summary") == m005_summary_path,
+    )
+    _record(
+        checks,
+        "packet_verifier_m005_events_path_repo_relative",
+        _is_repo_relative_m005_events(packet_verifier.get("m005_events")),
+    )
+    _record(
+        checks,
+        "packet_verifier_m005_events_matches_summary_sibling",
+        packet_verifier.get("m005_events") == _m005_events_path_for_summary(m005_summary_path),
     )
 
 
