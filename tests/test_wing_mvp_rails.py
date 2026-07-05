@@ -1318,7 +1318,9 @@ def test_m006_owner_decision_handoff_surfaces_track_latest_verifier_commit():
     assert expected_commit == latest_packet_check["commit"]
     assert latest_verifier["requires_packet_verifier_m005_stale_event_checks"] is True
     assert latest_verifier["requires_packet_verifier_m005_reconnect_event_checks"] is True
+    assert latest_verifier["requires_packet_verifier_m005_events_path_binding"] is True
     assert latest_packet_check["requires_packet_verifier_m005_reconnect_event_checks"] is True
+    assert latest_packet_check["requires_packet_verifier_m005_events_path_binding"] is True
 
     for surface_path in (
         ACTIVE_MILESTONE_DOC,
@@ -1335,6 +1337,7 @@ def test_m006_owner_decision_handoff_surfaces_track_latest_verifier_commit():
         normalized_surface = re.sub(r"\s+", " ", surface)
         assert "current M005 stale-readback event-evidence checks" in normalized_surface
         assert "matching reconnect-recovery physical readback event checks" in normalized_surface
+        assert "accepted M005 summary sibling `events.jsonl`" in normalized_surface
         assert "packet-verifier" in normalized_surface
         assert "reason=m006_owner_decision_pending" in normalized_surface
         assert "readiness-matrix update" in normalized_surface

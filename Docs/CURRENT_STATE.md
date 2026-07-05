@@ -1,18 +1,18 @@
 # Current State
 
-Generated: 2026-07-05T01:50:44Z
+Generated: 2026-07-05T02:04:44Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `46f809911 Require M005 reconnect event packet checks`
+  `5eda78126 Bind M006 decision to M005 event log path`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
-  `0e0635f0c Sync M006 reconnect event verifier truth surfaces`
+  `8da6b8388 Sync M006 reconnect packet check truth surfaces`
 - Tracked worktree state before this sync: clean after the M006 owner-decision
-  reconnect-event packet-check hardening commit `46f809911`; ignored
-  large/superseded local evidence remains local-only.
+  M005 event-log path binding commit `5eda78126`; ignored large/superseded
+  local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -164,6 +164,12 @@ Generated: 2026-07-05T01:50:44Z
   that predate `events.jsonl` reconnect-readback binding and grants no
   WING/backend contact, proposal creation, live apply, readiness closure,
   readiness-matrix update or live authority.
+- `5eda78126` binds the offline M006 owner-decision verifier to the exact M005
+  event-log path: the ready packet-verifier report must carry `m005_events`
+  equal to the accepted M005 summary sibling `events.jsonl`. This blocks
+  accepted owner decisions from relying on missing, copied or mismatched event
+  logs and grants no WING/backend contact, proposal creation, live apply,
+  readiness closure, readiness-matrix update or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2130,9 +2136,10 @@ Generated: 2026-07-05T01:50:44Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `46f809911` passed with
-  `5504 passed, 1 skipped, 1 warning`. This includes the M006 owner-decision
-  reconnect-event packet-check binding, the M006 packet-verifier
+- The latest verified full-suite run for `5eda78126` passed with
+  `5506 passed, 1 skipped, 1 warning`. This includes the M006 owner-decision
+  M005 event-log path binding, the M006 owner-decision reconnect-event
+  packet-check binding, the M006 packet-verifier
   reconnect-readback event binding, the M006 latest-verifier
   handoff surface guard, the M006 owner-decision packet-verifier stale-event
   check binding, the M005 stale-readback event-evidence binding, the M005

@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T01:50:44Z.
-- Latest verified full suite passed with `5504 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T02:04:44Z.
+- Latest verified full suite passed with `5506 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -68,17 +68,23 @@
   created before `events.jsonl` reconnect-readback binding and grants no
   backend/WING contact, proposal creation, live write, readiness update or
   live authority.
+- Latest M006 owner decision event-path hardening: `5eda78126` requires that
+  same ready packet-verifier summary to carry `m005_events` matching the
+  accepted M005 summary sibling `events.jsonl` before an accepted owner
+  decision can become a readiness-matrix candidate. This blocks missing, copied
+  or mismatched event logs and grants no backend/WING contact, proposal
+  creation, live write, readiness update or live authority.
 - Latest M006 packet verifier hardening: `3ea749d70` requires the M005
   reconnect-recovery physical readback summary to match a post-reconnect
   `events.jsonl` `recv` payload before owner-review input can be ready. This
   blocks hand-edited reconnect summary claims and grants no backend/WING
   contact, proposal creation, live write, readiness update or live authority.
 - Latest M006 handoff surface rail now points active handoff text at the
-  latest hardened M006 owner-decision verifier commit `46f809911`, including
-  both stale-readback and reconnect-readback packet-verifier check
-  requirements. This is offline docs/test rail hardening only and grants no
-  backend/WING contact, proposal creation, live write, readiness update or
-  live authority.
+  latest hardened M006 owner-decision verifier commit `5eda78126`, including
+  stale-readback, reconnect-readback and accepted M005 sibling `events.jsonl`
+  packet-verifier requirements. This is offline docs/test rail hardening only
+  and grants no backend/WING contact, proposal creation, live write,
+  readiness update or live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
   `operator_runtime_contract` before a runtime observation can pass: operator

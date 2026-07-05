@@ -28,8 +28,8 @@ for M005 disconnect/timeout/stale-state proof and M006 owner readiness review.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`m006_owner_decision_requires_reconnect_event_packet_checks` at
-`2026-07-05T01:50:44Z`. No live authority changed; release-ready live
+`m006_owner_decision_binds_m005_events_path` at
+`2026-07-05T02:04:44Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
 
@@ -38,10 +38,11 @@ packet-verifier report with the current M005 stale-readback event-evidence
 checks and matching reconnect-recovery physical readback event checks from
 `events.jsonl`.
 
-Latest M006 owner decision verifier: `46f809911`; it requires a ready
+Latest M006 owner decision verifier: `5eda78126`; it requires a ready
 packet-verifier report with the current M005 stale-readback event-evidence
-checks and matching reconnect-recovery physical readback event checks. The
-current pending template blocks with
+checks, matching reconnect-recovery physical readback event checks and the
+accepted M005 summary sibling `events.jsonl` path. The current pending template
+blocks with
 `reason=m006_owner_decision_pending` and does not grant a readiness-matrix
 update.
 
