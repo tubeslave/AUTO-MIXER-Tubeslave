@@ -134,11 +134,14 @@ def write_m005_event_log(
     request_types: list[str],
     stale_readback: dict | None = None,
     stale_event_type: str | None = None,
+    reconnect_readback: dict | None = None,
+    reconnect_event_type: str | None = None,
 ) -> None:
     rows = []
     seq = 1
     query_count = 0
     stale_inserted = False
+    reconnect_inserted = False
     if stale_readback is None:
         effective_stale_event_type = None
     else:
@@ -147,6 +150,9 @@ def write_m005_event_log(
             if stale_readback.get("status") == "readback_timeout"
             else "recv"
         )
+    effective_reconnect_event_type = (
+        None if reconnect_readback is None else reconnect_event_type or "recv"
+    )
     for request_type in request_types:
         rows.append({"seq": seq, "event_type": "send", "payload": {"type": request_type}})
         seq += 1
@@ -168,11 +174,57 @@ def write_m005_event_log(
             )
             seq += 1
             stale_inserted = True
+        if (
+            reconnect_readback is not None
+            and effective_reconnect_event_type is not None
+            and not reconnect_inserted
+            and request_type == "query_mixer_parameter"
+            and query_count == 3
+        ):
+            rows.append(
+                {
+                    "seq": seq,
+                    "event_type": effective_reconnect_event_type,
+                    "payload": reconnect_readback,
+                }
+            )
+            seq += 1
+            reconnect_inserted = True
 
     events_path.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows),
         encoding="utf-8",
     )
+
+
+def load_m005_event_audit_from_log(
+    tmp_path: Path,
+    m005: dict,
+    *,
+    stale_readback: dict | None = None,
+    reconnect_readback: dict | None = None,
+    reconnect_event_type: str | None = None,
+) -> dict:
+    summary_path = tmp_path / "summary.json"
+    events_path = tmp_path / "events.jsonl"
+    audit_m005 = copy.deepcopy(m005)
+    audit_m005["events_path"] = str(events_path)
+    summary_path.write_text(json.dumps(audit_m005), encoding="utf-8")
+    write_m005_event_log(
+        events_path,
+        complete_m005_event_request_types(m005),
+        stale_readback=stale_readback,
+        reconnect_readback=reconnect_readback,
+        reconnect_event_type=reconnect_event_type,
+    )
+
+    audit, _display_events_path = verifier.load_m005_event_audit(
+        m005_summary_path=summary_path,
+        m005_summary=audit_m005,
+    )
+
+    assert isinstance(audit, dict)
+    return audit
 
 
 def test_packet_without_m005_summary_fails_closed() -> None:
@@ -308,6 +360,7 @@ def test_complete_m005_event_stale_readback_allows_owner_review_input_only() -> 
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         m005_event_stale_readback=stale_readback,
+        m005_event_reconnect_readback=m005["phases"]["reconnect_recovery"]["readback"],
         m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
@@ -321,6 +374,9 @@ def test_complete_m005_event_stale_readback_allows_owner_review_input_only() -> 
     assert result["checks"]["m005_events_stale_readback_payload_present"] is True
     assert result["checks"]["m005_events_stale_readback_matches_summary"] is True
     assert result["checks"]["m005_events_stale_readback_unavailable"] is True
+    assert result["checks"]["m005_events_reconnect_readback_payload_present"] is True
+    assert result["checks"]["m005_events_reconnect_readback_matches_summary"] is True
+    assert result["checks"]["m005_events_reconnect_readback_physical"] is True
     assert result["live_authority_granted"] is False
     assert result["readiness_matrix_update_allowed"] is False
 
@@ -335,6 +391,7 @@ def test_m005_event_stale_readback_required_blocks_missing_payload() -> None:
         packet,
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
+        m005_event_reconnect_readback=m005["phases"]["reconnect_recovery"]["readback"],
         m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
@@ -369,6 +426,7 @@ def test_m005_event_stale_readback_mismatch_blocks_owner_review() -> None:
         m005_summary=m005,
         m005_event_request_types=complete_m005_event_request_types(m005),
         m005_event_stale_readback=event_readback,
+        m005_event_reconnect_readback=m005["phases"]["reconnect_recovery"]["readback"],
         m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
@@ -613,6 +671,121 @@ def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
     assert result["readiness_matrix_update_allowed"] is False
 
 
+def test_m005_event_reconnect_readback_required_blocks_missing_payload(tmp_path: Path) -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    stale_readback = timeout_stale_readback()
+    m005["phases"]["stale_readback"]["readback"] = stale_readback
+    audit = load_m005_event_audit_from_log(
+        tmp_path,
+        m005,
+        stale_readback=stale_readback,
+        reconnect_readback=None,
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=audit["request_types"],
+        m005_event_stale_readback=audit["stale_readback"],
+        m005_event_reconnect_readback=audit["reconnect_readback"],
+        m005_event_stale_readback_required=True,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_events_reconnect_readback_payload_present" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_matches_summary" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_physical" in result["failed_checks"]
+    assert "m005_events_stale_readback_matches_summary" not in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_event_reconnect_readback_mismatch_blocks_owner_review(tmp_path: Path) -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    stale_readback = timeout_stale_readback()
+    summary_reconnect = m005["phases"]["reconnect_recovery"]["readback"]
+    event_reconnect = dict(summary_reconnect)
+    event_reconnect["value"] = -3.0
+    m005["phases"]["stale_readback"]["readback"] = stale_readback
+    audit = load_m005_event_audit_from_log(
+        tmp_path,
+        m005,
+        stale_readback=stale_readback,
+        reconnect_readback=event_reconnect,
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=audit["request_types"],
+        m005_event_stale_readback=audit["stale_readback"],
+        m005_event_reconnect_readback=audit["reconnect_readback"],
+        m005_event_stale_readback_required=True,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_events_reconnect_readback_payload_present" not in result["failed_checks"]
+    assert "m005_events_reconnect_readback_matches_summary" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_physical" not in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_event_reconnect_readback_nonphysical_blocks_owner_review(tmp_path: Path) -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    stale_readback = timeout_stale_readback()
+    event_reconnect = {
+        "type": "mixer_parameter_value",
+        "status": "readback_unavailable",
+        "source": "unavailable",
+        "value": None,
+    }
+    m005["phases"]["stale_readback"]["readback"] = stale_readback
+    audit = load_m005_event_audit_from_log(
+        tmp_path,
+        m005,
+        stale_readback=stale_readback,
+        reconnect_readback=event_reconnect,
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=audit["request_types"],
+        m005_event_stale_readback=audit["stale_readback"],
+        m005_event_reconnect_readback=audit["reconnect_readback"],
+        m005_event_stale_readback_required=True,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_events_reconnect_readback_payload_present" not in result["failed_checks"]
+    assert "m005_events_reconnect_readback_matches_summary" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_physical" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
 def test_m005_blocked_write_apply_result_must_be_blocked() -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
@@ -729,6 +902,7 @@ def test_m005_event_log_forbidden_request_type_blocks_owner_review_even_if_summa
 def test_m005_event_audit_extracts_stale_timeout_before_apply(tmp_path: Path) -> None:
     m005 = complete_m005_summary()
     stale_readback = timeout_stale_readback()
+    reconnect_readback = m005["phases"]["reconnect_recovery"]["readback"]
     m005["phases"]["stale_readback"]["readback"] = stale_readback
     summary_path = tmp_path / "summary.json"
     events_path = tmp_path / "events.jsonl"
@@ -738,6 +912,7 @@ def test_m005_event_audit_extracts_stale_timeout_before_apply(tmp_path: Path) ->
         events_path,
         complete_m005_event_request_types(m005),
         stale_readback=stale_readback,
+        reconnect_readback=reconnect_readback,
     )
 
     audit, display_events_path = verifier.load_m005_event_audit(
@@ -749,6 +924,7 @@ def test_m005_event_audit_extracts_stale_timeout_before_apply(tmp_path: Path) ->
     assert audit == {
         "request_types": complete_m005_event_request_types(m005),
         "stale_readback": stale_readback,
+        "reconnect_readback": reconnect_readback,
     }
 
 
@@ -763,6 +939,7 @@ def test_verify_packet_paths_rejects_m005_artifact_outside_canonical_root(tmp_pa
         events_path,
         complete_m005_event_request_types(m005),
         stale_readback=m005["phases"]["stale_readback"]["readback"],
+        reconnect_readback=m005["phases"]["reconnect_recovery"]["readback"],
     )
 
     result = verifier.verify_packet_paths(PACKET_SUMMARY, summary_path)

@@ -64,6 +64,8 @@ EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES = {
     "mixer_parameter_read_blocked",
     "mixer_parameter_value",
 }
+EXPECTED_M005_RECONNECT_EVENT_TYPES = {"recv"}
+EXPECTED_M005_RECONNECT_EVENT_PAYLOAD_TYPES = {"mixer_parameter_value"}
 AUTHORITY_DENIAL_FLAGS = {
     "live_authority_granted": False,
     "readiness_closure_allowed": False,
@@ -194,6 +196,7 @@ def load_m005_event_audit(
     return {
         "request_types": request_types,
         "stale_readback": _m005_event_stale_readback_payload(rows),
+        "reconnect_readback": _m005_event_reconnect_readback_payload(rows),
     }, display_events_path
 
 
@@ -388,7 +391,14 @@ def _m005_request_sequence_proves_disconnect_flow(request_types: Any) -> bool:
     return _m005_disconnect_flow_indexes(request_types) is not None
 
 
-def _m005_event_stale_readback_payload(rows: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+def _m005_event_payload_between_requests(
+    rows: list[Mapping[str, Any]],
+    *,
+    after_request: str,
+    before_request: str | None,
+    expected_event_types: set[str],
+    expected_payload_types: set[str],
+) -> dict[str, Any] | None:
     request_types: list[str] = []
     send_row_indexes: list[int] = []
     for row_index, row in enumerate(rows):
@@ -407,18 +417,43 @@ def _m005_event_stale_readback_payload(rows: list[Mapping[str, Any]]) -> dict[st
     if flow_indexes is None:
         return None
 
-    stale_query_row = send_row_indexes[flow_indexes["stale_query"]]
-    blocked_apply_row = send_row_indexes[flow_indexes["blocked_apply"]]
-    for row in rows[stale_query_row + 1 : blocked_apply_row]:
-        if row.get("event_type") not in EXPECTED_M005_STALE_EVENT_TYPES:
+    start_row = send_row_indexes[flow_indexes[after_request]]
+    if before_request is None:
+        candidate_rows = rows[start_row + 1 :]
+    else:
+        end_row = send_row_indexes[flow_indexes[before_request]]
+        candidate_rows = rows[start_row + 1 : end_row]
+
+    for row in candidate_rows:
+        if row.get("event_type") not in expected_event_types:
             continue
         payload = row.get("payload")
         if not isinstance(payload, Mapping):
             return None
-        if payload.get("type") not in EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES:
+        if payload.get("type") not in expected_payload_types:
             continue
         return dict(payload)
     return None
+
+
+def _m005_event_stale_readback_payload(rows: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+    return _m005_event_payload_between_requests(
+        rows,
+        after_request="stale_query",
+        before_request="blocked_apply",
+        expected_event_types=EXPECTED_M005_STALE_EVENT_TYPES,
+        expected_payload_types=EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES,
+    )
+
+
+def _m005_event_reconnect_readback_payload(rows: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+    return _m005_event_payload_between_requests(
+        rows,
+        after_request="reconnect_query",
+        before_request=None,
+        expected_event_types=EXPECTED_M005_RECONNECT_EVENT_TYPES,
+        expected_payload_types=EXPECTED_M005_RECONNECT_EVENT_PAYLOAD_TYPES,
+    )
 
 
 def _packet_input_proof_artifacts(packet: Mapping[str, Any]) -> list[str]:
@@ -743,6 +778,7 @@ def _record_m005_checks(
     m005_summary: Mapping[str, Any] | None,
     m005_event_request_types: list[str] | None = None,
     m005_event_stale_readback: Mapping[str, Any] | None = None,
+    m005_event_reconnect_readback: Mapping[str, Any] | None = None,
     m005_event_stale_readback_required: bool = False,
     m005_summary_path: str | None = None,
     m005_events_path: str | None = None,
@@ -938,6 +974,9 @@ def _record_m005_checks(
     stale_event_present = isinstance(m005_event_stale_readback, Mapping) and bool(
         m005_event_stale_readback
     )
+    reconnect_event_present = isinstance(m005_event_reconnect_readback, Mapping) and bool(
+        m005_event_reconnect_readback
+    )
     if m005_event_stale_readback_required:
         _record(
             checks,
@@ -953,6 +992,22 @@ def _record_m005_checks(
             checks,
             "m005_events_stale_readback_unavailable",
             stale_event_present and _m005_readback_is_unavailable(m005_event_stale_readback),
+        )
+        _record(
+            checks,
+            "m005_events_reconnect_readback_payload_present",
+            reconnect_event_present,
+        )
+        _record(
+            checks,
+            "m005_events_reconnect_readback_matches_summary",
+            reconnect_event_present
+            and dict(m005_event_reconnect_readback) == dict(reconnect_readback),
+        )
+        _record(
+            checks,
+            "m005_events_reconnect_readback_physical",
+            reconnect_event_present and _m005_readback_is_physical(m005_event_reconnect_readback),
         )
     _record(
         checks,
@@ -1003,6 +1058,7 @@ def verify_packet(
     m005_summary: Mapping[str, Any] | None = None,
     m005_event_request_types: list[str] | None = None,
     m005_event_stale_readback: Mapping[str, Any] | None = None,
+    m005_event_reconnect_readback: Mapping[str, Any] | None = None,
     m005_event_stale_readback_required: bool = False,
     proof_summaries_by_artifact: Mapping[str, Mapping[str, Any]] | None = None,
     packet_summary_path: str | None = None,
@@ -1021,6 +1077,7 @@ def verify_packet(
         m005_summary=m005_summary,
         m005_event_request_types=m005_event_request_types,
         m005_event_stale_readback=m005_event_stale_readback,
+        m005_event_reconnect_readback=m005_event_reconnect_readback,
         m005_event_stale_readback_required=m005_event_stale_readback_required,
         m005_summary_path=m005_summary_path,
         m005_events_path=m005_events_path,
@@ -1067,6 +1124,7 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
     )
     m005_event_request_types = None
     m005_event_stale_readback = None
+    m005_event_reconnect_readback = None
     if isinstance(m005_event_audit, Mapping):
         request_types = m005_event_audit.get("request_types")
         if isinstance(request_types, list):
@@ -1074,12 +1132,16 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
         stale_readback = m005_event_audit.get("stale_readback")
         if isinstance(stale_readback, Mapping):
             m005_event_stale_readback = stale_readback
+        reconnect_readback = m005_event_audit.get("reconnect_readback")
+        if isinstance(reconnect_readback, Mapping):
+            m005_event_reconnect_readback = reconnect_readback
     proof_summaries = load_packet_proof_summaries(packet)
     return verify_packet(
         packet,
         m005_summary=m005,
         m005_event_request_types=m005_event_request_types,
         m005_event_stale_readback=m005_event_stale_readback,
+        m005_event_reconnect_readback=m005_event_reconnect_readback,
         m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=proof_summaries,
         packet_summary_path=str(packet_summary),
