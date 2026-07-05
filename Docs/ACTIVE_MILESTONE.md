@@ -83,13 +83,16 @@ be trusted.
   protection, followed by M006 owner readiness review.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m006_latest_verifier_handoff_surface_bound` at
-  `2026-07-05T01:22:54Z`. No live authority changed; release-ready live
+  `m006_packet_verifier_reconnect_event_readback_bound` at
+  `2026-07-05T01:41:29Z`. No live authority changed; release-ready live
   correction families remain `0`, live-allowed safety rows remain `0`, and
   current supervised live-write kinds remain `0`.
-- Latest M006 owner decision verifier: `0936030c5`; it requires a ready
+- Latest M006 packet verifier hardening: `3ea749d70`; it requires a ready
   packet-verifier report with the current M005 stale-readback event-evidence
-  checks. The current pending template blocks with
+  checks and matching reconnect-recovery physical readback event checks from
+  `events.jsonl`.
+- Latest M006 owner decision verifier: `0936030c5`; the current pending
+  template blocks with
   `reason=m006_owner_decision_pending` and does not grant a readiness-matrix
   update.
 

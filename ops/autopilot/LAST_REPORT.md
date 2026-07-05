@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T01:22:54Z.
-- Latest verified full suite passed with `5500 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T01:41:29Z.
+- Latest verified full suite passed with `5503 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -61,6 +61,11 @@
   readiness-matrix candidate. This blocks stale ready reports created before
   `events.jsonl` stale-payload binding and grants no backend/WING contact,
   proposal creation, live write, readiness update or live authority.
+- Latest M006 packet verifier hardening: `3ea749d70` requires the M005
+  reconnect-recovery physical readback summary to match a post-reconnect
+  `events.jsonl` `recv` payload before owner-review input can be ready. This
+  blocks hand-edited reconnect summary claims and grants no backend/WING
+  contact, proposal creation, live write, readiness update or live authority.
 - Latest M006 handoff surface rail: `69cc3cbe4` binds active handoff text to
   the latest hardened M006 owner-decision verifier commit `0936030c5` and adds
   a WING MVP rail that rejects stale latest-verifier mentions. This is
