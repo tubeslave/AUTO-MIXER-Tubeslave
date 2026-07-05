@@ -38,6 +38,11 @@ EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS = {
     "m005_events_stale_readback_matches_summary",
     "m005_events_stale_readback_unavailable",
 }
+EXPECTED_PACKET_VERIFIER_M005_RECONNECT_EVENT_CHECKS = {
+    "m005_events_reconnect_readback_payload_present",
+    "m005_events_reconnect_readback_matches_summary",
+    "m005_events_reconnect_readback_physical",
+}
 EXPECTED_M005_ACCEPTANCE = {
     "physical_cable_loss": True,
     "stale_readback_unavailable": True,
@@ -344,7 +349,10 @@ def _record_packet_verifier_checks(
         "packet_verifier_checks_present",
         isinstance(packet_verifier.get("checks"), Mapping),
     )
-    for check_name in sorted(EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS):
+    for check_name in sorted(
+        EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS
+        | EXPECTED_PACKET_VERIFIER_M005_RECONNECT_EVENT_CHECKS
+    ):
         _record(
             checks,
             f"packet_verifier_{check_name}",
