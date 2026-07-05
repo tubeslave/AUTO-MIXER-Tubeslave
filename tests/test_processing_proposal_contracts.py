@@ -125,7 +125,7 @@ OBJECTIVE_FAMILY_METHODS = {
     "gate_expander": ("auto_gate_caig", "context_aware_gate_agent"),
     "gate_expander_deesser": ("deesser_vocal_sibilance",),
     "fx_sends": ("auto_fx", "fx_send_proposal"),
-    "pan_stereo": ("auto_panner", "pan_spatial_proposal"),
+    "pan_stereo": ("pan_v3", "auto_panner", "pan_spatial_proposal"),
     "phase_alignment": ("phase_v3", "phase_alignment", "phase_aware_eq_guard"),
     "routing_groups_scenes": (
         "routing_management_proposal",
@@ -147,7 +147,7 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "fx_direct_apply",
 )
 
-EXPECTED_METHOD_REVIEW_CARD_COUNT = 41
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 42
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",
@@ -5843,7 +5843,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "2": 9,
         "3": 3,
         "4": 3,
-        "5": 2,
+        "5": 3,
         "6": 4,
         "7": 1,
     }

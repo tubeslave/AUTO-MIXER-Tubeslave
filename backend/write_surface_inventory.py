@@ -608,6 +608,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="Pan, phase, polarity, and delay direct apply",
         status="quarantined",
         paths=(
+            "backend/heuristics/pan_v3.py",
             "backend/auto_panner.py",
             "backend/auto_panner_adaptive.py",
             "backend/auto_fader_v2/controller.py",

@@ -5397,6 +5397,54 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("proposal_only", "direct_gate_send_quarantined", "dry_run_default", "no_live_writes"),
     ),
     ProcessingMethod(
+        id="pan_v3",
+        label="Pan v3 Venue-Aware Panning",
+        domain="pan",
+        status="proposal_only",
+        summary=(
+            "Venue-aware panning method: relevance gate (mono PA bypasses "
+            "the module entirely — the biggest harm eliminator, and the "
+            "conservative default when the venue profile is unknown); "
+            "anchors for critical roles (lead vocal/kick/snare/bass/"
+            "speech) and LF-dominant sources (>60% energy below 150 Hz) "
+            "fixed to center; venue-class width budget (club 50%, theater "
+            "70%, arena 30%, festival 25%); symmetric slot assignment "
+            "spreading spectrally-similar sources to opposite sides "
+            "(centroid used for SEPARATION only, not width — Pestana "
+            "Assumption 10 is False); stereo pairs get a symmetric pair "
+            "width, never individual pans; verification by L/R "
+            "third-octave symmetry <=1.5 dB, mono-fold correlation >=0.5, "
+            "mono-sum drop <=1 dB and side headroom <=2 dB; LIVE pans are "
+            "frozen in the snapshot with opt-in rate-limited lanes (solo "
+            "spotlight <=20% toward center, L/R symmetry drift guard "
+            ">2.5 dB/60 s alert with armed <=10% trim), total drift <=15% "
+            "and rollback."
+        ),
+        module="backend/heuristics/pan_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "pan_v3_live_writes_need_supervised_pan_apply_gate_readback_"
+            "rollback_and_per_console_pan_law_send_coupling_verification"
+        ),
+        promotion_next=(
+            "route pan assignments to operator review; verify per-console "
+            "pan law, OSC scaling, LCR/CSR and pan-follow-to-sends "
+            "coupling before any live pan lane is armed"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "mono_pa_relevance_gate",
+            "critical_and_lf_center_anchors",
+            "venue_class_width_budget",
+            "stereo_pair_width_only",
+            "centroid_for_separation_not_width",
+            "live_pans_frozen_optin_lanes",
+        ),
+    ),
+    ProcessingMethod(
         id="auto_panner",
         label="Auto Panner",
         domain="pan",

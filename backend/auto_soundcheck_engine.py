@@ -35,6 +35,7 @@ from heuristics.gain_v3 import CLASS_GAIN_PROFILE as GAIN_V3_CLASS_PROFILE
 from heuristics.phase_v3 import (
     pair_alignment_allowed as phase_pair_alignment_allowed,
 )
+from heuristics.pan_v3 import PanConfig, assign_pans
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -4345,6 +4346,7 @@ class AutoSoundcheckEngine:
         self._eq_v3_proposals = self._compute_eq_v3_proposals()
         self._comp_v3_proposals = self._compute_comp_v3_proposals()
         self._balance_v3_solution = self._compute_balance_v3_solution()
+        self._pan_v3_solution = self._compute_pan_v3_solution()
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -4629,6 +4631,42 @@ class AutoSoundcheckEngine:
                 logger.info("Ch %s: comp_v3 -> bypass (%s)", ch,
                             proposal.decision.get("reason"))
         return proposals
+
+    def _compute_pan_v3_solution(self):
+        """Решение панорамы v3 по активным каналам.
+
+        None — pan-конфиг отсутствует и нет каналов: fallback на пресетную
+        таблицу. Дефолтный PanConfig консервативен (pa_type=mono → все в
+        центр), что для незнакомого зала — правильное поведение.
+        """
+        payload: Dict[int, Dict[str, Any]] = {}
+        audio_payload = self._collect_v3_channel_audio()
+        for ch, info in self.channels.items():
+            if not info.has_signal or not info.auto_corrections_enabled:
+                continue
+            role = (info.source_role if info.source_role != "unknown"
+                    else (info.preset or "line"))
+            entry: Dict[str, Any] = {"role": role}
+            if ch in audio_payload:
+                entry["audio"] = audio_payload[ch]["audio"]
+            if info.metrics and info.metrics.level.lufs_integrated > -90:
+                entry["level_lufs"] = float(info.metrics.level.lufs_integrated)
+            payload[ch] = entry
+        if not payload:
+            return None
+        try:
+            config = getattr(self, "pan_config", None) or PanConfig()
+            solution = assign_pans(payload, config, self.sample_rate)
+            logger.info(
+                "pan_v3 (%s/%s): %d каналов%s",
+                config.pa_type, config.venue_class, len(payload),
+                " — BYPASS (mono PA)" if solution.bypass else
+                f", якорей {len(solution.anchored)}",
+            )
+            return solution
+        except Exception:
+            logger.exception("pan_v3 solve failed; falling back to preset pans")
+            return None
 
     def _compute_balance_v3_solution(self):
         """Решение баланса v3: вектор целей от вокала + итеративный решатель.
@@ -5340,6 +5378,28 @@ class AutoSoundcheckEngine:
     ):
         """Set pan position based on instrument type."""
         if not hasattr(self.mixer_client, 'set_pan'):
+            return
+
+        # Pan v3 (основной путь): venue-зависимое решение из мультиканального
+        # прогона (relevance-gate: mono PA → всё в центр; якоря критичных и
+        # НЧ; бюджет ширины по классу зала). Пресетная таблица — fallback.
+        v3_pan_solution = getattr(self, "_pan_v3_solution", None)
+        if v3_pan_solution is not None and ch in v3_pan_solution.pans:
+            pan = float(v3_pan_solution.pans[ch]) * 100.0  # −1..1 → проценты
+            raw = self._snapshot_raw(info)
+            if self.preserve_existing_processing and "pan" in raw:
+                logger.info(f"Ch {ch} '{info.name}': pan preserved (v3 skip)")
+                return
+            try:
+                decision = self._execute_action(
+                    PanAdjust(channel_id=ch, pan=pan,
+                              reason=f"Pan v3 ({v3_pan_solution.notes})"),
+                    phase_guard_context=phase_guard_context,
+                )
+                if decision and decision.sent:
+                    logger.info(f"Ch {ch} '{info.name}': pan_v3 -> {pan:+.0f}")
+            except Exception as e:
+                logger.warning(f"Ch {ch}: pan_v3 set failed: {e}")
             return
 
         pan = INSTRUMENT_PAN.get(preset, 0.0)

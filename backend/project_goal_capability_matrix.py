@@ -341,7 +341,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically perform panning.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("pan_spatial_proposal", "auto_panner"),
+        method_ids=("pan_v3", "pan_spatial_proposal", "auto_panner"),
         support_paths=(
             "backend/auto_panner.py",
             "backend/auto_panner_adaptive.py",
@@ -714,7 +714,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control panorama.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("pan_spatial_proposal", "auto_panner"),
+        method_ids=("pan_v3", "pan_spatial_proposal", "auto_panner"),
         support_paths=(
             "backend/auto_panner.py",
             "backend/auto_panner_adaptive.py",
