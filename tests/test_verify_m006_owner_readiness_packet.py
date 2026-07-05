@@ -32,6 +32,11 @@ COMPLETE_M005_EVENTS_PATH = (
     "artifacts/wing_timeout_disconnect_proof/"
     "unit_m005_disconnect_timeout_stale_proof/events.jsonl"
 )
+M005_TARGET = {
+    "channel": 3,
+    "value_type": "fader",
+    "address": "/ch/3/fdr",
+}
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_packet", TOOL_PATH)
 assert SPEC is not None
@@ -48,11 +53,16 @@ def load_packet_proofs(packet: dict | None = None) -> dict:
     return verifier.load_packet_proof_summaries(packet or load_packet())
 
 
+def with_m005_target(payload: dict) -> dict:
+    return {**payload, **M005_TARGET}
+
+
 def complete_m005_summary() -> dict:
     return {
         "proof_artifact_schema": "wing_timeout_disconnect_proof.v1",
         "status": "passed",
         "disconnect_mode": "physical-cable-loss",
+        **M005_TARGET,
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
@@ -77,18 +87,31 @@ def complete_m005_summary() -> dict:
         "missing_m005_evidence": [],
         "remaining_m005_evidence": [],
         "phases": {
+            "baseline": {
+                "status": "passed",
+                "readback": with_m005_target(
+                    {
+                        "type": "mixer_parameter_value",
+                        "status": "verified_from_physical_readback",
+                        "source": "physical_readback",
+                        "value": 0.0,
+                    }
+                ),
+            },
             "disconnect": {
                 "status": "operator_confirmed_physical_cable_loss",
                 "confirmation": "WING_CABLE_PULLED_BY_OPERATOR",
             },
             "stale_readback": {
                 "status": "passed",
-                "readback": {
-                    "type": "mixer_parameter_value",
-                    "status": "readback_unavailable",
-                    "source": "unavailable",
-                    "value": None,
-                },
+                "readback": with_m005_target(
+                    {
+                        "type": "mixer_parameter_value",
+                        "status": "readback_unavailable",
+                        "source": "unavailable",
+                        "value": None,
+                    }
+                ),
             },
             "blocked_write_while_disconnected": {
                 "status": "passed",
@@ -102,12 +125,14 @@ def complete_m005_summary() -> dict:
             "reconnect_recovery": {
                 "status": "passed",
                 "connection_status": {"connected": True},
-                "readback": {
-                    "type": "mixer_parameter_value",
-                    "status": "verified_from_physical_readback",
-                    "source": "physical_readback",
-                    "value": 0.0,
-                },
+                "readback": with_m005_target(
+                    {
+                        "type": "mixer_parameter_value",
+                        "status": "verified_from_physical_readback",
+                        "source": "physical_readback",
+                        "value": 0.0,
+                    }
+                ),
                 "unchanged_from_baseline": True,
             },
         },
@@ -119,14 +144,16 @@ def complete_m005_event_request_types(m005: dict) -> list[str]:
 
 
 def timeout_stale_readback() -> dict:
-    return {
-        "type": "mixer_parameter_read_blocked",
-        "status": "readback_timeout",
-        "source": "timeout",
-        "reason": "stale_readback_timeout_after_disconnect",
-        "value": None,
-        "transport_failure": {"type": "TimeoutError"},
-    }
+    return with_m005_target(
+        {
+            "type": "mixer_parameter_read_blocked",
+            "status": "readback_timeout",
+            "source": "timeout",
+            "reason": "stale_readback_timeout_after_disconnect",
+            "value": None,
+            "transport_failure": {"type": "TimeoutError"},
+        }
+    )
 
 
 def write_m005_event_log(
@@ -412,12 +439,14 @@ def test_m005_event_stale_readback_mismatch_blocks_owner_review() -> None:
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
     summary_readback = timeout_stale_readback()
-    event_readback = {
-        "type": "mixer_parameter_value",
-        "status": "readback_unavailable",
-        "source": "unavailable",
-        "value": None,
-    }
+    event_readback = with_m005_target(
+        {
+            "type": "mixer_parameter_value",
+            "status": "readback_unavailable",
+            "source": "unavailable",
+            "value": None,
+        }
+    )
     m005["phases"]["stale_readback"]["readback"] = summary_readback
     packet = load_packet()
 
@@ -446,12 +475,14 @@ def test_m005_event_stale_readback_mismatch_blocks_owner_review() -> None:
 def test_m005_blocked_unsupported_address_cannot_satisfy_stale_readback() -> None:
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
-    m005["phases"]["stale_readback"]["readback"] = {
-        "type": "mixer_parameter_read_blocked",
-        "status": "blocked",
-        "reason": "unsupported_address",
-        "value": None,
-    }
+    m005["phases"]["stale_readback"]["readback"] = with_m005_target(
+        {
+            "type": "mixer_parameter_read_blocked",
+            "status": "blocked",
+            "reason": "unsupported_address",
+            "value": None,
+        }
+    )
     packet = load_packet()
 
     result = verifier.verify_packet(
@@ -539,6 +570,29 @@ def test_packet_contract_must_forbid_m005_rollback_remediation() -> None:
     assert result["reason"] == "m006_owner_review_inputs_failed"
     assert "m005_contract_requires_no_rollback_request" in result["failed_checks"]
     assert "m005_contract_forbids_remediation_request_types" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_packet_contract_must_require_m005_readback_target_binding() -> None:
+    packet = load_packet()
+    packet["m005_completion_contract"].pop("required_readback_target_binding")
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(load_packet()),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_contract_requires_readback_target_binding" in result["failed_checks"]
     assert result["owner_review_input_ready"] is False
     assert result["live_authority_granted"] is False
     assert result["readiness_matrix_update_allowed"] is False
@@ -647,12 +701,14 @@ def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
-    m005["phases"]["reconnect_recovery"]["readback"] = {
-        "type": "mixer_parameter_value",
-        "status": "readback_unavailable",
-        "source": "unavailable",
-        "value": None,
-    }
+    m005["phases"]["reconnect_recovery"]["readback"] = with_m005_target(
+        {
+            "type": "mixer_parameter_value",
+            "status": "readback_unavailable",
+            "source": "unavailable",
+            "value": None,
+        }
+    )
 
     result = verifier.verify_packet(
         packet,
@@ -666,6 +722,60 @@ def test_m005_reconnect_without_physical_readback_blocks_owner_review() -> None:
     assert result["status"] == "blocked"
     assert result["reason"] == "m006_owner_review_inputs_failed"
     assert "m005_reconnect_recovery_physical_readback" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_stale_readback_wrong_target_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    wrong_target = dict(m005["phases"]["stale_readback"]["readback"])
+    wrong_target["channel"] = 4
+    wrong_target["address"] = "/ch/4/fdr"
+    m005["phases"]["stale_readback"]["readback"] = wrong_target
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_stale_readback_target_matches" in result["failed_checks"]
+    assert "m005_stale_readback_unavailable" not in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_reconnect_readback_wrong_target_blocks_owner_review() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    wrong_target = dict(m005["phases"]["reconnect_recovery"]["readback"])
+    wrong_target["channel"] = 4
+    wrong_target["address"] = "/ch/4/fdr"
+    m005["phases"]["reconnect_recovery"]["readback"] = wrong_target
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_reconnect_readback_target_matches" in result["failed_checks"]
+    assert "m005_reconnect_recovery_physical_readback" not in result["failed_checks"]
     assert result["owner_review_input_ready"] is False
     assert result["live_authority_granted"] is False
     assert result["readiness_matrix_update_allowed"] is False
@@ -745,17 +855,57 @@ def test_m005_event_reconnect_readback_mismatch_blocks_owner_review(tmp_path: Pa
     assert result["readiness_matrix_update_allowed"] is False
 
 
+def test_m005_event_reconnect_readback_wrong_target_blocks_owner_review(tmp_path: Path) -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    stale_readback = timeout_stale_readback()
+    event_reconnect = dict(m005["phases"]["reconnect_recovery"]["readback"])
+    event_reconnect["channel"] = 4
+    event_reconnect["address"] = "/ch/4/fdr"
+    m005["phases"]["stale_readback"]["readback"] = stale_readback
+    audit = load_m005_event_audit_from_log(
+        tmp_path,
+        m005,
+        stale_readback=stale_readback,
+        reconnect_readback=event_reconnect,
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=audit["request_types"],
+        m005_event_stale_readback=audit["stale_readback"],
+        m005_event_reconnect_readback=audit["reconnect_readback"],
+        m005_event_stale_readback_required=True,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_events_reconnect_readback_matches_summary" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_target_matches" in result["failed_checks"]
+    assert "m005_events_reconnect_readback_physical" not in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
 def test_m005_event_reconnect_readback_nonphysical_blocks_owner_review(tmp_path: Path) -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
     m005["m005_complete"] = True
     stale_readback = timeout_stale_readback()
-    event_reconnect = {
-        "type": "mixer_parameter_value",
-        "status": "readback_unavailable",
-        "source": "unavailable",
-        "value": None,
-    }
+    event_reconnect = with_m005_target(
+        {
+            "type": "mixer_parameter_value",
+            "status": "readback_unavailable",
+            "source": "unavailable",
+            "value": None,
+        }
+    )
     m005["phases"]["stale_readback"]["readback"] = stale_readback
     audit = load_m005_event_audit_from_log(
         tmp_path,

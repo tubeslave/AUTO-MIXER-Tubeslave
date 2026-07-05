@@ -2335,6 +2335,13 @@ def test_m006_owner_review_packet_requires_complete_m005_summary_contract():
         "blocked_write_while_disconnected",
         "reconnect_recovery_verified",
     ]
+    assert contract["required_readback_target_binding"] == [
+        "baseline_readback",
+        "stale_readback",
+        "reconnect_readback",
+        "events_stale_readback",
+        "events_reconnect_readback",
+    ]
     assert contract["must_keep_authority_denied"] == {
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
@@ -2348,8 +2355,13 @@ def test_m006_owner_review_packet_requires_complete_m005_summary_contract():
         "M005 proves physical cable-loss, stale readback denial, blocked write while "
         "disconnected and reconnect recovery"
     ) in prerequisites
+    assert any(
+        "channel" in item and "value_type" in item and "address" in item
+        for item in prerequisites
+    )
 
     assert "M005 summary has `m005_complete=true` and `missing_m005_evidence=[]`." in report
+    assert "baseline, stale-state or\nreconnect readback payloads" in report
     assert "`live_authority_granted=false`" in report
     assert "`readiness_closure_allowed=false`" in report
     assert "`readiness_matrix_update_allowed=false`" in report

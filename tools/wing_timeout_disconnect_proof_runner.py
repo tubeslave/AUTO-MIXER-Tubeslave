@@ -180,6 +180,49 @@ def _readback_is_physical(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _payload_target_field(payload: Dict[str, Any], field_name: str) -> Any:
+    if field_name in payload:
+        return payload.get(field_name)
+    request = payload.get("request")
+    if isinstance(request, dict):
+        return request.get(field_name)
+    return None
+
+
+def _readback_matches_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    payload_channel = _payload_target_field(payload, "channel")
+    try:
+        channel_matches = int(payload_channel) == int(channel)
+    except (TypeError, ValueError):
+        channel_matches = False
+    return (
+        channel_matches
+        and _payload_target_field(payload, "value_type") == value_type
+        and _payload_target_field(payload, "address") == address
+    )
+
+
+def _readback_is_physical_for_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    return _readback_is_physical(payload) and _readback_matches_target(
+        payload,
+        channel=channel,
+        value_type=value_type,
+        address=address,
+    )
+
+
 def _readback_is_unavailable(payload: Dict[str, Any]) -> bool:
     if payload.get("type") == "mixer_parameter_read_blocked":
         return True
@@ -188,6 +231,21 @@ def _readback_is_unavailable(payload: Dict[str, Any]) -> bool:
         and payload.get("status") == "readback_unavailable"
         and payload.get("value") is None
         and payload.get("source") in {"unavailable", "physical_readback"}
+    )
+
+
+def _readback_is_unavailable_for_target(
+    payload: Dict[str, Any],
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+) -> bool:
+    return _readback_is_unavailable(payload) and _readback_matches_target(
+        payload,
+        channel=channel,
+        value_type=value_type,
+        address=address,
     )
 
 
@@ -260,10 +318,21 @@ def _unexpected_apply(payload: Dict[str, Any]) -> bool:
 def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
     phases = summary.get("phases") if isinstance(summary.get("phases"), dict) else {}
     completed: list[str] = []
+    try:
+        channel = int(summary.get("channel"))
+    except (TypeError, ValueError):
+        channel = 0
+    value_type = str(summary.get("value_type") or "")
+    address = str(summary.get("address") or "")
 
     baseline = phases.get("baseline") if isinstance(phases.get("baseline"), dict) else {}
     baseline_readback = baseline.get("readback") if isinstance(baseline.get("readback"), dict) else {}
-    if baseline.get("status") == "passed" and _readback_is_physical(baseline_readback):
+    if baseline.get("status") == "passed" and _readback_is_physical_for_target(
+        baseline_readback,
+        channel=channel,
+        value_type=value_type,
+        address=address,
+    ):
         completed.append("physical_baseline_readback")
 
     disconnect = phases.get("disconnect") if isinstance(phases.get("disconnect"), dict) else {}
@@ -279,6 +348,11 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
     )
     if stale_readback.get("status") == "passed" and _readback_is_unavailable(
         stale_readback.get("readback") if isinstance(stale_readback.get("readback"), dict) else {}
+    ) and _readback_matches_target(
+        stale_readback.get("readback") if isinstance(stale_readback.get("readback"), dict) else {},
+        channel=channel,
+        value_type=value_type,
+        address=address,
     ):
         completed.append("stale_readback_unavailable")
 
@@ -307,7 +381,12 @@ def _completed_m005_evidence(summary: Dict[str, Any]) -> list[str]:
         reconnect.get("status") == "passed"
         and reconnect_status.get("connected") is True
         and reconnect.get("unchanged_from_baseline") is True
-        and _readback_is_physical(reconnect_readback)
+        and _readback_is_physical_for_target(
+            reconnect_readback,
+            channel=channel,
+            value_type=value_type,
+            address=address,
+        )
     ):
         completed.append("reconnect_recovery_verified")
 
@@ -527,11 +606,16 @@ async def run(args: argparse.Namespace) -> int:
                 request_id=f"{run_id}:baseline",
             )
             summary["phases"]["baseline"] = {"status": "passed", "readback": baseline}
-            if not _readback_is_physical(baseline):
+            if not _readback_is_physical_for_target(
+                baseline,
+                channel=args.channel,
+                value_type=args.value_type,
+                address=address,
+            ):
                 summary.update(
                     {
                         "status": "blocked",
-                        "reason": "baseline_not_verified_from_physical_readback",
+                        "reason": "baseline_not_verified_from_target_physical_readback",
                         "fail_closed": True,
                     }
                 )
@@ -630,10 +714,24 @@ async def run(args: argparse.Namespace) -> int:
                 )
                 recorder.record("synthetic_recv_timeout", stale_probe)
             summary["phases"]["stale_readback"] = {
-                "status": "passed" if _readback_is_unavailable(stale_probe) else "failed",
+                "status": (
+                    "passed"
+                    if _readback_is_unavailable_for_target(
+                        stale_probe,
+                        channel=args.channel,
+                        value_type=args.value_type,
+                        address=address,
+                    )
+                    else "failed"
+                ),
                 "readback": stale_probe,
             }
-            if not _readback_is_unavailable(stale_probe):
+            if not _readback_is_unavailable_for_target(
+                stale_probe,
+                channel=args.channel,
+                value_type=args.value_type,
+                address=address,
+            ):
                 summary.update(
                     {
                         "status": "blocked",
@@ -725,7 +823,12 @@ async def run(args: argparse.Namespace) -> int:
                 )
                 recovered_value = recovery_readback.get("value")
                 unchanged = (
-                    _readback_is_physical(recovery_readback)
+                    _readback_is_physical_for_target(
+                        recovery_readback,
+                        channel=args.channel,
+                        value_type=args.value_type,
+                        address=address,
+                    )
                     and abs(float(recovered_value) - old_value) <= 0.06
                 )
                 summary["phases"]["reconnect_recovery"] = {

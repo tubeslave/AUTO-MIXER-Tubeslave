@@ -30,18 +30,27 @@ EXPECTED_PACKET_VERIFIER_SCHEMA = "automixer.m006_owner_readiness_packet_verifie
 EXPECTED_ALLOWED_ROW_IDS = ["fader_supervised", "gain_supervised"]
 EXPECTED_ALLOWED_KINDS = ["fader", "gain"]
 EXPECTED_M005_SUMMARY_GLOB = "artifacts/wing_timeout_disconnect_proof/*/summary.json"
+EXPECTED_M005_READBACK_TARGET_BINDING = [
+    "baseline_readback",
+    "stale_readback",
+    "reconnect_readback",
+    "events_stale_readback",
+    "events_reconnect_readback",
+]
 EXPECTED_PACKET_STATUS = "ready_for_owner_review_after_m005"
 EXPECTED_PACKET_VERIFIER_STATUS = "ready_for_owner_review"
 EXPECTED_PACKET_VERIFIER_REASON = "m006_owner_review_inputs_verified"
 EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS = {
     "m005_events_stale_readback_payload_present",
     "m005_events_stale_readback_matches_summary",
+    "m005_events_stale_readback_target_matches",
     "m005_events_stale_readback_unavailable",
 }
 EXPECTED_PACKET_VERIFIER_M005_RECONNECT_EVENT_CHECKS = {
     "m005_events_reconnect_readback_payload_present",
     "m005_events_reconnect_readback_matches_summary",
     "m005_events_reconnect_readback_physical",
+    "m005_events_reconnect_readback_target_matches",
 }
 EXPECTED_M005_ACCEPTANCE = {
     "physical_cable_loss": True,
@@ -287,6 +296,12 @@ def _record_packet_checks(
         checks,
         "packet_requires_no_m005_rollback_request",
         contract.get("required_rollback_request_sent") is False,
+    )
+    _record(
+        checks,
+        "packet_requires_m005_readback_target_binding",
+        contract.get("required_readback_target_binding")
+        == EXPECTED_M005_READBACK_TARGET_BINDING,
     )
 
     _record(checks, "packet_rows_match_allowed_rows", _set_equals(_packet_row_ids(packet), EXPECTED_ALLOWED_ROW_IDS))

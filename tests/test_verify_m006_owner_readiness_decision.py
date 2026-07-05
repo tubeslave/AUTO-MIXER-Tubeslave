@@ -75,10 +75,12 @@ def ready_packet_verifier_report() -> dict:
             "unit_ready": True,
             "m005_events_stale_readback_payload_present": True,
             "m005_events_stale_readback_matches_summary": True,
+            "m005_events_stale_readback_target_matches": True,
             "m005_events_stale_readback_unavailable": True,
             "m005_events_reconnect_readback_payload_present": True,
             "m005_events_reconnect_readback_matches_summary": True,
             "m005_events_reconnect_readback_physical": True,
+            "m005_events_reconnect_readback_target_matches": True,
         },
         "failed_checks": [],
     }

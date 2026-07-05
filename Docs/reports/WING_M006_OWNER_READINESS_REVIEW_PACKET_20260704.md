@@ -77,7 +77,10 @@ Acceptance prerequisites:
    reason.
 5. M005 summary has `rollback_request_sent=false`, and the summary/events
    request audits contain no `rollback_last_manual_write`.
-6. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
+6. M005 baseline, stale-readback and reconnect-readback payloads, including
+   `events.jsonl` stale/reconnect payloads, are bound to the same
+   `channel`, `value_type` and WING `address`.
+7. Owner explicitly accepts the listed CH3 fader and gain-down proof artifacts.
 
 The M005 summary must also keep `live_authority_granted=false`,
 `readiness_closure_allowed=false`, and `readiness_matrix_update_allowed=false`.
@@ -110,6 +113,11 @@ The verifier also treats rollback remediation inside M005 as contaminated
 disconnect-proof evidence. If `rollback_request_sent=true` or either M005
 request audit contains `rollback_last_manual_write`, owner-review input remains
 `blocked`; a clean blocked-write probe should need no rollback.
+
+The verifier also rejects M005 summaries/events where baseline, stale-state or
+reconnect readback payloads are not for the requested M005 `channel`,
+`value_type` and WING `address`; a physical readback for a different parameter
+cannot satisfy disconnect/reconnect proof.
 
 ## Decision Verifier
 

@@ -154,9 +154,19 @@ def unavailable_readback() -> dict[str, Any]:
     }
 
 
+def wrong_target_readback(payload: dict[str, Any]) -> dict[str, Any]:
+    wrong = dict(payload)
+    wrong["channel"] = 4
+    wrong["address"] = "/ch/4/fdr"
+    return wrong
+
+
 def test_m005_completion_requires_physical_reconnect_readback() -> None:
     summary = {
         "disconnect_mode": "physical-cable-loss",
+        "channel": 3,
+        "value_type": "fader",
+        "address": "/ch/3/fdr",
         "phases": {
             "baseline": {
                 "status": "passed",
@@ -198,6 +208,9 @@ def test_m005_completion_requires_physical_reconnect_readback() -> None:
 def test_m005_completion_requires_blocked_apply_result_payload() -> None:
     summary = {
         "disconnect_mode": "physical-cable-loss",
+        "channel": 3,
+        "value_type": "fader",
+        "address": "/ch/3/fdr",
         "phases": {
             "baseline": {
                 "status": "passed",
@@ -490,6 +503,89 @@ async def test_live_or_stale_readback_after_disconnect_stops_before_apply(
     assert summary["safety_pre_write_disconnect_verified"] is True
     assert summary["safety_pre_write_readback_unavailable"] is False
     assert summary["live_apply_request_sent"] is False
+    assert summary["direct_live_write_request_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_wrong_target_stale_readback_stops_before_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_accepted_preflight_gate(monkeypatch)
+    websocket = FakeWebSocket(
+        [*standard_prefix_responses(), wrong_target_readback(unavailable_readback())]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+
+    exit_code = await runner.run(execute_args(tmp_path))
+
+    assert exit_code == 7
+    sent_types = [request["type"] for request in websocket.sent]
+    assert sent_types == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "disconnect_mixer",
+        "query_mixer_parameter",
+    ]
+    assert "apply_operator_proposal" not in sent_types
+
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == "stale_or_live_readback_after_disconnect"
+    assert summary["phases"]["stale_readback"]["status"] == "failed"
+    assert summary["safety_pre_write_readback_unavailable"] is False
+    assert summary["m005_complete"] is False
+    assert "stale_readback_unavailable" in summary["missing_m005_evidence"]
+    assert summary["live_apply_request_sent"] is False
+    assert summary["direct_live_write_request_sent"] is False
+
+
+@pytest.mark.asyncio
+async def test_wrong_target_reconnect_readback_cannot_complete_m005(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_accepted_preflight_gate(monkeypatch)
+    websocket = FakeWebSocket(
+        [
+            *standard_prefix_responses()[:-1],
+            unavailable_readback(),
+            {
+                "type": "operator_proposal_apply_blocked",
+                "status": "apply_blocked",
+                "apply_result": {"status": "blocked", "reason": "mixer_not_connected"},
+            },
+            {"type": "connection_status", "connected": True},
+            wrong_target_readback(physical_readback(0.0)),
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+
+    exit_code = await runner.run(
+        execute_args(
+            tmp_path,
+            "--disconnect-mode",
+            "physical-cable-loss",
+            "--operator-confirm-physical-cable-loss",
+            runner.PHYSICAL_CABLE_CONFIRMATION,
+            "--physical-loss-wait-sec",
+            "0",
+            "--reconnect-wing-ip",
+            "192.0.2.10",
+        )
+    )
+
+    assert exit_code == 10
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "failed"
+    assert summary["reason"] == "reconnect_recovery_not_verified"
+    assert summary["phases"]["reconnect_recovery"]["status"] == "failed"
+    assert summary["phases"]["reconnect_recovery"]["unchanged_from_baseline"] is False
+    assert summary["m005_complete"] is False
+    assert "reconnect_recovery_verified" in summary["missing_m005_evidence"]
     assert summary["direct_live_write_request_sent"] is False
 
 

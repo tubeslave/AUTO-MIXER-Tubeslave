@@ -69,6 +69,7 @@
     "M005 summary path matches the verifier report and proves physical cable-loss",
     "M005 proves stale readback unavailable, blocked write while disconnected and reconnect recovery",
     "M005 rollback_request_sent=false and request/event audits contain no rollback_last_manual_write",
+    "M005 baseline/stale/reconnect readback payloads and events are bound to the requested channel/value_type/address",
     "Owner explicitly accepts only fader_supervised and gain_supervised proof artifacts"
   ],
   "operator_notes": ""

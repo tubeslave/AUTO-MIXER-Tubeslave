@@ -33,6 +33,13 @@ EXPECTED_M005_EVIDENCE = [
     "blocked_write_while_disconnected",
     "reconnect_recovery_verified",
 ]
+EXPECTED_M005_READBACK_TARGET_BINDING = [
+    "baseline_readback",
+    "stale_readback",
+    "reconnect_readback",
+    "events_stale_readback",
+    "events_reconnect_readback",
+]
 EXPECTED_M005_SAFE_BLOCK_REASONS = {
     "manual_write_exception",
     "mixer_not_connected",
@@ -231,6 +238,47 @@ def _m005_readback_is_physical(readback: Mapping[str, Any]) -> bool:
         and readback.get("status") == PHYSICAL_READBACK_STATUS
         and readback.get("source") == PHYSICAL_READBACK_SOURCE
         and readback.get("value") is not None
+    )
+
+
+def _m005_payload_target_field(payload: Mapping[str, Any], field_name: str) -> Any:
+    if field_name in payload:
+        return payload.get(field_name)
+    request = payload.get("request")
+    if isinstance(request, Mapping):
+        return request.get(field_name)
+    return None
+
+
+def _m005_summary_target(m005_summary: Mapping[str, Any]) -> dict[str, Any] | None:
+    try:
+        channel = int(m005_summary.get("channel"))
+    except (TypeError, ValueError):
+        return None
+    value_type = m005_summary.get("value_type")
+    address = m005_summary.get("address")
+    if not isinstance(value_type, str) or not value_type:
+        return None
+    if not isinstance(address, str) or not address:
+        return None
+    return {"channel": channel, "value_type": value_type, "address": address}
+
+
+def _m005_readback_matches_target(
+    readback: Mapping[str, Any],
+    m005_summary: Mapping[str, Any],
+) -> bool:
+    target = _m005_summary_target(m005_summary)
+    if target is None:
+        return False
+    try:
+        channel_matches = int(_m005_payload_target_field(readback, "channel")) == target["channel"]
+    except (TypeError, ValueError):
+        channel_matches = False
+    return (
+        channel_matches
+        and _m005_payload_target_field(readback, "value_type") == target["value_type"]
+        and _m005_payload_target_field(readback, "address") == target["address"]
     )
 
 
@@ -550,6 +598,12 @@ def _record_packet_checks(checks: dict[str, bool], packet: Mapping[str, Any]) ->
         checks,
         "m005_contract_requires_no_rollback_request",
         contract.get("required_rollback_request_sent") is False,
+    )
+    _record(
+        checks,
+        "m005_contract_requires_readback_target_binding",
+        contract.get("required_readback_target_binding")
+        == EXPECTED_M005_READBACK_TARGET_BINDING,
     )
     _record(
         checks,
@@ -963,10 +1017,12 @@ def _record_m005_checks(
     )
 
     phases = _get_mapping(m005_summary, "phases")
+    baseline = _get_mapping(phases, "baseline")
     disconnect = _get_mapping(phases, "disconnect")
     stale = _get_mapping(phases, "stale_readback")
     blocked_write = _get_mapping(phases, "blocked_write_while_disconnected")
     reconnect = _get_mapping(phases, "reconnect_recovery")
+    baseline_readback = _get_mapping(baseline, "readback")
     stale_readback = _get_mapping(stale, "readback")
     blocked_apply_result = _get_mapping(blocked_write, "apply_result")
     reconnect_status = _get_mapping(reconnect, "connection_status")
@@ -1008,7 +1064,24 @@ def _record_m005_checks(
             checks,
             "m005_events_reconnect_readback_physical",
             reconnect_event_present and _m005_readback_is_physical(m005_event_reconnect_readback),
-        )
+    )
+    _record(
+        checks,
+        "m005_summary_target_fields_present",
+        _m005_summary_target(m005_summary) is not None,
+    )
+    _record(checks, "m005_baseline_phase_passed", baseline.get("status") == "passed")
+    _record(
+        checks,
+        "m005_baseline_readback_target_matches",
+        _m005_readback_matches_target(baseline_readback, m005_summary),
+    )
+    _record(
+        checks,
+        "m005_baseline_physical_readback",
+        baseline.get("status") == "passed"
+        and _m005_readback_is_physical(baseline_readback),
+    )
     _record(
         checks,
         "m005_disconnect_phase_operator_confirmed_physical_loss",
@@ -1020,6 +1093,12 @@ def _record_m005_checks(
         checks,
         "m005_stale_readback_unavailable",
         stale.get("status") == "passed" and _m005_readback_is_unavailable(stale_readback),
+    )
+    _record(
+        checks,
+        "m005_stale_readback_target_matches",
+        stale.get("status") == "passed"
+        and _m005_readback_matches_target(stale_readback, m005_summary),
     )
     _record(
         checks,
@@ -1050,6 +1129,25 @@ def _record_m005_checks(
         "m005_reconnect_recovery_physical_readback",
         reconnect.get("status") == "passed" and _m005_readback_is_physical(reconnect_readback),
     )
+    _record(
+        checks,
+        "m005_reconnect_readback_target_matches",
+        reconnect.get("status") == "passed"
+        and _m005_readback_matches_target(reconnect_readback, m005_summary),
+    )
+    if m005_event_stale_readback_required:
+        _record(
+            checks,
+            "m005_events_stale_readback_target_matches",
+            stale_event_present
+            and _m005_readback_matches_target(m005_event_stale_readback, m005_summary),
+        )
+        _record(
+            checks,
+            "m005_events_reconnect_readback_target_matches",
+            reconnect_event_present
+            and _m005_readback_matches_target(m005_event_reconnect_readback, m005_summary),
+        )
 
 
 def verify_packet(
