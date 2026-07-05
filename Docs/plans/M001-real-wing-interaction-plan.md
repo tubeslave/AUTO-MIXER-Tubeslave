@@ -53,6 +53,10 @@ Current gate state:
   exactly `fader_supervised`/`gain_supervised`. The current decision template
   is still `pending_owner_review`, so the verifier blocks and grants no
   readiness-matrix update or live authority.
+- Frontend operator-review evidence now shows old value, new value, delta,
+  rollback and review-field completeness for decision-queue proposals before
+  generic evidence rows. This satisfies the operator-visibility slice only; it
+  does not run M005, make an M006 owner decision or grant live authority.
 
 ## Hard Safety Boundary
 

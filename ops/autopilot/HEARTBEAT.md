@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-04T23:41:50Z
+Last heartbeat UTC: 2026-07-05T00:09:20Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,16 +23,13 @@ External validation requirements:
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: `cca9fb447` added a separate offline M006 owner decision
-verifier. The current decision template is still `pending_owner_review`, and
-the verifier returns `blocked` with `reason=m006_owner_decision_pending`; an
-accepted decision can only become a readiness-matrix update candidate for
-exactly `fader_supervised` and `gain_supervised` after a ready packet-verifier
-report and accepted M005 summary path are supplied. This heartbeat records no
-WING/backend contact during this checkpoint, no proposal creation, no live
-apply, no readiness-matrix update and no authority widening. The earlier
-`rollback_not_applied` artifact remains closed audit history, not the active
-blocker.
+Latest check: `3c3a90c7c` surfaces backend operator-review coverage in
+frontend task safety evidence. Operators now see old value, new value, delta,
+rollback and review-field completeness before generic evidence rows. This
+heartbeat records display-only/read-only UI evidence: no WING/backend contact
+during this checkpoint, no proposal creation, no live apply, no readiness-matrix
+update and no authority widening. The earlier `rollback_not_applied` artifact
+remains closed audit history, not the active blocker.
 Latest verified full pytest passed with `5490 passed, 1 skipped`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or

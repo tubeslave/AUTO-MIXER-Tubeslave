@@ -1,18 +1,17 @@
 # Current State
 
-Generated: 2026-07-04T23:41:50Z
+Generated: 2026-07-05T00:09:20Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `cca9fb447 Add M006 owner decision verifier`
+  `3c3a90c7c Show operator review rollback evidence in UI`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `73ab5d92 Keep replay evidence report row visible`
-- Tracked worktree state before this sync: clean after the offline M006 owner
-  decision verifier commit `cca9fb447`; ignored large/superseded local
-  evidence remains local-only.
+- Tracked worktree state before this sync: clean after the frontend operator review evidence commit
+  `3c3a90c7c`; ignored large/superseded local evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -200,6 +199,12 @@ Generated: 2026-07-04T23:41:50Z
   proposals are surfaced as coverage gaps only; this does not mutate queue
   state, does not run preflight, does not call `apply_operator_proposal` and
   does not grant live WING authority.
+- `3c3a90c7c` carries that backend operator-review coverage through the
+  frontend task adapter as display-only safety evidence: old value, new value,
+  delta, rollback and review-field completeness are shown before generic
+  evidence rows. This is operator visibility only; it does not contact backend
+  or WING, create proposals, call apply paths, update readiness rows or grant
+  live authority.
 - The write-surface static scan now treats direct raw `send(..., value)`
   OSC calls as write-adjacent. The inventory declares WING meter subscription
   transport, legacy enhanced gain direct apply, legacy snapshot navigation
@@ -2075,7 +2080,7 @@ Generated: 2026-07-04T23:41:50Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `cca9fb447` passed with
+- The latest verified full-suite run for `3c3a90c7c` passed with
   `5490 passed, 1 skipped`. This includes the M006 owner decision verifier,
   the M005 rollback-free owner-evidence binding, the M005 blocked-apply
   response owner-verifier binding, the soundcheck runtime

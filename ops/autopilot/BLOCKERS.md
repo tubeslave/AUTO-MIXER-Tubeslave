@@ -113,6 +113,10 @@
   without granting apply authority: it does not mutate the queue, does not run
   preflight, does not call `apply_operator_proposal`, and keeps
   `live_authority_granted=false`.
+- Frontend task safety evidence now renders the same proposal review context
+  before generic safety evidence: old value, new value, delta, rollback and
+  review-field completeness. This is display-only operator visibility and does
+  not grant apply authority, readiness closure or live WING authority.
 - Dirty worktree split was recorded on `2026-07-04T18:27:09Z`: HEAD is
   `22ece58e09`, `ops/autopilot/WRITER_LEASE/owner.json` is absent, and
   `ops/autopilot/STOP` is absent. Keep WING proof/readiness WIP
@@ -149,8 +153,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m006_owner_decision_verifier_bound` at
-  `2026-07-04T23:41:50Z`. That row preserves the same `current_blocker`,
+  `operator_review_ui_evidence_bound` at
+  `2026-07-05T00:09:20Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

@@ -10,7 +10,7 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-04T23:41:50Z.
+- Latest heartbeat: 2026-07-05T00:09:20Z.
 - Latest verified full suite passed with `5490 passed, 1 skipped`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
@@ -40,6 +40,11 @@
   `rollback_last_manual_write` in the request audit. This grants no
   backend/WING contact, proposal creation, live write, readiness update or
   live authority.
+- Latest operator review UI evidence sync: `3c3a90c7c` surfaces backend
+  operator-review coverage in frontend task safety evidence. Operators now see
+  old value, new value, delta, rollback and review-field completeness before
+  generic evidence rows. This grants no backend/WING contact, proposal
+  creation, live write, readiness update or live authority.
 - Latest M006 owner decision hardening: `cca9fb447` adds a separate offline
   owner decision verifier and pending decision template. The current template
   returns `blocked` with `reason=m006_owner_decision_pending`; an accepted

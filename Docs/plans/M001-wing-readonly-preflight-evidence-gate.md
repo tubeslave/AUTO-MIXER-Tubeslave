@@ -40,8 +40,8 @@ it does not grant release readiness.
 Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 
 Latest ledger handoff row:
-`m006_owner_decision_verifier_bound` at
-`2026-07-04T23:41:50Z`. No live authority changed; release-ready live
+`operator_review_ui_evidence_bound` at
+`2026-07-05T00:09:20Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
 

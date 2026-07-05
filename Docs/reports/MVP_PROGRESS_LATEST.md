@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-04T23:41:50Z`
+Generated: `2026-07-05T00:09:20Z`
 
 ## Current MVP
 
@@ -33,7 +33,7 @@ Supervised WING Rack proof.
 - External validation requirements:
   - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
   - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
-- Latest ledger handoff row: `m006_owner_decision_verifier_bound` at `2026-07-04T23:41:50Z`
+- Latest ledger handoff row: `operator_review_ui_evidence_bound` at `2026-07-05T00:09:20Z`
 - Latest M006 owner decision verifier: `cca9fb447`; current template verifier
   result is `blocked` with `reason=m006_owner_decision_pending`.
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
