@@ -189,6 +189,33 @@ def _readback_is_unavailable(payload: Dict[str, Any]) -> bool:
     )
 
 
+def _timeout_readback_unavailable(
+    *,
+    channel: int,
+    value_type: str,
+    address: str,
+    request_id: str,
+    timeout: float,
+    error: BaseException,
+) -> Dict[str, Any]:
+    return {
+        "type": "mixer_parameter_read_blocked",
+        "status": "readback_timeout",
+        "source": "timeout",
+        "reason": "stale_readback_timeout_after_disconnect",
+        "address": address,
+        "channel": channel,
+        "value_type": value_type,
+        "value": None,
+        "request_id": request_id,
+        "timeout_sec": timeout,
+        "transport_failure": {
+            "type": type(error).__name__,
+            "message": str(error),
+        },
+    }
+
+
 def _apply_block_reason(payload: Dict[str, Any]) -> Optional[str]:
     result = payload.get("apply_result")
     if isinstance(result, dict) and result.get("reason"):
@@ -579,15 +606,27 @@ async def run(args: argparse.Namespace) -> int:
                     "wait_sec": args.physical_loss_wait_sec,
                 }
 
-            stale_probe = await _query_parameter(
-                ws,
-                recorder,
-                channel=args.channel,
-                value_type=args.value_type,
-                address=address,
-                timeout=args.timeout,
-                request_id=f"{run_id}:stale-probe",
-            )
+            stale_request_id = f"{run_id}:stale-probe"
+            try:
+                stale_probe = await _query_parameter(
+                    ws,
+                    recorder,
+                    channel=args.channel,
+                    value_type=args.value_type,
+                    address=address,
+                    timeout=args.timeout,
+                    request_id=stale_request_id,
+                )
+            except TimeoutError as exc:
+                stale_probe = _timeout_readback_unavailable(
+                    channel=args.channel,
+                    value_type=args.value_type,
+                    address=address,
+                    request_id=stale_request_id,
+                    timeout=args.timeout,
+                    error=exc,
+                )
+                recorder.record("synthetic_recv_timeout", stale_probe)
             summary["phases"]["stale_readback"] = {
                 "status": "passed" if _readback_is_unavailable(stale_probe) else "failed",
                 "readback": stale_probe,

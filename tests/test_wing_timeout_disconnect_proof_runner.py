@@ -25,10 +25,11 @@ ACCEPTED_READONLY_SOURCE_ID = (
     "artifacts/wing_readonly_preflight/"
     "20260702T061111Z_wing_readonly_preflight/summary.json"
 )
+FakeResponse = dict[str, Any] | BaseException
 
 
 class FakeWebSocket:
-    def __init__(self, responses: list[dict[str, Any]]):
+    def __init__(self, responses: list[FakeResponse]):
         self.responses = list(responses)
         self.sent: list[dict[str, Any]] = []
         self.url: str | None = None
@@ -39,7 +40,10 @@ class FakeWebSocket:
     async def recv(self) -> str:
         if not self.responses:
             raise AssertionError("No fake WebSocket response queued")
-        return json.dumps(self.responses.pop(0))
+        response = self.responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return json.dumps(response)
 
 
 class FakeWebSocketConnect:
@@ -390,6 +394,69 @@ async def test_physical_cable_loss_with_reconnect_marks_m005_complete(
     assert summary["live_authority_granted"] is False
     assert summary["readiness_closure_allowed"] is False
     assert summary["readiness_matrix_update_allowed"] is False
+
+
+@pytest.mark.asyncio
+async def test_physical_stale_readback_timeout_counts_as_unavailable_before_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_accepted_preflight_gate(monkeypatch)
+    websocket = FakeWebSocket(
+        [
+            *standard_prefix_responses()[:-1],
+            TimeoutError("Timed out waiting for stale readback"),
+            {
+                "type": "operator_proposal_apply_blocked",
+                "status": "apply_blocked",
+                "apply_result": {"status": "blocked", "reason": "mixer_not_connected"},
+            },
+            {"type": "connection_status", "connected": True},
+            physical_readback(0.0),
+        ]
+    )
+    patch_websocket_connect(monkeypatch, websocket)
+
+    exit_code = await runner.run(
+        execute_args(
+            tmp_path,
+            "--disconnect-mode",
+            "physical-cable-loss",
+            "--operator-confirm-physical-cable-loss",
+            runner.PHYSICAL_CABLE_CONFIRMATION,
+            "--physical-loss-wait-sec",
+            "0",
+            "--reconnect-wing-ip",
+            "192.0.2.10",
+        )
+    )
+
+    assert exit_code == 0
+    sent_types = [request["type"] for request in websocket.sent]
+    assert sent_types == [
+        "get_operator_mode",
+        "get_state",
+        "query_mixer_parameter",
+        "set_operator_mode",
+        "create_operator_proposal",
+        "query_mixer_parameter",
+        "apply_operator_proposal",
+        "connect_wing",
+        "query_mixer_parameter",
+    ]
+
+    summary = read_summary(tmp_path)
+    stale_readback = summary["phases"]["stale_readback"]["readback"]
+    assert summary["status"] == "passed"
+    assert summary["m005_complete"] is True
+    assert stale_readback["type"] == "mixer_parameter_read_blocked"
+    assert stale_readback["status"] == "readback_timeout"
+    assert stale_readback["source"] == "timeout"
+    assert stale_readback["reason"] == "stale_readback_timeout_after_disconnect"
+    assert stale_readback["transport_failure"]["type"] == "TimeoutError"
+    assert summary["completed_m005_evidence"] == list(runner.M005_REQUIRED_EVIDENCE)
+    assert summary["live_authority_granted"] is False
+    assert summary["readiness_closure_allowed"] is False
 
 
 @pytest.mark.asyncio
