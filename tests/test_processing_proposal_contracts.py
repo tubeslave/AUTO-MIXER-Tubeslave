@@ -132,7 +132,7 @@ OBJECTIVE_FAMILY_METHODS = {
         "scene_preset_management_proposal",
         "mute_management_proposal",
     ),
-    "master_output": ("master_bus_optimization_proposal",),
+    "master_output": ("pa_v3", "master_bus_optimization_proposal",),
     "source_identity_calibration": ("source_identity_replay_calibration",),
     "mix_variant_profile": ("mix_variant_profile_proposal",),
     "performance_adaptation": ("performance_adaptation_proposal",),
@@ -147,7 +147,7 @@ QUARANTINED_WRITE_SURFACE_METHODS = (
     "fx_direct_apply",
 )
 
-EXPECTED_METHOD_REVIEW_CARD_COUNT = 43
+EXPECTED_METHOD_REVIEW_CARD_COUNT = 44
 
 REQUIRED_OPERATOR_FIELDS = (
     "method_id",
@@ -5845,7 +5845,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
         "4": 4,
         "5": 3,
         "6": 4,
-        "7": 1,
+        "7": 2,
     }
     assert decision_template_summary[
         "priority_operator_payload_required_field_counts"
@@ -6516,7 +6516,7 @@ def test_correction_method_goal_operator_review_export_writes_readonly_artifacts
     ]
     assert priority_decision_sections[1]["method_decision_count"] == 8
     assert priority_decision_sections[2]["method_decision_count"] == 9
-    assert priority_decision_sections[7]["method_decision_count"] == 1
+    assert priority_decision_sections[7]["method_decision_count"] == 2
     for section in priority_decision_sections.values():
         assert section["review_scope"] == "offline_proposal_only"
         assert section["review_status"] == "operator_review_pending"

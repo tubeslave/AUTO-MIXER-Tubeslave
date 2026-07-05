@@ -5652,6 +5652,60 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         ),
     ),
     ProcessingMethod(
+        id="pa_v3",
+        label="PA v3 System Tuning Layer",
+        domain="master_bus",
+        status="proposal_only",
+        summary=(
+            "System layer that tunes the PA through WING outputs in the "
+            "SETUP phase (empty hall, before the channel soundcheck): "
+            "validated dual-channel H1 transfer function with coherence "
+            "gating (0.7 setup / 0.6 live-freeze), Farina ESS "
+            "deconvolution IR and delay locator, .frd mic calibration, "
+            "coherence-weighted 3-5 position spatial averaging with a "
+            "3 dB consistency mask ('EQ the trend, not the ripple'), "
+            "three target-curve presets (no single correct curve exists "
+            "- McCarthy), prefer-cut system EQ (max 8 filters, "
+            "-6/+3 dB clamp), sub/top alignment by delay/polarity scan "
+            "maximizing crossover-band summation, fill delay/level "
+            "solver with a precedence cap, limiter threshold policy and "
+            "a locked system snapshot gating the channel pipelines; "
+            "LIVE is alerts-only by default - SPL supervision per "
+            "jurisdiction (WHO table), limiter GR and tilt alerts, and "
+            "one opt-in lane: audience HF-absorption shelf compensation "
+            "(+1 dB steps, <=0.5 dB/min, +3 dB cap); coherence below "
+            "0.6 freezes all system automation; delay/polarity/"
+            "crossover changes during the show are forbidden; system "
+            "output parameters are excluded from song scenes."
+        ),
+        module="backend/heuristics/pa_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "pa_v3_live_writes_need_supervised_output_apply_gate_"
+            "per_firmware_osc_verification_and_loopback_flat_tf_proof"
+        ),
+        promotion_next=(
+            "verify output OSC paths per firmware, run the loopback "
+            "flat-TF proof, then route SETUP derivations to operator "
+            "review; live lanes stay alert-only until armed"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "h1_transfer_function_coherence_gated",
+            "ess_deconvolution",
+            "spatial_average_consistency_mask",
+            "prefer_cut_max_8_filters",
+            "sub_top_alignment_setup_only",
+            "system_snapshot_gates_channel_pipelines",
+            "spl_jurisdiction_supervision",
+            "hf_absorption_lane_opt_in",
+            "outputs_excluded_from_song_scenes",
+        ),
+    ),
+    ProcessingMethod(
         id="master_bus_optimization_proposal",
         label="Master Bus Optimization Proposal Layer",
         domain="master_bus",

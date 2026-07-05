@@ -538,7 +538,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically optimize the master bus.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("master_bus_optimization_proposal", "muq_perceptual_shadow"),
+        method_ids=("pa_v3", "master_bus_optimization_proposal", "muq_perceptual_shadow"),
         support_paths=(
             "backend/master_bus_optimization_proposal.py",
             "backend/auto_mastering.py",

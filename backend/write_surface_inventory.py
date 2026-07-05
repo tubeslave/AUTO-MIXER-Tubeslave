@@ -519,6 +519,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "backend/auto_fader_v2/controller.py",
             "backend/autofoh_safety.py",
             "backend/auto_soundcheck_engine.py",
+            "backend/heuristics/pa_v3.py",
             "backend/system_measurement.py",
         ),
         entrypoints=(
