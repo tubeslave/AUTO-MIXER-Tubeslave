@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T00:55:53Z.
-- Latest verified full suite passed with `5498 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T01:07:32Z.
+- Latest verified full suite passed with `5499 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -54,6 +54,12 @@
   decision must bind to the report-only M006 packet, a ready packet-verifier
   report and the accepted M005 summary path, and it can only name
   `fader_supervised`/`gain_supervised`. This grants no backend/WING contact,
+  proposal creation, live write, readiness update or live authority.
+- Latest M006 owner decision packet-check hardening: `0936030c5` requires a
+  ready packet-verifier summary to include the current M005 stale-readback
+  event-evidence checks before an accepted owner decision can become a
+  readiness-matrix candidate. This blocks stale ready reports created before
+  `events.jsonl` stale-payload binding and grants no backend/WING contact,
   proposal creation, live write, readiness update or live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
@@ -594,7 +600,7 @@ After CP05, verified no-WING safety-scope hardening commits were added:
   response before M005 blocked-write evidence or M006 owner-review input can
   be ready, and `f10894198` requires clean M005 owner-review input to be
   rollback-free. The latest verified full suite passed with
-  `5498 passed, 1 skipped, 1 warning`;
+  `5499 passed, 1 skipped, 1 warning`;
   current targeted checks passed for the proof surface contract, runner
   artifact surface contract, smart-DSP gate-slot conflict path, SmartDSP
   readback extraction/basic-control path, WING proof apply surface-contract path,

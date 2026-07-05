@@ -49,7 +49,8 @@ Current gate state:
   only and does not run M005 or grant live authority.
 - M006 owner decision verification now has a separate offline gate:
   `tools/verify_m006_owner_readiness_decision.py` must see an accepted owner
-  decision, a ready packet-verifier report, the accepted M005 summary path and
+  decision, a ready packet-verifier report with the current M005
+  stale-readback event-evidence checks, the accepted M005 summary path and
   exactly `fader_supervised`/`gain_supervised`. The current decision template
   is still `pending_owner_review`, so the verifier blocks and grants no
   readiness-matrix update or live authority.
@@ -378,8 +379,9 @@ operator/owner action, unattended Codex work may execute only the safe slice:
    the referenced proof summaries, require a complete M005 summary contract,
    require M005 request/event sequence ordering, require the nested blocked
    apply result to prove `operator_proposal_apply_blocked`, require
-   rollback-free M005 request/event audits, and keep readiness updates blocked
-   until M005 and owner acceptance.
+   rollback-free M005 request/event audits, require owner-decision input to
+   consume packet-verifier stale-readback event checks, and keep readiness
+   updates blocked until M005 and owner acceptance.
 
 Codex must not execute or retry the supervised proof unattended; this now also
 includes the M005 physical cable-loss proof, reconnect proof and any supervised

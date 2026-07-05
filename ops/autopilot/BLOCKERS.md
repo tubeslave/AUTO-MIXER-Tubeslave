@@ -68,6 +68,12 @@
   summary path are supplied. This is offline verification only and grants no
   backend/WING contact, proposal creation, live apply, readiness update or live
   authority.
+- `0936030c5` tightens that owner-decision gate: the ready packet-verifier
+  report must include the current M005 stale-readback event-evidence checks
+  before any accepted owner decision can become a readiness-matrix candidate.
+  This prevents M006 from relying on stale packet-verifier reports created
+  before `events.jsonl` stale-payload binding; it is offline verification only
+  and does not close M005 or M006.
 - The M005/M006 verifier contract is now stricter: `f10894198` requires clean
   M005 owner-review input to be rollback-free. The M006 packet contract
   declares `required_rollback_request_sent=false` and forbids
@@ -153,8 +159,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_stale_readback_event_evidence_bound` at
-  `2026-07-05T00:55:53Z`. That row preserves the same `current_blocker`,
+  `m006_owner_decision_requires_stale_event_packet_checks` at
+  `2026-07-05T01:07:32Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

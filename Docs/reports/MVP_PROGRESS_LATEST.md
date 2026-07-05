@@ -34,7 +34,7 @@ Supervised WING Rack proof.
 - External validation requirements:
   - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
   - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
-- Latest ledger handoff row: `m005_stale_readback_event_evidence_bound` at `2026-07-05T00:55:53Z`
+- Latest ledger handoff row: `m006_owner_decision_requires_stale_event_packet_checks` at `2026-07-05T01:07:32Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 
