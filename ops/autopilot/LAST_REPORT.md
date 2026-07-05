@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T01:41:29Z.
-- Latest verified full suite passed with `5503 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T01:50:44Z.
+- Latest verified full suite passed with `5504 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -61,16 +61,24 @@
   readiness-matrix candidate. This blocks stale ready reports created before
   `events.jsonl` stale-payload binding and grants no backend/WING contact,
   proposal creation, live write, readiness update or live authority.
+- Latest M006 owner decision reconnect-check hardening: `46f809911` requires
+  that same ready packet-verifier summary to also include the current M005
+  reconnect-readback event-evidence checks before an accepted owner decision
+  can become a readiness-matrix candidate. This blocks stale ready reports
+  created before `events.jsonl` reconnect-readback binding and grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
 - Latest M006 packet verifier hardening: `3ea749d70` requires the M005
   reconnect-recovery physical readback summary to match a post-reconnect
   `events.jsonl` `recv` payload before owner-review input can be ready. This
   blocks hand-edited reconnect summary claims and grants no backend/WING
   contact, proposal creation, live write, readiness update or live authority.
-- Latest M006 handoff surface rail: `69cc3cbe4` binds active handoff text to
-  the latest hardened M006 owner-decision verifier commit `0936030c5` and adds
-  a WING MVP rail that rejects stale latest-verifier mentions. This is
-  offline docs/test rail hardening only and grants no backend/WING contact,
-  proposal creation, live write, readiness update or live authority.
+- Latest M006 handoff surface rail now points active handoff text at the
+  latest hardened M006 owner-decision verifier commit `46f809911`, including
+  both stale-readback and reconnect-readback packet-verifier check
+  requirements. This is offline docs/test rail hardening only and grants no
+  backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
 - Latest soundcheck runtime hardening: `f8eb799c6` makes
   `tools/soundcheck_runtime_observation_runner.py` require a complete
   `operator_runtime_contract` before a runtime observation can pass: operator
