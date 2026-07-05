@@ -77,7 +77,28 @@ class DuganGainSharing:
     _states: Dict[str, _ChannelShareState] = field(default_factory=dict)
     _last_batch_t: float = field(default=0.0)
 
-    def update(self, levels_db: Mapping[str, float]) -> Dict[str, float]:
+    def update(
+        self,
+        levels_db: Mapping[str, float],
+        *,
+        segment_type: str = "speech",
+        enabled_channels: "frozenset | set | None" = None,
+    ) -> Dict[str, float]:
+        """segment_type — тип текущего сегмента программы:
+        - "speech": штатный режим (речь/объявления) — gain-sharing работает;
+        - "vocal"/"music": ПЕНИЕ или музыка — слой выключен и возвращает {}
+          (кейс дуэта: Dugan не давит тихого вокалиста на вокальных
+          сегментах; балансом поющих занимается guard по суммарной шине).
+        enabled_channels — фильтр (инструментальное шоу: только
+        announce-микрофоны; пустой набор = слой выключен).
+        """
+        if segment_type != "speech":
+            return {}
+        if enabled_channels is not None:
+            levels_db = {ch: v for ch, v in levels_db.items()
+                         if ch in enabled_channels}
+            if not levels_db:
+                return {}
         now = float(self.time_provider())
         if self._last_batch_t and (now - self._last_batch_t) < self.min_update_interval_s:
             return {}

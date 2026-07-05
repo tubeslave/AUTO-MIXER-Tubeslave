@@ -25,7 +25,12 @@ from audio_capture import (
 )
 from heuristics.eq_v3 import soundcheck_eq_v3
 from heuristics.comp_v3 import soundcheck_comp_v3
-from heuristics.balance_v3 import solve_faders, target_vector_lufs
+from heuristics.balance_v3 import (
+    BalanceConfig,
+    build_target_vector,
+    solve_faders,
+    target_vector_lufs,
+)
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -4647,12 +4652,17 @@ class AutoSoundcheckEngine:
         if len(measured) < 2:
             return None
         try:
-            genre = str(getattr(self, "balance_genre", "pop_rock"))
-            targets = target_vector_lufs(roles, genre)
+            config = getattr(self, "balance_config", None) or BalanceConfig(
+                genre=str(getattr(self, "balance_genre", "pop_rock")))
+            targets, anchor_role, anchor_warning = build_target_vector(config, roles)
             solution = solve_faders(measured, targets, current_faders_db=current)
+            solution.anchor_role = anchor_role
+            solution.anchor_warning = anchor_warning
             logger.info(
-                "balance_v3 (%s): %d каналов, converged=%s, passes=%d%s",
-                genre, len(measured), solution.converged, solution.passes,
+                "balance_v3 (%s, anchor=%s): %d каналов, converged=%s, passes=%d%s%s",
+                config.genre, anchor_role, len(measured),
+                solution.converged, solution.passes,
+                f", ВНИМАНИЕ: {anchor_warning}" if anchor_warning else "",
                 f", notes={solution.notes}" if solution.notes else "",
             )
             return solution

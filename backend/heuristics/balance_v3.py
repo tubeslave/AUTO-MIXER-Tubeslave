@@ -54,9 +54,26 @@ MUSICAL_DROP_FRACTION = 0.7
 
 AYAIC_LEAD_VOCAL_LUFS = -22.0     # абсолютный якорь плоскостей проекта
 
+# Абсолютная Ayaic-плоскость по роли якоря (правило CLAUDE.md): якорем может
+# быть не только вокал — инструментальный сет якорится на своей плоскости.
+ROLE_ANCHOR_LUFS: Dict[str, float] = {
+    "lead_vocal": -22.0, "lead_instrument": -22.0,
+    "kick": -25.0, "snare": -25.0, "bass": -25.0, "guitar": -25.0,
+    "acoustic_guitar": -25.0, "playback": -25.0, "backing_vocal": -27.0,
+    "overheads": -28.0, "tom": -28.0, "floor_tom": -28.0, "hihat": -28.0,
+    "keys": -30.0, "line": -27.0,
+}
+
+ANCHOR_ACTIVE_HOLD_S = 2.0        # непрерывное подтверждение активности якоря
+ANCHOR_BLEED_MARGIN_DB = 6.0      # над bleed-полом из снапшота
+INSTRUMENTAL_GUARD_MARGIN_LU = 1.5
+DRIFT_REF_STABLE_LU = 1.0         # |ΔLU_drift_ref| ниже — референс стабилен
+
 # Жанровые пресеты: смещения LU относительно ведущего вокала (= 0).
 # pop_rock — гибрид измеренной иерархии De Man и Ayaic-плоскостей;
 # выбирается оператором НА САУНДЧЕКЕ, не угадывается в лайве.
+# backing_vocal −4…−5 LU — НЕкалиброванный практический prior (внутри
+# вокальной шины, относительно лид-вокала); требует позальной калибровки.
 GENRE_PRESETS: Dict[str, Dict[str, float]] = {
     "pop_rock": {
         "lead_vocal": 0.0, "backing_vocal": -4.0, "bass": -3.0,
@@ -82,18 +99,102 @@ GENRE_PRESETS: Dict[str, Dict[str, float]] = {
 }
 
 
+@dataclass
+class BalanceConfig:
+    """Конфиг баланса. Якорь назначается НА САУНДЧЕКЕ и фиксируется в
+    снапшоте; автоматическое переназначение якоря в LIVE запрещено
+    (защита от скачка системы координат при ошибке классификатора)."""
+    anchor_channel: str = "lead_vocal"      # роль опорного канала
+    anchor_fallback: List[str] = field(default_factory=lambda: [
+        "lead_instrument", "kick", "snare"])
+    targets_LU: Optional[Dict[str, float]] = None  # офсеты отн. anchor = 0
+    genre: str = "pop_rock"
+    guard_enabled: bool = True
+    guard_margin_LU: float = 2.5            # вокал 2-3 LU; инструмент 1-2 LU
+    guard_bus: str = "vocal_bus"            # guard читает/двигает ШИНУ, не каналы
+    guard_reassign_on_instrumental: bool = True  # False -> guard выключается
+    drift_reference: Optional[str] = None   # ручное переопределение
+    announce_channels: List[str] = field(default_factory=list)  # Dugan в инстр. шоу
+
+
+def resolve_anchor(
+    config: BalanceConfig,
+    active_roles: "set[str] | frozenset[str]",
+) -> "tuple[str, Optional[str]]":
+    """Выбор якоря: сконфигурированный, иначе первый доступный из fallback.
+
+    Возвращает (anchor_role, warning). Warning != None — якорь заменён.
+    """
+    if config.anchor_channel in active_roles:
+        return config.anchor_channel, None
+    for candidate in config.anchor_fallback:
+        if candidate in active_roles:
+            warning = (
+                f"anchor '{config.anchor_channel}' отсутствует среди активных "
+                f"каналов саундчека — выбран fallback '{candidate}'")
+            logger = __import__("logging").getLogger(__name__)
+            logger.warning(warning)
+            return candidate, warning
+    fallback = sorted(active_roles)[0] if active_roles else config.anchor_channel
+    return fallback, f"ни один fallback-якорь не активен — взят '{fallback}'"
+
+
+def rebase_targets(
+    targets_lu: Mapping[str, float],
+    new_anchor: str,
+) -> Dict[str, float]:
+    """Смена системы координат: target_i_new = target_i_old − target_anchor_old.
+
+    Абсолютные позиции фейдеров НЕ меняются — только точка отсчёта офсетов.
+    """
+    if new_anchor not in targets_lu:
+        raise KeyError(f"новый якорь '{new_anchor}' отсутствует в таблице целей")
+    shift = float(targets_lu[new_anchor])
+    return {role: float(v) - shift for role, v in targets_lu.items()}
+
+
 def target_vector_lufs(
     roles_by_channel: Mapping[Any, str],
     genre: str = "pop_rock",
     *,
     anchor_lufs: float = AYAIC_LEAD_VOCAL_LUFS,
+    anchor_role: str = "lead_vocal",
+    offsets_lu: Optional[Mapping[str, float]] = None,
 ) -> Dict[Any, float]:
-    """Абсолютные LUFS-цели: вокал-относительный пресет на Ayaic-якоре."""
-    offsets = GENRE_PRESETS.get(genre, GENRE_PRESETS["pop_rock"])
+    """Абсолютные LUFS-цели: якорь-относительные офсеты на Ayaic-плоскости.
+
+    Офсеты (пресет жанра или config.targets_LU) ребейзятся так, чтобы
+    anchor_role = 0, затем ложатся на абсолютную плоскость якоря. Кейс
+    дуэта покрыт по построению: оба канала с ролью якоря получают 0 LU.
+    """
+    offsets = dict(offsets_lu or GENRE_PRESETS.get(genre, GENRE_PRESETS["pop_rock"]))
+    if anchor_role not in offsets:
+        offsets[anchor_role] = 0.0
+    offsets = rebase_targets(offsets, anchor_role)
+    fallback_offset = offsets.get("line", -5.0)
     return {
-        ch: float(anchor_lufs) + float(offsets.get(role, offsets["line"]))
+        ch: float(anchor_lufs) + float(offsets.get(role, fallback_offset))
         for ch, role in roles_by_channel.items()
     }
+
+
+def build_target_vector(
+    config: BalanceConfig,
+    roles_by_channel: Mapping[Any, str],
+) -> "tuple[Dict[Any, float], str, Optional[str]]":
+    """Полный путь: выбор якоря (с fallback) → ребейз офсетов → абсолютные цели.
+
+    Возвращает (targets, anchor_role, warning).
+    """
+    anchor_role, warning = resolve_anchor(
+        config, set(roles_by_channel.values()))
+    anchor_lufs = ROLE_ANCHOR_LUFS.get(anchor_role, -25.0)
+    targets = target_vector_lufs(
+        roles_by_channel, config.genre,
+        anchor_lufs=anchor_lufs, anchor_role=anchor_role,
+        offsets_lu=config.targets_LU,
+    )
+    return targets, anchor_role, warning
 
 
 @dataclass
@@ -103,6 +204,10 @@ class FaderSolution:
     converged: bool
     residual_lu: Dict[Any, float] = field(default_factory=dict)
     notes: List[str] = field(default_factory=list)
+    # Якорь фиксируется при сохранении снапшота саундчека; автоматическое
+    # переназначение в LIVE запрещено (скачок системы координат).
+    anchor_role: str = "lead_vocal"
+    anchor_warning: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -111,6 +216,8 @@ class FaderSolution:
             "converged": self.converged,
             "residual_lu": {str(k): round(v, 2) for k, v in self.residual_lu.items()},
             "notes": list(self.notes),
+            "anchor_role": self.anchor_role,
+            "anchor_warning": self.anchor_warning,
             "method": "balance_v3_soundcheck",
         }
 
@@ -222,6 +329,55 @@ def vocal_guard_step(
     return state
 
 
+@dataclass
+class AnchorActivityGate:
+    """Gated-детекция активности якоря для guard-слоя.
+
+    Активен = short-term LUFS якоря выше его bleed-пола ИЗ СНАПШОТА
+    (+ запас) И подтверждение классификатора — непрерывно ≥ hold_s.
+    При anchor_active == False guard спит и не корректирует ничего.
+    """
+    bleed_floor_snapshot_db: float
+    margin_db: float = ANCHOR_BLEED_MARGIN_DB
+    hold_s: float = ANCHOR_ACTIVE_HOLD_S
+    confirmed_seconds: float = 0.0
+    active: bool = False
+
+    def step(
+        self,
+        short_term_lufs: float,
+        classifier_confirmed: bool,
+        dt_s: float,
+    ) -> bool:
+        above_bleed = short_term_lufs > (self.bleed_floor_snapshot_db + self.margin_db)
+        if above_bleed and classifier_confirmed:
+            self.confirmed_seconds += dt_s
+        else:
+            self.confirmed_seconds = 0.0
+        self.active = self.confirmed_seconds >= self.hold_s
+        return self.active
+
+
+def make_guard_state(
+    config: BalanceConfig,
+    *,
+    instrumental: bool = False,
+) -> Optional["VocalGuardState"]:
+    """Guard-состояние по конфигу: вокальный margin 2.5, инструментальный 1.5.
+
+    None — guard выключен (guard_enabled=False, либо инструментальный сет
+    с guard_reassign_on_instrumental=False). Guard читает и двигает
+    config.guard_bus (шину/DCA), не отдельные микрофонные каналы.
+    """
+    if not config.guard_enabled:
+        return None
+    if instrumental and not config.guard_reassign_on_instrumental:
+        return None
+    margin = (INSTRUMENTAL_GUARD_MARGIN_LU if instrumental
+              else config.guard_margin_LU)
+    return VocalGuardState(margin_lu=margin)
+
+
 # ── LIVE слой 2: дрейф-коррекция + детектор намеренной динамики ──
 
 def musical_dynamics_detected(
@@ -236,6 +392,62 @@ def musical_dynamics_detected(
         return False
     drops = [d for d in delta_lu_by_channel.values() if d < drop_threshold_lu]
     return len(drops) >= fraction * len(delta_lu_by_channel)
+
+
+def select_drift_reference(
+    short_term_lufs_by_channel: Mapping[Any, "list[float]"],
+    manual_override: Optional[Any] = None,
+    *,
+    silence_lufs: float = -60.0,
+    min_samples: int = 4,
+) -> Optional[Any]:
+    """Выбор drift-референса на саундчеке: канал с минимальной дисперсией
+    short-term LUFS по активным сегментам (argmin σ) — обычно kick.
+    manual_override из конфига имеет приоритет."""
+    if manual_override is not None:
+        return manual_override
+    best_ch, best_sigma = None, None
+    for ch, series in short_term_lufs_by_channel.items():
+        active = [float(v) for v in series
+                  if np.isfinite(v) and float(v) > silence_lufs]
+        if len(active) < min_samples:
+            continue
+        sigma = float(np.std(active))
+        if best_sigma is None or sigma < best_sigma:
+            best_ch, best_sigma = ch, sigma
+    return best_ch
+
+
+def drift_precheck(
+    delta_ref_lu: float,
+    delta_lu_by_channel: Mapping[Any, float],
+    *,
+    ref_stable_lu: float = DRIFT_REF_STABLE_LU,
+    moved_threshold_lu: float = DRIFT_DEADBAND_LU,
+    correlated_fraction: float = MUSICAL_DROP_FRACTION,
+) -> str:
+    """Дешёвая предварительная проверка ПЕРЕД полной корреляционной матрицей.
+
+    Возвращает:
+      "correct_individual_drift" — drift_reference стабилен (|Δ| < 1 LU),
+        а отдельные каналы ушли → это их дрейф, корректировать их;
+      "freeze_musical" — референс и большинство каналов ушли коррелированно
+        (одного знака) → музыкальная динамика/смена секции → freeze;
+      "full_check" — картина неоднозначна → полная корреляционная проверка
+        (musical_dynamics_detected) как подтверждающий этап.
+    """
+    others = {ch: float(d) for ch, d in delta_lu_by_channel.items()}
+    if abs(float(delta_ref_lu)) < ref_stable_lu:
+        moved = [d for d in others.values() if abs(d) > moved_threshold_lu]
+        return "correct_individual_drift" if moved else "full_check"
+    ref_sign = 1.0 if delta_ref_lu > 0 else -1.0
+    same_sign_moved = [
+        d for d in others.values()
+        if abs(d) > moved_threshold_lu and (1.0 if d > 0 else -1.0) == ref_sign
+    ]
+    if others and len(same_sign_moved) >= correlated_fraction * len(others):
+        return "freeze_musical"
+    return "full_check"
 
 
 def drift_correction_step(
