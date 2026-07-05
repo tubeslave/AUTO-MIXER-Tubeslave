@@ -5559,6 +5559,53 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("transport_free", "dry_run_true", "current_phase_context_freshness_gate", "no_pace_or_proprietary_pi_logic", "phase_before_eq_guard"),
     ),
     ProcessingMethod(
+        id="fx_v3",
+        label="FX v3 Venue-Aware Effects Management",
+        domain="fx",
+        status="proposal_only",
+        summary=(
+            "Two-mode FX management: soundcheck derives the full setup — "
+            "rough Schroeder RT60 venue profile (+-0.2-0.4 s, not for "
+            "certification), the validated venue-RT budget clamp (pop/rock "
+            "hall optimum ~0.6 s, Adelman-Larsen JASA 2010) shortening and "
+            "darkening reverbs in reverberant rooms, tempo-synced delay "
+            "and pre-delay, send-level calibration to a -10+-3 dB "
+            "return-vs-dry target using CONSOLE meters, return-compressor "
+            "ducking config (WING has no bus-to-bus sidechain) and one "
+            "unidirectional masking re-check; live is hygiene only — "
+            "send-level lane (<=1 dB/s, +-3 dB of snapshot), speech "
+            "duck/mute state machine (confidence>0.8, 0.5-1 s fades, "
+            "sends muted so tails ring out), delay runaway guard capping "
+            "feedback, tempo resync only in pauses >=2 s; fx model (mdl) "
+            "changes are silence-only until a real-console glitch test "
+            "passes; creative throws/sweeps are forbidden by design."
+        ),
+        module="backend/heuristics/fx_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "fx_v3_live_writes_need_supervised_fx_apply_gate_readback_"
+            "rollback_and_mdl_glitch_test_evidence"
+        ),
+        promotion_next=(
+            "route FX derivations to operator review; run the mdl glitch "
+            "test on the real WING before any silence-gated model recall; "
+            "keep sends-level as the only SAFE live lane"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "venue_rt_budget_clamp",
+            "console_meter_send_calibration",
+            "return_compressor_ducking",
+            "speech_duck_state_machine",
+            "delay_runaway_guard",
+            "mdl_silence_only_until_glitch_test",
+            "creative_throws_forbidden",
+        ),
+    ),
+    ProcessingMethod(
         id="auto_fx",
         label="FX / Reverb / Sends",
         domain="fx",

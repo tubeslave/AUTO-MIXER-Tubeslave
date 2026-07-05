@@ -628,6 +628,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         label="FX, insert, and send direct apply",
         status="quarantined",
         paths=(
+            "backend/heuristics/fx_v3.py",
             "backend/auto_fx.py",
             "backend/auto_effects.py",
             "backend/auto_reverb.py",

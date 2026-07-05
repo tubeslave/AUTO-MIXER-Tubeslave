@@ -417,7 +417,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically manage effects.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("fx_send_proposal", "auto_fx"),
+        method_ids=("fx_v3", "fx_send_proposal", "auto_fx"),
         support_paths=(
             "backend/operator_product_state.py",
             "backend/auto_fx.py",
@@ -435,7 +435,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically tune effect sends.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("fx_send_proposal", "auto_fx"),
+        method_ids=("fx_v3", "fx_send_proposal", "auto_fx"),
         support_paths=(
             "backend/auto_fx.py",
             "backend/fx_send_proposal.py",
@@ -837,7 +837,7 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Control FX.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("fx_send_proposal", "auto_fx"),
+        method_ids=("fx_v3", "fx_send_proposal", "auto_fx"),
         support_paths=(
             "backend/operator_product_state.py",
             "backend/auto_fx.py",

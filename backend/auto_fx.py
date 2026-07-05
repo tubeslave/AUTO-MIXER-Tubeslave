@@ -63,9 +63,14 @@ class FXPlan:
 class AutoFXPlanner:
     """Rule-based FX planner for reverb, delay, chorus/doubler, and placement."""
 
-    def __init__(self, tempo_bpm: float = 120.0, vocal_priority: bool = True):
+    def __init__(self, tempo_bpm: float = 120.0, vocal_priority: bool = True,
+                 venue_rt60_s: float | None = None, genre: str = "pop_rock"):
         self.tempo_bpm = max(40.0, min(float(tempo_bpm), 240.0))
         self.vocal_priority = bool(vocal_priority)
+        # FX v3: RT зала съедает бюджет реверберации — при известном RT60
+        # decay/damping ревербов клампуются через heuristics.fx_v3
+        self.venue_rt60_s = venue_rt60_s
+        self.genre = str(genre)
         self.live_write_allowed = False
         self.write_policy = "proposal_only_quarantined"
         self.last_apply_result: dict[str, Any] = {}
@@ -329,6 +334,21 @@ class AutoFXPlanner:
         room_predelay_ms = min(max(quarter_ms / 16.0, 5.0), 25.0)
         room_decay_s = min(max(
             2.0 * quarter_ms / 1000.0 - room_predelay_ms / 1000.0, 0.4), 1.2)
+        # FX v3: venue-aware кламп (гулкий зал -> короче и темнее)
+        if self.venue_rt60_s is not None:
+            try:
+                from heuristics.fx_v3 import select_reverb_params
+                v_voc = select_reverb_params(
+                    "vocal", self.genre, float(self.venue_rt60_s),
+                    tempo_bpm=self.tempo_bpm)
+                v_drm = select_reverb_params(
+                    "drums", self.genre, float(self.venue_rt60_s),
+                    tempo_bpm=self.tempo_bpm)
+                plate_decay_s = min(plate_decay_s, float(v_voc["dcy"]))
+                plate_predelay_ms = float(v_voc["pdel"])
+                room_decay_s = min(room_decay_s, float(v_drm["dcy"]))
+            except Exception:  # pragma: no cover - venue clamp optional
+                pass
         return [
             FXBusDecision(
                 bus_id=13,
