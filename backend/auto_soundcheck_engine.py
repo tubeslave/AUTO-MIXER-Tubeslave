@@ -4742,6 +4742,10 @@ class AutoSoundcheckEngine:
                 (float(b["freq_hz"]), float(b["gain_db"]), float(b["q"]))
                 for b in v3_proposal.applied_bands
             ]
+            # v3-полосы не проходят пресетную адаптацию: «оригинал» для
+            # лога изменений совпадает с ними (иначе UnboundLocalError
+            # в цикле сравнения ниже — падало на реальном прогоне 2026-07-05)
+            eq_bands = list(adapted_bands)
             m = None
             logger.info(f"Ch {ch}: EQ v3 ({len(adapted_bands)} полос, метод eq_v3_soundcheck)")
         else:
@@ -5742,9 +5746,11 @@ class AutoSoundcheckEngine:
         v3_params = None
         if v3_proposal is not None:
             if not v3_proposal.compress:
-                logger.info(
-                    f"Ch {ch}: comp_v3 bypass — {v3_proposal.decision.get('reason')}"
+                bypass_reason = (
+                    v3_proposal.warnings[-1] if v3_proposal.warnings
+                    else v3_proposal.decision.get("reason")
                 )
+                logger.info(f"Ch {ch}: comp_v3 bypass — {bypass_reason}")
                 return
             v3_params = v3_proposal.params
 
