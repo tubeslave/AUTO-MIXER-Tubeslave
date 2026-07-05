@@ -87,9 +87,11 @@ be trusted.
   `2026-07-05T01:07:32Z`. No live authority changed; release-ready live
   correction families remain `0`, live-allowed safety rows remain `0`, and
   current supervised live-write kinds remain `0`.
-- Latest M006 owner decision verifier: `cca9fb447`; the current pending
-  template blocks with `reason=m006_owner_decision_pending` and does not grant
-  a readiness-matrix update.
+- Latest M006 owner decision verifier: `0936030c5`; it requires a ready
+  packet-verifier report with the current M005 stale-readback event-evidence
+  checks. The current pending template blocks with
+  `reason=m006_owner_decision_pending` and does not grant a readiness-matrix
+  update.
 
 ## Current external validation requirements
 

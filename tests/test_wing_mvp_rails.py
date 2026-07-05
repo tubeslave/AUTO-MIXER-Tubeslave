@@ -1309,6 +1309,34 @@ def test_mvp_progress_report_records_external_validation_handoff():
         assert marker in normalized_progress
 
 
+def test_m006_owner_decision_handoff_surfaces_track_latest_verifier_commit():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    latest_verifier = state["latest_m006_owner_decision_verifier_commit"]
+    latest_packet_check = state["latest_m006_owner_decision_stale_event_packet_check_commit"]
+    expected_commit = latest_verifier["commit"]
+
+    assert expected_commit == latest_packet_check["commit"]
+    assert latest_verifier["requires_packet_verifier_m005_stale_event_checks"] is True
+
+    for surface_path in (
+        ACTIVE_MILESTONE_DOC,
+        M001_PLAN,
+        ROADMAP_DOC,
+        BLOCKERS_DOC,
+    ):
+        surface = surface_path.read_text(encoding="utf-8")
+        latest_mentions = re.findall(
+            r"Latest M006 owner decision verifier: `([0-9a-f]+)`",
+            surface,
+        )
+        assert latest_mentions == [expected_commit]
+        normalized_surface = re.sub(r"\s+", " ", surface)
+        assert "current M005 stale-readback event-evidence checks" in normalized_surface
+        assert "packet-verifier" in normalized_surface
+        assert "reason=m006_owner_decision_pending" in normalized_surface
+        assert "readiness-matrix update" in normalized_surface
+
+
 def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
     state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
     progress_report = MVP_PROGRESS_REPORT.read_text(encoding="utf-8")
