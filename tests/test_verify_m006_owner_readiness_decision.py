@@ -66,7 +66,12 @@ def ready_packet_verifier_report() -> dict:
         "contacts_wing": False,
         "contacts_backend": False,
         "live_write": False,
-        "checks": {"unit_ready": True},
+        "checks": {
+            "unit_ready": True,
+            "m005_events_stale_readback_payload_present": True,
+            "m005_events_stale_readback_matches_summary": True,
+            "m005_events_stale_readback_unavailable": True,
+        },
         "failed_checks": [],
     }
 
@@ -184,6 +189,24 @@ def test_packet_verifier_must_be_ready_and_clean() -> None:
     assert "packet_verifier_failed_checks_empty" in result["failed_checks"]
     assert "packet_verifier_owner_review_input_ready" in result["failed_checks"]
     assert result["owner_decision_accepted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_packet_verifier_must_include_m005_stale_event_checks() -> None:
+    packet_verifier = ready_packet_verifier_report()
+    packet_verifier["checks"].pop("m005_events_stale_readback_matches_summary")
+
+    result = verify(accepted_decision(), packet_verifier=packet_verifier)
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_decision_failed_closed"
+    assert (
+        "packet_verifier_m005_events_stale_readback_matches_summary"
+        in result["failed_checks"]
+    )
+    assert result["owner_decision_accepted"] is False
+    assert result["readiness_matrix_update_candidate_ready"] is False
+    assert result["live_authority_granted"] is False
     assert result["readiness_matrix_update_allowed"] is False
 
 

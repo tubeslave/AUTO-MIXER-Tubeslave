@@ -33,6 +33,11 @@ EXPECTED_M005_SUMMARY_GLOB = "artifacts/wing_timeout_disconnect_proof/*/summary.
 EXPECTED_PACKET_STATUS = "ready_for_owner_review_after_m005"
 EXPECTED_PACKET_VERIFIER_STATUS = "ready_for_owner_review"
 EXPECTED_PACKET_VERIFIER_REASON = "m006_owner_review_inputs_verified"
+EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS = {
+    "m005_events_stale_readback_payload_present",
+    "m005_events_stale_readback_matches_summary",
+    "m005_events_stale_readback_unavailable",
+}
 EXPECTED_M005_ACCEPTANCE = {
     "physical_cable_loss": True,
     "stale_readback_unavailable": True,
@@ -333,6 +338,18 @@ def _record_packet_verifier_checks(
         "packet_verifier_owner_review_input_ready",
         packet_verifier.get("owner_review_input_ready") is True,
     )
+    packet_verifier_checks = _get_mapping(packet_verifier, "checks")
+    _record(
+        checks,
+        "packet_verifier_checks_present",
+        isinstance(packet_verifier.get("checks"), Mapping),
+    )
+    for check_name in sorted(EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS):
+        _record(
+            checks,
+            f"packet_verifier_{check_name}",
+            packet_verifier_checks.get(check_name) is True,
+        )
     for field_name, expected in {**AUTHORITY_DENIAL_FLAGS, **TRANSPORT_DENIAL_FLAGS}.items():
         _record(checks, f"packet_verifier_{field_name}_denied", packet_verifier.get(field_name) is expected)
     _record(
