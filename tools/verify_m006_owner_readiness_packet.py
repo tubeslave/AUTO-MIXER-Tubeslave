@@ -59,6 +59,11 @@ EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES = {
 EXPECTED_M005_FORBIDDEN_REMEDIATION_REQUEST_TYPES = {
     "rollback_last_manual_write",
 }
+EXPECTED_M005_STALE_EVENT_TYPES = {"recv", "synthetic_recv_timeout"}
+EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES = {
+    "mixer_parameter_read_blocked",
+    "mixer_parameter_value",
+}
 AUTHORITY_DENIAL_FLAGS = {
     "live_authority_granted": False,
     "readiness_closure_allowed": False,
@@ -138,6 +143,23 @@ def load_m005_event_request_types(
     m005_summary_path: str | Path | None,
     m005_summary: Mapping[str, Any] | None,
 ) -> tuple[list[str] | None, str | None]:
+    audit, display_events_path = load_m005_event_audit(
+        m005_summary_path=m005_summary_path,
+        m005_summary=m005_summary,
+    )
+    if audit is None:
+        return None, display_events_path
+    request_types = audit.get("request_types")
+    if not isinstance(request_types, list):
+        return None, display_events_path
+    return [str(item) for item in request_types], display_events_path
+
+
+def load_m005_event_audit(
+    *,
+    m005_summary_path: str | Path | None,
+    m005_summary: Mapping[str, Any] | None,
+) -> tuple[dict[str, Any] | None, str | None]:
     if m005_summary is None:
         return None, None
     events_path = _resolve_m005_events_path(
@@ -149,6 +171,7 @@ def load_m005_event_request_types(
         return None, display_events_path
 
     request_types: list[str] = []
+    rows: list[Mapping[str, Any]] = []
     try:
         for raw_line in events_path.read_text(encoding="utf-8").splitlines():
             if not raw_line.strip():
@@ -156,6 +179,7 @@ def load_m005_event_request_types(
             row = json.loads(raw_line)
             if not isinstance(row, Mapping):
                 return None, display_events_path
+            rows.append(row)
             if row.get("event_type") != "send":
                 continue
             payload = row.get("payload")
@@ -167,7 +191,10 @@ def load_m005_event_request_types(
             request_types.append(request_type)
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None, display_events_path
-    return request_types, display_events_path
+    return {
+        "request_types": request_types,
+        "stale_readback": _m005_event_stale_readback_payload(rows),
+    }, display_events_path
 
 
 def _iso_now() -> str:
@@ -306,12 +333,12 @@ def _m005_events_path_matches_summary_path(
     return events_path == summary_path.with_name("events.jsonl")
 
 
-def _m005_request_sequence_proves_disconnect_flow(request_types: Any) -> bool:
+def _m005_disconnect_flow_indexes(request_types: Any) -> dict[str, int] | None:
     if not isinstance(request_types, list):
-        return False
+        return None
     sequence = [item for item in request_types if isinstance(item, str)]
     if len(sequence) != len(request_types):
-        return False
+        return None
 
     def find_after(request_type: str, start_index: int) -> int | None:
         try:
@@ -321,30 +348,77 @@ def _m005_request_sequence_proves_disconnect_flow(request_types: Any) -> bool:
 
     baseline_query = find_after("query_mixer_parameter", 0)
     if baseline_query is None:
-        return False
+        return None
     supervised_mode = find_after("set_operator_mode", baseline_query + 1)
     if supervised_mode is None:
-        return False
+        return None
     proposal = find_after("create_operator_proposal", supervised_mode + 1)
     if proposal is None:
-        return False
+        return None
     stale_query = find_after("query_mixer_parameter", proposal + 1)
     if stale_query is None:
-        return False
+        return None
     blocked_apply = find_after("apply_operator_proposal", stale_query + 1)
     if blocked_apply is None:
-        return False
+        return None
     reconnect = find_after("connect_wing", blocked_apply + 1)
     if reconnect is None:
-        return False
+        return None
     reconnect_query = find_after("query_mixer_parameter", reconnect + 1)
     if reconnect_query is None:
-        return False
+        return None
 
-    return (
-        find_after("apply_operator_proposal", 0) == blocked_apply
-        and find_after("connect_wing", 0) == reconnect
-    )
+    if find_after("apply_operator_proposal", 0) != blocked_apply:
+        return None
+    if find_after("connect_wing", 0) != reconnect:
+        return None
+
+    return {
+        "baseline_query": baseline_query,
+        "supervised_mode": supervised_mode,
+        "proposal": proposal,
+        "stale_query": stale_query,
+        "blocked_apply": blocked_apply,
+        "reconnect": reconnect,
+        "reconnect_query": reconnect_query,
+    }
+
+
+def _m005_request_sequence_proves_disconnect_flow(request_types: Any) -> bool:
+    return _m005_disconnect_flow_indexes(request_types) is not None
+
+
+def _m005_event_stale_readback_payload(rows: list[Mapping[str, Any]]) -> dict[str, Any] | None:
+    request_types: list[str] = []
+    send_row_indexes: list[int] = []
+    for row_index, row in enumerate(rows):
+        if row.get("event_type") != "send":
+            continue
+        payload = row.get("payload")
+        if not isinstance(payload, Mapping):
+            return None
+        request_type = payload.get("type")
+        if not isinstance(request_type, str) or not request_type:
+            return None
+        request_types.append(request_type)
+        send_row_indexes.append(row_index)
+
+    flow_indexes = _m005_disconnect_flow_indexes(request_types)
+    if flow_indexes is None:
+        return None
+
+    stale_query_row = send_row_indexes[flow_indexes["stale_query"]]
+    blocked_apply_row = send_row_indexes[flow_indexes["blocked_apply"]]
+    for row in rows[stale_query_row + 1 : blocked_apply_row]:
+        if row.get("event_type") not in EXPECTED_M005_STALE_EVENT_TYPES:
+            continue
+        payload = row.get("payload")
+        if not isinstance(payload, Mapping):
+            return None
+        if payload.get("type") not in EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES:
+            continue
+        return dict(payload)
+    return None
 
 
 def _packet_input_proof_artifacts(packet: Mapping[str, Any]) -> list[str]:
@@ -668,6 +742,8 @@ def _record_m005_checks(
     *,
     m005_summary: Mapping[str, Any] | None,
     m005_event_request_types: list[str] | None = None,
+    m005_event_stale_readback: Mapping[str, Any] | None = None,
+    m005_event_stale_readback_required: bool = False,
     m005_summary_path: str | None = None,
     m005_events_path: str | None = None,
 ) -> None:
@@ -859,6 +935,25 @@ def _record_m005_checks(
     blocked_apply_result = _get_mapping(blocked_write, "apply_result")
     reconnect_status = _get_mapping(reconnect, "connection_status")
     reconnect_readback = _get_mapping(reconnect, "readback")
+    stale_event_present = isinstance(m005_event_stale_readback, Mapping) and bool(
+        m005_event_stale_readback
+    )
+    if m005_event_stale_readback_required:
+        _record(
+            checks,
+            "m005_events_stale_readback_payload_present",
+            stale_event_present,
+        )
+        _record(
+            checks,
+            "m005_events_stale_readback_matches_summary",
+            stale_event_present and dict(m005_event_stale_readback) == dict(stale_readback),
+        )
+        _record(
+            checks,
+            "m005_events_stale_readback_unavailable",
+            stale_event_present and _m005_readback_is_unavailable(m005_event_stale_readback),
+        )
     _record(
         checks,
         "m005_disconnect_phase_operator_confirmed_physical_loss",
@@ -907,6 +1002,8 @@ def verify_packet(
     *,
     m005_summary: Mapping[str, Any] | None = None,
     m005_event_request_types: list[str] | None = None,
+    m005_event_stale_readback: Mapping[str, Any] | None = None,
+    m005_event_stale_readback_required: bool = False,
     proof_summaries_by_artifact: Mapping[str, Mapping[str, Any]] | None = None,
     packet_summary_path: str | None = None,
     m005_summary_path: str | None = None,
@@ -923,6 +1020,8 @@ def verify_packet(
         checks,
         m005_summary=m005_summary,
         m005_event_request_types=m005_event_request_types,
+        m005_event_stale_readback=m005_event_stale_readback,
+        m005_event_stale_readback_required=m005_event_stale_readback_required,
         m005_summary_path=m005_summary_path,
         m005_events_path=m005_events_path,
     )
@@ -962,15 +1061,26 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
     m005_path = _resolve(m005_summary) if m005_summary is not None else None
     packet = _load_json(packet_path)
     m005 = _load_json(m005_path) if m005_path is not None else None
-    m005_event_request_types, m005_events_path = load_m005_event_request_types(
+    m005_event_audit, m005_events_path = load_m005_event_audit(
         m005_summary_path=m005_path,
         m005_summary=m005,
     )
+    m005_event_request_types = None
+    m005_event_stale_readback = None
+    if isinstance(m005_event_audit, Mapping):
+        request_types = m005_event_audit.get("request_types")
+        if isinstance(request_types, list):
+            m005_event_request_types = [str(item) for item in request_types]
+        stale_readback = m005_event_audit.get("stale_readback")
+        if isinstance(stale_readback, Mapping):
+            m005_event_stale_readback = stale_readback
     proof_summaries = load_packet_proof_summaries(packet)
     return verify_packet(
         packet,
         m005_summary=m005,
         m005_event_request_types=m005_event_request_types,
+        m005_event_stale_readback=m005_event_stale_readback,
+        m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=proof_summaries,
         packet_summary_path=str(packet_summary),
         m005_summary_path=_display_path(m005_path) if m005_path is not None else None,
