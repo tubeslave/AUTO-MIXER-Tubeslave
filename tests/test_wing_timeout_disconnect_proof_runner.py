@@ -518,6 +518,36 @@ def test_physical_cable_loss_mode_requires_explicit_operator_confirmation(
 
 
 @pytest.mark.asyncio
+async def test_physical_cable_loss_execute_requires_reconnect_target_before_websocket(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    patch_websocket_connect_failure(monkeypatch, AssertionError("backend must not be contacted"))
+
+    exit_code = await runner.run(
+        execute_args(
+            tmp_path,
+            "--disconnect-mode",
+            "physical-cable-loss",
+            "--operator-confirm-physical-cable-loss",
+            runner.PHYSICAL_CABLE_CONFIRMATION,
+        )
+    )
+
+    assert exit_code == 2
+    summary = read_summary(tmp_path)
+    assert summary["status"] == "blocked"
+    assert summary["reason"] == (
+        "--reconnect-wing-ip is required for executed physical-cable-loss proof"
+    )
+    assert summary["m005_complete"] is False
+    assert "reconnect_recovery_verified" in summary["missing_m005_evidence"]
+    assert summary["sent_request_types"] == []
+    assert summary["live_apply_request_sent"] is False
+    assert summary["direct_live_write_request_sent"] is False
+
+
+@pytest.mark.asyncio
 async def test_execute_blocks_before_websocket_without_accepted_preflight_decision(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -162,6 +162,8 @@ def validate_args(args: argparse.Namespace) -> Optional[str]:
                 "--operator-confirm-physical-cable-loss must equal "
                 f"{PHYSICAL_CABLE_CONFIRMATION}"
             )
+        if args.execute and not args.reconnect_wing_ip:
+            return "--reconnect-wing-ip is required for executed physical-cable-loss proof"
     return None
 
 
