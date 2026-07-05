@@ -100,14 +100,77 @@ def low_frequency_weighting(x: np.ndarray, sample_rate: int) -> float:
 
 
 def ratio_ma2015(w_p: float, w_f: float) -> float:
-    """R(m) = 0.54*w_p + 0.764*w_f + 1 (Ma et al. 2015, ф-ла из статьи)."""
+    """R(m) = 0.54*w_p + 0.764*w_f + 1 (Ma et al. 2015, R^2=0.69)."""
     return float(np.clip(0.54 * w_p + 0.764 * w_f + 1.0, RATIO_MIN, RATIO_MAX))
 
 
 def threshold_ma2015(x_rms_db: float, w_p: float) -> float:
-    """T(m) = -11.03 + 0.44*x_RMS - 4.987*w_p (Ma et al. 2015)."""
-    t = -11.03 + 0.44 * x_rms_db - 4.987 * w_p
+    """T(m) = -11.03 + 0.441*x_RMS - 4.987*w_p (Ma et al. 2015, R^2=0.56)."""
+    t = -11.03 + 0.441 * x_rms_db - 4.987 * w_p
     return float(np.clip(t, THRESHOLD_MIN_DB, THRESHOLD_MAX_DB))
+
+
+# ── Кросс-адаптивные признаки статьи (мультитрек) ────────────────
+#
+# Оригинальные w_p/w_f Ma et al. считаются ОТНОСИТЕЛЬНО ВСЕХ каналов микса:
+# перкуссивность — гауссово отклонение crest factor канала от среднего по
+# трекам (w_p ∈ (0,2)), НЧ-вес — отношение НЧ-доли канала к средней по
+# трекам. Одноканальные функции выше — прокси для путей без мультитрек-
+# контекста (например, realtime CF-контроллер).
+
+PERCUSSIVITY_SIGMA = 2.0
+
+
+def percussivity_weighting_multitrack(
+    crest_db_by_channel: "dict[object, float]",
+) -> "dict[object, float]":
+    """w_p(m) ∈ (0, 2) относительно среднего crest по всем трекам (σ=2)."""
+    if not crest_db_by_channel:
+        return {}
+    values = np.asarray(list(crest_db_by_channel.values()), dtype=np.float64)
+    mean_crest = float(np.mean(values))
+    out = {}
+    for ch, crest in crest_db_by_channel.items():
+        dev = (float(crest) - mean_crest) ** 2 / (2.0 * PERCUSSIVITY_SIGMA ** 2)
+        g = float(np.exp(-dev))  # ограничиваем exp: гаусс, не разлетается
+        if float(crest) <= mean_crest:
+            out[ch] = g
+        else:
+            out[ch] = 2.0 - g
+    return out
+
+
+def low_frequency_weighting_multitrack(
+    lf_ratio_by_channel: "dict[object, float]",
+) -> "dict[object, float]":
+    """w_f(m): НЧ-доля канала, нормированная на среднюю по трекам."""
+    if not lf_ratio_by_channel:
+        return {}
+    values = np.asarray(list(lf_ratio_by_channel.values()), dtype=np.float64)
+    mean_lf = float(np.mean(values))
+    if mean_lf <= 0.0:
+        return {ch: 0.0 for ch in lf_ratio_by_channel}
+    return {ch: float(np.clip(v / mean_lf, 0.0, 2.0))
+            for ch, v in lf_ratio_by_channel.items()}
+
+
+def ballistics_giannoulis2013(crest_db: float) -> tuple[float, float]:
+    """tau_A = 2*tau_A_max/x_crest^2, tau_R = 2*tau_R_max/x_crest^2.
+
+    Giannoulis et al. 2013 (Parameter Automation in a DRC): x_crest —
+    ЛИНЕЙНЫЙ crest factor; tau_A_max=80 мс, tau_R_max=1000 мс. Чем
+    транзиентнее сигнал — тем короче константы времени.
+    """
+    x_crest = 10.0 ** (max(float(crest_db), 0.0) / 20.0)
+    x2 = max(x_crest ** 2, 1.0)
+    attack_ms = float(np.clip(2.0 * 80.0 / x2, ATTACK_MIN_MS, ATTACK_MAX_MS))
+    release_ms = float(np.clip(2.0 * 1000.0 / x2, RELEASE_MIN_MS, RELEASE_MAX_MS))
+    return attack_ms, release_ms
+
+
+def knee_width_ma2015(threshold_db: float) -> float:
+    """W(m) = |T|/2 — ниже порог -> шире (мягче) колено."""
+    return float(abs(threshold_db) / 2.0)
 
 
 def ballistics_giannoulis(crest_db: float, w_p: float) -> tuple[float, float]:

@@ -5229,6 +5229,45 @@ PROCESSING_METHODS: Tuple[ProcessingMethod, ...] = (
         notes=("transport_free", "proposal_only", "bounded_makeup", "feedback_guard", "freshness_gated", "no_live_writes"),
     ),
     ProcessingMethod(
+        id="comp_v3",
+        label="Comp v3 Two-Loop Dynamic Range Compression",
+        domain="dynamics",
+        status="proposal_only",
+        summary=(
+            "Two-loop compression method: soundcheck loop profiles channel "
+            "dynamics (crest windows, loudness percentiles, sigma), applies a "
+            "compress-only-with-reason gate, derives parameters from the "
+            "cross-adaptive Ma 2015 regressions with live clamps and a "
+            "loud-section GR-target threshold, then verifies by simulating "
+            "the Giannoulis soft-knee/smooth-decoupled core (pumping metric "
+            "2-8 Hz, bleed-lift, bounded fader compensation); live loop is a "
+            "GR supervisor that tracks threshold only (never ratio), "
+            "rate-limits makeup and freezes it below 6 dB feedback margin."
+        ),
+        module="backend/heuristics/comp_v3.py",
+        can_analyze=True,
+        can_propose=True,
+        pipeline_profiles=("main_live_assist", "shadow_quality", "lab_dsp"),
+        blocked_reason=(
+            "comp_v3_live_writes_need_dynamics_readback_feedback_headroom_"
+            "rollback_and_hardware_proof"
+        ),
+        promotion_next=(
+            "route comp_v3 soundcheck proposals to operator review; enable "
+            "the live GR supervisor only after the dynamics correction "
+            "family passes supervised hardware proof"
+        ),
+        notes=(
+            "transport_free",
+            "proposal_only",
+            "compress_only_with_reason_gate",
+            "giannoulis_core_simulation_verify",
+            "pumping_metric_2_8_hz",
+            "never_raise_ratio_live",
+            "makeup_feedback_margin_link",
+        ),
+    ),
+    ProcessingMethod(
         id="auto_compressor_cf",
         label="Crest-Factor Compressor",
         domain="dynamics",

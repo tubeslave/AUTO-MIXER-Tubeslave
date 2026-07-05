@@ -24,6 +24,7 @@ from audio_capture import (
     detect_audio_device, find_device_by_name, list_audio_devices,
 )
 from heuristics.eq_v3 import soundcheck_eq_v3
+from heuristics.comp_v3 import soundcheck_comp_v3
 from autofoh_analysis import build_stem_contribution_matrix, extract_analysis_features
 from autofoh_detectors import (
     HarshnessExcessDetector,
@@ -526,6 +527,7 @@ class AutoSoundcheckEngine:
         self.block_size = block_size
         self.buffer_seconds = buffer_seconds
         self._eq_v3_proposals: Dict[int, Any] = {}
+        self._comp_v3_proposals: Dict[int, Any] = {}
         self.auto_apply = bool(auto_apply)
         self.observe_only = bool(observe_only)
         self.feedback_emergency_apply = bool(feedback_emergency_apply)
@@ -4325,10 +4327,11 @@ class AutoSoundcheckEngine:
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
-        # EQ v3: один мультиканальный прогон (резонансы + ERB-маскирование
-        # против суммы + предсказательная A/B) ДО поканального цикла —
-        # маскирование считается по всем буферам сразу.
+        # EQ v3 и Comp v3: по одному мультиканальному прогону ДО поканального
+        # цикла — маскирование (EQ) и w_p/w_f (comp) кросс-адаптивны и
+        # считаются по всем буферам сразу.
         self._eq_v3_proposals = self._compute_eq_v3_proposals()
+        self._comp_v3_proposals = self._compute_comp_v3_proposals()
 
         for ch, info in self.channels.items():
             if not info.has_signal:
@@ -4538,13 +4541,8 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
-    def _compute_eq_v3_proposals(self) -> Dict[int, Any]:
-        """Мультиканальный прогон EQ v3 по активным каналам.
-
-        Возвращает {channel: EQv3ChannelProposal}. Пустой dict — аудио
-        недоступно (нет capture / короткие буферы): поканальный цикл
-        падает обратно на пресетный путь (fail-safe, пайплайн не ломается).
-        """
+    def _collect_v3_channel_audio(self) -> Dict[int, Dict[str, Any]]:
+        """Буферы активных каналов для мультиканальных v3-прогонов (EQ/comp)."""
         if self.audio_capture is None:
             return {}
         window = max(self.block_size, int(self.sample_rate * 2.0))
@@ -4565,6 +4563,16 @@ class AutoSoundcheckEngine:
                 "role": info.source_role if info.source_role != "unknown"
                 else (info.preset or "line"),
             }
+        return channels_payload
+
+    def _compute_eq_v3_proposals(self) -> Dict[int, Any]:
+        """Мультиканальный прогон EQ v3 по активным каналам.
+
+        Возвращает {channel: EQv3ChannelProposal}. Пустой dict — аудио
+        недоступно (нет capture / короткие буферы): поканальный цикл
+        падает обратно на пресетный путь (fail-safe, пайплайн не ломается).
+        """
+        channels_payload = self._collect_v3_channel_audio()
         if not channels_payload:
             return {}
         try:
@@ -4580,6 +4588,33 @@ class AutoSoundcheckEngine:
                 [(round(b["freq_hz"]), round(b["gain_db"], 1)) for b in proposal.applied_bands],
                 f", warnings={proposal.warnings}" if proposal.warnings else "",
             )
+        return proposals
+
+    def _compute_comp_v3_proposals(self) -> Dict[int, Any]:
+        """Мультиканальный прогон Comp v3 (w_p/w_f кросс-адаптивны по трекам).
+
+        Пустой dict — fail-safe fallback на пресетный компрессорный путь.
+        """
+        channels_payload = self._collect_v3_channel_audio()
+        if not channels_payload:
+            return {}
+        try:
+            proposals = soundcheck_comp_v3(channels_payload, self.sample_rate)
+        except Exception:
+            logger.exception("comp_v3 proposal computation failed; falling back to presets")
+            return {}
+        for ch, proposal in proposals.items():
+            if proposal.compress and proposal.params is not None:
+                logger.info(
+                    "Ch %s: comp_v3 -> T=%.1f R=%.1f atk=%.0fms rel=%.0fms (GR цель %.1f)%s",
+                    ch, proposal.params.threshold_db, proposal.params.ratio,
+                    proposal.params.attack_ms, proposal.params.release_ms,
+                    proposal.params.gr_target_db,
+                    f", warnings={proposal.warnings}" if proposal.warnings else "",
+                )
+            else:
+                logger.info("Ch %s: comp_v3 -> bypass (%s)", ch,
+                            proposal.decision.get("reason"))
         return proposals
 
     def _apply_eq(
@@ -5529,15 +5564,37 @@ class AutoSoundcheckEngine:
         if not hasattr(self.mixer_client, 'set_compressor'):
             return
 
+        # Comp v3 (основной путь): параметры из мультиканального прогона —
+        # кросс-адаптивные регрессии Ma 2015, порог от целевого GR на громких
+        # секциях, верификация симуляцией Giannoulis (пампинг/bleed-lift).
+        # Гейт «по умолчанию не сжимать»: стабильный канал пропускается.
+        v3_proposal = getattr(self, "_comp_v3_proposals", {}).get(ch)
+        v3_params = None
+        if v3_proposal is not None:
+            if not v3_proposal.compress:
+                logger.info(
+                    f"Ch {ch}: comp_v3 bypass — {v3_proposal.decision.get('reason')}"
+                )
+                return
+            v3_params = v3_proposal.params
+
         comp_params = INSTRUMENT_COMPRESSOR.get(preset)
-        if not comp_params:
+        if not comp_params and v3_params is None:
             return
 
-        base_threshold, base_ratio, base_attack, base_release = comp_params
-        threshold = base_threshold
-        ratio = base_ratio
-        attack = base_attack
-        release = base_release
+        if v3_params is not None:
+            threshold = float(v3_params.threshold_db)
+            ratio = float(v3_params.ratio)
+            attack = float(v3_params.attack_ms)
+            release = float(v3_params.release_ms)
+            base_threshold, base_ratio = threshold, ratio
+            base_attack, base_release = attack, release
+        else:
+            base_threshold, base_ratio, base_attack, base_release = comp_params
+            threshold = base_threshold
+            ratio = base_ratio
+            attack = base_attack
+            release = base_release
         raw_settings = self._snapshot_raw(info)
         current_comp_enabled = self._as_bool(
             raw_settings.get("compressor_enabled"),

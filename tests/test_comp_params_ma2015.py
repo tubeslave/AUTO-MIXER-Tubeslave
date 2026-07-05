@@ -65,9 +65,9 @@ class TestRegressions:
         assert ratio_ma2015(0.5, 0.25) == pytest.approx(1.461)
 
     def test_threshold_formula_exact(self):
-        # T = -11.03 + 0.44*x_rms - 4.987*w_p
-        assert threshold_ma2015(-20.0, 0.0) == pytest.approx(-19.83)
-        assert threshold_ma2015(-20.0, 1.0) == pytest.approx(-24.817)
+        # T = -11.03 + 0.441*x_rms - 4.987*w_p (точный коэффициент статьи)
+        assert threshold_ma2015(-20.0, 0.0) == pytest.approx(-19.85)
+        assert threshold_ma2015(-20.0, 1.0) == pytest.approx(-24.837)
 
     def test_threshold_clamped(self):
         assert threshold_ma2015(-90.0, 1.0) == -40.0

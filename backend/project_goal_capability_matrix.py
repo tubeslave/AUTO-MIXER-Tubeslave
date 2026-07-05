@@ -279,8 +279,11 @@ PROJECT_GOAL_CAPABILITIES: Tuple[ProjectGoalCapabilityRow, ...] = (
         project_requirement="Automatically perform compression.",
         status="proposal_only",
         autonomy_mode_ceiling="assisted",
-        method_ids=("compressor_dynamics_proposal", "auto_compressor", "auto_compressor_cf"),
+        method_ids=("comp_v3", "compressor_dynamics_proposal", "auto_compressor", "auto_compressor_cf"),
         support_paths=(
+            "backend/heuristics/comp_v3.py",
+            "backend/heuristics/drc_giannoulis.py",
+            "backend/comp_params_ma2015.py",
             "backend/compressor_dynamics_proposal.py",
             "backend/auto_compressor.py",
             "backend/auto_compressor_cf.py",
