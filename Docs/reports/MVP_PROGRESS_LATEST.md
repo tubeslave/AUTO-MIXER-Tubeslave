@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-05T02:04:44Z`
+Generated: `2026-07-05T02:51:16Z`
 
 ## Current MVP
 
@@ -34,7 +34,8 @@ Supervised WING Rack proof.
 - External validation requirements:
   - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
   - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
-- Latest ledger handoff row: `m005_physical_reconnect_target_required` at `2026-07-05T02:25:32Z`
+- Latest ledger handoff row: `m005_readback_target_binding_required` at `2026-07-05T02:51:16Z`
+- Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-readback and reconnect-readback payloads, including `events.jsonl` stale/reconnect payloads, now must match the requested `channel`, `value_type` and WING `address` before M005 completion or M006 owner-review input can be ready. This grants no backend/WING contact, proposal creation, live apply, readiness-matrix update or live authority.
 - Latest M005 physical reconnect target guard: `bbf7833e2` requires `--reconnect-wing-ip` before any executed `physical-cable-loss` M005 proof can contact backend/WebSocket, so the operator-present cable-loss proof remains bound to reconnect-recovery evidence and grants no live authority.
 - Latest M006 packet verifier hardening: `3ea749d70` requires matching reconnect-recovery physical readback event checks from `events.jsonl` before owner-review input can be ready.
 - Latest M006 owner decision verifier: `5eda78126` now also requires those matching reconnect-recovery physical readback event checks and the accepted M005 summary sibling `events.jsonl` path before an accepted owner decision can become a readiness-matrix candidate.

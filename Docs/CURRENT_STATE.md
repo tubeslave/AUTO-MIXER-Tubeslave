@@ -1,17 +1,17 @@
 # Current State
 
-Generated: 2026-07-05T02:25:32Z
+Generated: 2026-07-05T02:51:16Z
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Latest verified product/runtime commit:
-  `bbf7833e2 Require M005 physical reconnect target`
+  `d3eb93a62 Bind M005 readbacks to proof target`
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `df54ea7ec Sync M006 event log path truth surfaces`
 - Tracked worktree state before this sync: clean after the M005 physical
-  reconnect-target guard commit `bbf7833e2`; ignored large/superseded local
+  readback target-binding guard commit `d3eb93a62`; ignored large/superseded local
   evidence remains local-only.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
@@ -176,6 +176,13 @@ Generated: 2026-07-05T02:25:32Z
   disconnected-write artifact without reconnect-recovery proof, and grants no
   WING/backend contact, proposal creation, live apply, readiness closure,
   readiness-matrix update or live authority.
+- `d3eb93a62` binds M005 readback evidence to the requested proof target:
+  baseline, stale-readback and reconnect-readback payloads, including
+  `events.jsonl` stale/reconnect payloads consumed by M006, must match the
+  requested `channel`, `value_type` and WING `address` before M005 completion
+  or owner-review input can be ready. This is offline runner/verifier
+  hardening only and grants no WING/backend contact, proposal creation, live
+  apply, readiness closure, readiness-matrix update or live authority.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` now declares
   its packet scope as read-only preflight evidence handoff only, and points
   current next-action authority back to `Docs/CURRENT_STATE.md`,
@@ -2142,8 +2149,8 @@ Generated: 2026-07-05T02:25:32Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `bbf7833e2` passed with
-  `5507 passed, 1 skipped, 1 warning`. This includes the M005 physical
+- The latest verified full-suite run for `d3eb93a62` passed with
+  `5513 passed, 1 skipped, 1 warning`. This includes the M005 physical
   reconnect-target guard, the M006 owner-decision
   M005 event-log path binding, the M006 owner-decision reconnect-event
   packet-check binding, the M006 packet-verifier

@@ -58,6 +58,12 @@ Current gate state:
   rollback and review-field completeness for decision-queue proposals before
   generic evidence rows. This satisfies the operator-visibility slice only; it
   does not run M005, make an M006 owner decision or grant live authority.
+- M005 readback target-binding guard: `d3eb93a62` requires baseline,
+  stale-readback and reconnect-readback payloads, including `events.jsonl`
+  stale/reconnect payloads consumed by M006, to match the requested
+  `channel`, `value_type` and WING `address` before M005 completion or
+  owner-review input can be ready. This is offline artifact verification
+  only and does not run M005 or grant live authority.
 
 ## Hard Safety Boundary
 
@@ -290,6 +296,7 @@ Expected evidence:
 - stale-state query reports readback unavailable, not cache-fresh;
 - `apply_operator_proposal` is blocked while disconnected;
 - reconnect recovery confirms the channel value is unchanged from baseline;
+- baseline, stale and reconnect readback payloads and events match the requested channel, value type and WING address;
 - `live_authority_granted=false` and `readiness_closure_allowed=false` remain
   in the artifact.
 
@@ -385,7 +392,7 @@ operator/owner action, unattended Codex work may execute only the safe slice:
    the referenced proof summaries, require a complete M005 summary contract,
    require M005 request/event sequence ordering, require the nested blocked
    apply result to prove `operator_proposal_apply_blocked`, require
-   rollback-free M005 request/event audits, require owner-decision input to
+   rollback-free M005 request/event audits, require M005 readback/event target binding to the requested channel/value_type/address, require owner-decision input to
    consume packet-verifier stale-readback event checks, and keep readiness
    updates blocked until M005 and owner acceptance.
 

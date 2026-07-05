@@ -85,6 +85,8 @@
   accepted M005 summary sibling `events.jsonl`. This prevents M006 from relying
   on missing, copied or mismatched event logs and still does not close M005 or
   M006.
+Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-readback and reconnect-readback payloads, including `events.jsonl` stale/reconnect payloads, now must match the requested `channel`, `value_type` and WING `address` before M005 completion or M006 owner-review input can be ready. This grants no backend/WING contact, proposal creation, live apply, readiness-matrix update or live authority.
+
 - Latest M005 physical reconnect target guard: `bbf7833e2` hardens the M005
   runner before the next operator-present proof:
   executed `physical-cable-loss` mode now requires `--reconnect-wing-ip` before
@@ -181,8 +183,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m005_physical_reconnect_target_required` at
-  `2026-07-05T02:25:32Z`. That row preserves the same `current_blocker`,
+  `m005_readback_target_binding_required` at
+  `2026-07-05T02:51:16Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain
