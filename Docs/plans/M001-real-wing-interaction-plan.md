@@ -257,6 +257,9 @@ Required operator approval:
   actually pulled the WING network link for this proof;
 - accepted read-only source id is the current operator-accepted preflight
   artifact.
+- executed `physical-cable-loss` mode includes a reconnect target; the runner
+  fails closed before backend/WebSocket contact if `--reconnect-wing-ip` is
+  omitted.
 
 The reusable runner is:
 
@@ -278,6 +281,8 @@ python3 tools/wing_timeout_disconnect_proof_runner.py \
   --reason "m005_disconnect_timeout_stale_state_proof"
 ```
 
+Executed `physical-cable-loss` mode now fails closed before backend/WebSocket contact unless `--reconnect-wing-ip` is supplied.
+
 Expected evidence:
 
 - physical baseline readback before loss;
@@ -293,7 +298,8 @@ Stop if:
 - the runner observes live or stale physical readback after disconnect;
 - any direct write request type appears in the event log;
 - blocked-write probe applies unexpectedly without rollback/manual review;
-- reconnect readback is unavailable or differs from baseline.
+- reconnect readback is unavailable or differs from baseline;
+- `--reconnect-wing-ip` is missing for an executed physical cable-loss proof.
 
 ## Stage 4 - Readiness Update
 

@@ -34,7 +34,8 @@ Supervised WING Rack proof.
 - External validation requirements:
   - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
   - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
-- Latest ledger handoff row: `m006_owner_decision_binds_m005_events_path` at `2026-07-05T02:04:44Z`
+- Latest ledger handoff row: `m005_physical_reconnect_target_required` at `2026-07-05T02:25:32Z`
+- Latest M005 physical reconnect target guard: `bbf7833e2` requires `--reconnect-wing-ip` before any executed `physical-cable-loss` M005 proof can contact backend/WebSocket, so the operator-present cable-loss proof remains bound to reconnect-recovery evidence and grants no live authority.
 - Latest M006 packet verifier hardening: `3ea749d70` requires matching reconnect-recovery physical readback event checks from `events.jsonl` before owner-review input can be ready.
 - Latest M006 owner decision verifier: `5eda78126` now also requires those matching reconnect-recovery physical readback event checks and the accepted M005 summary sibling `events.jsonl` path before an accepted owner decision can become a readiness-matrix candidate.
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.

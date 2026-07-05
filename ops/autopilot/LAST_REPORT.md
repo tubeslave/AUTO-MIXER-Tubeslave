@@ -10,8 +10,8 @@
   readback, rollback and emergency-stop/block evidence, but physical
   disconnect/timeout/stale-state proof and owner readiness review still require
   operator/owner action before any readiness-matrix update.
-- Latest heartbeat: 2026-07-05T02:04:44Z.
-- Latest verified full suite passed with `5506 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-05T02:25:32Z.
+- Latest verified full suite passed with `5507 passed, 1 skipped, 1 warning`.
 - Writer lease: none. The stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed, and
   `ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
@@ -32,6 +32,12 @@
   proof and M006 owner readiness review remain open. The earlier
   `rollback_not_applied` fader artifact is closed by the passed CH3 rerun and
   remains audit history only.
+- Latest M005 physical reconnect target guard: `bbf7833e2` makes executed
+  `physical-cable-loss` M005 proof runs require `--reconnect-wing-ip` before
+  backend/WebSocket contact. This prevents an operator-present cable-loss
+  proof from continuing without reconnect-recovery target evidence and grants
+  no backend/WING contact, proposal creation, live write, readiness update or
+  live authority.
 - Latest M005/M006 verifier hardening: `f10894198` makes clean M005
   owner-review input rollback-free. The M006 packet contract now requires
   `required_rollback_request_sent=false` and forbids

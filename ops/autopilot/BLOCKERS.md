@@ -85,6 +85,12 @@
   accepted M005 summary sibling `events.jsonl`. This prevents M006 from relying
   on missing, copied or mismatched event logs and still does not close M005 or
   M006.
+- Latest M005 physical reconnect target guard: `bbf7833e2` hardens the M005
+  runner before the next operator-present proof:
+  executed `physical-cable-loss` mode now requires `--reconnect-wing-ip` before
+  backend/WebSocket contact. This prevents a cable-loss proof attempt from
+  producing a partial disconnected-write artifact without reconnect recovery
+  and still does not close M005 or M006.
 - `3ea749d70` tightens the packet-verifier side again: the M005
   reconnect-recovery physical readback summary must match a post-reconnect
   `events.jsonl` `recv` payload before owner-review input can be ready. This
@@ -175,8 +181,8 @@
   superseded drift-audit attempts are ignored as local evidence only.
 - Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
 - Latest ledger handoff row:
-  `m006_owner_decision_binds_m005_events_path` at
-  `2026-07-05T02:04:44Z`. That row preserves the same `current_blocker`,
+  `m005_physical_reconnect_target_required` at
+  `2026-07-05T02:25:32Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain

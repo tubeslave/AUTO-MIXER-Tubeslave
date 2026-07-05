@@ -855,6 +855,7 @@ def test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed():
 
 def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    latest_m005_guard = state["latest_m005_physical_reconnect_target_guard_commit"]
     active = ACTIVE_MILESTONE_DOC.read_text(encoding="utf-8")
     roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
     capability = CAPABILITY_MATRIX.read_text(encoding="utf-8")
@@ -873,12 +874,16 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert "M001 autonomous pre-hardware work is complete" in active
     assert "Real hardware proof now requires WING Rack" in active
     assert "rollback_not_applied" in active
+    assert latest_m005_guard["commit"] in active
+    assert "Latest M005 physical reconnect target guard" in active
 
     assert "Exactly one milestone is active: `M001`" in roadmap
     assert "`WAITING_FOR_EXTERNAL_VALIDATION`" in roadmap
     assert "Current M001 waiting reason" in roadmap
     assert "accepted_decision_ready" in roadmap
     assert "rollback_not_applied" in roadmap
+    assert latest_m005_guard["commit"] in roadmap
+    assert "Latest M005 physical reconnect target guard" in roadmap
     assert markdown_table_row(roadmap, "M001")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     assert markdown_table_row(roadmap, "M002")[-1] == "WAITING_FOR_EXTERNAL_VALIDATION"
     for milestone in ("M003", "M004", "M005", "M006"):
@@ -908,6 +913,8 @@ def test_milestone_and_roadmap_stay_waiting_for_real_wing_evidence():
     assert "WING_REAL_HARDWARE_READONLY_20260702.md" in blockers
     assert "temporary-root capture only" in blockers
     assert "cannot close readiness" in blockers
+    assert latest_m005_guard["commit"] in blockers
+    assert "Latest M005 physical reconnect target guard" in blockers
     assert "Real WING Rack hardware evidence is not available from this setup run" not in blockers
     assert "Control-plane docs/state can proceed without live hardware contact" in blockers
 

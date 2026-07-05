@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-05T02:04:44Z
+Last heartbeat UTC: 2026-07-05T02:25:32Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,8 +23,8 @@ External validation requirements:
 - Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
 - Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
 
-Latest check: `5eda78126` requires the offline M006 owner-decision verifier to reject ready packet-verifier summaries unless `m005_events` matches the accepted M005 summary sibling `events.jsonl` path, alongside stale-readback and reconnect-readback checks. This heartbeat records offline verifier/test hardening only: no WING/backend contact during this checkpoint, no proposal creation, no live apply, no readiness-matrix update and no authority widening.
-Latest verified full pytest passed with `5506 passed, 1 skipped, 1 warning`.
+Latest check: `bbf7833e2` requires executed M005 `physical-cable-loss` proof runs to supply `--reconnect-wing-ip` before backend/WebSocket contact, so the operator-present cable-loss proof cannot proceed without reconnect-recovery target evidence. This heartbeat records offline runner/test hardening only: no WING/backend contact during this checkpoint, no proposal creation, no live apply, no readiness-matrix update and no authority widening.
+Latest verified full pytest passed with `5507 passed, 1 skipped, 1 warning`.
 Latest direct mute/pan invalid-value guard passed: direct WebSocket
 `set_mute`, `mute_channel` and `unmute_channel` now reject missing or
 unparseable mute values before mixer writes, and direct `set_pan` rejects
