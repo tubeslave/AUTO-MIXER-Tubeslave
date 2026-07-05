@@ -118,6 +118,17 @@ def complete_m005_event_request_types(m005: dict) -> list[str]:
     return list(m005["sent_request_types"])
 
 
+def timeout_stale_readback() -> dict:
+    return {
+        "type": "mixer_parameter_read_blocked",
+        "status": "readback_timeout",
+        "source": "timeout",
+        "reason": "stale_readback_timeout_after_disconnect",
+        "value": None,
+        "transport_failure": {"type": "TimeoutError"},
+    }
+
+
 def write_m005_event_log(events_path: Path, request_types: list[str]) -> None:
     events_path.write_text(
         "".join(
@@ -232,6 +243,82 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["contacts_wing"] is False
     assert result["contacts_backend"] is False
     assert result["live_write"] is False
+
+
+def test_complete_m005_timeout_readback_allows_owner_review_input_only() -> None:
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["phases"]["stale_readback"]["readback"] = timeout_stale_readback()
+    packet = load_packet()
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "ready_for_owner_review"
+    assert result["reason"] == "m006_owner_review_inputs_verified"
+    assert result["owner_review_input_ready"] is True
+    assert "m005_stale_readback_unavailable" not in result["failed_checks"]
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_blocked_unsupported_address_cannot_satisfy_stale_readback() -> None:
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    m005["phases"]["stale_readback"]["readback"] = {
+        "type": "mixer_parameter_read_blocked",
+        "status": "blocked",
+        "reason": "unsupported_address",
+        "value": None,
+    }
+    packet = load_packet()
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_stale_readback_unavailable" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_matrix_update_allowed"] is False
+
+
+def test_m005_timeout_readback_must_have_canonical_timeout_shape() -> None:
+    m005 = complete_m005_summary()
+    m005["m005_complete"] = True
+    malformed_timeout = timeout_stale_readback()
+    malformed_timeout["reason"] = "generic_timeout"
+    m005["phases"]["stale_readback"]["readback"] = malformed_timeout
+    packet = load_packet()
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        m005_event_request_types=complete_m005_event_request_types(m005),
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m006_owner_review_inputs_failed"
+    assert "m005_stale_readback_unavailable" in result["failed_checks"]
+    assert result["owner_review_input_ready"] is False
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
 
 
 def test_packet_contract_must_require_blocked_apply_result() -> None:

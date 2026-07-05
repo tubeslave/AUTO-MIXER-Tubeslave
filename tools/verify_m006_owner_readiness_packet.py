@@ -40,6 +40,15 @@ EXPECTED_M005_SAFE_BLOCK_REASONS = {
     "pre_read_cache_not_fresh",
     "pre_read_unavailable",
 }
+EXPECTED_M005_STALE_TIMEOUT_REASON = "stale_readback_timeout_after_disconnect"
+EXPECTED_M005_SAFE_STALE_READBACK_BLOCK_REASONS = {
+    EXPECTED_M005_STALE_TIMEOUT_REASON,
+    "mixer_client_state_source_unavailable",
+    "mixer_not_connected",
+    "pre_read_cache_not_fresh",
+    "pre_read_unavailable",
+    "readback_unavailable",
+}
 EXPECTED_M005_FORBIDDEN_DIRECT_REQUEST_TYPES = {
     "load_" + "snap",
     "route_" + "output",
@@ -195,9 +204,40 @@ def _m005_readback_is_physical(readback: Mapping[str, Any]) -> bool:
     )
 
 
+def _m005_readback_is_timeout_evidence(readback: Mapping[str, Any]) -> bool:
+    return (
+        readback.get("status") == "readback_timeout"
+        or readback.get("source") == "timeout"
+        or readback.get("reason") == EXPECTED_M005_STALE_TIMEOUT_REASON
+    )
+
+
+def _m005_timeout_readback_is_unavailable(readback: Mapping[str, Any]) -> bool:
+    transport_failure = _get_mapping(readback, "transport_failure")
+    return (
+        readback.get("type") == "mixer_parameter_read_blocked"
+        and readback.get("status") == "readback_timeout"
+        and readback.get("source") == "timeout"
+        and readback.get("reason") == EXPECTED_M005_STALE_TIMEOUT_REASON
+        and readback.get("value") is None
+        and transport_failure.get("type") == "TimeoutError"
+    )
+
+
+def _m005_blocked_readback_is_unavailable(readback: Mapping[str, Any]) -> bool:
+    if _m005_readback_is_timeout_evidence(readback):
+        return _m005_timeout_readback_is_unavailable(readback)
+    return (
+        readback.get("type") == "mixer_parameter_read_blocked"
+        and readback.get("status") == "blocked"
+        and readback.get("reason") in EXPECTED_M005_SAFE_STALE_READBACK_BLOCK_REASONS
+        and readback.get("value") is None
+    )
+
+
 def _m005_readback_is_unavailable(readback: Mapping[str, Any]) -> bool:
     if readback.get("type") == "mixer_parameter_read_blocked":
-        return True
+        return _m005_blocked_readback_is_unavailable(readback)
     return (
         readback.get("type") == "mixer_parameter_value"
         and readback.get("status") == "readback_unavailable"
