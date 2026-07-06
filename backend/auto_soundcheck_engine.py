@@ -4405,6 +4405,21 @@ class AutoSoundcheckEngine:
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
+        # Кэш FX-инсертов шин: state подписки не всегда содержит preins —
+        # один явный read-запрос на шину до поканального цикла (live
+        # 2026-07-06: guard посылов отклонял все шины как «неизвестно»)
+        self._fx_bus_insert_cache = {}
+        query = getattr(self.mixer_client, "query_parameter", None)
+        if callable(query):
+            for _bus in sorted({b for sends in INSTRUMENT_FX_SENDS.values()
+                                for b, _ in sends}):
+                try:
+                    r = query(f"/bus/{_bus}/preins/ins", timeout=1.0)
+                    if r.get("status") == "received":
+                        self._fx_bus_insert_cache[_bus] = r.get("value")
+                except Exception:
+                    pass
+
         # Bleed-доминантные близкие микрофоны определяются один раз до
         # прогонов: их буферы — чужой сигнал, им нельзя ни коррекций,
         # ни участия в кросс-адаптивных вычислениях (маскирование, w_p/w_f)
@@ -4734,11 +4749,13 @@ class AutoSoundcheckEngine:
     def _fx_bus_has_insert(self, bus: int) -> bool:
         """Есть ли на шине реальный FX-инсерт (посыл без него запрещён).
 
-        Пассивное чтение из state (подписка его обновляет); неизвестно —
-        консервативный отказ.
+        Кэш из _apply_corrections (явный read при старте применения) →
+        state подписки; неизвестно — консервативный отказ.
         """
-        state = getattr(self.mixer_client, "state", None)
-        value = state.get(f"/bus/{bus}/preins/ins") if isinstance(state, dict) else None
+        value = getattr(self, "_fx_bus_insert_cache", {}).get(bus)
+        if value is None:
+            state = getattr(self.mixer_client, "state", None)
+            value = state.get(f"/bus/{bus}/preins/ins") if isinstance(state, dict) else None
         if value is None:
             return False
         return str(value).upper().startswith("FX")

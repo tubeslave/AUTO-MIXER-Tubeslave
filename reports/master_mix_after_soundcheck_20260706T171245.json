@@ -1,0 +1,16 @@
+{
+ "status": "ISSUES",
+ "lufs_integrated": -30.28,
+ "true_peak_dbtp": -4.94,
+ "crest_db": 25.14,
+ "lr_balance_db": 0.41,
+ "correlation": 0.982,
+ "mono_fold_ratio": 0.99,
+ "tilt_deviation_db": 9.67,
+ "vocal_presence_db": 6.2,
+ "issues": [
+  "громкость микса -30.3 LUFS вне -20.0±6.0",
+  "спектр отклоняется от 'live_standard' на 9.7 дБ (медиана)"
+ ],
+ "method": "master_mix_eval"
+}

@@ -1,0 +1,61 @@
+{
+ "stamp": "20260706T170416",
+ "decisions": [
+  {
+   "slot": 1,
+   "bus": 13,
+   "model": "PLATE",
+   "writes": {
+    "mdl": "PLATE",
+    "pdel": 63,
+    "dcy": 1.922494649887085,
+    "lc": 219.7120819091797,
+    "hc": 7962.14501953125,
+    "preins/ins": "FX1",
+    "preins/on": 1,
+    "bus_name": "Vocal Plate",
+    "bus_main_on": 1,
+    "bus_fdr": -3.999998092651367
+   },
+   "verdict": "applied"
+  },
+  {
+   "slot": 2,
+   "bus": 14,
+   "model": "ROOM",
+   "writes": {
+    "mdl": "ROOM",
+    "pdel": 25,
+    "dcy": 0.9902442693710327,
+    "lc": 183.56597900390625,
+    "hc": 5508.45849609375,
+    "preins/ins": "FX2",
+    "preins/on": 1,
+    "bus_name": "Drum Room",
+    "bus_main_on": 1,
+    "bus_fdr": -3.999998092651367
+   },
+   "verdict": "applied"
+  },
+  {
+   "slot": 3,
+   "bus": 15,
+   "model": "ST-DL",
+   "writes": {
+    "mdl": "ST-DL",
+    "time": 375.0,
+    "feed": 22.0,
+    "flc": 262.9757995605469,
+    "fhc": 5023.7734375,
+    "preins/ins": "FX3",
+    "preins/on": 1,
+    "bus_name": "Tempo Delay",
+    "bus_main_on": 1,
+    "bus_fdr": -6.0,
+    "bus_mute": 1
+   },
+   "delay_muted_until_tempo_confirmed": true,
+   "verdict": "applied"
+  }
+ ]
+}

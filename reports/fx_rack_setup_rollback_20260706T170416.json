@@ -1,0 +1,41 @@
+{
+ "original": {
+  "fx": {
+   "1": {
+    "mdl": "NONE"
+   },
+   "2": {
+    "mdl": "NONE"
+   },
+   "3": {
+    "mdl": "NONE"
+   }
+  },
+  "buses": {
+   "13": {
+    "preins/ins": "NONE",
+    "preins/on": 0,
+    "fdr": 0.0,
+    "mute": 1,
+    "name": "",
+    "main/1/on": 1
+   },
+   "14": {
+    "preins/ins": "NONE",
+    "preins/on": 0,
+    "fdr": 0.0,
+    "mute": 1,
+    "name": "",
+    "main/1/on": 1
+   },
+   "15": {
+    "preins/ins": "NONE",
+    "preins/on": 0,
+    "fdr": 0.0,
+    "mute": 1,
+    "name": "",
+    "main/1/on": 1
+   }
+  }
+ }
+}
