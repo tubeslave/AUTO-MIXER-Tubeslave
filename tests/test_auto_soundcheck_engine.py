@@ -2153,3 +2153,41 @@ def test_balance_solution_measured_in_console_domain():
     # без учёта трима гитара получила бы срез глубже вокального минимум
     # на разницу LUFS (4 дБ); с учётом — её срез МЕНЬШЕ вокального
     assert fader_gtr >= fader_voc - 1.0
+
+
+def test_balance_measured_is_post_fader_no_inversion_on_repeat_runs():
+    """Оператор 2026-07-06: «мало вокала и playback, громко гитары».
+    Pre-fader measured инвертировал баланс на повторных прогонах: вокал с
+    тримом +12 выглядел «уже громким», гитара с −12 — «тихой». Решатель
+    обязан получать ПОСТ-фейдерный уровень и восстанавливать иерархию."""
+    mixer = DetectorMixer()
+    mixer.state = {"/ch/1/in/set/trim": 12.0, "/ch/2/in/set/trim": -12.0}
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.mixer_client = mixer
+
+    class _Lvl:
+        def __init__(self, lufs): self.lufs_integrated = lufs
+    class _M:
+        def __init__(self, lufs): self.level = _Lvl(lufs)
+
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="VOCAL", preset="leadVocal",
+                       source_role="lead_vocal", has_signal=True,
+                       recognized=True, auto_corrections_enabled=True,
+                       fader_db=-30.0),
+        2: ChannelInfo(channel=2, name="GTR", preset="electricGuitar",
+                       source_role="guitar", has_signal=True,
+                       recognized=True, auto_corrections_enabled=True,
+                       fader_db=-10.0),
+    }
+    engine.channels[1].metrics = _M(-35.0)   # capture pre-trim одинаковый
+    engine.channels[2].metrics = _M(-35.0)
+
+    solution = engine._compute_balance_v3_solution()
+    assert solution is not None
+    # пост-фейдерные уровни решения: вокал должен оказаться ВЫШЕ гитары
+    post = {
+        ch: -35.0 + engine._channel_trim_db(ch) + solution.faders_db[ch]
+        for ch in (1, 2)
+    }
+    assert post[1] > post[2]  # вокал над гитарой (план: −22 vs −25)

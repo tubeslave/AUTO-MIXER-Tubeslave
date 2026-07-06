@@ -4929,16 +4929,20 @@ class AutoSoundcheckEngine:
                 lufs = float(info.lufs)
             if lufs <= -90:
                 continue
-            # КОНСОЛЬНЫЙ домен: capture pre-trim + текущий трим. Без этого
-            # решатель балансирует сигналы, которых в зале нет (гитары с
-            # тримом −8 получали ещё и фейдер −16 — двойной срез;
-            # оператор 2026-07-06)
+            # ПОСТ-ФЕЙДЕРНЫЙ консольный уровень: capture(pre-trim) + trim +
+            # текущий фейдер. Модель решателя обновляет measured дельтой
+            # фейдера, т.е. ожидает пост-фейдерный уровень; подача
+            # pre-fader уровня инвертировала баланс на повторных прогонах:
+            # каналы с +тримом (вокал +12) выглядели «уже громкими» и не
+            # поднимались, с −тримом (гитары −12) — «тихими» и бустились
+            # (оператор 2026-07-06: «мало вокала и playback, громко гитары»)
             trim = self._channel_trim_db(ch)
+            fader_now = float(info.fader_db) if info.fader_db > -140 else 0.0
             trims_at_solve[ch] = trim
-            measured[ch] = lufs + trim
+            measured[ch] = lufs + trim + fader_now
             roles[ch] = (info.source_role if info.source_role != "unknown"
                          else (info.preset or "line"))
-            current[ch] = float(info.fader_db) if info.fader_db > -140 else 0.0
+            current[ch] = fader_now
         self._balance_trim_at_solve = trims_at_solve
         if len(measured) < 2:
             return None
