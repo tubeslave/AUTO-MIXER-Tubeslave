@@ -957,7 +957,8 @@ def test_character_compressor_model_is_preserved_when_gr_is_available():
     makeup_blocks = _blocked_calls(engine, "set_compressor_gain")
     assert makeup_blocks
     assert makeup_blocks[-1]["channel"] == 1
-    assert makeup_blocks[-1]["makeup_db"] == 2.0
+    # полная компенсация GR (ratio 1.0; оператор 2026-07-06)
+    assert makeup_blocks[-1]["makeup_db"] == 4.0
     assert not any(call[0] == "set_compressor_gain" for call in mixer.calls)
     assert not any(call[0] == "set_compressor" for call in mixer.calls)
 
@@ -1004,7 +1005,8 @@ def test_existing_generic_compressor_makeup_compensates_gain_reduction():
     assert comp_blocks[-1]["ratio"] == 3.0
     assert comp_blocks[-1]["attack_ms"] == 5.0
     assert comp_blocks[-1]["release_ms"] == 80.0
-    assert comp_blocks[-1]["makeup_db"] == 2.0
+    # полная компенсация GR (ratio 1.0; оператор 2026-07-06)
+    assert comp_blocks[-1]["makeup_db"] == 4.0
     assert comp_blocks[-1]["enabled"] is True
     assert not any(call[0] == "set_compressor" for call in mixer.calls)
 
@@ -1053,7 +1055,8 @@ def test_b160_missing_gr_meter_gets_conservative_makeup_from_signal_headroom():
     makeup_blocks = _blocked_calls(engine, "set_compressor_gain")
     assert makeup_blocks
     assert makeup_blocks[-1]["channel"] == 1
-    assert makeup_blocks[-1]["makeup_db"] == 1.0
+    # headroom-ограниченный makeup при ratio 1.0
+    assert makeup_blocks[-1]["makeup_db"] == 1.5
     assert not any(call[0] == "set_compressor_gain" for call in mixer.calls)
     assert not any(call[0] == "set_compressor" for call in mixer.calls)
 

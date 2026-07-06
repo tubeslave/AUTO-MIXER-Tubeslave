@@ -76,10 +76,12 @@ MAX_VERIFY_ITERATIONS = 8
 
 RATIO_LIVE_MIN, RATIO_LIVE_MAX = 1.5, 4.0
 RATIO_VOCAL_MAX = 6.0
+MAKEUP_CAP_DB = 6.0   # был 2.0: не восстанавливал GR вокала (2026-07-06)
 
 # Целевой GR (дБ) и ожидаемый crest (дБ) по классам; клампы GR — safety
 CLASS_PROFILE: Dict[str, Dict[str, float]] = {
-    "lead_vocal": {"gr_target": 4.0, "expected_crest": 12.0, "gr_clamp": 8.0, "attack_ms": 8.0},
+    # gr_target 4->6 (2026-07-06): живой вокал с LRA 20+ LU «дышал» уровнем
+    "lead_vocal": {"gr_target": 6.0, "expected_crest": 12.0, "gr_clamp": 8.0, "attack_ms": 8.0},
     "backing_vocal": {"gr_target": 4.0, "expected_crest": 12.0, "gr_clamp": 8.0, "attack_ms": 10.0},
     "bass": {"gr_target": 6.0, "expected_crest": 8.0, "gr_clamp": 10.0, "attack_ms": 10.0},
     "kick": {"gr_target": 4.0, "expected_crest": 20.0, "gr_clamp": 6.0, "attack_ms": 20.0},
@@ -279,7 +281,11 @@ def derive_params(
 
     # makeup: компенсировать ожидаемый средний GR (70%), bounded по headroom
     expected_gr = max((stats.l10_db - threshold) * (1.0 - 1.0 / ratio), 0.0)
-    makeup = min(0.7 * expected_gr, 2.0)
+    # makeup ВОССТАНАВЛИВАЕТ уровень, потерянный компрессией (директива
+    # оператора 2026-07-06: «вокал то громко, то тихо»): полная компенсация
+    # среднего GR, bounded кэпом и true-peak headroom; bleed-lift
+    # верификация ниже всё равно уменьшит makeup при подъёме пауз
+    makeup = min(1.0 * expected_gr, MAKEUP_CAP_DB)
     if true_peak_dbtp is not None:
         makeup = min(makeup, max(0.0, -1.0 - true_peak_dbtp))
     return CompV3Params(

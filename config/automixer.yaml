@@ -215,8 +215,11 @@ autofoh:
     master_reference_channels: [23, 24]
     compressor_gr_max_db: 8.0
     compressor_gr_target_db: 4.0
-    compressor_makeup_compensation_ratio: 0.7
-    compressor_makeup_max_step_db: 2.0
+    # 0.7 -> 1.0 (оператор 2026-07-06): makeup обязан ВОССТАНАВЛИВАТЬ
+    # уровень, потерянный компрессией (правило CLAUDE.md); границы —
+    # makeup_max и true-peak ceiling ниже
+    compressor_makeup_compensation_ratio: 1.0
+    compressor_makeup_max_step_db: 4.0
     compressor_makeup_max_db: 9.0
     compressor_makeup_true_peak_ceiling_db: -3.0
     action_limits:

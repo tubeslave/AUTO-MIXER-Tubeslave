@@ -5934,6 +5934,7 @@ class AutoSoundcheckEngine:
         gain_reduction_db: Any,
         metrics: Optional[ChannelMetrics],
         assume_target_gr: bool = False,
+        trim_db: float = 0.0,
     ) -> Tuple[float, Dict[str, Any]]:
         current_makeup = self._as_float(current_makeup_db, 0.0)
         current_makeup = max(-6.0, min(12.0, current_makeup))
@@ -5957,6 +5958,9 @@ class AutoSoundcheckEngine:
         desired_makeup = max(0.0, min(self.compressor_makeup_max_db, desired_makeup))
 
         peak_db = self._compressor_peak_db_for_headroom(metrics)
+        if peak_db is not None:
+            # захват pre-trim -> консольный пик = capture + trim
+            peak_db = peak_db + float(trim_db)
         headroom_limited = False
         if peak_db is not None and desired_makeup > current_makeup:
             available_headroom = self.compressor_makeup_true_peak_ceiling_db - peak_db
@@ -6205,7 +6209,13 @@ class AutoSoundcheckEngine:
             gain_reduction_db=existing_gr,
             metrics=m,
             assume_target_gr=not current_comp_enabled and m is not None,
+            trim_db=self._channel_trim_db(ch),
         )
+        if v3_params is not None and getattr(v3_params, "makeup_db", 0.0) > makeup:
+            # comp v3 makeup верифицирован симуляцией (bleed-lift гейт);
+            # берём его, если он честно выше GR-эвристики движка
+            makeup = min(float(v3_params.makeup_db), self.compressor_makeup_max_db)
+            makeup_details["makeup_source"] = "comp_v3_verified"
         makeup_details["compressor_gr_source"] = compressor_gr_source
 
         # порог посчитан по PRE-trim USB-захвату — в пульте компрессор стоит
