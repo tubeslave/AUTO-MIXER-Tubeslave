@@ -1114,3 +1114,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация stereo_sources 2026-07-07: линк сайдчейнов стерео-компрессора (по поисковой выжимке)."
+
+  - source_id: sonnox_drum_phase
+    title: "Drum Phase Alignment: When to Nudge, When to Flip, and When to Leave It Alone"
+    source_type: web_article
+    authors: ["Sonnox"]
+    publisher: "sonnox.com"
+    year: 2024
+    url: "https://sonnox.com/articles/drum-phase-alignment-when-to-nudge-flip-or-leave-alone"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_phase_practice 2026-07-07: полярность-первой, OH-опора, риск пере-выравнивания, fader-pull диагностика."
+  - source_id: drumaudioediting_guide
+    title: "How To Phase Align Drums: The Ultimate Guide"
+    source_type: web_article
+    authors: ["Drum Audio Editing"]
+    publisher: "drumaudioediting.com"
+    year: 2023
+    url: "https://www.drumaudioediting.com/post/how-to-phase-align-drums-the-ultimate-guide"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_phase_practice 2026-07-07: неподвижный референс, ~1 мс/фут (по поисковой выжимке)."
