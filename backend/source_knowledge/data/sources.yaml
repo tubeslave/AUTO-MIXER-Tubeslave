@@ -1046,3 +1046,48 @@ sources:
       - paraphrased_rules
       - citation_metadata
     notes: "Собран пайплайном обучения 2026-07-06: тональные регионы по ролям (kick/snare/toms/OH/bass/guitars/keys/vocals), сверен с двумя независимыми чарт-источниками из поиска."
+
+  - source_id: sweetwater_gain_staging
+    title: "Gain Staging Like a Pro"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2024
+    url: "https://www.sweetwater.com/insync/gain-staging/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация gain_staging_live 2026-07-07; полный текст недоступен (403), правила по поисковой выжимке, сверены со вторым источником."
+  - source_id: prosoundweb_gain_staging
+    title: "Setting Sound System And Mixing Console Gain Staging"
+    source_type: web_article
+    authors: ["ProSoundWeb"]
+    publisher: "prosoundweb.com"
+    year: 2023
+    url: "https://www.prosoundweb.com/setting-sound-system-and-mixing-console-gain-staging/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация gain_staging_live 2026-07-07; 403 при fetch, использована поисковая выжимка."
+  - source_id: elysia_18dbfs
+    title: "-18 dBFS is the new 0 dBu"
+    source_type: web_article
+    authors: ["elysia"]
+    publisher: "elysia.com"
+    year: 2022
+    url: "https://www.elysia.com/18dbfs-is-the-new-0dbu/"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "EBU-конвенция цифрового номинала."
+  - source_id: totalproaudio_console_gain
+    title: "Console Gain Structure"
+    source_type: web_article
+    authors: ["Steve Bunting"]
+    publisher: "totalproaudio.stevebunting.com"
+    year: 2022
+    url: "https://totalproaudio.stevebunting.com/297/mixing/console-gain-structure/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Номинал цифрового пульта ~-20 dBFS при 20 дБ хедрума."

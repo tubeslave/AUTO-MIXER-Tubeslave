@@ -1,0 +1,50 @@
+mode: active
+started: '2026-07-07'
+iteration_log:
+- date: '2026-07-07'
+  topic: gain_staging_live
+  rules_added:
+  - gain.preamp_sets_nominal_faders_mix
+  - gain.digital_nominal_minus18
+  - gain.fader_resolution_near_unity
+  rules_rejected: []
+  notes: 'Критика: boost трима остаётся soundcheck-only (bleed-правило); «преампами
+    не миксуют» подтверждает трим-гистерезис и фейдер-балансировку; противоречий с
+    фактами пульта нет.'
+topics:
+- id: eq_tonal_targets
+  title: Тональные цели EQ по ролям инструментов
+  status: done
+  operator_complaint: EQ только давит выпирающие частоты
+- id: gain_staging_live
+  title: Gain staging на живом пульте — роли трима и фейдера, порядок
+  status: done
+  operator_complaint: kick сначала опущен тримом, затем задран фейдером
+- id: stereo_sources
+  title: Стерео-источники L/R — единая обработка, панорама, моносовместимость
+  status: pending
+  operator_complaint: L и R с разными trim и fader
+- id: drum_phase_practice
+  title: Практика фазы ударных — порядок выравнивания, полярность, OH-опора
+  status: pending
+  operator_complaint: фаза по схеме оператора; изолированные удары редки
+- id: compression_per_role
+  title: Компрессия по ролям — attack/release/ratio/GR цели, live-специфика
+  status: pending
+  operator_complaint: вокал то громко, то тихо; makeup обязателен
+- id: vocal_chain_live
+  title: Вокальный тракт live — EQ/comp/de-ess/FX порядок, борьба за читаемость
+  status: pending
+- id: mix_bus_loudness_live
+  title: Громкость и плотность живого микса — цели LUFS/TP, что двигать
+  status: pending
+  operator_complaint: микс на 8-9 LU тише цели, DCA cuts-only не поднимает
+- id: fx_reverb_delay_live
+  title: Ревербы/дилеи live — типы, времена, пре-дилей, посылы по ролям
+  status: pending
+- id: masking_arrangement
+  title: Маскирование и место в спектре — кто уступает, где резать
+  status: pending
+- id: monitor_room_interaction
+  title: Взаимодействие с залом — PA-кривые, low-end менеджмент, feedback
+  status: pending
