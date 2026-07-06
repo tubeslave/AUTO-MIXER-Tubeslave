@@ -4731,6 +4731,18 @@ class AutoSoundcheckEngine:
     CLOSE_MIC_PRESETS = frozenset({"kick", "snare", "tom"})
     BLEED_MIN_OWN_HITS = 3
 
+    def _fx_bus_has_insert(self, bus: int) -> bool:
+        """Есть ли на шине реальный FX-инсерт (посыл без него запрещён).
+
+        Пассивное чтение из state (подписка его обновляет); неизвестно —
+        консервативный отказ.
+        """
+        state = getattr(self.mixer_client, "state", None)
+        value = state.get(f"/bus/{bus}/preins/ins") if isinstance(state, dict) else None
+        if value is None:
+            return False
+        return str(value).upper().startswith("FX")
+
     def _channel_trim_db(self, ch: int) -> float:
         """Текущий цифровой трим канала (консольный домен).
 
@@ -6374,6 +6386,18 @@ class AutoSoundcheckEngine:
 
         sends = INSTRUMENT_FX_SENDS.get(preset, [])
         if not sends:
+            return
+
+        # Посыл ТОЛЬКО на шину с реальным FX-инсертом: пустая шина в мейне —
+        # это сухая параллельная копия канала («каша»; live 2026-07-06:
+        # после отката FX-рэка сбросом посылы снова записались на пустые
+        # шины 13-15 и суммировали дубли в мастер)
+        sends = [(bus, lvl) for bus, lvl in sends if self._fx_bus_has_insert(bus)]
+        if not sends:
+            logger.info(
+                f"Ch {ch} '{info.name}': FX sends skipped — целевые шины без "
+                "FX-инсерта (рэк не построен); запустите tools/fx_rack_setup.py"
+            )
             return
 
         m = info.metrics

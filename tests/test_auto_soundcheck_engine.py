@@ -2191,3 +2191,33 @@ def test_balance_measured_is_post_fader_no_inversion_on_repeat_runs():
         for ch in (1, 2)
     }
     assert post[1] > post[2]  # вокал над гитарой (план: −22 vs −25)
+
+
+def test_fx_sends_skipped_when_bus_has_no_insert():
+    """Live 2026-07-06: после отката FX-рэка посылы записались на пустые
+    шины — сухие параллельные копии каналов в мейне («каша»). Посыл только
+    на шину с реальным FX-инсертом."""
+    mixer = DetectorMixer()
+    mixer.state = {"/bus/13/preins/ins": "NONE", "/bus/15/preins/ins": "NONE"}
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    engine.auto_fx_sends_enabled = True
+    info = ChannelInfo(channel=1, name="VOCAL", preset="leadVocal",
+                       source_role="lead_vocal", has_signal=True,
+                       recognized=True, auto_corrections_enabled=True,
+                       allowed_controls=["fx_send"])
+    engine.channels = {1: info}
+    engine._apply_fx_sends(1, info, "leadVocal")
+    assert not any(c[0] == "set_channel_send" for c in mixer.calls)
+
+    # с реальным инсертом посыл разрешён (доходит до safety-слоя)
+    mixer.state["/bus/13/preins/ins"] = "FX1"
+    mixer.state["/bus/15/preins/ins"] = "FX3"
+    engine._apply_fx_sends(1, info, "leadVocal")
+    # запись может быть заблокирована карантином (нет промоута в этом
+    # контроллере), но до фильтра шин она дошла — иначе бы не было blocked
+    blocked = [d for d in engine.safety_controller.history
+               if getattr(d.action, "action_type", "") == "SendLevelAdjust"]
+    assert blocked
