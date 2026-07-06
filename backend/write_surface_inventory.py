@@ -108,6 +108,26 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
                "usr_signal_pool_taps"),
     ),
     WriteSurface(
+        id="mixing_rule_trial_runner",
+        label="Mixing-rule learning trial runner (operator-invoked)",
+        status="lab_only",
+        paths=("tools/mixing_rule_trial.py",),
+        entrypoints=("mixing_rule_trial CLI",),
+        write_kinds=("channel_eq", "channel_filter"),
+        allowed_live=False,
+        gate="rollback file before first write + per-address readback + "
+             "master-loop A/B (before/after) + operator verdict updates "
+             "rule score; occupied EQ bands are never re-purposed",
+        current_policy="Пайплайн обучения (директива 2026-07-06): проба "
+                       "правил-кандидатов из source_knowledge на реальном "
+                       "пульте, счёт helped/hurt, статус candidate -> "
+                       "active/rejected.",
+        next_action="После промоута правил — перенос tonal targets в "
+                    "EQ-стадию движка.",
+        notes=("source_knowledge_rules", "rollback_file_first",
+               "operator_verdict_scoring"),
+    ),
+    WriteSurface(
         id="master_pink_balance_runner",
         label="Master pink-noise balance SETUP runner (operator-invoked)",
         status="lab_only",

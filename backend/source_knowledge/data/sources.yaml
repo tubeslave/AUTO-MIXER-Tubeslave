@@ -1019,3 +1019,30 @@ sources:
       - citation_metadata
       - future_transcript_ingestion
     notes: "Registered for future reviewed lessons and general principles; no proprietary seminar details or style imitation stored."
+
+  - source_id: musicguymixing_live_kick_eq
+    title: "Live Kick Drum EQ - The Best Settings to Use"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/live-kick-drum-eq/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Собран пайплайном обучения 2026-07-06: live-специфичные EQ-цели кика (60 Hz body, 400-500 cut, 3 kHz click, HPF 40)."
+  - source_id: hyperbits_eq_cheat_sheet
+    title: "The Ultimate EQ Cheat Sheet for 30+ Instruments"
+    source_type: web_article
+    authors: ["Hyperbits"]
+    publisher: "hyperbits.com"
+    year: 2026
+    url: "https://hyperbits.com/eq-cheat-sheet/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses:
+      - paraphrased_rules
+      - citation_metadata
+    notes: "Собран пайплайном обучения 2026-07-06: тональные регионы по ролям (kick/snare/toms/OH/bass/guitars/keys/vocals), сверен с двумя независимыми чарт-источниками из поиска."
