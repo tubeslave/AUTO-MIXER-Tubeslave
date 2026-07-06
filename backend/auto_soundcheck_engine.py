@@ -4379,6 +4379,14 @@ class AutoSoundcheckEngine:
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
+        # Bleed-доминантные близкие микрофоны определяются один раз до
+        # прогонов: их буферы — чужой сигнал, им нельзя ни коррекций,
+        # ни участия в кросс-адаптивных вычислениях (маскирование, w_p/w_f)
+        self._bleed_dominated_channels = {
+            ch for ch, info in self.channels.items()
+            if info.has_signal and info.auto_corrections_enabled
+            and self._close_mic_bleed_dominated(ch, info, info.preset or "custom")
+        }
         # EQ v3 и Comp v3: по одному мультиканальному прогону ДО поканального
         # цикла — маскирование (EQ) и w_p/w_f (comp) кросс-адаптивны и
         # считаются по всем буферам сразу.
@@ -4397,6 +4405,23 @@ class AutoSoundcheckEngine:
                 continue
 
             preset = info.preset or "custom"
+            # Bleed-заморозка (замечание оператора 2026-07-06: система
+            # регулировала TOM/F TOM по блидингу): близкий барабанный
+            # микрофон без собственных ударов не получает EQ/comp/pan/
+            # trim/fader-коррекций — его замеры описывают чужой сигнал.
+            # Гейт применяется: он как раз против блидинга.
+            if ch in getattr(self, "_bleed_dominated_channels", set()):
+                logger.info(
+                    f"Ch {ch} '{info.name}': bleed-dominated close mic — "
+                    "коррекции заморожены (только гейт); нужен собственный "
+                    "проход инструмента"
+                )
+                self._apply_gate(
+                    ch, info, preset,
+                    phase_guard_context=phase_guard_context,
+                )
+                self._applied_channels.add(ch)
+                continue
             had_proc = ""
             if info.original_snapshot and info.original_snapshot.had_processing:
                 had_proc = " (existing settings preserved)"
@@ -4601,9 +4626,12 @@ class AutoSoundcheckEngine:
             return {}
         window = max(self.block_size, int(self.sample_rate * 2.0))
         channels_payload: Dict[int, Dict[str, Any]] = {}
+        bleed_frozen = getattr(self, "_bleed_dominated_channels", set())
         for ch, info in self.channels.items():
             if not info.has_signal or not info.auto_corrections_enabled:
                 continue
+            if ch in bleed_frozen:
+                continue  # чужой сигнал не участвует в кросс-адаптивных прогонах
             try:
                 samples = np.asarray(
                     self.audio_capture.get_buffer(ch, window), dtype=np.float64
@@ -4618,6 +4646,76 @@ class AutoSoundcheckEngine:
                 else (info.preset or "line"),
             }
         return channels_payload
+
+    # Пресеты близких барабанных микрофонов и порог собственных ударов
+    CLOSE_MIC_PRESETS = frozenset({"kick", "snare", "tom"})
+    BLEED_MIN_OWN_HITS = 3
+
+    def _close_mic_bleed_dominated(self, ch: int, info, preset: str) -> bool:
+        """Близкий микрофон без СОБСТВЕННЫХ ударов = bleed-доминантен.
+
+        Bleed-удары — тоже онсеты (транзиенты соседних барабанов), поэтому
+        порога над полом недостаточно. Признак собственного удара —
+        proximity: в 30-мс окне онсета этот микрофон энергичнее любого
+        другого близкого барабанного микрофона. Меньше BLEED_MIN_OWN_HITS
+        таких окон -> канал заморожен (замечание оператора 2026-07-06:
+        TOM/F TOM регулировались по блидингу).
+        """
+        if preset not in self.CLOSE_MIC_PRESETS:
+            return False
+        if self.audio_capture is None:
+            return False
+        try:
+            from heuristics.phase_v3 import detect_onsets
+            window = int(self.sample_rate * 4.0)
+            buf = np.asarray(
+                self.audio_capture.get_buffer(ch, window), dtype=np.float64
+            ).reshape(-1)
+        except Exception:
+            return False
+        if buf.size < self.sample_rate:
+            return False
+        onsets = detect_onsets(buf, self.sample_rate)
+        if len(onsets) < self.BLEED_MIN_OWN_HITS:
+            return True
+
+        # буферы остальных близких микрофонов (выровнены по хвосту окна).
+        # Микрофоны ТОГО ЖЕ источника (snare top/bottom, kick in/out) не
+        # конкурируют между собой: нижний снейр горячее верхнего на том же
+        # ударе — это не bleed (live 2026-07-06: SNARE T ложно замерзал)
+        multi_mic_same_source = preset in {"snare", "kick"}
+        others: List[np.ndarray] = []
+        for other_ch, other_info in self.channels.items():
+            if other_ch == ch or not other_info.has_signal:
+                continue
+            other_preset = other_info.preset or ""
+            if other_preset not in self.CLOSE_MIC_PRESETS:
+                continue
+            if multi_mic_same_source and other_preset == preset:
+                continue
+            try:
+                other = np.asarray(
+                    self.audio_capture.get_buffer(other_ch, window),
+                    dtype=np.float64,
+                ).reshape(-1)
+            except Exception:
+                continue
+            if other.size == buf.size:
+                others.append(other)
+        if not others:
+            return False  # сравнивать не с чем — не замораживаем
+
+        win = int(0.03 * self.sample_rate)
+        own_hits = 0
+        for onset in onsets:
+            hi = min(onset + win, buf.size)
+            if hi - onset < win // 2:
+                continue
+            e_self = float(np.mean(buf[onset:hi] ** 2))
+            e_others = max(float(np.mean(o[onset:hi] ** 2)) for o in others)
+            if e_self >= e_others:
+                own_hits += 1
+        return own_hits < self.BLEED_MIN_OWN_HITS
 
     def _compute_eq_v3_proposals(self) -> Dict[int, Any]:
         """Мультиканальный прогон EQ v3 по активным каналам.

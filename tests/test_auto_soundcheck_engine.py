@@ -1990,3 +1990,53 @@ def test_engine_writes_autofoh_session_report_on_stop(tmp_path):
     status = engine.get_status()
     assert "autofoh_session_report_summary" in status
     assert "ChannelFaderMove" in status["autofoh_session_report_summary"]
+
+
+def _burst_signal(sr, hits, amp, seed=0):
+    """4 c сигнала: удары amp в моменты hits (сек) + слабый пол."""
+    rng = np.random.default_rng(seed)
+    x = rng.normal(0, 0.001, 4 * sr).astype(np.float32)
+    for t in hits:
+        i = int(t * sr)
+        x[i:i + int(0.04 * sr)] += amp * rng.normal(0, 1, int(0.04 * sr)).astype(np.float32)
+    return x
+
+
+def test_bleed_dominated_tom_frozen_and_snare_with_own_hits_not():
+    """Замечание оператора 2026-07-06: TOM регулировался по блидингу.
+
+    Том, в котором каждый онсет громче звучит в снейр-канале (bleed),
+    замораживается; снейр с собственными ударами — нет."""
+    sr = 48000
+    hits = [0.5, 1.2, 1.9, 2.6, 3.3]
+    snare = _burst_signal(sr, hits, amp=0.5, seed=1)
+    tom_bleed = _burst_signal(sr, hits, amp=0.05, seed=2)  # те же моменты, тише
+
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.audio_capture = DetectorAudioCapture({1: snare, 2: tom_bleed})
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="SNARE", preset="snare", has_signal=True),
+        2: ChannelInfo(channel=2, name="TOM", preset="tom", has_signal=True),
+    }
+
+    assert engine._close_mic_bleed_dominated(2, engine.channels[2], "tom") is True
+    assert engine._close_mic_bleed_dominated(1, engine.channels[1], "snare") is False
+    # не-барабанные пресеты не замораживаются этим детектором
+    assert engine._close_mic_bleed_dominated(1, engine.channels[1], "leadVocal") is False
+
+
+def test_snare_pair_mics_do_not_freeze_each_other():
+    """Нижний снейр горячее верхнего на том же ударе — это не bleed."""
+    sr = 48000
+    hits = [0.5, 1.2, 1.9, 2.6, 3.3]
+    snare_top = _burst_signal(sr, hits, amp=0.2, seed=3)
+    snare_bot = _burst_signal(sr, hits, amp=0.6, seed=4)   # горячее
+
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.audio_capture = DetectorAudioCapture({1: snare_top, 2: snare_bot})
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="SNARE T", preset="snare", has_signal=True),
+        2: ChannelInfo(channel=2, name="SNARE B", preset="snare", has_signal=True),
+    }
+    assert engine._close_mic_bleed_dominated(1, engine.channels[1], "snare") is False
+    assert engine._close_mic_bleed_dominated(2, engine.channels[2], "snare") is False
