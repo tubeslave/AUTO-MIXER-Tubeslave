@@ -68,6 +68,21 @@ class WriteSurface:
 
 WRITE_SURFACES: Tuple[WriteSurface, ...] = (
     WriteSurface(
+        id="dca_groups_setup_runner",
+        label="DCA groups SETUP runner (operator-invoked)",
+        status="lab_only",
+        paths=("tools/dca_groups_setup.py",),
+        entrypoints=("dca_groups_setup CLI",),
+        write_kinds=("dca_name", "dca_fader", "dca_mute", "channel_tags"),
+        allowed_live=False,
+        gate="explicit --confirm-live-wing-write + rollback file before first "
+             "write + per-address readback; DCA assignment via #DN tag",
+        current_policy="SETUP-фаза по явному запуску оператора (2026-07-06): "
+                       "группы DRUMS/BASS/GTRS/PLAYBK/KEYS/VOX.",
+        next_action="Синхронизировать карту групп с config autofoh.dca_balance.",
+        notes=("wing_tags_dca_assignment", "rollback_file_first"),
+    ),
+    WriteSurface(
         id="master_pink_balance_runner",
         label="Master pink-noise balance SETUP runner (operator-invoked)",
         status="lab_only",

@@ -15,7 +15,8 @@ from autofoh_analysis import extract_analysis_features
 from autofoh_detectors import LeadMaskingAnalyzer, aggregate_stem_features
 from autofoh_models import RuntimeState
 from autofoh_profiles import build_phase_learning_snapshot, build_soundcheck_profile
-from autofoh_safety import AutoFOHSafetyController, ChannelEQMove, ChannelFaderMove
+from autofoh_safety import (AutoFOHSafetyConfig, AutoFOHSafetyController,
+                            ChannelEQMove, ChannelFaderMove)
 from correction_action_executor import CorrectionActionExecutorConfig, GatedCorrectionActionExecutor
 from feedback_detector import FeedbackEvent
 from observation_mixer import ObservationMixerClient
@@ -220,6 +221,16 @@ class DetectorMixer:
 
     def get_fader(self, channel):
         return self.fader.get(channel, -10.0)
+
+    def get_dca_fader(self, dca):
+        return getattr(self, "dca_fader", {}).get(dca, 0.0)
+
+    def set_dca_fader(self, dca, value_db):
+        if not hasattr(self, "dca_fader"):
+            self.dca_fader = {}
+        self.dca_fader[dca] = value_db
+        self.calls.append(("set_dca_fader", dca, value_db))
+        return True
 
     def get_eq_band_gain(self, channel, band):
         band_num = int(str(band).replace("g", ""))
@@ -2287,3 +2298,42 @@ def test_stereo_pair_balanced_as_one_stereo_instrument():
     assert adjusted[9] == pytest.approx(-28.0)   # плоскость −3 (сумма пары = −25)
     assert adjusted[10] == pytest.approx(-28.0)  # равные уровни
     assert adjusted[16] == pytest.approx(-22.0)
+
+
+def test_dca_group_balance_trims_stem_to_plane_cuts_only():
+    """Директива 2026-07-06: финальный баланс стемов DCA-группами.
+    Сумма группы над плоскостью -> DCA вниз; буст выше 0 запрещён."""
+    mixer = DetectorMixer()
+    mixer.state = {}
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            promoted_direct_write_action_types=("DCAFaderMove",)),
+    )
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    engine.config_manager.get_section = lambda name: (
+        {"dca_balance": {"enabled": True, "groups": {
+            1: {"name": "DRUMS", "channels": [1, 2], "plane_lufs": -25.0}}}}
+        if name == "autofoh" else {})
+
+    class _Lvl:
+        def __init__(self, lufs): self.lufs_integrated = lufs
+    class _M:
+        def __init__(self, lufs): self.level = _Lvl(lufs)
+
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="KICK", preset="kick", has_signal=True,
+                       fader_db=0.0),
+        2: ChannelInfo(channel=2, name="SNARE", preset="snare", has_signal=True,
+                       fader_db=0.0),
+    }
+    engine.channels[1].metrics = _M(-22.0)
+    engine.channels[2].metrics = _M(-22.0)   # сумма ~ -19 при плоскости -25
+
+    engine._apply_dca_group_balance()
+    dca_calls = [c for c in mixer.calls if c[0] == "set_dca_fader"]
+    assert dca_calls, "DCA-движение не отправлено"
+    assert dca_calls[-1][1] == 1
+    assert dca_calls[-1][2] == pytest.approx(-6.0, abs=0.3)   # -25 - (-19)

@@ -852,12 +852,20 @@ class AutoFOHSafetyController:
 
         if isinstance(action, DCAFaderMove):
             current = self._safe_get(lambda: self.mixer_client.get_dca_fader(action.dca_id), default=-144.0)
-            desired_delta = action.target_db - current
-            bounded_delta = max(
-                -self.config.dca_fader_max_step_db,
-                min(self.config.dca_fader_max_step_db, desired_delta),
-            )
-            target = max(-144.0, min(0.0, current + bounded_delta))
+            if derivation:
+                # финальный стем-баланс: абсолютная цель в [-12, 0] —
+                # DCA прибирает группы к плоскостям; буст всей группы —
+                # шагом <=6 дБ (резкий взлёт стема опасен), выше 0 нельзя
+                target = max(-12.0, min(0.0, float(action.target_db)))
+                if target > current:
+                    target = min(target, current + 6.0)
+            else:
+                desired_delta = action.target_db - current
+                bounded_delta = max(
+                    -self.config.dca_fader_max_step_db,
+                    min(self.config.dca_fader_max_step_db, desired_delta),
+                )
+                target = max(-144.0, min(0.0, current + bounded_delta))
             bounded = abs(target - action.target_db) > 1e-6
             return DCAFaderMove(
                 dca_id=action.dca_id,
@@ -1104,6 +1112,12 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, DCAFaderMove):
+            # финальный баланс стемов DCA-группами (оператор 2026-07-06);
+            # оживает только при явном промоуте в конфиге
+            return self._require_method(
+                "set_dca_fader",
+                lambda a: self.mixer_client.set_dca_fader(a.dca_id, a.target_db))
         if isinstance(action, ChannelEQMove):
             def _send_eq(a):
                 r_band = self.mixer_client.set_eq_band(

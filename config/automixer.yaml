@@ -102,6 +102,17 @@ autofoh:
   # USB-отправки 47/48 (/io/out/USB/47|48 grp=MAIN) — проект принимает
   # общий микс и оценивает результат сведения по звучанию. Tap-каналы
   # исключаются из всех коррекций (master-reference правило).
+  # Финальный баланс стемов DCA-группами (директива 2026-07-06):
+  # группы соответствуют tools/dca_groups_setup.py; плоскости — Ayaic
+  dca_balance:
+    enabled: true
+    groups:
+      1: {name: DRUMS, channels: [1, 2, 3, 4, 5, 6, 7], plane_lufs: -25.0}
+      2: {name: BASS, channels: [8], plane_lufs: -25.0}
+      3: {name: GTRS, channels: [9, 10], plane_lufs: -25.0}
+      4: {name: PLAYBK, channels: [11, 12], plane_lufs: -30.0}
+      5: {name: KEYS, channels: [13], plane_lufs: -30.0}
+      6: {name: VOX, channels: [16], plane_lufs: -22.0}
   master_mix:
     enabled: true
     capture_channels: [47, 48]
@@ -185,7 +196,9 @@ autofoh:
       ChannelFaderMove: true
       EmergencyFeedbackNotch: true
       BusFaderMove: false
-      DCAFaderMove: false
+      # DCA промоутнут 2026-07-06: финальный баланс стемов DCA-группами
+      # (директива оператора); в деривации только «прибирание» −12..0
+      DCAFaderMove: true
       MasterFaderMove: false
       ChannelEQMove: true
       BusEQMove: false

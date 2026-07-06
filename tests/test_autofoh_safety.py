@@ -592,7 +592,9 @@ def test_bus_and_dca_fader_moves_are_step_limited_and_never_above_zero():
     assert_blocked_evidence(dca, "set_dca_fader")
     assert dca.bounded is True
     assert bus.payload["blocked_calls"][0]["value_db"] == -7.0
-    assert dca.payload["blocked_calls"][0]["value_db"] == -8.5
+    # деривация: абсолютная цель clip(0.0, [-12, 0]), но буст всей группы
+    # ограничен шагом +6 дБ от текущих -9.0 -> -3.0
+    assert dca.payload["blocked_calls"][0]["value_db"] == -3.0
     assert mixer.calls == []
 
 
@@ -698,19 +700,21 @@ def test_autofoh_safety_default_config_keeps_non_fader_gain_writes_quarantined()
         assert decision.write_policy == "proposal_only_quarantined"
     assert mixer.calls == []
 
-    # мьюты/мастер/DCA/шинные записи транслятора не имеют вовсе —
+    # мьюты/мастер/шинные записи транслятора не имеют вовсе —
     # промоут в конфиге их не оживит
     source = Path("backend/autofoh_safety.py").read_text()
     translator_src = source.split("def _translator_for")[1].split("def _require_method")[0]
     for forbidden in (
         "set_channel_mute(",
         "set_bus_fader(",
-        "set_dca_fader(",
         "set_main_fader(",
         "set_bus_eq_band(",
         "set_bus_compressor(",
     ):
         assert forbidden not in translator_src
+    # DCA-фейдер промоутнут оператором 2026-07-06 (финальный стем-баланс) —
+    # транслятор существует, но без промоута в конфиге остаётся proposal-only
+    assert "set_dca_fader(" in translator_src
     assert '"cmd": "set_eq_band"' in source
     assert '"cmd": "set_gate"' in source
 

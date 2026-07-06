@@ -4582,9 +4582,67 @@ class AutoSoundcheckEngine:
                 notes="Post-learning snapshot lock after initial correction pass",
             )
 
-        # 12. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
+        # 12. Финальный баланс стемов DCA-группами (директива 2026-07-06):
+        # поканальный баланс задаёт бленд внутри групп, DCA прибирает
+        # группы к Ayaic-плоскостям (только вниз, потолок 0)
+        self._apply_dca_group_balance(phase_guard_context=phase_guard_context)
+
+        # 13. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
         # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
         self._evaluate_master_mix()
+
+    def _apply_dca_group_balance(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Стем-суммы групп к плоскостям через DCA-фейдеры (cuts-only)."""
+        cfg = (self.config_manager.get_section("autofoh") or {}).get(
+            "dca_balance", {}) or {}
+        if not cfg.get("enabled", False):
+            return
+        groups = cfg.get("groups", {}) or {}
+        for dca_id, spec in sorted(groups.items()):
+            try:
+                members = [int(ch) for ch in (spec.get("channels") or [])]
+                plane = float(spec.get("plane_lufs", -25.0))
+                powers = []
+                for ch in members:
+                    info = self.channels.get(ch)
+                    if info is None or not info.has_signal:
+                        continue
+                    lufs = None
+                    if info.metrics and info.metrics.level.lufs_integrated > -90:
+                        lufs = float(info.metrics.level.lufs_integrated)
+                    elif info.lufs > -90:
+                        lufs = float(info.lufs)
+                    if lufs is None:
+                        continue
+                    post = (lufs + self._channel_trim_db(ch)
+                            + (float(info.fader_db) if info.fader_db > -140 else 0.0))
+                    powers.append(10.0 ** (post / 10.0))
+                if not powers:
+                    logger.info(
+                        "DCA%d '%s': нет замеренного сигнала у участников — "
+                        "пропуск", int(dca_id), spec.get("name", ""))
+                    continue
+                stem_sum = 10.0 * np.log10(sum(powers) + 1e-12)
+                target = float(np.clip(plane - stem_sum, -12.0, 0.0))
+                decision = self._execute_action(
+                    DCAFaderMove(
+                        dca_id=int(dca_id),
+                        target_db=round(target, 1),
+                        reason=(f"Final stem balance: {spec.get('name', dca_id)} "
+                                f"sum {stem_sum:.1f} LUFS -> plane {plane:.1f}"),
+                    ),
+                    phase_guard_context=phase_guard_context,
+                )
+                if decision and decision.sent:
+                    logger.info(
+                        "DCA%d '%s': стем %.1f LUFS, плоскость %.1f -> fdr %.1f",
+                        int(dca_id), spec.get("name", ""), stem_sum, plane, target)
+            except Exception:
+                logger.exception("DCA balance failed for group %s", dca_id)
 
     def _evaluate_master_mix(self) -> Optional[Dict[str, Any]]:
         """Захват мастер-петли и оценка микса; вердикт в лог и reports/."""
