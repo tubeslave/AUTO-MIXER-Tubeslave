@@ -383,7 +383,7 @@ class AutoFXPlanner:
                 name="Tempo Delay",
                 fx_type="delay",
                 fx_slot="FX3",
-                model="STEREO_DELAY",
+                model="ST-DL",  # официальное имя FW 3.1; STEREO_DELAY не существует
                 return_level_db=-0.5,
                 params={
                     "left_delay_ms": dotted_eighth_ms,

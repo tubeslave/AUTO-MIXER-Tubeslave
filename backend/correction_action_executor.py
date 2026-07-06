@@ -24,9 +24,12 @@ from autofoh_safety import (
     ChannelFaderMove,
     ChannelGainMove,
     ChannelMuteMove,
+    CompressorAdjust,
+    CompressorMakeupAdjust,
     DCAFaderMove,
     DelayAdjust,
     EmergencyFeedbackNotch,
+    GateAdjust,
     HighPassAdjust,
     MasterFaderMove,
     PanAdjust,
@@ -293,7 +296,7 @@ class GatedCorrectionActionExecutor:
             return result
 
         result.eligible = True
-        bounded_action, bounded = self._preview_bounds(action)
+        bounded_action, bounded = self._preview_bounds(action, runtime_state)
         result.action = bounded_action
         read_plan = self._build_read_plan(bounded_action)
         result.target = dict(read_plan.target)
@@ -372,12 +375,21 @@ class GatedCorrectionActionExecutor:
         self._record_event("gated_action_verified", result, idempotency_key)
         return result
 
-    def _preview_bounds(self, action: TypedCorrectionAction) -> Tuple[TypedCorrectionAction, bool]:
+    def _preview_bounds(
+        self,
+        action: TypedCorrectionAction,
+        runtime_state: Optional[RuntimeState] = None,
+    ) -> Tuple[TypedCorrectionAction, bool]:
         apply_bounds = getattr(self.safety_controller, "_apply_bounds", None)
         if not callable(apply_bounds):
             return action, False
         try:
-            return apply_bounds(action)
+            return apply_bounds(action, runtime_state)
+        except TypeError:
+            try:
+                return apply_bounds(action)
+            except Exception:
+                return action, False
         except Exception:
             return action, False
 
@@ -555,7 +567,10 @@ class GatedCorrectionActionExecutor:
         if isinstance(action, SendLevelAdjust):
             current, source = self._read_method_or_state(
                 methods=(("get_send_level", (action.channel_id, action.send_bus)),),
-                state_keys=(f"/ch/{action.channel_id}/send/{action.send_bus}/level",),
+                state_keys=(
+                    f"/ch/{action.channel_id}/send/{action.send_bus}/lvl",
+                    f"/ch/{action.channel_id}/send/{action.send_bus}/level",
+                ),
             )
             return ActionReadPlan(
                 value_type="send_level",
@@ -564,6 +579,54 @@ class GatedCorrectionActionExecutor:
                 current_source=source,
                 tolerance=self.config.readback_tolerance_db,
                 rollback_action=self._rollback_action_for(action, current),
+                target=target,
+            )
+        if isinstance(action, CompressorAdjust):
+            # pre-read/readback по порогу; rollback — полный снимок динамики
+            current, source = self._read_method_or_state(
+                methods=(("get_compressor_threshold", (action.channel_id,)),),
+                state_keys=(
+                    f"/ch/{action.channel_id}/dyn/thr",
+                    f"/ch/{action.channel_id}/dyn/thr26",
+                ),
+            )
+            return ActionReadPlan(
+                value_type="comp_threshold",
+                target_value=action.threshold_db,
+                current_value=current,
+                current_source=source,
+                tolerance=self.config.readback_tolerance_db,
+                rollback_action=self._rollback_action_for(
+                    action, self._read_compressor_snapshot(action.channel_id)),
+                target=target,
+            )
+        if isinstance(action, CompressorMakeupAdjust):
+            current, source = self._read_method_or_state(
+                methods=(("get_compressor_gain", (action.channel_id,)),),
+                state_keys=(f"/ch/{action.channel_id}/dyn/gain",),
+            )
+            return ActionReadPlan(
+                value_type="comp_makeup",
+                target_value=action.makeup_db,
+                current_value=current,
+                current_source=source,
+                tolerance=self.config.readback_tolerance_db,
+                rollback_action=self._rollback_action_for(action, current),
+                target=target,
+            )
+        if isinstance(action, GateAdjust):
+            current, source = self._read_method_or_state(
+                methods=(("get_gate_threshold", (action.channel_id,)),),
+                state_keys=(f"/ch/{action.channel_id}/gate/thr",),
+            )
+            return ActionReadPlan(
+                value_type="gate_threshold",
+                target_value=action.threshold_db,
+                current_value=current,
+                current_source=source,
+                tolerance=self.config.readback_tolerance_db,
+                rollback_action=self._rollback_action_for(
+                    action, self._read_gate_snapshot(action.channel_id)),
                 target=target,
             )
 
@@ -678,6 +741,40 @@ class GatedCorrectionActionExecutor:
                 level_db=old_float,
                 reason=f"rollback {action.reason}",
             )
+        if isinstance(action, CompressorAdjust) and isinstance(old_value, dict):
+            old_thr = _coerce_float(old_value.get("threshold_db"))
+            if old_thr is None:
+                return None
+            return CompressorAdjust(
+                channel_id=action.channel_id,
+                threshold_db=old_thr,
+                ratio=_coerce_float(old_value.get("ratio")) or action.ratio,
+                attack_ms=_coerce_float(old_value.get("attack_ms")) or action.attack_ms,
+                release_ms=_coerce_float(old_value.get("release_ms")) or action.release_ms,
+                makeup_db=_coerce_float(old_value.get("makeup_db")) or 0.0,
+                enabled=bool(old_value.get("enabled") or 0),
+                reason=f"rollback {action.reason}",
+            )
+        if isinstance(action, CompressorMakeupAdjust) and old_float is not None:
+            return CompressorMakeupAdjust(
+                channel_id=action.channel_id,
+                makeup_db=old_float,
+                reason=f"rollback {action.reason}",
+            )
+        if isinstance(action, GateAdjust) and isinstance(old_value, dict):
+            old_thr = _coerce_float(old_value.get("threshold_db"))
+            if old_thr is None:
+                return None
+            return GateAdjust(
+                channel_id=action.channel_id,
+                threshold_db=old_thr,
+                range_db=_coerce_float(old_value.get("range_db")) or action.range_db,
+                attack_ms=_coerce_float(old_value.get("attack_ms")) or action.attack_ms,
+                hold_ms=_coerce_float(old_value.get("hold_ms")) or action.hold_ms,
+                release_ms=_coerce_float(old_value.get("release_ms")) or action.release_ms,
+                enabled=bool(old_value.get("enabled") or 0),
+                reason=f"rollback {action.reason}",
+            )
         return None
 
     def _rollback_after_failed_readback(
@@ -711,6 +808,44 @@ class GatedCorrectionActionExecutor:
             ),
         )
 
+    def _read_compressor_snapshot(self, channel_id: int) -> Optional[Dict[str, Any]]:
+        """Снимок динамики для отката CompressorAdjust (None = нет данных)."""
+        state = getattr(self.mixer_client, "state", None)
+        if not isinstance(state, dict):
+            return None
+        base = f"/ch/{channel_id}/dyn"
+        thr = state.get(f"{base}/thr")
+        if thr is None:
+            thr = state.get(f"{base}/thr26")
+        snapshot = {
+            "threshold_db": thr,
+            "ratio": state.get(f"{base}/ratio"),
+            "attack_ms": state.get(f"{base}/att"),
+            "release_ms": state.get(f"{base}/rel"),
+            "makeup_db": state.get(f"{base}/gain"),
+            "enabled": state.get(f"{base}/on"),
+        }
+        if snapshot["threshold_db"] is None:
+            return None
+        return snapshot
+
+    def _read_gate_snapshot(self, channel_id: int) -> Optional[Dict[str, Any]]:
+        state = getattr(self.mixer_client, "state", None)
+        if not isinstance(state, dict):
+            return None
+        base = f"/ch/{channel_id}/gate"
+        thr = state.get(f"{base}/thr")
+        if thr is None:
+            return None
+        return {
+            "threshold_db": thr,
+            "range_db": state.get(f"{base}/range"),
+            "attack_ms": state.get(f"{base}/att"),
+            "hold_ms": state.get(f"{base}/hld"),
+            "release_ms": state.get(f"{base}/rel"),
+            "enabled": state.get(f"{base}/on"),
+        }
+
     def _read_hpf(self, channel_id: int) -> Tuple[Any, str]:
         method = getattr(self.mixer_client, "get_hpf", None)
         if callable(method):
@@ -731,6 +866,10 @@ class GatedCorrectionActionExecutor:
         if isinstance(state, dict):
             freq = state.get(f"/ch/{channel_id}/eq/hpf/f")
             enabled = state.get(f"/ch/{channel_id}/eq/hpf/on", True)
+            if freq is None:
+                # WING: low-cut живёт в /ch/N/flt/{lcf,lc}
+                freq = state.get(f"/ch/{channel_id}/flt/lcf")
+                enabled = state.get(f"/ch/{channel_id}/flt/lc", True)
             if freq is not None:
                 return {"freq_hz": freq, "enabled": bool(enabled)}, "state"
         return None, "unavailable"

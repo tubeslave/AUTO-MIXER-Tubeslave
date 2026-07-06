@@ -93,6 +93,11 @@ autofoh:
     fft_size: 4096
     octave_fraction: 3
     slope_compensation_db_per_octave: 4.5
+  # Pan v3: профиль PA зала (оператор подтвердил стерео-PA 2026-07-06).
+  # mono — консервативный дефолт для незнакомого зала (pan-решение bypass).
+  pan:
+    pa_type: stereo
+    venue_class: club
   detectors:
     monitor_cycle_interval_sec: 1.0
     lead_masking:
@@ -159,6 +164,10 @@ autofoh:
     readback_tolerance_db: 0.25
     readback_tolerance_ms: 0.05
     artifact_path: artifacts/show_assist_auto_v1/gated_correction_events.jsonl
+    # Промоуты одобрены оператором 2026-07-05 (цель: полный саундчек-режим,
+    # все методы коррекции применяются к реальному пульту через gated
+    # executor c pre-read/readback/rollback). Мьюты и мастер/DCA/шинные
+    # фейдеры остаются proposal-only.
     promoted_action_types:
       ChannelGainMove: true
       ChannelFaderMove: true
@@ -166,18 +175,18 @@ autofoh:
       BusFaderMove: false
       DCAFaderMove: false
       MasterFaderMove: false
-      ChannelEQMove: false
+      ChannelEQMove: true
       BusEQMove: false
-      HighPassAdjust: false
-      CompressorAdjust: false
+      HighPassAdjust: true
+      CompressorAdjust: true
       BusCompressorAdjust: false
-      CompressorMakeupAdjust: false
+      CompressorMakeupAdjust: true
       BusCompressorMakeupAdjust: false
-      GateAdjust: false
-      PanAdjust: false
-      DelayAdjust: false
-      PolarityAdjust: false
-      SendLevelAdjust: false
+      GateAdjust: true
+      PanAdjust: true
+      DelayAdjust: true
+      PolarityAdjust: true
+      SendLevelAdjust: true
   safety:
     minimum_auto_apply_classification_confidence: 0.75
     new_or_unknown_channel_auto_corrections_enabled: false
@@ -185,10 +194,13 @@ autofoh:
     allow_destructive_reset: false
     allow_input_trim_boost: false
     auto_gate_close_mics: true
-    auto_fx_sends_enabled: false
+    # FX-посылы одобрены оператором 2026-07-06 (цель: полный саундчек-режим).
+    # Имена шин на реальном пульте пустые, inserts NONE — мониторных шин в
+    # текущей конфигурации зала нет; FX-рэк ставится SETUP-раннером на 13-15.
+    auto_fx_sends_enabled: true
     close_mic_fx_sends_enabled: false
-    monitor_bus_ids: [13, 14, 15, 16]
-    effect_bus_ids: [9, 10]
+    monitor_bus_ids: []
+    effect_bus_ids: [13, 14, 15]
     group_bus_correction_enabled: true
     master_reference_channels: [23, 24]
     compressor_gr_max_db: 8.0

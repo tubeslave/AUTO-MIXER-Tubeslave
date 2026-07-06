@@ -697,11 +697,38 @@ class WingClient(MixerClientBase):
         return all(results)
     
     def get_compressor_threshold(self, channel: int) -> Optional[float]:
-        """Get compressor threshold"""
-        value = self.state.get(f"/ch/{channel}/dyn/thr26")
+        """Get compressor threshold (свежий запрос + чтение state).
+
+        Порядок предпочтения — thr, затем thr26: при модели COMP thr26
+        может держать устаревшее значение (запись в него молча теряется).
+        """
+        if self.is_connected:
+            self.send(f"/ch/{channel}/dyn/thr")
+            self.send(f"/ch/{channel}/dyn/thr26")
+            time.sleep(0.05)
+        value = self.state.get(f"/ch/{channel}/dyn/thr")
         if value is not None:
             return value
-        return self.state.get(f"/ch/{channel}/dyn/thr")
+        return self.state.get(f"/ch/{channel}/dyn/thr26")
+
+    def get_gate_threshold(self, channel: int) -> Optional[float]:
+        """Get gate threshold (свежий запрос + чтение state)."""
+        if self.is_connected:
+            self.send(f"/ch/{channel}/gate/thr")
+            time.sleep(0.05)
+        return self.state.get(f"/ch/{channel}/gate/thr")
+
+    def get_hpf(self, channel: int) -> Optional[dict]:
+        """Get low-cut (HPF) state: {'freq_hz': ..., 'enabled': ...}."""
+        if self.is_connected:
+            self.send(f"/ch/{channel}/flt/lcf")
+            self.send(f"/ch/{channel}/flt/lc")
+            time.sleep(0.05)
+        freq = self.state.get(f"/ch/{channel}/flt/lcf")
+        if freq is None:
+            return None
+        return {"freq_hz": float(freq),
+                "enabled": bool(self.state.get(f"/ch/{channel}/flt/lc") or 0)}
     
     def set_compressor_ratio(self, channel: int, ratio: str):
         """
@@ -723,7 +750,10 @@ class WingClient(MixerClientBase):
         return self.send(f"/ch/{channel}/dyn/gain", gain)
     
     def get_compressor_gain(self, channel: int) -> Optional[float]:
-        """Get compressor make-up gain"""
+        """Get compressor make-up gain (свежий запрос + чтение state)"""
+        if self.is_connected:
+            self.send(f"/ch/{channel}/dyn/gain")
+            time.sleep(0.05)
         return self.state.get(f"/ch/{channel}/dyn/gain")
 
     def get_compressor_gr(self, channel: int) -> Optional[float]:
@@ -980,6 +1010,10 @@ class WingClient(MixerClientBase):
             ratio = f"{float(ratio):.1f}"
         # Small delay between OSC commands to ensure mixer processes them
         if threshold is not None:
+            # Адрес порога зависит от модели динамики (COMP -> thr,
+            # эмуляции -> thr26) — пишем в оба, лишний молча игнорируется
+            results.append(self.send(f"{base}/thr", threshold))
+            time.sleep(0.01)
             results.append(self.send(f"{base}/thr26", threshold))
             time.sleep(0.01)
         if ratio is not None:
@@ -1998,6 +2032,15 @@ class WingClient(MixerClientBase):
 
     def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
         return self.set_channel_send(channel, send_bus, level=level_db)
+
+    def get_send_level(self, channel: int, send_bus: int) -> Optional[float]:
+        """Get channel send level (свежий запрос + чтение state)."""
+        address = f"/ch/{channel}/send/{send_bus}/lvl"
+        if self.is_connected:
+            self.send(address)
+            time.sleep(0.05)
+        value = self.state.get(address)
+        return float(value) if value is not None else None
 
     def reset_channel_eq(self, channel: int):
         self.set_eq_on(channel, 0)

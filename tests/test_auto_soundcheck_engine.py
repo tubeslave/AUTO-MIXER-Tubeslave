@@ -651,7 +651,9 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     delay_blocks = _blocked_history(engine, "set_delay")
     assert delay_blocks
     assert delay_blocks[0].payload["blocked_calls"][0]["channel"] == 2
-    assert delay_blocks[0].payload["blocked_calls"][0]["delay_ms"] == 0.25
+    # саундчек-деривация (SOURCE_LEARNING): абсолютная цель выравнивания,
+    # без пошагового live-лимита
+    assert delay_blocks[0].payload["blocked_calls"][0]["delay_ms"] == 0.5
     assert not any(call[0] == "set_delay" for call in mixer.calls)
 
 
@@ -804,6 +806,9 @@ def test_eq_correction_enables_eq_and_retunes_mismatched_existing_band():
     engine.mixer_client = mixer
     engine.safety_controller = AutoFOHSafetyController(mixer)
     engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    # сценарий теста — БЕЗ операторского промоута EQ: включение eq/on
+    # остаётся supervised-предложением (blocked evidence)
+    engine.correction_executor_config.promoted_action_types["ChannelEQMove"] = False
     info = ChannelInfo(
         channel=1,
         name="Snare",
@@ -849,7 +854,7 @@ def test_eq_correction_enables_eq_and_retunes_mismatched_existing_band():
         call
         for decision in eq_blocks
         for call in decision.payload["blocked_calls"]
-        if call["band"] == 2
+        if call.get("band") == 2
     ]
     assert blocked_band2
     assert blocked_band2[0]["freq"] == pytest.approx(400.0)

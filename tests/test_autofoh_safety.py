@@ -460,6 +460,7 @@ def test_safety_layer_bounds_outgoing_correction_values():
         ),
     )
 
+    # live-состояние (VERSE): пошаговый лимит 1 дБ от текущего значения
     decision = controller.execute(
         ChannelEQMove(
             channel_id=5,
@@ -469,7 +470,7 @@ def test_safety_layer_bounds_outgoing_correction_values():
             q=1.0,
             reason="too much low boost",
         ),
-        runtime_state=RuntimeState.SOURCE_LEARNING,
+        runtime_state=RuntimeState.VERSE,
     )
 
     assert_blocked_evidence(decision, "set_eq_band")
@@ -483,6 +484,23 @@ def test_safety_layer_bounds_outgoing_correction_values():
         "q": 1.0,
         "semantic": "channel_eq_move",
     }
+    assert mixer.calls == []
+
+    # саундчек-деривация: абсолютный кламп ±soundcheck_eq_max_abs_db,
+    # без пошагового бюджета (one-shot цели)
+    derivation = controller.execute(
+        ChannelEQMove(
+            channel_id=5,
+            band=1,
+            freq_hz=90.0,
+            gain_db=-12.0,
+            q=1.0,
+            reason="resonance cut",
+        ),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+    assert derivation.bounded is True
+    assert derivation.payload["blocked_calls"][0]["gain"] == -9.0
     assert mixer.calls == []
 
 
@@ -626,13 +644,14 @@ def test_phase_actions_are_bounded_and_use_safety_translators():
         ),
     )
 
+    # live-состояние: шаг задержки ограничен 0.25 мс от текущей (1.0)
     delay = controller.execute(
         DelayAdjust(channel_id=1, delay_ms=2.0, reason="drum phase"),
-        runtime_state=RuntimeState.SOURCE_LEARNING,
+        runtime_state=RuntimeState.VERSE,
     )
     polarity = controller.execute(
         PolarityAdjust(channel_id=2, inverted=True, reason="polarity"),
-        runtime_state=RuntimeState.SOURCE_LEARNING,
+        runtime_state=RuntimeState.VERSE,
     )
 
     assert_blocked_evidence(delay, "set_delay")
@@ -642,30 +661,80 @@ def test_phase_actions_are_bounded_and_use_safety_translators():
     assert polarity.payload["blocked_calls"][0]["inverted"] is True
     assert mixer.calls == []
 
+    # саундчек-деривация: абсолютная цель в пределах delay_max_ms
+    derivation = controller.execute(
+        DelayAdjust(channel_id=1, delay_ms=4.7, reason="drum phase align"),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+    assert derivation.payload["blocked_calls"][0]["delay_ms"] == 4.7
+    capped = controller.execute(
+        DelayAdjust(channel_id=1, delay_ms=25.0, reason="cap check"),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+    assert capped.payload["blocked_calls"][0]["delay_ms"] == 10.0
+    assert mixer.calls == []
 
-def test_autofoh_safety_source_has_no_direct_non_fader_gain_writes():
+
+def test_autofoh_safety_default_config_keeps_non_fader_gain_writes_quarantined():
+    """Трансляторы для EQ/comp/pan/delay/... существуют (операторский промоут
+    2026-07-05), но БЕЗ промоута в promoted_direct_write_action_types любая
+    такая запись блокируется proposal-only политикой — mixer не трогается."""
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(mixer)
+
+    quarantined_actions = (
+        ChannelEQMove(channel_id=1, band=1, freq_hz=500.0, gain_db=-3.0, q=2.0,
+                      reason="eq"),
+        PolarityAdjust(channel_id=1, inverted=True, reason="pol"),
+        DelayAdjust(channel_id=1, delay_ms=1.0, reason="dly"),
+        HighPassAdjust(channel_id=1, freq_hz=100.0, reason="hpf"),
+    )
+    for action in quarantined_actions:
+        decision = controller.execute(action, RuntimeState.SOURCE_LEARNING)
+        assert decision.blocked is True, action.action_type
+        assert decision.sent is False, action.action_type
+        assert decision.write_policy == "proposal_only_quarantined"
+    assert mixer.calls == []
+
+    # мьюты/мастер/DCA/шинные записи транслятора не имеют вовсе —
+    # промоут в конфиге их не оживит
     source = Path("backend/autofoh_safety.py").read_text()
-
-    assert "self.mixer_client.set_gain(" in source
-    assert "self.mixer_client.set_fader(" in source
+    translator_src = source.split("def _translator_for")[1].split("def _require_method")[0]
     for forbidden in (
-        "self.mixer_client.set_channel_mute(",
-        "self.mixer_client.set_bus_fader(",
-        "self.mixer_client.set_dca_fader(",
-        "self.mixer_client.set_main_fader(",
-        "self.mixer_client.set_polarity(",
-        "self.mixer_client.set_delay(",
-        "self.mixer_client.set_eq_band(",
-        "self.mixer_client.set_bus_eq_band(",
-        "self.mixer_client.set_hpf(",
-        "self.mixer_client.set_compressor(",
-        "self.mixer_client.set_bus_compressor(",
-        "self.mixer_client.set_compressor_gain(",
-        "self.mixer_client.set_bus_compressor_gain(",
-        "self.mixer_client.set_gate(",
-        "self.mixer_client.set_pan(",
-        "self.mixer_client.set_send_level(",
+        "set_channel_mute(",
+        "set_bus_fader(",
+        "set_dca_fader(",
+        "set_main_fader(",
+        "set_bus_eq_band(",
+        "set_bus_compressor(",
     ):
-        assert forbidden not in source
+        assert forbidden not in translator_src
     assert '"cmd": "set_eq_band"' in source
     assert '"cmd": "set_gate"' in source
+
+
+def test_promoted_direct_write_types_allow_gated_console_writes():
+    """Операторский промоут: типы из promoted_direct_write_action_types
+    проходят до транслятора и реально пишутся."""
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            promoted_direct_write_action_types=("PolarityAdjust",),
+        ),
+    )
+    decision = controller.execute(
+        PolarityAdjust(channel_id=2, inverted=True, reason="pol"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+    assert decision.blocked is False
+    assert decision.sent is True
+    assert ("set_polarity", 2, True) in mixer.calls
+
+    # непромоутнутый тип по-прежнему в карантине
+    blocked = controller.execute(
+        DelayAdjust(channel_id=1, delay_ms=1.0, reason="dly"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+    assert blocked.blocked is True
+    assert len(mixer.calls) == 1

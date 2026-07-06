@@ -69,6 +69,7 @@ from autofoh_profiles import (
     build_soundcheck_profile,
 )
 from autofoh_safety import (
+    SOUNDCHECK_DERIVATION_STATES,
     AutoFOHSafetyConfig,
     AutoFOHSafetyController,
     BusCompressorAdjust,
@@ -455,23 +456,26 @@ INSTRUMENT_TARGET_INPUT_DB: Dict[str, float] = {
 
 # FX send presets: reverb bus, delay bus (send_bus_number, level_db)
 # Assumes: Bus 1 = Reverb (plate/hall), Bus 2 = Delay
+# Шины соответствуют плану AutoFXPlanner (SETUP-фаза, операторский рэк):
+# 13 = Vocal Plate, 14 = Drum Room, 15 = Tempo Delay. Шины 1/2 — НЕ FX
+# (старая таблица слала бы ревер в мониторные/субгруппные шины).
 INSTRUMENT_FX_SENDS: Dict[str, List[Tuple[int, float]]] = {
     "kick": [],
-    "snare": [(1, -20.0)],            # Light reverb
-    "tom": [(1, -22.0)],
+    "snare": [(14, -20.0)],           # Drum room
+    "tom": [(14, -22.0)],
     "hihat": [],
     "ride": [],
     "cymbals": [],
-    "overheads": [(1, -25.0)],
+    "overheads": [(14, -25.0)],
     "room": [],
     "bass": [],
-    "electricGuitar": [(1, -18.0), (2, -25.0)],   # Reverb + delay
-    "acousticGuitar": [(1, -15.0)],
-    "accordion": [(1, -18.0)],
-    "synth": [(1, -20.0), (2, -22.0)],
+    "electricGuitar": [(13, -18.0), (15, -25.0)],   # Reverb + delay
+    "acousticGuitar": [(13, -15.0)],
+    "accordion": [(13, -18.0)],
+    "synth": [(13, -20.0), (15, -22.0)],
     "playback": [],
-    "leadVocal": [(1, -12.0), (2, -18.0)],         # More reverb + delay
-    "backVocal": [(1, -15.0), (2, -20.0)],
+    "leadVocal": [(13, -12.0), (15, -18.0)],        # More reverb + delay
+    "backVocal": [(13, -15.0), (15, -20.0)],
     "custom": [],
 }
 
@@ -667,6 +671,23 @@ class AutoSoundcheckEngine:
         )
         self.correction_executor_config = CorrectionActionExecutorConfig.from_config(
             autofoh_live_action_executor
+        )
+        # Единый источник промоутов: типы, включённые оператором в
+        # live_action_executor.promoted_action_types, разрешаются и на
+        # уровне direct-write политики SafetyController (иначе промоут
+        # исполнителя упирается в proposal-only карантин).
+        self.action_safety_config.promoted_direct_write_action_types = tuple(
+            sorted(
+                name for name, enabled
+                in self.correction_executor_config.promoted_action_types.items()
+                if enabled
+            )
+        )
+        # Pan v3: профиль PA из конфига (mono = консервативный дефолт)
+        pan_cfg = autofoh_config.get("pan", {}) or {}
+        self.pan_config = PanConfig(
+            pa_type=str(pan_cfg.get("pa_type", "mono")),
+            venue_class=str(pan_cfg.get("venue_class", "club")),
         )
         self.evaluation_policy = AutoFOHEvaluationPolicy.from_config(autofoh_evaluation)
         self.autofoh_logging_enabled = bool(autofoh_logging.get("enabled", False))
@@ -1633,6 +1654,16 @@ class AutoSoundcheckEngine:
             RuntimeState.ROLLBACK,
         }:
             return False
+        # В фазах саундчек-деривации компрессия и FX-посылы выведены из-под
+        # коридорного стража: их громкостный эффект уже верифицирован
+        # собственным A/B-контуром comp v3 / калибровкой посылов, а коридор
+        # в этот момент сам является продуктом деривации (live-прогон
+        # 2026-07-06: страж молча блокировал все верифицированные
+        # comp-предложения).
+        if runtime_state in SOUNDCHECK_DERIVATION_STATES and isinstance(
+            action, (CompressorAdjust, SendLevelAdjust)
+        ):
+            return False
         return isinstance(
             action,
             (
@@ -2115,6 +2146,14 @@ class AutoSoundcheckEngine:
                         or infer_evaluation_band(action)
                         or ""
                     ) or None
+                    # видимость: молчаливые блокировки стража скрывали
+                    # причину непримёнённых коррекций (live 2026-07-06)
+                    logger.info(
+                        "Phase-target guard blocked %s ch=%s: %s",
+                        action.action_type,
+                        getattr(action, "channel_id", None),
+                        guard_message,
+                    )
                     self._log_autofoh_event(
                         "phase_target_guard_blocked",
                         channel_id=getattr(action, "channel_id", None),
@@ -4815,7 +4854,13 @@ class AutoSoundcheckEngine:
             raw_settings = self._snapshot_raw(info)
             existing_eq_on = self._as_bool(raw_settings.get("eq_on"), False)
             existing_bands = raw_settings.get("eq_bands") or []
-            if not existing_eq_on and hasattr(self.mixer_client, "set_eq_on"):
+            eq_move_promoted = bool(
+                self.correction_executor_config.promoted_action_types.get("ChannelEQMove")
+            )
+            if (not existing_eq_on and not eq_move_promoted
+                    and hasattr(self.mixer_client, "set_eq_on")):
+                # без промоута включение EQ остаётся supervised-предложением;
+                # при промоуте eq/on едет вместе с ChannelEQMove (translator)
                 self._record_blocked_console_write(
                     "set_eq_on",
                     channel=ch,
@@ -5214,8 +5259,21 @@ class AutoSoundcheckEngine:
                 # вокал/подвижные источники и room — никогда.
                 info_a0 = self.channels.get(ch_a)
                 info_b0 = self.channels.get(ch_b)
-                role_a = info_a0.source_role if info_a0 else "line"
-                role_b = info_b0.source_role if info_b0 else "line"
+
+                # роль для белого списка: source_role классификатора, а при
+                # unknown — preset по имени канала. Live-прогон 2026-07-06:
+                # OH L/R с source_role=unknown проскочили запрет стереопар
+                # и получили выравнивающую задержку (стереоинформация!)
+                def _phase_role(info):
+                    if info is None:
+                        return "line"
+                    role = getattr(info, "source_role", "unknown") or "unknown"
+                    if role != "unknown":
+                        return role
+                    return info.preset or "line"
+
+                role_a = _phase_role(info_a0)
+                role_b = _phase_role(info_b0)
                 allowed, deny_reason = phase_pair_alignment_allowed(role_a, role_b)
                 if not allowed:
                     logger.info(
@@ -5299,11 +5357,27 @@ class AutoSoundcheckEngine:
                         0.0,
                     )
                     measured_delay_ms = abs(float(icm.delay_ms))
-                    delay_target_ms = current_delay_ms + measured_delay_ms
+                    # АБСОЛЮТНАЯ цель от задержки опорного канала пары:
+                    # pre-trim USB tap НЕ отражает применённую канальную
+                    # задержку, поэтому measured инвариантен между
+                    # прогонами; инкремент от current = интеграторный
+                    # храповик (live 2026-07-06: 1.10→1.68 при том же 0.58)
+                    ref_ch = ch_a if align_ch == ch_b else ch_b
+                    ref_info = self.channels.get(ref_ch)
+                    ref_raw = self._snapshot_raw(ref_info) if ref_info else {}
+                    ref_delay_ms = self._as_float(ref_raw.get("delay_ms"), 0.0)
+                    delay_target_ms = ref_delay_ms + measured_delay_ms
+                    if abs(delay_target_ms - current_delay_ms) <= 0.15:
+                        logger.info(
+                            f"Phase: Ch {align_ch} delay already at absolute "
+                            f"target {delay_target_ms:.2f}ms (idempotent skip)"
+                        )
+                        continue
                     logger.info(
                         f"Phase: correcting Ch {align_ch} delay "
                         f"{current_delay_ms:.2f}→{delay_target_ms:.2f}ms "
-                        f"(measured={measured_delay_ms:.2f}ms, "
+                        f"(absolute: ref ch{ref_ch} {ref_delay_ms:.2f}ms + "
+                        f"measured {measured_delay_ms:.2f}ms, "
                         f"enabled={current_delay_enabled}, coherence={icm.coherence:.3f})"
                     )
                     self._execute_action(
@@ -5391,8 +5465,16 @@ class AutoSoundcheckEngine:
         if v3_pan_solution is not None and ch in v3_pan_solution.pans:
             pan = float(v3_pan_solution.pans[ch]) * 100.0  # −1..1 → проценты
             raw = self._snapshot_raw(info)
-            if self.preserve_existing_processing and "pan" in raw:
-                logger.info(f"Ch {ch} '{info.name}': pan preserved (v3 skip)")
+            existing_pan = self._as_float(raw.get("pan"), 0.0)
+            # сохраняем только НЕцентральную панораму: центр — заводское
+            # состояние, а не операторский выбор (live-прогон 2026-07-06:
+            # «pan preserved» глушил всё решение на чистом пульте)
+            if (self.preserve_existing_processing and "pan" in raw
+                    and abs(existing_pan) > 5.0):
+                logger.info(
+                    f"Ch {ch} '{info.name}': pan preserved at "
+                    f"{existing_pan:+.0f} (operator value, v3 skip)"
+                )
                 return
             try:
                 decision = self._execute_action(
@@ -5798,7 +5880,10 @@ class AutoSoundcheckEngine:
                 compressor_gr_source = "signal_estimate"
 
         m = info.metrics
-        if m and m.level.rms_db > -80:
+        # Метрическая адаптация — только для пресетного пути: параметры
+        # comp v3 уже кросс-адаптивны и верифицированы симуляцией,
+        # пост-адаптация (ratio x1.3 на crest и т.п.) их развалидирует
+        if v3_params is None and m and m.level.rms_db > -80:
             rms_db = m.level.rms_db
             crest_factor = m.level.crest_factor_db
             dynamic_range = m.dynamics.dynamic_range_db
@@ -5851,7 +5936,9 @@ class AutoSoundcheckEngine:
             crest_factor = 0.0
             dynamic_range = 0.0
 
-        if not current_comp_enabled and m and crest_factor < 8.0 and dynamic_range < 8.0:
+        if (v3_params is None and not current_comp_enabled and m
+                and crest_factor < 8.0 and dynamic_range < 8.0):
+            # только пресетный путь: у comp v3 своё решение should_compress
             logger.info(
                 f"Ch {ch} '{info.name}': compressor skipped; measured dynamics do not justify enabling it"
             )

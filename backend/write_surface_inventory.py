@@ -68,6 +68,23 @@ class WriteSurface:
 
 WRITE_SURFACES: Tuple[WriteSurface, ...] = (
     WriteSurface(
+        id="fx_rack_setup_runner",
+        label="FX rack SETUP runner (operator-invoked)",
+        status="lab_only",
+        paths=("tools/fx_rack_setup.py",),
+        entrypoints=("fx_rack_setup CLI",),
+        write_kinds=("fx_model", "fx_params", "bus_insert", "bus_fader", "bus_name"),
+        allowed_live=False,
+        gate="explicit --confirm-live-wing-write + rollback file written before "
+             "first write + per-address readback; premium models only slots 1-8",
+        current_policy="SETUP-фаза по явному запуску оператора (2026-07-06); "
+                       "не песенная автоматика. Слот с несовпавшим readback "
+                       "откатывается в NONE.",
+        next_action="Дополнить операторским прослушиванием и калибровкой "
+                    "посылов -10±3 дБ по консольным метрам (fx_v3).",
+        notes=("plan_source_auto_fx_planner", "rollback_file_first"),
+    ),
+    WriteSurface(
         id="product_layer_fader_gain_apply",
         label="Product Layer supervised fader/gain apply",
         status="canonical_supervised",

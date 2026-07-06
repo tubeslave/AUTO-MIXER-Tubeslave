@@ -65,6 +65,22 @@ class TestWhitelist:
         ok, _ = pair_alignment_allowed("snare", "overheads")
         assert ok
 
+    def test_role_variants_canonicalized(self):
+        # oh_l/oh_r — разные строки одной стереопары (live 2026-07-06)
+        ok, reason = pair_alignment_allowed("oh_l", "oh_r")
+        assert not ok and "stereo" in reason
+        # многомикрофонные кластеры одного источника — выравниваемы
+        ok, _ = pair_alignment_allowed("snare_top", "snare_bottom")
+        assert ok
+        ok, _ = pair_alignment_allowed("kick_in", "kick_out")
+        assert ok
+
+    def test_unknown_roles_conservative_deny(self):
+        ok, reason = pair_alignment_allowed("unknown", "unknown")
+        assert not ok and "unknown" in reason
+        ok, _ = pair_alignment_allowed("line", "kick")
+        assert not ok
+
     def test_room_cluster_align_disabled(self):
         room = next(c for c in DEFAULT_CLUSTERS if c.name == "room_mics")
         assert not room.align

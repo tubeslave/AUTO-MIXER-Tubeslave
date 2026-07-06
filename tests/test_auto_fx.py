@@ -236,7 +236,7 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
         "planned_fx_slots": {
             "FX1": {"model": "PLATE", "fx_type": "reverb"},
             "FX2": {"model": "ROOM", "fx_type": "reverb"},
-            "FX3": {"model": "STEREO_DELAY", "fx_type": "delay"},
+            "FX3": {"model": "ST-DL", "fx_type": "delay"},
             "FX4": {"model": "CHORUS", "fx_type": "chorus"},
         },
         "requires_physical_schema_readback": True,

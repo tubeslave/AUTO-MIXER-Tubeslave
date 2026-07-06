@@ -11,13 +11,16 @@ from heuristics.drc_giannoulis import (
     smooth_decoupled_detector,
 )
 from heuristics.comp_v3 import (
+    CompV3Params,
     LiveGRSupervisorState,
+    canonical_role,
     channel_dynamics_stats,
     derive_params,
     live_gr_supervise,
     safe_generic_params,
     should_compress,
     soundcheck_comp_v3,
+    verify_params,
 )
 from comp_params_ma2015 import (
     ballistics_giannoulis2013,
@@ -206,3 +209,31 @@ class TestLiveSupervisor:
         params = safe_generic_params(l10_db=-18.0)
         assert params.ratio == 2.0
         assert params.makeup_db == 0.0
+
+
+class TestDegradationLadder:
+    def test_threshold_raised_when_release_exhausted(self):
+        # перкуссия ~4 Гц с crest ~20 дБ: релиз пампинг не лечит,
+        # лестница обязана поднять порог (мельче GR) и сойтись/отказаться
+        t = np.arange(10 * SR) / SR
+        env = (np.maximum(0.0, np.sin(2 * np.pi * 4.0 * t)) ** 8)
+        x = env * RNG.normal(0, 0.5, len(t))
+        params = CompV3Params(
+            threshold_db=-40.0, ratio=4.0, knee_db=6.0,
+            attack_ms=5.0, release_ms=100.0, makeup_db=0.0, gr_target_db=4.0)
+        result = verify_params(x, SR, params)
+        raised = [a for a in result["adjustments"] if a.startswith("threshold")]
+        release_steps = [a for a in result["adjustments"] if a.startswith("release")]
+        assert len(release_steps) <= 2          # релиз ограничен двумя шагами
+        if not result["passed"]:
+            # честный отказ допустим, но только после подъёма порога
+            assert raised or result["mean_gr_db"] <= 1.5
+        else:
+            assert raised                        # сошлись именно порогом
+            assert result["final_params"]["threshold_db"] > -40.0
+
+    def test_role_aliases_map_to_profiles(self):
+        assert canonical_role("leadVocal") == "lead_vocal"
+        assert canonical_role("electricGuitar") == "guitar"
+        assert canonical_role("kick") == "kick"
+        assert canonical_role("weird_thing") == "weird_thing"

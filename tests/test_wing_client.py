@@ -698,7 +698,9 @@ class TestConnectionLifecycle:
                     lpf=9000.0,
                 ) is True
 
-            assert client.state["/ch/1/dyn/thr"] == -24.0
+            # set_compressor(threshold_db=-20) пишет порог в ОБА адреса
+            # (thr/thr26 зависят от модели динамики; фикс 2026-07-06)
+            assert client.state["/ch/1/dyn/thr"] == -20.0
             assert client.state["/ch/1/dyn/thr26"] == -20.0
             assert client.state["/ch/1/gate/thr"] == -55.0
             assert client.state["/bus/2/dyn/thr37"] == -12.0

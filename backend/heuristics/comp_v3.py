@@ -66,7 +66,13 @@ MAX_LOUDNESS_BIAS_LU = 0.5
 PUMPING_LIMIT = 0.6                   # метрика 2-8 Гц (калибровано 2026-07-05)
 BLEED_LIFT_LIMIT_DB = 3.0
 RELEASE_STEP_FACTOR = 1.2
-MAX_VERIFY_ITERATIONS = 4
+# Лестница деградации (live-прогон 2026-07-06: на барабанах crest ~20 дБ
+# GR на ударах уходит в 7-10 дБ при цели 4 — одним релизом пампинг не
+# лечится; после релиза компрессия делается МЕЛЬЧЕ подъёмом порога)
+MAX_RELEASE_STEPS = 2
+THRESHOLD_RAISE_STEP_DB = 3.0
+MIN_USEFUL_GR_DB = 1.5
+MAX_VERIFY_ITERATIONS = 8
 
 RATIO_LIVE_MIN, RATIO_LIVE_MAX = 1.5, 4.0
 RATIO_VOCAL_MAX = 6.0
@@ -91,6 +97,27 @@ CLASS_PROFILE: Dict[str, Dict[str, float]] = {
 }
 SAFE_GENERIC = {"ratio": 2.0, "attack_ms": 10.0, "release_ms": 200.0,
                 "gr_target": 3.0, "gr_clamp": 6.0}
+
+# Пресеты движка приходят в camelCase — нормализация к ключам CLASS_PROFILE
+# (live-прогон 2026-07-06: leadVocal попадал в SAFE_GENERIC вместо вокального
+# профиля)
+ROLE_ALIASES: Dict[str, str] = {
+    "leadVocal": "lead_vocal",
+    "backingVocal": "backing_vocal",
+    "electricGuitar": "guitar",
+    "acousticGuitar": "acoustic_guitar",
+    "floorTom": "floor_tom",
+    "hiHat": "hihat",
+    "vocal": "lead_vocal",
+    "vocals": "lead_vocal",
+}
+
+
+def canonical_role(role: str) -> str:
+    role = str(role or "line")
+    if role in CLASS_PROFILE:
+        return role
+    return ROLE_ALIASES.get(role, role)
 
 
 @dataclass
@@ -162,7 +189,8 @@ def channel_dynamics_stats(x: np.ndarray, sample_rate: int) -> ChannelDynamicsSt
 
 def should_compress(stats: ChannelDynamicsStats, role: str) -> Dict[str, Any]:
     """Гейт «по умолчанию не сжимать»: стабильный канал остаётся нетронутым."""
-    profile = CLASS_PROFILE.get(role, SAFE_GENERIC | {"expected_crest": 12.0})
+    profile = CLASS_PROFILE.get(canonical_role(role),
+                                SAFE_GENERIC | {"expected_crest": 12.0})
     sigma_trigger = stats.sigma_level_db > SIGMA_COMPRESS_THRESHOLD_DB
     crest_trigger = stats.crest_median_db > (
         float(profile.get("expected_crest", 12.0)) + CREST_EXCESS_THRESHOLD_DB
@@ -231,6 +259,7 @@ def derive_params(
     tempo_bpm: float = 120.0,
     true_peak_dbtp: Optional[float] = None,
 ) -> CompV3Params:
+    role = canonical_role(role)
     profile = CLASS_PROFILE.get(role, dict(SAFE_GENERIC))
     ratio_cap = RATIO_VOCAL_MAX if (
         role == "lead_vocal" and stats.sigma_level_db > 4.0
@@ -278,6 +307,7 @@ def verify_params(
     """
     x = np.asarray(x, dtype=np.float64)
     current = params
+    release_steps = 0
     result: Dict[str, Any] = {"iterations": 0, "adjustments": []}
     for _ in range(MAX_VERIFY_ITERATIONS):
         result["iterations"] += 1
@@ -312,11 +342,24 @@ def verify_params(
         })
 
         if pumping > PUMPING_LIMIT:
-            current = CompV3Params(**{**current.__dict__,
-                                      "release_ms": current.release_ms * RELEASE_STEP_FACTOR})
-            result["adjustments"].append(
-                f"release +20% -> {current.release_ms:.0f} ms (pumping)")
-            continue
+            if release_steps < MAX_RELEASE_STEPS:
+                release_steps += 1
+                current = CompV3Params(**{**current.__dict__,
+                                          "release_ms": current.release_ms * RELEASE_STEP_FACTOR})
+                result["adjustments"].append(
+                    f"release +20% -> {current.release_ms:.0f} ms (pumping)")
+                continue
+            # релиз исчерпан — компрессия мельче: порог вверх (меньше GR)
+            if (result["mean_gr_db"] > MIN_USEFUL_GR_DB
+                    and current.threshold_db + THRESHOLD_RAISE_STEP_DB <= -4.0):
+                current = CompV3Params(**{**current.__dict__,
+                                          "threshold_db": current.threshold_db
+                                          + THRESHOLD_RAISE_STEP_DB})
+                result["adjustments"].append(
+                    f"threshold +{THRESHOLD_RAISE_STEP_DB:.0f} -> "
+                    f"{current.threshold_db:.1f} dB (pumping, shallower GR)")
+                continue
+            break  # не лечится мягкой деградацией — честный отказ
         if bleed_lift > BLEED_LIFT_LIMIT_DB and current.makeup_db > 0.0:
             current = CompV3Params(**{**current.__dict__,
                                       "makeup_db": max(current.makeup_db - 0.5, 0.0)})

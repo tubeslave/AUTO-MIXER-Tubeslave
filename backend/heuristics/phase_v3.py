@@ -67,6 +67,26 @@ NEVER_ALIGN_ROLES = frozenset({
 })
 # Роли-стереопары: выравнивание ВНУТРИ пары запрещено
 STEREO_PAIR_INTERIOR_ROLES = frozenset({"overheads", "room"})
+UNKNOWN_ROLES = frozenset({"unknown", "line", "custom", ""})
+
+# Канонизация вариантов ролей классификатора в семейства (live 2026-07-06:
+# oh_l/oh_r — РАЗНЫЕ строки, проверка role_a == role_b пропускала стереопару
+# оверхедов). Snare top/bottom и kick in/out — многомикрофонные кластеры
+# ОДНОГО источника: канонизируются и остаются выравниваемыми.
+PHASE_ROLE_FAMILIES: Dict[str, str] = {
+    "oh_l": "overheads", "oh_r": "overheads", "overhead": "overheads",
+    "cymbals": "overheads", "drum_room": "room",
+    "snare_top": "snare", "snare_bottom": "snare",
+    "kick_in": "kick", "kick_out": "kick",
+    "rack_tom": "tom", "floor_tom": "tom",
+    "leadVocal": "lead_vocal", "backVocal": "backing_vocal",
+    "vocal": "lead_vocal", "tracks": "playback",
+}
+
+
+def phase_role_family(role: str) -> str:
+    role = str(role or "unknown")
+    return PHASE_ROLE_FAMILIES.get(role, role)
 
 
 @dataclass(frozen=True)
@@ -109,10 +129,15 @@ DEFAULT_CLUSTERS: Tuple[AlignmentCluster, ...] = (
 
 def pair_alignment_allowed(role_a: str, role_b: str) -> Tuple[bool, str]:
     """Жёсткий белый список: можно ли вообще выравнивать пару ролей."""
-    if role_a in NEVER_ALIGN_ROLES or role_b in NEVER_ALIGN_ROLES:
+    fam_a, fam_b = phase_role_family(role_a), phase_role_family(role_b)
+    if fam_a in NEVER_ALIGN_ROLES or fam_b in NEVER_ALIGN_ROLES:
         return False, "never_align_role_moving_source_or_room"
-    if (role_a == role_b) and role_a in STEREO_PAIR_INTERIOR_ROLES:
+    if (fam_a == fam_b) and fam_a in STEREO_PAIR_INTERIOR_ROLES:
         return False, "stereo_pair_interior_delay_is_stereo_information"
+    # Неизвестная роль = консервативный отказ: пара может оказаться
+    # стереопарой (белый список, а не чёрный). Live-прогон 2026-07-06.
+    if fam_a in UNKNOWN_ROLES or fam_b in UNKNOWN_ROLES:
+        return False, "unknown_role_conservative_deny"
     return True, "ok"
 
 

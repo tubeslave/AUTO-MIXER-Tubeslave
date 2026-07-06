@@ -408,6 +408,13 @@ class AutoFOHSafetyConfig:
     feedback_notch_max_cut_db: float = -6.0
     feedback_notch_min_q: float = 8.0
     feedback_notch_ttl_sec: float = 120.0
+    # Абсолютный кламп EQ-полосы в фазах саундчек-деривации (one-shot)
+    soundcheck_eq_max_abs_db: float = 9.0
+    # Операторский промоут прямых записей: имена action_type сверх базового
+    # белого списка (gain/fader). Пусто по умолчанию — доктрина
+    # proposal-only не меняется; заполняется движком из
+    # live_action_executor.promoted_action_types (единый источник).
+    promoted_direct_write_action_types: Tuple[str, ...] = ()
 
     @classmethod
     def from_config(cls, config: Optional[Dict[str, Any]] = None) -> "AutoFOHSafetyConfig":
@@ -445,11 +452,24 @@ class AutoFOHSafetyConfig:
             feedback_notch_max_cut_db=float(config.get("feedback_notch_max_cut_db", -6.0)),
             feedback_notch_min_q=float(config.get("feedback_notch_min_q", 8.0)),
             feedback_notch_ttl_sec=float(config.get("feedback_notch_ttl_sec", 120.0)),
+            soundcheck_eq_max_abs_db=float(config.get("soundcheck_eq_max_abs_db", 9.0)),
+            promoted_direct_write_action_types=tuple(
+                str(t) for t in (config.get("promoted_direct_write_action_types") or ())
+            ),
         )
 
 
 AUTOFOH_DIRECT_WRITE_POLICY = "proposal_only_quarantined"
 AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES = (ChannelGainMove, ChannelFaderMove)
+
+# Состояния саундчек-деривации: коррекции пишутся как абсолютные one-shot
+# цели (пошаговые live-лимиты EQ/delay в этих фазах не применяются)
+SOUNDCHECK_DERIVATION_STATES = frozenset({
+    RuntimeState.SOURCE_LEARNING,
+    RuntimeState.STEM_LEARNING,
+    RuntimeState.FULL_BAND_LEARNING,
+    RuntimeState.SNAPSHOT_LOCK,
+})
 
 
 class AutoFOHSafetyController:
@@ -490,7 +510,7 @@ class AutoFOHSafetyController:
             self.history.append(decision)
             return decision
 
-        bounded_action, bounded = self._apply_bounds(action)
+        bounded_action, bounded = self._apply_bounds(action, runtime_state)
         decision.action = bounded_action
         decision.bounded = bounded
 
@@ -548,7 +568,12 @@ class AutoFOHSafetyController:
         return payload
 
     def _is_direct_write_allowed(self, action: TypedCorrectionAction) -> bool:
-        return isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES)
+        if isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES):
+            return True
+        # Операторский промоут (см. AutoFOHSafetyConfig): типы, явно
+        # разрешённые конфигом, пишутся напрямую — исполнитель поверх
+        # этого всё равно требует pre-read/readback/rollback.
+        return action.action_type in self.config.promoted_direct_write_action_types
 
     def _blocked_direct_write_payload(self, action: TypedCorrectionAction) -> Dict[str, Any] | None:
         if self._is_direct_write_allowed(action):
@@ -611,15 +636,25 @@ class AutoFOHSafetyController:
                 "semantic": "phase_delay_adjust",
             }]
         if isinstance(action, ChannelEQMove):
-            return [{
-                "cmd": "set_eq_band",
-                "channel": action.channel_id,
-                "band": action.band,
-                "freq": action.freq_hz,
-                "gain": action.gain_db,
-                "q": action.q,
-                "semantic": "channel_eq_move",
-            }]
+            # eq/on едет вместе с полосой (паттерн GateAdjust): срез в
+            # выключенном EQ неслышим — оператор не может оценить результат
+            return [
+                {
+                    "cmd": "set_eq_band",
+                    "channel": action.channel_id,
+                    "band": action.band,
+                    "freq": action.freq_hz,
+                    "gain": action.gain_db,
+                    "q": action.q,
+                    "semantic": "channel_eq_move",
+                },
+                {
+                    "cmd": "set_eq_on",
+                    "channel": action.channel_id,
+                    "on": 1,
+                    "semantic": "channel_eq_enable",
+                },
+            ]
         if isinstance(action, BusEQMove):
             return [{
                 "cmd": "set_bus_eq_band",
@@ -731,8 +766,15 @@ class AutoFOHSafetyController:
             }]
         return []
 
-    def _apply_bounds(self, action: TypedCorrectionAction) -> Tuple[TypedCorrectionAction, bool]:
+    def _apply_bounds(
+        self,
+        action: TypedCorrectionAction,
+        runtime_state: Optional[RuntimeState] = None,
+    ) -> Tuple[TypedCorrectionAction, bool]:
         bounded = False
+        # Саундчек-деривация пишет АБСОЛЮТНЫЕ цели one-shot (правило
+        # CLAUDE.md об идемпотентных целях); пошаговые лимиты — для live
+        derivation = runtime_state in SOUNDCHECK_DERIVATION_STATES
 
         if isinstance(action, ChannelGainMove):
             target = max(-self.config.gain_max_abs_db, min(self.config.gain_max_abs_db, action.target_db))
@@ -809,17 +851,21 @@ class AutoFOHSafetyController:
             ), False
 
         if isinstance(action, DelayAdjust):
-            current = self._safe_get(
-                lambda: self.mixer_client.get_delay(action.channel_id),
-                default=0.0,
-            )
-            desired_delta = float(action.delay_ms) - float(current or 0.0)
-            bounded_delta = max(
-                -self.config.delay_max_step_ms,
-                min(self.config.delay_max_step_ms, desired_delta),
-            )
-            target = float(current or 0.0) + bounded_delta
-            target = max(0.0, min(self.config.delay_max_ms, target))
+            if derivation:
+                # one-shot выравнивание: абсолютная цель в пределах кэпа
+                target = max(0.0, min(self.config.delay_max_ms, float(action.delay_ms)))
+            else:
+                current = self._safe_get(
+                    lambda: self.mixer_client.get_delay(action.channel_id),
+                    default=0.0,
+                )
+                desired_delta = float(action.delay_ms) - float(current or 0.0)
+                bounded_delta = max(
+                    -self.config.delay_max_step_ms,
+                    min(self.config.delay_max_step_ms, desired_delta),
+                )
+                target = float(current or 0.0) + bounded_delta
+                target = max(0.0, min(self.config.delay_max_ms, target))
             bounded = abs(target - float(action.delay_ms)) > 1e-6
             return DelayAdjust(
                 channel_id=action.channel_id,
@@ -829,20 +875,27 @@ class AutoFOHSafetyController:
             ), bounded
 
         if isinstance(action, ChannelEQMove):
-            key = (action.channel_id, action.band)
-            current_gain = self._safe_get(
-                lambda: self.mixer_client.get_eq_band_gain(action.channel_id, f"{action.band}g"),
-                default=0.0,
-            )
-            baseline = self._eq_baselines.setdefault(key, float(current_gain or 0.0))
-            desired_step = action.gain_db - float(current_gain or 0.0)
-            bounded_step = max(-self.config.broad_eq_max_step_db, min(self.config.broad_eq_max_step_db, desired_step))
-            target_gain = float(current_gain or 0.0) + bounded_step
-            target_gain = max(
-                baseline - self.config.broad_eq_max_total_db_from_snapshot,
-                min(baseline + self.config.broad_eq_max_total_db_from_snapshot, target_gain),
-            )
-            target_gain = max(-15.0, min(15.0, target_gain))
+            if derivation:
+                # one-shot: абсолютный кламп без пошагового бюджета
+                target_gain = max(
+                    -self.config.soundcheck_eq_max_abs_db,
+                    min(self.config.soundcheck_eq_max_abs_db, action.gain_db),
+                )
+            else:
+                key = (action.channel_id, action.band)
+                current_gain = self._safe_get(
+                    lambda: self.mixer_client.get_eq_band_gain(action.channel_id, f"{action.band}g"),
+                    default=0.0,
+                )
+                baseline = self._eq_baselines.setdefault(key, float(current_gain or 0.0))
+                desired_step = action.gain_db - float(current_gain or 0.0)
+                bounded_step = max(-self.config.broad_eq_max_step_db, min(self.config.broad_eq_max_step_db, desired_step))
+                target_gain = float(current_gain or 0.0) + bounded_step
+                target_gain = max(
+                    baseline - self.config.broad_eq_max_total_db_from_snapshot,
+                    min(baseline + self.config.broad_eq_max_total_db_from_snapshot, target_gain),
+                )
+                target_gain = max(-15.0, min(15.0, target_gain))
             bounded = abs(target_gain - action.gain_db) > 1e-6
             return ChannelEQMove(
                 channel_id=action.channel_id,
@@ -1013,6 +1066,57 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, ChannelEQMove):
+            def _send_eq(a):
+                r_band = self.mixer_client.set_eq_band(
+                    a.channel_id, a.band, freq=a.freq_hz, gain=a.gain_db, q=a.q)
+                # срез в выключенном EQ неслышим — включение едет с полосой
+                r_on = self.mixer_client.set_eq_on(a.channel_id, 1)
+                return (r_band is not False) and (r_on is not False)
+            return self._require_method("set_eq_band", _send_eq)
+        if isinstance(action, HighPassAdjust):
+            return self._require_method(
+                "set_hpf",
+                lambda a: self.mixer_client.set_hpf(a.channel_id, a.freq_hz, enabled=bool(a.enabled)))
+        if isinstance(action, CompressorAdjust):
+            return self._require_method(
+                "set_compressor",
+                lambda a: self.mixer_client.set_compressor(
+                    a.channel_id, threshold_db=a.threshold_db, ratio=a.ratio,
+                    attack_ms=a.attack_ms, release_ms=a.release_ms,
+                    makeup_db=a.makeup_db, enabled=bool(a.enabled)))
+        if isinstance(action, CompressorMakeupAdjust):
+            return self._require_method(
+                "set_compressor_gain",
+                lambda a: self.mixer_client.set_compressor_gain(a.channel_id, a.makeup_db))
+        if isinstance(action, GateAdjust):
+            def _send_gate(a):
+                r_gate = self.mixer_client.set_gate(
+                    a.channel_id, threshold=a.threshold_db, range_db=a.range_db,
+                    attack=a.attack_ms, hold=a.hold_ms, release=a.release_ms)
+                r_on = self.mixer_client.set_gate_on(a.channel_id, 1 if a.enabled else 0)
+                return (r_gate is not False) and (r_on is not False)
+            return self._require_method("set_gate", _send_gate)
+        if isinstance(action, PanAdjust):
+            return self._require_method(
+                "set_pan", lambda a: self.mixer_client.set_pan(a.channel_id, a.pan))
+        if isinstance(action, DelayAdjust):
+            return self._require_method(
+                "set_delay",
+                lambda a: self.mixer_client.set_delay(a.channel_id, a.delay_ms, enabled=bool(a.enabled)))
+        if isinstance(action, PolarityAdjust):
+            return self._require_method(
+                "set_polarity",
+                lambda a: self.mixer_client.set_polarity(a.channel_id, bool(a.inverted)))
+        if isinstance(action, SendLevelAdjust):
+            def _send_level(a):
+                r_lvl = self.mixer_client.set_send_level(
+                    a.channel_id, a.send_bus, a.level_db)
+                # установка уровня FX-посыла подразумевает включённый посыл
+                set_send = getattr(self.mixer_client, "set_channel_send", None)
+                r_on = set_send(a.channel_id, a.send_bus, on=1) if callable(set_send) else True
+                return (r_lvl is not False) and (r_on is not False)
+            return self._require_method("set_send_level", _send_level)
         return None
 
     def _require_method(self, method_name: str, callback):
