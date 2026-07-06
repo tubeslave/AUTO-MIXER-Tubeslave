@@ -1,0 +1,606 @@
+{
+ "engine_final_state": "EngineState.RUNNING",
+ "diff": {
+  "channels": {
+   "1": {
+    "name": "KICK",
+    "eq/2g": {
+     "before": 3.0,
+     "after": 4.0
+    },
+    "eq/3g": {
+     "before": -2.0,
+     "after": -1.0
+    },
+    "eq/3f": {
+     "before": 1252.8668212890625,
+     "after": 2992.470947265625
+    }
+   },
+   "2": {
+    "name": "SNARE T",
+    "fdr": {
+     "before": -7.747276306152344,
+     "after": -9.206659317016602
+    },
+    "gate/thr": {
+     "before": -48.0,
+     "after": -47.0
+    },
+    "dyn/thr": {
+     "before": -18.5,
+     "after": -21.0
+    }
+   },
+   "3": {
+    "name": "",
+    "fdr": {
+     "before": -16.96429443359375,
+     "after": -18.75412940979004
+    },
+    "gate/thr": {
+     "before": -46.0,
+     "after": -45.5
+    }
+   },
+   "4": {
+    "name": "",
+    "pan": {
+     "before": -29.0,
+     "after": -25.0
+    },
+    "gate/thr": {
+     "before": -49.5,
+     "after": -50.0
+    },
+    "eq/3g": {
+     "before": -2.0,
+     "after": -3.0
+    },
+    "eq/3f": {
+     "before": 1252.8668212890625,
+     "after": 2992.470947265625
+    }
+   },
+   "5": {
+    "name": "",
+    "pan": {
+     "before": -30.0,
+     "after": -16.0
+    },
+    "eq/2g": {
+     "before": -1.0,
+     "after": -2.0
+    },
+    "eq/3g": {
+     "before": 0.0,
+     "after": -1.0
+    },
+    "eq/3f": {
+     "before": 1499.788330078125,
+     "after": 1252.8668212890625
+    },
+    "eq/3q": {
+     "before": 0.9979702234268188,
+     "after": 3.9916467666625977
+    }
+   },
+   "6": {
+    "name": "",
+    "dyn/thr": {
+     "before": -36.5,
+     "after": -37.0
+    }
+   },
+   "7": {
+    "name": "",
+    "fdr": {
+     "before": -3.645467758178711,
+     "after": -7.741031646728516
+    },
+    "pan": {
+     "before": 26.0,
+     "after": 28.0
+    },
+    "dyn/thr": {
+     "before": -29.0,
+     "after": -32.0
+    }
+   },
+   "8": {
+    "name": "",
+    "fdr": {
+     "before": -2.6985092163085938,
+     "after": -5.100000381469727
+    },
+    "eq/1g": {
+     "before": 0.0,
+     "after": 1.0
+    },
+    "eq/1f": {
+     "before": 119.99275207519531,
+     "after": 81.94641876220703
+    },
+    "eq/1q": {
+     "before": 1.9958817958831787,
+     "after": 0.9979702234268188
+    },
+    "eq/3g": {
+     "before": 1.0,
+     "after": 2.0
+    },
+    "eq/4g": {
+     "before": 0.0,
+     "after": 5.0
+    }
+   },
+   "9": {
+    "name": "",
+    "fdr": {
+     "before": -3.836832046508789,
+     "after": -5.239936828613281
+    }
+   },
+   "10": {
+    "name": "",
+    "fdr": {
+     "before": -4.378530502319336,
+     "after": -5.366813659667969
+    },
+    "in/set/trim": {
+     "before": -10.100000381469727,
+     "after": -11.199999809265137
+    }
+   },
+   "11": {
+    "name": "",
+    "fdr": {
+     "before": -11.050300598144531,
+     "after": -12.0
+    },
+    "eq/on": {
+     "before": 0,
+     "after": 1
+    },
+    "dyn/thr": {
+     "before": -31.0,
+     "after": -29.0
+    },
+    "eq/1g": {
+     "before": 0.0,
+     "after": -6.0
+    },
+    "eq/1f": {
+     "before": 10694.3671875,
+     "after": 11999.275390625
+    },
+    "eq/3g": {
+     "before": 0.0,
+     "after": -6.0
+    },
+    "eq/3f": {
+     "before": 1499.788330078125,
+     "after": 9531.36328125
+    },
+    "eq/3q": {
+     "before": 0.9979702234268188,
+     "after": 3.9916467666625977
+    }
+   },
+   "12": {
+    "name": "",
+    "fdr": {
+     "before": -11.691272735595703,
+     "after": -12.0
+    },
+    "in/set/trim": {
+     "before": -1.0,
+     "after": -1.2999992370605469
+    },
+    "dyn/thr": {
+     "before": -31.0,
+     "after": -29.0
+    }
+   },
+   "13": {
+    "name": "",
+    "fdr": {
+     "before": -5.2000732421875,
+     "after": -4.558088302612305
+    },
+    "dyn/on": {
+     "before": 0,
+     "after": 1
+    },
+    "dyn/thr": {
+     "before": -10.0,
+     "after": -37.0
+    },
+    "dyn/ratio": {
+     "before": 3.0,
+     "after": 2.0
+    },
+    "dyn/att": {
+     "before": 50.0,
+     "after": 10.0
+    },
+    "dyn/rel": {
+     "before": 152.565185546875,
+     "after": 247.03453063964844
+    },
+    "dyn/gain": {
+     "before": 0.0,
+     "after": 4.0
+    }
+   },
+   "14": {
+    "name": "",
+    "pan": {
+     "before": 0.0,
+     "after": -100.0
+    }
+   },
+   "15": {
+    "name": "",
+    "pan": {
+     "before": -1.0,
+     "after": 100.0
+    },
+    "eq/on": {
+     "before": 0,
+     "after": 1
+    },
+    "eq/3g": {
+     "before": 0.0,
+     "after": 1.0
+    },
+    "eq/4g": {
+     "before": 0.0,
+     "after": 1.0
+    }
+   },
+   "16": {
+    "name": "",
+    "dyn/thr": {
+     "before": -40.5,
+     "after": -39.5
+    },
+    "dyn/ratio": {
+     "before": 2.5,
+     "after": 2.0
+    },
+    "dyn/rel": {
+     "before": 322.8768005371094,
+     "after": 359.37554931640625
+    }
+   }
+  },
+  "fx": {},
+  "buses": {},
+  "dca": {}
+ },
+ "channel_updates": [
+  {
+   "ch": 1,
+   "name": "KICK",
+   "preset": "kick",
+   "source_role": "kick",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.312938776526273,
+   "rms_db": -47.43315970290473,
+   "lufs": -35.19533637603816,
+   "gain_correction_db": 8.666035919632439,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": 0.0
+  },
+  {
+   "ch": 2,
+   "name": "SNARE T",
+   "preset": "snare",
+   "source_role": "snare_top",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.160327988018903,
+   "rms_db": -53.15653731350154,
+   "lufs": -34.8402884984275,
+   "gain_correction_db": 8.364245223663373,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -9.206660542199955
+  },
+  {
+   "ch": 3,
+   "name": "SNARE B",
+   "preset": "snare",
+   "source_role": "snare_bottom",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -5.188017235443958,
+   "rms_db": -49.66164140587642,
+   "lufs": -29.347977960463787,
+   "gain_correction_db": 4.104349361707041,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -18.75412969785463
+  },
+  {
+   "ch": 6,
+   "name": "OH L",
+   "preset": "overheads",
+   "source_role": "oh_l",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -24.179241585895443,
+   "rms_db": -54.14217209934195,
+   "lufs": -46.87664755133471,
+   "gain_correction_db": 12.0,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": 0.0
+  },
+  {
+   "ch": 7,
+   "name": "OH R",
+   "preset": "overheads",
+   "source_role": "oh_r",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -19.07988046162587,
+   "rms_db": -50.05841759631943,
+   "lufs": -40.191244810742965,
+   "gain_correction_db": 10.191244810742965,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -7.741032702589209
+  },
+  {
+   "ch": 8,
+   "name": "BASS",
+   "preset": "bass",
+   "source_role": "bass",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -19.634967220476998,
+   "rms_db": -34.13415351047842,
+   "lufs": -33.09918830996482,
+   "gain_correction_db": 10.099188309964823,
+   "eq_applied": true,
+   "compressor_applied": false,
+   "fader_db": -4.604371067445555
+  },
+  {
+   "ch": 9,
+   "name": "GUITAR L",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -11.36634246703805,
+   "rms_db": -34.06827997343967,
+   "lufs": -25.58934747111636,
+   "gain_correction_db": 2.5893474711163584,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -5.239938894758318
+  },
+  {
+   "ch": 10,
+   "name": "GUITAR R",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.06119851228488,
+   "rms_db": -34.897853002186615,
+   "lufs": -26.613275149746116,
+   "gain_correction_db": 3.6132751497461157,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -5.366813064381617
+  },
+  {
+   "ch": 11,
+   "name": "PLAYBACK L",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -11.484964146489185,
+   "rms_db": -29.986125077908326,
+   "lufs": -28.097015701518284,
+   "gain_correction_db": 5.097015701518284,
+   "eq_applied": true,
+   "compressor_applied": true,
+   "fader_db": -12.230025197002796
+  },
+  {
+   "ch": 12,
+   "name": "PLAYBACK R",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.093072502461297,
+   "rms_db": -30.988952370625455,
+   "lufs": -29.331523086318455,
+   "gain_correction_db": 6.331523086318455,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -11.723176280247756
+  },
+  {
+   "ch": 13,
+   "name": "ACCORDION",
+   "preset": "accordion",
+   "source_role": "accordion",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -21.16360519295593,
+   "rms_db": -36.72236620839016,
+   "lufs": -35.63474254351004,
+   "gain_correction_db": 12.0,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -4.558089175007446
+  },
+  {
+   "ch": 16,
+   "name": "VOCAL",
+   "preset": "leadVocal",
+   "source_role": "lead_vocal",
+   "classification_confidence": 0.86,
+   "auto_corrections_enabled": true,
+   "peak_db": -16.266752031082603,
+   "rms_db": -38.746575547015404,
+   "lufs": -33.91536504346375,
+   "gain_correction_db": 9.740755530424625,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": 0.0
+  }
+ ],
+ "soundcheck_checklist": {
+  "drum_image.oh_internal": {
+   "attempts": 37,
+   "status": "deferred",
+   "reason": "no_valid_hits"
+  },
+  "drum_image.snare_to_oh": {
+   "attempts": 37,
+   "status": "deferred",
+   "reason": "no_valid_hits"
+  },
+  "drum_image.snare_tb": {
+   "attempts": 37,
+   "status": "deferred",
+   "reason": "no_valid_hits"
+  },
+  "drum_image.oh_pan": {
+   "attempts": 13,
+   "status": "done",
+   "reason": ""
+  },
+  "drum_image.ch4_align": {
+   "attempts": 37,
+   "status": "deferred",
+   "reason": "no_valid_hits"
+  },
+  "drum_image.ch5_align": {
+   "attempts": 37,
+   "status": "deferred",
+   "reason": "no_valid_hits"
+  },
+  "dca.1": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "dca.2": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "dca.3": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "dca.4": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "dca.5": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "dca.6": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.1.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.2.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.3.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.4.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.5.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.6.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.7.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.8.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.9.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.10.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.11.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.12.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.13.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.14.signal": {
+   "attempts": 1,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.15.signal": {
+   "attempts": 1,
+   "status": "done",
+   "reason": ""
+  },
+  "channel.16.signal": {
+   "attempts": 0,
+   "status": "done",
+   "reason": ""
+  }
+ }
+}

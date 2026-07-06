@@ -6085,6 +6085,10 @@ class AutoSoundcheckEngine:
             self.soundcheck_checklist: Dict[str, Dict[str, Any]] = {}
         item = self.soundcheck_checklist.setdefault(key, {"attempts": 0})
         prev = item.get("status")
+        if prev == "done" and status == "deferred":
+            # закрытый пункт не переоткрывается пустым повторным замером
+            # (конвергенция №21: oh_pan done -> deferred в окне без снейра)
+            return
         item["status"] = status
         item["reason"] = reason
         if status != "done":
