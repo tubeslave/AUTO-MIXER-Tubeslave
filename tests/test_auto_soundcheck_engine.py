@@ -2224,3 +2224,22 @@ def test_fx_sends_skipped_when_bus_has_no_insert():
     blocked = [d for d in engine.safety_controller.history
                if getattr(d.action, "action_type", "") == "SendLevelAdjust"]
     assert blocked
+
+
+def test_comp_threshold_follows_trim_shift():
+    """Live 2026-07-06: после сброса тримов пороги компрессоров остались в
+    старом трим-домене (вокал давился GR~12). Сдвиг трима обязан сдвигать
+    порог включённого компрессора на ту же дельту."""
+    mixer = DetectorMixer()
+    mixer.state = {"/ch/1/dyn/on": 1, "/ch/1/dyn/thr": -43.5}
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine._shift_comp_threshold_with_trim(1, +12.0)
+    thr_calls = [c for c in mixer.calls if c[0] == "set_compressor_threshold"]
+    assert thr_calls and thr_calls[-1][2] == pytest.approx(-31.5)
+
+    # выключенный комп не трогается
+    mixer.state["/ch/1/dyn/on"] = 0
+    n = len(mixer.calls)
+    engine._shift_comp_threshold_with_trim(1, -6.0)
+    assert len(mixer.calls) == n

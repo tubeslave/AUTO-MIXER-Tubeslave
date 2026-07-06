@@ -5484,8 +5484,39 @@ class AutoSoundcheckEngine:
                     f"TP={true_peak:.1f}dBTP, RMS={rms:.1f}, "
                     f"crest={crest:.1f}, target={target_peak:.0f}dB)"
                 )
+                # Закон зависимостей (gain v3): сдвиг трима смещает сигнал
+                # на компрессоре — порог ОБЯЗАН сдвинуться на ту же дельту,
+                # иначе комп остаётся в чужом трим-домене (live 2026-07-06:
+                # после сброса тримов вокал давился GR~12 порогом из
+                # старого домена, kick-комп молчал)
+                applied_delta = float(
+                    getattr(decision.action, "target_db", target_gain)
+                ) - float(current_gain)
+                if abs(applied_delta) > 0.5:
+                    self._shift_comp_threshold_with_trim(ch, applied_delta)
         except Exception as e:
             logger.warning(f"Ch {ch}: input gain failed: {e}")
+
+    def _shift_comp_threshold_with_trim(self, ch: int, delta_db: float) -> None:
+        """Сдвинуть порог включённого компрессора вслед за тримом."""
+        state = getattr(self.mixer_client, "state", None)
+        if not isinstance(state, dict):
+            return
+        if not self._as_bool(state.get(f"/ch/{ch}/dyn/on"), False):
+            return
+        thr = state.get(f"/ch/{ch}/dyn/thr")
+        if thr is None:
+            thr = state.get(f"/ch/{ch}/dyn/thr26")
+        if thr is None:
+            return
+        new_thr = float(np.clip(float(thr) + delta_db, -60.0, -4.0))
+        setter = getattr(self.mixer_client, "set_compressor_threshold", None)
+        if callable(setter):
+            setter(ch, round(new_thr, 1))
+            logger.info(
+                f"Ch {ch}: comp threshold follows trim "
+                f"{float(thr):.1f}→{new_thr:.1f} dB (Δtrim {delta_db:+.1f})"
+            )
 
     # ── 5e. Phase / polarity detection ────────────────────────
 
