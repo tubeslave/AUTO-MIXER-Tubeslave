@@ -222,6 +222,11 @@ class DetectorMixer:
     def get_fader(self, channel):
         return self.fader.get(channel, -10.0)
 
+    def set_fader(self, channel, value_db):
+        self.fader[channel] = value_db
+        self.calls.append(("set_fader", channel, value_db))
+        return True
+
     def get_dca_fader(self, dca):
         return getattr(self, "dca_fader", {}).get(dca, 0.0)
 
@@ -612,6 +617,9 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     engine.mixer_client = mixer
     engine.safety_controller = AutoFOHSafetyController(mixer)
     engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    # легаси-путь барабанной фазы: при включённой операторской схеме
+    # drum_image (стадия 11b) он отключён — тест проверяет именно легаси
+    engine.config_manager.get_section = lambda name: {}
     engine.audio_capture = DetectorAudioCapture(
         {
             1: np.ones(48000, dtype=np.float32) * 0.1,
@@ -1710,7 +1718,12 @@ def test_phase_target_guard_allows_mirror_eq_inside_green_corridor():
     assert not any(call[0] == "set_eq_band" for call in mixer.calls)
 
 
-def test_phase_target_guard_blocks_initial_fader_move_without_mutating_channel_state():
+def test_phase_target_guard_exempts_fader_moves_in_derivation():
+    """Решение 2026-07-06: в саундчек-деривации фейдеры выведены из-под
+    коридорного стража — баланс v3 сам задаёт новый коридор (страж молча
+    резал баланс: «очень слабая балансировка фейдерами»). Раньше тест
+    ожидал блокировку и проходил лишь потому, что у фейка не было
+    set_fader."""
     def sine(freq_hz, amplitude):
         t = np.arange(12000, dtype=np.float32) / 48000.0
         return amplitude * np.sin(2.0 * np.pi * freq_hz * t)
@@ -1776,7 +1789,6 @@ def test_phase_target_guard_blocks_initial_fader_move_without_mutating_channel_s
     phase_guard_context = engine._build_phase_target_guard_context(
         runtime_state=RuntimeState.SNAPSHOT_LOCK
     )
-    original_fader_db = engine.channels[1].fader_db
 
     engine._apply_fader(
         1,
@@ -1785,8 +1797,9 @@ def test_phase_target_guard_blocks_initial_fader_move_without_mutating_channel_s
         phase_guard_context=phase_guard_context,
     )
 
-    assert mixer.calls == []
-    assert engine.channels[1].fader_db == original_fader_db
+    fader_calls = [c for c in mixer.calls if c[0] == "set_fader"]
+    assert fader_calls, "фейдер в деривации не должен блокироваться стражем"
+    assert all(c[2] <= 0.0 for c in fader_calls)   # потолок 0 dBFS
 
 
 def test_phase_target_guard_blocks_initial_hpf_above_learned_max():
@@ -2393,6 +2406,44 @@ def test_postfader_tap_channel_mapping_follows_config():
     assert engine._postfader_tap_channel(16) == 32
     assert engine._postfader_tap_channel(17) is None
     assert engine._postfader_tap_channel(0) is None
+
+
+def test_stereo_pair_identity_replicates_processing_and_unifies_levels():
+    """Директива 2026-07-06: L/R = ОДИН инструмент. EQ реплицируется с
+    ведущего, фейдеры сводятся к среднему."""
+    from autofoh_safety import ChannelEQMove as EQMove
+    mixer = DetectorMixer()
+    mixer.state = {}
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(promoted_direct_write_action_types=(
+            "ChannelEQMove", "ChannelFaderMove")),
+    )
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    engine.config_manager.get_section = lambda name: {}
+    engine.channels = {
+        9: ChannelInfo(channel=9, name="GTR L", preset="electricGuitar",
+                       has_signal=True, auto_corrections_enabled=True),
+        10: ChannelInfo(channel=10, name="GTR R", preset="electricGuitar",
+                        has_signal=True, auto_corrections_enabled=True),
+    }
+    engine._applied_channels = {9, 10}
+    mixer.fader = {9: -4.0, 10: -8.0}
+    engine._sent_actions_by_channel = {
+        9: [EQMove(channel_id=9, band=2, freq_hz=400.0, gain_db=-2.0, q=2.0,
+                   reason="masking cut")],
+    }
+
+    engine._enforce_stereo_pair_identity()
+
+    eq_calls = [c for c in mixer.calls if c[0] == "set_eq_band" and c[1] == 10]
+    assert eq_calls, "EQ ведущего не реплицирован на второй канал пары"
+    fader_calls = [c for c in mixer.calls if c[0] == "set_fader"]
+    assert {c[1] for c in fader_calls} == {9, 10}
+    for c in fader_calls:
+        assert c[2] == pytest.approx(-6.0, abs=0.1)   # среднее (-4, -8)
 
 
 def test_same_source_pair_rejects_implausible_alignment_delay():

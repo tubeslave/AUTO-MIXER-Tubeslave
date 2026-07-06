@@ -2278,6 +2278,15 @@ class AutoSoundcheckEngine:
             metadata=metadata,
         )
         self._mirror_mixing_station_decision(decision, snapshot=snapshot)
+        if decision.sent:
+            # журнал отправленных действий по каналам — источник реплики
+            # для стерео-идентичности (L/R = один инструмент)
+            ch_id = getattr(decision.action, "channel_id", None)
+            if ch_id is not None:
+                if not hasattr(self, "_sent_actions_by_channel"):
+                    self._sent_actions_by_channel = {}
+                self._sent_actions_by_channel.setdefault(
+                    int(ch_id), []).append(decision.action)
         if decision.sent and register_evaluation:
             pending = self._register_pending_action_evaluation(
                 decision.action,
@@ -4559,6 +4568,11 @@ class AutoSoundcheckEngine:
             except Exception as e:
                 logger.error(f"Ch {ch}: error applying corrections: {e}")
 
+        # 8b. Стерео-идентичность пар L/R (директива 2026-07-06): один
+        # инструмент — одна обработка, единый трим и фейдер (кроме OH)
+        self._enforce_stereo_pair_identity(
+            phase_guard_context=phase_guard_context)
+
         # 9. Full-band shared-chat mix pass over the current live console state.
         self._apply_live_shared_mix_pass(phase_guard_context=phase_guard_context)
 
@@ -4567,6 +4581,10 @@ class AutoSoundcheckEngine:
 
         # 11. Phase / polarity check across correlated channel pairs
         self._detect_and_fix_phase()
+
+        # 11b. Операторская схема панорамы и фазового порядка ударных
+        # (2026-07-06): OH — мастер-картинка, всё выравнивается в неё
+        self._apply_drum_image_scheme(phase_guard_context=phase_guard_context)
         snapshot_profile = self._build_soundcheck_profile_from_live_buffers()
         if snapshot_profile is not None:
             self._capture_learning_phase(
@@ -5943,6 +5961,238 @@ class AutoSoundcheckEngine:
     SAME_SOURCE_CLOSE_PAIR_PRESETS = frozenset({"kick", "snare"})
     SAME_SOURCE_MAX_PLAUSIBLE_DELAY_MS = 2.0
 
+    _CYMBAL_NAME_MARKERS = ("hihat", "hi-hat", "hi hat", "hh", "ride",
+                            "crash")
+
+    def _drum_image_enabled(self) -> bool:
+        cfg = (self.config_manager.get_section("autofoh") or {}).get(
+            "drum_image", {}) or {}
+        return bool(cfg.get("enabled", False))
+
+    def _drum_image_roles(self, *,
+                          restrict_to_applied: bool = False) -> Dict[str, Any]:
+        """Раскладка каналов для операторской схемы панорамы/фазы."""
+        roles: Dict[str, Any] = {
+            "kick": None, "snare_t": None, "snare_b": None,
+            "oh_pair": None, "toms": [], "cymbals": [],
+            "center": [], "stereo_pairs": [], "covered": set(),
+        }
+        oh_l = oh_r = None
+        snares: List[Tuple[int, str]] = []
+        stereo_groups: Dict[str, List[Tuple[int, str]]] = {}
+        for ch, info in sorted(self.channels.items()):
+            if not info.has_signal or ch in self.master_reference_channels:
+                continue
+            # замьюченный слой / каналы вне коррекций (директива: 17-40
+            # не использовать) — схема их не трогает; live-прогон №19:
+            # ch17/21/35/36 получили панораму
+            if not info.auto_corrections_enabled:
+                continue
+            if (restrict_to_applied and self._applied_channels
+                    and ch not in self._applied_channels):
+                continue
+            name = (info.name or "").strip().lower()
+            preset = info.preset or ""
+            role = info.source_role or "unknown"
+            if preset == "kick" and roles["kick"] is None:
+                roles["kick"] = ch
+            elif preset == "snare":
+                snares.append((ch, name))
+            elif preset == "overheads" or name.startswith("oh"):
+                if any(m in name for m in (" l", "_l", "left")) or oh_l is None:
+                    if any(m in name for m in (" r", "_r", "right")) and oh_l is not None:
+                        oh_r = ch
+                    elif oh_l is None:
+                        oh_l = ch
+                    else:
+                        oh_r = ch
+                else:
+                    oh_r = ch
+            elif preset == "tom":
+                roles["toms"].append(ch)
+            elif any(m in name for m in self._CYMBAL_NAME_MARKERS):
+                roles["cymbals"].append(ch)
+            elif preset == "bass" or role == "lead_vocal" or preset == "leadVocal":
+                roles["center"].append(ch)
+            elif preset in self.STEREO_PAIR_PRESETS_BALANCE and any(
+                    m in name for m in self._STEREO_MARKERS):
+                stereo_groups.setdefault(preset, []).append((ch, name))
+        # snare T/B: явные маркеры, иначе первый = T
+        for ch, name in snares:
+            if name.endswith(" b") or "_b" in name or "bottom" in name:
+                roles["snare_b"] = ch
+            elif roles["snare_t"] is None:
+                roles["snare_t"] = ch
+            elif roles["snare_b"] is None:
+                roles["snare_b"] = ch
+        if oh_l is not None and oh_r is not None:
+            roles["oh_pair"] = (oh_l, oh_r)
+        # стерео-пары (кроме OH): l-маркер жёстко влево, r — вправо
+        for preset, members in stereo_groups.items():
+            if len(members) < 2:
+                continue
+            left = next((c for c, n in members
+                         if any(m in n for m in (" l", "_l", "left"))), None)
+            right = next((c for c, n in members
+                          if any(m in n for m in (" r", "_r", "right"))), None)
+            if left is None or right is None:
+                left, right = members[0][0], members[1][0]
+            roles["stereo_pairs"].append((left, right, preset))
+        covered = {roles["kick"], roles["snare_t"], roles["snare_b"]}
+        covered.update(roles["toms"])
+        covered.update(roles["cymbals"])
+        covered.update(roles["center"])
+        if roles["oh_pair"]:
+            covered.update(roles["oh_pair"])
+        for l_ch, r_ch, _p in roles["stereo_pairs"]:
+            covered.update((l_ch, r_ch))
+        covered.discard(None)
+        roles["covered"] = covered
+        return roles
+
+    def _enforce_stereo_pair_identity(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """L/R стерео-пара = ОДИН инструмент (директива оператора 2026-07-06).
+
+        Обработка (EQ/HPF/comp/makeup/gate) реплицируется с ведущего (L)
+        на второй канал; трим — минимальный из двух («при сомнениях —
+        снижай»: горячая сторона не перегружается), фейдер — средний.
+        Оверхеды — исключение: их разводит drum_image-схема.
+        """
+        import dataclasses
+        roles = self._drum_image_roles(restrict_to_applied=True)
+        pairs = roles.get("stereo_pairs") or []
+        if not pairs:
+            return
+        replicate_types = (ChannelEQMove, HighPassAdjust, CompressorAdjust,
+                           CompressorMakeupAdjust, GateAdjust)
+        sent_map = getattr(self, "_sent_actions_by_channel", {})
+        for l_ch, r_ch, preset in pairs:
+            try:
+                replicated = 0
+                for a in list(sent_map.get(l_ch, [])):
+                    if isinstance(a, replicate_types):
+                        clone = dataclasses.replace(
+                            a, channel_id=r_ch,
+                            reason=f"stereo identity: реплика с ch{l_ch} "
+                                   f"({preset})")
+                        d = self._execute_action(
+                            clone, phase_guard_context=phase_guard_context)
+                        if d and d.sent:
+                            replicated += 1
+                # единый трим: минимальный из двух
+                t_l = self._channel_trim_db(l_ch)
+                t_r = self._channel_trim_db(r_ch)
+                trim_target = None
+                if abs(t_l - t_r) > 0.25:
+                    trim_target = min(t_l, t_r)
+                    for ch, t_now in ((l_ch, t_l), (r_ch, t_r)):
+                        if abs(t_now - trim_target) <= 0.25:
+                            continue
+                        d = self._execute_action(
+                            ChannelGainMove(
+                                channel_id=ch, target_db=trim_target,
+                                reason=f"stereo identity: единый трим пары "
+                                       f"{preset}"),
+                            phase_guard_context=phase_guard_context)
+                        if d and d.sent:
+                            self._shift_comp_threshold_with_trim(
+                                ch, trim_target - t_now)
+                # единый фейдер: средний
+                fader_target = None
+                try:
+                    f_l = float(self.mixer_client.get_fader(l_ch))
+                    f_r = float(self.mixer_client.get_fader(r_ch))
+                except Exception:
+                    f_l = f_r = None
+                if (f_l is not None and f_r is not None
+                        and abs(f_l - f_r) > 0.25):
+                    fader_target = (f_l + f_r) / 2.0
+                    for ch in (l_ch, r_ch):
+                        self._execute_action(
+                            ChannelFaderMove(
+                                channel_id=ch, target_db=round(fader_target, 1),
+                                reason=f"stereo identity: единый фейдер пары "
+                                       f"{preset}"),
+                            phase_guard_context=phase_guard_context)
+                if replicated or trim_target is not None or fader_target is not None:
+                    logger.info(
+                        "stereo identity %s (ch%d/ch%d): реплик обработки %d"
+                        "%s%s", preset, l_ch, r_ch, replicated,
+                        (f", трим -> {trim_target:.1f}"
+                         if trim_target is not None else ""),
+                        (f", фейдер -> {fader_target:.1f}"
+                         if fader_target is not None else ""))
+            except Exception:
+                logger.exception(
+                    "stereo identity failed for pair ch%d/ch%d", l_ch, r_ch)
+
+    def _apply_drum_image_scheme(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Схема оператора 2026-07-06: панорама + фазовый порядок ударных."""
+        if not self._drum_image_enabled():
+            return
+        try:
+            from heuristics.drum_image_v3 import plan_drum_image
+            roles = self._drum_image_roles(restrict_to_applied=True)
+            drum_chs = {roles["kick"], roles["snare_t"], roles["snare_b"]}
+            drum_chs.update(roles["toms"])
+            drum_chs.update(roles["cymbals"])
+            if roles["oh_pair"]:
+                drum_chs.update(roles["oh_pair"])
+            drum_chs.discard(None)
+            buffers = {}
+            if self.audio_capture is not None:
+                for ch in drum_chs:
+                    buffers[ch] = self.audio_capture.get_buffer(
+                        ch, self.sample_rate * 5)
+            plan = plan_drum_image(
+                buffers, self.sample_rate,
+                oh_pair=roles["oh_pair"],
+                snare_t=roles["snare_t"], snare_b=roles["snare_b"],
+                kick=roles["kick"], toms=roles["toms"],
+                cymbals=roles["cymbals"],
+            )
+            # панорамы вне барабанов: центр и жёсткие стерео-пары
+            for ch in roles["center"]:
+                plan.pans[ch] = 0.0
+            for l_ch, r_ch, _preset in roles["stereo_pairs"]:
+                plan.pans[l_ch] = -100.0
+                plan.pans[r_ch] = 100.0
+            logger.info(
+                "drum_image: план: pans=%s delays=%s pol=%s oh_ref=%s%s",
+                {k: round(v) for k, v in plan.pans.items()},
+                {k: round(v, 2) for k, v in plan.delays_ms.items()},
+                plan.polarity_flip, plan.oh_ref,
+                (" | " + "; ".join(plan.notes)) if plan.notes else "")
+            for key, m in plan.measurements.items():
+                logger.info("drum_image: замер %s: %s", key, m)
+            # порядок исполнения: полярность -> задержки -> панорамы
+            for ch, flip in plan.polarity_flip.items():
+                self._execute_action(
+                    PolarityAdjust(channel_id=ch, inverted=bool(flip),
+                                   reason="drum_image: snare B polarity"),
+                    phase_guard_context=phase_guard_context)
+            for ch, dly in plan.delays_ms.items():
+                self._execute_action(
+                    DelayAdjust(channel_id=ch, delay_ms=round(float(dly), 1),
+                                enabled=True,
+                                reason="drum_image: выравнивание в картинку OH"),
+                    phase_guard_context=phase_guard_context)
+            for ch, pan in plan.pans.items():
+                self._execute_action(
+                    PanAdjust(channel_id=ch, pan=round(float(pan), 1),
+                              reason="drum_image: панорама по схеме оператора"),
+                    phase_guard_context=phase_guard_context)
+        except Exception:
+            logger.exception("drum_image scheme failed (informational only)")
+
     def _same_source_delay_plausible(self, pair_type: str,
                                      delay_ms: float) -> bool:
         """Замер задержки внутри пары одного источника правдоподобен?"""
@@ -5969,6 +6219,9 @@ class AutoSoundcheckEngine:
                 preset_channels.setdefault(info.preset, []).append(ch)
 
         drum_pair_presets = {"kick", "snare", "overheads", "room"}
+        if self._drum_image_enabled():
+            # барабанную фазу целиком ведёт операторская схема (стадия 11b)
+            drum_pair_presets = set()
         for preset in drum_pair_presets:
             channels = sorted(preset_channels.get(preset, []))
             if len(channels) < 2:
@@ -6005,6 +6258,16 @@ class AutoSoundcheckEngine:
         """Set pan position based on instrument type."""
         if not hasattr(self.mixer_client, 'set_pan'):
             return
+
+        # Каналы операторской схемы drum image (стадия 11b) панорамирует
+        # только она — легаси-панорама им не пишет
+        if self._drum_image_enabled():
+            if not hasattr(self, "_drum_image_covered_cache"):
+                self._drum_image_covered_cache = (
+                    self._drum_image_roles()["covered"])
+            if ch in self._drum_image_covered_cache:
+                logger.debug(f"Ch {ch}: pan deferred to drum_image scheme")
+                return
 
         # Pan v3 (основной путь): venue-зависимое решение из мультиканального
         # прогона (relevance-gate: mono PA → всё в центр; якоря критичных и
