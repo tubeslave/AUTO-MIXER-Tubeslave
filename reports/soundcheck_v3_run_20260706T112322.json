@@ -1,0 +1,441 @@
+{
+ "engine_final_state": "EngineState.RUNNING",
+ "diff": {
+  "channels": {
+   "1": {
+    "name": "KICK",
+    "fdr": {
+     "before": -6.799999237060547,
+     "after": -0.7999992370605469
+    },
+    "gate/thr": {
+     "before": -44.0,
+     "after": -46.0
+    },
+    "dyn/thr": {
+     "before": -20.0,
+     "after": -23.0
+    },
+    "eq/1g": {
+     "before": 3.5,
+     "after": 4.5
+    },
+    "eq/3g": {
+     "before": 4.0,
+     "after": 5.0
+    },
+    "eq/3f": {
+     "before": 2992.470947265625,
+     "after": 1252.8668212890625
+    }
+   },
+   "2": {
+    "name": "SNARE T",
+    "fdr": {
+     "before": -15.084285736083984,
+     "after": -20.23473358154297
+    },
+    "gate/thr": {
+     "before": -45.5,
+     "after": -44.0
+    }
+   },
+   "3": {
+    "name": "",
+    "fdr": {
+     "before": -22.439342498779297,
+     "after": -29.39282989501953
+    },
+    "gate/thr": {
+     "before": -42.5,
+     "after": -46.0
+    },
+    "dyn/thr": {
+     "before": -16.5,
+     "after": -16.0
+    },
+    "dyn/ratio": {
+     "before": 3.0,
+     "after": 2.5
+    }
+   },
+   "4": {
+    "name": "",
+    "gate/thr": {
+     "before": -26.5,
+     "after": -30.5
+    },
+    "eq/1g": {
+     "before": 0.0,
+     "after": -1.8000001907348633
+    },
+    "eq/1f": {
+     "before": 3262.345947265625,
+     "after": 119.99275207519531
+    },
+    "eq/1q": {
+     "before": 7.983060836791992,
+     "after": 3.9916467666625977
+    },
+    "eq/3g": {
+     "before": 0.0,
+     "after": -1.0
+    },
+    "eq/3f": {
+     "before": 1499.788330078125,
+     "after": 1252.8668212890625
+    },
+    "eq/3q": {
+     "before": 0.9979702234268188,
+     "after": 3.9916467666625977
+    }
+   },
+   "5": {
+    "name": "",
+    "gate/thr": {
+     "before": -26.0,
+     "after": -30.0
+    }
+   },
+   "6": {
+    "name": "",
+    "fdr": {
+     "before": -13.584754943847656,
+     "after": -10.723114013671875
+    },
+    "dyn/on": {
+     "before": 0,
+     "after": 1
+    },
+    "dyn/thr": {
+     "before": -10.0,
+     "after": -26.5
+    },
+    "dyn/ratio": {
+     "before": 3.0,
+     "after": 2.5
+    },
+    "dyn/att": {
+     "before": 50.0,
+     "after": 10.0
+    },
+    "dyn/rel": {
+     "before": 152.565185546875,
+     "after": 359.37554931640625
+    },
+    "dyn/gain": {
+     "before": 0.0,
+     "after": 2.0
+    },
+    "eq/1g": {
+     "before": -3.0,
+     "after": -4.0
+    },
+    "eq/1f": {
+     "before": 3192.6767578125,
+     "after": 39.90524673461914
+    },
+    "eq/1q": {
+     "before": 7.983060836791992,
+     "after": 3.9916467666625977
+    }
+   },
+   "7": {
+    "name": "",
+    "fdr": {
+     "before": -13.593986511230469,
+     "after": -18.254940032958984
+    },
+    "dyn/thr": {
+     "before": -32.5,
+     "after": -29.5
+    }
+   },
+   "8": {
+    "name": "",
+    "fdr": {
+     "before": -13.371902465820312,
+     "after": -21.921306610107422
+    }
+   },
+   "9": {
+    "name": "",
+    "fdr": {
+     "before": -16.0,
+     "after": -11.447395324707031
+    }
+   },
+   "10": {
+    "name": "",
+    "fdr": {
+     "before": -16.0,
+     "after": -10.679542541503906
+    }
+   },
+   "11": {
+    "name": "",
+    "fdr": {
+     "before": -17.0,
+     "after": -17.44446563720703
+    },
+    "in/set/trim": {
+     "before": -2.3999996185302734,
+     "after": -3.5
+    },
+    "dyn/thr": {
+     "before": -27.5,
+     "after": -30.5
+    },
+    "dyn/rel": {
+     "before": 247.03453063964844,
+     "after": 322.8768005371094
+    }
+   },
+   "12": {
+    "name": "",
+    "fdr": {
+     "before": -16.0,
+     "after": -20.003421783447266
+    },
+    "dyn/on": {
+     "before": 0,
+     "after": 1
+    },
+    "dyn/thr": {
+     "before": -10.0,
+     "after": -31.0
+    },
+    "dyn/ratio": {
+     "before": 3.0,
+     "after": 2.5
+    },
+    "dyn/att": {
+     "before": 50.0,
+     "after": 20.0
+    },
+    "dyn/rel": {
+     "before": 152.565185546875,
+     "after": 359.37554931640625
+    },
+    "dyn/gain": {
+     "before": 0.0,
+     "after": 2.0
+    }
+   },
+   "13": {
+    "name": "",
+    "fdr": {
+     "before": -16.699054718017578,
+     "after": -23.569305419921875
+    }
+   },
+   "16": {
+    "name": "",
+    "fdr": {
+     "before": -3.450000762939453,
+     "after": -12.419998168945312
+    },
+    "dyn/thr": {
+     "before": -34.0,
+     "after": -31.0
+    },
+    "dyn/ratio": {
+     "before": 2.5,
+     "after": 2.0
+    },
+    "dyn/rel": {
+     "before": 359.37554931640625,
+     "after": 290.08489990234375
+    },
+    "eq/2g": {
+     "before": -2.0,
+     "after": -1.0
+    }
+   }
+  },
+  "fx": {},
+  "buses": {}
+ },
+ "channel_updates": [
+  {
+   "ch": 1,
+   "name": "KICK",
+   "preset": "kick",
+   "source_role": "kick",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.109605689214389,
+   "rms_db": -52.20720809973056,
+   "lufs": -31.855244983120933,
+   "gain_correction_db": 5.826958235652793,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -0.7999992370605469
+  },
+  {
+   "ch": 2,
+   "name": "SNARE T",
+   "preset": "snare",
+   "source_role": "snare_top",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -13.800917583273009,
+   "rms_db": -56.76118469547509,
+   "lufs": -36.90479710272292,
+   "gain_correction_db": 8.333357971906041,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -20.234733425747137
+  },
+  {
+   "ch": 3,
+   "name": "SNARE B",
+   "preset": "snare",
+   "source_role": "snare_bottom",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -8.562622652329454,
+   "rms_db": -53.92596675456537,
+   "lufs": -30.101757210839533,
+   "gain_correction_db": 3.5712300475876733,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -29.392830080325833
+  },
+  {
+   "ch": 6,
+   "name": "OH L",
+   "preset": "overheads",
+   "source_role": "oh_l",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -27.38721352578213,
+   "rms_db": -57.47527992945458,
+   "lufs": -47.916884872300926,
+   "gain_correction_db": 12.0,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -10.7231148639328
+  },
+  {
+   "ch": 7,
+   "name": "OH R",
+   "preset": "overheads",
+   "source_role": "oh_r",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -19.10295296988339,
+   "rms_db": -52.716351237255374,
+   "lufs": -40.39429069424257,
+   "gain_correction_db": 8.835147090106185,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -18.254940609373968
+  },
+  {
+   "ch": 8,
+   "name": "BASS",
+   "preset": "bass",
+   "source_role": "bass",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -18.80212916110508,
+   "rms_db": -34.04083349831386,
+   "lufs": -33.305842147769795,
+   "gain_correction_db": 10.305842147769795,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -21.921306254845767
+  },
+  {
+   "ch": 9,
+   "name": "GUITAR L",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.101661051564129,
+   "rms_db": -32.10059619103624,
+   "lufs": -27.707851284045084,
+   "gain_correction_db": 4.707851284045084,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -11.447393889810712
+  },
+  {
+   "ch": 10,
+   "name": "GUITAR R",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.674303718638667,
+   "rms_db": -32.82564465636952,
+   "lufs": -28.475700654557006,
+   "gain_correction_db": 5.475700654557006,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -10.679544519298794
+  },
+  {
+   "ch": 11,
+   "name": "PLAYBACK L",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -11.873079298219293,
+   "rms_db": -30.93214958704914,
+   "lufs": -29.183861256517254,
+   "gain_correction_db": 6.183861256517254,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -17.444463597027564
+  },
+  {
+   "ch": 12,
+   "name": "PLAYBACK R",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.00760070762858,
+   "rms_db": -31.914971433405835,
+   "lufs": -29.85182353888263,
+   "gain_correction_db": 6.8518235388826305,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -20.00342239791262
+  },
+  {
+   "ch": 13,
+   "name": "ACCORDION",
+   "preset": "accordion",
+   "source_role": "accordion",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -20.991540243224204,
+   "rms_db": -36.68518893674257,
+   "lufs": -36.88499449848817,
+   "gain_correction_db": 12.0,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -23.569305774854932
+  },
+  {
+   "ch": 16,
+   "name": "VOCAL",
+   "preset": "leadVocal",
+   "source_role": "lead_vocal",
+   "classification_confidence": 0.86,
+   "auto_corrections_enabled": true,
+   "peak_db": -16.27517053449378,
+   "rms_db": -49.75828868459394,
+   "lufs": -32.68906804402913,
+   "gain_correction_db": 8.882347630820389,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -12.916177892766122
+  }
+ ]
+}

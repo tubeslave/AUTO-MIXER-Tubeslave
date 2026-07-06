@@ -98,6 +98,16 @@ autofoh:
   pan:
     pa_type: stereo
     venue_class: club
+  # Мастер-петля (директива оператора 2026-07-06): Main LR заведён на
+  # USB-отправки 47/48 (/io/out/USB/47|48 grp=MAIN) — проект принимает
+  # общий микс и оценивает результат сведения по звучанию. Tap-каналы
+  # исключаются из всех коррекций (master-reference правило).
+  master_mix:
+    enabled: true
+    capture_channels: [47, 48]
+    capture_seconds: 10.0
+    target_curve: live_standard
+    target_lufs: -20.0
   detectors:
     monitor_cycle_interval_sec: 1.0
     lead_masking:

@@ -10,6 +10,7 @@ This is the main entry point for fully automatic operation.
 """
 
 import asyncio
+import json
 import logging
 import time
 import threading
@@ -689,6 +690,21 @@ class AutoSoundcheckEngine:
             pa_type=str(pan_cfg.get("pa_type", "mono")),
             venue_class=str(pan_cfg.get("venue_class", "club")),
         )
+        # Мастер-петля: Main LR -> USB-отправки (замкнутый контур оценки
+        # сведения по звучанию; директива оператора 2026-07-06). Tap-каналы
+        # приходят в capture на этих индексах и НЕ являются источниками.
+        mm_cfg = autofoh_config.get("master_mix", {}) or {}
+        self.master_mix_enabled = bool(mm_cfg.get("enabled", False))
+        self.master_mix_channels = [
+            int(ch) for ch in (mm_cfg.get("capture_channels") or [])
+        ][:2]
+        self.master_mix_seconds = float(mm_cfg.get("capture_seconds", 10.0))
+        self.master_mix_target_curve = str(mm_cfg.get("target_curve", "live_standard"))
+        self.master_mix_target_lufs = float(mm_cfg.get("target_lufs", -20.0))
+        self.last_master_mix_verdict: Optional[Dict[str, Any]] = None
+        if self.master_mix_enabled:
+            # master-reference правило: petля не корректируется как источник
+            self.master_reference_channels.update(self.master_mix_channels)
         self.evaluation_policy = AutoFOHEvaluationPolicy.from_config(autofoh_evaluation)
         self.autofoh_logging_enabled = bool(autofoh_logging.get("enabled", False))
         self.autofoh_log_path = str(autofoh_logging.get("path", "") or "")
@@ -4551,6 +4567,60 @@ class AutoSoundcheckEngine:
                 notes="Post-learning snapshot lock after initial correction pass",
             )
 
+        # 12. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
+        # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
+        self._evaluate_master_mix()
+
+    def _evaluate_master_mix(self) -> Optional[Dict[str, Any]]:
+        """Захват мастер-петли и оценка микса; вердикт в лог и reports/."""
+        if not getattr(self, "master_mix_enabled", False):
+            return None
+        if len(self.master_mix_channels) < 2 or self.audio_capture is None:
+            return None
+        try:
+            from master_mix_eval import evaluate_master_mix
+            window = int(self.sample_rate * self.master_mix_seconds)
+            ch_l, ch_r = self.master_mix_channels[0], self.master_mix_channels[1]
+            left = np.asarray(
+                self.audio_capture.get_buffer(ch_l, window), dtype=np.float64
+            ).reshape(-1)
+            right = np.asarray(
+                self.audio_capture.get_buffer(ch_r, window), dtype=np.float64
+            ).reshape(-1)
+            verdict = evaluate_master_mix(
+                left, right, self.sample_rate,
+                target_curve=self.master_mix_target_curve,
+                target_lufs=self.master_mix_target_lufs,
+            )
+            payload = verdict.to_dict()
+            self.last_master_mix_verdict = payload
+            if verdict.status == "NO_SIGNAL":
+                logger.warning(
+                    "Master mix eval: NO_SIGNAL — %s", "; ".join(verdict.issues))
+            else:
+                logger.info(
+                    "Master mix eval: %s | LUFS %.1f | TP %.1f dBTP | "
+                    "L/R %+.1f dB | corr %+.2f | tilt dev %.1f dB | vocal %+.1f dB%s",
+                    verdict.status,
+                    verdict.lufs_integrated or -120.0,
+                    verdict.true_peak_dbtp or -120.0,
+                    verdict.lr_balance_db or 0.0,
+                    verdict.correlation or 0.0,
+                    verdict.tilt_deviation_db or 0.0,
+                    verdict.vocal_presence_db or 0.0,
+                    (" | " + "; ".join(verdict.issues)) if verdict.issues else "",
+                )
+            try:
+                out = (Path(__file__).resolve().parents[1] / "reports"
+                       / f"master_mix_eval_{time.strftime('%Y%m%dT%H%M%S')}.json")
+                out.write_text(json.dumps(payload, ensure_ascii=False, indent=1))
+            except Exception:  # pragma: no cover - отчёт вторичен
+                pass
+            return payload
+        except Exception:
+            logger.exception("master mix eval failed (informational only)")
+            return None
+
     def _apply_hpf(
         self,
         ch: int,
@@ -4660,6 +4730,30 @@ class AutoSoundcheckEngine:
     # Пресеты близких барабанных микрофонов и порог собственных ударов
     CLOSE_MIC_PRESETS = frozenset({"kick", "snare", "tom"})
     BLEED_MIN_OWN_HITS = 3
+
+    def _channel_trim_db(self, ch: int) -> float:
+        """Текущий цифровой трим канала (консольный домен).
+
+        USB-tap стоит ДО трима (правило CLAUDE.md): любые пороги и цели,
+        посчитанные по захвату, обязаны сдвигаться на трим перед записью
+        в пульт — иначе, например, бочка с тримом −4 играет ПОД порогом
+        компрессора, поставленным по pre-trim замеру (оператор 2026-07-06).
+        """
+        state = getattr(self.mixer_client, "state", None)
+        if isinstance(state, dict):
+            value = state.get(f"/ch/{ch}/in/set/trim")
+            if value is not None:
+                try:
+                    return float(value)
+                except (TypeError, ValueError):
+                    pass
+        info = self.channels.get(ch)
+        if info is not None:
+            snap = self._snapshot_raw(info)
+            value = snap.get("input_gain_db", snap.get("trim"))
+            if value is not None:
+                return self._as_float(value, 0.0)
+        return 0.0
 
     def _close_mic_bleed_dominated(self, ch: int, info, preset: str) -> bool:
         """Близкий микрофон без СОБСТВЕННЫХ ударов = bleed-доминантен.
@@ -4824,6 +4918,7 @@ class AutoSoundcheckEngine:
         measured: Dict[int, float] = {}
         roles: Dict[int, str] = {}
         current: Dict[int, float] = {}
+        trims_at_solve: Dict[int, float] = {}
         for ch, info in self.channels.items():
             if not info.has_signal or not info.auto_corrections_enabled:
                 continue
@@ -4834,10 +4929,17 @@ class AutoSoundcheckEngine:
                 lufs = float(info.lufs)
             if lufs <= -90:
                 continue
-            measured[ch] = lufs
+            # КОНСОЛЬНЫЙ домен: capture pre-trim + текущий трим. Без этого
+            # решатель балансирует сигналы, которых в зале нет (гитары с
+            # тримом −8 получали ещё и фейдер −16 — двойной срез;
+            # оператор 2026-07-06)
+            trim = self._channel_trim_db(ch)
+            trims_at_solve[ch] = trim
+            measured[ch] = lufs + trim
             roles[ch] = (info.source_role if info.source_role != "unknown"
                          else (info.preset or "line"))
             current[ch] = float(info.fader_db) if info.fader_db > -140 else 0.0
+        self._balance_trim_at_solve = trims_at_solve
         if len(measured) < 2:
             return None
         try:
@@ -5134,6 +5236,13 @@ class AutoSoundcheckEngine:
         v3_solution = getattr(self, "_balance_v3_solution", None)
         if v3_solution is not None and ch in v3_solution.faders_db:
             fader_db = float(v3_solution.faders_db[ch])
+            # трим мог сдвинуться МЕЖДУ solve и apply (стадия 1 цепочки):
+            # компенсируем дельту, чтобы уровень в зале попал в план
+            trim_solve = getattr(self, "_balance_trim_at_solve", {}).get(ch)
+            if trim_solve is not None:
+                trim_delta = self._channel_trim_db(ch) - float(trim_solve)
+                if abs(trim_delta) > 0.05:
+                    fader_db -= trim_delta
             fader_db = max(-144.0, min(0.0, fader_db))
             previous_fader_db = current_fader
             try:
@@ -5678,6 +5787,8 @@ class AutoSoundcheckEngine:
         if m and m.level.rms_db > -90 and m.level.true_peak_dbtp > -90:
             # Keep the threshold below real hits, but above likely bleed.
             threshold = min(m.level.true_peak_dbtp - 10.0, m.level.rms_db + 6.0)
+            # замер pre-trim, гейт в пульте ПОСЛЕ трима — консольный домен
+            threshold += self._channel_trim_db(ch)
             threshold = max(base_threshold - 10.0, min(base_threshold + 8.0, threshold))
             if m.level.crest_factor_db > 18.0:
                 attack = min(attack, 1.5)
@@ -6060,6 +6171,18 @@ class AutoSoundcheckEngine:
             assume_target_gr=not current_comp_enabled and m is not None,
         )
         makeup_details["compressor_gr_source"] = compressor_gr_source
+
+        # порог посчитан по PRE-trim USB-захвату — в пульте компрессор стоит
+        # ПОСЛЕ трима: конверсия в консольный домен ДО любых blend'ов с
+        # текущим консольным порогом (оператор 2026-07-06: «бочка играет
+        # ниже порога компрессора» при триме −4)
+        trim_now = self._channel_trim_db(ch)
+        if abs(trim_now) > 0.05:
+            logger.info(
+                f"Ch {ch}: comp threshold {threshold:.1f} -> "
+                f"{threshold + trim_now:.1f} dB (trim {trim_now:+.1f}, console domain)"
+            )
+            threshold = threshold + trim_now
 
         if (
             self.preserve_existing_processing

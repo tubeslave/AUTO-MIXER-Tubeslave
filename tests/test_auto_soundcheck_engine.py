@@ -2101,3 +2101,55 @@ def test_phase_target_guard_allows_mirror_eq_when_stem_below_baseline():
     assert "stem" not in (decision.message or "")
     assert decision.blocked is True
     assert decision.write_policy == "proposal_only_quarantined"
+
+
+def test_channel_trim_db_reads_console_state():
+    """USB-tap pre-trim: пороги из захвата сдвигаются на трим канала."""
+    mixer = DetectorMixer()
+    mixer.state = {"/ch/1/in/set/trim": -4.0}
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="KICK", preset="kick", has_signal=True),
+    }
+    assert engine._channel_trim_db(1) == pytest.approx(-4.0)
+    assert engine._channel_trim_db(2) == pytest.approx(0.0)  # нет данных -> 0
+
+
+def test_balance_solution_measured_in_console_domain():
+    """Оператор 2026-07-06: гитары с тримом −8 получали ещё и фейдер −16.
+    Решатель обязан видеть capture+trim, а не сырой pre-trim захват."""
+    mixer = DetectorMixer()
+    mixer.state = {"/ch/1/in/set/trim": 0.0, "/ch/2/in/set/trim": -8.0}
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.mixer_client = mixer
+
+    class _Lvl:
+        def __init__(self, lufs): self.lufs_integrated = lufs
+    class _M:
+        def __init__(self, lufs): self.level = _Lvl(lufs)
+
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="VOCAL", preset="leadVocal",
+                       source_role="lead_vocal", has_signal=True,
+                       recognized=True, auto_corrections_enabled=True,
+                       fader_db=0.0),
+        2: ChannelInfo(channel=2, name="GTR", preset="electricGuitar",
+                       source_role="guitar", has_signal=True,
+                       recognized=True, auto_corrections_enabled=True,
+                       fader_db=0.0),
+    }
+    engine.channels[1].metrics = _M(-22.0)
+    engine.channels[2].metrics = _M(-18.0)   # pre-trim громче вокала
+
+    solution = engine._compute_balance_v3_solution()
+    assert solution is not None
+    # в консольном домене гитара уже -26 (trim −8) — ТИШЕ вокала;
+    # решатель не должен резать её глубоко
+    assert engine._balance_trim_at_solve[2] == pytest.approx(-8.0)
+    fader_gtr = solution.faders_db.get(2)
+    fader_voc = solution.faders_db.get(1)
+    assert fader_gtr is not None and fader_voc is not None
+    # без учёта трима гитара получила бы срез глубже вокального минимум
+    # на разницу LUFS (4 дБ); с учётом — её срез МЕНЬШЕ вокального
+    assert fader_gtr >= fader_voc - 1.0
