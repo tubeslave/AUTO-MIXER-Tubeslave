@@ -42,6 +42,16 @@ HARMONIC_SERIES_THRESHOLD_DB = 15.0       # гармоники ближе -> э�
 FFT_SIZE = 8192
 LOCAL_WINDOW_OCT = 1.0 / 3.0
 
+# Ring-тест (замечание оператора 2026-07-06 «EQ просто давит громкое»):
+# проблемный резонанс ЗВЕНИТ — после спада широкополосной огибающей его
+# полоса затухает медленнее остального спектра. Формант/тембровое ядро
+# умирает вместе с нотой. Без подтверждения звоном срез ограничивается
+# гигиеническим кэпом.
+RING_BROADBAND_DROP_DB = 10.0        # спад огибающей, где меряем затухание
+RING_DECAY_RATIO_MAX = 0.6           # band_decay/broadband_decay ниже -> звон
+RING_MIN_GAPS = 2                    # минимум окон спада для вердикта
+UNCONFIRMED_CUT_CAP_DB = 3.0         # кэп среза без ring-подтверждения
+
 # Границы HPF по ролям (min, max); None = HPF выключен для роли
 ROLE_HPF_BOUNDS: Dict[str, Optional[Tuple[float, float]]] = {
     "kick": None,
@@ -71,6 +81,8 @@ class ResonanceCut:
     prominence_db: float
     bandwidth_hz: float
     harmonic_check: Dict[str, Any] = field(default_factory=dict)
+    ring_confirmed: Optional[bool] = None   # None = проверить было нечем
+    ring_decay_ratio: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -80,8 +92,60 @@ class ResonanceCut:
             "prominence_db": round(self.prominence_db, 2),
             "bandwidth_hz": round(self.bandwidth_hz, 1),
             "harmonic_check": dict(self.harmonic_check),
+            "ring_confirmed": self.ring_confirmed,
+            "ring_decay_ratio": (
+                None if self.ring_decay_ratio is None
+                else round(self.ring_decay_ratio, 2)
+            ),
             "rule": "resonance_cut_v3",
         }
+
+
+def ring_decay_ratio(
+    x: np.ndarray,
+    sample_rate: int,
+    freq_hz: float,
+    bandwidth_hz: float,
+) -> Optional[float]:
+    """Отношение затухания полосы кандидата к широкополосному в паузах.
+
+    Ищем окна, где широкополосная огибающая падает на RING_BROADBAND_DROP_DB
+    от локального пика; в них сравниваем спад уровня полосы кандидата со
+    спадом всего спектра. Резонанс звенит: ratio < RING_DECAY_RATIO_MAX.
+    Формант умирает с нотой: ratio ~ 1. None — пауз для замера нет.
+    """
+    x = np.asarray(x, dtype=np.float64)
+    hop = max(int(0.01 * sample_rate), 64)
+    n_bins = (len(x) - hop) // hop
+    if n_bins < 20:
+        return None
+    # огибающие: широкополосная и полосовая (биквад-полоса через FFT-маску
+    # слишком дорога поэлементно; берём короткие DFT-пробы на f кандидата)
+    t = np.arange(hop) / sample_rate
+    probe = np.exp(-2j * np.pi * freq_hz * t) * np.hanning(hop)
+    broad_db = np.empty(n_bins)
+    band_db = np.empty(n_bins)
+    for i in range(n_bins):
+        seg = x[i * hop:(i + 1) * hop]
+        broad_db[i] = 10.0 * np.log10(float(np.mean(seg ** 2)) + 1e-12)
+        band_db[i] = 20.0 * np.log10(abs(complex(np.dot(seg, probe))) + 1e-12)
+    ratios: List[float] = []
+    i = 1
+    while i < n_bins - 3:
+        # локальный пик широкополосной огибающей
+        if broad_db[i] >= broad_db[i - 1] and broad_db[i] >= broad_db[i + 1]:
+            # ищем спад на RING_BROADBAND_DROP_DB в ближайших 400 мс
+            for j in range(i + 1, min(i + 40, n_bins)):
+                broad_drop = broad_db[i] - broad_db[j]
+                if broad_drop >= RING_BROADBAND_DROP_DB:
+                    band_drop = band_db[i] - band_db[j]
+                    ratios.append(float(band_drop / max(broad_drop, 1e-6)))
+                    i = j  # не пересекать окна спада
+                    break
+        i += 1
+    if len(ratios) < RING_MIN_GAPS:
+        return None
+    return float(np.median(ratios))
 
 
 def estimate_fundamental_hz(
@@ -205,9 +269,18 @@ def detect_resonances(
         bw = max((right - left) * freq_res, freq_res)
         q = float(np.clip(f / bw, Q_MIN, Q_MAX))
         cut = -min(prominence * RESONANCE_CUT_FACTOR, max_cut_db)
+
+        # ring-тест: без подтверждения звоном (формант/тембровое ядро —
+        # затухает вместе с нотой) срез ограничивается гигиеническим кэпом
+        ratio = ring_decay_ratio(x, sample_rate, float(f), float(bw))
+        ring_confirmed = None if ratio is None else bool(ratio < RING_DECAY_RATIO_MAX)
+        if ring_confirmed is not True:
+            cut = max(cut, -UNCONFIRMED_CUT_CAP_DB)
+
         cuts.append(ResonanceCut(
             freq_hz=float(f), gain_db=float(cut), q=q,
             prominence_db=prominence, bandwidth_hz=float(bw),
+            ring_confirmed=ring_confirmed, ring_decay_ratio=ratio,
             harmonic_check={
                 "phpr_db": None if phpr is None else round(phpr, 1),
                 "subharmonic_ratio_db": None if sub is None else round(sub, 1),

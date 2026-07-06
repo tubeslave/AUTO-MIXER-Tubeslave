@@ -49,6 +49,17 @@ def _resonant_noise(res_freq, n_sec=1.0, res_amp=0.5):
     )
 
 
+def _bursty_noise(n_sec=4.0, period_s=0.5, burst_s=0.12, amp=0.5, seed=7):
+    """Пульсирующий шум: всплески с паузами (нужны ring-тесту)."""
+    rng = np.random.default_rng(seed)
+    x = rng.normal(0, 0.002, int(n_sec * SR))
+    for start in np.arange(0.1, n_sec - burst_s, period_s):
+        i = int(start * SR)
+        n = int(burst_s * SR)
+        x[i:i + n] += amp * rng.normal(0, 1, n) * np.hanning(n)
+    return x.astype(np.float64)
+
+
 class TestFundamentalAndHPF:
     def test_estimates_f0(self):
         f0 = estimate_fundamental_hz(_tone(110.0, harmonics={2: 0.5, 3: 0.3}), SR)
@@ -91,9 +102,42 @@ class TestResonanceDetection:
     def test_flat_noise_no_cuts(self):
         assert detect_resonances(_noise(), SR) == []
 
-    def test_cut_proportional_to_prominence_and_capped(self):
+    def test_continuous_signal_unconfirmed_ring_capped(self):
+        """Непрерывный сигнал: пауз нет, звон не доказан -> кэп -3
+        (вопрос оператора 2026-07-06: «EQ просто давит громкое»)."""
         strong = detect_resonances(_resonant_noise(445.0, res_amp=2.0), SR)
-        assert strong and strong[0].gain_db == -9.0  # кэп саундчека
+        assert strong
+        assert strong[0].gain_db == pytest.approx(-3.0)
+        assert strong[0].ring_confirmed is not True
+
+    def test_ringing_resonance_gets_deep_cut(self):
+        """Звенящий резонатор (высокий Q) поверх резко глохнущего шума:
+        полоса затухает медленнее широкополосного -> глубокий срез."""
+        from scipy.signal import iirpeak, lfilter
+        base = _bursty_noise(seed=9)              # умирает с концом всплеска
+        b, a = iirpeak(445.0 / (SR / 2), Q=60)
+        ring = lfilter(b, a, base) * 6.0          # звенит в паузах
+        x = base + ring
+        cuts = detect_resonances(x, SR)
+        assert cuts, "звенящий резонанс не найден"
+        top = cuts[0]
+        assert top.freq_hz == pytest.approx(445.0, rel=0.06)
+        assert top.ring_confirmed is True
+        assert top.gain_db < -3.0
+
+    def test_formant_without_ring_capped(self):
+        """Формантоподобный пик, умирающий вместе с огибающей ноты, —
+        гигиенический кэп -3, характер не выпиливается."""
+        from scipy.signal import butter, sosfiltfilt
+        env_noise = _bursty_noise()
+        sos = butter(4, [900, 1100], btype="band", fs=SR, output="sos")
+        formant = sosfiltfilt(sos, env_noise) * 12.0   # та же огибающая
+        x = env_noise * 0.3 + formant
+        cuts = detect_resonances(x, SR)
+        for c in cuts:
+            if abs(c.freq_hz - 1000.0) < 150.0:
+                assert c.ring_confirmed is not True
+                assert c.gain_db >= -3.0 - 1e-6
 
 
 class TestERBMasking:
@@ -136,6 +180,19 @@ class TestERBMasking:
         cuts = allocate_complementary_cuts(
             bands, {"gtr": "guitar", "oh": "overheads"})
         assert all(c.channel != "gtr" or c.masked_channel != "oh" for c in cuts)
+
+    def test_masker_identity_core_capped(self):
+        """Тембровое ядро маскера (полосы у его максимума) не режется
+        глубже -3 даже при конфликте с вокалом (оператор 2026-07-06:
+        «EQ просто давит громкое»)."""
+        vocal = _tone(1000.0, amp=0.05)
+        guitar = _tone(1000.0, amp=0.5)   # 1 кГц = энергетическое ядро гитары
+        bands = {"voc": self._bands(vocal), "gtr": self._bands(guitar)}
+        cuts = allocate_complementary_cuts(
+            bands, {"voc": "lead_vocal", "gtr": "guitar"})
+        gtr_cuts = [c for c in cuts if c.channel == "gtr"]
+        assert gtr_cuts, "конфликт не решался"
+        assert all(c.gain_db >= -3.0 - 1e-6 for c in gtr_cuts)
 
 
 class TestABCheck:

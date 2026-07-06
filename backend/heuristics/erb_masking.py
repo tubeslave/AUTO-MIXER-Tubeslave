@@ -30,6 +30,13 @@ FREQ_MIN_HZ, FREQ_MAX_HZ = 50.0, 16000.0
 MASK_THRESHOLD_DB = 6.0
 MAX_MASKING_CUT_DB = 6.0
 CUT_STEP_DB = 1.0
+# Защита тембрового ядра маскера (вопрос оператора 2026-07-06 «EQ просто
+# давит громкое»): полосы в пределах IDENTITY_CORE_WINDOW_DB от максимума
+# канала — его голос; срезать их глубже IDENTITY_CORE_CUT_CAP_DB нельзя,
+# даже если они конфликтуют с суммой. Конфликт решается в НЕ-ядерных
+# полосах маскера или балансом/аранжировкой, не выпиливанием характера.
+IDENTITY_CORE_WINDOW_DB = 6.0
+IDENTITY_CORE_CUT_CAP_DB = 3.0
 MASKING_CUT_Q = 4.0            # constrained-версия Hafezi & Reiss (Q=5, у нас кэп WING)
 MAX_CUTS_PER_CHANNEL = 3
 
@@ -160,6 +167,12 @@ def allocate_complementary_cuts(
 
     priority = {ch: ROLE_PRIORITY.get(roles.get(ch, "line"), 0.5) for ch in working}
     cut_budget = {ch: {} for ch in working}   # ch -> band -> cut_db (>0)
+    # тембровое ядро каждого канала — по ИСХОДНОМУ спектру (до срезов)
+    identity_core = {
+        ch: {int(b) for b in np.flatnonzero(
+            np.asarray(bands) >= float(np.max(bands)) - IDENTITY_CORE_WINDOW_DB)}
+        for ch, bands in working.items()
+    }
     cuts: List[MaskingCut] = []
 
     maskees = sorted(working, key=lambda ch: -priority[ch])
@@ -174,19 +187,25 @@ def allocate_complementary_cuts(
             if working[maskee][b] <= -80.0:
                 continue
             # доминирующий маскер с меньшим приоритетом и запасом бюджета
+            def _band_cap(ch: Any) -> float:
+                # в тембровом ядре маскера срез ограничен гигиеническим кэпом
+                return (IDENTITY_CORE_CUT_CAP_DB if b in identity_core.get(ch, set())
+                        else max_cut_db)
+
             candidates = [
                 ch for ch in working
                 if ch != maskee
                 and priority[ch] < priority[maskee]
                 and roles.get(ch, "") not in PROTECTED_ROLES
-                and cut_budget[ch].get(b, 0.0) < max_cut_db
+                and cut_budget[ch].get(b, 0.0) < _band_cap(ch)
             ]
             if not candidates:
                 continue
             masker = max(candidates, key=lambda ch: working[ch][b])
+            masker_cap = _band_cap(masker)
             mask_before = float(mask[b])
             applied = 0.0
-            while (cut_budget[masker].get(b, 0.0) + applied < max_cut_db):
+            while (cut_budget[masker].get(b, 0.0) + applied < masker_cap):
                 working[masker][b] -= CUT_STEP_DB
                 applied += CUT_STEP_DB
                 mask = masking_vector_db(working, maskee)
