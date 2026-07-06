@@ -83,6 +83,31 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         notes=("wing_tags_dca_assignment", "rollback_file_first"),
     ),
     WriteSurface(
+        id="stem_bus_routing_setup_runner",
+        label="Stem bus routing + processing reset SETUP runner "
+              "(operator-invoked)",
+        status="lab_only",
+        paths=("tools/stem_bus_routing_setup.py",),
+        entrypoints=("stem_bus_routing_setup CLI",),
+        write_kinds=("channel_eq", "channel_gate", "channel_dyn",
+                     "channel_filter", "channel_delay", "channel_polarity",
+                     "channel_trim", "channel_send", "channel_main_assign",
+                     "bus_name", "bus_fader", "bus_mute", "bus_main_assign",
+                     "main_eq", "main_dyn", "usr_signal", "usb_output_routing"),
+        allowed_live=False,
+        gate="rollback file before first write + per-address readback + "
+             "audio probe of new taps; buses built muted, channels leave "
+             "main before buses unmute (no level doubling)",
+        current_policy="SETUP-фаза по явной директиве оператора (2026-07-06): "
+                       "сброс обработки ch1-16 + main, стем-шины 1-6 (GRP "
+                       "sends), USB 33-44 = стемы post-fader, 45/46 = Main LR "
+                       "pre-fader через USR 17/18.",
+        next_action="Подключить стем-тапы 33-44 и Main-pre 45/46 к "
+                    "измерительным контурам движка.",
+        notes=("wing_send_mode_grp", "rollback_file_first",
+               "usr_signal_pool_taps"),
+    ),
+    WriteSurface(
         id="master_pink_balance_runner",
         label="Master pink-noise balance SETUP runner (operator-invoked)",
         status="lab_only",

@@ -1,0 +1,3373 @@
+{
+ "stamp": "20260706T214158",
+ "writes": [
+  {
+   "addr": "/ch/1/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/1/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/14/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/14/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/15/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/15/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/gate/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/dyn/gain",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/flt/lc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/flt/hc",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/in/set/dly",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/in/set/inv",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/in/set/trim",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/on",
+   "value": 0
+  },
+  {
+   "addr": "/main/1/dyn/on",
+   "value": 0
+  },
+  {
+   "addr": "/main/1/eq/1g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/2g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/3g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/4g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/5g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/6g",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/lg",
+   "value": 0.0
+  },
+  {
+   "addr": "/main/1/eq/hg",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/1/name",
+   "value": "DRUMS"
+  },
+  {
+   "addr": "/bus/1/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/1/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/1/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/1/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/2/name",
+   "value": "BASS"
+  },
+  {
+   "addr": "/bus/2/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/2/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/2/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/2/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/3/name",
+   "value": "GTRS"
+  },
+  {
+   "addr": "/bus/3/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/3/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/3/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/3/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/4/name",
+   "value": "PLAYBK"
+  },
+  {
+   "addr": "/bus/4/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/4/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/4/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/4/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/5/name",
+   "value": "KEYS"
+  },
+  {
+   "addr": "/bus/5/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/5/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/5/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/5/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/6/name",
+   "value": "VOX"
+  },
+  {
+   "addr": "/bus/6/fdr",
+   "value": 0.0
+  },
+  {
+   "addr": "/bus/6/mute",
+   "value": 1
+  },
+  {
+   "addr": "/bus/6/main/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/bus/6/main/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/1/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/1/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/1/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/2/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/2/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/2/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/2/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/3/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/3/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/3/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/3/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/4/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/4/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/4/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/4/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/5/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/5/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/5/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/5/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/6/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/6/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/6/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/6/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/7/send/1/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/7/send/1/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/7/send/1/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/7/send/1/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/8/send/2/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/8/send/2/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/8/send/2/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/8/send/2/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/9/send/3/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/9/send/3/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/9/send/3/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/9/send/3/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/10/send/3/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/10/send/3/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/10/send/3/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/10/send/3/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/11/send/4/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/11/send/4/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/11/send/4/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/11/send/4/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/12/send/4/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/12/send/4/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/12/send/4/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/12/send/4/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/13/send/5/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/13/send/5/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/13/send/5/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/13/send/5/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/16/send/6/mode",
+   "value": "GRP"
+  },
+  {
+   "addr": "/ch/16/send/6/lvl",
+   "value": 0.0
+  },
+  {
+   "addr": "/ch/16/send/6/plink",
+   "value": 1
+  },
+  {
+   "addr": "/ch/16/send/6/on",
+   "value": 1
+  },
+  {
+   "addr": "/ch/1/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/2/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/3/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/4/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/5/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/6/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/7/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/8/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/9/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/10/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/11/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/12/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/13/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/ch/16/main/1/on",
+   "value": 0
+  },
+  {
+   "addr": "/bus/1/mute",
+   "value": 0
+  },
+  {
+   "addr": "/bus/2/mute",
+   "value": 0
+  },
+  {
+   "addr": "/bus/3/mute",
+   "value": 0
+  },
+  {
+   "addr": "/bus/4/mute",
+   "value": 0
+  },
+  {
+   "addr": "/bus/5/mute",
+   "value": 0
+  },
+  {
+   "addr": "/bus/6/mute",
+   "value": 0
+  },
+  {
+   "addr": "/io/in/USR/17/name",
+   "value": "MAIN PRE L"
+  },
+  {
+   "addr": "/io/in/USR/17/user/grp",
+   "value": "MAIN"
+  },
+  {
+   "addr": "/io/in/USR/17/user/in",
+   "value": 1
+  },
+  {
+   "addr": "/io/in/USR/17/user/tap",
+   "value": "PRE"
+  },
+  {
+   "addr": "/io/in/USR/17/user/lr",
+   "value": "L"
+  },
+  {
+   "addr": "/io/in/USR/18/name",
+   "value": "MAIN PRE R"
+  },
+  {
+   "addr": "/io/in/USR/18/user/grp",
+   "value": "MAIN"
+  },
+  {
+   "addr": "/io/in/USR/18/user/in",
+   "value": 1
+  },
+  {
+   "addr": "/io/in/USR/18/user/tap",
+   "value": "PRE"
+  },
+  {
+   "addr": "/io/in/USR/18/user/lr",
+   "value": "R"
+  },
+  {
+   "addr": "/io/out/USB/33/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/33/in",
+   "value": 1
+  },
+  {
+   "addr": "/io/out/USB/34/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/34/in",
+   "value": 2
+  },
+  {
+   "addr": "/io/out/USB/35/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/35/in",
+   "value": 3
+  },
+  {
+   "addr": "/io/out/USB/36/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/36/in",
+   "value": 4
+  },
+  {
+   "addr": "/io/out/USB/37/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/37/in",
+   "value": 5
+  },
+  {
+   "addr": "/io/out/USB/38/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/38/in",
+   "value": 6
+  },
+  {
+   "addr": "/io/out/USB/39/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/39/in",
+   "value": 7
+  },
+  {
+   "addr": "/io/out/USB/40/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/40/in",
+   "value": 8
+  },
+  {
+   "addr": "/io/out/USB/41/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/41/in",
+   "value": 9
+  },
+  {
+   "addr": "/io/out/USB/42/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/42/in",
+   "value": 10
+  },
+  {
+   "addr": "/io/out/USB/43/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/43/in",
+   "value": 11
+  },
+  {
+   "addr": "/io/out/USB/44/grp",
+   "value": "BUS"
+  },
+  {
+   "addr": "/io/out/USB/44/in",
+   "value": 12
+  },
+  {
+   "addr": "/io/out/USB/45/grp",
+   "value": "USR"
+  },
+  {
+   "addr": "/io/out/USB/45/in",
+   "value": 17
+  },
+  {
+   "addr": "/io/out/USB/46/grp",
+   "value": "USR"
+  },
+  {
+   "addr": "/io/out/USB/46/in",
+   "value": 18
+  }
+ ],
+ "failed_sends": [],
+ "verify": {
+  "/ch/1/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/1/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/1/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/1/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/1/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/2/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/2/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/2/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/3/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/3/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/3/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/4/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/4/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/4/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/5/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/5/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/5/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/6/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/6/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/6/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/7/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/7/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/7/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/8/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/8/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/8/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/9/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/9/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/9/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/10/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/10/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/10/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/11/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/11/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/11/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/12/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/12/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/12/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/13/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/13/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/in/set/dly": {
+   "want": 0.0,
+   "got": 0.5
+  },
+  "/ch/13/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/14/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/14/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/14/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/14/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/14/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/15/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/15/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/15/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/15/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/15/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/eq/5g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/16/eq/6g": {
+   "want": 0.0,
+   "got": null
+  },
+  "/ch/16/gate/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/dyn/gain": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/flt/lc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/flt/hc": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/in/set/dly": {
+   "want": 0.0,
+   "got": 0.10000000149011612
+  },
+  "/ch/16/in/set/inv": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/in/set/trim": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/main/1/dyn/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/main/1/eq/1g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/2g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/3g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/4g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/5g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/6g": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/lg": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/main/1/eq/hg": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/1/name": {
+   "want": "DRUMS",
+   "got": "DRUMS"
+  },
+  "/bus/1/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/1/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/1/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/1/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/2/name": {
+   "want": "BASS",
+   "got": "BASS"
+  },
+  "/bus/2/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/2/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/2/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/2/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/3/name": {
+   "want": "GTRS",
+   "got": "GTRS"
+  },
+  "/bus/3/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/3/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/3/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/3/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/4/name": {
+   "want": "PLAYBK",
+   "got": "PLAYBK"
+  },
+  "/bus/4/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/4/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/4/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/4/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/5/name": {
+   "want": "KEYS",
+   "got": "KEYS"
+  },
+  "/bus/5/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/5/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/5/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/5/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/6/name": {
+   "want": "VOX",
+   "got": "VOX"
+  },
+  "/bus/6/fdr": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/bus/6/mute": {
+   "want": 0,
+   "got": 0
+  },
+  "/bus/6/main/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/bus/6/main/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/1/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/1/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/1/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/2/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/2/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/2/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/2/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/3/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/3/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/3/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/3/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/4/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/4/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/4/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/4/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/5/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/5/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/5/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/5/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/6/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/6/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/6/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/6/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/7/send/1/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/7/send/1/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/7/send/1/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/7/send/1/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/8/send/2/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/8/send/2/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/8/send/2/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/8/send/2/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/9/send/3/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/9/send/3/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/9/send/3/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/9/send/3/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/10/send/3/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/10/send/3/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/10/send/3/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/10/send/3/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/11/send/4/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/11/send/4/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/11/send/4/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/11/send/4/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/12/send/4/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/12/send/4/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/12/send/4/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/12/send/4/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/13/send/5/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/13/send/5/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/13/send/5/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/13/send/5/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/16/send/6/mode": {
+   "want": "GRP",
+   "got": "GRP"
+  },
+  "/ch/16/send/6/lvl": {
+   "want": 0.0,
+   "got": 0.0
+  },
+  "/ch/16/send/6/plink": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/16/send/6/on": {
+   "want": 1,
+   "got": 1
+  },
+  "/ch/1/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/2/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/3/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/4/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/5/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/6/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/7/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/8/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/9/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/10/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/11/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/12/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/13/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/ch/16/main/1/on": {
+   "want": 0,
+   "got": 0
+  },
+  "/io/in/USR/17/name": {
+   "want": "MAIN PRE L",
+   "got": "MAIN PRE L"
+  },
+  "/io/in/USR/17/user/grp": {
+   "want": "MAIN",
+   "got": "MAIN"
+  },
+  "/io/in/USR/17/user/in": {
+   "want": 1,
+   "got": 0
+  },
+  "/io/in/USR/17/user/tap": {
+   "want": "PRE",
+   "got": "PRE"
+  },
+  "/io/in/USR/17/user/lr": {
+   "want": "L",
+   "got": "L"
+  },
+  "/io/in/USR/18/name": {
+   "want": "MAIN PRE R",
+   "got": "MAIN PRE R"
+  },
+  "/io/in/USR/18/user/grp": {
+   "want": "MAIN",
+   "got": "MAIN"
+  },
+  "/io/in/USR/18/user/in": {
+   "want": 1,
+   "got": 0
+  },
+  "/io/in/USR/18/user/tap": {
+   "want": "PRE",
+   "got": "PRE"
+  },
+  "/io/in/USR/18/user/lr": {
+   "want": "R",
+   "got": "R"
+  },
+  "/io/out/USB/33/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/33/in": {
+   "want": 1,
+   "got": 0
+  },
+  "/io/out/USB/34/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/34/in": {
+   "want": 2,
+   "got": 1
+  },
+  "/io/out/USB/35/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/35/in": {
+   "want": 3,
+   "got": 2
+  },
+  "/io/out/USB/36/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/36/in": {
+   "want": 4,
+   "got": 3
+  },
+  "/io/out/USB/37/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/37/in": {
+   "want": 5,
+   "got": 4
+  },
+  "/io/out/USB/38/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/38/in": {
+   "want": 6,
+   "got": 5
+  },
+  "/io/out/USB/39/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/39/in": {
+   "want": 7,
+   "got": 6
+  },
+  "/io/out/USB/40/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/40/in": {
+   "want": 8,
+   "got": 7
+  },
+  "/io/out/USB/41/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/41/in": {
+   "want": 9,
+   "got": 8
+  },
+  "/io/out/USB/42/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/42/in": {
+   "want": 10,
+   "got": 9
+  },
+  "/io/out/USB/43/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/43/in": {
+   "want": 11,
+   "got": 10
+  },
+  "/io/out/USB/44/grp": {
+   "want": "BUS",
+   "got": "BUS"
+  },
+  "/io/out/USB/44/in": {
+   "want": 12,
+   "got": 11
+  },
+  "/io/out/USB/45/grp": {
+   "want": "USR",
+   "got": "USR"
+  },
+  "/io/out/USB/45/in": {
+   "want": 17,
+   "got": 16
+  },
+  "/io/out/USB/46/grp": {
+   "want": "USR",
+   "got": "USR"
+  },
+  "/io/out/USB/46/in": {
+   "want": 18,
+   "got": 17
+  }
+ },
+ "mismatches": [
+  {
+   "addr": "/ch/1/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/1/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/1/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/2/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/2/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/2/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/3/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/3/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/3/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/4/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/4/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/4/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/5/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/5/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/6/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/6/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/6/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/7/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/7/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/7/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/8/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/8/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/9/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/9/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/10/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/10/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/11/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/11/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/12/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/12/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/13/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/13/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/13/in/set/dly",
+   "want": 0.0,
+   "got": 0.5
+  },
+  {
+   "addr": "/ch/14/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/14/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/15/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/15/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/16/eq/5g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/ch/16/eq/6g",
+   "want": 0.0,
+   "got": null
+  },
+  {
+   "addr": "/bus/1/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/bus/2/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/bus/3/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/bus/4/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/bus/5/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/bus/6/mute",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/io/in/USR/17/user/in",
+   "want": 1,
+   "got": 0
+  },
+  {
+   "addr": "/io/in/USR/18/user/in",
+   "want": 1,
+   "got": 0
+  }
+ ]
+}

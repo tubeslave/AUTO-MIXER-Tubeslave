@@ -113,6 +113,21 @@ autofoh:
       4: {name: PLAYBK, channels: [11, 12], plane_lufs: -30.0}
       5: {name: KEYS, channels: [13], plane_lufs: -30.0}
       6: {name: VOX, channels: [16], plane_lufs: -22.0}
+  # Карта измерительных USB-тапов (директива оператора 2026-07-06):
+  # 1-16 RAW pre-trim (построил оператор), 17-32 каналы post-fader через
+  # USR 1-16 (построил оператор), 33-44 стем-шины 1-6 post-fader (L/R),
+  # 45-46 Main LR PRE-fader через USR 17/18 (tools/stem_bus_routing_setup.py)
+  measurement_taps:
+    raw_channels: {first_usb: 1, channels: 16}
+    postfader_channels: {first_usb: 17, channels: 16}
+    stem_buses:
+      1: {name: DRUMS, usb: [33, 34]}
+      2: {name: BASS, usb: [35, 36]}
+      3: {name: GTRS, usb: [37, 38]}
+      4: {name: PLAYBK, usb: [39, 40]}
+      5: {name: KEYS, usb: [41, 42]}
+      6: {name: VOX, usb: [43, 44]}
+    main_prefader: [45, 46]
   master_mix:
     enabled: true
     capture_channels: [47, 48]
