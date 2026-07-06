@@ -145,7 +145,7 @@ class TestScenario4Instrumental:
         targets, anchor, warning = build_target_vector(config, roles)
         assert anchor == "lead_instrument" and warning is None
         measured = {5: -28.0, 1: -24.0, 8: -26.0, 9: -22.0}
-        sol = solve_faders(measured, targets)
+        sol = solve_faders(measured, targets, anchor_channel=5)
         assert sol.converged
         assert sol.passes <= 3
         result = {ch: measured[ch] + sol.faders_db[ch] for ch in measured}

@@ -47,7 +47,7 @@ class TestFaderSolver:
         measured = {16: -30.0, 8: -24.0, 1: -26.0}
         targets = target_vector_lufs(
             {16: "lead_vocal", 8: "bass", 1: "kick"}, "pop_rock")
-        sol = solve_faders(measured, targets)
+        sol = solve_faders(measured, targets, anchor_channel=16)
         assert sol.converged
         # линейная модель: measured + fader == target (после нормализации
         # вниз разница между каналами сохраняется)
@@ -59,7 +59,7 @@ class TestFaderSolver:
         """Тихий вокал требует +8 дБ — весь вектор уезжает вниз, не выше 0."""
         measured = {16: -34.0, 9: -22.0}
         targets = target_vector_lufs({16: "lead_vocal", 9: "guitar"}, "pop_rock")
-        sol = solve_faders(measured, targets)
+        sol = solve_faders(measured, targets, anchor_channel=16)
         assert max(sol.faders_db.values()) <= 0.0 + 1e-9
         assert any("нормализация вниз" in n for n in sol.notes)
 
@@ -176,3 +176,20 @@ class TestBleedRobustness:
         measured = {"voc": contaminated_voc, "drum": -20.0}
         est = lm.estimate_true_levels_db(measured)
         assert est["voc"] < contaminated_voc - 1.0
+
+
+def test_single_headroom_limited_channel_does_not_drag_mix_down():
+    """Live 2026-07-06: kick с тримом −12 требовал фейдер +12 — старая
+    нормализация стаскивала ВЕСЬ микс на −12 дБ каждый прогон
+    (−34 -> −38.5 LUFS). Не-якорный дефицитный канал клампится на потолке,
+    остальные остаются на плоскостях."""
+    measured = {16: -22.0, 1: -34.0, 8: -25.0, 9: -25.0}   # kick глубоко в минусе
+    targets = target_vector_lufs(
+        {16: "lead_vocal", 1: "kick", 8: "bass", 9: "guitar"}, "pop_rock")
+    sol = solve_faders(measured, targets, anchor_channel=16)
+    assert sol.faders_db[1] <= 0.0 + 1e-9          # kick на потолке
+    assert abs(sol.residual_lu[1]) > 1.0           # честный дефицит kick
+    # вокал/бас/гитара достигли целей БЕЗ глобального сдвига
+    for ch in (16, 8, 9):
+        assert abs(sol.residual_lu[ch]) <= 1.0
+    assert any("клампированы" in n for n in sol.notes)

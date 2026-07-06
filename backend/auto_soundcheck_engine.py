@@ -4946,7 +4946,10 @@ class AutoSoundcheckEngine:
             config = getattr(self, "balance_config", None) or BalanceConfig(
                 genre=str(getattr(self, "balance_genre", "pop_rock")))
             targets, anchor_role, anchor_warning = build_target_vector(config, roles)
-            solution = solve_faders(measured, targets, current_faders_db=current)
+            anchor_ch = next(
+                (ch for ch, role in roles.items() if role == anchor_role), None)
+            solution = solve_faders(measured, targets, current_faders_db=current,
+                                    anchor_channel=anchor_ch)
             solution.anchor_role = anchor_role
             solution.anchor_warning = anchor_warning
             logger.info(

@@ -231,6 +231,7 @@ def solve_faders(
     tolerance_lu: float = SOLVER_TOLERANCE_LU,
     max_passes: int = SOLVER_MAX_PASSES,
     max_move_db: float = SOUNDCHECK_MAX_MOVE_DB,
+    anchor_channel: Optional[Any] = None,
 ) -> FaderSolution:
     """Итеративный решатель фейдеров саундчека.
 
@@ -264,16 +265,36 @@ def solve_faders(
             # bounded move от стартовой позиции
             faders[ch] = float(np.clip(
                 faders[ch], start[ch] - max_move_db, start[ch] + max_move_db))
-        # Потолок 0 dBFS: баланс ОТНОСИТЕЛЕН — при переполнении вниз сдвигается
-        # и вектор фейдеров, и вектор целей (иначе абсолютные цели становятся
-        # недостижимыми и решатель осциллирует).
-        overshoot = max(faders.values()) - FADER_CEILING_DB
-        if overshoot > 0.0:
-            faders = {ch: v - overshoot for ch, v in faders.items()}
-            targets = {ch: v - overshoot for ch, v in targets.items()}
-            notes.append(
-                f"pass {passes}: вектор сдвинут на {-overshoot:.1f} dB "
-                "(потолок 0 dBFS, нормализация вниз)")
+        # Потолок 0 dBFS. Глобальная нормализация вниз — ТОЛЬКО когда над
+        # потолком БОЛЬШИНСТВО каналов (весь план невыполним): иначе один
+        # headroom-ограниченный канал (kick с тримом −12 и crest 38 дБ)
+        # прогон за прогоном стаскивает весь микс на величину своего
+        # дефицита — live 2026-07-06: −12 дБ на КАЖДОМ прогоне, микс уехал
+        # с −34 до −38.5 LUFS. Отдельный невыполнимый канал клампится на
+        # потолке и остаётся в residual (честный дефицит), баланс остальных
+        # не трогается.
+        over = {ch: v - FADER_CEILING_DB for ch, v in faders.items()
+                if v > FADER_CEILING_DB}
+        if over:
+            anchor_over = anchor_channel is not None and anchor_channel in over
+            if anchor_over or len(over) > len(faders) / 2:
+                # якорь (вокал) обязан сидеть на своей плоскости — при его
+                # дефиците опускается весь микс (вокал-референсная доктрина);
+                # то же при невыполнимости большинства целей
+                overshoot = (float(over[anchor_channel]) if anchor_over
+                             else float(np.median(list(over.values()))))
+                faders = {ch: v - overshoot for ch, v in faders.items()}
+                targets = {ch: v - overshoot for ch, v in targets.items()}
+                notes.append(
+                    f"pass {passes}: вектор сдвинут на {-overshoot:.1f} dB "
+                    "(потолок 0 dBFS, нормализация вниз: "
+                    f"{'якорь' if anchor_over else 'большинство'} над потолком)")
+            else:
+                for ch in over:
+                    faders[ch] = FADER_CEILING_DB
+                notes.append(
+                    f"pass {passes}: каналы {sorted(over)} клампированы на "
+                    "потолке (headroom-дефицит, честный residual)")
         if measure_fn is not None:
             measured = {ch: float(v) for ch, v in measure_fn(faders).items()}
         else:
