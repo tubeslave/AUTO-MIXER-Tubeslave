@@ -131,6 +131,12 @@ def apply_plan(client: WingClient, decisions, journal: dict) -> None:
         entry["writes"]["bus_main_on"] = wr(f"/bus/{d.bus_id}/main/1/on", 1)
         entry["writes"]["bus_fdr"] = wr(f"/bus/{d.bus_id}/fdr",
                                         float(d.return_level_db))
+        if d.fx_type == "delay":
+            # темпо-дилей вне сетки трека читается как «второй мультитрек»
+            # (live 2026-07-06): шина ставится ЗАМЬЮЧЕННОЙ, оператор
+            # снимает мьют после подтверждения темпа (или ре-синк fx_v3)
+            entry["writes"]["bus_mute"] = wr(f"/bus/{d.bus_id}/mute", 1)
+            entry["delay_muted_until_tempo_confirmed"] = True
         entry["verdict"] = ("applied" if entry["writes"]["preins/on"] == 1
                             else "insert_not_confirmed")
         journal["decisions"].append(entry)

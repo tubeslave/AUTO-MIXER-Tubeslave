@@ -71,7 +71,7 @@ def test_tempo_delay_uses_tempo_for_dotted_eighth_and_quarter():
 
     assert delay_bus.params["left_delay_ms"] == 450.0
     assert delay_bus.params["right_delay_ms"] == 600.0
-    assert delay_bus.return_level_db == -0.5
+    assert delay_bus.return_level_db == -6.0  # -0.5 звучал как дубль (live 2026-07-06)
     assert delay_bus.duck_source == "lead_vocal"
 
 
@@ -82,7 +82,7 @@ def test_default_fx_returns_are_audible_live_variant():
     levels = {bus.name: bus.return_level_db for bus in plan.buses}
     assert levels["Vocal Plate"] == -4.0
     assert levels["Drum Room"] == -4.0
-    assert levels["Tempo Delay"] == -0.5
+    assert levels["Tempo Delay"] == -6.0
     assert levels["Mod Doubler"] == -11.0
 
 
@@ -128,7 +128,7 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
     assert correction["future_wing_readback_contract"]["target_kind"] == "send_or_fx_parameter"
     assert correction["bounded_delta"]["action_type"] == "auto_fx_apply_blocked"
     assert correction["bounded_delta"]["parameter_deltas"]["target_send_db"] == -17.0
-    assert correction["bounded_delta"]["parameter_deltas"]["return_level_db"] == -0.5
+    assert correction["bounded_delta"]["parameter_deltas"]["return_level_db"] == -4.0
     assert correction["bounded_delta"]["parameter_deltas"]["send_level_db"] == -17.0
     assert correction["confidence"] == 0.4
     assert correction["confidence_review"]["status"] == (
@@ -175,15 +175,15 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
     }
     assert source_evidence["fx_return_headroom"] == {
         "status": "blocked_until_physical_return_readback",
-        "planned_loudest_return_db": -0.5,
+        "planned_loudest_return_db": -4.0,
         "min_return_headroom_db": 3.0,
-        "return_level_safety_status": "blocked",
+        "return_level_safety_status": "passed",
         "source": "cached_or_physical_fx_read_required_before_promotion",
         "required_before_live_promotion": True,
     }
     assert source_evidence["return_level_safety"] == {
-        "status": "blocked",
-        "loudest_return_db": -0.5,
+        "status": "passed",
+        "loudest_return_db": -4.0,
         "max_return_level_db": -3.0,
         "source": "legacy_auto_fx_plan_blocked_calls",
         "physical_return_readback_required_before_live_promotion": True,
@@ -192,9 +192,9 @@ def test_apply_to_mixer_is_fail_closed_and_returns_blocked_fx_commands():
         "fx_mix_percent": 100.0,
         "post_fader_sends_only": True,
         "loudest_send_db": -17.0,
-        "loudest_return_db": -0.5,
+        "loudest_return_db": -4.0,
         "send_level_limit_status": "passed",
-        "return_level_safety_status": "blocked",
+        "return_level_safety_status": "passed",
     }
     evidence_checks = correction["headroom_feedback_true_peak_checks"][
         "evidence_checks"

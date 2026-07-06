@@ -1,0 +1,15 @@
+{
+ "status": "NO_SIGNAL",
+ "lufs_integrated": null,
+ "true_peak_dbtp": null,
+ "crest_db": null,
+ "lr_balance_db": null,
+ "correlation": null,
+ "mono_fold_ratio": null,
+ "tilt_deviation_db": null,
+ "vocal_presence_db": null,
+ "issues": [
+  "в мастер-отводе тишина — проверить mute Main LR и роутинг /io/out/USB/47|48"
+ ],
+ "method": "master_mix_eval"
+}

@@ -384,7 +384,10 @@ class AutoFXPlanner:
                 fx_type="delay",
                 fx_slot="FX3",
                 model="ST-DL",  # официальное имя FW 3.1; STEREO_DELAY не существует
-                return_level_db=-0.5,
+                # −0.5 дБ звучало как «второй мультитрек» на живом миксе
+                # (оператор 2026-07-06): темпо-дилей вне сетки трека при
+                # горячем возврате читается как параллельный дубль
+                return_level_db=-6.0,
                 params={
                     "left_delay_ms": dotted_eighth_ms,
                     "right_delay_ms": quarter_ms,
