@@ -42,6 +42,16 @@ iteration_log:
   notes: Ролевые цели согласуются с comp_v3 (kick release 359 мс над полом 50; вокальные
     GR в рамках); новое — duty-cycle компрессора как метрика здоровья (<80%) и release-пол
     50 мс для НЧ.
+- date: '2026-07-07'
+  topic: vocal_chain_live
+  rules_added:
+  - vocal_chain.order_live
+  - vocal_chain.deess_after_comp
+  - vocal_chain.fx_on_sends_only
+  rules_rejected: []
+  notes: 'Частотные цели вокала кросс-подтверждают eq.tonal_targets.lead_vocal; ключевая
+    WING-оговорка: единый EQ до динамики — прибавляющие бусты компрессируются; FX-на-посылах
+    уже наша архитектура.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -65,7 +75,7 @@ topics:
   operator_complaint: вокал то громко, то тихо; makeup обязателен
 - id: vocal_chain_live
   title: Вокальный тракт live — EQ/comp/de-ess/FX порядок, борьба за читаемость
-  status: pending
+  status: done
 - id: mix_bus_loudness_live
   title: Громкость и плотность живого микса — цели LUFS/TP, что двигать
   status: pending

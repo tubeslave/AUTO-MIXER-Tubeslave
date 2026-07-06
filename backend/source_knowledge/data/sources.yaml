@@ -1182,3 +1182,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация compression_per_role 2026-07-07: барабанные release-полы (по поисковой выжимке)."
+
+  - source_id: rysupaudio_vocal_chain
+    title: "Best Vocal Chain Order — Correct Plugin Signal Flow"
+    source_type: web_article
+    authors: ["Rys Up Audio"]
+    publisher: "rysupaudio.com"
+    year: 2026
+    url: "https://rysupaudio.com/blogs/news/best-vocal-chain-order"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация vocal_chain_live 2026-07-07: порядок тракта с обоснованиями, параметры."
+  - source_id: izotope_vocal_chain
+    title: "Crafting a basic vocal chain"
+    source_type: web_article
+    authors: ["iZotope"]
+    publisher: "izotope.com"
+    year: 2024
+    url: "https://www.izotope.com/en/learn/crafting-a-basic-vocal-chain.html"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация vocal_chain_live 2026-07-07: кросс-подтверждение порядка (по поисковой выжимке)."
