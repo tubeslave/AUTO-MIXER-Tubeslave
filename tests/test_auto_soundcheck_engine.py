@@ -2337,3 +2337,103 @@ def test_dca_group_balance_trims_stem_to_plane_cuts_only():
     assert dca_calls, "DCA-движение не отправлено"
     assert dca_calls[-1][1] == 1
     assert dca_calls[-1][2] == pytest.approx(-6.0, abs=0.3)   # -25 - (-19)
+
+
+def test_dca_group_balance_prefers_stem_bus_tap_over_member_sum():
+    """Тапы 33-44: реальный замер стем-шины важнее мощностной суммы
+    участников (та игнорирует фазу/корреляцию микрофонов)."""
+    mixer = DetectorMixer()
+    mixer.state = {}
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            promoted_direct_write_action_types=("DCAFaderMove",)),
+    )
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    engine.config_manager.get_section = lambda name: (
+        {"dca_balance": {"enabled": True, "groups": {
+            1: {"name": "DRUMS", "channels": [1, 2], "plane_lufs": -25.0}}},
+         "measurement_taps": {"stem_buses": {
+             1: {"name": "DRUMS", "usb": [33, 34]}}}}
+        if name == "autofoh" else {})
+
+    class _Lvl:
+        def __init__(self, lufs): self.lufs_integrated = lufs
+    class _M:
+        def __init__(self, lufs): self.level = _Lvl(lufs)
+
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="KICK", preset="kick", has_signal=True,
+                       fader_db=0.0),
+        2: ChannelInfo(channel=2, name="SNARE", preset="snare", has_signal=True,
+                       fader_db=0.0),
+    }
+    # участники говорят -40 (сумма ~ -37), но тап шины слышит -20/-20
+    # (power sum ~ -17): решает тап
+    engine.channels[1].metrics = _M(-40.0)
+    engine.channels[2].metrics = _M(-40.0)
+    engine._tap_lufs = lambda ch, seconds=4.0: (
+        -20.0 if ch in (33, 34) else None)
+
+    engine._apply_dca_group_balance()
+    dca_calls = [c for c in mixer.calls if c[0] == "set_dca_fader"]
+    assert dca_calls, "DCA-движение не отправлено"
+    assert dca_calls[-1][2] == pytest.approx(-8.0, abs=0.3)  # -25 - (-17)
+
+
+def test_postfader_tap_channel_mapping_follows_config():
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.config_manager.get_section = lambda name: (
+        {"measurement_taps": {"postfader_channels": {
+            "first_usb": 17, "channels": 16}}}
+        if name == "autofoh" else {})
+    assert engine._postfader_tap_channel(1) == 17
+    assert engine._postfader_tap_channel(16) == 32
+    assert engine._postfader_tap_channel(17) is None
+    assert engine._postfader_tap_channel(0) is None
+
+
+def test_same_source_pair_rejects_implausible_alignment_delay():
+    """SNARE T/B — микрофоны одного барабана в паре сантиметров: замер
+    9.9 мс (период резонанса ~100 Гц) — неоднозначность GCC-PHAT, не
+    настоящая задержка. Live 2026-07-06: ch2 получил dly 10 мс."""
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    assert engine._same_source_delay_plausible("snare", 0.58) is True
+    assert engine._same_source_delay_plausible("snare", 9.90) is False
+    assert engine._same_source_delay_plausible("kick", -3.5) is False
+    # room-микрофоны стоят в метрах от источника — большие задержки легитимны
+    assert engine._same_source_delay_plausible("room", 9.90) is True
+
+
+def test_master_mix_eval_falls_back_to_prefader_tap_when_master_muted():
+    """Мастер замьючен внешним актором: post-fader тап 47/48 молчит,
+    оценка микса берётся с PRE-fader тапа 45/46 и помечается source."""
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.master_mix_enabled = True
+    engine.master_mix_channels = [47, 48]
+    engine.master_mix_seconds = 2.0
+    engine.master_mix_target_curve = "pink"
+    engine.master_mix_target_lufs = -20.0
+    engine.config_manager.get_section = lambda name: (
+        {"measurement_taps": {"main_prefader": [45, 46]}}
+        if name == "autofoh" else {})
+
+    sr = engine.sample_rate
+    t = np.arange(int(sr * 2.0)) / sr
+    rng = np.random.default_rng(7)
+    music = (0.1 * np.sin(2 * np.pi * 220 * t)
+             + 0.05 * rng.standard_normal(t.size))
+
+    class _Cap:
+        def get_buffer(self, ch, n):
+            if ch in (45, 46):
+                return music[:n]
+            return np.zeros(n)
+    engine.audio_capture = _Cap()
+
+    payload = engine._evaluate_master_mix()
+    assert payload is not None
+    assert payload["source"] == "main_prefader_muted_master"
+    assert payload["status"] != "NO_SIGNAL"

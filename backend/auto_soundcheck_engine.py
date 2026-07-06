@@ -4591,6 +4591,57 @@ class AutoSoundcheckEngine:
         # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
         self._evaluate_master_mix()
 
+    def _measurement_taps(self) -> Dict[str, Any]:
+        """Карта измерительных USB-тапов (config autofoh.measurement_taps)."""
+        return ((self.config_manager.get_section("autofoh") or {})
+                .get("measurement_taps", {}) or {})
+
+    def _tap_lufs(self, capture_channel: int,
+                  seconds: float = 4.0) -> Optional[float]:
+        """Integrated LUFS с измерительного USB-тапа; None при тишине."""
+        if self.audio_capture is None or not capture_channel:
+            return None
+        try:
+            from master_mix_eval import _integrated_lufs
+            window = int(self.sample_rate * seconds)
+            x = np.asarray(
+                self.audio_capture.get_buffer(capture_channel, window),
+                dtype=np.float64).reshape(-1)
+            if x.size < self.sample_rate:
+                return None
+            lufs = _integrated_lufs(x, self.sample_rate)
+            if not np.isfinite(lufs) or lufs <= -90.0:
+                return None
+            return float(lufs)
+        except Exception:
+            return None
+
+    def _postfader_tap_channel(self, ch: int) -> Optional[int]:
+        """USB-канал post-fader тапа канала ch (17-32 для ch 1-16)."""
+        cfg = self._measurement_taps().get("postfader_channels") or {}
+        try:
+            first = int(cfg.get("first_usb", 0))
+            count = int(cfg.get("channels", 0))
+        except (TypeError, ValueError):
+            return None
+        if first <= 0 or not (1 <= ch <= count):
+            return None
+        return first + ch - 1
+
+    def _stem_tap_lufs(self, dca_id: int) -> Optional[float]:
+        """Стем-сумма группы по USB-тапу шины (BS.1770 power sum L/R)."""
+        stems = self._measurement_taps().get("stem_buses") or {}
+        spec = stems.get(dca_id) or stems.get(str(dca_id)) or {}
+        usb = spec.get("usb") or []
+        if len(usb) < 2:
+            return None
+        sides = [self._tap_lufs(int(usb[0])), self._tap_lufs(int(usb[1]))]
+        vals = [v for v in sides if v is not None]
+        if not vals:
+            return None
+        return float(10.0 * np.log10(
+            sum(10.0 ** (v / 10.0) for v in vals) + 1e-12))
+
     def _apply_dca_group_balance(
         self,
         *,
@@ -4606,27 +4657,34 @@ class AutoSoundcheckEngine:
             try:
                 members = [int(ch) for ch in (spec.get("channels") or [])]
                 plane = float(spec.get("plane_lufs", -25.0))
-                powers = []
-                for ch in members:
-                    info = self.channels.get(ch)
-                    if info is None or not info.has_signal:
-                        continue
-                    lufs = None
-                    if info.metrics and info.metrics.level.lufs_integrated > -90:
-                        lufs = float(info.metrics.level.lufs_integrated)
-                    elif info.lufs > -90:
-                        lufs = float(info.lufs)
-                    if lufs is None:
-                        continue
-                    post = (lufs + self._channel_trim_db(ch)
-                            + (float(info.fader_db) if info.fader_db > -140 else 0.0))
-                    powers.append(10.0 ** (post / 10.0))
-                if not powers:
+                # приоритет — реальный замер стем-шины (USB-тап post-fader):
+                # честная сумма с учётом фазы/корреляции микрофонов
+                stem_sum = self._stem_tap_lufs(int(dca_id))
+                stem_src = "тап шины"
+                if stem_sum is None:
+                    stem_src = "сумма участников"
+                    powers = []
+                    for ch in members:
+                        info = self.channels.get(ch)
+                        if info is None or not info.has_signal:
+                            continue
+                        lufs = None
+                        if info.metrics and info.metrics.level.lufs_integrated > -90:
+                            lufs = float(info.metrics.level.lufs_integrated)
+                        elif info.lufs > -90:
+                            lufs = float(info.lufs)
+                        if lufs is None:
+                            continue
+                        post = (lufs + self._channel_trim_db(ch)
+                                + (float(info.fader_db) if info.fader_db > -140 else 0.0))
+                        powers.append(10.0 ** (post / 10.0))
+                    if powers:
+                        stem_sum = 10.0 * np.log10(sum(powers) + 1e-12)
+                if stem_sum is None:
                     logger.info(
-                        "DCA%d '%s': нет замеренного сигнала у участников — "
-                        "пропуск", int(dca_id), spec.get("name", ""))
+                        "DCA%d '%s': нет сигнала ни на тапе шины, ни у "
+                        "участников — пропуск", int(dca_id), spec.get("name", ""))
                     continue
-                stem_sum = 10.0 * np.log10(sum(powers) + 1e-12)
                 target = float(np.clip(plane - stem_sum, -12.0, 0.0))
                 decision = self._execute_action(
                     DCAFaderMove(
@@ -4639,8 +4697,10 @@ class AutoSoundcheckEngine:
                 )
                 if decision and decision.sent:
                     logger.info(
-                        "DCA%d '%s': стем %.1f LUFS, плоскость %.1f -> fdr %.1f",
-                        int(dca_id), spec.get("name", ""), stem_sum, plane, target)
+                        "DCA%d '%s': стем %.1f LUFS (%s), плоскость %.1f -> "
+                        "fdr %.1f",
+                        int(dca_id), spec.get("name", ""), stem_sum, stem_src,
+                        plane, target)
             except Exception:
                 logger.exception("DCA balance failed for group %s", dca_id)
 
@@ -4666,6 +4726,30 @@ class AutoSoundcheckEngine:
                 target_lufs=self.master_mix_target_lufs,
             )
             payload = verdict.to_dict()
+            payload["source"] = "main_postfader"
+            if verdict.status == "NO_SIGNAL":
+                # мастер замьючен (внешний актор) — честная оценка микса
+                # остаётся возможной по PRE-fader тапу (USB 45/46)
+                pre = self._measurement_taps().get("main_prefader") or []
+                if len(pre) >= 2:
+                    left = np.asarray(
+                        self.audio_capture.get_buffer(int(pre[0]), window),
+                        dtype=np.float64).reshape(-1)
+                    right = np.asarray(
+                        self.audio_capture.get_buffer(int(pre[1]), window),
+                        dtype=np.float64).reshape(-1)
+                    pre_verdict = evaluate_master_mix(
+                        left, right, self.sample_rate,
+                        target_curve=self.master_mix_target_curve,
+                        target_lufs=self.master_mix_target_lufs,
+                    )
+                    if pre_verdict.status != "NO_SIGNAL":
+                        logger.warning(
+                            "Master LR замьючен — оценка по PRE-fader тапу "
+                            "%s (в зал микс сейчас НЕ идёт)", list(pre))
+                        verdict = pre_verdict
+                        payload = verdict.to_dict()
+                        payload["source"] = "main_prefader_muted_master"
             self.last_master_mix_verdict = payload
             if verdict.status == "NO_SIGNAL":
                 logger.warning(
@@ -5084,6 +5168,7 @@ class AutoSoundcheckEngine:
         roles: Dict[int, str] = {}
         current: Dict[int, float] = {}
         trims_at_solve: Dict[int, float] = {}
+        tap_channels: List[int] = []
         for ch, info in self.channels.items():
             if not info.has_signal or not info.auto_corrections_enabled:
                 continue
@@ -5104,11 +5189,22 @@ class AutoSoundcheckEngine:
             trim = self._channel_trim_db(ch)
             fader_now = float(info.fader_db) if info.fader_db > -140 else 0.0
             trims_at_solve[ch] = trim
-            measured[ch] = lufs + trim + fader_now
+            # приоритет — прямой замер post-fader USB-тапа (17-32):
+            # закрытый контур вместо вычисленного capture+trim+fader
+            tap_lufs = self._tap_lufs(self._postfader_tap_channel(ch) or 0)
+            if tap_lufs is not None:
+                measured[ch] = tap_lufs
+                tap_channels.append(ch)
+            else:
+                measured[ch] = lufs + trim + fader_now
             roles[ch] = (info.source_role if info.source_role != "unknown"
                          else (info.preset or "line"))
             current[ch] = fader_now
         self._balance_trim_at_solve = trims_at_solve
+        if tap_channels:
+            logger.info(
+                "balance_v3: post-fader тапы использованы для %d каналов: %s",
+                len(tap_channels), tap_channels)
         if len(measured) < 2:
             return None
         try:
@@ -5736,6 +5832,21 @@ class AutoSoundcheckEngine:
                     logger.debug(f"Phase: skipping — low coherence/similarity")
                     continue
 
+                # Микрофоны ОДНОГО барабана стоят в паре сантиметров:
+                # физический потолок задержки ~2 мс. Больший замер —
+                # неоднозначность GCC-PHAT на периодическом сигнале
+                # (резонанс снейра ~100 Гц = период 10 мс; live 2026-07-06:
+                # SNARE T/B «9.90 мс» при coherence 1.0). Замеру пары
+                # доверять нельзя целиком — пропускаем и polarity тоже.
+                if not self._same_source_delay_plausible(
+                        pair_type, icm.delay_ms):
+                    logger.warning(
+                        f"Phase: {name_a} ↔ {name_b}: замер "
+                        f"{icm.delay_ms:.2f} мс физически неправдоподобен "
+                        f"для пары одного источника — пара пропущена "
+                        f"(периодическая неоднозначность GCC-PHAT)")
+                    continue
+
                 # Phase inversion detected
                 if icm.phase_inverted:
                     raw_b = self._snapshot_raw(info_b) if info_b else {}
@@ -5827,6 +5938,17 @@ class AutoSoundcheckEngine:
 
             except Exception as e:
                 logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
+
+    # пресеты пар «один источник — несколько близких микрофонов»
+    SAME_SOURCE_CLOSE_PAIR_PRESETS = frozenset({"kick", "snare"})
+    SAME_SOURCE_MAX_PLAUSIBLE_DELAY_MS = 2.0
+
+    def _same_source_delay_plausible(self, pair_type: str,
+                                     delay_ms: float) -> bool:
+        """Замер задержки внутри пары одного источника правдоподобен?"""
+        if pair_type not in self.SAME_SOURCE_CLOSE_PAIR_PRESETS:
+            return True
+        return abs(float(delay_ms)) <= self.SAME_SOURCE_MAX_PLAUSIBLE_DELAY_MS
 
     def _find_correlated_pairs(self) -> List[Tuple[int, int, str]]:
         """Find channel pairs that should be phase-correlated.
