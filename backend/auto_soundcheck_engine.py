@@ -4568,11 +4568,6 @@ class AutoSoundcheckEngine:
             except Exception as e:
                 logger.error(f"Ch {ch}: error applying corrections: {e}")
 
-        # 8b. Стерео-идентичность пар L/R (директива 2026-07-06): один
-        # инструмент — одна обработка, единый трим и фейдер (кроме OH)
-        self._enforce_stereo_pair_identity(
-            phase_guard_context=phase_guard_context)
-
         # 9. Full-band shared-chat mix pass over the current live console state.
         self._apply_live_shared_mix_pass(phase_guard_context=phase_guard_context)
 
@@ -4585,6 +4580,13 @@ class AutoSoundcheckEngine:
         # 11b. Операторская схема панорамы и фазового порядка ударных
         # (2026-07-06): OH — мастер-картинка, всё выравнивается в неё
         self._apply_drum_image_scheme(phase_guard_context=phase_guard_context)
+
+        # 11c. Стерео-идентичность пар L/R (директива 2026-07-06): один
+        # инструмент — одна обработка, единый трим и фейдер (кроме OH).
+        # Идёт ПОСЛЕ shared-mix/групповых стадий: в прогоне №20 они
+        # растащили выровненные фейдеры пары обратно на 0.6 дБ
+        self._enforce_stereo_pair_identity(
+            phase_guard_context=phase_guard_context)
         snapshot_profile = self._build_soundcheck_profile_from_live_buffers()
         if snapshot_profile is not None:
             self._capture_learning_phase(
@@ -4608,6 +4610,18 @@ class AutoSoundcheckEngine:
         # 13. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
         # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
         self._evaluate_master_mix()
+
+        # 14. Чек-лист: каналы без сигнала — незакрытые пункты; саундчек
+        # продолжается конвергентным циклом, пока задача не закрыта
+        # (директива 2026-07-06)
+        self._checklist_channels_signal()
+        pending = self.soundcheck_pending_items()
+        if pending:
+            logger.info(
+                "Чек-лист саундчека: %d незакрытых пунктов: %s",
+                len(pending), sorted(pending))
+        else:
+            logger.info("Чек-лист саундчека: все пункты закрыты")
 
     def _measurement_taps(self) -> Dict[str, Any]:
         """Карта измерительных USB-тапов (config autofoh.measurement_taps)."""
@@ -4702,7 +4716,10 @@ class AutoSoundcheckEngine:
                     logger.info(
                         "DCA%d '%s': нет сигнала ни на тапе шины, ни у "
                         "участников — пропуск", int(dca_id), spec.get("name", ""))
+                    self._checklist_set(f"dca.{int(dca_id)}", "deferred",
+                                        "стем ещё не играл")
                     continue
+                self._checklist_set(f"dca.{int(dca_id)}", "done")
                 target = float(np.clip(plane - stem_sum, -12.0, 0.0))
                 decision = self._execute_action(
                     DCAFaderMove(
@@ -5700,7 +5717,17 @@ class AutoSoundcheckEngine:
         target_gain = max(-SAFE_MAX_GAIN_DB, min(SAFE_MAX_GAIN_DB, current_gain + correction))
         effective_correction = target_gain - current_gain
 
-        if abs(effective_correction) < 1.0:
+        # Гистерезис ре-трима (оператор 2026-07-06: «kick сначала опущен
+        # тримом, потом задран»): канал уже отстроен — пики зависят от
+        # материала, гонять трим за ними = блуждание; повторное движение
+        # только при ошибке > 3 дБ
+        retrim_deadband = 3.0 if abs(current_gain) > 0.5 else 1.0
+        if abs(effective_correction) < retrim_deadband:
+            if retrim_deadband > 1.0:
+                logger.info(
+                    f"Ch {ch} '{info.name}': трим уже отстроен "
+                    f"({current_gain:+.1f}), ошибка {effective_correction:+.1f} "
+                    f"в пределах гистерезиса ±{retrim_deadband:.0f} дБ — не трогаем")
             return
         if effective_correction > 0.0 and not self.allow_input_trim_boost:
             logger.info(
@@ -6050,6 +6077,76 @@ class AutoSoundcheckEngine:
         roles["covered"] = covered
         return roles
 
+    # ── Чек-лист саундчека (директива 2026-07-06): саундчек идёт, пока
+    # не закрыта задача — все каналы измерены, отложенные шаги доделаны ──
+
+    def _checklist_set(self, key: str, status: str, reason: str = "") -> None:
+        if not hasattr(self, "soundcheck_checklist"):
+            self.soundcheck_checklist: Dict[str, Dict[str, Any]] = {}
+        item = self.soundcheck_checklist.setdefault(key, {"attempts": 0})
+        prev = item.get("status")
+        item["status"] = status
+        item["reason"] = reason
+        if status != "done":
+            item["attempts"] = item.get("attempts", 0) + 1
+        if prev != status:
+            logger.info("Чек-лист: %s -> %s%s", key, status,
+                        f" ({reason})" if reason else "")
+
+    def soundcheck_pending_items(self) -> Dict[str, Dict[str, Any]]:
+        return {k: v for k, v in
+                getattr(self, "soundcheck_checklist", {}).items()
+                if v.get("status") != "done"}
+
+    def _checklist_channels_signal(self) -> None:
+        """Каналы без сигнала — незакрытые пункты (ждём, пока сыграют)."""
+        sr = self.sample_rate
+        for ch, info in sorted(self.channels.items()):
+            if ch in self.master_reference_channels or ch > 16:
+                continue
+            if not info.auto_corrections_enabled and not info.has_signal:
+                continue
+            key = f"channel.{ch}.signal"
+            seen = bool(info.has_signal)
+            if not seen and self.audio_capture is not None:
+                try:
+                    buf = np.asarray(
+                        self.audio_capture.get_buffer(ch, sr)).reshape(-1)
+                    seen = buf.size > 0 and float(np.max(np.abs(buf))) > 1e-4
+                except Exception:
+                    seen = False
+            self._checklist_set(key, "done" if seen else "deferred",
+                                "" if seen else "канал ещё не играл")
+
+    def retry_deferred_soundcheck_items(
+        self,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Конвергентный шаг: повторить незакрытые пункты чек-листа.
+
+        Вызывается циклически (саундчек не «окно», а процесс): свежие
+        буферы могут содержать удары снейра/сигнал молчавших каналов.
+        Все записи идут в саундчек-деривации (абсолютные цели).
+        """
+        pending = set(self.soundcheck_pending_items())
+        saved_state = self.runtime_state
+        self.runtime_state = RuntimeState.SNAPSHOT_LOCK
+        try:
+            if any(k.startswith("drum_image.") for k in pending):
+                self._apply_drum_image_scheme(
+                    phase_guard_context=phase_guard_context)
+            if any(k.startswith("dca.") for k in pending):
+                self._apply_dca_group_balance(
+                    phase_guard_context=phase_guard_context)
+            if any(k.startswith("channel.") for k in pending):
+                self._checklist_channels_signal()
+            self._enforce_stereo_pair_identity(
+                phase_guard_context=phase_guard_context)
+        finally:
+            self.runtime_state = saved_state
+        return {"pending": self.soundcheck_pending_items()}
+
     def _enforce_stereo_pair_identity(
         self,
         *,
@@ -6173,6 +6270,35 @@ class AutoSoundcheckEngine:
                 (" | " + "; ".join(plan.notes)) if plan.notes else "")
             for key, m in plan.measurements.items():
                 logger.info("drum_image: замер %s: %s", key, m)
+            # чек-лист: отложенные замеры доделываются конвергентным циклом
+            if roles["oh_pair"] and roles["snare_t"]:
+                deferred_reasons = {"no_valid_hits", "insufficient_hits",
+                                    "mad_above_0.5ms_needs_solo_pass",
+                                    "iqr_unstable"}
+
+                def _mark(label, est):
+                    if est is None:
+                        self._checklist_set(label, "deferred", "нет замера")
+                    elif est.get("accepted"):
+                        self._checklist_set(label, "done")
+                    elif est.get("reject_reason") in deferred_reasons:
+                        self._checklist_set(label, "deferred",
+                                            est.get("reject_reason") or "")
+                    else:
+                        self._checklist_set(label, "done",
+                                            est.get("reject_reason") or "")
+                m = plan.measurements
+                _mark("drum_image.oh_internal", m.get("oh_internal"))
+                _mark("drum_image.snare_to_oh", m.get("snare_t_to_oh"))
+                if roles["snare_b"] is not None:
+                    _mark("drum_image.snare_tb", m.get("snare_t_to_b"))
+                self._checklist_set(
+                    "drum_image.oh_pan",
+                    "done" if roles["oh_pair"][0] in plan.pans else "deferred",
+                    "" if roles["oh_pair"][0] in plan.pans
+                    else "нет ILD снейра в OH")
+                for ch in list(roles["toms"]) + list(roles["cymbals"]):
+                    _mark(f"drum_image.ch{ch}_align", m.get(f"ch{ch}_to_oh"))
             # порядок исполнения: полярность -> задержки -> панорамы
             for ch, flip in plan.polarity_flip.items():
                 self._execute_action(

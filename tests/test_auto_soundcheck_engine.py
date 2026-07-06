@@ -2446,6 +2446,38 @@ def test_stereo_pair_identity_replicates_processing_and_unifies_levels():
         assert c[2] == pytest.approx(-6.0, abs=0.1)   # среднее (-4, -8)
 
 
+def test_soundcheck_checklist_defers_and_converges():
+    """Директива 2026-07-06: саундчек — процесс до закрытия задачи.
+    Молчащий канал -> deferred; появился сигнал -> retry закрывает пункт."""
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    engine.config_manager.get_section = lambda name: {}
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="KICK", preset="kick",
+                       has_signal=True, auto_corrections_enabled=True),
+        2: ChannelInfo(channel=2, name="SNARE T", preset="snare",
+                       has_signal=False, auto_corrections_enabled=True),
+    }
+
+    class _Cap:
+        def __init__(self):
+            self.loud = False
+        def get_buffer(self, ch, n):
+            if ch == 2 and self.loud:
+                return np.ones(int(n)) * 0.1
+            return np.zeros(int(n))
+    cap = _Cap()
+    engine.audio_capture = cap
+
+    engine._checklist_channels_signal()
+    pending = engine.soundcheck_pending_items()
+    assert "channel.2.signal" in pending
+    assert "channel.1.signal" not in pending
+
+    cap.loud = True   # снейр наконец сыграл
+    engine.retry_deferred_soundcheck_items()
+    assert "channel.2.signal" not in engine.soundcheck_pending_items()
+
+
 def test_same_source_pair_rejects_implausible_alignment_delay():
     """SNARE T/B — микрофоны одного барабана в паре сантиметров: замер
     9.9 мс (период резонанса ~100 Гц) — неоднозначность GCC-PHAT, не
