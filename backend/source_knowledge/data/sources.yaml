@@ -1137,3 +1137,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация drum_phase_practice 2026-07-07: неподвижный референс, ~1 мс/фут (по поисковой выжимке)."
+
+  - source_id: behindthemixer_compression
+    title: "How to Use Compression"
+    source_type: web_article
+    authors: ["Behind The Mixer"]
+    publisher: "behindthemixer.com"
+    year: 2022
+    url: "https://www.behindthemixer.com/how-use-compression/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация compression_per_role 2026-07-07: live-FOH специфика, анти-пере-компрессия, порядок настройки."
+  - source_id: masteringthemix_punchy_compression
+    title: "The Best Compression Settings for a Punchy Mix"
+    source_type: web_article
+    authors: ["Mastering The Mix"]
+    publisher: "masteringthemix.com"
+    year: 2023
+    url: "https://www.masteringthemix.com/blogs/learn/best-compression-settings-for-a-punchy-mix"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация compression_per_role 2026-07-07: ролевые таблицы (по поисковой выжимке)."
+  - source_id: musicguymixing_vocal_comp
+    title: "The Best Compressor Settings for Vocals"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/compressor-settings-for-vocals/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация compression_per_role 2026-07-07: вокальные GR-цели 5-10 дБ на пиках (по поисковой выжимке)."
+  - source_id: musicguymixing_drum_comp_chart
+    title: "Drum Compression Chart - How to Compress Every Drum"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/drum-compression-chart/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация compression_per_role 2026-07-07: барабанные release-полы (по поисковой выжимке)."

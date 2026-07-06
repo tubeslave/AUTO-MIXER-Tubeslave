@@ -32,6 +32,16 @@ iteration_log:
     drum_image_v3; новое — запрет пере-выравнивания (rooms никогда, томам можно жить
     с 0.5 мс), sum-energy как метрика проб (+6 дБ потенциал), fader-pull диагностика
     ~ sum_energy_gain_db.
+- date: '2026-07-07'
+  topic: compression_per_role
+  rules_added:
+  - compression.role_targets_live
+  - compression.anti_over_compression
+  - compression.low_end_release_floor
+  rules_rejected: []
+  notes: Ролевые цели согласуются с comp_v3 (kick release 359 мс над полом 50; вокальные
+    GR в рамках); новое — duty-cycle компрессора как метрика здоровья (<80%) и release-пол
+    50 мс для НЧ.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -51,7 +61,7 @@ topics:
   operator_complaint: фаза по схеме оператора; изолированные удары редки
 - id: compression_per_role
   title: Компрессия по ролям — attack/release/ratio/GR цели, live-специфика
-  status: pending
+  status: done
   operator_complaint: вокал то громко, то тихо; makeup обязателен
 - id: vocal_chain_live
   title: Вокальный тракт live — EQ/comp/de-ess/FX порядок, борьба за читаемость
