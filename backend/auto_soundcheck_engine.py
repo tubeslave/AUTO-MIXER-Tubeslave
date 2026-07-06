@@ -4746,6 +4746,55 @@ class AutoSoundcheckEngine:
     CLOSE_MIC_PRESETS = frozenset({"kick", "snare", "tom"})
     BLEED_MIN_OWN_HITS = 3
 
+    # Вторичный микрофон многомикрофонного источника прячется под ведущим
+    MULTI_MIC_SECONDARY_OFFSET_LU = 6.0
+    _MULTI_MIC_SECONDARY_MARKERS = ("bottom", " b", "_b", "out", "sub")
+
+    def _apply_multi_mic_group_targets(
+        self,
+        targets: Dict[int, float],
+        roles: Dict[int, str],
+    ) -> Dict[int, float]:
+        """Snare T/B и kick in/out — один инструмент двумя микрофонами.
+
+        Внутри группы (одинаковый preset из {snare, kick}) ведущий микрофон
+        остаётся на плоскости, вторичные получают цель на
+        MULTI_MIC_SECONDARY_OFFSET_LU ниже ведущего.
+        """
+        groups: Dict[str, List[int]] = {}
+        for ch in targets:
+            info = self.channels.get(ch)
+            preset = (info.preset or "") if info else ""
+            if preset in ("snare", "kick"):
+                groups.setdefault(preset, []).append(ch)
+        adjusted = dict(targets)
+        for preset, members in groups.items():
+            if len(members) < 2:
+                continue
+
+            def _is_secondary(ch: int) -> bool:
+                info = self.channels.get(ch)
+                text = f"{(info.name or '') if info else ''} " \
+                       f"{(info.source_role or '') if info else ''}".lower()
+                return any(m in text for m in self._MULTI_MIC_SECONDARY_MARKERS)
+
+            secondaries = [ch for ch in members if _is_secondary(ch)]
+            primaries = [ch for ch in members if ch not in secondaries]
+            if not primaries:
+                primaries = [min(members)]
+                secondaries = [ch for ch in members if ch != primaries[0]]
+            primary_target = min(adjusted[ch] for ch in primaries)
+            for ch in secondaries:
+                adjusted[ch] = primary_target - self.MULTI_MIC_SECONDARY_OFFSET_LU
+            if secondaries:
+                logger.info(
+                    "Multi-mic группа '%s': ведущие %s на плоскости %.1f, "
+                    "вторичные %s на -%.0f LU (один инструмент)",
+                    preset, primaries, primary_target, secondaries,
+                    self.MULTI_MIC_SECONDARY_OFFSET_LU,
+                )
+        return adjusted
+
     def _fx_bus_has_insert(self, bus: int) -> bool:
         """Есть ли на шине реальный FX-инсерт (посыл без него запрещён).
 
@@ -4979,6 +5028,12 @@ class AutoSoundcheckEngine:
             config = getattr(self, "balance_config", None) or BalanceConfig(
                 genre=str(getattr(self, "balance_genre", "pop_rock")))
             targets, anchor_role, anchor_warning = build_target_vector(config, roles)
+            # Многомикрофонный источник (snare T/B, kick in/out) — ОДИН
+            # инструмент: ведущий микрофон на плоскости, вторичный —
+            # приправой на MULTI_MIC_SECONDARY_OFFSET_LU ниже; иначе
+            # когерентная сумма выпирает из микса на каждый удар
+            # (оператор 2026-07-06: «вылезает snare из сложенных T+B»)
+            targets = self._apply_multi_mic_group_targets(targets, roles)
             anchor_ch = next(
                 (ch for ch, role in roles.items() if role == anchor_role), None)
             solution = solve_faders(measured, targets, current_faders_db=current,

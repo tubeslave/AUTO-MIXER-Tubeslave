@@ -2243,3 +2243,27 @@ def test_comp_threshold_follows_trim_shift():
     n = len(mixer.calls)
     engine._shift_comp_threshold_with_trim(1, -6.0)
     assert len(mixer.calls) == n
+
+
+def test_multi_mic_pair_balanced_as_one_instrument():
+    """Оператор 2026-07-06: «вылезает snare из сложенных T+B — это один
+    инструмент двумя микрофонами». Вторичный микрофон получает цель на
+    6 LU ниже ведущего, а не собственную полную плоскость."""
+    engine = AutoSoundcheckEngine(num_channels=4, auto_discover=False)
+    engine.channels = {
+        2: ChannelInfo(channel=2, name="SNARE T", preset="snare",
+                       source_role="snare_top", has_signal=True),
+        3: ChannelInfo(channel=3, name="SNARE B", preset="snare",
+                       source_role="snare_bottom", has_signal=True),
+        1: ChannelInfo(channel=1, name="KICK", preset="kick",
+                       source_role="kick", has_signal=True),
+        16: ChannelInfo(channel=16, name="VOCAL", preset="leadVocal",
+                        source_role="lead_vocal", has_signal=True),
+    }
+    targets = {2: -25.0, 3: -25.0, 1: -25.0, 16: -22.0}
+    adjusted = engine._apply_multi_mic_group_targets(
+        targets, {2: "snare", 3: "snare", 1: "kick", 16: "lead_vocal"})
+    assert adjusted[2] == pytest.approx(-25.0)   # ведущий на плоскости
+    assert adjusted[3] == pytest.approx(-31.0)   # нижний -6 LU приправой
+    assert adjusted[1] == pytest.approx(-25.0)   # одиночный kick не тронут
+    assert adjusted[16] == pytest.approx(-22.0)
