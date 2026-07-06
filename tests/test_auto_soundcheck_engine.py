@@ -2267,3 +2267,23 @@ def test_multi_mic_pair_balanced_as_one_instrument():
     assert adjusted[3] == pytest.approx(-31.0)   # нижний -6 LU приправой
     assert adjusted[1] == pytest.approx(-25.0)   # одиночный kick не тронут
     assert adjusted[16] == pytest.approx(-22.0)
+
+
+def test_stereo_pair_balanced_as_one_stereo_instrument():
+    """Оператор 2026-07-06: каналы с подписью L/R — один стерео-инструмент:
+    сумма пары на плоскости, каждый канал −3 LU, уровни равные."""
+    engine = AutoSoundcheckEngine(num_channels=4, auto_discover=False)
+    engine.channels = {
+        9: ChannelInfo(channel=9, name="GUITAR L", preset="electricGuitar",
+                       source_role="guitar", has_signal=True),
+        10: ChannelInfo(channel=10, name="GUITAR R", preset="electricGuitar",
+                        source_role="guitar", has_signal=True),
+        16: ChannelInfo(channel=16, name="VOCAL", preset="leadVocal",
+                        source_role="lead_vocal", has_signal=True),
+    }
+    targets = {9: -25.0, 10: -25.0, 16: -22.0}
+    adjusted = engine._apply_multi_mic_group_targets(
+        targets, {9: "guitar", 10: "guitar", 16: "lead_vocal"})
+    assert adjusted[9] == pytest.approx(-28.0)   # плоскость −3 (сумма пары = −25)
+    assert adjusted[10] == pytest.approx(-28.0)  # равные уровни
+    assert adjusted[16] == pytest.approx(-22.0)

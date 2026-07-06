@@ -77,7 +77,7 @@ SPL_LIMITS: Dict[str, Dict[str, Any]] = {
 }
 
 # Целевые кривые — предложения отчёта (настраиваемые), НЕ «истина»
-TARGET_CURVE_PRESETS = ("flat_tilt", "live_standard", "edm")
+TARGET_CURVE_PRESETS = ("flat_tilt", "live_standard", "edm", "pink")
 
 # Карта выходных OSC-путей WING. Подтверждена на реальном пульте
 # 2026-07-05 (read-only опрос /main/1 и /mtx/1 + write/rollback leq:
@@ -223,7 +223,7 @@ def spatial_average(
 # ── Целевые кривые и системный EQ ────────────────────────────────
 
 def target_curve_db(freqs_hz: np.ndarray, preset: str = "live_standard") -> np.ndarray:
-    """Три пресета (предложения отчёта; единственно верной кривой нет)."""
+    """Пресеты целевых кривых (предложения; единственно верной нет)."""
     f = np.maximum(np.asarray(freqs_hz, dtype=np.float64), 1.0)
     curve = np.zeros_like(f)
     if preset == "flat_tilt":
@@ -233,6 +233,11 @@ def target_curve_db(freqs_hz: np.ndarray, preset: str = "live_standard") -> np.n
         curve[f < 90.0] = 9.0
         above = f > 1500.0
         curve[above] = -1.0 * np.log2(f[above] / 1500.0)
+    elif preset == "pink":
+        # розовый шум: равная энергия на октаву = −3 дБ/окт по бинам
+        # (директива оператора 2026-07-06: балансировка общего микса
+        # по розовому шуму)
+        curve = -3.0 * np.log2(f / 1000.0)
     else:  # live_standard
         curve[f < 100.0] = 6.0
         above = f > 2000.0
@@ -263,8 +268,12 @@ def solve_system_eq(
     filters: List[Dict[str, float]] = []
     residual = error.copy()
     audible = (freqs >= 40.0) & (freqs <= 16000.0)
+    selectable = audible.copy()
     for _ in range(max_filters):
-        idx = int(np.argmax(np.abs(residual * audible)))
+        masked = np.abs(residual) * selectable
+        if not masked.any():
+            break
+        idx = int(np.argmax(masked))
         peak_err = float(residual[idx])
         if abs(peak_err) < 1.5:      # меньше — не трогаем (экономия фильтров)
             break
@@ -273,6 +282,12 @@ def solve_system_eq(
         filt = {"freq_hz": float(freqs[idx]), "gain_db": round(gain, 2), "q": q}
         filters.append(filt)
         residual = residual + bell_response_db(freqs, filt["freq_hz"], gain, q)
+        # минимальный разнос 1/3 октавы: жадный fit не должен класть два
+        # фильтра на одну частоту, когда пик глубже клампа (live 2026-07-06:
+        # полосы 1 и 4 легли на 56.8 Гц по −6 = −12 суммарно)
+        spacing = 2.0 ** (1.0 / 3.0)
+        selectable &= ~((freqs >= filt["freq_hz"] / spacing)
+                        & (freqs <= filt["freq_hz"] * spacing))
     cuts = sum(1 for f in filters if f["gain_db"] < 0)
     return {
         "filters": filters,

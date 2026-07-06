@@ -4749,6 +4749,12 @@ class AutoSoundcheckEngine:
     # Вторичный микрофон многомикрофонного источника прячется под ведущим
     MULTI_MIC_SECONDARY_OFFSET_LU = 6.0
     _MULTI_MIC_SECONDARY_MARKERS = ("bottom", " b", "_b", "out", "sub")
+    # Стерео-пары (подписи L/R) — один стерео-инструмент: сумма пары на
+    # плоскости, каждый канал на −3 (директива оператора 2026-07-06)
+    STEREO_PAIR_PRESETS_BALANCE = frozenset(
+        {"electricGuitar", "acousticGuitar", "playback", "synth",
+         "overheads", "backVocal"})
+    _STEREO_MARKERS = (" l", "_l", " r", "_r", "left", "right")
 
     def _apply_multi_mic_group_targets(
         self,
@@ -4793,6 +4799,29 @@ class AutoSoundcheckEngine:
                     preset, primaries, primary_target, secondaries,
                     self.MULTI_MIC_SECONDARY_OFFSET_LU,
                 )
+
+        # Стерео-пары L/R: один стерео-инструмент — энергетическая сумма
+        # пары на плоскости, каждый канал −3 LU, уровни равные
+        stereo_groups: Dict[str, List[int]] = {}
+        for ch in targets:
+            info = self.channels.get(ch)
+            preset = (info.preset or "") if info else ""
+            name = ((info.name or "") if info else "").lower()
+            if preset in self.STEREO_PAIR_PRESETS_BALANCE and any(
+                    name.endswith(m) or m.strip() + " " in name or m in name
+                    for m in self._STEREO_MARKERS):
+                stereo_groups.setdefault(preset, []).append(ch)
+        for preset, members in stereo_groups.items():
+            if len(members) < 2:
+                continue
+            pair_target = min(adjusted[ch] for ch in members) - 3.0
+            for ch in members:
+                adjusted[ch] = pair_target
+            logger.info(
+                "Стерео-пара '%s' %s: каналы по %.1f LU "
+                "(сумма пары на плоскости, один стерео-инструмент)",
+                preset, members, pair_target,
+            )
         return adjusted
 
     def _fx_bus_has_insert(self, bus: int) -> bool:

@@ -68,6 +68,21 @@ class WriteSurface:
 
 WRITE_SURFACES: Tuple[WriteSurface, ...] = (
     WriteSurface(
+        id="master_pink_balance_runner",
+        label="Master pink-noise balance SETUP runner (operator-invoked)",
+        status="lab_only",
+        paths=("tools/master_pink_balance.py",),
+        entrypoints=("master_pink_balance CLI",),
+        write_kinds=("main_eq",),
+        allowed_live=False,
+        gate="explicit --confirm-live-wing-write + rollback file before first "
+             "write + per-address readback; closed loop via master tap",
+        current_policy="SETUP-фаза по явному запуску оператора (2026-07-06): "
+                       "спектр мастера к розовой кривой, prefer-cut ≤6 дБ.",
+        next_action="Повторять по мере смены материала; freeze при NO_SIGNAL.",
+        notes=("solver_pa_v3", "rollback_file_first"),
+    ),
+    WriteSurface(
         id="fx_rack_setup_runner",
         label="FX rack SETUP runner (operator-invoked)",
         status="lab_only",
