@@ -1091,3 +1091,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Номинал цифрового пульта ~-20 dBFS при 20 дБ хедрума."
+
+  - source_id: sonible_stereo_to_mono
+    title: "Avoiding the Collapse: From Stereo to Mono (Compatibility)"
+    source_type: web_article
+    authors: ["sonible"]
+    publisher: "sonible.com"
+    year: 2023
+    url: "https://www.sonible.com/blog/stereo-to-mono/"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация stereo_sources 2026-07-07: корреляция, моно-фолд, панорамные потери."
+  - source_id: williamssoundstudio_dual_mono
+    title: "What is the Difference Between Dual-Mono and Stereo?"
+    source_type: web_article
+    authors: ["Williams Sound Studio"]
+    publisher: "williamssoundstudio.com"
+    year: 2022
+    url: "https://williamssoundstudio.com/mixing/dual-mono-and-stereo-explained.php"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация stereo_sources 2026-07-07: линк сайдчейнов стерео-компрессора (по поисковой выжимке)."

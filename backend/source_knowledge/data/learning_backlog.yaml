@@ -11,6 +11,16 @@ iteration_log:
   notes: 'Критика: boost трима остаётся soundcheck-only (bleed-правило); «преампами
     не миксуют» подтверждает трим-гистерезис и фейдер-балансировку; противоречий с
     фактами пульта нет.'
+- date: '2026-07-07'
+  topic: stereo_sources
+  rules_added:
+  - stereo.linked_dynamics_sidechains
+  - stereo.mono_compatibility_checks
+  rules_rejected:
+  - '''избегать жёсткой панорамы'' — отвергнуто как правило: стерео-PA и явная команда
+    оператора ±100; оставлено оговоркой в mono_compatibility_checks'
+  notes: 'Ключевой вывод для движка: identity-реплика настроек comp НЕ линкует детекторы
+    — нужен канальный линк WING или max-GR-обеих; корреляцию уже меряем master_mix_eval.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -22,7 +32,7 @@ topics:
   operator_complaint: kick сначала опущен тримом, затем задран фейдером
 - id: stereo_sources
   title: Стерео-источники L/R — единая обработка, панорама, моносовместимость
-  status: pending
+  status: done
   operator_complaint: L и R с разными trim и fader
 - id: drum_phase_practice
   title: Практика фазы ударных — порядок выравнивания, полярность, OH-опора
