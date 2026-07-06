@@ -410,6 +410,9 @@ class AutoFOHSafetyConfig:
     feedback_notch_ttl_sec: float = 120.0
     # Абсолютный кламп EQ-полосы в фазах саундчек-деривации (one-shot)
     soundcheck_eq_max_abs_db: float = 9.0
+    # Фейдеры в деривации: срезы абсолютные, подъём шагом, паркинг не трогаем
+    soundcheck_fader_boost_step_db: float = 6.0
+    parked_fader_floor_db: float = -60.0
     # Операторский промоут прямых записей: имена action_type сверх базового
     # белого списка (gain/fader). Пусто по умолчанию — доктрина
     # proposal-only не меняется; заполняется движком из
@@ -453,6 +456,9 @@ class AutoFOHSafetyConfig:
             feedback_notch_min_q=float(config.get("feedback_notch_min_q", 8.0)),
             feedback_notch_ttl_sec=float(config.get("feedback_notch_ttl_sec", 120.0)),
             soundcheck_eq_max_abs_db=float(config.get("soundcheck_eq_max_abs_db", 9.0)),
+            soundcheck_fader_boost_step_db=float(
+                config.get("soundcheck_fader_boost_step_db", 6.0)),
+            parked_fader_floor_db=float(config.get("parked_fader_floor_db", -60.0)),
             promoted_direct_write_action_types=tuple(
                 str(t) for t in (config.get("promoted_direct_write_action_types") or ())
             ),
@@ -461,6 +467,9 @@ class AutoFOHSafetyConfig:
 
 AUTOFOH_DIRECT_WRITE_POLICY = "proposal_only_quarantined"
 AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES = (ChannelGainMove, ChannelFaderMove)
+
+# Пауза ретрая при сбросе записи OSC-троттлером WING (~10 Гц на адрес)
+OSC_THROTTLE_RETRY_DELAY_S = 0.25
 
 # Состояния саундчек-деривации: коррекции пишутся как абсолютные one-shot
 # цели (пошаговые live-лимиты EQ/delay в этих фазах не применяются)
@@ -550,9 +559,18 @@ class AutoFOHSafetyController:
 
         try:
             result = translator(bounded_action)
+            if result is False:
+                # OSC-троттл WING молча дропает повторную запись в тот же
+                # адрес чаще ~10 Гц (правило CLAUDE.md): ретрай с паузой
+                # больше интервала троттлера. Live 2026-07-06: миррор-EQ
+                # терял записи как «send returned false».
+                time.sleep(OSC_THROTTLE_RETRY_DELAY_S)
+                result = translator(bounded_action)
+                decision.payload["osc_throttle_retry"] = True
             decision.sent = bool(result is not False)
             self._last_sent_at[bounded_action.target_key] = self.time_provider()
-            decision.payload = self._decision_payload(bounded_action)
+            decision.payload = {**self._decision_payload(bounded_action),
+                                **decision.payload}
             decision.message = "sent" if decision.sent else "send returned false"
         except Exception as exc:
             decision.allowed = False
@@ -783,10 +801,30 @@ class AutoFOHSafetyController:
 
         if isinstance(action, ChannelFaderMove):
             current = self._safe_get(lambda: self.mixer_client.get_fader(action.channel_id), default=-144.0)
-            max_step = self.config.lead_fader_max_step_db if action.is_lead else self.config.channel_fader_max_step_db
-            desired_delta = action.target_db - current
-            bounded_delta = max(-max_step, min(max_step, desired_delta))
-            target = max(-144.0, min(0.0, current + bounded_delta))
+            if derivation:
+                # саундчек СТАВИТ баланс one-shot (замечание оператора
+                # 2026-07-06: «очень слабая балансировка фейдерами» — за
+                # прогон доезжал 1 дБ из 8-12). Семантика:
+                #  - срезы — абсолютная цель решателя (при сомнениях —
+                #    снижай), жёсткий потолок 0 dBFS (правило №1 CLAUDE.md);
+                #  - подъёмы — шагом <= soundcheck_fader_boost_step_db
+                #    (резкий взлёт открытого микрофона опасен);
+                #  - запаркованные (< parked_fader_floor_db) не поднимаются:
+                #    fader-mute — операторский выбор.
+                target = max(-144.0, min(0.0, float(action.target_db)))
+                if target > current:
+                    if current <= self.config.parked_fader_floor_db:
+                        target = current
+                    else:
+                        target = min(
+                            target,
+                            current + self.config.soundcheck_fader_boost_step_db,
+                        )
+            else:
+                max_step = self.config.lead_fader_max_step_db if action.is_lead else self.config.channel_fader_max_step_db
+                desired_delta = action.target_db - current
+                bounded_delta = max(-max_step, min(max_step, desired_delta))
+                target = max(-144.0, min(0.0, current + bounded_delta))
             bounded = abs(target - action.target_db) > 1e-6
             return ChannelFaderMove(
                 channel_id=action.channel_id,

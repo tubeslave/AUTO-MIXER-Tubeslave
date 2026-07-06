@@ -397,7 +397,9 @@ def test_fader_bounds_do_not_lift_parked_channels_to_minus_30():
 
     assert decision.sent is True
     assert decision.bounded is True
-    assert mixer.calls[-1] == ("set_fader", 1, -99.0)
+    # запаркованный канал (fader-mute — операторский выбор) не поднимается
+    # вовсе, даже в саундчек-деривации
+    assert mixer.calls[-1] == ("set_fader", 1, -100.0)
 
 
 def test_rollback_state_bypasses_rate_limit_for_reversible_actions():
@@ -738,3 +740,76 @@ def test_promoted_direct_write_types_allow_gated_console_writes():
     )
     assert blocked.blocked is True
     assert len(mixer.calls) == 1
+
+
+def test_osc_throttle_drop_is_retried_once():
+    """WING OSC-троттл молча дропает запись (send False): контроллер
+    ретраит с паузой больше интервала троттлера (live 2026-07-06:
+    mirror EQ терял записи как «send returned false»)."""
+    class FlakySendMixer(FakeMixer):
+        def __init__(self):
+            super().__init__()
+            self.fail_next = 1
+
+        def set_fader(self, channel, value_db):
+            if self.fail_next > 0:
+                self.fail_next -= 1
+                self.calls.append(("set_fader_dropped", channel, value_db))
+                return False
+            return super().set_fader(channel, value_db)
+
+    mixer = FlakySendMixer()
+    controller = AutoFOHSafetyController(mixer)
+    decision = controller.execute(
+        ChannelFaderMove(channel_id=1, target_db=-9.5, reason="throttle test"),
+        RuntimeState.SNAPSHOT_LOCK,
+    )
+    assert decision.sent is True
+    assert decision.payload.get("osc_throttle_retry") is True
+    assert ("set_fader", 1, -9.5) in mixer.calls
+
+
+def test_fader_absolute_target_in_derivation_stepped_in_live():
+    """Оператор 2026-07-06: «очень слабая балансировка фейдерами для
+    саундчека» — в деривации фейдер идёт к АБСОЛЮТНОЙ цели решателя
+    (потолок 0 dBFS), микрошаги — только в live."""
+    mixer = FakeMixer()
+    controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            channel_fader_max_step_db=1.0,
+            promoted_direct_write_action_types=("ChannelFaderMove",),
+        ),
+    )
+    mixer.fader[1] = -2.0
+
+    # деривация: сразу к цели -10.5
+    derivation = controller.execute(
+        ChannelFaderMove(channel_id=1, target_db=-10.5, reason="balance v3"),
+        RuntimeState.SNAPSHOT_LOCK,
+    )
+    assert derivation.sent is True
+    assert mixer.fader[1] == pytest.approx(-10.5)
+
+    # подъём в деривации — шагом <= 6 дБ (открытый микрофон не взлетает)
+    boost = controller.execute(
+        ChannelFaderMove(channel_id=1, target_db=3.0, reason="boost check"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+    assert boost.action.target_db == pytest.approx(-4.5)  # -10.5 + 6
+
+    # потолок 0 dBFS абсолютен и в деривации
+    mixer.fader[3] = -2.0
+    ceiling = controller.execute(
+        ChannelFaderMove(channel_id=3, target_db=3.0, reason="ceiling check"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+    assert ceiling.action.target_db == pytest.approx(0.0)
+
+    # live (VERSE): прежний микрошаг 1 дБ от текущего
+    mixer.fader[2] = -2.0
+    live = controller.execute(
+        ChannelFaderMove(channel_id=2, target_db=-9.0, reason="live step"),
+        RuntimeState.VERSE,
+    )
+    assert live.action.target_db == pytest.approx(-3.0)

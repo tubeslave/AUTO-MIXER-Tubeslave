@@ -68,8 +68,10 @@ def test_backend_bridge_applies_channel_gain_through_safety_controller():
     result = bridge.validate_or_apply([action], runtime_state=RuntimeState.SOURCE_LEARNING, apply=True)
 
     assert result.decisions[0]["sent"] is True
-    assert result.decisions[0]["bounded"] is True
-    assert mixer.calls[-1] == ("set_fader", 1, -10.5)
+    # деривационная семантика 2026-07-06: срез идёт к абсолютной цели
+    # (пошаговые лимиты — для live-состояний)
+    assert result.decisions[0]["bounded"] is False
+    assert mixer.calls[-1] == ("set_fader", 1, -12.0)
 
 
 def test_backend_bridge_keeps_sidechain_as_advisory():

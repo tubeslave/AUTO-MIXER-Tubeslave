@@ -2040,3 +2040,64 @@ def test_snare_pair_mics_do_not_freeze_each_other():
     }
     assert engine._close_mic_bleed_dominated(1, engine.channels[1], "snare") is False
     assert engine._close_mic_bleed_dominated(2, engine.channels[2], "snare") is False
+
+
+def test_phase_target_guard_allows_mirror_eq_when_stem_below_baseline():
+    """Live 2026-07-06: стем-ветка стража душила mirror EQ (planned=8 sent=2).
+    Миррор-сепарация — не движение уровня стема; страж её пропускает."""
+    def sine(freq_hz, amplitude):
+        t = np.arange(12000, dtype=np.float32) / 48000.0
+        return amplitude * np.sin(2.0 * np.pi * freq_hz * t)
+
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+    # профиль выучен на ГРОМКОМ сигнале, текущий — тихий: стем ниже baseline
+    loud = {1: extract_analysis_features(sine(2800.0, 0.4))}
+    loud_stems = aggregate_stem_features(loud, {1: ["GUITARS", "MUSIC"]})
+    engine.audio_capture = DetectorAudioCapture({1: sine(2800.0, 0.02)})
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1, name="Gtr 1", source_role="guitar",
+            stem_roles=["GUITARS", "MUSIC"], allowed_controls=["eq", "fader"],
+            has_signal=True, recognized=True, auto_corrections_enabled=True,
+            fader_db=-8.0, priority=0.6,
+        ),
+    }
+    profile = build_soundcheck_profile(
+        channel_features=loud,
+        channel_metadata={
+            1: {"name": "Gtr 1", "source_role": "guitar",
+                "stem_roles": ["GUITARS", "MUSIC"],
+                "allowed_controls": ["eq", "fader"], "priority": 0.6},
+        },
+        stem_features=loud_stems,
+        stem_contributions={},
+        phase_snapshots={
+            "SNAPSHOT_LOCK": build_phase_learning_snapshot(
+                phase_name="SNAPSHOT_LOCK", runtime_state="SNAPSHOT_LOCK",
+                channel_features=loud, stem_features=loud_stems,
+            ),
+        },
+    )
+    engine.loaded_soundcheck_profile = profile
+    engine.soundcheck_profile_use_loaded_target_corridor = True
+    engine.soundcheck_profile_use_phase_target_action_guards = True
+
+    decision = engine._execute_action(
+        ChannelEQMove(
+            channel_id=1, band=3, freq_hz=3000.0, gain_db=-1.0, q=4.0,
+            reason="Mirror EQ cut masker: cross-adaptive overlap at 3000Hz",
+        ),
+        runtime_state=RuntimeState.SNAPSHOT_LOCK,
+        phase_guard_context=engine._build_phase_target_guard_context(
+            runtime_state=RuntimeState.SNAPSHOT_LOCK
+        ),
+    )
+    assert decision is not None
+    # страж пропустил (нет stem-блока); дальше честный proposal-only карантин
+    assert "stem" not in (decision.message or "")
+    assert decision.blocked is True
+    assert decision.write_policy == "proposal_only_quarantined"

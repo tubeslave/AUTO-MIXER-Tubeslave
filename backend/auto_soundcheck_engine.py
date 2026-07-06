@@ -1654,14 +1654,15 @@ class AutoSoundcheckEngine:
             RuntimeState.ROLLBACK,
         }:
             return False
-        # В фазах саундчек-деривации компрессия и FX-посылы выведены из-под
-        # коридорного стража: их громкостный эффект уже верифицирован
-        # собственным A/B-контуром comp v3 / калибровкой посылов, а коридор
-        # в этот момент сам является продуктом деривации (live-прогон
-        # 2026-07-06: страж молча блокировал все верифицированные
-        # comp-предложения).
+        # В фазах саундчек-деривации компрессия, FX-посылы и ФЕЙДЕРЫ выведены
+        # из-под коридорного стража: comp верифицирован собственным A/B,
+        # посылы калибруются своим контуром, а баланс фейдеров — решение
+        # balance v3 (вокал-референсные цели, потолок, vocal guard), которое
+        # САМО задаёт новый коридор; старый выученный профиль в этот момент
+        # не эталон (live 2026-07-06: страж молча блокировал comp и резал
+        # баланс — «очень слабая балансировка фейдерами»).
         if runtime_state in SOUNDCHECK_DERIVATION_STATES and isinstance(
-            action, (CompressorAdjust, SendLevelAdjust)
+            action, (CompressorAdjust, SendLevelAdjust, ChannelFaderMove)
         ):
             return False
         return isinstance(
@@ -4044,6 +4045,15 @@ class AutoSoundcheckEngine:
                         "phase target guard blocked EQ boost inside learned green corridor",
                         metadata,
                     )
+
+            # Миррор-EQ — парная спектральная сепарация (unmasking), а не
+            # движение уровня стема: её полосный эффект на RMS стема мал и
+            # ограничен собственными лимитами слоя. Стем-страж её не душит —
+            # симметрично исключению в ветке зелёного коридора выше
+            # (live 2026-07-06: shared-mix pass planned=8 sent=2).
+            if is_mirror_eq:
+                metadata["stem_guard_decision"] = "allow_mirror_eq_source_separation"
+                return True, "", metadata
 
             stem_names = [
                 stem_name
