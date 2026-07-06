@@ -1,0 +1,474 @@
+{
+ "engine_final_state": "EngineState.RUNNING",
+ "diff": {
+  "channels": {
+   "1": {
+    "name": "KICK",
+    "dyn/thr": {
+     "before": -29.0,
+     "after": -31.0
+    },
+    "eq/2g": {
+     "before": 3.0,
+     "after": 4.0
+    },
+    "eq/3g": {
+     "before": 4.5,
+     "after": 3.5
+    },
+    "eq/3f": {
+     "before": 1252.8668212890625,
+     "after": 2992.470947265625
+    }
+   },
+   "2": {
+    "name": "SNARE T",
+    "fdr": {
+     "before": -44.23473358154297,
+     "after": -41.312095642089844
+    },
+    "gate/thr": {
+     "before": -40.5,
+     "after": -42.5
+    },
+    "dyn/thr": {
+     "before": -19.0,
+     "after": -16.0
+    },
+    "eq/2g": {
+     "before": 0.0,
+     "after": 1.0
+    },
+    "eq/2f": {
+     "before": 601.3883666992188,
+     "after": 374.0286865234375
+    },
+    "eq/2q": {
+     "before": 0.9979702234268188,
+     "after": 1.9958817958831787
+    }
+   },
+   "3": {
+    "name": "",
+    "fdr": {
+     "before": -53.39282989501953,
+     "after": -52.70000457763672
+    },
+    "gate/thr": {
+     "before": -43.0,
+     "after": -43.5
+    }
+   },
+   "4": {
+    "name": "",
+    "gate/thr": {
+     "before": -38.0,
+     "after": -40.0
+    },
+    "eq/2g": {
+     "before": -2.0,
+     "after": -3.0
+    }
+   },
+   "5": {
+    "name": "",
+    "eq/3g": {
+     "before": 0.0,
+     "after": -1.0
+    },
+    "eq/3f": {
+     "before": 1499.788330078125,
+     "after": 2992.470947265625
+    },
+    "eq/3q": {
+     "before": 0.9979702234268188,
+     "after": 3.9916467666625977
+    }
+   },
+   "6": {
+    "name": "",
+    "fdr": {
+     "before": -23.204801559448242,
+     "after": -17.204803466796875
+    },
+    "dyn/thr": {
+     "before": -24.5,
+     "after": -27.5
+    }
+   },
+   "7": {
+    "name": "",
+    "fdr": {
+     "before": -42.254940032958984,
+     "after": -38.898555755615234
+    },
+    "dyn/thr": {
+     "before": -23.5,
+     "after": -20.5
+    }
+   },
+   "8": {
+    "name": "",
+    "fdr": {
+     "before": -46.41999816894531,
+     "after": -45.86854934692383
+    }
+   },
+   "9": {
+    "name": "",
+    "fdr": {
+     "before": -23.421714782714844,
+     "after": -17.421714782714844
+    }
+   },
+   "10": {
+    "name": "",
+    "fdr": {
+     "before": -21.007396697998047,
+     "after": -15.007396697998047
+    }
+   },
+   "11": {
+    "name": "",
+    "fdr": {
+     "before": -37.309051513671875,
+     "after": -31.309051513671875
+    },
+    "dyn/thr": {
+     "before": -30.5,
+     "after": -33.5
+    },
+    "dyn/rel": {
+     "before": 290.08489990234375,
+     "after": 247.03453063964844
+    }
+   },
+   "12": {
+    "name": "",
+    "fdr": {
+     "before": -42.762184143066406,
+     "after": -37.29499816894531
+    },
+    "dyn/thr": {
+     "before": -31.0,
+     "after": -29.5
+    },
+    "dyn/rel": {
+     "before": 359.37554931640625,
+     "after": 290.08489990234375
+    }
+   },
+   "13": {
+    "name": "",
+    "fdr": {
+     "before": -47.569305419921875,
+     "after": -48.60669708251953
+    }
+   },
+   "16": {
+    "name": "",
+    "fdr": {
+     "before": -33.86000061035156,
+     "after": -33.44916534423828
+    },
+    "dyn/thr": {
+     "before": -31.0,
+     "after": -28.0
+    },
+    "dyn/rel": {
+     "before": 290.08489990234375,
+     "after": 359.37554931640625
+    }
+   }
+  },
+  "fx": {},
+  "buses": {}
+ },
+ "channel_updates": [
+  {
+   "ch": 1,
+   "name": "KICK",
+   "preset": "kick",
+   "source_role": "kick",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -11.511183585267506,
+   "rms_db": -52.05881166438135,
+   "lufs": -34.46389053849472,
+   "gain_correction_db": 6.624723376946301,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": 0.0
+  },
+  {
+   "ch": 2,
+   "name": "SNARE T",
+   "preset": "snare",
+   "source_role": "snare_top",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -15.36459332032136,
+   "rms_db": -55.23738497148332,
+   "lufs": -36.82263692250696,
+   "gain_correction_db": 8.275845845754871,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -41.31209627756628
+  },
+  {
+   "ch": 3,
+   "name": "SNARE B",
+   "preset": "snare",
+   "source_role": "snare_bottom",
+   "classification_confidence": 0.93,
+   "auto_corrections_enabled": true,
+   "peak_db": -8.724912915697233,
+   "rms_db": -51.173783721376914,
+   "lufs": -29.5928256811861,
+   "gain_correction_db": 3.2149779768302693,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -52.700003832363706
+  },
+  {
+   "ch": 6,
+   "name": "OH L",
+   "preset": "overheads",
+   "source_role": "oh_l",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -24.525374842923192,
+   "rms_db": -56.70075718136952,
+   "lufs": -47.111109507875575,
+   "gain_correction_db": 12.0,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -17.204801559448242
+  },
+  {
+   "ch": 7,
+   "name": "OH R",
+   "preset": "overheads",
+   "source_role": "oh_r",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -19.340797620319602,
+   "rms_db": -52.01738869189617,
+   "lufs": -40.25638212516294,
+   "gain_correction_db": 10.256382125162943,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -38.898557526326314
+  },
+  {
+   "ch": 8,
+   "name": "BASS",
+   "preset": "bass",
+   "source_role": "bass",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -20.177598046517843,
+   "rms_db": -34.80548129362199,
+   "lufs": -34.25145123048284,
+   "gain_correction_db": 11.251451230482843,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -45.86854770140192
+  },
+  {
+   "ch": 9,
+   "name": "GUITAR L",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.672983896440655,
+   "rms_db": -32.035650826184884,
+   "lufs": -25.50527069629778,
+   "gain_correction_db": 2.5052706962977815,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -17.421714782714844
+  },
+  {
+   "ch": 10,
+   "name": "GUITAR R",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.649914119359368,
+   "rms_db": -33.878943727614484,
+   "lufs": -26.714858713202165,
+   "gain_correction_db": 3.7148587132021653,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -15.007396697998047
+  },
+  {
+   "ch": 11,
+   "name": "PLAYBACK L",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.722550916050325,
+   "rms_db": -31.145771813519527,
+   "lufs": -30.12931038502282,
+   "gain_correction_db": 7.129310385022819,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -31.309051513671875
+  },
+  {
+   "ch": 12,
+   "name": "PLAYBACK R",
+   "preset": "playback",
+   "source_role": "playback",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.036338763297586,
+   "rms_db": -31.862504452797094,
+   "lufs": -31.16718746734122,
+   "gain_correction_db": 8.167187467341218,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -37.29499743866464
+  },
+  {
+   "ch": 13,
+   "name": "ACCORDION",
+   "preset": "accordion",
+   "source_role": "accordion",
+   "classification_confidence": 0.9,
+   "auto_corrections_enabled": true,
+   "peak_db": -22.23703164234187,
+   "rms_db": -35.03574502886971,
+   "lufs": -34.56260945333112,
+   "gain_correction_db": 11.56260945333112,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -48.60669634806048
+  },
+  {
+   "ch": 16,
+   "name": "VOCAL",
+   "preset": "leadVocal",
+   "source_role": "lead_vocal",
+   "classification_confidence": 0.86,
+   "auto_corrections_enabled": true,
+   "peak_db": -15.743781433943996,
+   "rms_db": -41.35823305064076,
+   "lufs": -34.410835688585884,
+   "gain_correction_db": 10.087584982010117,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -33.44916492176568
+  },
+  {
+   "ch": 25,
+   "name": "KICK",
+   "preset": "kick",
+   "source_role": "kick",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -4.536087583083038,
+   "rms_db": -44.21779122834457,
+   "lufs": -27.304038969584603,
+   "gain_correction_db": 1.6128272787092222,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -7.295957597187858
+  },
+  {
+   "ch": 26,
+   "name": "SNARE",
+   "preset": "snare",
+   "source_role": "snare",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -3.550092526941273,
+   "rms_db": -39.567646419577926,
+   "lufs": -27.331653170294018,
+   "gain_correction_db": 1.6321572192058127,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": 0.0
+  },
+  {
+   "ch": 27,
+   "name": "BASS",
+   "preset": "bass",
+   "source_role": "bass",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -11.396788478593699,
+   "rms_db": -24.16384388085904,
+   "lufs": -25.05097492363116,
+   "gain_correction_db": 2.050974923631159,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -9.249022406080755
+  },
+  {
+   "ch": 28,
+   "name": "GUITAR L",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -10.877799704859815,
+   "rms_db": -27.742738083231643,
+   "lufs": -24.14607165340348,
+   "gain_correction_db": 1.1460716534034816,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -5.0882935269202
+  },
+  {
+   "ch": 29,
+   "name": "GUITAR R",
+   "preset": "electricGuitar",
+   "source_role": "guitar",
+   "classification_confidence": 0.84,
+   "auto_corrections_enabled": true,
+   "peak_db": -12.458628466700123,
+   "rms_db": -28.914958270647094,
+   "lufs": -24.72607973017739,
+   "gain_correction_db": 1.7260797301773891,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -9.181036206101908
+  },
+  {
+   "ch": 30,
+   "name": "OH L",
+   "preset": "overheads",
+   "source_role": "oh_l",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -14.338224650021665,
+   "rms_db": -40.370144943489706,
+   "lufs": -35.240593999251935,
+   "gain_correction_db": 4.454504899364145,
+   "eq_applied": false,
+   "compressor_applied": true,
+   "fader_db": -4.259402186050799
+  },
+  {
+   "ch": 31,
+   "name": "OH R",
+   "preset": "overheads",
+   "source_role": "oh_r",
+   "classification_confidence": 0.98,
+   "auto_corrections_enabled": true,
+   "peak_db": -8.812147251982532,
+   "rms_db": -32.03605830832419,
+   "lufs": -27.6020002537371,
+   "gain_correction_db": -2.397999746262901,
+   "eq_applied": false,
+   "compressor_applied": false,
+   "fader_db": -6.610142802078441
+  }
+ ]
+}
