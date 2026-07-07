@@ -93,6 +93,17 @@ iteration_log:
   notes: 'Первая волна backlog закрыта (9 тем). Подтверждён пробел акустического домена
     (нужен микрофон зала). Backlog пополнен второй волной: WING-поверхности для shadow-правил,
     протокол саундчека, жанровые кривые, бэк-вокалы, гейты углублённо.'
+- date: '2026-07-07'
+  topic: wing_sidechain_deesser_surfaces
+  rules_added:
+  - wing.dynsc_cross_channel_sidechain
+  - wing.deesser_dynamic_eq_models
+  - wing.channel_proc_order_and_peq
+  rules_rejected: []
+  notes: 'Все три shadow-направления получили WING-поверхности: kick->bass duck (dynsc/src
+    CH.x + DUCK), де-эссер DS902 в гейт-слоте при COMP в dyn, порядок EDGI для канонического
+    вокального тракта, PEQ как второй EQ. Перед автоматизацией — read-only верификация
+    токенов на пульте (риск тихих отказов), затем SETUP-раннер по образцу существующих.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -133,7 +144,7 @@ topics:
 - id: wing_sidechain_deesser_surfaces
   title: 'WING-поверхности: sidechain-источники динамики, де-эссер, dynamic EQ — изучение
     протокола и план автоматизации'
-  status: pending
+  status: done
   operator_complaint: shadow-правила masking.dynamic_ducking и vocal_chain.deess_after_comp
     ждут поверхностей
 - id: soundcheck_workflow_pro

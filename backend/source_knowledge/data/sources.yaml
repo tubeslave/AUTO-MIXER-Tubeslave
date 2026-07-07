@@ -1352,3 +1352,15 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация monitor_room_interaction 2026-07-07: измерительный микрофон + анализатор для мод (по поисковой выжимке)."
+
+  - source_id: wing_remote_protocols_v31
+    title: "WING Remote Protocols V3.1 (official)"
+    source_type: official_documentation
+    authors: ["Behringer/Music Tribe"]
+    publisher: "Behringer"
+    year: 2025
+    url: "Docs/Behringer_WING_Official/text/WING_Remote_Protocols_V3.1-03.txt"
+    authority_tier: official_protocol
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata, protocol_facts]
+    notes: "Итерация wing_sidechain_deesser_surfaces 2026-07-07: dynsc/gatesc узлы, модели DS902/DEQ/DEQ2/DUCK в обоих слотах, /ch/N/proc (24 порядка), /ch/N/peq."
