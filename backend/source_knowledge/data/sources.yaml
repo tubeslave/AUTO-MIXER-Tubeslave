@@ -1318,3 +1318,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация masking_arrangement 2026-07-07: широкий срез 800-3к у гитар под вокал, multiband sidechain (по поисковой выжимке)."
+
+  - source_id: proaudiofiles_pa_tuning
+    title: "How to Tune a PA System for Live Sound"
+    source_type: web_article
+    authors: ["Pro Audio Files"]
+    publisher: "theproaudiofiles.com"
+    year: 2023
+    url: "https://theproaudiofiles.com/live-sound-pa-tuning-101/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация monitor_room_interaction 2026-07-07: консервативные срезы, ring-out, over-EQ как главная ошибка."
+  - source_id: collaborateworship_room_eq
+    title: "Room EQ for POWERFUL and PAINLESS Sound | Simple PA Tuning"
+    source_type: web_article
+    authors: ["Collaborate Worship"]
+    publisher: "collaborateworship.com"
+    year: 2022
+    url: "https://collaborateworship.com/room-eq/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация monitor_room_interaction 2026-07-07: дип 3 кГц в house curve (по поисковой выжимке)."
+  - source_id: sweetwater_venue_eq
+    title: "How to EQ Your Venue the Easy Way"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2023
+    url: "https://www.sweetwater.com/insync/how-to-eq-your-venue-the-easy-way/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация monitor_room_interaction 2026-07-07: измерительный микрофон + анализатор для мод (по поисковой выжимке)."

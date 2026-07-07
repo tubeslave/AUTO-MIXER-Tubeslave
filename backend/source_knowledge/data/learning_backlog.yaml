@@ -83,6 +83,16 @@ iteration_log:
   notes: ERB-маскирование и identity-core кэп подтверждены; новое направление — динамические
     срезы через WING sidechain (shadow, нужна отдельная поверхность движка); моно-сумма
     как детектор скрытого маскирования.
+- date: '2026-07-07'
+  topic: monitor_room_interaction
+  rules_added:
+  - pa.conservative_room_eq
+  - pa.house_curve_3k_dip
+  - pa.acoustic_domain_requires_mic
+  rules_rejected: []
+  notes: 'Первая волна backlog закрыта (9 тем). Подтверждён пробел акустического домена
+    (нужен микрофон зала). Backlog пополнен второй волной: WING-поверхности для shadow-правил,
+    протокол саундчека, жанровые кривые, бэк-вокалы, гейты углублённо.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -119,4 +129,28 @@ topics:
   status: done
 - id: monitor_room_interaction
   title: Взаимодействие с залом — PA-кривые, low-end менеджмент, feedback
+  status: done
+- id: wing_sidechain_deesser_surfaces
+  title: 'WING-поверхности: sidechain-источники динамики, де-эссер, dynamic EQ — изучение
+    протокола и план автоматизации'
+  status: pending
+  operator_complaint: shadow-правила masking.dynamic_ducking и vocal_chain.deess_after_comp
+    ждут поверхностей
+- id: soundcheck_workflow_pro
+  title: Порядок профессионального саундчека — очередность инструментов, соло-проходы,
+    что просить у музыкантов
+  status: pending
+  operator_complaint: фазовые пункты ждут изолированных ударов — нужен протокол взаимодействия
+    с барабанщиком
+- id: genre_target_curves
+  title: Жанровые целевые кривые микса — rock/pop/electronic/acoustic спектральные
+    плоскости
+  status: pending
+- id: backing_vocals_blend
+  title: Бэк-вокалы — блендинг с лидом, панорама, обработка (меньше презенса/воздуха,
+    дабл)
+  status: pending
+- id: gates_expanders_live_advanced
+  title: Гейты/экспандеры live углублённо — range vs полный гейт, hysteresis, sidechain-фильтры,
+    duck-режимы
   status: pending
