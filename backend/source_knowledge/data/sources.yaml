@@ -1250,3 +1250,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация mix_bus_loudness_live 2026-07-07: gain staging для хедрума, фейдеры у unity (по поисковой выжимке)."
+
+  - source_id: yamaha_reverb_delay_live
+    title: "Using Reverb and Delay In Live Sound, Part 2"
+    source_type: web_article
+    authors: ["Yamaha Pro Audio"]
+    publisher: "hub.yamaha.com"
+    year: 2023
+    url: "https://hub.yamaha.com/proaudio/livesound/using-reverb-and-delay-part-2/"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация fx_reverb_delay_live 2026-07-07: по-инструментные рекомендации, исключения (kick/bass/тарелки), outdoor-bias."
+  - source_id: musicproductionnerds_live_vocals
+    title: "Reverb and Delay Settings for Live Vocals"
+    source_type: web_article
+    authors: ["Music Production Nerds"]
+    publisher: "musicproductionnerds.com"
+    year: 2023
+    url: "https://musicproductionnerds.com/reverb-and-delay-settings-for-live-vocals"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация fx_reverb_delay_live 2026-07-07: plate/room для live, пре-дилей 10-30 мс (по поисковой выжимке)."
+  - source_id: izotope_predelay
+    title: "Reverb pre-delay explained: how to avoid a muddy reverb sound"
+    source_type: web_article
+    authors: ["iZotope"]
+    publisher: "izotope.com"
+    year: 2024
+    url: "https://www.izotope.com/en/learn/reverb-pre-delay"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация fx_reverb_delay_live 2026-07-07: пре-дилей как разделение сигнала и хвоста (по поисковой выжимке)."
+  - source_id: collaborateworship_reverb
+    title: "Reverb Techniques for Church Sound"
+    source_type: web_article
+    authors: ["Collaborate Worship"]
+    publisher: "collaborateworship.com"
+    year: 2022
+    url: "https://collaborateworship.com/reverb/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация fx_reverb_delay_live 2026-07-07: decay снейра до следующего удара, half-note дилей (по поисковой выжимке)."

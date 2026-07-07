@@ -63,6 +63,16 @@ iteration_log:
   notes: 'Прямой ответ на кейс -29 LUFS: источники под номиналом, лечится trim-boost
     в саундчек-фазе с opt-in оператора; якорь — барабаны 9-12 дБ хедрума, мастер в
     unity.'
+- date: '2026-07-07'
+  topic: fx_reverb_delay_live
+  rules_added:
+  - fx.reverb_type_predelay_live
+  - fx.no_reverb_low_end_cymbals
+  - fx.delay_tempo_snare_decay
+  rules_rejected: []
+  notes: Подтверждены PLATE/ROOM-рэк, мьют дилей-шины до темпа, запрет close-mic FX;
+    новое — исключения kick/bass/тарелки, снейр-decay до следующего удара, дабл 30
+    мс для бэков, outdoor-bias.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -93,7 +103,7 @@ topics:
   operator_complaint: микс на 8-9 LU тише цели, DCA cuts-only не поднимает
 - id: fx_reverb_delay_live
   title: Ревербы/дилеи live — типы, времена, пре-дилей, посылы по ролям
-  status: pending
+  status: done
 - id: masking_arrangement
   title: Маскирование и место в спектре — кто уступает, где резать
   status: pending
