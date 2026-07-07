@@ -1421,3 +1421,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация genre_target_curves 2026-07-07: энергетический профиль электроники (саб 27% + бас 54%) — по поисковой выжимке."
+
+  - source_id: waves_bgv_hacks
+    title: "Mixing Background Vocals: 10 HOT HACKS"
+    source_type: web_article
+    authors: ["Waves Audio"]
+    publisher: "waves.com"
+    year: 2023
+    url: "https://www.waves.com/mixing-background-vocals-hot-hacks"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация backing_vocals_blend 2026-07-07: bus-glue 5-10 дБ GR, симметричная панорама, реверб-глубина."
+  - source_id: musicguymixing_bgv_eq
+    title: "Background Vocal EQ - The Best EQ Settings for Backing Vocals"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/background-vocal-eq/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация backing_vocals_blend 2026-07-07: HPF до 300, LPF 5-6к, тело лиду (по поисковой выжимке)."
+  - source_id: behindthemixer_bgv_blend
+    title: "Top Seven Ways for Blending Backing Vocals"
+    source_type: web_article
+    authors: ["Behind The Mixer"]
+    publisher: "behindthemixer.com"
+    year: 2022
+    url: "https://www.behindthemixer.com/top-ways-of-blending-backing-vocals/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация backing_vocals_blend 2026-07-07: live-блендинг бэков (по поисковой выжимке)."

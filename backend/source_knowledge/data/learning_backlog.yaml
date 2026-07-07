@@ -123,6 +123,14 @@ iteration_log:
   notes: 'Тема собрана слабее (конкретных дБ/окт нет в источниках) — уверенность 0.7;
     ядро: кривая жанрозависима, референс через тот же измеритель; наш pink-target
     остаётся операторским выбором; reference matching только по явному запросу (CLAUDE.md).'
+- date: '2026-07-07'
+  topic: backing_vocals_blend
+  rules_added:
+  - bgv.darker_thinner_behind_lead
+  - bgv.bus_glue_and_panning
+  rules_rejected: []
+  notes: Согласуется с Ayaic tucked backs -27 LU и masking-приоритетом лида; в текущем
+    составе бэков нет — правила про запас; при появлении бэков нужна группа-шина.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -179,7 +187,7 @@ topics:
 - id: backing_vocals_blend
   title: Бэк-вокалы — блендинг с лидом, панорама, обработка (меньше презенса/воздуха,
     дабл)
-  status: pending
+  status: done
 - id: gates_expanders_live_advanced
   title: Гейты/экспандеры live углублённо — range vs полный гейт, hysteresis, sidechain-фильтры,
     duck-режимы
