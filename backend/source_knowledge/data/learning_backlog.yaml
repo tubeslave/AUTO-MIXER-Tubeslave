@@ -73,6 +73,16 @@ iteration_log:
   notes: Подтверждены PLATE/ROOM-рэк, мьют дилей-шины до темпа, запрет close-mic FX;
     новое — исключения kick/bass/тарелки, снейр-decay до следующего удара, дабл 30
     мс для бэков, outdoor-bias.
+- date: '2026-07-07'
+  topic: masking_arrangement
+  rules_added:
+  - masking.priority_carve
+  - masking.dynamic_ducking
+  - masking.detection_checks
+  rules_rejected: []
+  notes: ERB-маскирование и identity-core кэп подтверждены; новое направление — динамические
+    срезы через WING sidechain (shadow, нужна отдельная поверхность движка); моно-сумма
+    как детектор скрытого маскирования.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -106,7 +116,7 @@ topics:
   status: done
 - id: masking_arrangement
   title: Маскирование и место в спектре — кто уступает, где резать
-  status: pending
+  status: done
 - id: monitor_room_interaction
   title: Взаимодействие с залом — PA-кривые, low-end менеджмент, feedback
   status: pending

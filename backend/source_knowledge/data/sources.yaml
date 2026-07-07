@@ -1295,3 +1295,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация fx_reverb_delay_live 2026-07-07: decay снейра до следующего удара, half-note дилей (по поисковой выжимке)."
+
+  - source_id: masteringbox_frequency_masking
+    title: "What is Frequency Masking? Techniques for Mix Clarity"
+    source_type: web_article
+    authors: ["MasteringBOX"]
+    publisher: "masteringbox.com"
+    year: 2024
+    url: "https://www.masteringbox.com/learn/frequency-masking"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация masking_arrangement 2026-07-07: детекция, carve-стратегия, динамические решения."
+  - source_id: audio_issues_guitar_vocal_space
+    title: "How to Give Your Guitars and Vocals Their Own Space in the Mix"
+    source_type: web_article
+    authors: ["Audio Issues"]
+    publisher: "audio-issues.com"
+    year: 2022
+    url: "https://www.audio-issues.com/music-mixing/give-guitars-vocals-space-mix/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация masking_arrangement 2026-07-07: широкий срез 800-3к у гитар под вокал, multiband sidechain (по поисковой выжимке)."
