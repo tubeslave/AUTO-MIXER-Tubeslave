@@ -169,6 +169,15 @@ iteration_log:
     компрессию live — прямая связь с 'вокал то громко, то тихо'); секционные райды
     мастера — руки оператора (MasterFaderMove proposal-only); снапшот-дисциплина совпадает
     с CLAUDE.md snap safety.
+- date: '2026-07-07'
+  topic: spl_targets_venue
+  rules_added:
+  - spl.who_100dba_15min_leq
+  - spl.niosh_exposure_model
+  rules_rejected: []
+  notes: Третья волна закрыта. WHO 100 dBA LAeq/15мин + NIOSH-модель; SPL-мониторинг
+    упирается в микрофон зала (telemetry.spl mock, EMERGENCY_SPL готово). Четвёртая
+    волна засеяна.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -242,4 +251,16 @@ topics:
   status: done
 - id: spl_targets_venue
   title: SPL-цели и слуховая безопасность — уровни по типам площадок, динамика вечера
+  status: done
+- id: keys_playback_integration
+  title: Клавиши/синты/плейбек - интеграция линейных стерео-источников, уровни, EQ-место
+  status: pending
+- id: wing_eq_models_character
+  title: WING EQ-модели (SOUL/E88/E84/F110/PULSAR) - характер и когда какую выбирать
+  status: pending
+- id: low_end_xover_mains
+  title: Управление низом на мейнах - кроссоверы LR24/LR48 (leq/heq), сабы, mono low
+  status: pending
+- id: festival_changeover_speed
+  title: Быстрый чендж-овер/фестивальный саундчек - что делать за 15 минут
   status: pending

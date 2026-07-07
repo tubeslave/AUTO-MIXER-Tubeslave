@@ -1602,3 +1602,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация show_time_supervision 2026-07-07: снапшот-память консолей, recall между песнями (по поисковой выжимке)."
+
+  - source_id: who_safe_listening_standard
+    title: "WHO Global standard for safe listening venues and events"
+    source_type: standard
+    authors: ["World Health Organization"]
+    publisher: "WHO"
+    year: 2022
+    url: "https://www.igvw.org/wp-content/uploads/WHO-global-standard-for-safe-listening-venues-and-events.pdf"
+    authority_tier: international_standard
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация spl_targets_venue 2026-07-07: 100 dB LAeq/15 мин, обоснование окна."
+  - source_id: fohonline_spl_rules
+    title: "SPL's: Playing by the Rules"
+    source_type: web_article
+    authors: ["FOH Magazine"]
+    publisher: "fohonline.com"
+    year: 2022
+    url: "https://fohonline.com/articles/on-the-digital-edge/spls-playing-by-the-rules/"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация spl_targets_venue 2026-07-07: контрактные лимиты площадок, LEQ-окна (по поисковой выжимке)."
+  - source_id: testmyaudio_decibels
+    title: "Decibel levels: a quick reference for everyday sound"
+    source_type: web_article
+    authors: ["TestMyAudio"]
+    publisher: "testmyaudio.com"
+    year: 2024
+    url: "https://testmyaudio.com/decibel-levels-guide"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация spl_targets_venue 2026-07-07: NIOSH-модель 85/8ч, 3-дБ обмен (по поисковой выжимке)."
+  - source_id: cdc_safe_listening
+    title: "Safe Listening at Venues and Events with Amplified Music - United States, 2022"
+    source_type: government_report
+    authors: ["CDC MMWR"]
+    publisher: "cdc.gov"
+    year: 2022
+    url: "https://www.cdc.gov/mmwr/volumes/72/wr/mm7213a3.htm"
+    authority_tier: government
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация spl_targets_venue 2026-07-07: экспозиция аудитории (по поисковой выжимке)."
