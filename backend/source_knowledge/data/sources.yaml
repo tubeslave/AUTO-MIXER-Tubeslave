@@ -1489,3 +1489,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация gates_expanders_live_advanced 2026-07-07: hold против обрезки затухания (по поисковой выжимке)."
+
+  - source_id: drewbrashler_bdx902
+    title: "bdx902 De-Esser - Behringer Wing Effects Tutorial"
+    source_type: web_article
+    authors: ["Drew Brashler"]
+    publisher: "drewbrashler.com"
+    year: 2023
+    url: "https://drewbrashler.com/2023/bdx902/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация deesser_ds902_practice 2026-07-07: WING-специфичный туториал BDX902 — пороговобезопасная детекция, пение 4.4 кГц, NORMAL-6 дБ."
+  - source_id: producelikeapro_deess
+    title: "How To De-Ess Vocals | Settings for a Pro Mix"
+    source_type: web_article
+    authors: ["Produce Like A Pro"]
+    publisher: "producelikeapro.com"
+    year: 2023
+    url: "https://producelikeapro.com/blog/pro-de-esser-tips-better-sounding-vocals/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация deesser_ds902_practice 2026-07-07: половые полосы сибилянтов (по поисковой выжимке)."
+  - source_id: sos_deessing
+    title: "Techniques For Vocal De-essing"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2021
+    url: "https://www.soundonsound.com/techniques/techniques-vocal-de-essing"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация deesser_ds902_practice 2026-07-07: диапазон сибилянтов 2-10 кГц индивидуален (по поисковой выжимке)."

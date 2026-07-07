@@ -141,6 +141,15 @@ iteration_log:
   notes: 'Вторая волна закрыта (5 тем). Гейт-правила подтверждают три внедрённых решения
     (range -20, hysteresis, sidechain-фильтры). Третья волна: де-эссер практика, drum
     bus glue, дисциплина шоу, SPL-цели.'
+- date: '2026-07-07'
+  topic: deesser_ds902_practice
+  rules_added:
+  - deess.ds902_live_settings
+  - deess.gender_sibilance_bands
+  rules_rejected: []
+  notes: 'WING-специфичный источник (drewbrashler): BDX902 детекция без порога — самоподстройка
+    под live-уровни (прямой ответ на ''вокал то громко, то тихо''); связка с итерацией
+    10 (гейт-слот + proc EDGI) даёт полный рецепт вокального тракта для пробы.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -204,7 +213,7 @@ topics:
   status: done
 - id: deesser_ds902_practice
   title: Де-эссер на практике — пороги/полосы live, параметры DBX 902 (DS902)
-  status: pending
+  status: done
   operator_complaint: WING-поверхность найдена (итерация 10), нужны рабочие параметры
 - id: drum_bus_glue_live
   title: Обработка барабанной шины live — glue-комп, параллель, EQ шины
