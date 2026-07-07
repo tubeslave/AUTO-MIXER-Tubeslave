@@ -189,6 +189,16 @@ iteration_log:
   notes: Линейные источники — полный замкнутый контур (нет bleed); перекачанный бас
     стемов объясняет постоянное прижатие PLAYBK к плоскости; разнесённые бусты дополняют
     masking-правила.
+- date: '2026-07-07'
+  topic: wing_eq_models_character
+  rules_added:
+  - wing_eq.model_character_selection
+  - wing_eq.colored_boost_clean_cut
+  rules_rejected: []
+  notes: Протокол подтвердил список EQ-моделей /ch/N/eq/mdl (STD/SOUL/E88/E84/F110/PULSAR/MACH)
+    и что смена модели меняет токены; веб дал характер. Уверенность 0.72-0.75 — субъективный
+    тонкий выбор; оставлено shadow, дефолт STD достаточно нейтрален для автоматики,
+    смена модели — операторская.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -268,7 +278,7 @@ topics:
   status: done
 - id: wing_eq_models_character
   title: WING EQ-модели (SOUL/E88/E84/F110/PULSAR) - характер и когда какую выбирать
-  status: pending
+  status: done
 - id: low_end_xover_mains
   title: Управление низом на мейнах - кроссоверы LR24/LR48 (leq/heq), сабы, mono low
   status: pending

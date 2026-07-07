@@ -1670,3 +1670,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация keys_playback_integration 2026-07-07: раскладка стемов по каналам, EQ под зал (по поисковой выжимке)."
+
+  - source_id: wing_protocol_v31
+    title: "WING Remote Protocols V3.1 (Appendix: EQ/Compressor/Gate models)"
+    source_type: manufacturer_doc
+    authors: ["Patrick-Gilles Maillot"]
+    publisher: "Behringer / Music Tribe"
+    year: 2024
+    url: "Docs/Behringer_WING_Official/text/WING_Remote_Protocols_V3.1-03.txt"
+    authority_tier: manufacturer_primary
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata, protocol_facts]
+    notes: "Итерация wing_eq_models_character 2026-07-07: /ch/N/eq/mdl список STD/SOUL/E88/E84/F110/PULSAR/MACH + токены каждой модели."
+  - source_id: mixedbymarcmozart_classic_eqs
+    title: "Classic EQ types and how to use them in your mix"
+    source_type: web_article
+    authors: ["Marc Mozart"]
+    publisher: "mixedbymarcmozart.com"
+    year: 2015
+    url: "https://mixedbymarcmozart.com/2015/04/02/classic-eqs-and-how-to-use-them-in-your-mix/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация wing_eq_models_character 2026-07-07: характер Pultec/SSL/Neve/API/линейно-фазовых, boost-colored/cut-clean."
+  - source_id: gearnews_eq_techniques
+    title: "EQ Techniques: Neve vs Pultec vs API vs SSL"
+    source_type: web_article
+    authors: ["gearnews"]
+    publisher: "gearnews.com"
+    year: 2023
+    url: "https://www.gearnews.com/eq-techniques-studio/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация wing_eq_models_character 2026-07-07: Neve тёплый на bass/drums/vocal, SSL чистый (по поисковой выжимке)."
+  - source_id: proaudiofiles_eq_plugins
+    title: "6 EQ Plugins Modeled After Analog Hardware"
+    source_type: web_article
+    authors: ["Pro Audio Files"]
+    publisher: "theproaudiofiles.com"
+    year: 2022
+    url: "https://theproaudiofiles.com/eq-plugins-modeled-after-analog-gear/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация wing_eq_models_character 2026-07-07: колор vs чистый по назначению (по поисковой выжимке)."
