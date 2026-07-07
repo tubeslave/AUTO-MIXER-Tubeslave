@@ -178,6 +178,17 @@ iteration_log:
   notes: Третья волна закрыта. WHO 100 dBA LAeq/15мин + NIOSH-модель; SPL-мониторинг
     упирается в микрофон зала (telemetry.spl mock, EMERGENCY_SPL готово). Четвёртая
     волна засеяна.
+- date: '2026-07-07'
+  topic: keys_playback_integration
+  rules_added:
+  - keys.source_consistency_first
+  - keys.line_source_eq_carve
+  rules_rejected:
+  - '''моно-PA предупреждение для стерео-клавиш'' — не наш случай (стерео-PA подтверждён
+    оператором), оставлено оговоркой'
+  notes: Линейные источники — полный замкнутый контур (нет bleed); перекачанный бас
+    стемов объясняет постоянное прижатие PLAYBK к плоскости; разнесённые бусты дополняют
+    masking-правила.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -254,7 +265,7 @@ topics:
   status: done
 - id: keys_playback_integration
   title: Клавиши/синты/плейбек - интеграция линейных стерео-источников, уровни, EQ-место
-  status: pending
+  status: done
 - id: wing_eq_models_character
   title: WING EQ-модели (SOUL/E88/E84/F110/PULSAR) - характер и когда какую выбирать
   status: pending

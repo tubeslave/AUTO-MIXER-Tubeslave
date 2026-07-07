@@ -1647,3 +1647,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация spl_targets_venue 2026-07-07: экспозиция аудитории (по поисковой выжимке)."
+
+  - source_id: mixingmusiclive_keys_playback
+    title: "How to mix keyboards (and playback tracks)"
+    source_type: web_article
+    authors: ["Mixing Music Live"]
+    publisher: "mixingmusiclive.com"
+    year: 2023
+    url: "https://www.mixingmusiclive.com/blog/mixing-keyboards-and-playback-tracks"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_playback_integration 2026-07-07: консистентность у источника, бас стемов, стабильность в шоу."
+  - source_id: sos_backing_tracks
+    title: "Preparing Backing Tracks For Live Use"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2021
+    url: "https://www.soundonsound.com/techniques/preparing-backing-tracks-live-use"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_playback_integration 2026-07-07: раскладка стемов по каналам, EQ под зал (по поисковой выжимке)."
