@@ -150,6 +150,14 @@ iteration_log:
   notes: 'WING-специфичный источник (drewbrashler): BDX902 детекция без порога — самоподстройка
     под live-уровни (прямой ответ на ''вокал то громко, то тихо''); связка с итерацией
     10 (гейт-слот + proc EDGI) даёт полный рецепт вокального тракта для пробы.'
+- date: '2026-07-07'
+  topic: drum_bus_glue_live
+  rules_added:
+  - drum_bus.glue_settings
+  - drum_bus.parallel_compression
+  rules_rejected: []
+  notes: Glue-цели кросс-подтверждают итерацию 4 (drum_bus 2:1 GR 1-2); шина DRUMS
+    готова к пробе по команде; параллель требует второй шины с POST-посылами — SETUP-план.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -217,7 +225,7 @@ topics:
   operator_complaint: WING-поверхность найдена (итерация 10), нужны рабочие параметры
 - id: drum_bus_glue_live
   title: Обработка барабанной шины live — glue-комп, параллель, EQ шины
-  status: pending
+  status: done
 - id: show_time_supervision
   title: Что трогать во время шоу — дисциплина изменений, снапшоты, ride вокала
   status: pending

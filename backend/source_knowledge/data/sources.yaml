@@ -1523,3 +1523,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация deesser_ds902_practice 2026-07-07: диапазон сибилянтов 2-10 кГц индивидуален (по поисковой выжимке)."
+
+  - source_id: musicguymixing_drum_bus_comp
+    title: "Drum Bus Compression Cheat Sheet - The Best Settings"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/drum-bus-compression/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_bus_glue_live 2026-07-07: glue 2:1/атака 3-10/GR 1-2/порог последним."
+  - source_id: unison_drum_bus_comp
+    title: "Drum Bus Compression: 14+ Key Techniques & Powerful Secrets"
+    source_type: web_article
+    authors: ["Unison Audio"]
+    publisher: "unison.audio"
+    year: 2024
+    url: "https://unison.audio/drum-bus-compression/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_bus_glue_live 2026-07-07: кросс-подтверждение glue-настроек (по поисковой выжимке)."
+  - source_id: nailthemix_parallel
+    title: "Parallel Compression: Slamming Drums & Punchy Modern Metal Mixes"
+    source_type: web_article
+    authors: ["Nail The Mix"]
+    publisher: "nailthemix.com"
+    year: 2023
+    url: "https://www.nailthemix.com/parallel-compression"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_bus_glue_live 2026-07-07: параллель 8:1+/атака 2 мс/GR 5-7 (по поисковой выжимке)."
+  - source_id: mastering_com_parallel
+    title: "Parallel Compression: 8 Tips for Pro Mixes"
+    source_type: web_article
+    authors: ["Mastering.com"]
+    publisher: "mastering.com"
+    year: 2023
+    url: "https://mastering.com/parallel-compression-guide/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация drum_bus_glue_live 2026-07-07: бленд едва слышим (по поисковой выжимке)."
