@@ -1364,3 +1364,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata, protocol_facts]
     notes: "Итерация wing_sidechain_deesser_surfaces 2026-07-07: dynsc/gatesc узлы, модели DS902/DEQ/DEQ2/DUCK в обоих слотах, /ch/N/proc (24 порядка), /ch/N/peq."
+
+  - source_id: proaudiofiles_soundcheck
+    title: "Live Sound 101: How to Sound Check a Band for a Live Show"
+    source_type: web_article
+    authors: ["Pro Audio Files"]
+    publisher: "theproaudiofiles.com"
+    year: 2022
+    url: "https://theproaudiofiles.com/soundcheck/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация soundcheck_workflow_pro 2026-07-07: line check vs soundcheck, порядок инструментов."
+  - source_id: sweetwater_drum_soundcheck
+    title: "How to Soundcheck Drums"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2023
+    url: "https://www.sweetwater.com/insync/how-to-soundcheck-drums/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация soundcheck_workflow_pro 2026-07-07: kick соло ровными ударами, kick+snare попеременно (по поисковой выжимке)."
+  - source_id: gearank_soundcheck
+    title: "The Sound Check Process That Never Fails"
+    source_type: web_article
+    authors: ["Gearank"]
+    publisher: "gearank.com"
+    year: 2023
+    url: "https://gearank.com/sound-check/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация soundcheck_workflow_pro 2026-07-07: полная последовательность до whole band (по поисковой выжимке)."

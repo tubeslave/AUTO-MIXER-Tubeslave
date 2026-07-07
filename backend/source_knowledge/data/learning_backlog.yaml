@@ -104,6 +104,16 @@ iteration_log:
     CH.x + DUCK), де-эссер DS902 в гейт-слоте при COMP в dyn, порядок EDGI для канонического
     вокального тракта, PEQ как второй EQ. Перед автоматизацией — read-only верификация
     токенов на пульте (риск тихих отказов), затем SETUP-раннер по образцу существующих.'
+- date: '2026-07-07'
+  topic: soundcheck_workflow_pro
+  rules_added:
+  - soundcheck.line_check_order
+  - soundcheck.solo_passes_feed_measurements
+  - soundcheck.two_phase_line_then_band
+  rules_rejected: []
+  notes: 'Главный actionable: чек-лист конвергенции должен генерировать список просьб
+    к музыкантам (deferred фазовые пункты -> ''прошу 5-10 одиночных ударов по снейру'');
+    двухфазность line check/full band совпадает с архитектурой движка.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -150,7 +160,7 @@ topics:
 - id: soundcheck_workflow_pro
   title: Порядок профессионального саундчека — очередность инструментов, соло-проходы,
     что просить у музыкантов
-  status: pending
+  status: done
   operator_complaint: фазовые пункты ждут изолированных ударов — нужен протокол взаимодействия
     с барабанщиком
 - id: genre_target_curves
