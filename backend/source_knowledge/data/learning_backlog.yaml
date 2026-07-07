@@ -52,6 +52,17 @@ iteration_log:
   notes: 'Частотные цели вокала кросс-подтверждают eq.tonal_targets.lead_vocal; ключевая
     WING-оговорка: единый EQ до динамики — прибавляющие бусты компрессируются; FX-на-посылах
     уже наша архитектура.'
+- date: '2026-07-07'
+  topic: mix_bus_loudness_live
+  rules_added:
+  - loudness.fix_at_gain_staging_not_master
+  - loudness.drums_headroom_anchor
+  rules_rejected:
+  - мастер-лимитер как решение громкости — отвергнут (совпадает с запретом финального
+    лимитера в CLAUDE.md)
+  notes: 'Прямой ответ на кейс -29 LUFS: источники под номиналом, лечится trim-boost
+    в саундчек-фазе с opt-in оператора; якорь — барабаны 9-12 дБ хедрума, мастер в
+    unity.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -78,7 +89,7 @@ topics:
   status: done
 - id: mix_bus_loudness_live
   title: Громкость и плотность живого микса — цели LUFS/TP, что двигать
-  status: pending
+  status: done
   operator_complaint: микс на 8-9 LU тише цели, DCA cuts-only не поднимает
 - id: fx_reverb_delay_live
   title: Ревербы/дилеи live — типы, времена, пре-дилей, посылы по ролям

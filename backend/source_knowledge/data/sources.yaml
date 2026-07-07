@@ -1205,3 +1205,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация vocal_chain_live 2026-07-07: кросс-подтверждение порядка (по поисковой выжимке)."
+
+  - source_id: izotope_headroom
+    title: "Headroom: How to Set Your Levels in Mixing and Mastering"
+    source_type: web_article
+    authors: ["iZotope"]
+    publisher: "izotope.com"
+    year: 2024
+    url: "https://www.izotope.com/en/learn/headroom-how-to-set-levels-mixing-and-mastering.html"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация mix_bus_loudness_live 2026-07-07: уровень контролируется на каналах, не стрипом энергии микса."
+  - source_id: landr_headroom
+    title: "Headroom in Audio: How to Get Levels for Mixing and Mastering"
+    source_type: web_article
+    authors: ["LANDR"]
+    publisher: "blog.landr.com"
+    year: 2024
+    url: "https://blog.landr.com/headroom-audio/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация mix_bus_loudness_live 2026-07-07: пики -9, тело -18; мастер-пуш прячет балансные ошибки."
+  - source_id: majormixing_loudness
+    title: "How loud should mix be before mastering?"
+    source_type: web_article
+    authors: ["Major Mixing"]
+    publisher: "majormixing.com"
+    year: 2023
+    url: "https://majormixing.com/how-loud-should-mix-be-before-mastering/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация mix_bus_loudness_live 2026-07-07: барабаны 9-12 дБ хедрума как якорь."
+  - source_id: sweetwater_foh_tips
+    title: "Your #1 Tip for Getting a Great Live Mix - FOH Pros Weigh In"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2023
+    url: "https://www.sweetwater.com/insync/your-1-tip-for-getting-a-great-live-mix-foh-pros-weigh-in/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация mix_bus_loudness_live 2026-07-07: gain staging для хедрума, фейдеры у unity (по поисковой выжимке)."
