@@ -1398,3 +1398,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация soundcheck_workflow_pro 2026-07-07: полная последовательность до whole band (по поисковой выжимке)."
+
+  - source_id: emastered_tonal_balance
+    title: "What is Tonal Balance in Mixing and Mastering?"
+    source_type: web_article
+    authors: ["eMastered"]
+    publisher: "emastered.com"
+    year: 2023
+    url: "https://emastered.com/blog/tonal-balance"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация genre_target_curves 2026-07-07: жанровые скелеты, референс-практика, типовые ошибки."
+  - source_id: trackscore_frequency_balance
+    title: "Frequency Balance in Electronic Music: What Your Spectrum Should Look Like"
+    source_type: web_article
+    authors: ["TRACKSCORE.AI"]
+    publisher: "trackscore.ai"
+    year: 2024
+    url: "https://trackscore.ai/blog/frequency-balance-electronic-music"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация genre_target_curves 2026-07-07: энергетический профиль электроники (саб 27% + бас 54%) — по поисковой выжимке."

@@ -114,6 +114,15 @@ iteration_log:
   notes: 'Главный actionable: чек-лист конвергенции должен генерировать список просьб
     к музыкантам (deferred фазовые пункты -> ''прошу 5-10 одиночных ударов по снейру'');
     двухфазность line check/full band совпадает с архитектурой движка.'
+- date: '2026-07-07'
+  topic: genre_target_curves
+  rules_added:
+  - tonal.genre_target_curve_selection
+  - tonal.reference_track_practice
+  rules_rejected: []
+  notes: 'Тема собрана слабее (конкретных дБ/окт нет в источниках) — уверенность 0.7;
+    ядро: кривая жанрозависима, референс через тот же измеритель; наш pink-target
+    остаётся операторским выбором; reference matching только по явному запросу (CLAUDE.md).'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -166,7 +175,7 @@ topics:
 - id: genre_target_curves
   title: Жанровые целевые кривые микса — rock/pop/electronic/acoustic спектральные
     плоскости
-  status: pending
+  status: done
 - id: backing_vocals_blend
   title: Бэк-вокалы — блендинг с лидом, панорама, обработка (меньше презенса/воздуха,
     дабл)
