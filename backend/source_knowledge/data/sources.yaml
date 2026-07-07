@@ -1455,3 +1455,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация backing_vocals_blend 2026-07-07: live-блендинг бэков (по поисковой выжимке)."
+
+  - source_id: sos_gates_expanders
+    title: "Production Techniques Using Gates & Expanders"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2022
+    url: "https://www.soundonsound.com/techniques/production-techniques-using-gates-expanders"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация gates_expanders_live_advanced 2026-07-07: экспандер vs гейт, chatter/hysteresis, ключ-фильтры."
+  - source_id: unison_gate_vs_expander
+    title: "Noise Gate vs Expander 101: Key Differences & Creative Tips"
+    source_type: web_article
+    authors: ["Unison Audio"]
+    publisher: "unison.audio"
+    year: 2024
+    url: "https://unison.audio/noise-gate-vs-expander/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация gates_expanders_live_advanced 2026-07-07: ratio 2:1-4:1, range ~10 дБ между ударами (по поисковой выжимке)."
+  - source_id: waves_gating_basics
+    title: "Audio Gating Basics"
+    source_type: web_article
+    authors: ["Waves Audio"]
+    publisher: "waves.com"
+    year: 2023
+    url: "https://www.waves.com/audio-gating-basics"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация gates_expanders_live_advanced 2026-07-07: hold против обрезки затухания (по поисковой выжимке)."
