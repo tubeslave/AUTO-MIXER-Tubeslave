@@ -158,6 +158,17 @@ iteration_log:
   rules_rejected: []
   notes: Glue-цели кросс-подтверждают итерацию 4 (drum_bus 2:1 GR 1-2); шина DRUMS
     готова к пробе по команде; параллель требует второй шины с POST-посылами — SETUP-план.
+- date: '2026-07-07'
+  topic: show_time_supervision
+  rules_added:
+  - show.vocal_is_money_channel
+  - show.section_dynamics_master_ride
+  - show.snapshot_discipline
+  rules_rejected: []
+  notes: WING RIDE (Waves Vocal Rider) — кандидат для вокала (spill запрещает глубокую
+    компрессию live — прямая связь с 'вокал то громко, то тихо'); секционные райды
+    мастера — руки оператора (MasterFaderMove proposal-only); снапшот-дисциплина совпадает
+    с CLAUDE.md snap safety.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -228,7 +239,7 @@ topics:
   status: done
 - id: show_time_supervision
   title: Что трогать во время шоу — дисциплина изменений, снапшоты, ride вокала
-  status: pending
+  status: done
 - id: spl_targets_venue
   title: SPL-цели и слуховая безопасность — уровни по типам площадок, динамика вечера
   status: pending

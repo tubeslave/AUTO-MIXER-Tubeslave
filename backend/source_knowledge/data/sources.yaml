@@ -1568,3 +1568,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация drum_bus_glue_live 2026-07-07: бленд едва слышим (по поисковой выжимке)."
+
+  - source_id: sos_pooch_foh
+    title: "Ken 'Pooch' Van Druten: FOH Mix Engineer"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2020
+    url: "https://www.soundonsound.com/people/ken-pooch-van-druten-foh-mix-engineer"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация show_time_supervision 2026-07-07: райды вокала, секционная динамика PA -3..-6, снапшот-дисциплина (по поисковой выжимке)."
+  - source_id: mixonline_money_channel
+    title: "Mixing the Money Channel: FOH Engineers Share Their Expertise on Vocal Processing"
+    source_type: web_article
+    authors: ["Mix Magazine"]
+    publisher: "mixonline.com"
+    year: 2019
+    url: "https://www.mixonline.com/live-sound/mixing-money-channel-foh-engineers-share-their-expertise-vocal-processing-368930"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация show_time_supervision 2026-07-07: вокал — высший приоритет FOH (по поисковой выжимке)."
+  - source_id: wikipedia_live_sound_mixing
+    title: "Live sound mixing"
+    source_type: encyclopedia
+    authors: ["Wikipedia"]
+    publisher: "wikipedia.org"
+    year: 2026
+    url: "https://en.wikipedia.org/wiki/Live_sound_mixing"
+    authority_tier: encyclopedia
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация show_time_supervision 2026-07-07: снапшот-память консолей, recall между песнями (по поисковой выжимке)."
