@@ -199,6 +199,18 @@ iteration_log:
     и что смена модели меняет токены; веб дал характер. Уверенность 0.72-0.75 — субъективный
     тонкий выбор; оставлено shadow, дефолт STD достаточно нейтрален для автоматики,
     смена модели — операторская.
+- date: '2026-07-07'
+  topic: low_end_xover_mains
+  rules_added:
+  - lowend.mono_subs_crossover_80
+  - lowend.aux_fed_subs
+  - lowend.main_eq_crossover_types
+  rules_rejected: []
+  notes: Протокол подтвердил кроссоверные типы main/1/eq/leq (LR12/24/48, BW, BS);
+    большинство низа живёт в системном процессоре вне нашего контура. Наша роль —
+    kick/bass в моно-центре (совпадает с mono_compatibility keep_mono). Aux-fed subs
+    и LR24-tops-HPF — только по команде оператора (свободная aux-шина + системная
+    разводка).
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -281,7 +293,7 @@ topics:
   status: done
 - id: low_end_xover_mains
   title: Управление низом на мейнах - кроссоверы LR24/LR48 (leq/heq), сабы, mono low
-  status: pending
+  status: done
 - id: festival_changeover_speed
   title: Быстрый чендж-овер/фестивальный саундчек - что делать за 15 минут
   status: pending

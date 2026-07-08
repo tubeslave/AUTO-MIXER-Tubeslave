@@ -1715,3 +1715,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация wing_eq_models_character 2026-07-07: колор vs чистый по назначению (по поисковой выжимке)."
+
+  - source_id: qsc_sub_level
+    title: "Setting Subwoofer Level correctly in your PA System"
+    source_type: web_article
+    authors: ["QSC"]
+    publisher: "blogs.qsc.com"
+    year: 2022
+    url: "https://blogs.qsc.com/live-sound/setting-subwoofer-level-correctly-in-your-pa-system/"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация low_end_xover_mains 2026-07-07: моно-сабы, кроссовер 80/100, согласование tops HPF и sub LPF, локализация."
+  - source_id: svs_crossover
+    title: "Tips for Setting the Crossover Frequency of a Subwoofer"
+    source_type: web_article
+    authors: ["SVS"]
+    publisher: "svsound.com"
+    year: 2023
+    url: "https://www.svsound.com/blogs/subwoofer-setup-and-tuning/tips-for-setting-the-proper-crossover-frequency-for-a-subwoofer"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация low_end_xover_mains 2026-07-07: 80 Гц дефолт, локализация выше 100 (по поисковой выжимке)."
+  - source_id: prosoundweb_aux_subs
+    title: "The Pros And Cons Of Aux Fed Subs"
+    source_type: web_article
+    authors: ["ProSoundWeb"]
+    publisher: "prosoundweb.com"
+    year: 2022
+    url: "https://www.prosoundweb.com/the-pros-and-cons-of-aux-fed-subs/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация low_end_xover_mains 2026-07-07: aux-fed subs — только НЧ-источники, чище низ, продвинутая техника (403 при fetch, поисковая выжимка)."
