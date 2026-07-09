@@ -251,6 +251,16 @@ iteration_log:
     DET = чистый punch для live (альтернатива компрессии на барабанах). Оговорка:
     WAVE занимает слот динамики — конфликт с COMP/GATE, выбор по операторскому решению.
     Сдержанность согласуется с anti-over-compression.'
+- date: '2026-07-07'
+  topic: multiband_dynamics_live
+  rules_added:
+  - dyn_eq.momentary_vs_persistent
+  - dyn_eq.serial_light_touch
+  rules_rejected: []
+  notes: Протокол подтвердил WING DEQ/DEQ2 в dyn/gate слоте. Критерий момент-vs-персист
+    напрямую питает наши детекторы (sibilance/harshness/mud уже различают momentary
+    spikes); light-touch <=2 дБ на стадию согласуется с identity-core кэпом. DEQ конфликтует
+    со слотом COMP/де-эссера — операторский выбор.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -351,7 +361,7 @@ topics:
 - id: multiband_dynamics_live
   title: Мультибенд-динамика/dynamic EQ live — когда вместо статичного EQ, low-end
     контроль, de-harsh
-  status: pending
+  status: done
 - id: monitor_wedges_iem_foh
   title: Мониторинг сцены (клинья/IEM) с точки FOH — как влияет на bleed и фидбек
     в зале

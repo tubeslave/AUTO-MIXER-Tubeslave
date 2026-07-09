@@ -1907,3 +1907,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация transient_designers_live 2026-07-07: риск over-processing (по поисковой выжимке)."
+
+  - source_id: unison_dyneq_vs_mb
+    title: "Dynamic EQ vs Multiband Compression 101"
+    source_type: web_article
+    authors: ["Unison Audio"]
+    publisher: "unison.audio"
+    year: 2024
+    url: "https://unison.audio/dynamic-eq-vs-multiband-compression/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация multiband_dynamics_live 2026-07-07: конкретные полосы/пороги де-эсс/резонанс/НЧ, серийный light-touch <=2 дБ."
+  - source_id: musicguymixing_dyneq_mb
+    title: "Dynamic EQ vs Multiband Compression"
+    source_type: web_article
+    authors: ["Music Guy Mixing"]
+    publisher: "musicguymixing.com"
+    year: 2024
+    url: "https://www.musicguymixing.com/dynamic-eq-vs-multiband-compression/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация multiband_dynamics_live 2026-07-07: момент vs персист как критерий выбора (по поисковой выжимке)."
+  - source_id: sonarworks_dyneq_mb
+    title: "Pro Mastering: Dynamic EQ and Multiband Compression"
+    source_type: web_article
+    authors: ["Sonarworks"]
+    publisher: "sonarworks.com"
+    year: 2023
+    url: "https://www.sonarworks.com/blog/learn/pro-mastering-dynamic-eq-and-multiband-compression"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация multiband_dynamics_live 2026-07-07: серийное сочетание, прозрачность суммы (по поисковой выжимке)."
