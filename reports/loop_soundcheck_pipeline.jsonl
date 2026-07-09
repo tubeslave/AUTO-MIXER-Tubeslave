@@ -1,1 +1,2 @@
 {"ts": "20260709T092702", "main_fdr": 0.0, "master_status": "ISSUES", "lufs": -27.65, "true_peak_dbtp": 0.22, "tilt_db": 4.05, "issues": 2, "code_fixes": 1, "proposals": 3, "report": "reports/loop_soundcheck_20260709T092702.json"}
+{"ts": "20260709T120814", "iter": 2, "main_fdr": 0.0, "master_status": "OK", "lufs": -24.06, "true_peak_dbtp": -1.44, "tilt_db": 1.89, "issues": 0, "code_fixes": 0, "proposals": 0, "report": "reports/loop_soundcheck_20260709T120814.json"}

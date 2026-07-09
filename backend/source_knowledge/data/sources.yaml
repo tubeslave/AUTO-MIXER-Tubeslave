@@ -1749,3 +1749,48 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация low_end_xover_mains 2026-07-07: aux-fed subs — только НЧ-источники, чище низ, продвинутая техника (403 при fetch, поисковая выжимка)."
+
+  - source_id: soundgirls_festival_guest
+    title: "Festival Guide Part 1: Guest Engineer"
+    source_type: web_article
+    authors: ["SoundGirls.org"]
+    publisher: "soundgirls.org"
+    year: 2022
+    url: "https://soundgirls.org/festival-guide-part-1-guest-engineer/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация festival_changeover_speed 2026-07-07: preload show-file/channel-map/stage-plot offline, rolling line check."
+  - source_id: sos_jon_burton_festival
+    title: "Jon Burton (The Prodigy): Outdoor Sounds — Engineering Sound For Festival Events"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2021
+    url: "https://www.soundonsound.com/people/jon-burton-prodigy-outdoor-sounds-engineering-sound-festival-events"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация festival_changeover_speed 2026-07-07: level check вместо полного чека, наушники/PFL, sub-box multipin (по поисковой выжимке)."
+  - source_id: talkbass_festival_check
+    title: "How to get a good sound check in a festival setting?"
+    source_type: forum
+    authors: ["TalkBass community"]
+    publisher: "talkbass.com"
+    year: 2021
+    url: "https://www.talkbass.com/threads/how-to-get-a-good-sound-check-in-a-festival-setting.1294613/"
+    authority_tier: community_forum
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация festival_changeover_speed 2026-07-07: линчек low-on-bill достаточен (по поисковой выжимке)."
+  - source_id: gearspace_festival_soundcheck
+    title: "Festival Soundcheck?"
+    source_type: forum
+    authors: ["Gearspace community"]
+    publisher: "gearspace.com"
+    year: 2022
+    url: "https://gearspace.com/board/live-sound/1025369-festival-soundcheck.html"
+    authority_tier: community_forum
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация festival_changeover_speed 2026-07-07: приоритеты под таймером (по поисковой выжимке)."

@@ -211,6 +211,16 @@ iteration_log:
     kick/bass в моно-центре (совпадает с mono_compatibility keep_mono). Aux-fed subs
     и LR24-tops-HPF — только по команде оператора (свободная aux-шина + системная
     разводка).
+- date: '2026-07-07'
+  topic: festival_changeover_speed
+  rules_added:
+  - festival.preload_show_file
+  - festival.priority_order_under_clock
+  rules_rejected: []
+  notes: 'Четвёртая волна закрыта. Прямая связь с чек-листом конвергенции: фестивальный
+    режим НЕ блокирует завершение на deferred фазовых пунктах — доводит их в первой
+    песне; preload-файл = наш autofoh_soundcheck_profile. Backlog исчерпан — нужна
+    пятая волна или сводка оператору.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -296,4 +306,4 @@ topics:
   status: done
 - id: festival_changeover_speed
   title: Быстрый чендж-овер/фестивальный саундчек - что делать за 15 минут
-  status: pending
+  status: done
