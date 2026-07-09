@@ -307,3 +307,32 @@ topics:
 - id: festival_changeover_speed
   title: Быстрый чендж-овер/фестивальный саундчек - что делать за 15 минут
   status: done
+- id: acoustic_guitar_di_mic_live
+  title: Акустическая гитара live — DI/микрофон/blend, борьба с фидбеком body-резонанса,
+    EQ
+  status: pending
+- id: keys_synth_stereo_placement
+  title: Клавиши/синты — стерео-размещение, слои, регистровое разделение с гитарами/вокалом
+  status: pending
+- id: transient_designers_live
+  title: Transient-дизайнеры (WING WAVE/SPL) — attack/sustain по ролям, punch барабанов
+    без компрессии
+  status: pending
+- id: multiband_dynamics_live
+  title: Мультибенд-динамика/dynamic EQ live — когда вместо статичного EQ, low-end
+    контроль, de-harsh
+  status: pending
+- id: monitor_wedges_iem_foh
+  title: Мониторинг сцены (клинья/IEM) с точки FOH — как влияет на bleed и фидбек
+    в зале
+  status: pending
+- id: horn_brass_strings_live
+  title: Духовые/струнные live — динамика, harshness 2-4к, пан, поддержка тела
+  status: pending
+- id: percussion_congas_tamb_live
+  title: Перкуссия (конги/бонги/тамбурин/shaker) — гейт/EQ, место в панораме и спектре
+  status: pending
+- id: automixer_dugan_speech
+  title: Автомикс-алгоритмы (Dugan/gain-sharing) — речь/несколько вокалов, когда включать
+    live
+  status: pending
