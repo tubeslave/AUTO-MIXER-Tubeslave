@@ -127,6 +127,32 @@ class WingClient(MixerClientBase):
         self.state[address] = value
         self.state_timestamps[address] = time.time()
 
+    def _active_readback(self, address: str, ttl: float = 0.4,
+                         timeout: float = 0.15) -> Any:
+        """Return a surface parameter, refreshing it from the mixer when stale.
+
+        Some parameters (pan, eq/*, in/set/trim) are NOT pushed by the
+        ``/xremote`` subscription, so a passive ``self.state`` read returns
+        ``None``/stale — which silently breaks readback verification of applied
+        corrections. When connected and the cached value is older than ``ttl``
+        seconds, send a bare GET and wait up to ``timeout`` for the physical
+        readback (early-exiting the moment it lands) before returning the cached
+        value. Repeated reads within ``ttl`` hit the cache, so hot callers are
+        not slowed. GET messages carry no value and bypass the write throttle.
+        Mirrors the active-query pattern already used by
+        :meth:`get_gate_threshold` / :meth:`get_compressor_threshold`.
+        """
+        if getattr(self, "is_connected", False):
+            prev_ts = self.state_timestamps.get(address, 0.0)
+            if (time.time() - prev_ts) > ttl:
+                self.send(address)
+                deadline = time.time() + max(0.0, float(timeout))
+                while time.time() < deadline:
+                    if self.state_timestamps.get(address, 0.0) > prev_ts:
+                        break
+                    time.sleep(0.005)
+        return self.state.get(address)
+
     def connect(self, timeout: float = 5.0) -> bool:
         """
         Connect to Wing mixer and validate connection
@@ -568,9 +594,8 @@ class WingClient(MixerClientBase):
         return self.send(address, value)
 
     def get_channel_gain(self, channel: int) -> Optional[float]:
-        """Get channel input trim/gain"""
-        address = f"/ch/{channel}/in/set/trim"
-        return self.state.get(address)
+        """Get channel input trim/gain (active readback; not streamed)."""
+        return self._active_readback(f"/ch/{channel}/in/set/trim")
 
     def set_channel_gain(self, channel: int, value: float):
         """Set channel input trim/gain (dB, range: -18..18)"""
@@ -612,9 +637,8 @@ class WingClient(MixerClientBase):
         return all(results)
 
     def get_channel_pan(self, channel: int) -> Optional[float]:
-        """Get channel pan"""
-        address = f"/ch/{channel}/pan"
-        return self.state.get(address)
+        """Get channel pan (active readback; /xremote does not stream pan)."""
+        return self._active_readback(f"/ch/{channel}/pan")
 
     def set_channel_pan(self, channel: int, value: float):
         """Set channel pan (-100=left, 0=center, 100=right)"""
@@ -628,8 +652,8 @@ class WingClient(MixerClientBase):
         return self.send(f"/ch/{channel}/eq/on", on)
     
     def get_eq_on(self, channel: int) -> Optional[int]:
-        """Get EQ on/off state"""
-        return self.state.get(f"/ch/{channel}/eq/on")
+        """Get EQ on/off state (active readback; not streamed)."""
+        return self._active_readback(f"/ch/{channel}/eq/on")
     
     def set_eq_band_gain(self, channel: int, band: str, gain: float):
         """
@@ -643,8 +667,8 @@ class WingClient(MixerClientBase):
         return self.send(f"/ch/{channel}/eq/{band}", gain)
     
     def get_eq_band_gain(self, channel: int, band: str) -> Optional[float]:
-        """Get EQ band gain"""
-        return self.state.get(f"/ch/{channel}/eq/{band}")
+        """Get EQ band gain (active readback; not streamed)."""
+        return self._active_readback(f"/ch/{channel}/eq/{band}")
     
     def set_eq_band_frequency(self, channel: int, band: str, frequency: float):
         """
@@ -658,8 +682,8 @@ class WingClient(MixerClientBase):
         return self.send(f"/ch/{channel}/eq/{band}", frequency)
     
     def get_eq_band_frequency(self, channel: int, band: str) -> Optional[float]:
-        """Get EQ band frequency"""
-        return self.state.get(f"/ch/{channel}/eq/{band}")
+        """Get EQ band frequency (active readback; not streamed)."""
+        return self._active_readback(f"/ch/{channel}/eq/{band}")
     
     def set_eq_band_q(self, channel: int, band: str, q: float):
         """
