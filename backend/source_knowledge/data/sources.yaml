@@ -1873,3 +1873,37 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация keys_synth_stereo_placement 2026-07-07: баланс тонов между несколькими клавишами (по поисковой выжимке)."
+
+  - source_id: spl_transient_designer_ua
+    title: "SPL Transient Designer Manual"
+    source_type: manufacturer_doc
+    authors: ["Universal Audio / SPL"]
+    publisher: "help.uaudio.com"
+    year: 2024
+    url: "https://help.uaudio.com/hc/en-us/articles/33538335681428-SPL-Transient-Designer-Manual"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация transient_designers_live 2026-07-07: DET, attack/sustain независимо от пика, sidechain filter, коррекция кажущейся дистанции микрофона (по поисковой выжимке)."
+  - source_id: soundonsound_transient
+    title: "Using Transient Processors"
+    source_type: web_article
+    authors: ["Sound On Sound"]
+    publisher: "soundonsound.com"
+    year: 2021
+    url: "https://www.soundonsound.com/techniques/using-transient-processors"
+    authority_tier: primary_magazine
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация transient_designers_live 2026-07-07: attack/sustain по ролям, сдержанность (по поисковой выжимке)."
+  - source_id: masteringbox_transient
+    title: "Using Transient Shapers for Punchy Drums"
+    source_type: web_article
+    authors: ["MasteringBOX"]
+    publisher: "masteringbox.com"
+    year: 2023
+    url: "https://www.masteringbox.com/learn/transient-shaper-techniques"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация transient_designers_live 2026-07-07: риск over-processing (по поисковой выжимке)."

@@ -241,6 +241,16 @@ iteration_log:
   notes: Кросс-подтверждает stereo.mono_compatibility и erb_masking (пан до EQ); новое
     — держать synth low-end mono (защита DCA-баланса), playback studio-bass укрощать
     (плоскость -30 PLAYBK). Пан-first согласуется с нашим balance-before-EQ.
+- date: '2026-07-07'
+  topic: transient_designers_live
+  rules_added:
+  - transient.wave_designer_drum_shaping
+  - transient.restraint_and_sidechain
+  rules_rejected: []
+  notes: 'Протокол подтвердил WING WAVE токены (att -15..15, sust -24..24, g); порогонезависимость
+    DET = чистый punch для live (альтернатива компрессии на барабанах). Оговорка:
+    WAVE занимает слот динамики — конфликт с COMP/GATE, выбор по операторскому решению.
+    Сдержанность согласуется с anti-over-compression.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -337,7 +347,7 @@ topics:
 - id: transient_designers_live
   title: Transient-дизайнеры (WING WAVE/SPL) — attack/sustain по ролям, punch барабанов
     без компрессии
-  status: pending
+  status: done
 - id: multiband_dynamics_live
   title: Мультибенд-динамика/dynamic EQ live — когда вместо статичного EQ, low-end
     контроль, de-harsh
