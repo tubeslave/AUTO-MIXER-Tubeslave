@@ -1794,3 +1794,26 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация festival_changeover_speed 2026-07-07: приоритеты под таймером (по поисковой выжимке)."
+
+  - source_id: sweetwater_foh_acoustic
+    title: "FOH Pro Tips for a Great Live Acoustic Guitar Sound"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2023
+    url: "https://www.sweetwater.com/insync/foh-pro-tips-great-live-acoustic-guitar-sound/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация acoustic_guitar_di_mic_live 2026-07-07: quack 2.5к cut 3-4дБ, body +2-3дБ 400, piezo lows/mic highs (403 при fetch, поисковая выжимка + Radial)."
+  - source_id: radial_acoustic_pickups
+    title: "Acoustic Pickups & How to Make Them Sound Their Best"
+    source_type: web_article
+    authors: ["Radial Engineering"]
+    publisher: "radialeng.com"
+    year: 2023
+    url: "https://www.radialeng.com/blog/acoustic-pickups-how-to-make-them-sound-their-best"
+    authority_tier: manufacturer_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация acoustic_guitar_di_mic_live 2026-07-07: quack труден для EQ, blend piezo-lows/mic-warmth, компрессия восстанавливает динамику, low-cut от бубнения."

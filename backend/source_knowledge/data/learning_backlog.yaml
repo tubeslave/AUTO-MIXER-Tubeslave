@@ -221,6 +221,16 @@ iteration_log:
     режим НЕ блокирует завершение на deferred фазовых пунктах — доводит их в первой
     песне; preload-файл = наш autofoh_soundcheck_profile. Backlog исчерпан — нужна
     пятая волна или сводка оператору.'
+- date: '2026-07-07'
+  topic: acoustic_guitar_di_mic_live
+  rules_added:
+  - acoustic_gtr.piezo_quack_and_body
+  - acoustic_gtr.feedback_stability_live
+  rules_rejected: []
+  notes: 'Пятая волна начата. Индивидуальность гитар -> уверенность 0.75, shadow.
+    Ключевое: body-резонанс 80-200 Гц = точка фидбека (notch, не фейдер), piezo-quack
+    2.5к, feedback first приоритет сохранён. В текущем составе выделенной акустики
+    нет — правила про запас.'
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -310,7 +320,7 @@ topics:
 - id: acoustic_guitar_di_mic_live
   title: Акустическая гитара live — DI/микрофон/blend, борьба с фидбеком body-резонанса,
     EQ
-  status: pending
+  status: done
 - id: keys_synth_stereo_placement
   title: Клавиши/синты — стерео-размещение, слои, регистровое разделение с гитарами/вокалом
   status: pending
