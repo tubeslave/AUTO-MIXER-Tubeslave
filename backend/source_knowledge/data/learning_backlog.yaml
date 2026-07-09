@@ -231,6 +231,16 @@ iteration_log:
     Ключевое: body-резонанс 80-200 Гц = точка фидбека (notch, не фейдер), piezo-quack
     2.5к, feedback first приоритет сохранён. В текущем составе выделенной акустики
     нет — правила про запас.'
+- date: '2026-07-07'
+  topic: keys_synth_stereo_placement
+  rules_added:
+  - keys.stereo_width_mono_check
+  - keys.placement_by_space_not_eq_first
+  - keys.patch_level_consistency
+  rules_rejected: []
+  notes: Кросс-подтверждает stereo.mono_compatibility и erb_masking (пан до EQ); новое
+    — держать synth low-end mono (защита DCA-баланса), playback studio-bass укрощать
+    (плоскость -30 PLAYBK). Пан-first согласуется с нашим balance-before-EQ.
 topics:
 - id: eq_tonal_targets
   title: Тональные цели EQ по ролям инструментов
@@ -323,7 +333,7 @@ topics:
   status: done
 - id: keys_synth_stereo_placement
   title: Клавиши/синты — стерео-размещение, слои, регистровое разделение с гитарами/вокалом
-  status: pending
+  status: done
 - id: transient_designers_live
   title: Transient-дизайнеры (WING WAVE/SPL) — attack/sustain по ролям, punch барабанов
     без компрессии

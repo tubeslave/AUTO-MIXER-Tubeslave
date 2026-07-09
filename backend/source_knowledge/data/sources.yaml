@@ -1817,3 +1817,59 @@ sources:
     status: active
     allowed_uses: [paraphrased_rules, citation_metadata]
     notes: "Итерация acoustic_guitar_di_mic_live 2026-07-07: quack труден для EQ, blend piezo-lows/mic-warmth, компрессия восстанавливает динамику, low-cut от бубнения."
+
+  - source_id: audiotechnology_synth_pop
+    title: "Mixing Synth Pop: Synths"
+    source_type: web_article
+    authors: ["AudioTechnology"]
+    publisher: "audiotechnology.com"
+    year: 2022
+    url: "https://www.audiotechnology.com/tutorials/mixing-synth-pop-synths"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_synth_stereo_placement 2026-07-07: моно-совместимость псевдо-стерео патчей, EQ на send/return реверба (403 при fetch, поисковая выжимка)."
+  - source_id: behindthemix_stereo_imaging
+    title: "7 Game-Changing Tips for Stereo Imaging in Music Production"
+    source_type: web_article
+    authors: ["Behind the Mix"]
+    publisher: "behindthemix.com"
+    year: 2023
+    url: "https://behindthemix.com/tips-for-stereo-imaging-in-music-production/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_synth_stereo_placement 2026-07-07: пан в свободное место вместо EQ, вокал в центре, симметрия частот по полю (по поисковой выжимке)."
+  - source_id: production_expert_stereo
+    title: "Mixing in Stereo - Adding Width and Depth to Your Recordings"
+    source_type: web_article
+    authors: ["Production Expert"]
+    publisher: "production-expert.com"
+    year: 2022
+    url: "https://www.production-expert.com/production-expert-1/mixing-in-stereo-adding-width-and-depth-to-your-recordings"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_synth_stereo_placement 2026-07-07: распределение по полю для разделения (по поисковой выжимке)."
+  - source_id: mixingmusiclive_keys
+    title: "How to mix keyboards"
+    source_type: web_article
+    authors: ["Mixing Music Live"]
+    publisher: "mixingmusiclive.com"
+    year: 2022
+    url: "https://www.mixingmusiclive.com/blog/mixing-keyboards-and-playback-tracks"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_synth_stereo_placement 2026-07-07: консистентность патчей у источника, tame studio-hot playback bass."
+  - source_id: sweetwater_keyboard_mixer
+    title: "Choosing the Right Mixer for Your Keyboards"
+    source_type: web_article
+    authors: ["Sweetwater inSync"]
+    publisher: "sweetwater.com"
+    year: 2023
+    url: "https://www.sweetwater.com/insync/choosing-the-right-mixer-for-your-keyboards/"
+    authority_tier: practitioner_web
+    status: active
+    allowed_uses: [paraphrased_rules, citation_metadata]
+    notes: "Итерация keys_synth_stereo_placement 2026-07-07: баланс тонов между несколькими клавишами (по поисковой выжимке)."
