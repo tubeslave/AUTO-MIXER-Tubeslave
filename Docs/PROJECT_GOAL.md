@@ -25,6 +25,94 @@ supervised `fader`/`gain-down` proof с physical readback, rollback и
 emergency-stop evidence, и только после этого последующее расширение
 soundcheck-автоматизации отдельными hardware-backed решениями.
 
+## Текущий план доведения soundcheck pipeline до рабочего состояния
+
+План принят владельцем проекта 2026-07-10. Его цель — получить безопасный,
+воспроизводимый supervised soundcheck на работающем WING Rack и строгую оценку
+не ниже 90/100 только после подтвержденных runtime и hardware evidence.
+
+1. Закрыть сетевой доступ к live-командам: loopback по умолчанию, а для
+   удаленного WebSocket — обязательная аутентификация и fail-closed startup.
+2. Удалить runtime-обходы Safety Kernel: `force_auto_apply`, headless
+   AutoSoundcheck `auto_apply=True` и engine-owned live transport.
+3. Сделать один системный emergency-stop контур, который останавливает manual,
+   agent и AutoSoundcheck writers и проверяется непосредственно перед каждой
+   отправкой и повторной попыткой.
+4. Разделить commanded и physically observed WING state. Статус `applied`
+   разрешен только после коррелированного physical readback; timeout,
+   disconnect и mismatch блокируют дальнейшие записи.
+5. Сделать rollback транзакционным: exact transaction id, fresh physical
+   compare-and-swap и запрет перезаписывать более свежее ручное движение.
+6. Сохранить live scope узким: только operator-approved `fader` и `gain-down`.
+   EQ, dynamics, gate, pan, delay, polarity, send, DCA, routing, scenes, FX и
+   master остаются proposal-only до отдельных ADR и hardware proof.
+7. Пройти targeted regression, полный backend/frontend/E2E/no-WING контур,
+   затем read-only WING/audio smoke и операторские M005/M006 проверки.
+8. Обновить readiness и оценку только из принятых evidence artifacts. Зеленые
+   unit tests или заявления агента не могут сами дать оценку 90+ или live
+   authority.
+
+Исполняемый архитектурный контракт этого плана фиксируется в
+`Docs/adr/soundcheck-live-safety-kernel-20260710.md`.
+
+## Результат реализации 2026-07-10
+
+План реализован для рабочего supervised soundcheck scope. Canonical
+AutoSoundcheck теперь измеряет реальные WING/USB сигналы и формирует evidence в
+`proposal-only` режиме; физическая запись остается только за узким ручным gate.
+
+- WebSocket слушает loopback по умолчанию; remote bind без bearer token не
+  запускается.
+- `force_auto_apply` удален из frontend и отвергается backend.
+- AutoSoundcheck принудительно использует `observe_only=true` и
+  `auto_apply=false`; observe-only цикл не сохраняет tracked learning profile.
+- Emergency stop останавливает AutoSoundcheck, MixingAgent и активные
+  контроллеры, а generation latch проверяется перед каждым retry.
+- WING `commanded_state` отделен от физически наблюдаемого `state`; статус
+  `applied` требует `verified_from_physical_readback`.
+- Rollback требует transaction id и fresh physical compare-and-swap.
+- Положительный live gain без true-peak evidence и readiness без свежего master
+  true peak закрываются fail-closed.
+
+Проверка: `5848 passed, 1 skipped`, frontend `98 passed`, production build и
+Playwright `9 passed`; реальный WING Rack `192.168.1.102`, fw `3.0.5`, дал три
+physical readback на CH3 и 43 активных USB meter channel. Canonical engine
+дошел до `running` на CH3/9/10, на всех трех каналах обнаружен сигнал,
+`dry_run=true`, `live_apply_enabled=false`.
+
+Строгая оценка этого supervised soundcheck scope: **92/100**. Остаток до 100 —
+физический M005 disconnect/timeout/stale-state fault proof, M006 owner review и
+отдельные hardware-backed ADR для любых live-семейств шире fader/gain-down.
+Подробности: `Docs/reports/SOUNDCHECK_PIPELINE_HARDENING_20260710.md`.
+
+## Цель frontend live cockpit — 2026-07-10
+
+Довести frontend Automixer до production-grade операторского cockpit с оценкой
+не ниже 95/100. В нормальной работе интерфейс обязан автоматически подключаться
+к Product Layer, показывать подтвержденный WING/audio/readback и не подменять
+отсутствующие live-данные mock-значениями. Каждая активная кнопка должна вызывать
+канонический безопасный backend-контракт; неподтвержденные live-ручки и фейдеры
+остаются read-only или явно блокируются с причиной. Desktop предназначен для
+звукорежиссера, mobile — для быстрого контроля музыкантом или оператором.
+
+### Результат
+
+- Исходная строгая оценка: **62/100**.
+- Итоговая строгая оценка: **96/100**.
+- Реальный WING `192.168.1.102` отображается в observation-only режиме.
+- Реальный audio capture: 48 каналов, 48 kHz; тишина отображается как
+  `NO SIGNAL`, а не как выдуманные LUFS/peak/spectrum.
+- Refresh, Analyze, read-only Connect WING и desktop/mobile Start/Stop meters
+  подключены к backend.
+- Full Autonomous блокируется, когда backend не дает apply authority.
+- Fake transport, system network/clock placeholders и local-only proposal
+  actions удалены с основных операторских поверхностей.
+- Проверка: frontend 102 passed, Playwright 9 passed, backend meter/audio 9
+  passed, production build passed, browser console 0 errors/warnings.
+
+Evidence и шкала: `Docs/reports/FRONTEND_COCKPIT_AUDIT_20260710.md`.
+Архитектурный контракт: `Docs/adr/frontend-live-cockpit-20260710.md`.
+
 MVP закрыт только когда есть реальные, принятые evidence artifacts для:
 
 1. WING read-only connection proof.

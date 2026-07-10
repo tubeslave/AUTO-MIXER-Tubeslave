@@ -46,6 +46,7 @@ EXPECTED_ROLLBACK_EVENTS = {
     "manual_write_rollback_applied",
     "manual_write_rollback_blocked",
     "manual_write_rollback_error",
+    "manual_write_rollback_unverified",
 }
 EXPECTED_PARAMETER_EVENTS = {"mixer_parameter_value", "mixer_parameter_read_blocked"}
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
@@ -829,6 +830,7 @@ async def run(args: argparse.Namespace) -> int:
                     "approved": True,
                     "approval_id": f"{args.approval_prefix}:rollback:{run_id}",
                     "reason": f"rollback:{args.reason}",
+                    "transaction_id": extract_apply_result(apply_result).get("transaction_id"),
                 },
                 EXPECTED_ROLLBACK_EVENTS,
                 timeout=args.timeout,

@@ -1429,6 +1429,33 @@ def test_engine_can_save_and_load_soundcheck_profile(tmp_path):
     assert loaded.phase_targets["SNAPSHOT_LOCK"].runtime_state == "SNAPSHOT_LOCK"
 
 
+def test_observe_only_soundcheck_never_auto_saves_profile(monkeypatch):
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+        auto_apply=False,
+        observe_only=True,
+    )
+    engine.soundcheck_profile_enabled = True
+    engine.soundcheck_profile_auto_save = True
+    saved = []
+    monkeypatch.setattr(
+        engine,
+        "_build_soundcheck_profile_from_live_buffers",
+        lambda: saved.append("built") or {"profile": True},
+    )
+    monkeypatch.setattr(
+        engine,
+        "_save_soundcheck_profile",
+        lambda profile: saved.append(profile),
+    )
+
+    result = engine._auto_save_soundcheck_profile_if_allowed()
+
+    assert result is None
+    assert saved == []
+
+
 def test_runtime_state_uses_phase_specific_target_corridor_for_analysis():
     def sine(freq_hz, amplitude):
         t = np.arange(12000, dtype=np.float32) / 48000.0

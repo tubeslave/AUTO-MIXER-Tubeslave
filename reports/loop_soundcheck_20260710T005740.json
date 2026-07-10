@@ -1,0 +1,215 @@
+{
+ "iteration_ts": "20260710T005740",
+ "iteration": 11,
+ "source": "loop/hourly (job f3ec0ca8)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -44.5,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -41.5,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -32.5,
+    "comp_thr": -15.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -25.0,
+    "comp_thr": -14.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -19.0,
+    "comp_thr": -16.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -13.0,
+    "comp_thr": -10.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -24.0,
+    "comp_thr": -7.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -14.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -21.0,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "ISSUES",
+  "lufs_integrated": -16.1,
+  "true_peak_dbtp": -0.7,
+  "crest_db": 15.43,
+  "lr_balance_db": 0.0,
+  "correlation": 1.0,
+  "mono_fold_ratio": 1.0,
+  "tilt_deviation_db": 3.18,
+  "vocal_presence_db": 8.5,
+  "issues": [
+   "true peak -0.7 dBTP выше потолка -1.0 (pre-limiter tap)"
+  ],
+  "method": "master_mix_eval",
+  "capture": "memory_only_no_wav"
+ },
+ "console_state": "RESET TO FLAT — all 16 ch fdr=0.0, pan=0.0, EQ OFF (snapshot/scene reset, not a mix)",
+ "mix_findings": [
+  "true-peak -0.7 dBTP breaches -1.0 ceiling due to flat unity sum; pre-master-limiter tap so real output is limited downstream; transient reset state"
+ ],
+ "safety_note": "per operator directive, observe only — no autonomous master pullback (would be the safety action if breach persists in a real mix and operator opts in)",
+ "audio_policy": "memory-only metrics; no WAV/host/chat audio (operator directive)",
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "notes": "console reset event; expect autopilot to re-mix next iter"
+}

@@ -36,20 +36,32 @@ function backendLabel(label: string): string {
 }
 
 export function dashboardSpectrumTrace(
-  runtime: Pick<DashboardRuntime, 'sourceLabel' | 'spectrumBins'>,
+  runtime: Pick<DashboardRuntime, 'sourceLabel' | 'spectrumBins' | 'spectrumAvailable' | 'audioCaptureRunning'>,
   fallback: number[]
 ): { values: number[]; sourceLabel: string; sourceTone: Tone; caption: string } {
   const runtimeBins = Array.isArray(runtime.spectrumBins)
     ? runtime.spectrumBins.filter(value => Number.isFinite(value))
     : [];
 
-  if (runtimeBins.length >= 4) {
+  if (runtime.spectrumAvailable && runtimeBins.length >= 4) {
     const backendSource = runtime.sourceLabel.toLowerCase().includes('backend');
+    const hasSignal = runtimeBins.some(value => value > 1);
     return {
       values: runtimeBins.map(tracePoint),
-      sourceLabel: backendSource ? 'Backend DTO' : runtime.sourceLabel,
-      sourceTone: backendSource ? 'green' : 'blue',
-      caption: 'Read-only analyzer trace from dashboard DTO'
+      sourceLabel: backendSource ? (hasSignal ? 'Real audio' : 'No signal') : runtime.sourceLabel,
+      sourceTone: backendSource ? (hasSignal ? 'green' : 'muted') : 'blue',
+      caption: hasSignal ? 'Read-only analyzer trace from dashboard DTO' : 'Analyzer connected; no measurable signal'
+    };
+  }
+
+  if (runtime.sourceLabel.toLowerCase().includes('backend')) {
+    return {
+      values: [],
+      sourceLabel: runtime.audioCaptureRunning ? 'No signal' : 'Audio offline',
+      sourceTone: 'muted',
+      caption: runtime.audioCaptureRunning
+        ? 'Analyzer connected; no measurable signal'
+        : 'Start read-only audio meters to see spectrum'
     };
   }
 
@@ -70,6 +82,17 @@ export function dashboardAnalysisCards(
     const runtimeValues = Array.isArray(runtimeTrace?.values)
       ? runtimeTrace.values.filter(value => Number.isFinite(value)).map(tracePoint)
       : [];
+
+    if (!runtimeValues.length && runtime.sourceLabel.toLowerCase().includes('backend')) {
+      return {
+        ...card,
+        values: [],
+        primary: 'Not measured',
+        secondary: 'Waiting for analyzer data',
+        sourceLabel: 'Unavailable',
+        sourceTone: 'muted'
+      };
+    }
 
     if (!runtimeValues.length) {
       return card;
@@ -93,20 +116,23 @@ export function dashboardTelemetryForChannel(
   options: { suppressMockSolo?: boolean } = {}
 ): ChannelDashboardTelemetry {
   const hasRuntimeLevel = finiteNumber(channel.level);
-  const level = hasRuntimeLevel ? channel.level : fallback.meterL;
+  const backendChannel = channel.dataSource === 'backend';
+  const meterAvailable = channel.meterAvailable !== false && hasRuntimeLevel;
+  const level = meterAvailable ? channel.level : backendChannel ? -120 : fallback.meterL;
   const muted = channel.status === 'MUTED';
   const inactive = channel.status === 'INACTIVE';
 
   return {
     ...fallback,
-    meterL: hasRuntimeLevel ? level : fallback.meterL,
-    meterR: hasRuntimeLevel ? level : fallback.meterR,
-    gateLabel: channel.gateLabel || fallback.gateLabel,
-    compLabel: channel.compLabel || fallback.compLabel,
-    pan: finiteNumber(channel.pan) ? channel.pan : fallback.pan,
+    waveform: backendChannel && !meterAvailable ? [] : fallback.waveform,
+    meterL: level,
+    meterR: level,
+    gateLabel: channel.gateAvailable === false ? 'G —' : channel.gateLabel || (backendChannel ? 'G —' : fallback.gateLabel),
+    compLabel: channel.compAvailable === false ? 'C —' : channel.compLabel || (backendChannel ? 'C —' : fallback.compLabel),
+    pan: channel.panAvailable === false ? 0 : finiteNumber(channel.pan) ? channel.pan : backendChannel ? 0 : fallback.pan,
     muted,
     solo: options.suppressMockSolo ? false : fallback.solo,
-    safeState: muted ? 'MUTE' : inactive ? 'OFF' : safeStateForLevel(level),
+    safeState: muted ? 'MUTE' : !meterAvailable ? 'NO METER' : inactive ? 'NO SIGNAL' : safeStateForLevel(level),
     accent: muted
       ? 'red'
       : inactive

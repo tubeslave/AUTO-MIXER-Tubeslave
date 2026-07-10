@@ -1,9 +1,18 @@
 const DEFAULT_WS_PORT = 8765;
 const WS_URL_STORAGE_KEY = 'automixer_ws_url';
+const WS_AUTH_TOKEN_STORAGE_KEY = 'automixer_ws_auth_token';
 
 function safeLocalStorage() {
   try {
     return globalThis.localStorage || null;
+  } catch {
+    return null;
+  }
+}
+
+function safeSessionStorage() {
+  try {
+    return globalThis.sessionStorage || null;
   } catch {
     return null;
   }
@@ -36,7 +45,9 @@ export class BaseWebSocketTransport {
   constructor({
     url = inferWebSocketUrl(),
     reconnectInterval = 3000,
-    WebSocketImpl = globalThis.WebSocket
+    WebSocketImpl = globalThis.WebSocket,
+    authToken = safeSessionStorage()?.getItem(WS_AUTH_TOKEN_STORAGE_KEY) || '',
+    clientId = 'automixer-ui'
   } = {}) {
     this.ws = null;
     this.url = normalizeWebSocketUrl(url);
@@ -46,6 +57,8 @@ export class BaseWebSocketTransport {
     this.connectPromise = null;
     this.shouldReconnect = true;
     this.WebSocketImpl = WebSocketImpl;
+    this.authToken = String(authToken || '');
+    this.clientId = String(clientId || 'automixer-ui');
   }
 
   getUrl() {
@@ -61,6 +74,20 @@ export class BaseWebSocketTransport {
       safeLocalStorage()?.setItem(WS_URL_STORAGE_KEY, nextUrl);
     }
 
+    if (reconnect) {
+      this.disconnect();
+      this.shouldReconnect = true;
+      this.connect().catch(err => console.error('Reconnect failed:', err));
+    }
+  }
+
+  setAuthToken(token, { persist = true, reconnect = true } = {}) {
+    this.authToken = String(token || '');
+    const storage = safeSessionStorage();
+    if (persist && storage) {
+      if (this.authToken) storage.setItem(WS_AUTH_TOKEN_STORAGE_KEY, this.authToken);
+      else storage.removeItem(WS_AUTH_TOKEN_STORAGE_KEY);
+    }
     if (reconnect) {
       this.disconnect();
       this.shouldReconnect = true;
@@ -99,6 +126,13 @@ export class BaseWebSocketTransport {
             }
             return;
           }
+          if (this.authToken) {
+            socket.send(JSON.stringify({
+              type: 'authenticate',
+              token: this.authToken,
+              client_id: this.clientId
+            }));
+          }
           console.log('WebSocket connected');
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
@@ -112,7 +146,9 @@ export class BaseWebSocketTransport {
         socket.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
-            console.log('WebSocket message received:', data.type, data);
+            if (data.type !== 'meter_frame') {
+              console.log('WebSocket message received:', data.type, data);
+            }
             this.notifyListeners(data.type, data);
           } catch (error) {
             console.error('Error parsing message:', error);

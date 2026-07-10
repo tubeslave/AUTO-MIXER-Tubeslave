@@ -145,7 +145,7 @@ test('dashboard spectrum uses read-only analyzer bins before visual fallback', a
   const backendTrace = dashboardSpectrumTrace(runtime, [28, 42, 36, 58]);
 
   assert.deepEqual(backendTrace.values, [8, 24, 50, 88, 72]);
-  assert.equal(backendTrace.sourceLabel, 'Backend DTO');
+  assert.equal(backendTrace.sourceLabel, 'Real audio');
   assert.equal(backendTrace.sourceTone, 'green');
   assert.equal(backendTrace.caption, 'Read-only analyzer trace from dashboard DTO');
 

@@ -130,6 +130,19 @@ async def test_start_agent_initializes_safe_suggest_mode():
 
 
 @pytest.mark.asyncio
+async def test_force_auto_apply_is_rejected_before_agent_initialization():
+    server = DummyServer()
+    handlers = register_handlers(server)
+
+    await handlers["start_agent"]("ws", {"force_auto_apply": True})
+
+    assert server.mixing_agent is None
+    _, payload = server.sent_messages[-1]
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "force_auto_apply_removed"
+
+
+@pytest.mark.asyncio
 async def test_approve_action_returns_updated_pending_actions():
     server = DummyServer()
     server.mixing_agent = FakeAgent()

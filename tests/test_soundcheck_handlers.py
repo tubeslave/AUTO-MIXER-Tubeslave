@@ -115,6 +115,7 @@ async def test_start_auto_soundcheck_handler_starts_new_engine_with_observe_only
     assert created["num_channels"] == 2
     assert created["audio_device_name"] == "dev1"
     assert created["observe_only"] is True
+    assert created["auto_apply"] is False
     assert server.auto_soundcheck_running is True
 
 
@@ -141,6 +142,8 @@ async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
     assert created["mixer_ip"] == "10.0.0.5"
     assert created["mixer_port"] == 2223
     assert created["audio_device_name"] == "Test Device"
+    assert created["observe_only"] is True
+    assert created["auto_apply"] is False
     assert callable(created["on_state_change"])
     assert callable(created["on_channel_update"])
 

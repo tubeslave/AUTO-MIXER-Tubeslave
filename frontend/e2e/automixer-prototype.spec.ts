@@ -57,7 +57,7 @@ test.describe('Automixer frontend prototype', () => {
     await expect(page.getByText('Safety Evidence')).toBeVisible();
     await expect(page.getByText('Apply Plan')).toBeVisible();
     await page.getByLabel('Automation mode').selectOption('Supervised');
-    await expect(page.getByText('Mode changed to Supervised AutoMix', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mode changed to Supervised AutoMix. Mock fallback only.', { exact: true })).toBeVisible();
 
     const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
     await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
@@ -111,7 +111,7 @@ test.describe('Automixer frontend prototype', () => {
     await page.goto('/#/dashboard');
     await page.getByLabel('Automation mode').selectOption('Supervised');
 
-    await expect(page.getByText('Mode changed to Supervised AutoMix', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mode changed to Supervised AutoMix. Mock fallback only.', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Automation mode')).toHaveValue('Supervised');
   });
 
@@ -1327,9 +1327,9 @@ test.describe('Automixer backend Product Layer adapter', () => {
     });
 
     await page.goto('/#/dashboard');
-    await expect(page.locator('header').filter({ hasText: 'Status' }).getByText(/Partial data/i)).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Partial data', { exact: true })).toBeVisible();
     await expect(page.getByRole('banner').getByText(/Product Layer partial/i)).toBeVisible();
-    await expect(page.getByText('WING 10.10.10.20')).toBeVisible();
+    await expect(page.getByRole('banner').getByText('WING 10.10.10.20')).toBeVisible();
     await expect(page.getByText('-18.2').first()).toBeVisible();
     await expect(page.getByText('-2.4').first()).toBeVisible();
     await expect(page.locator('aside').getByText('Ready for live').first()).toBeVisible();

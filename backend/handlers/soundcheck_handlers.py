@@ -75,7 +75,9 @@ def register_handlers(server):
             mixer_config.get("port", 51328 if mixer_type == "dlive" else 2223)
         )
         audio_device = data.get("audio_device", data.get("device_id", audio_config.get("device_name", "soundgrid")))
-        observe_only = data.get("observe_only", soundcheck_events)
+        # The canonical soundcheck path measures and proposes. All physical writes
+        # must pass through the supervised manual gate with explicit approval.
+        observe_only = True
         loop = asyncio.get_running_loop()
 
         def on_state(state, msg):
@@ -117,6 +119,8 @@ def register_handlers(server):
             }), "auto engine channel broadcast")
 
         def on_observation(payload):
+            if isinstance(payload, dict) and payload.get("master_true_peak_dbtp") is not None:
+                server.record_master_true_peak_evidence(payload.get("master_true_peak_dbtp"))
             payload = {
                 "type": "auto_soundcheck_observation",
                 **payload,
@@ -149,7 +153,7 @@ def register_handlers(server):
             num_channels=num_channels,
             selected_channels=selected_channels,
             observe_only=observe_only,
-            auto_apply=True,
+            auto_apply=False,
             on_state_change=on_state,
             on_channel_update=on_channel,
             on_observation=on_observation,
@@ -179,6 +183,8 @@ def register_handlers(server):
             "is_running": True,
             "running": True,
             "observe_only": observe_only,
+            "proposal_only": True,
+            "auto_apply": False,
             "mixer_type": mixer_type,
             "mixer_ip": mixer_ip,
             "selected_channels": selected_channels,
@@ -186,7 +192,7 @@ def register_handlers(server):
             "live_action_executor_enabled": bool(
                 getattr(live_action_config, "enabled", False)
             ),
-            "message": "New AutoSoundcheckEngine started",
+            "message": "AutoSoundcheckEngine started in proposal-only mode",
         })
 
     async def handle_start_auto_soundcheck(websocket, data):

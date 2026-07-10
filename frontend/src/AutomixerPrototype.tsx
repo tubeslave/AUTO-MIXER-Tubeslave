@@ -236,6 +236,11 @@ export default function App() {
     pushToast('Offline replay requested. Live writes remain disabled.', 'blue');
   }, [backendActions, connected, pushToast]);
 
+  const navigate = useCallback((route: RouteId) => {
+    window.location.hash = `/${route}`;
+    setActiveRoute(route);
+  }, []);
+
   const ui: UiState = useMemo(() => ({
     mode,
     backend,
@@ -288,18 +293,16 @@ export default function App() {
     createSnapshot,
     rollbackLastAction,
     refreshBackend: backendActions.refreshBackend,
+    toggleAudioPreview: backendActions.toggleAudioPreview,
+    connectWingReadOnly: backendActions.connectWingReadOnly,
+    navigate,
     runBackendAnalysis: backendActions.runBackendAnalysis,
     startReplayRun,
     pushToast,
     dismissToast: () => setToast(null)
-  }), [backendActions.refreshBackend, backendActions.runBackendAnalysis, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
+  }), [backendActions.connectWingReadOnly, backendActions.refreshBackend, backendActions.runBackendAnalysis, backendActions.toggleAudioPreview, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, navigate, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
 
   const view = useMemo(() => buildView(activeRoute, ui, actions, viewData), [activeRoute, ui, actions, viewData]);
-
-  const navigate = (route: RouteId) => {
-    window.location.hash = `/${route}`;
-    setActiveRoute(route);
-  };
 
   return (
     <AppShell

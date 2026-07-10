@@ -5,10 +5,9 @@ import {
   LevelMeter,
   MetricCard,
   Panel,
-  Sparkline,
   StatusBadge
 } from '../components/prototype/AutomixerComponents';
-import { channels, deviceHealth, devices, logs } from '../mock/automixerData';
+import { channels, devices, logs } from '../mock/automixerData';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { DeviceRecord, LogRecord, Metric, RoutingSegment, Tone, TopologyNode, UiActions, UiState } from '../types';
 import {
@@ -114,20 +113,22 @@ function SystemTopologyDiagram({
   nodes,
   links,
   selectedNodeId,
-  onSelect
+  onSelect,
+  onRefresh
 }: {
   nodes: TopologyNode[];
   links: ReturnType<typeof runtimeTopologyLinks>;
   selectedNodeId?: string;
   onSelect: (id: string) => void;
+  onRefresh: () => void;
 }) {
   const nodeById = new Map(nodes.map(node => [node.id, node]));
 
   return (
     <div className="relative h-full min-h-[300px] overflow-hidden rounded-[8px] border border-line bg-[#091018]">
       <div className="absolute right-3 top-3 z-10 flex gap-2">
-        <button className="am-button" type="button">Auto Layout</button>
-        <button className="am-button" type="button">Refresh</button>
+        <span className="rounded-[4px] border border-line bg-panel2 px-2 py-1 text-[9px] uppercase tracking-[0.06em] text-muted">Fixed operator layout</span>
+        <button className="am-button" onClick={onRefresh} type="button">Refresh live state</button>
       </div>
       <svg className="absolute inset-0 h-full w-full" viewBox="0 0 100 100" preserveAspectRatio="none">
         <defs>
@@ -414,9 +415,9 @@ function DeviceInspector({ device, sourceRaw }: { device?: DeviceRecord; sourceR
             I/O: {device.io}
           </p>
           <div className="mt-4"><StatusBadge tone={statusToneForDevice(device.status)}>{device.status}</StatusBadge></div>
-          <div className="mt-4 text-[9px] uppercase tracking-[0.08em] text-dim">Activity trace is display-only</div>
-          <div className="mt-2 h-24"><Sparkline tone="green" filled /></div>
-          <button className="am-button mt-4" type="button">Inspect</button>
+              <div className="mt-4 rounded-[5px] border border-line bg-row p-2 text-[10px] leading-4 text-muted">
+                Read-only backend inventory. No device or console command is exposed from this inspector.
+              </div>
         </>
       ) : readOnlyEmptyState('No device selected', sourceRaw)}
     </Panel>
@@ -444,23 +445,25 @@ export function SystemConnection(ui: UiState, actions: UiActions, data: Operator
   const selectedNode = nodes.find(node => node.id === ui.selectedTopologyNodeId) ?? nodes.find(node => node.id === 'automixer_core') ?? nodes[0];
   return tableView('10. System Connection', 'Live topology, latency, and connection status', (
     <div className="grid h-full grid-rows-[1fr_100px] gap-2">
-      <Panel title="System Topology"><SystemTopologyDiagram links={links} nodes={nodes} onSelect={actions.selectTopologyNode} selectedNodeId={selectedNode?.id} /></Panel>
+      <Panel title="System Topology"><SystemTopologyDiagram links={links} nodes={nodes} onRefresh={actions.refreshBackend} onSelect={actions.selectTopologyNode} selectedNodeId={selectedNode?.id} /></Panel>
       <div className="grid grid-cols-3 gap-2">
-        <Panel title="Network Interfaces · Display-only">
+        <Panel title="Console Transport">
           <TechnicalChecklist rows={[
-            { label: 'Ethernet 1', value: '1Gbps Up', tone: 'blue' },
-            { label: 'Ethernet 2', value: '1Gbps Standby', tone: 'yellow' }
+            { label: 'WING', value: ui.backend.mixerConnected ? ui.backend.connectionLabel : 'Disconnected', tone: ui.backend.mixerConnected ? 'green' : 'red' },
+            { label: 'Authority', value: ui.backend.observationOnly ? 'Observation only' : ui.backend.liveWritePolicy, tone: ui.backend.observationOnly ? 'green' : 'yellow' }
           ]} />
         </Panel>
-        <Panel title="System Latency · Display-only">
-          <div className="mb-2 text-[9px] uppercase tracking-[0.08em] text-dim">visual placeholder until latency DTO lands</div>
-          <Sparkline tone="green" filled />
-        </Panel>
-        <Panel title="Sync Status · Display-only">
+        <Panel title="Audio Capture">
           <TechnicalChecklist rows={[
-            { label: 'System Clock', value: 'Locked', tone: 'green' },
-            { label: 'Sample Rate', value: '48 kHz', tone: 'blue' },
-            { label: 'Latency Comp', value: '0.8 ms', tone: 'blue' }
+            { label: 'State', value: ui.backend.audioCaptureRunning ? 'Running' : 'Stopped', tone: ui.backend.audioCaptureRunning ? 'green' : 'yellow' },
+            { label: 'Format', value: ui.backend.audioCaptureRunning ? `${ui.backend.audioCaptureChannels} ch @ ${ui.backend.audioSampleRate} Hz` : 'Not measured', tone: ui.backend.audioCaptureRunning ? 'blue' : 'muted' }
+          ]} />
+        </Panel>
+        <Panel title="Readback Contract">
+          <TechnicalChecklist rows={[
+            { label: 'Source', value: sourceDisplay(topologySourceRaw), tone: topologySourceRaw === 'mock' ? 'yellow' : 'green' },
+            { label: 'Last update', value: ui.backend.lastUpdated, tone: 'blue' },
+            { label: 'Console writes', value: ui.backend.canApplyToConsole ? 'Supervised gate' : 'Blocked', tone: ui.backend.canApplyToConsole ? 'yellow' : 'green' }
           ]} />
         </Panel>
       </div>
@@ -526,14 +529,17 @@ export function Devices(ui: UiState, actions: UiActions, data: OperatorViewData)
   const deviceSourceRaw = data.devices.length ? 'connection_topology_snapshot' : ui.backend.hasRuntimeData ? 'connection_topology_backend_empty' : 'mock';
   const deviceRows = data.devices.length ? data.devices : sourceDisplay(deviceSourceRaw) === 'Mock' ? devices : [];
   const selectedDevice = deviceRows.find(device => device.name === ui.selectedDeviceName) ?? deviceRows[0];
+  const onlineCount = deviceRows.filter(device => ['online', 'connected', 'running'].includes(device.status.toLowerCase())).length;
+  const consoleCount = deviceRows.filter(device => /console|mixer|wing/i.test(`${device.type} ${device.name}`)).length;
+  const warningCount = Math.max(0, deviceRows.length - onlineCount);
   return tableView('13. Devices', 'Audio devices and controller inventory', (
     <div className="grid h-full grid-rows-[76px_1fr_108px] gap-2">
       <div className="grid grid-cols-4 gap-2">
         {[
-          { label: 'Connected', value: String(deviceRows.length), sub: ui.backend.sourceLabel, tone: 'green' },
-          { label: 'Audio I/O', value: '80 ch', sub: 'display baseline', tone: 'blue' },
-          { label: 'Controllers', value: '2', sub: 'display baseline', tone: 'purple' },
-          { label: 'Warnings', value: '0', sub: 'display health', tone: 'green' }
+          { label: 'Runtime devices', value: String(deviceRows.length), sub: sourceDisplay(deviceSourceRaw), tone: deviceRows.length ? 'blue' : 'muted' },
+          { label: 'Online', value: String(onlineCount), sub: 'backend topology', tone: onlineCount ? 'green' : 'yellow' },
+          { label: 'Mixers', value: String(consoleCount), sub: ui.backend.connectionLabel, tone: consoleCount ? 'purple' : 'yellow' },
+          { label: 'Warnings', value: String(warningCount), sub: 'non-online rows', tone: warningCount ? 'yellow' : 'green' }
         ].map(metric => <MetricCard metric={metric as Metric} key={metric.label} />)}
       </div>
       <DataTable
@@ -564,14 +570,15 @@ export function Devices(ui: UiState, actions: UiActions, data: OperatorViewData)
         searchPlaceholder="Search device..."
         selectedRow={selectedDevice}
       />
-      <div className="grid grid-cols-4 gap-2">
-        {deviceHealth.map(item => (
-          <Panel title={`${item.name} · Display-only`} key={item.name}>
-            <div className="flex items-center justify-between text-[11px]"><StatusBadge tone={item.tone as Tone}>{item.value}</StatusBadge><span className="font-mono text-muted">{item.latency}</span></div>
-            <div className="mt-4 h-8"><Sparkline tone={item.tone as Tone} filled /></div>
-          </Panel>
-        ))}
-      </div>
+          <div className="grid grid-cols-4 gap-2">
+            {deviceRows.slice(0, 4).map(item => (
+              <Panel title={item.name} key={item.name}>
+                <div className="flex items-center justify-between gap-2 text-[10px]"><StatusBadge tone={statusToneForDevice(item.status)}>{item.status}</StatusBadge><span className="truncate font-mono text-muted">{item.sampleRate}</span></div>
+                <div className="mt-2 truncate text-[9px] text-muted">{item.type} · {item.io}</div>
+              </Panel>
+            ))}
+            {!deviceRows.length && <div className="col-span-4">{readOnlyEmptyState('No runtime devices received', deviceSourceRaw)}</div>}
+          </div>
     </div>
   ), <DeviceInspector device={selectedDevice} sourceRaw={deviceSourceRaw} />);
 }

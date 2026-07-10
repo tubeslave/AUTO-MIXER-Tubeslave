@@ -259,7 +259,9 @@ class SafetyGate:
             return None, "live_gain_increase_exceeds_limit"
         state = _target_state(current_state, decision.target)
         true_peak = _number(state.get("true_peak_dbtp"), None)
-        if not emergency and gain_db > 0.0 and true_peak is not None:
+        if not emergency and live_mode and gain_db > 0.0:
+            if true_peak is None:
+                return None, "true_peak_headroom_unknown"
             if true_peak + gain_db > self.config.true_peak_ceiling_dbtp:
                 return None, "true_peak_headroom_would_be_violated"
         return self._mark_allowed(decision, "gain_allowed", dry_run), "gain allowed"

@@ -280,13 +280,8 @@ class GatedCorrectionActionExecutor:
         )
 
         if not self.config.enabled:
-            decision = self.safety_controller.execute(action, runtime_state)
-            result.safety_decision = decision
-            result.allowed = decision.allowed
-            result.sent = decision.sent
-            result.write_sent = decision.sent
-            result.message = decision.message
-            self._record_event("gated_action_bypassed", result, idempotency_key)
+            result.message = "gated_executor_disabled"
+            self._record_event("gated_action_blocked", result, idempotency_key)
             return result
 
         if not self.is_promoted(action.action_type) and not proof_run:

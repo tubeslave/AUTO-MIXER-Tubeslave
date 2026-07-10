@@ -7635,10 +7635,7 @@ class AutoSoundcheckEngine:
                 notes="Snapshot lock captured without auto-apply",
             )
 
-        if self.soundcheck_profile_enabled and self.soundcheck_profile_auto_save:
-            profile = self._build_soundcheck_profile_from_live_buffers()
-            if profile is not None:
-                self._save_soundcheck_profile(profile)
+        self._auto_save_soundcheck_profile_if_allowed()
 
         self._set_state(EngineState.RUNNING, "Auto-soundcheck complete, monitoring...")
 
@@ -7655,6 +7652,18 @@ class AutoSoundcheckEngine:
 
         self.stop()
         return True
+
+    def _auto_save_soundcheck_profile_if_allowed(self):
+        """Persist learned profiles only for an explicitly mutable session."""
+        if self.observe_only:
+            logger.info("Observe-only session: skipping soundcheck profile auto-save")
+            return None
+        if not (self.soundcheck_profile_enabled and self.soundcheck_profile_auto_save):
+            return None
+        profile = self._build_soundcheck_profile_from_live_buffers()
+        if profile is None:
+            return None
+        return self._save_soundcheck_profile(profile)
 
     def start_async(self):
         """Start engine in background thread."""

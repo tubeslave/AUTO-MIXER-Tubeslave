@@ -46,6 +46,7 @@ EXPECTED_ROLLBACK_EVENTS = {
     "manual_write_rollback_applied",
     "manual_write_rollback_blocked",
     "manual_write_rollback_error",
+    "manual_write_rollback_unverified",
 }
 PHYSICAL_READBACK_STATUSES = {"verified_from_physical_readback"}
 SAFE_DISCONNECT_REQUEST_TYPES = {"disconnect_mixer", "disconnect_wing"}
@@ -498,6 +499,7 @@ async def _rollback_unexpected_apply(
     run_id: str,
     approval_prefix: str,
     timeout: float,
+    transaction_id: str,
 ) -> Dict[str, Any]:
     return await send_and_wait(
         ws,
@@ -507,6 +509,7 @@ async def _rollback_unexpected_apply(
             "approved": True,
             "approval_id": f"{approval_prefix}:rollback-unexpected:{run_id}",
             "reason": f"rollback_unexpected_m005_apply:{run_id}",
+            "transaction_id": transaction_id,
         },
         EXPECTED_ROLLBACK_EVENTS,
         timeout=timeout,
@@ -764,12 +767,16 @@ async def run(args: argparse.Namespace) -> int:
             if _unexpected_apply(apply_probe):
                 rollback = None
                 if args.rollback_on_unexpected_apply:
+                    nested_apply = apply_probe.get("apply_result")
+                    if not isinstance(nested_apply, dict):
+                        nested_apply = apply_probe
                     rollback = await _rollback_unexpected_apply(
                         ws,
                         recorder,
                         run_id=run_id,
                         approval_prefix=args.approval_prefix,
                         timeout=args.timeout,
+                        transaction_id=str(nested_apply.get("transaction_id") or ""),
                     )
                 summary["unexpected_apply_rollback_result"] = rollback
                 summary.update(

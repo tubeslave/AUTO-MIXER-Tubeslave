@@ -293,6 +293,7 @@ async def run(args: argparse.Namespace) -> int:
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:rollback:{run_id}",
                 "reason": f"rollback:{args.reason}",
+                "transaction_id": extract_apply_result(apply_result).get("transaction_id"),
             },
         )
         rollback_status = rollback_payload.get("rollback_readback_status") or rollback_payload.get("readback_status")

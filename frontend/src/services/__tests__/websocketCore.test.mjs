@@ -70,6 +70,7 @@ test.beforeEach(() => {
   FakeWebSocket.instances = [];
   delete globalThis.location;
   delete globalThis.localStorage;
+  delete globalThis.sessionStorage;
 });
 
 test('reuses the same pending connect promise and resolves on open', async () => {
@@ -187,6 +188,29 @@ test('send() serializes messages when socket is open', async () => {
   transport.send({ type: 'ping', id: 7 });
 
   assert.deepEqual(socket.sentMessages, ['{"type":"ping","id":7}']);
+});
+
+test('authentication frame is always the first remote frame and token is session-only', async () => {
+  const store = new Map();
+  globalThis.sessionStorage = {
+    getItem: key => store.get(key) || null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const transport = createTransport({ authToken: 'secret-test-token' });
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+  await connectPromise;
+  transport.send({ type: 'ping' });
+
+  assert.deepEqual(socket.sentMessages, [
+    '{"type":"authenticate","token":"secret-test-token","client_id":"automixer-ui"}',
+    '{"type":"ping"}'
+  ]);
+  transport.setAuthToken('next-token', { reconnect: false });
+  assert.equal(store.get('automixer_ws_auth_token'), 'next-token');
 });
 
 test('infers websocket host from browser page host', () => {

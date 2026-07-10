@@ -26,13 +26,22 @@ class AuthManager:
     def generate_token(self, client_id: str, expires_hours: float = 24.0) -> str:
         """Generate an authentication token."""
         token = secrets.token_urlsafe(32)
+        self.register_token(token, client_id=client_id, expires_hours=expires_hours)
+        logger.info(f"Token generated for client: {client_id}")
+        return token
+
+    def register_token(self, token: str, client_id: str, expires_hours: float = 24.0) -> None:
+        """Register an externally supplied bearer token without retaining plaintext."""
+        if not isinstance(token, str) or not token:
+            raise ValueError("token must be a non-empty string")
+        if not isinstance(client_id, str) or not client_id:
+            raise ValueError("client_id must be a non-empty string")
         self._tokens[self._token_digest(token)] = {
             'client_id': client_id,
             'created': time.time(),
             'expires': time.time() + expires_hours * 3600,
         }
-        logger.info(f"Token generated for client: {client_id}")
-        return token
+        logger.info("Bearer token registered for client: %s", client_id)
 
     def _token_digest(self, token: str) -> str:
         """Derive a stable in-memory lookup key without storing bearer tokens."""

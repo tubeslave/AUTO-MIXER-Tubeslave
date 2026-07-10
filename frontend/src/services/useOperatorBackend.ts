@@ -154,20 +154,13 @@ const EXPECTED_RUNTIME_PAYLOADS: (keyof ProductLayerPayloads)[] = [
   'telemetryAlerts'
 ];
 
-function startsOnMockDashboard() {
-  if (typeof window === 'undefined') return false;
-  const route = window.location.hash.replace(/^#\/?/, '');
-  return route === '' || route === 'dashboard';
-}
-
 function shouldAutoConnect() {
   try {
     const preference = globalThis.localStorage?.getItem(AUTOCONNECT_STORAGE_KEY);
-    if (preference === 'on') return true;
     if (preference === 'off') return false;
-    return !startsOnMockDashboard();
+    return true;
   } catch {
-    return !startsOnMockDashboard();
+    return true;
   }
 }
 
@@ -398,6 +391,124 @@ function mergeMeterFrameIntoPayloads(current: ProductLayerPayloads, frame: Recor
   return next;
 }
 
+function mergeAudioCaptureStatusIntoPayloads(
+  current: ProductLayerPayloads,
+  payload: Record<string, unknown>
+): ProductLayerPayloads {
+  const dashboard = recordValue(current.dashboard);
+  return {
+    ...current,
+    dashboard: {
+      ...dashboard,
+      type: stringValue(dashboard.type, 'dashboard_snapshot'),
+      generated_at: new Date().toISOString(),
+      audio_capture: {
+        ...payload,
+        _frontend_authoritative_status: true
+      }
+    }
+  };
+}
+
+function mergeDashboardSnapshotIntoPayloads(
+  current: ProductLayerPayloads,
+  payload: unknown
+): ProductLayerPayloads {
+  const incoming = recordValue(payload);
+  const currentDashboard = recordValue(current.dashboard);
+  const currentAudioCapture = recordValue(currentDashboard.audio_capture);
+  return {
+    ...current,
+    dashboard: {
+      ...incoming,
+      ...(currentAudioCapture._frontend_authoritative_status === true
+        ? { audio_capture: currentAudioCapture }
+        : {})
+    }
+  };
+}
+
+function mergeConnectionStatusIntoPayloads(
+  current: ProductLayerPayloads,
+  payload: Record<string, unknown>
+): ProductLayerPayloads {
+  const dashboard = recordValue(current.dashboard);
+  const connection = recordValue(dashboard.connection);
+  return {
+    ...current,
+    dashboard: {
+      ...dashboard,
+      type: stringValue(dashboard.type, 'dashboard_snapshot'),
+      generated_at: new Date().toISOString(),
+      connection: {
+        ...connection,
+        connected: Boolean(payload.connected),
+        connection_mode: payload.mode ?? connection.connection_mode,
+        ip: payload.ip ?? connection.ip,
+        state: payload.state ?? connection.state
+      }
+    }
+  };
+}
+
+function mixerUpdateValue(values: unknown): unknown {
+  if (!Array.isArray(values) || values.length === 0) return undefined;
+  const semantic = values[values.length - 1];
+  return semantic ?? values[0];
+}
+
+function mergeMixerUpdateIntoPayloads(
+  current: ProductLayerPayloads,
+  payload: Record<string, unknown>
+): ProductLayerPayloads {
+  const address = stringValue(payload.address);
+  const channelMatch = address.match(/^\/ch\/(\d+)\/(fdr|mute|pan|\$name|name)$/);
+  const value = mixerUpdateValue(payload.values);
+  const dashboard = recordValue(current.dashboard);
+  const dashboardConnection = recordValue(dashboard.connection);
+  const dashboardState = recordValue(dashboardConnection.state);
+  const nextDashboard = {
+    ...dashboard,
+    generated_at: new Date().toISOString(),
+    connection: {
+      ...dashboardConnection,
+      state: address ? { ...dashboardState, [address]: value } : dashboardState
+    }
+  };
+
+  if (!channelMatch) {
+    return { ...current, dashboard: nextDashboard };
+  }
+
+  const channelId = Number(channelMatch[1]);
+  const field = channelMatch[2];
+  const inventory = recordValue(current.channels);
+  const rows = Array.isArray(inventory.channels) ? inventory.channels : [];
+  const nextRows = rows.map(row => {
+    const record = recordValue(row);
+    if (Number(record.id ?? record.number) !== channelId) return row;
+    const control = recordValue(record.control_state);
+    if (field === '$name' || field === 'name') {
+      const name = stringValue(value);
+      return name ? { ...record, name } : record;
+    }
+    const controlKey = field === 'fdr' ? 'fader_db' : field;
+    return {
+      ...record,
+      control_state: {
+        ...control,
+        [controlKey]: value
+      }
+    };
+  });
+
+  return {
+    ...current,
+    dashboard: nextDashboard,
+    channels: rows.length ? { ...inventory, channels: nextRows } : current.channels
+  };
+}
+
 export function useOperatorBackend() {
   const [connectionState, setConnectionState] = useState<BackendConnectionState>(() => shouldAutoConnect() ? 'connecting' : 'mock');
   const [payloads, setPayloads] = useState<ProductLayerPayloads>({});
@@ -425,6 +536,7 @@ export function useOperatorBackend() {
     websocketService.getProcessingPipelineSnapshot(false);
     websocketService.getMainPipelinePreview(48, false);
     websocketService.getTelemetryAlertsSnapshot(50, 8);
+    websocketService.getAudioCaptureStatus();
     websocketService.subscribeMeters();
   }, []);
 
@@ -466,6 +578,44 @@ export function useOperatorBackend() {
     setLogs(current => appendBackendLog(current, 'replay_run', 'Offline replay requested. Live writes remain disabled.', 'INFO'));
   }, [refreshBackend]);
 
+  const toggleAudioPreview = useCallback(() => {
+    if (!socketIsOpen()) {
+      refreshBackend();
+      setLogs(current => appendBackendLog(current, 'audio_capture', 'Connect backend before changing read-only audio meters.', 'WARN'));
+      return;
+    }
+    const dashboard = recordValue(payloads.dashboard);
+    const audioCapture = recordValue(dashboard.audio_capture);
+    if (audioCapture.running) {
+      websocketService.stopAudioCapturePreview();
+      setLogs(current => appendBackendLog(current, 'audio_capture', 'Stopping read-only WING audio meters.', 'INFO'));
+      return;
+    }
+    websocketService.startAudioCapturePreview(0, 48, 48000);
+    setLogs(current => appendBackendLog(current, 'audio_capture', 'Starting read-only WING 48-channel meters.', 'INFO'));
+  }, [payloads.dashboard, refreshBackend]);
+
+  const connectWingReadOnly = useCallback(() => {
+    const connect = () => {
+      websocketService.connectWing('192.168.1.102', 2223, 2223, true);
+      setLogs(current => appendBackendLog(current, 'connection', 'Requested WING 192.168.1.102 in observation-only mode.', 'INFO'));
+    };
+    if (socketIsOpen()) {
+      connect();
+      return;
+    }
+    setConnectionState('connecting');
+    websocketService.connect()
+      .then(() => {
+        setConnectionState('connected');
+        connect();
+      })
+      .catch(() => {
+        setConnectionState('error');
+        setLogs(current => appendBackendLog(current, 'connection', 'Backend unavailable; WING read-only connect was not sent.', 'WARN'));
+      });
+  }, []);
+
   const setBackendMode = useCallback((mode: AutomixerMode) => {
     websocketService.setOperatorMode(toBackendMode(mode), 'frontend_operator_mode_dropdown');
   }, []);
@@ -495,7 +645,7 @@ export function useOperatorBackend() {
 
   useEffect(() => {
     const handleDashboard = (payload: unknown) => {
-      setPayloads(current => ({ ...current, dashboard: payload }));
+      setPayloads(current => mergeDashboardSnapshotIntoPayloads(current, payload));
       setLogs(current => appendBackendLog(current, 'dashboard_snapshot', 'Dashboard snapshot received.', 'SUCCESS'));
     };
     const handleChannels = (payload: unknown) => {
@@ -613,6 +763,36 @@ export function useOperatorBackend() {
       if (!frame || frame.available !== true) return;
       setPayloads(current => mergeMeterFrameIntoPayloads(current, frame));
     };
+    const handleAudioCaptureStatus = (payload: unknown) => {
+      const data = recordValue(payload);
+      setPayloads(current => mergeAudioCaptureStatusIntoPayloads(current, data));
+      const running = Boolean(data.running);
+      const level: LogRecord['level'] = data.error ? 'WARN' : running ? 'SUCCESS' : 'INFO';
+      setLogs(current => appendBackendLog(
+        current,
+        'audio_capture_status',
+        data.error ? stringValue(data.error) : running ? `Read-only audio meters online: ${numberValue(data.num_channels, 0)} channels.` : 'Read-only audio meters stopped.',
+        level
+      ));
+      websocketService.getDashboardSnapshot();
+      websocketService.getChannelInventory(48);
+      websocketService.getConnectionTopology();
+    };
+    const handleConnectionStatus = (payload: unknown) => {
+      const data = recordValue(payload);
+      setPayloads(current => mergeConnectionStatusIntoPayloads(current, data));
+      setLogs(current => appendBackendLog(
+        current,
+        'connection_status',
+        data.connected ? `WING connected in ${data.observation_only === false ? 'write-capable' : 'observation-only'} mode.` : stringValue(data.error, 'Mixer disconnected.'),
+        data.connected ? 'SUCCESS' : 'WARN'
+      ));
+      requestSnapshot();
+    };
+    const handleMixerUpdate = (payload: unknown) => {
+      const data = recordValue(payload);
+      setPayloads(current => mergeMixerUpdateIntoPayloads(current, data));
+    };
     const handleDisconnected = () => {
       setConnectionState(previous => previous === 'mock' ? 'mock' : 'offline');
       setLogs(current => appendBackendLog(current, 'backend', 'Product Layer disconnected; using mock fallback.', 'WARN'));
@@ -647,6 +827,9 @@ export function useOperatorBackend() {
     websocketService.on('operator_proposal_apply_blocked', handleProposalApplyBlocked);
     websocketService.on('operator_proposals_imported', handleProposalMutation);
     websocketService.on('meter_frame', handleMeterFrame);
+    websocketService.on('audio_capture_status', handleAudioCaptureStatus);
+    websocketService.on('connection_status', handleConnectionStatus);
+    websocketService.on('mixer_update', handleMixerUpdate);
     websocketService.on('disconnected', handleDisconnected);
 
     if (shouldAutoConnect()) {
@@ -693,6 +876,9 @@ export function useOperatorBackend() {
       websocketService.off('operator_proposal_apply_blocked', handleProposalApplyBlocked);
       websocketService.off('operator_proposals_imported', handleProposalMutation);
       websocketService.off('meter_frame', handleMeterFrame);
+      websocketService.off('audio_capture_status', handleAudioCaptureStatus);
+      websocketService.off('connection_status', handleConnectionStatus);
+      websocketService.off('mixer_update', handleMixerUpdate);
       websocketService.off('disconnected', handleDisconnected);
       if (socketIsOpen()) {
         websocketService.unsubscribeMeters();
@@ -790,13 +976,15 @@ export function useOperatorBackend() {
 
   const backendActions = useMemo(() => ({
     refreshBackend,
+    toggleAudioPreview,
+    connectWingReadOnly,
     runBackendAnalysis,
     startReplayRun,
     setBackendMode,
     acceptProposal,
     dismissProposal,
     applyProposal
-  }), [acceptProposal, applyProposal, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun]);
+  }), [acceptProposal, applyProposal, connectWingReadOnly, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, toggleAudioPreview]);
 
   return {
     backend,

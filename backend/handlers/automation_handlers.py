@@ -9,13 +9,9 @@ def register_handlers(server):
         await server.send_to_client(websocket, {"type": "live_mode_set", "live_mode": server.live_mode})
 
     async def handle_emergency_stop(websocket, data):
-        server._manual_write_emergency_stopped = True
-        if server.gain_staging:
-            server.gain_staging.automation_frozen = True
-        if server.auto_fader_controller:
-            server.auto_fader_controller.set_automation_frozen(True)
-        if getattr(server, "auto_fader_v2_controller", None):
-            server.auto_fader_v2_controller.set_automation_frozen(True)
+        await server.activate_system_emergency_stop(
+            data.get("reason") or "websocket:emergency_stop"
+        )
         payload = {
             "type": "emergency_stop_applied",
             "status": "stopped",

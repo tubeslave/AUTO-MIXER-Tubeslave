@@ -10,12 +10,13 @@ class WebSocketService extends BaseWebSocketTransport {
   }
 
   // Wing direct connection
-  connectWing(ip, sendPort = 2223, receivePort = 2223) {
+  connectWing(ip, sendPort = 2223, receivePort = 2223, observationOnly = true) {
     this.send({
       type: 'connect_wing',
       ip,
       send_port: sendPort,
-      receive_port: receivePort
+      receive_port: receivePort,
+      observation_only: observationOnly
     });
   }
 
@@ -437,14 +438,13 @@ class WebSocketService extends BaseWebSocketTransport {
   }
 
   // AI Mixing Agent commands
-  startAgent(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, forceAutoApply = false) {
+  startAgent(mode = 'suggest', channels = [], useLlm = true, allowAutoApply = false) {
     this.send({
       type: 'start_agent',
       mode,
       channels,
       use_llm: useLlm,
-      allow_auto_apply: allowAutoApply,
-      force_auto_apply: forceAutoApply
+      allow_auto_apply: allowAutoApply
     });
   }
 
@@ -460,23 +460,21 @@ class WebSocketService extends BaseWebSocketTransport {
     this.send({ type: 'get_agent_status' });
   }
 
-  setAgentMode(mode = 'auto', channels = [], useLlm = true, allowAutoApply = true, start = false, forceAutoApply = false) {
+  setAgentMode(mode = 'suggest', channels = [], useLlm = true, allowAutoApply = false, start = false) {
     this.send({
       type: 'set_agent_mode',
       mode,
       channels,
       use_llm: useLlm,
       allow_auto_apply: allowAutoApply,
-      start,
-      force_auto_apply: forceAutoApply
+      start
     });
   }
 
-  updateAgentState(channels = [], forceAutoApply = false) {
+  updateAgentState(channels = []) {
     this.send({
       type: 'update_agent_state',
-      channels,
-      force_auto_apply: forceAutoApply
+      channels
     });
   }
 

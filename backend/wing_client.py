@@ -33,6 +33,8 @@ class WingClient(MixerClientBase):
         
         self.state = {}
         self.state_timestamps = {}
+        self.commanded_state = {}
+        self.command_timestamps = {}
         self.callbacks = {}
         
         self.is_connected = False
@@ -41,6 +43,7 @@ class WingClient(MixerClientBase):
         self._osc_throttle_enabled = True
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
+        self._osc_send_lock = threading.Lock()
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
@@ -124,8 +127,14 @@ class WingClient(MixerClientBase):
         return f"/{type_map[target_key]}/{int(target)}/{pos_map[position_key]}"
 
     def _set_state_value(self, address: str, value: Any) -> None:
+        """Record only state received from the physical console."""
         self.state[address] = value
         self.state_timestamps[address] = time.time()
+
+    def _set_commanded_value(self, address: str, value: Any) -> None:
+        """Record transport intent separately from observed console state."""
+        self.commanded_state[address] = value
+        self.command_timestamps[address] = time.time()
 
     def _active_readback(self, address: str, ttl: float = 0.4,
                          timeout: float = 0.15) -> Any:
@@ -332,34 +341,30 @@ class WingClient(MixerClientBase):
             self.is_connected = False
             return False
         
-        # Throttle check: only for commands with values (not queries)
-        if self._osc_throttle_enabled and values:
-            current_time = time.time()
-            min_interval = 1.0 / self._osc_throttle_hz
-            
-            if address in self._osc_last_send_time:
-                time_since_last = current_time - self._osc_last_send_time[address]
-                if time_since_last < min_interval:
-                    # Skip this command - too soon
-                    logger.debug(f"OSC throttle: skipping {address} (last sent {time_since_last*1000:.1f}ms ago, min {min_interval*1000:.1f}ms)")
-                    return False
-            
-            self._osc_last_send_time[address] = current_time
-            
         try:
-            builder = OscMessageBuilder(address=address)
-            for v in values:
-                builder.add_arg(v)
-            msg = builder.build()
-            self.sock.sendto(msg.dgram, (self.ip, self.port))
-            logger.debug(f"Sent: {address} {values}")
-            # Update local state cache when setting values (not queries)
-            if values:
-                if len(values) == 1:
-                    self._set_state_value(address, values[0])
-                else:
-                    self._set_state_value(address, values)
-            return True
+            with self._osc_send_lock:
+                # Throttle preserves the newest command by delaying it; it never
+                # reports a dropped command as a successful transport outcome.
+                if self._osc_throttle_enabled and values and self._osc_throttle_hz > 0:
+                    min_interval = 1.0 / self._osc_throttle_hz
+                    last_send = self._osc_last_send_time.get(address)
+                    now = time.monotonic()
+                    if last_send is not None:
+                        delay = min_interval - (now - last_send)
+                        if delay > 0:
+                            time.sleep(delay)
+
+                builder = OscMessageBuilder(address=address)
+                for v in values:
+                    builder.add_arg(v)
+                msg = builder.build()
+                self.sock.sendto(msg.dgram, (self.ip, self.port))
+                if values:
+                    self._osc_last_send_time[address] = time.monotonic()
+                    commanded = values[0] if len(values) == 1 else values
+                    self._set_commanded_value(address, commanded)
+                logger.debug(f"Sent: {address} {values}")
+                return True
         except OSError as e:
             # Socket error - mark as disconnected
             if e.errno in (9, 57, 32):  # Bad file descriptor, Socket not connected, Broken pipe

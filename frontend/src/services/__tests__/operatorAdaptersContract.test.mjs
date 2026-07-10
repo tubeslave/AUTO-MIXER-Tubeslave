@@ -5389,8 +5389,9 @@ test('dashboard analyzer metrics populate read-only phase dynamics and LUFS card
   assert.equal(cards[0].sourceTone, 'green');
   assert.deepEqual(cards[1].values, [44, 55, 66]);
   assert.equal(cards[2].primary, '-18.2 LUFS');
-  assert.equal(cards[3].sourceLabel, undefined);
-  assert.deepEqual(cards[3].values, [40]);
+  assert.equal(cards[3].sourceLabel, 'Unavailable');
+  assert.equal(cards[3].primary, 'Not measured');
+  assert.deepEqual(cards[3].values, []);
 
   const dashboardMockSource = await fs.readFile(path.join(srcRoot, 'mock/dashboardMock.ts'), 'utf8');
   assert.equal(dashboardMockSource.includes('TODO(analyzer metrics)'), false);
@@ -5574,7 +5575,7 @@ test('director runtime surfaces preview integration bundle readiness without liv
   assert.equal(runtime.manualGateLabel, 'Apply blocked');
 });
 
-test('cockpit marks visual placeholder metrics instead of presenting them as live telemetry', async () => {
+test('cockpit removes visual placeholder metrics from live operator surfaces', async () => {
   const dashboardSource = await fs.readFile(path.join(srcRoot, 'components/dashboard/AutomixerDashboard.tsx'), 'utf8');
   const performanceSource = await fs.readFile(path.join(srcRoot, 'views/PerformanceView.tsx'), 'utf8');
   const systemSource = await fs.readFile(path.join(srcRoot, 'views/SystemViews.tsx'), 'utf8');
@@ -5583,7 +5584,9 @@ test('cockpit marks visual placeholder metrics instead of presenting them as liv
   const agentsSource = await fs.readFile(path.join(srcRoot, 'components/prototype/AgentsConsolePanels.tsx'), 'utf8');
 
   assert.match(dashboardSource, /Backend DTO/);
-  assert.match(dashboardSource, /Display-only/);
+  assert.match(dashboardSource, /Real audio/);
+  assert.match(dashboardSource, /No measurable signal/);
+  assert.doesNotMatch(dashboardSource, /mixBalanceSegments/);
   assert.equal(dashboardSource.includes('BS.1770 mock readout'), false);
   assert.match(backendHookSource, /performance: payloadSource\(payloads\.agents/);
   assert.match(performanceSource, /data\.readModelSources\.performance/);
@@ -5591,8 +5594,10 @@ test('cockpit marks visual placeholder metrics instead of presenting them as liv
   assert.equal(performanceSource.includes("data.performanceRecords.length ? 'Backend-derived' : 'Mock'"), false);
   assert.match(performanceSource, /Display Trace/);
   assert.match(performanceSource, /Trend traces/);
-  assert.match(systemSource, /System Latency · Display-only/);
-  assert.match(systemSource, /Activity trace is display-only/);
-  assert.match(shellSource, /Display-only health/);
+  assert.doesNotMatch(systemSource, /System Latency · Display-only/);
+  assert.doesNotMatch(systemSource, /Activity trace is display-only/);
+  assert.doesNotMatch(systemSource, /1Gbps Up/);
+  assert.match(systemSource, /Observation only/);
+  assert.match(shellSource, /No hidden local fader, snapshot, record or rollback actions/);
   assert.match(agentsSource, /Traffic by Agent · Display Trace/);
 });

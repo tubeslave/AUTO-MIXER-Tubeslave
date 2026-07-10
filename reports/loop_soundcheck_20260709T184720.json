@@ -1,0 +1,213 @@
+{
+ "iteration_ts": "20260709T184720",
+ "iteration": 9,
+ "source": "loop/hourly (job f3ec0ca8)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": -9.733348846435547,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -20.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -21.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": -0.5028915405273438,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -18.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 20.0,
+    "gate_thr": -14.0,
+    "comp_thr": -24.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -25.0,
+    "gate_thr": -13.5,
+    "comp_thr": -22.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": -9.088518142700195,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -19.0,
+    "comp_thr": -26.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": -9.088518142700195,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -13.0,
+    "comp_thr": -20.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": -7.963230133056641,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -16.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": -6.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": -6.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -14.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": -8.463756561279297,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": -8.463756561279297,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": -7.779594421386719,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -17.0,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "OK",
+  "lufs_integrated": -25.02,
+  "true_peak_dbtp": -5.14,
+  "crest_db": 19.98,
+  "lr_balance_db": 0.03,
+  "correlation": 0.954,
+  "mono_fold_ratio": 0.977,
+  "tilt_deviation_db": 3.0,
+  "vocal_presence_db": 8.76,
+  "issues": [],
+  "method": "master_mix_eval",
+  "capture": "memory_only_no_wav"
+ },
+ "console_state": "CHANGED vs iter8 — autopilot raised levels back (OH -9, gtr -6, playback -8.5)",
+ "mix_findings": [],
+ "watch": [
+  "correlation series low: 0.954 (0.998->0.954 over 5 iters); mono_fold 0.977 still fine (~0.2dB loss); flag if <0.90"
+ ],
+ "audio_policy": "memory-only metrics; no WAV/host/chat audio (operator directive)",
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "notes": "master OK -25 LUFS; observe posture"
+}

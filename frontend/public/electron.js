@@ -50,8 +50,18 @@ function startBackend() {
 
   if (isDev) {
     const pythonExecutable = process.platform === 'win32' ? 'python' : 'python3';
+    const repoRoot = path.join(__dirname, '../..');
+    const backendDir = path.join(repoRoot, 'backend');
+    const pythonPath = [backendDir, repoRoot, process.env.PYTHONPATH]
+      .filter(Boolean)
+      .join(path.delimiter);
     backendProcess = spawn(pythonExecutable, [backendPath], {
-      cwd: path.join(__dirname, '../../backend')
+      cwd: backendDir,
+      env: {
+        ...process.env,
+        AUTOMIXER_REPO_ROOT: repoRoot,
+        PYTHONPATH: pythonPath
+      }
     });
   } else {
     if (!fs.existsSync(backendPath)) {

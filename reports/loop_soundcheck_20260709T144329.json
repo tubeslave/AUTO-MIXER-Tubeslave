@@ -1,0 +1,210 @@
+{
+ "iteration_ts": "20260709T144329",
+ "iteration": 5,
+ "source": "loop/hourly (job f3ec0ca8)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -20.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -21.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": -3.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -17.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 20.0,
+    "gate_thr": -14.0,
+    "comp_thr": -24.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -25.0,
+    "gate_thr": -13.5,
+    "comp_thr": -21.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": -8.640914916992188,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -16.0,
+    "comp_thr": -23.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": -10.354236602783203,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -16.0,
+    "comp_thr": -23.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": -7.265445709228516,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -17.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": -5.41107177734375,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": -6.123697280883789,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": -6.484651565551758,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": -5.612295150756836,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": -5.107481002807617,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -16.0,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "OK",
+  "lufs_integrated": -20.83,
+  "true_peak_dbtp": -1.61,
+  "crest_db": 19.95,
+  "lr_balance_db": 0.01,
+  "correlation": 0.998,
+  "mono_fold_ratio": 0.999,
+  "tilt_deviation_db": 2.14,
+  "vocal_presence_db": 8.97,
+  "issues": [],
+  "method": "master_mix_eval",
+  "capture": "memory_only_no_wav"
+ },
+ "console_state": "CHANGED vs iter4 — levels up (bass/gtr/playback/accordion +~6dB), comp thresholds raised ~+10..14dB across almost all ch (scene recall / batch?)",
+ "mix_findings": [],
+ "audio_policy": "memory-only metrics; no WAV, no file-host, no chat audio (operator directive 2026-07-09)",
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "notes": "master now on-target (-20.8 LUFS), clean; observe posture"
+}

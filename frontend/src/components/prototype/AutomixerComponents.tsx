@@ -570,6 +570,7 @@ export function TopStatusBar({
   actions: UiActions;
   mockDataOnly?: boolean;
 }) {
+  const offlineDemo = ui.backend.connectionState === 'mock';
   const statusLabel = mockDataOnly ? 'Live' : ui.backend.statusLabel;
   const connectionLabel = mockDataOnly ? 'WING Rack' : ui.backend.connectionLabel;
   const sourceLabel = mockDataOnly ? 'Mock' : ui.backend.sourceLabel;
@@ -577,12 +578,12 @@ export function TopStatusBar({
     ? 'On'
     : (ui.backend.canApplyToConsole ? 'Gate' : 'Read-only');
   const statusItems: { label: string; value: string; tone: Tone; interactive?: boolean }[] = [
-    ...(!mockDataOnly ? [{ label: 'Session', value: 'Live Club', tone: 'blue' as Tone }] : []),
-    { label: 'Status', value: statusLabel, tone: mockDataOnly ? 'green' : ui.backend.statusTone },
+    { label: 'Backend', value: statusLabel, tone: mockDataOnly ? 'green' : ui.backend.statusTone },
     { label: 'Data', value: mockDataOnly ? 'Mock fallback' : ui.backend.dataStateLabel, tone: mockDataOnly ? 'blue' : ui.backend.dataStateTone },
     { label: 'Mode', value: getModeDisplayLabel(mode), tone: policyForMode(mode).tone, interactive: true },
-    { label: 'Safe', value: safeValue, tone: mockDataOnly ? 'green' : (ui.backend.canApplyToConsole ? 'yellow' : 'green') },
-    { label: 'Connected To', value: connectionLabel, tone: mockDataOnly ? 'green' : (ui.backend.connectionState === 'connected' ? 'green' : 'blue') }
+    { label: 'Authority', value: safeValue, tone: mockDataOnly ? 'green' : (ui.backend.canApplyToConsole ? 'yellow' : 'green') },
+    { label: 'Console', value: connectionLabel, tone: mockDataOnly ? 'green' : (ui.backend.mixerConnected ? 'green' : 'red') },
+    { label: 'Audio', value: ui.backend.audioCaptureRunning ? `${ui.backend.audioCaptureChannels}ch · ${Math.round(ui.backend.audioSampleRate / 1000)}k` : 'Stopped', tone: ui.backend.audioCaptureRunning ? 'green' : 'yellow' }
   ];
 
   return (
@@ -606,8 +607,8 @@ export function TopStatusBar({
                 >
                   <option value="Analyze">Analysis Mode</option>
                   <option value="Assist">Assisted Mixing</option>
-                  <option value="Supervised">Supervised AutoMix</option>
-                  <option value="Auto">Full Autonomous Mixing</option>
+                  <option disabled={!offlineDemo && !ui.backend.availableModes.includes('Supervised')} value="Supervised">Supervised AutoMix {!offlineDemo && !ui.backend.availableModes.includes('Supervised') ? '(blocked)' : ''}</option>
+                  <option disabled={!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto'))} value="Auto">Full Autonomous Mixing {!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto')) ? '(blocked)' : ''}</option>
                 </select>
               ) : (
                 <StatusBadge tone={item.tone}>{item.value}</StatusBadge>
@@ -617,7 +618,8 @@ export function TopStatusBar({
         </div>
       </div>
       <div className="flex items-center gap-2 text-[10px] text-muted">
-        <IconButton label="Input monitor" onClick={() => actions.pushToast('Input monitor opened locally.', 'blue')}>~</IconButton>
+        {!ui.backend.mixerConnected && <IconButton label="Connect WING read-only" onClick={actions.connectWingReadOnly}>W</IconButton>}
+        <IconButton label={ui.backend.audioCaptureRunning ? 'Stop read-only audio meters' : 'Start read-only audio meters'} onClick={actions.toggleAudioPreview}>~</IconButton>
         <IconButton label="Refresh backend" onClick={actions.refreshBackend}>↻</IconButton>
         <IconButton label="Run backend analysis" onClick={actions.runBackendAnalysis}>◇</IconButton>
         <div className="ml-2 text-right">
@@ -627,6 +629,45 @@ export function TopStatusBar({
         <DirectorAvatar compact />
       </div>
     </header>
+  );
+}
+
+function RuntimeControlBar({ ui, actions, runtime }: { ui: UiState; actions: UiActions; runtime: DirectorRuntime }) {
+  const audioLabel = ui.backend.audioCaptureRunning
+    ? `${ui.backend.audioCaptureChannels} channels · ${Math.round(ui.backend.audioSampleRate / 1000)} kHz`
+    : 'Stopped · meters unavailable';
+  const authorityLabel = ui.backend.canApplyToConsole
+    ? `${ui.backend.writeScope.join(', ') || 'supervised'} · approval required`
+    : ui.backend.observationOnly ? 'Observation only · no console writes' : 'Apply blocked';
+
+  return (
+    <footer className="col-span-2 grid grid-cols-[1.1fr_1.25fr_1.25fr_1.35fr_1.2fr_minmax(220px,1.5fr)] items-stretch border-t border-line bg-[#081019] text-[9px]">
+      <div className="flex flex-col justify-center border-r border-line px-3">
+        <div className="am-label">Backend</div>
+        <div className="mt-1 flex items-center gap-2"><StatusBadge tone={ui.backend.statusTone}>{ui.backend.statusLabel}</StatusBadge><span className="truncate text-muted">{ui.backend.dataStateLabel}</span></div>
+      </div>
+      <div className="flex flex-col justify-center border-r border-line px-3">
+        <div className="am-label">Console readback</div>
+        <div className="mt-1 flex items-center gap-2"><StatusBadge tone={ui.backend.mixerConnected ? 'green' : 'red'}>{ui.backend.mixerConnected ? 'WING online' : 'Disconnected'}</StatusBadge><span className="truncate text-muted">{ui.backend.connectionLabel}</span></div>
+      </div>
+      <div className="flex flex-col justify-center border-r border-line px-3">
+        <div className="am-label">Audio meters</div>
+        <div className="mt-1 flex items-center justify-between gap-2"><span className={ui.backend.audioCaptureRunning ? 'text-online' : 'text-warn'}>{audioLabel}</span><button className="am-button px-2 py-1" onClick={actions.toggleAudioPreview} type="button">{ui.backend.audioCaptureRunning ? 'Stop' : 'Start'}</button></div>
+      </div>
+      <div className="flex flex-col justify-center border-r border-line px-3">
+        <div className="am-label">Write authority</div>
+        <div className="mt-1 truncate font-semibold text-text">{authorityLabel}</div>
+        <div className="truncate text-[8px] text-muted">{runtime.manualGateLabel} · {runtime.liveWritePolicy}</div>
+      </div>
+      <div className="flex flex-col justify-center border-r border-line px-3">
+        <div className="am-label">Safety state</div>
+        <div className="mt-1 flex items-center gap-2"><StatusBadge tone={runtime.readyTone}>{runtime.readyLabel}</StatusBadge><span className="truncate text-muted">{runtime.audioLabel}</span></div>
+      </div>
+      <div className="flex items-center justify-between gap-3 px-3">
+        <div className="min-w-0"><div className="am-label">Last confirmed state</div><div className="mt-1 truncate text-text">{ui.backend.lastUpdated}</div><div className="truncate text-[8px] text-muted">No hidden local fader, snapshot, record or rollback actions</div></div>
+        <div className="flex shrink-0 gap-2"><button className="am-button px-3 py-1.5" onClick={actions.refreshBackend} type="button">Refresh</button><button className="am-button border-audio/40 bg-audio/10 px-3 py-1.5 text-audio" onClick={actions.runBackendAnalysis} type="button">Analyze</button></div>
+      </div>
+    </footer>
   );
 }
 
@@ -729,6 +770,7 @@ function CompactOperatorView({
   runtime: DirectorRuntime;
 }) {
   const compactRoutes = items.filter(item => ['dashboard', 'task-queue', 'channels', 'agents', 'settings'].includes(item.id));
+  const offlineDemo = ui.backend.connectionState === 'mock';
   const compactDataLabel = ui.backend.dataState === 'connected' ? 'PL live' : ui.backend.dataStateLabel;
   const compactReadyLabel = runtime.readyLabel === 'Ready for live' ? 'Ready' : runtime.readyLabel;
   const compactAudioLabel = runtime.audioLabel === 'Audio capture running' ? 'Audio running' : runtime.audioLabel;
@@ -750,8 +792,8 @@ function CompactOperatorView({
         >
           <option value="Analyze">Analysis Mode</option>
           <option value="Assist">Assisted Mixing</option>
-          <option value="Supervised">Supervised AutoMix</option>
-          <option value="Auto">Full Autonomous Mixing</option>
+          <option disabled={!offlineDemo && !ui.backend.availableModes.includes('Supervised')} value="Supervised">Supervised AutoMix {!offlineDemo && !ui.backend.availableModes.includes('Supervised') ? '(blocked)' : ''}</option>
+          <option disabled={!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto'))} value="Auto">Full Autonomous Mixing {!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto')) ? '(blocked)' : ''}</option>
         </select>
       </header>
       <main className="am-scrollbar flex-1 space-y-2 overflow-auto p-3">
@@ -778,12 +820,14 @@ function CompactOperatorView({
             <div className="flex items-center justify-between border-b border-line pb-2"><span className="text-muted">Current route</span><b>{active}</b></div>
             <div className="flex items-center justify-between border-b border-line pb-2"><span className="text-muted">Writes</span><b className={ui.backend.canApplyToConsole ? 'text-warn' : 'text-danger'}>{ui.backend.canApplyToConsole ? 'Supervised gate' : 'Blocked'}</b></div>
             <div className="flex items-center justify-between border-b border-line pb-2"><span className="text-muted">Backend</span><b className="text-text">{compactDataLabel}</b></div>
+            <div className="flex items-center justify-between border-b border-line pb-2"><span className="text-muted">Console</span><b className={ui.backend.mixerConnected ? 'text-ok' : 'text-danger'}>{ui.backend.mixerConnected ? 'WING online' : 'Offline'}</b></div>
+            <div className="flex items-center justify-between border-b border-line pb-2"><span className="text-muted">Authority</span><b className={ui.backend.canApplyToConsole ? 'text-warn' : 'text-ok'}>{ui.backend.observationOnly ? 'Observation only' : 'Supervised'}</b></div>
           </div>
         </Panel>
         <Panel title="Safe Mode">
           <div className="grid grid-cols-2 gap-2">
             <button className="am-button" onClick={actions.refreshBackend}>Refresh</button>
-            <button className="am-button" onClick={actions.rollbackLastAction}>Rollback UI</button>
+            <button className="am-button" onClick={actions.toggleAudioPreview}>{ui.backend.audioCaptureRunning ? 'Stop meters' : 'Start meters'}</button>
           </div>
           <p className="mt-3 text-[10px] leading-5 text-muted">Compact view remains read-only unless the supervised backend gate explicitly allows an approved apply.</p>
         </Panel>
@@ -875,7 +919,7 @@ export function AppShell({ items, active, onNavigate, view, mode, onModeChange, 
           {!dashboardMode && <ModePolicyTray mode={mode} />}
           {!dashboardMode && <ActionFocusTray focus={ui.actionFocus} onClear={actions.clearActionFocus} />}
         </aside>
-        <BottomTransportBar ui={ui} actions={actions} dashboardMode={dashboardMode} />
+        <RuntimeControlBar ui={ui} actions={actions} runtime={shellRuntime} />
         <ToastLayer toast={ui.toast} onDismiss={actions.dismissToast} />
       </div>
     </>

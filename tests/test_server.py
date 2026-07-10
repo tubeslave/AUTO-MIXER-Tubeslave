@@ -168,10 +168,66 @@ class TestAutoMixerServerInit:
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     def test_custom_host_port(self, mock_config, mock_bleed):
-        """Server should accept custom host and port."""
-        server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+        """Remote bind is accepted only with a configured bearer token."""
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
         assert server.ws_host == "0.0.0.0"
         assert server.ws_port == 9999
+        assert server._ws_auth_required is True
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_remote_bind_without_token_fails_closed(self, mock_config, mock_bleed):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            with pytest.raises(RuntimeError, match="requires AUTOMIXER_WS_AUTH_TOKEN"):
+                AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_remote_websocket_authenticates_first_frame(self, mock_config, mock_bleed):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(return_value=json.dumps({
+            "type": "authenticate",
+            "token": "test-remote-token",
+            "client_id": "automixer-ui",
+        }))
+        websocket.send = AsyncMock()
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is True
+        websocket.close.assert_not_awaited()
+        sent = json.loads(websocket.send.await_args.args[0])
+        assert sent == {"type": "authentication_status", "authenticated": True}
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_remote_websocket_rejects_bad_token(self, mock_config, mock_bleed):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(return_value=json.dumps({
+            "type": "authenticate",
+            "token": "wrong-token",
+            "client_id": "automixer-ui",
+        }))
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is False
+        websocket.close.assert_awaited_once_with(code=1008, reason="authentication_failed")
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -432,11 +488,51 @@ class TestAutoMixerServerConfigNormalization:
         server.gain_staging = MagicMock()
         server.auto_fader_controller = MagicMock()
         server.auto_fader_controller.get_status.return_value = {"collecting": True}
+        server.record_master_true_peak_evidence(-6.0)
 
         status = server.get_ready_for_live_status()
 
         assert status["ready"] is True
         assert status["checks"]["auto_fader_available"] is True
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_ready_for_live_blocks_without_fresh_master_true_peak(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        server.mixer_client = MagicMock(is_connected=True)
+        server.gain_staging = MagicMock()
+        server.auto_fader_controller = MagicMock()
+        server.auto_fader_controller.get_status.return_value = {"collecting": True}
+
+        status = server.get_ready_for_live_status()
+
+        assert status["ready"] is False
+        assert status["checks"]["no_clipping"] is False
+        assert "master_true_peak_unavailable_or_stale" in status["blocked_reasons"]
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_system_emergency_stop_covers_all_active_writer_variants(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        server.auto_soundcheck_engine = MagicMock()
+        server.auto_soundcheck_task = MagicMock()
+        server.mixing_agent = MagicMock()
+        server.multi_channel_auto_eq_controller = MagicMock(spec=["stop_all"])
+        server.voice_control = MagicMock(spec=["stop_listening"])
+        server.phase_alignment_controller = MagicMock(spec=["stop"])
+
+        result = await server.activate_system_emergency_stop("unit:all_writers")
+
+        assert result["status"] == "stopped"
+        assert server._manual_write_emergency_stopped is True
+        assert server._manual_write_emergency_generation == 1
+        assert server.auto_soundcheck_task is None
+        server.mixing_agent.emergency_stop.assert_called_once_with()
+        server.mixing_agent.stop.assert_called_once_with()
+        server.multi_channel_auto_eq_controller.stop_all.assert_called_once_with()
+        server.voice_control.stop_listening.assert_called_once_with()
+        server.phase_alignment_controller.stop.assert_called_once_with()
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -1723,8 +1819,23 @@ class DummyWingLike:
         self.state_timestamps = {}
         self.state = TimestampedState(self)
         self.state.update({"/ch/1/fdr": -8.0, "/ch/1/in/set/trim": 1.0})
-        self.set_channel_fader = MagicMock(return_value=True)
-        self.set_channel_gain = MagicMock()
+        def set_value(address, value):
+            self.state[address] = value
+            return True
+
+        self.query_parameter = MagicMock(
+            side_effect=lambda address: {
+                "status": "received",
+                "address": address,
+                "value": self.state.get(address),
+            }
+        )
+        self.set_channel_fader = MagicMock(
+            wraps=lambda channel, value: set_value(f"/ch/{channel}/fdr", value)
+        )
+        self.set_channel_gain = MagicMock(
+            wraps=lambda channel, value: set_value(f"/ch/{channel}/in/set/trim", value)
+        )
         self.set_eq_band = MagicMock()
         self.set_compressor = MagicMock()
         self.load_snap = MagicMock(return_value=True)
@@ -1746,8 +1857,12 @@ class DummyWingLike:
         self.set_compressor_threshold = MagicMock(return_value=True)
         self.get_compressor_gain = MagicMock(return_value=0.0)
         self.set_compressor_gain = MagicMock(return_value=True)
-        self.set_channel_mute = MagicMock(return_value=True)
-        self.set_channel_pan = MagicMock(return_value=True)
+        self.set_channel_mute = MagicMock(
+            wraps=lambda channel, value: set_value(f"/ch/{channel}/mute", int(bool(value)))
+        )
+        self.set_channel_pan = MagicMock(
+            wraps=lambda channel, value: set_value(f"/ch/{channel}/pan", value)
+        )
         self.set_channel_phase_invert = MagicMock(return_value=True)
         self.set_channel_delay = MagicMock(return_value=True)
         self.get_write_gate_status = MagicMock(return_value={"state": "unconfigured"})
@@ -2645,13 +2760,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["status"] == "applied"
         assert payload["value_type"] == "fader"
         assert payload["old_value"] == -8.0
-        assert payload["pre_read_status"] == "verified_from_cache"
-        assert payload["pre_read_source"] == "mixer_state_cache"
-        assert payload["readback_status"] == "readback_cache_not_fresh"
-        assert payload["readback_value"] == -8.0
-        assert payload["readback_cache_freshness"]["status"] == "not_after_write"
-        assert payload["readback_cache_freshness"]["updated_after_minimum"] is False
-        assert payload["proof_status"] == "partial"
+        assert payload["pre_read_status"] == "verified_from_physical_readback"
+        assert payload["pre_read_source"] == "physical_readback"
+        assert payload["readback_status"] == "verified_from_physical_readback"
+        assert payload["readback_value"] == -6.0
+        assert payload["proof_status"] == "verified"
         assert payload["rollback_available"] is True
         assert payload["rollback_value"] == -8.0
         assert payload["rollback_status"] == "not_attempted"
@@ -3057,7 +3170,16 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client = DummyWingLike()
         server.mixer_client._osc_throttle_enabled = True
         server.mixer_client._osc_throttle_hz = 1000.0
-        server.mixer_client.set_channel_fader = MagicMock(side_effect=[False, True])
+        attempts = {"count": 0}
+
+        def retry_then_apply(channel, value):
+            attempts["count"] += 1
+            if attempts["count"] == 1:
+                return False
+            server.mixer_client.state[f"/ch/{channel}/fdr"] = value
+            return True
+
+        server.mixer_client.set_channel_fader = MagicMock(side_effect=retry_then_apply)
 
         result = await server._apply_manual_console_write(
             websocket=None,
@@ -3104,6 +3226,33 @@ class TestWingDeploymentWriteBoundary:
         assert result["reason"] == "mixer_write_failed"
         assert result["write_attempts"] == 3
         assert server.mixer_client.set_channel_fader.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_emergency_generation_stops_a_manual_write_before_retry(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._manual_write_cooldown_sec = 0.0
+
+        def stop_during_first_attempt(channel, value):
+            server._manual_write_emergency_stopped = True
+            server._manual_write_emergency_generation += 1
+            return False
+
+        server.mixer_client.set_channel_fader.side_effect = stop_during_first_attempt
+
+        result = await server._apply_manual_console_write(
+            None,
+            channel=1,
+            value=-6.0,
+            value_type="fader",
+            source="unit:emergency_between_retries",
+            approved=True,
+            approval_id="unit-emergency-between-retries",
+        )
+
+        assert result["status"] == "blocked"
+        assert result["reason"] == "emergency_stop_active"
+        assert server.mixer_client.set_channel_fader.call_count == 1
 
     @pytest.mark.asyncio
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -3161,6 +3310,7 @@ class TestWingDeploymentWriteBoundary:
             source="unit:throttled_rollback",
             approved=True,
             approval_id="unit-throttled-rollback",
+            transaction_id=apply_result["transaction_id"],
         )
 
         assert rollback_result["status"] == "applied"
@@ -3252,6 +3402,7 @@ class TestWingDeploymentWriteBoundary:
             source="unit:trailing_edge_rollback",
             approved=True,
             approval_id="unit-trailing-edge-rollback",
+            transaction_id=apply_result["transaction_id"],
         )
 
         assert rollback_result["status"] == "applied"
@@ -3309,6 +3460,7 @@ class TestWingDeploymentWriteBoundary:
             source="unit:proof_sequence_rollback",
             approved=True,
             approval_id="unit-proof-sequence-rollback",
+            transaction_id=apply_result["transaction_id"],
         )
         assert rollback_result["status"] == "applied"
         assert rollback_result["rollback_status"] in {"applied", "partial"}
@@ -3887,6 +4039,7 @@ class TestWingDeploymentWriteBoundary:
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
         server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time() - 120.0
+        server.mixer_client.query_parameter = None
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -3932,6 +4085,7 @@ class TestWingDeploymentWriteBoundary:
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
         server.mixer_client.state_timestamps["/ch/1/in/set/trim"] = time.time() - 120.0
+        server.mixer_client.query_parameter = None
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -3977,6 +4131,7 @@ class TestWingDeploymentWriteBoundary:
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
         server.mixer_client.state = {}
+        server.mixer_client.query_parameter = None
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -4121,6 +4276,7 @@ class TestWingDeploymentWriteBoundary:
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
         server.mixer_client.state = {"/ch/1/fdr": -8.0}
+        server.mixer_client.query_parameter = None
 
         await server._dispatch["create_operator_proposal"](
             websocket,
@@ -4278,6 +4434,7 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.operator_mode = "supervised"
         server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time() - 120.0
+        server.mixer_client.query_parameter = None
         websocket = MagicMock()
         websocket.send = AsyncMock()
         handlers = mixer_handlers.register_handlers(server)
@@ -4325,7 +4482,7 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)
 
     @pytest.mark.asyncio
-    async def test_websocket_gain_reports_cache_readback_and_rollback_metadata(self, dummy_wing_server):
+    async def test_websocket_gain_reports_physical_readback_and_rollback_metadata(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
         websocket = MagicMock()
@@ -4349,11 +4506,11 @@ class TestWingDeploymentWriteBoundary:
         assert payload["value_type"] == "gain"
         assert payload["old_value"] == 1.0
         assert payload["pre_read_value"] == 1.0
-        assert payload["pre_read_status"] == "verified_from_cache"
-        assert payload["pre_read_source"] == "mixer_state_cache"
+        assert payload["pre_read_status"] == "verified_from_physical_readback"
+        assert payload["pre_read_source"] == "physical_readback"
         assert payload["readback_value"] == 2.0
-        assert payload["readback_status"] == "verified_from_cache"
-        assert payload["readback_source"] == "mixer_state_cache"
+        assert payload["readback_status"] == "verified_from_physical_readback"
+        assert payload["readback_source"] == "physical_readback"
         assert payload["proof_status"] == "verified"
         assert payload["rollback_available"] is True
         assert payload["rollback_value"] == 1.0
@@ -4367,6 +4524,7 @@ class TestWingDeploymentWriteBoundary:
         server.operator_mode = "supervised"
         server.mixer_client.state = {"/ch/1/in/set/trim": 1.0}
         server.mixer_client.state_timestamps = {"/ch/1/in/set/trim": time.time()}
+        server.mixer_client.query_parameter = None
         websocket = MagicMock()
         websocket.send = AsyncMock()
         handlers = mixer_handlers.register_handlers(server)
@@ -4383,14 +4541,13 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_applied"
-        assert payload["status"] == "applied"
-        assert payload["readback_value"] == 2.0
-        assert payload["readback_status"] == "readback_cache_not_fresh"
-        assert payload["readback_cache_freshness"]["status"] == "not_after_write"
-        assert payload["readback_cache_freshness"]["updated_after_minimum"] is False
+        assert payload["type"] == "manual_write_unverified"
+        assert payload["status"] == "sent_unverified"
+        assert payload["readback_value"] is None
+        assert payload["readback_status"] == "readback_unavailable"
         assert payload["proof_status"] == "partial"
         assert payload["rollback_available"] is True
+        assert payload["emergency_stop_activated"] is True
         server.mixer_client.set_channel_gain.assert_called_once_with(1, 2.0)
 
     @pytest.mark.asyncio
@@ -5458,7 +5615,14 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
         )
-        await handlers["rollback_last_manual_write"](websocket, {"approval_id": "rollback-unit"})
+        apply_payload = self._decode_last_message(websocket)
+        await handlers["rollback_last_manual_write"](
+            websocket,
+            {
+                "approval_id": "rollback-unit",
+                "transaction_id": apply_payload["transaction_id"],
+            },
+        )
 
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "manual_write_rollback_blocked"
@@ -5480,6 +5644,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
         )
+        apply_payload = self._decode_last_message(websocket)
 
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
@@ -5488,18 +5653,53 @@ class TestWingDeploymentWriteBoundary:
 
         await handlers["rollback_last_manual_write"](
             websocket,
-            {"approved": True, "approval_id": "rollback-timeout"},
+            {
+                "approved": True,
+                "approval_id": "rollback-timeout",
+                "transaction_id": apply_payload["transaction_id"],
+            },
         )
 
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "manual_write_rollback_blocked"
         assert payload["status"] == "blocked"
-        assert payload["reason"] == "pre_read_unavailable"
-        assert payload["rollback"] is True
-        assert payload["rollback_of"] == "unit-apply"
-        assert payload["pre_read_status"] == "readback_unavailable"
-        assert payload["pre_read_source"] == "physical_readback"
+        assert payload["reason"] == "rollback_intervening_change_or_unverified_state"
+        assert payload["rollback_of_transaction_id"] == apply_payload["transaction_id"]
+        assert payload["current_readback_status"] == "readback_unavailable"
+        assert payload["current_readback_source"] == "physical_readback"
         assert payload["proof_status"] == "blocked"
+        assert server.mixer_client.set_channel_fader.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_rollback_transaction_cas_blocks_intervening_console_change(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._manual_write_cooldown_sec = 0.0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-cas-apply"},
+        )
+        apply_payload = self._decode_last_message(websocket)
+        server.mixer_client.state["/ch/1/fdr"] = -5.0
+
+        await handlers["rollback_last_manual_write"](
+            websocket,
+            {
+                "approved": True,
+                "approval_id": "unit-cas-rollback",
+                "transaction_id": apply_payload["transaction_id"],
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_rollback_blocked"
+        assert payload["reason"] == "rollback_intervening_change_or_unverified_state"
+        assert payload["current_readback_value"] == -5.0
+        assert payload["expected_current_value"] == -6.0
         assert server.mixer_client.set_channel_fader.call_count == 1
 
     @pytest.mark.asyncio
@@ -5522,9 +5722,14 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
         )
+        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
-            {"approved": True, "approval_id": "rollback-unit"},
+            {
+                "approved": True,
+                "approval_id": "rollback-unit",
+                "transaction_id": apply_payload["transaction_id"],
+            },
         )
 
         payload = self._decode_last_message(websocket)
@@ -5537,9 +5742,9 @@ class TestWingDeploymentWriteBoundary:
         assert payload["effective_value"] == -8.0
         assert payload["old_value"] == -6.0
         assert payload["readback_value"] == -8.0
-        assert payload["readback_status"] == "verified_from_cache"
+        assert payload["readback_status"] == "verified_from_physical_readback"
         assert payload["proof_status"] == "verified"
-        assert payload["rollback_readback_status"] == "verified_from_cache"
+        assert payload["rollback_readback_status"] == "verified_from_physical_readback"
         assert payload["rollback_proof_status"] == "verified"
         assert payload["artifact_path"].endswith("manual_write_events.jsonl")
         assert [item.args for item in server.mixer_client.set_channel_fader.call_args_list] == [
@@ -5574,9 +5779,14 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
         )
+        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
-            {"approved": True, "approval_id": "rollback-unit"},
+            {
+                "approved": True,
+                "approval_id": "rollback-unit",
+                "transaction_id": apply_payload["transaction_id"],
+            },
         )
 
         payload = self._decode_last_message(websocket)
@@ -5611,14 +5821,20 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
         )
+        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
-            {"approved": True, "approval_id": "rollback-unit"},
+            {
+                "approved": True,
+                "approval_id": "rollback-unit",
+                "transaction_id": apply_payload["transaction_id"],
+            },
         )
 
         payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_rollback_applied"
-        assert payload["status"] == "applied"
-        assert payload["rollback_status"] == "partial"
-        assert payload["rollback_readback_status"] == "readback_cache_not_fresh"
+        assert payload["type"] == "manual_write_rollback_unverified"
+        assert payload["status"] == "sent_unverified"
+        assert payload["rollback_status"] == "unverified"
+        assert payload["rollback_readback_status"] == "not_verified"
         assert payload["rollback_proof_status"] == "partial"
+        assert payload["emergency_stop_activated"] is True

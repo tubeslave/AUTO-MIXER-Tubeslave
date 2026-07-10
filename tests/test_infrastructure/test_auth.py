@@ -31,6 +31,17 @@ class TestAuthManager:
         assert am._token_digest(token) in am._tokens
         assert am.validate_token(token) is True
 
+    def test_register_external_token_retains_only_digest(self):
+        am = AuthManager(enabled=True)
+        token = 'operator-supplied-token'
+
+        am.register_token(token, client_id='automixer-ui', expires_hours=1.0)
+
+        assert token not in am._tokens
+        assert am._token_digest(token) in am._tokens
+        assert am.authenticate(token=token, client_id='automixer-ui') is True
+        assert am.authenticate(token=token, client_id='other-client') is False
+
     def test_validate_token_when_disabled(self):
         """Token validation always returns True when auth is disabled."""
         am = AuthManager(enabled=False)

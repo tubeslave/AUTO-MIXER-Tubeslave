@@ -1,0 +1,216 @@
+{
+ "iteration_ts": "20260709T164055",
+ "iteration": 7,
+ "source": "loop/hourly (job f3ec0ca8)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -22.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -21.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": -0.4634590148925781,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -10.5,
+    "comp_thr": -19.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 20.0,
+    "gate_thr": -13.0,
+    "comp_thr": -21.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": -0.503936767578125,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -25.0,
+    "gate_thr": -13.5,
+    "comp_thr": -20.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": -11.384368896484375,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -19.0,
+    "comp_thr": -22.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": -11.384368896484375,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -13.5,
+    "comp_thr": -15.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": -9.102169036865234,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -16.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": -8.308067321777344,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": -8.308067321777344,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -14.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": -5.978233337402344,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": -5.978233337402344,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": -8.190601348876953,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -17.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -14.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -15.5,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "OK",
+  "lufs_integrated": -20.08,
+  "true_peak_dbtp": -3.03,
+  "crest_db": 17.16,
+  "lr_balance_db": 0.02,
+  "correlation": 0.977,
+  "mono_fold_ratio": 0.989,
+  "tilt_deviation_db": 1.82,
+  "vocal_presence_db": 8.4,
+  "issues": [],
+  "method": "master_mix_eval",
+  "capture": "memory_only_no_wav"
+ },
+ "console_state": "CHANGED vs iter6 — instruments pulled back down from -3.0 batch (OH -11.4, bass -9.1, gtr -8.3); BACK L/R got EQ ON + compression (addresses earlier BGV-flat observation)",
+ "mix_findings": [],
+ "resolved": [
+  "true-peak headroom recovered: -1.08 -> -3.03 dBTP after autopilot pulled levels back"
+ ],
+ "watch": [
+  "correlation slow downtrend 0.998->0.988->0.977 (wider stereo); still >0.95, fine"
+ ],
+ "audio_policy": "memory-only metrics; no WAV/host/chat audio (operator directive)",
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "notes": "master on-target -20.1 LUFS, clean; observe posture"
+}

@@ -21,11 +21,14 @@ from typing import Any, Dict, Iterable, Optional
 import websockets
 
 
-EXPECTED_WRITE_EVENTS = {"manual_write_applied", "manual_write_blocked", "manual_write_error"}
+EXPECTED_WRITE_EVENTS = {
+    "manual_write_applied", "manual_write_unverified", "manual_write_blocked", "manual_write_error"
+}
 EXPECTED_ROLLBACK_EVENTS = {
     "manual_write_rollback_applied",
     "manual_write_rollback_blocked",
     "manual_write_rollback_error",
+    "manual_write_rollback_unverified",
 }
 
 
@@ -256,6 +259,7 @@ async def run(args: argparse.Namespace) -> int:
                     "approved": True,
                     "approval_id": f"{args.approval_prefix}:rollback:{run_id}",
                     "reason": f"rollback:{args.reason}",
+                    "transaction_id": write_result.get("transaction_id"),
                 },
                 EXPECTED_ROLLBACK_EVENTS,
                 timeout=args.timeout,

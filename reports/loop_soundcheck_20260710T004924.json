@@ -1,0 +1,213 @@
+{
+ "iteration_ts": "20260710T004924",
+ "iteration": 10,
+ "source": "loop/hourly (job f3ec0ca8)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": -0.31307411193847656,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -44.5,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": -0.8617515563964844,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -12.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": -12.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 0.0,
+    "gate_thr": -41.5,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 20.0,
+    "gate_thr": -32.5,
+    "comp_thr": -15.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": -0.8370990753173828,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -25.0,
+    "gate_thr": -25.0,
+    "comp_thr": -14.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": -10.431446075439453,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -19.0,
+    "comp_thr": -16.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": -10.431446075439453,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -13.0,
+    "comp_thr": -10.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": -9.133255004882812,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -24.0,
+    "comp_thr": -7.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": -7.67713737487793,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": -7.67713737487793,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -14.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": -7.651617050170898,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -12.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": -7.651617050170898,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": -6.977863311767578,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -13.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -21.0,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "OK",
+  "lufs_integrated": -25.95,
+  "true_peak_dbtp": -7.1,
+  "crest_db": 18.17,
+  "lr_balance_db": 0.02,
+  "correlation": 0.995,
+  "mono_fold_ratio": 0.997,
+  "tilt_deviation_db": 1.6,
+  "vocal_presence_db": 6.56,
+  "issues": [],
+  "method": "master_mix_eval",
+  "capture": "memory_only_no_wav"
+ },
+ "console_state": "CHANGED vs iter9 (14 ch) — SNARE T/B EQ off, comp thresholds raised ~-10, PLAYBACK EQ on",
+ "mix_findings": [],
+ "resolved": [
+  "correlation recovered 0.954->0.995 (mono compat healthy again)"
+ ],
+ "audio_policy": "memory-only metrics; no WAV/host/chat audio (operator directive)",
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "notes": "master OK; vocal presence dipped 8.76->6.56 (minor); observe posture"
+}

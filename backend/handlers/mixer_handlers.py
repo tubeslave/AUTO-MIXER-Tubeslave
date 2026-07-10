@@ -299,6 +299,8 @@ def register_handlers(server):
                 approval_id=data.get("approval_id"),
             )
             result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
+            if result.get("status") == "sent_unverified":
+                result_type = "manual_write_unverified"
             if result.get("status") == "error":
                 result_type = "manual_write_error"
             await server.send_to_client(websocket, {"type": result_type, **result})
@@ -327,6 +329,8 @@ def register_handlers(server):
                 approval_id=data.get("approval_id"),
             )
             result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
+            if result.get("status") == "sent_unverified":
+                result_type = "manual_write_unverified"
             if result.get("status") == "error":
                 result_type = "manual_write_error"
             await server.send_to_client(websocket, {"type": result_type, **result})
@@ -552,6 +556,7 @@ def register_handlers(server):
             reason=data.get("reason") or "websocket_rollback_last_manual_write",
             approved=bool(data.get("approved", False)),
             approval_id=data.get("approval_id"),
+            transaction_id=data.get("transaction_id"),
         )
         result_type = (
             "manual_write_rollback_applied"
@@ -560,6 +565,8 @@ def register_handlers(server):
         )
         if result.get("status") == "error":
             result_type = "manual_write_rollback_error"
+        elif result.get("status") == "sent_unverified":
+            result_type = "manual_write_rollback_unverified"
         await server.send_to_client(websocket, {"type": result_type, **result})
 
     async def handle_get_state(websocket, data):

@@ -14,10 +14,22 @@ def register_handlers(server):
         return bool(checker)
 
     def _resolve_agent_auto_apply(data: dict):
-        force_auto_apply = bool(data.get("force_auto_apply", False))
-        if _orchestrator_dry_run() and not force_auto_apply:
+        if _orchestrator_dry_run():
             return False
         return bool(data.get("allow_auto_apply", True))
+
+    async def _reject_removed_force_auto_apply(websocket, data: dict) -> bool:
+        if not bool(data.get("force_auto_apply", False)):
+            return False
+        await server.send_to_client(websocket, {
+            "type": "agent_action_blocked",
+            "action": "force_auto_apply",
+            "status": "blocked",
+            "reason": "force_auto_apply_removed",
+            "message": "force_auto_apply is not a valid live authority",
+            "dry_run": True,
+        })
+        return True
 
     def _manual_actions_blocked():
         if getattr(server, "agent_auto_apply_enabled", False):
@@ -69,13 +81,14 @@ def register_handlers(server):
         await _send_agent_status(websocket)
 
     async def handle_start_agent(websocket, data):
-        force_auto_apply = bool(data.get("force_auto_apply", False))
+        if await _reject_removed_force_auto_apply(websocket, data):
+            return
         agent = await server.init_mixing_agent(
             mode=data.get("mode", "auto"),
             channels=data.get("channels"),
             use_llm=data.get("use_llm", True),
             allow_auto_apply=_resolve_agent_auto_apply(data),
-            force_auto_apply=force_auto_apply,
+            force_auto_apply=False,
             start=True,
         )
         await server.send_to_client(websocket, {
@@ -92,10 +105,14 @@ def register_handlers(server):
         })
 
     async def handle_emergency_stop_agent(websocket, data):
-        agent = _agent()
-        if agent:
-            agent.emergency_stop()
-        await server.stop_mixing_agent()
+        system_stop = getattr(server, "activate_system_emergency_stop", None)
+        if callable(system_stop):
+            await system_stop("websocket:emergency_stop_agent")
+        else:
+            agent = _agent()
+            if agent:
+                agent.emergency_stop()
+            await server.stop_mixing_agent()
         await server.send_to_client(websocket, {
             "type": "agent_emergency_stopped",
             "is_running": False,
@@ -103,14 +120,15 @@ def register_handlers(server):
         })
 
     async def handle_set_agent_mode(websocket, data):
+        if await _reject_removed_force_auto_apply(websocket, data):
+            return
         mode = data.get("mode", "auto")
-        force_auto_apply = bool(data.get("force_auto_apply", False))
         agent = await server.init_mixing_agent(
             mode=mode,
             channels=data.get("channels"),
             use_llm=data.get("use_llm", True),
             allow_auto_apply=_resolve_agent_auto_apply(data),
-            force_auto_apply=force_auto_apply,
+            force_auto_apply=False,
             start=data.get("start", False),
         )
         await server.send_to_client(websocket, {
@@ -205,15 +223,16 @@ def register_handlers(server):
             await server.send_to_client(websocket, {"type": "action_history", "history": [], "audit": []})
 
     async def handle_update_agent_state(websocket, data):
+        if await _reject_removed_force_auto_apply(websocket, data):
+            return
         agent = _agent()
         if agent is None:
-            force_auto_apply = bool(data.get("force_auto_apply", False))
             agent = await server.init_mixing_agent(
                 mode=data.get("mode", "auto"),
                 channels=data.get("channels"),
                 use_llm=data.get("use_llm", True),
                 allow_auto_apply=_resolve_agent_auto_apply(data),
-                force_auto_apply=force_auto_apply,
+                force_auto_apply=False,
                 start=False,
             )
         states = data.get("channel_states")

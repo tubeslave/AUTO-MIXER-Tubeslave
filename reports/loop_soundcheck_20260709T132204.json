@@ -1,0 +1,213 @@
+{
+ "iteration_ts": "20260709T132204",
+ "iteration": 4,
+ "source": "loop/hourly (job 5640aea4)",
+ "mixer": {
+  "ip": "192.168.1.102",
+  "reachable": true
+ },
+ "scan": {
+  "main_fader_db": 0.0,
+  "channels": [
+   {
+    "ch": 1,
+    "name": "KICK",
+    "fdr": -1.7428512573242188,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -17.5,
+    "comp_thr": -34.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 2,
+    "name": "SNARE T",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -16.0,
+    "comp_thr": -34.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 3,
+    "name": "SNARE B",
+    "fdr": -3.7707366943359375,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -14.0,
+    "comp_thr": -29.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 4,
+    "name": "TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 20.0,
+    "gate_thr": -32.0,
+    "comp_thr": -36.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 5,
+    "name": "F TOM",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -25.0,
+    "gate_thr": -31.5,
+    "comp_thr": -33.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 6,
+    "name": "OH L",
+    "fdr": -8.057014465332031,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -100.0,
+    "gate_thr": -32.0,
+    "comp_thr": -36.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 7,
+    "name": "OH R",
+    "fdr": -9.324453353881836,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 100.0,
+    "gate_thr": -26.5,
+    "comp_thr": -36.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 8,
+    "name": "BASS",
+    "fdr": -13.039161682128906,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -26.0,
+    "comp_thr": -22.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 9,
+    "name": "GUITAR L",
+    "fdr": -11.026901245117188,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": -70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -23.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 10,
+    "name": "GUITAR R",
+    "fdr": -9.206153869628906,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 70.0,
+    "gate_thr": -40.0,
+    "comp_thr": -23.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 11,
+    "name": "PLAYBACK L",
+    "fdr": -12.929122924804688,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 12,
+    "name": "PLAYBACK R",
+    "fdr": -13.418807983398438,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 100.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 13,
+    "name": "ACCORDION",
+    "fdr": -12.151222229003906,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -40.0,
+    "comp_thr": -21.5,
+    "comp_gr": null
+   },
+   {
+    "ch": 14,
+    "name": "BACK L",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": -45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 15,
+    "name": "BACK R",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 0,
+    "pan": 45.0,
+    "gate_thr": -40.0,
+    "comp_thr": -10.0,
+    "comp_gr": null
+   },
+   {
+    "ch": 16,
+    "name": "VOCAL",
+    "fdr": 0.0,
+    "mute": 0,
+    "eq_on": 1,
+    "pan": 0.0,
+    "gate_thr": -19.5,
+    "comp_thr": -28.0,
+    "comp_gr": null
+   }
+  ]
+ },
+ "master_verdict": {
+  "status": "ISSUES",
+  "lufs_integrated": -26.37,
+  "true_peak_dbtp": -3.64,
+  "crest_db": 22.73,
+  "lr_balance_db": 0.01,
+  "correlation": 0.998,
+  "mono_fold_ratio": 0.999,
+  "tilt_deviation_db": 3.04,
+  "vocal_presence_db": 9.64,
+  "issues": [
+   "громкость -26.4 LUFS вне -20±6 (на 0.37 LU ниже пола, borderline)"
+  ],
+  "method": "master_mix_eval"
+ },
+ "console_state": "CHANGED vs iter3 — active live mixing (OH up ~ -8/-9, bass down -13, comp thresholds retuned, some ch pulled)",
+ "mix_findings": [
+  "loudness dipped 0.37 LU below window floor (borderline, likely quiet passage during active mix)"
+ ],
+ "code_fixes": [],
+ "proposed_corrections": [],
+ "master_wav": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/reports/master_bus_20260709T132050.wav",
+ "notes": "observe posture; borderline loudness, no autonomous write"
+}

@@ -26,6 +26,12 @@ export interface BackendUiState {
   liveWritePolicy: string;
   applyPath: string;
   writeScope: string[];
+  mixerConnected: boolean;
+  observationOnly: boolean;
+  audioCaptureRunning: boolean;
+  audioCaptureChannels: number;
+  audioSampleRate: number;
+  availableModes: AutomixerMode[];
   lastUpdated: string;
   message: string;
   proposalApplyResult?: ProposalApplyResult | null;
@@ -253,6 +259,15 @@ export interface Channel {
   gateLabel?: string;
   compLabel?: string;
   confidence: number;
+  meterAvailable?: boolean;
+  faderAvailable?: boolean;
+  muteAvailable?: boolean;
+  panAvailable?: boolean;
+  gateAvailable?: boolean;
+  compAvailable?: boolean;
+  readCoverageStatus?: string;
+  cacheFreshnessStatus?: string;
+  dataSource?: 'backend' | 'mock';
 }
 
 export interface BusRecord {
@@ -482,6 +497,19 @@ export interface DashboardRuntime {
   appliedDecisions: number;
   blockedDecisions: number;
   sourceLabel: string;
+  masterAvailable: boolean;
+  integratedLufsAvailable: boolean;
+  truePeakAvailable: boolean;
+  shortTermLufsAvailable: boolean;
+  momentaryLufsAvailable: boolean;
+  lraAvailable: boolean;
+  spectrumAvailable: boolean;
+  aiConfidenceAvailable: boolean;
+  audioCaptureRunning: boolean;
+  mainFaderDb?: number;
+  mainFaderAvailable: boolean;
+  readCoverageStatus: string;
+  cacheFreshnessStatus: string;
   spectrumBins?: number[];
   analysisTraces?: Partial<Record<'phase' | 'correlation' | 'dynamics' | 'loudness', DashboardRuntimeTrace>>;
 }
@@ -579,6 +607,9 @@ export interface UiActions {
   createSnapshot: () => void;
   rollbackLastAction: () => void;
   refreshBackend: () => void;
+  toggleAudioPreview: () => void;
+  connectWingReadOnly: () => void;
+  navigate: (route: RouteId) => void;
   runBackendAnalysis: () => void;
   startReplayRun: () => void;
   pushToast: (message: string, tone?: Tone) => void;

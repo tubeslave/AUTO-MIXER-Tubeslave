@@ -1,6 +1,7 @@
 import asyncio
 import atexit
 import errno
+import ipaddress
 import math
 import json
 import logging
@@ -11,6 +12,7 @@ import subprocess
 import sys
 import threading
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Set, Optional, Union, List, Dict, Any, Mapping, TYPE_CHECKING
@@ -79,6 +81,7 @@ from operator_recommendation_bridge import (
 )
 from processing_proposal_adapters import build_operator_correction_payload
 from automation_trace import AutomationDecisionTrace, AutomationTraceStore
+from auth import AuthManager
 from decision_memory import DecisionMemoryStore
 
 _REPO_ROOT = os.path.abspath(
@@ -294,6 +297,23 @@ class AutoMixerServer:
     def __init__(self, ws_host: str = "localhost", ws_port: int = 8765):
         self.ws_host = ws_host
         self.ws_port = ws_port
+
+        self._ws_auth_required = not self._is_loopback_host(ws_host)
+        self.auth_manager = AuthManager(enabled=self._ws_auth_required)
+        if self._ws_auth_required:
+            configured_token = os.environ.get("AUTOMIXER_WS_AUTH_TOKEN")
+            if not configured_token:
+                raise RuntimeError(
+                    "Remote WebSocket bind requires AUTOMIXER_WS_AUTH_TOKEN; "
+                    "use 127.0.0.1/localhost for local-only operation"
+                )
+            client_id = os.environ.get("AUTOMIXER_WS_CLIENT_ID", "automixer-ui")
+            self.auth_manager.register_token(
+                configured_token,
+                client_id=client_id,
+                expires_hours=float(os.environ.get("AUTOMIXER_WS_TOKEN_TTL_HOURS", "8760")),
+            )
+            configured_token = None
         
         # Load configuration
         self.config = self._load_config()
@@ -403,6 +423,9 @@ class AutoMixerServer:
             os.getenv("AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED", "true")
         )
         self._manual_write_emergency_stopped = False
+        self._manual_write_emergency_generation = 0
+        self._latest_master_true_peak_dbtp: Optional[float] = None
+        self._latest_master_true_peak_timestamp = 0.0
         self._manual_write_cooldown_sec = max(
             0.0,
             self._parse_env_float(os.getenv("AUTOMIXER_MANUAL_WRITE_COOLDOWN_SEC"), 2.0),
@@ -448,6 +471,47 @@ class AutoMixerServer:
     @staticmethod
     def _parse_env_bool(value: Any) -> bool:
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+    @staticmethod
+    def _is_loopback_host(host: str) -> bool:
+        normalized = str(host or "").strip().lower()
+        if normalized == "localhost":
+            return True
+        try:
+            return ipaddress.ip_address(normalized).is_loopback
+        except ValueError:
+            return False
+
+    async def _authenticate_websocket(self, websocket: WebSocketServerProtocol) -> bool:
+        """Authenticate the first frame before registering a remotely bound client."""
+        if not self._ws_auth_required:
+            return True
+        try:
+            raw_message = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+            request = json.loads(raw_message)
+        except (asyncio.TimeoutError, json.JSONDecodeError, TypeError, ValueError):
+            await websocket.close(code=1008, reason="authentication_required")
+            return False
+
+        token = request.get("token") if isinstance(request, dict) else None
+        client_id = request.get("client_id") if isinstance(request, dict) else None
+        authenticated = bool(
+            isinstance(request, dict)
+            and request.get("type") == "authenticate"
+            and self.auth_manager.authenticate(token=token, client_id=client_id)
+        )
+        token = None
+        if not authenticated:
+            await websocket.close(code=1008, reason="authentication_failed")
+            return False
+
+        await send_json(
+            websocket,
+            {"type": "authentication_status", "authenticated": True},
+            converter=convert_numpy_types,
+            logger_=logger,
+        )
+        return True
 
     @staticmethod
     def _parse_env_float(value: Any, default: float) -> float:
@@ -733,6 +797,69 @@ class AutoMixerServer:
         if artifact_path:
             result["artifact_path"] = artifact_path
         return result
+
+    async def activate_system_emergency_stop(self, reason: str = "") -> Dict[str, Any]:
+        """Latch the write gate and stop every active autonomous writer."""
+        self._manual_write_emergency_stopped = True
+        self._manual_write_emergency_generation += 1
+        self.auto_soundcheck_running = False
+        self.auto_soundcheck_observe_only = True
+
+        engine = getattr(self, "auto_soundcheck_engine", None)
+        if engine is not None:
+            self._safe_cleanup_call(engine.stop, "Could not stop AutoSoundcheckEngine")
+            self.auto_soundcheck_engine = None
+        legacy_soundcheck_task = getattr(self, "auto_soundcheck_task", None)
+        if legacy_soundcheck_task is not None:
+            self._safe_cleanup_call(
+                legacy_soundcheck_task.cancel,
+                "Could not cancel legacy auto-soundcheck task",
+            )
+            self.auto_soundcheck_task = None
+
+        agent = getattr(self, "mixing_agent", None)
+        if agent is not None:
+            self._safe_cleanup_call(agent.emergency_stop, "Could not emergency-stop MixingAgent")
+        await self.stop_mixing_agent()
+
+        controllers = (
+            (getattr(self, "gain_staging", None), "gain_staging", ("stop",)),
+            (getattr(self, "auto_fader_controller", None), "auto_fader", ("stop",)),
+            (getattr(self, "auto_fader_v2_controller", None), "auto_fader_v2", ("stop",)),
+            (getattr(self, "auto_eq_controller", None), "auto_eq", ("stop",)),
+            (
+                getattr(self, "multi_channel_auto_eq_controller", None),
+                "multi_channel_auto_eq",
+                ("stop_all", "stop"),
+            ),
+            (getattr(self, "auto_compressor_controller", None), "auto_compressor", ("stop",)),
+            (getattr(self, "phase_alignment_controller", None), "phase_alignment", ("stop",)),
+            (getattr(self, "voice_control", None), "voice_control", ("stop_listening", "stop")),
+        )
+        for controller, label, stop_methods in controllers:
+            if controller is None:
+                continue
+            freeze = getattr(controller, "set_automation_frozen", None)
+            if callable(freeze):
+                self._safe_cleanup_call(
+                    lambda freeze=freeze: freeze(True),
+                    f"Could not freeze {label}",
+                )
+            elif hasattr(controller, "automation_frozen"):
+                controller.automation_frozen = True
+            for stop_method in stop_methods:
+                stop = getattr(controller, stop_method, None)
+                if callable(stop):
+                    self._safe_cleanup_call(stop, f"Could not stop {label}")
+                    break
+
+        self.agent_auto_apply_enabled = False
+        return {
+            "status": "stopped",
+            "success": True,
+            "reason": str(reason or "system_emergency_stop"),
+            "generation": self._manual_write_emergency_generation,
+        }
 
     def import_safe_gain_suggestions_to_operator_queue(
         self,
@@ -1510,6 +1637,14 @@ class AutoMixerServer:
             physical = await physical_read()
             if physical and physical.get("value") is not None:
                 return physical
+            if minimum_cache_updated_at_epoch is not None:
+                return physical or {
+                    "value": None,
+                    "status": "readback_unavailable",
+                    "source": "physical_readback",
+                    "address": address,
+                    "error": "physical_query_unavailable",
+                }
 
         if self._readonly_read_value_available(value_type, cached_value):
             return {
@@ -1536,7 +1671,7 @@ class AutoMixerServer:
 
     @staticmethod
     def _manual_write_proof_status(readback_status: str) -> str:
-        if readback_status in {"verified_from_cache", "verified_from_physical_readback"}:
+        if readback_status == "verified_from_physical_readback":
             return "verified"
         return "partial"
 
@@ -1553,6 +1688,7 @@ class AutoMixerServer:
         approval_id: Optional[str] = None,
         bypass_cooldown: bool = False,
         record_event: bool = True,
+        emergency_recovery: bool = False,
     ) -> Dict[str, Any]:
         write_kind = self._normalize_manual_write_kind(value_type)
         supported_manual_write_kinds = self._get_supported_manual_write_kinds()
@@ -1607,7 +1743,7 @@ class AutoMixerServer:
                 },
             )
 
-        if self._manual_write_emergency_stopped:
+        if self._manual_write_emergency_stopped and not emergency_recovery:
             return self._manual_write_blocked_result(
                 reason="emergency_stop_active",
                 channel=channel,
@@ -1763,11 +1899,26 @@ class AutoMixerServer:
             )
 
         write_started_epoch = datetime.now(timezone.utc).timestamp()
+        write_emergency_generation = self._manual_write_emergency_generation
+        transaction_id = str(uuid.uuid4())
         max_write_attempts = 3
         retry_delay_sec = self._manual_write_retry_delay_sec()
         write_attempts = 0
         write_result: Any = False
         while True:
+            if (
+                self._manual_write_emergency_generation != write_emergency_generation
+                or (self._manual_write_emergency_stopped and not emergency_recovery)
+            ):
+                return self._manual_write_blocked_result(
+                    reason="emergency_stop_active",
+                    channel=channel_int,
+                    value=requested_value,
+                    value_type=write_kind,
+                    source=source,
+                    approval_id=approval_id,
+                    extra={"transaction_id": transaction_id},
+                )
             write_attempts += 1
             try:
                 write_result = write_method(channel_int, effective_value)
@@ -1852,9 +2003,16 @@ class AutoMixerServer:
         rollback_value = self._coerce_optional_float(old_value)
         rollback_available = rollback_value is not None
 
+        physically_verified = readback_status == "verified_from_physical_readback"
         result = {
-            "status": "applied",
-            "success": True,
+            "status": "applied" if physically_verified else "sent_unverified",
+            "success": physically_verified,
+            "reason": (
+                str(reason or "manual_supervised_write")
+                if physically_verified
+                else "physical_readback_not_verified"
+            ),
+            "transaction_id": transaction_id,
             "channel": channel_int,
             "value_type": write_kind,
             "requested_value": requested_value,
@@ -1875,15 +2033,25 @@ class AutoMixerServer:
             "rollback_status": "not_attempted",
             "cooldown_sec": self._manual_write_cooldown_sec,
             "source": source,
-            "reason": str(reason or "manual_supervised_write"),
+            "requested_reason": str(reason or "manual_supervised_write"),
             "approval_id": approval_id,
             "method": method_name,
             "write_attempts": write_attempts,
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
         self._last_manual_write_result = dict(result)
+        if not physically_verified:
+            await self.activate_system_emergency_stop(
+                f"manual_write_unverified:{transaction_id}"
+            )
+            result["emergency_stop_activated"] = True
+            result["manual_write_supervision"] = self.get_manual_write_supervision_status()
+            self._last_manual_write_result.update(result)
         if record_event:
-            artifact_path = self._record_manual_write_event("manual_write_applied", result)
+            artifact_path = self._record_manual_write_event(
+                "manual_write_applied" if physically_verified else "manual_write_unverified",
+                result,
+            )
             if artifact_path:
                 result["artifact_path"] = artifact_path
                 self._last_manual_write_result["artifact_path"] = artifact_path
@@ -1897,13 +2065,40 @@ class AutoMixerServer:
         reason: str = "",
         approved: bool = False,
         approval_id: Optional[str] = None,
+        transaction_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        previous = self._last_manual_write_result
-        if not previous or previous.get("status") != "applied":
+        previous = dict(self._last_manual_write_result or {})
+        if not previous or previous.get("status") not in {"applied", "sent_unverified"}:
             return self._manual_write_blocked_result(
                 reason="no_rollback_available",
                 source=source,
                 approval_id=approval_id,
+                event_type="manual_write_rollback_blocked",
+            )
+
+        previous_transaction_id = str(previous.get("transaction_id") or "")
+        requested_transaction_id = str(transaction_id or "")
+        if not requested_transaction_id:
+            return self._manual_write_blocked_result(
+                reason="rollback_transaction_id_required",
+                channel=previous.get("channel"),
+                value_type=previous.get("value_type"),
+                source=source,
+                approval_id=approval_id,
+                extra={"rollback_of_transaction_id": previous_transaction_id},
+                event_type="manual_write_rollback_blocked",
+            )
+        if requested_transaction_id != previous_transaction_id:
+            return self._manual_write_blocked_result(
+                reason="rollback_transaction_mismatch",
+                channel=previous.get("channel"),
+                value_type=previous.get("value_type"),
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "rollback_of_transaction_id": previous_transaction_id,
+                    "requested_transaction_id": requested_transaction_id,
+                },
                 event_type="manual_write_rollback_blocked",
             )
 
@@ -1918,6 +2113,38 @@ class AutoMixerServer:
                 event_type="manual_write_rollback_blocked",
             )
 
+        rollback_address = str(previous.get("rollback_address") or "")
+        current_read = await self._manual_write_read_value(
+            channel=int(previous.get("channel")),
+            value_type=str(previous.get("value_type")),
+            address=rollback_address,
+            prefer_physical=True,
+        )
+        current_status = self._manual_write_readback_status(
+            old_value=previous.get("effective_value"),
+            readback_value=current_read.get("value"),
+            effective_value=previous.get("effective_value"),
+            value_type=str(previous.get("value_type")),
+            readback_source=str(current_read.get("source") or "unavailable"),
+            readback_cache_freshness=current_read.get("cache_freshness"),
+        )
+        if current_status != "verified_from_physical_readback":
+            return self._manual_write_blocked_result(
+                reason="rollback_intervening_change_or_unverified_state",
+                channel=previous.get("channel"),
+                value_type=previous.get("value_type"),
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "rollback_of_transaction_id": previous_transaction_id,
+                    "current_readback_value": current_read.get("value"),
+                    "current_readback_source": current_read.get("source"),
+                    "current_readback_status": current_status,
+                    "expected_current_value": previous.get("effective_value"),
+                },
+                event_type="manual_write_rollback_blocked",
+            )
+
         rollback_result = await self._apply_manual_console_write(
             websocket,
             channel=previous.get("channel"),
@@ -1929,22 +2156,24 @@ class AutoMixerServer:
             approval_id=approval_id or f"rollback:{previous.get('approval_id') or 'manual_write'}",
             bypass_cooldown=True,
             record_event=False,
+            emergency_recovery=True,
         )
         rollback_result.update(
             {
                 "rollback": True,
                 "rollback_of": previous.get("approval_id"),
+                "rollback_of_transaction_id": previous_transaction_id,
                 "rollback_source": previous.get("source"),
             }
         )
-        if rollback_result.get("status") == "applied":
+        if rollback_result.get("status") in {"applied", "sent_unverified"}:
             rollback_proof_status = rollback_result.get("proof_status") or self._manual_write_proof_status(
                 str(rollback_result.get("readback_status") or "")
             )
             rollback_result["rollback_readback_status"] = rollback_result.get("readback_status")
             rollback_result["rollback_readback_source"] = rollback_result.get("readback_source")
             rollback_result["rollback_proof_status"] = rollback_proof_status
-            rollback_result["rollback_status"] = "applied" if rollback_proof_status == "verified" else "partial"
+            rollback_result["rollback_status"] = "applied" if rollback_proof_status == "verified" else "unverified"
         rollback_event_type = (
             "manual_write_rollback_applied"
             if rollback_result.get("status") == "applied"
@@ -1952,6 +2181,8 @@ class AutoMixerServer:
         )
         if rollback_result.get("status") == "error":
             rollback_event_type = "manual_write_rollback_error"
+        elif rollback_result.get("status") == "sent_unverified":
+            rollback_event_type = "manual_write_rollback_unverified"
         artifact_path = self._record_manual_write_event(rollback_event_type, rollback_result)
         if artifact_path:
             rollback_result["artifact_path"] = artifact_path
@@ -2662,7 +2893,7 @@ class AutoMixerServer:
         )
 
     def _is_agent_dry_run(self) -> bool:
-        return bool(self._is_real_mixer_connected() and not self._agent_force_auto_apply)
+        return bool(self._is_real_mixer_connected())
 
     def _enforce_agent_dry_run_mode(self):
         """Keep agent in suggest-only mode while a real mixer is connected."""
@@ -2676,7 +2907,9 @@ class AutoMixerServer:
             logger.info("Real mixer connected: forcing AI agent into SUGGEST (dry-run) mode")
 
     def _apply_llm_dry_run_overrides(self, mode: str = None, allow_auto_apply: bool = True, force_auto_apply: bool = False):
-        if self._is_real_mixer_connected() and not force_auto_apply:
+        if force_auto_apply:
+            logger.warning("Ignoring removed force_auto_apply authority")
+        if self._is_real_mixer_connected():
             if allow_auto_apply:
                 logger.info(
                     "Real mixer connected: forcing AI agent to dry-run mode (AUTO disabled)."
@@ -2907,11 +3140,11 @@ class AutoMixerServer:
         from ai.rule_engine import RuleEngine
 
         self._sync_runtime_from_auto_soundcheck()
-        self._agent_force_auto_apply = bool(force_auto_apply)
+        self._agent_force_auto_apply = False
         mode, allow_auto_apply = self._apply_llm_dry_run_overrides(
             mode=mode,
             allow_auto_apply=allow_auto_apply,
-            force_auto_apply=self._agent_force_auto_apply,
+            force_auto_apply=force_auto_apply,
         )
         agent_config = self.config.get("agent", {})
         ai_config = self.config.get("ai", {})
@@ -5697,7 +5930,23 @@ class AutoMixerServer:
                 logger.warning("Failed to read Auto Fader freeze status: %s", exc)
         manual_emergency_clear = not self._manual_write_emergency_stopped
         automation_unfrozen = not (gain_automation_frozen or fader_automation_frozen)
-        no_clipping = True
+        master_true_peak = self._coerce_finite_float(self._latest_master_true_peak_dbtp)
+        master_true_peak_age_sec = (
+            max(0.0, time.time() - self._latest_master_true_peak_timestamp)
+            if self._latest_master_true_peak_timestamp > 0
+            else None
+        )
+        master_true_peak_fresh = bool(
+            master_true_peak is not None
+            and master_true_peak_age_sec is not None
+            and master_true_peak_age_sec <= 10.0
+        )
+        no_clipping_threshold_dbtp = -3.0
+        no_clipping = bool(
+            master_true_peak_fresh
+            and master_true_peak is not None
+            and master_true_peak <= no_clipping_threshold_dbtp
+        )
         ready = (
             mixer_connected
             and gain_available
@@ -5717,6 +5966,10 @@ class AutoMixerServer:
             blocked_reasons.append("manual_write_emergency_stop_active")
         if not automation_unfrozen:
             blocked_reasons.append("automation_frozen_after_emergency_stop")
+        if not master_true_peak_fresh:
+            blocked_reasons.append("master_true_peak_unavailable_or_stale")
+        elif not no_clipping:
+            blocked_reasons.append("master_true_peak_headroom_insufficient")
         return {
             "ready": ready,
             "blocked_reasons": blocked_reasons,
@@ -5727,8 +5980,24 @@ class AutoMixerServer:
                 "manual_write_emergency_clear": manual_emergency_clear,
                 "automation_unfrozen": automation_unfrozen,
                 "no_clipping": no_clipping,
+                "master_true_peak_fresh": master_true_peak_fresh,
+            },
+            "master_true_peak": {
+                "value_dbtp": master_true_peak,
+                "threshold_dbtp": no_clipping_threshold_dbtp,
+                "age_sec": round(master_true_peak_age_sec, 3) if master_true_peak_age_sec is not None else None,
+                "max_age_sec": 10.0,
             },
         }
+
+    def record_master_true_peak_evidence(self, value_dbtp: Any) -> bool:
+        """Record a measured master true peak; callers must not pass channel peaks."""
+        value = self._coerce_finite_float(value_dbtp)
+        if value is None:
+            return False
+        self._latest_master_true_peak_dbtp = value
+        self._latest_master_true_peak_timestamp = time.time()
+        return True
     
     async def create_snapshot(self, websocket, channels: list = None):
         """Create backup snapshot (for undo). Uses current mixer client."""
@@ -7941,6 +8210,8 @@ class AutoMixerServer:
             )
 
     async def handler(self, websocket: WebSocketServerProtocol):
+        if not await self._authenticate_websocket(websocket):
+            return
         await self.register_client(websocket)
         
         try:
@@ -8057,7 +8328,7 @@ if __name__ == "__main__":
     # Register atexit handler
     atexit.register(_atexit_cleanup)
 
-    ws_host = os.environ.get("AUTOMIXER_WS_HOST", "0.0.0.0")
+    ws_host = os.environ.get("AUTOMIXER_WS_HOST", "127.0.0.1")
     ws_port = int(os.environ.get("AUTOMIXER_WS_PORT", "8765"))
     server = AutoMixerServer(ws_host=ws_host, ws_port=ws_port)
     _server_instance = server

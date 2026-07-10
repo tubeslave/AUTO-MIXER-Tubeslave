@@ -62,3 +62,31 @@ def test_safety_gate_rate_limits_repeated_actions():
 
     assert first.allowed_count == 1
     assert second.blocked[0]["reason"] == "rate_limited"
+
+
+def test_safety_gate_blocks_positive_gain_when_true_peak_is_unknown():
+    gate = SafetyGate(
+        SafetyGateConfig(max_gain_change_db=1.0, max_live_gain_increase_db=1.0)
+    )
+    plan = ActionPlan(
+        plan_id="missing-headroom",
+        decisions=[
+            ActionDecision(
+                id="gain.unknown_headroom",
+                action_type=ACTION_GAIN,
+                target="channel:1",
+                parameters={"channel_id": 1, "gain_db": 0.5},
+                reason="test missing evidence",
+                confidence=0.9,
+                risk_level="low",
+                source_modules=["test"],
+                expected_audio_effect="small gain",
+                safe_to_apply=True,
+            )
+        ],
+    )
+
+    result = gate.evaluate_plan(plan, current_state={"channel:1": {}}, live_mode=True)
+
+    assert result.allowed_count == 0
+    assert result.blocked[0]["reason"] == "true_peak_headroom_unknown"

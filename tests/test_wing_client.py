@@ -57,8 +57,8 @@ class TestOSCThrottle:
             assert client._osc_throttle_enabled is True
             assert client._osc_throttle_hz == 5.0
 
-    def test_osc_throttle_blocks_rapid_sends(self):
-        """Rapid sends to the same address should be throttled."""
+    def test_osc_throttle_delivers_rapid_final_send(self):
+        """Rapid same-address writes are serialized rather than dropped."""
         with patch.dict("sys.modules", {
             "pythonosc": MagicMock(),
             "pythonosc.udp_client": MagicMock(),
@@ -75,12 +75,14 @@ class TestOSCThrottle:
 
             # First send should succeed
             result1 = client.send("/ch/1/fdr", 0.5)
-            # Immediate second send to same address should be throttled
-            result2 = client.send("/ch/1/fdr", 0.6)
+            with patch("wing_client.time.sleep", return_value=None) as sleep:
+                result2 = client.send("/ch/1/fdr", 0.6)
 
-            assert result1 is not False or result1 is None  # First send goes through
-            # Second send is likely throttled (returns False)
-            # Note: exact behavior depends on timing, but we test the mechanism
+            assert result1 is True
+            assert result2 is True
+            sleep.assert_called_once()
+            assert client.sock.sendto.call_count == 2
+            assert client.commanded_state["/ch/1/fdr"] == 0.6
 
     def test_osc_throttle_allows_queries(self):
         """Queries (sends without values) should not be throttled."""
@@ -433,8 +435,8 @@ class TestConnectionLifecycle:
             result = client.send("/ch/1/fdr", 0.5)
             assert result is False
 
-    def test_send_updates_local_state(self):
-        """Sending a value should update the local state cache."""
+    def test_send_updates_commanded_state_without_faking_observed_state(self):
+        """Sending records intent but cannot manufacture console readback."""
         with patch.dict("sys.modules", {
             "pythonosc": MagicMock(),
             "pythonosc.udp_client": MagicMock(),
@@ -451,7 +453,8 @@ class TestConnectionLifecycle:
 
             result = client.send("/ch/1/fdr", 0.75)
             assert result is True
-            assert client.state.get("/ch/1/fdr") == 0.75
+            assert client.commanded_state.get("/ch/1/fdr") == 0.75
+            assert "/ch/1/fdr" not in client.state
 
     def test_set_channel_fader_returns_send_result(self):
         """set_channel_fader should expose send() success/failure to callers."""
@@ -470,7 +473,7 @@ class TestConnectionLifecycle:
             client._osc_throttle_enabled = False
 
             assert client.set_channel_fader(1, -6.0) is True
-            assert client.state.get("/ch/1/fdr") == -6.0
+            assert client.commanded_state.get("/ch/1/fdr") == -6.0
 
     def test_set_channel_mute_returns_send_result(self):
         """set_channel_mute must not hide a dropped/failed write from callers.
@@ -493,7 +496,7 @@ class TestConnectionLifecycle:
             client._osc_throttle_enabled = False
 
             assert client.set_channel_mute(1, 1) is True
-            assert client.state.get("/ch/1/mute") == 1
+            assert client.commanded_state.get("/ch/1/mute") == 1
 
             client.is_connected = False
             assert client.set_channel_mute(1, 0) is False
@@ -515,7 +518,7 @@ class TestConnectionLifecycle:
             client._osc_throttle_enabled = False
 
             assert client.set_channel_pan(1, -50.0) is True
-            assert client.state.get("/ch/1/pan") == -50.0
+            assert client.commanded_state.get("/ch/1/pan") == -50.0
 
             client.is_connected = False
             assert client.set_channel_pan(1, 0.0) is False
@@ -548,17 +551,17 @@ class TestConnectionLifecycle:
             assert client.set_delay(1, 0.0, enabled=False) is True
             assert client.set_send_level(1, 13, -18.0) is True
 
-            assert client.state["/ch/1/fdr"] == -6.0
-            assert client.state["/ch/1/in/set/trim"] == -3.0
-            assert client.state["/ch/1/mute"] == 1
-            assert client.state["/ch/1/pan"] == 10.0
-            assert client.state["/ch/1/flt/lc"] == 1
-            assert client.state["/ch/1/flt/lcf"] == 120.0
-            assert client.state["/ch/1/in/set/inv"] == 1
-            assert client.state["/ch/1/in/set/dlymode"] == "MS"
-            assert client.state["/ch/1/in/set/dly"] == 2.5
-            assert client.state["/ch/1/in/set/dlyon"] == 0
-            assert client.state["/ch/1/send/13/lvl"] == -18.0
+            assert client.commanded_state["/ch/1/fdr"] == -6.0
+            assert client.commanded_state["/ch/1/in/set/trim"] == -3.0
+            assert client.commanded_state["/ch/1/mute"] == 1
+            assert client.commanded_state["/ch/1/pan"] == 10.0
+            assert client.commanded_state["/ch/1/flt/lc"] == 1
+            assert client.commanded_state["/ch/1/flt/lcf"] == 120.0
+            assert client.commanded_state["/ch/1/in/set/inv"] == 1
+            assert client.commanded_state["/ch/1/in/set/dlymode"] == "MS"
+            assert client.commanded_state["/ch/1/in/set/dly"] == 2.5
+            assert client.commanded_state["/ch/1/in/set/dlyon"] == 0
+            assert client.commanded_state["/ch/1/send/13/lvl"] == -18.0
 
             client.is_connected = False
 
@@ -604,12 +607,12 @@ class TestConnectionLifecycle:
             assert client.set_channel_name(1, "Lead Vox") is True
             assert client.set_channel_color(1, 4) is True
 
-            assert client.state["/ch/1/flt/hc"] == 1
-            assert client.state["/ch/1/eq/on"] == 1
-            assert client.state["/ch/1/eq/mdl"] == "STD"
-            assert client.state["/ch/1/eq/1g"] == -3.0
-            assert client.state["/ch/1/eq/2g"] == 1.5
-            assert client.state["/ch/1/name"] == "Lead Vox"
+            assert client.commanded_state["/ch/1/flt/hc"] == 1
+            assert client.commanded_state["/ch/1/eq/on"] == 1
+            assert client.commanded_state["/ch/1/eq/mdl"] == "STD"
+            assert client.commanded_state["/ch/1/eq/1g"] == -3.0
+            assert client.commanded_state["/ch/1/eq/2g"] == 1.5
+            assert client.commanded_state["/ch/1/name"] == "Lead Vox"
 
             client.is_connected = False
 
@@ -700,16 +703,16 @@ class TestConnectionLifecycle:
 
             # set_compressor(threshold_db=-20) пишет порог в ОБА адреса
             # (thr/thr26 зависят от модели динамики; фикс 2026-07-06)
-            assert client.state["/ch/1/dyn/thr"] == -20.0
-            assert client.state["/ch/1/dyn/thr26"] == -20.0
-            assert client.state["/ch/1/gate/thr"] == -55.0
-            assert client.state["/bus/2/dyn/thr37"] == -12.0
-            assert client.state["/main/1/eq/1g"] == -1.0
-            assert client.state["/mtx/1/eq/1g"] == -1.0
+            assert client.commanded_state["/ch/1/dyn/thr"] == -20.0
+            assert client.commanded_state["/ch/1/dyn/thr26"] == -20.0
+            assert client.commanded_state["/ch/1/gate/thr"] == -55.0
+            assert client.commanded_state["/bus/2/dyn/thr37"] == -12.0
+            assert client.commanded_state["/main/1/eq/1g"] == -1.0
+            assert client.commanded_state["/mtx/1/eq/1g"] == -1.0
             assert "/fx/1/on" not in client.state
-            assert client.state["/fx/1/fxmix"] == 100.0
-            assert client.state["/ch/1/preins/ins"] == "FX1"
-            assert client.state["/ch/1/send/13/mode"] == "POST"
+            assert client.commanded_state["/fx/1/fxmix"] == 100.0
+            assert client.commanded_state["/ch/1/preins/ins"] == "FX1"
+            assert client.commanded_state["/ch/1/send/13/mode"] == "POST"
 
             client.is_connected = False
 
@@ -763,12 +766,12 @@ class TestAutoSoundcheckBridge:
                     enabled=True,
                 )
 
-            assert client.state["/ch/1/dyn/on"] == 1
-            assert client.state["/ch/1/dyn/thr26"] == -18.0
-            assert client.state["/ch/1/dyn/ratio"] == "4.0"
-            assert client.state["/ch/1/dyn/att"] == 12.0
-            assert client.state["/ch/1/dyn/rel"] == 120.0
-            assert client.state["/ch/1/dyn/gain"] == 3.0
+            assert client.commanded_state["/ch/1/dyn/on"] == 1
+            assert client.commanded_state["/ch/1/dyn/thr26"] == -18.0
+            assert client.commanded_state["/ch/1/dyn/ratio"] == "4.0"
+            assert client.commanded_state["/ch/1/dyn/att"] == 12.0
+            assert client.commanded_state["/ch/1/dyn/rel"] == 120.0
+            assert client.commanded_state["/ch/1/dyn/gain"] == 3.0
 
     def test_generic_engine_methods_map_to_wing_commands(self):
         with patch.dict("sys.modules", {
@@ -789,7 +792,7 @@ class TestAutoSoundcheckBridge:
             client.set_polarity(2, True)
             client.set_delay(2, 2.5, enabled=False)
 
-            assert client.state["/ch/2/flt/lc"] == 1
-            assert client.state["/ch/2/flt/lcf"] == 90.0
-            assert client.state["/ch/2/in/set/inv"] == 1
-            assert client.state["/ch/2/in/set/dlyon"] == 0
+            assert client.commanded_state["/ch/2/flt/lc"] == 1
+            assert client.commanded_state["/ch/2/flt/lcf"] == 90.0
+            assert client.commanded_state["/ch/2/in/set/inv"] == 1
+            assert client.commanded_state["/ch/2/in/set/dlyon"] == 0

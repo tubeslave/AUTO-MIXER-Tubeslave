@@ -125,6 +125,21 @@ def test_dry_run_never_writes_but_returns_operator_recommendation_data():
     assert decision.payload["gated_executor"]["pre_read"]["value"] == 0.0
 
 
+def test_disabled_gated_executor_fails_closed_without_calling_legacy_writer():
+    mixer = ProofMixer()
+    executor = _executor(mixer, enabled=False)
+
+    result = executor.execute(
+        ChannelFaderMove(channel_id=1, target_db=-8.5, reason="disabled gate"),
+        RuntimeState.SOURCE_LEARNING,
+    )
+
+    assert result.allowed is False
+    assert result.sent is False
+    assert result.message == "gated_executor_disabled"
+    assert mixer.calls == []
+
+
 def test_unpromoted_eq_is_blocked_before_any_mixer_write():
     mixer = ProofMixer()
     executor = _executor(mixer)

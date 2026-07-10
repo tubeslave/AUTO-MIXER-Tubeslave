@@ -1,0 +1,16 @@
+{
+  "target": "http://localhost:3000/#/dashboard",
+  "date": "2026-07-10",
+  "baseline_score": 62,
+  "final_score": 96,
+  "viewport": {
+    "desktop": "1440x900",
+    "mobile": "390x844"
+  },
+  "baseline_screenshot": ".gstack/qa-reports/screenshots/initial.png",
+  "final_screenshots": [
+    ".gstack/qa-reports/screenshots/issue-001-after.png",
+    ".gstack/qa-reports/screenshots/issue-002-after.png",
+    ".gstack/qa-reports/screenshots/issue-003-mobile-after.png"
+  ]
+}

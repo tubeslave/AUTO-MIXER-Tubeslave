@@ -111,7 +111,7 @@ export function RightDirectorPanel({
 
       <Panel title="Текущая цель">
         <p className="line-clamp-4 text-[10.5px] leading-[17px] text-text/90">{runtime.currentGoal}</p>
-        <SectionAllButton label="Детали цели" onClick={() => actions?.pushToast('Goal details are read-only in this cockpit view.', 'blue')} />
+        <SectionAllButton label="Детали цели" onClick={() => actions?.navigate('settings')} />
       </Panel>
 
       <Panel title="Runtime Guard">
@@ -158,7 +158,7 @@ export function RightDirectorPanel({
             </div>
           )}
         </div>
-        <SectionAllButton label="Все решения" onClick={() => actions?.pushToast('Full decision log opens in Decision Log view.', 'blue')} />
+        <SectionAllButton label="Все решения" onClick={() => actions?.navigate('task-queue')} />
       </Panel>
 
       <Panel title="Предложения агента">
@@ -178,14 +178,14 @@ export function RightDirectorPanel({
               <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                 <button
                   className="rounded-[4px] border border-online/50 bg-online/14 px-2 py-1 text-[9px] font-black uppercase tracking-[0.06em] text-online transition hover:bg-online/25"
-                  onClick={() => actions?.pushToast(suggestion.reviewMessage, 'green')}
+                  onClick={() => actions?.openSupervisedProposal(suggestion.id)}
                   type="button"
                 >
-                  Принять
+                  Рассмотреть
                 </button>
                 <button
                   className="rounded-[4px] border border-danger/50 bg-danger/10 px-2 py-1 text-[9px] font-black uppercase tracking-[0.06em] text-danger transition hover:bg-danger/20"
-                  onClick={() => actions?.pushToast(suggestion.rejectMessage, 'red')}
+                  onClick={() => actions?.setTaskStatus(suggestion.id, 'Rejected')}
                   type="button"
                 >
                   Отклонить
@@ -199,7 +199,7 @@ export function RightDirectorPanel({
             </div>
           )}
         </div>
-        <SectionAllButton label="Все предложения" onClick={() => actions?.pushToast('Full proposal queue opens in Decision Log view.', 'blue')} />
+        <SectionAllButton label="Все предложения" onClick={() => actions?.navigate('task-queue')} />
       </Panel>
     </div>
   );

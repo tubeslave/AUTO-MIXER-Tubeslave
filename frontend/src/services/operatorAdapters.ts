@@ -121,6 +121,12 @@ export const mockBackendState: BackendUiState = {
   liveWritePolicy: 'mock_frontend_only',
   applyPath: 'none',
   writeScope: [],
+  mixerConnected: false,
+  observationOnly: true,
+  audioCaptureRunning: false,
+  audioCaptureChannels: 0,
+  audioSampleRate: 0,
+  availableModes: ['Analyze', 'Assist', 'Supervised', 'Auto'],
   lastUpdated: 'mock',
   message: 'Backend is not connected. UI is using local prototype data.',
   proposalApplyResult: null
@@ -263,6 +269,10 @@ function boolish(value: unknown): boolean | undefined {
 function metricNum(value: unknown, fallback: number): number {
   if (value === null || value === undefined || value === '') return fallback;
   return num(value, fallback);
+}
+
+function finiteMetric(value: unknown): value is number {
+  return value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
 }
 
 function str(value: unknown, fallback = ''): string {
@@ -719,6 +729,7 @@ export function adaptBackendState(
   const mode = asRecord(data.operator_mode ?? data);
   const capabilities = asRecord(mode.capabilities);
   const connection = asRecord(data.connection);
+  const audioCapture = asRecord(data.audio_capture);
   const safety = asRecord(data.safety);
   const manual = asRecord(safety.manual_write_supervision);
   const connected = Boolean(connection.connected);
@@ -730,6 +741,14 @@ export function adaptBackendState(
   const writeScope = Array.isArray(capabilities.allowed_live_write_kinds)
     ? capabilities.allowed_live_write_kinds.map(item => String(item))
     : [];
+  const rawAvailableModes = Array.isArray(mode.available_modes) ? mode.available_modes : [];
+  const availableModes = rawAvailableModes
+    .filter(item => {
+      const row = asRecord(item);
+      return row.available !== false && row.enabled !== false && row.blocked !== true;
+    })
+    .map(item => toUiMode(asRecord(item).key ?? asRecord(item).mode ?? item));
+  const normalizedAvailableModes = Array.from(new Set<AutomixerMode>(availableModes.length ? availableModes : ['Analyze', 'Assist']));
 
   return {
     connectionState,
@@ -751,6 +770,12 @@ export function adaptBackendState(
     liveWritePolicy,
     applyPath: str(mode.apply_path, 'none'),
     writeScope,
+    mixerConnected: connected,
+    observationOnly: manual.wing_observation_only !== false,
+    audioCaptureRunning: Boolean(audioCapture.running),
+    audioCaptureChannels: Math.trunc(metricNum(audioCapture.num_channels, 0)),
+    audioSampleRate: Math.trunc(metricNum(audioCapture.sample_rate, 0)),
+    availableModes: normalizedAvailableModes,
     lastUpdated: str(data.generated_at, new Date().toISOString()),
     message: emergencyStopped
       ? 'Emergency stop is active. Supervised apply is blocked until explicit operator reset.'
@@ -767,12 +792,24 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
     const base = fallback[index] ?? fallback[fallback.length - 1];
     const meter = asRecord(row.meter);
     const control = asRecord(row.control_state);
+    const readCoverage = asRecord(row.read_coverage);
+    const readSections = asRecord(readCoverage.sections);
+    const basicControls = asRecord(readSections.basic_controls);
+    const basicFields = asRecord(basicControls.fields);
+    const processing = asRecord(readSections.processing);
+    const processingFields = asRecord(processing.fields);
     const recognition = asRecord(row.ai_recognition);
     const id = Math.trunc(num(row.id ?? row.number, base?.id ?? index + 1));
     const status = str(row.status, 'unknown').toLowerCase();
     const controlMute = boolish(control.mute ?? control.muted ?? row.mute ?? row.muted);
-    const confidence = num(recognition.confidence, base?.confidence ?? 72);
-    const pan = channelPanPercent(control.pan ?? control.pan_percent ?? row.pan, base?.pan);
+    const confidence = finiteMetric(recognition.confidence) ? num(recognition.confidence, 0) : 0;
+    const pan = channelPanPercent(control.pan ?? control.pan_percent ?? row.pan);
+    const meterAvailable = meter.available === true || finiteMetric(row.level_db) || finiteMetric(meter.rms_db);
+    const faderAvailable = basicFields.fader_db === true || finiteMetric(control.fader_db);
+    const muteAvailable = basicFields.mute === true || boolish(control.mute ?? control.muted ?? row.mute ?? row.muted) !== undefined;
+    const panAvailable = basicFields.pan === true || finiteMetric(control.pan ?? control.pan_percent ?? row.pan);
+    const gateAvailable = processingFields.gate_enabled === true || processingFields.gate_threshold_db === true || finiteMetric(control.gate_enabled ?? row.gate_enabled) || finiteMetric(control.gate_threshold_db ?? row.gate_threshold_db) || str(control.gate_label ?? row.gate_label) !== '';
+    const compAvailable = processingFields.compressor_enabled === true || processingFields.compressor_threshold_db === true || processingFields.compressor_gain_reduction_db === true || finiteMetric(control.compressor_enabled ?? row.compressor_enabled) || finiteMetric(control.compressor_threshold_db ?? row.compressor_threshold_db) || finiteMetric(control.compressor_gain_reduction_db ?? row.compressor_gain_reduction_db) || str(control.comp_label ?? control.compressor_label ?? row.comp_label ?? row.compressor_label) !== '';
     const gateLabel = channelControlLabel(
       'G',
       control.gate_label ?? row.gate_label ?? control.gate_threshold_db ?? row.gate_threshold_db,
@@ -800,17 +837,26 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
       name: str(row.name, base?.name ?? `Ch ${id}`),
       type: str(row.role, base?.type ?? 'Channel'),
       source: str(row.source, base?.source ?? `In ${String(id).padStart(2, '0')}`),
-      level: num(row.level_db ?? meter.rms_db, base?.level ?? -60),
-      lufs: num(row.lufs ?? meter.lufs, base?.lufs ?? -60),
-      dynamic: num(row.dynamic_range_db ?? meter.dynamic_range_db, base?.dynamic ?? 0),
+      level: meterAvailable ? num(row.level_db ?? meter.rms_db, -120) : -120,
+      lufs: meterAvailable ? num(row.lufs ?? meter.lufs, -100) : -100,
+      dynamic: meterAvailable ? num(row.dynamic_range_db ?? meter.dynamic_range_db, 0) : 0,
       status: channelStatus,
       recognition: `${str(recognition.label, str(row.role, base?.type ?? 'Channel'))}${confidence ? ` (${Math.round(confidence)}%)` : ''}`,
       group: str(row.group, base?.group ?? 'CHANNELS').toUpperCase(),
-      fader: num(control.fader_db, base?.fader ?? -50),
+      fader: faderAvailable ? num(control.fader_db, -144) : -144,
       pan,
-      gateLabel,
-      compLabel,
-      confidence
+      gateLabel: gateAvailable ? gateLabel : undefined,
+      compLabel: compAvailable ? compLabel : undefined,
+      confidence,
+      meterAvailable,
+      faderAvailable,
+      muteAvailable,
+      panAvailable,
+      gateAvailable,
+      compAvailable,
+      readCoverageStatus: str(readCoverage.status, 'unknown'),
+      cacheFreshnessStatus: str(asRecord(readCoverage.cache_freshness).status, str(asRecord(row.cache_freshness).status, 'unknown')),
+      dataSource: 'backend'
     };
   });
 }
@@ -3708,7 +3754,19 @@ export function adaptDashboardRuntime(
       pendingDecisions: 23,
       appliedDecisions: 12,
       blockedDecisions: 3,
-      sourceLabel: 'Mock'
+      sourceLabel: 'Mock',
+      masterAvailable: false,
+      integratedLufsAvailable: false,
+      truePeakAvailable: false,
+      shortTermLufsAvailable: false,
+      momentaryLufsAvailable: false,
+      lraAvailable: false,
+      spectrumAvailable: false,
+      aiConfidenceAvailable: false,
+      audioCaptureRunning: false,
+      mainFaderAvailable: false,
+      readCoverageStatus: 'mock',
+      cacheFreshnessStatus: 'mock'
     };
   }
 
@@ -3726,13 +3784,19 @@ export function adaptDashboardRuntime(
     master.spectrum_bins
   );
   const analysisTraces = adaptDashboardAnalysisTraces(analyzer, master);
+  const audioCapture = asRecord(dash.audio_capture);
+  const connection = asRecord(dash.connection);
+  const mixerState = asRecord(connection.state);
+  const mainFader = mixerState['/main/1/fdr'];
+  const masterAvailable = master.available === true && Boolean(audioCapture.running);
+  const spectrumAvailable = analyzer.available !== false && Boolean(spectrumBins?.length);
 
   return {
-    integratedLufs: metricNum(master.integrated_lufs, -14.2),
-    truePeakDb: metricNum(master.true_peak_db, -1.1),
-    shortTermLufs: metricNum(master.short_term_lufs, metricNum(master.integrated_lufs, -13.8)),
-    momentaryLufs: metricNum(master.momentary_lufs, metricNum(master.short_term_lufs, -12.1)),
-    lraLu: metricNum(master.lra_lu, 6.7),
+    integratedLufs: metricNum(master.integrated_lufs, -100),
+    truePeakDb: metricNum(master.true_peak_db, -200),
+    shortTermLufs: metricNum(master.short_term_lufs, -100),
+    momentaryLufs: metricNum(master.momentary_lufs, -100),
+    lraLu: metricNum(master.lra_lu, 0),
     aiConfidencePercent: Math.max(0, Math.min(100, Math.round(averageConfidence))),
     activeChannels: Math.trunc(metricNum(channelSummary.active_channels, 0)),
     totalChannels: Math.trunc(metricNum(channelSummary.total_channels, 0)),
@@ -3740,6 +3804,19 @@ export function adaptDashboardRuntime(
     appliedDecisions: Math.trunc(metricNum(decisionSummary.applied_count, 0)),
     blockedDecisions: Math.trunc(metricNum(decisionSummary.blocked_count, 0)),
     sourceLabel: 'Backend',
+    masterAvailable,
+    integratedLufsAvailable: masterAvailable && finiteMetric(master.integrated_lufs),
+    truePeakAvailable: masterAvailable && finiteMetric(master.true_peak_db),
+    shortTermLufsAvailable: masterAvailable && finiteMetric(master.short_term_lufs),
+    momentaryLufsAvailable: masterAvailable && finiteMetric(master.momentary_lufs),
+    lraAvailable: masterAvailable && finiteMetric(master.lra_lu),
+    spectrumAvailable,
+    aiConfidenceAvailable: confidenceValues.length > 0,
+    audioCaptureRunning: Boolean(audioCapture.running),
+    mainFaderDb: finiteMetric(mainFader) ? Number(mainFader) : undefined,
+    mainFaderAvailable: finiteMetric(mainFader),
+    readCoverageStatus: str(channelSummary.read_coverage_status, 'unknown'),
+    cacheFreshnessStatus: str(channelSummary.cache_freshness_status, 'unknown'),
     spectrumBins,
     ...(Object.keys(analysisTraces).length ? { analysisTraces } : {})
   };
