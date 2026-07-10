@@ -1,0 +1,25 @@
+{
+  "source": "WING USB 47/48 Main L/R",
+  "device_id": 0,
+  "sample_rate": 48000,
+  "channels": 2,
+  "frames": 2880000,
+  "duration_seconds": 60.0,
+  "overflow_blocks": 0,
+  "wav_path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/reports/wing_master_60s_20260710T115621.wav",
+  "evaluation": {
+    "status": "ISSUES",
+    "lufs_integrated": -28.08,
+    "true_peak_dbtp": -9.33,
+    "crest_db": 18.01,
+    "lr_balance_db": 0.01,
+    "correlation": 0.998,
+    "mono_fold_ratio": 0.999,
+    "tilt_deviation_db": 4.41,
+    "vocal_presence_db": 10.74,
+    "issues": [
+      "громкость микса -28.1 LUFS вне -20.0±6.0"
+    ],
+    "method": "master_mix_eval"
+  }
+}
