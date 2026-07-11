@@ -8,7 +8,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from itertools import count
+import hashlib
+import json
 from typing import Any, Dict, List, Optional
 
 
@@ -45,6 +46,9 @@ class SoundcheckRecommendation:
             "target": dict(self.target),
             "current_state": dict(self.current_state),
             "requested_state": dict(self.requested_state),
+            "value_semantics": "absolute_target",
+            "relative_only": False,
+            "baseline_available": True,
             "confidence": self.confidence,
             "rationale": dict(self.rationale or {}),
             "metadata": dict(self.metadata or {}),
@@ -53,6 +57,7 @@ class SoundcheckRecommendation:
                 "auto_apply_blocked": True,
                 "live_mixer_writes": False,
                 "transport_policy": "dry_run_only",
+                "value_semantics": "absolute_target",
             },
         }
 
@@ -79,11 +84,14 @@ class NoWriteSoundcheckRecommendationWorkflow:
     ) -> None:
         self.source_system = str(source_system or "auto_soundcheck_engine")
         self.context_metadata = dict(context_metadata or {})
-        self._sequence = count(1)
-        self._recommendations: List[SoundcheckRecommendation] = []
+        self._recommendations: Dict[str, SoundcheckRecommendation] = {}
 
     def list_recommendations(self) -> List[Dict[str, Any]]:
-        return [recommendation.to_dict() for recommendation in self._recommendations]
+        return [recommendation.to_dict() for recommendation in self._recommendations.values()]
+
+    def clear(self) -> None:
+        """Start a fresh derivation pass without carrying stale proposals."""
+        self._recommendations.clear()
 
     def recommend_input_gain(
         self,
@@ -153,8 +161,24 @@ class NoWriteSoundcheckRecommendationWorkflow:
         metadata: Optional[Dict[str, Any]],
         rationale: Optional[Dict[str, Any]],
     ) -> SoundcheckRecommendation:
+        identity_payload = {
+            "source_system": self.source_system,
+            "kind": kind,
+            "action_type": action_type,
+            "channel": int(channel),
+            "current_state": current_state,
+            "requested_state": requested_state,
+        }
+        digest = hashlib.sha256(
+            json.dumps(
+                identity_payload,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()[:16]
         recommendation = SoundcheckRecommendation(
-            recommendation_id=f"soundcheck:{next(self._sequence)}",
+            recommendation_id=f"soundcheck:{digest}",
             kind=kind,
             action_type=action_type,
             mode="approval_required",
@@ -166,5 +190,5 @@ class NoWriteSoundcheckRecommendationWorkflow:
             metadata=metadata,
             rationale=rationale,
         )
-        self._recommendations.append(recommendation)
+        self._recommendations[recommendation.recommendation_id] = recommendation
         return recommendation

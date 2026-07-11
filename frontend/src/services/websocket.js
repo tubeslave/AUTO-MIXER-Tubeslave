@@ -950,7 +950,7 @@ class WebSocketService extends BaseWebSocketTransport {
 
   // ========== Auto Soundcheck Commands ==========
 
-  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = false) {
+  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = true) {
     console.log('startAutoSoundcheck called with:', { deviceId, channels, timings, observeOnly });
     this.send({
       type: 'start_auto_soundcheck',

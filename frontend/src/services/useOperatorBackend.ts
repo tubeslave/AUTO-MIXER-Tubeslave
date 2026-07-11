@@ -69,12 +69,68 @@ import type {
   RuleLibrarySnapshotRow,
   RoutingSegment,
   SafetyMonitorState,
+  SoundcheckRuntime,
   Task,
   TelemetryAlertsSnapshot,
   TrainingSessionSnapshotRow,
   TopologyLink,
   TopologyNode
 } from '../types';
+
+const idleSoundcheckRuntime: SoundcheckRuntime = {
+  running: false,
+  state: 'idle',
+  message: 'Soundcheck is idle.',
+  error: '',
+  observeOnly: true,
+  proposalOnly: true,
+  mixerConnected: false,
+  audioRunning: false,
+  selectedChannels: [],
+  channelsWithSignal: 0,
+  totalChannels: 0,
+  recommendationCount: 0,
+  derivationComplete: false,
+  interceptedWriteCount: 0,
+  lastUpdated: ''
+};
+
+function soundcheckRuntimeFromPayload(
+  current: SoundcheckRuntime,
+  payload: unknown
+): SoundcheckRuntime {
+  const data = recordValue(payload);
+  const selected = Array.isArray(data.selected_channels)
+    ? data.selected_channels.map(Number).filter(Number.isFinite)
+    : current.selectedChannels;
+  const summary = recordValue(data.summary);
+  return {
+    ...current,
+    running: Boolean(data.running ?? data.is_running ?? current.running),
+    state: stringValue(data.current_step ?? data.state, current.state),
+    message: stringValue(data.message, current.message),
+    error: stringValue(data.error),
+    observeOnly: data.observe_only !== false,
+    proposalOnly: data.proposal_only !== false,
+    mixerConnected: Boolean(data.mixer_connected ?? current.mixerConnected),
+    audioRunning: Boolean(data.audio_running ?? current.audioRunning),
+    selectedChannels: selected,
+    channelsWithSignal: numberValue(data.channels_with_signal, current.channelsWithSignal),
+    totalChannels: numberValue(data.total_channels, selected.length || current.totalChannels),
+    recommendationCount: numberValue(
+      data.soundcheck_recommendation_count ?? data.recommendation_count,
+      current.recommendationCount
+    ),
+    derivationComplete: Boolean(
+      data.recommendation_derivation_complete ?? current.derivationComplete
+    ),
+    interceptedWriteCount: numberValue(
+      summary.total_operations ?? data.intercepted_write_count,
+      current.interceptedWriteCount
+    ),
+    lastUpdated: new Date().toLocaleTimeString()
+  };
+}
 
 type ProductLayerPayloads = {
   dashboard?: unknown;
@@ -515,6 +571,7 @@ export function useOperatorBackend() {
   const [modeFromBackend, setModeFromBackend] = useState<AutomixerMode | null>(null);
   const [logs, setLogs] = useState<LogRecord[]>(mockLogs);
   const [proposalApplyResult, setProposalApplyResult] = useState<ProposalApplyResult | null>(null);
+  const [soundcheck, setSoundcheck] = useState<SoundcheckRuntime>(idleSoundcheckRuntime);
 
   const requestSnapshot = useCallback(() => {
     websocketService.getOperatorMode();
@@ -537,6 +594,7 @@ export function useOperatorBackend() {
     websocketService.getMainPipelinePreview(48, false);
     websocketService.getTelemetryAlertsSnapshot(50, 8);
     websocketService.getAudioCaptureStatus();
+    websocketService.getAutoSoundcheckStatus();
     websocketService.subscribeMeters();
   }, []);
 
@@ -591,7 +649,7 @@ export function useOperatorBackend() {
       setLogs(current => appendBackendLog(current, 'audio_capture', 'Stopping read-only WING audio meters.', 'INFO'));
       return;
     }
-    websocketService.startAudioCapturePreview(0, 48, 48000);
+    websocketService.startAudioCapturePreview(null, 48, 48000);
     setLogs(current => appendBackendLog(current, 'audio_capture', 'Starting read-only WING 48-channel meters.', 'INFO'));
   }, [payloads.dashboard, refreshBackend]);
 
@@ -641,6 +699,34 @@ export function useOperatorBackend() {
       updatedAt: new Date().toLocaleTimeString()
     });
     websocketService.applyOperatorProposal(proposalId, true, 'frontend_supervised_operator_approved_apply');
+  }, []);
+
+  const startSoundcheck = useCallback(() => {
+    if (!socketIsOpen()) {
+      refreshBackend();
+      setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Connect backend before starting soundcheck.', 'WARN'));
+      return;
+    }
+    websocketService.startAutoSoundcheck(null, 48, {}, {}, {}, true);
+    setSoundcheck(current => ({
+      ...current,
+      running: true,
+      state: 'starting',
+      message: 'Proposal-only soundcheck requested.',
+      error: '',
+      observeOnly: true,
+      proposalOnly: true,
+      derivationComplete: false,
+      recommendationCount: 0,
+      lastUpdated: new Date().toLocaleTimeString()
+    }));
+    setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Proposal-only soundcheck requested. Mixer writes remain blocked.', 'INFO'));
+  }, [refreshBackend]);
+
+  const stopSoundcheck = useCallback(() => {
+    if (!socketIsOpen()) return;
+    websocketService.stopAutoSoundcheck();
+    setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Soundcheck stop requested.', 'INFO'));
   }, []);
 
   useEffect(() => {
@@ -778,6 +864,33 @@ export function useOperatorBackend() {
       websocketService.getChannelInventory(48);
       websocketService.getConnectionTopology();
     };
+    const handleAutoSoundcheckStatus = (payload: unknown) => {
+      setSoundcheck(current => soundcheckRuntimeFromPayload(current, payload));
+      const data = recordValue(payload);
+      const error = stringValue(data.error);
+      setLogs(current => appendBackendLog(
+        current,
+        'auto_soundcheck',
+        error || stringValue(data.message, `Soundcheck ${stringValue(data.state, 'status updated')}.`),
+        error ? 'WARN' : data.running || data.is_running ? 'INFO' : 'SUCCESS'
+      ));
+    };
+    const handleAutoSoundcheckObservation = (payload: unknown) => {
+      setSoundcheck(current => soundcheckRuntimeFromPayload(current, payload));
+    };
+    const handleAutoSoundcheckChannel = () => {
+      websocketService.getAutoSoundcheckStatus();
+    };
+    const handleSoundcheckProposalImport = (payload: unknown) => {
+      const data = recordValue(payload);
+      if (stringValue(data.source) !== 'soundcheck_recommendation_bundle') return;
+      setSoundcheck(current => ({
+        ...current,
+        recommendationCount: numberValue(data.imported_count ?? data.created_count, current.recommendationCount),
+        derivationComplete: true,
+        lastUpdated: new Date().toLocaleTimeString()
+      }));
+    };
     const handleConnectionStatus = (payload: unknown) => {
       const data = recordValue(payload);
       setPayloads(current => mergeConnectionStatusIntoPayloads(current, data));
@@ -828,6 +941,10 @@ export function useOperatorBackend() {
     websocketService.on('operator_proposals_imported', handleProposalMutation);
     websocketService.on('meter_frame', handleMeterFrame);
     websocketService.on('audio_capture_status', handleAudioCaptureStatus);
+    websocketService.on('auto_soundcheck_status', handleAutoSoundcheckStatus);
+    websocketService.on('auto_soundcheck_observation', handleAutoSoundcheckObservation);
+    websocketService.on('auto_soundcheck_channel_update', handleAutoSoundcheckChannel);
+    websocketService.on('operator_proposals_imported', handleSoundcheckProposalImport);
     websocketService.on('connection_status', handleConnectionStatus);
     websocketService.on('mixer_update', handleMixerUpdate);
     websocketService.on('disconnected', handleDisconnected);
@@ -877,6 +994,10 @@ export function useOperatorBackend() {
       websocketService.off('operator_proposals_imported', handleProposalMutation);
       websocketService.off('meter_frame', handleMeterFrame);
       websocketService.off('audio_capture_status', handleAudioCaptureStatus);
+      websocketService.off('auto_soundcheck_status', handleAutoSoundcheckStatus);
+      websocketService.off('auto_soundcheck_observation', handleAutoSoundcheckObservation);
+      websocketService.off('auto_soundcheck_channel_update', handleAutoSoundcheckChannel);
+      websocketService.off('operator_proposals_imported', handleSoundcheckProposalImport);
       websocketService.off('connection_status', handleConnectionStatus);
       websocketService.off('mixer_update', handleMixerUpdate);
       websocketService.off('disconnected', handleDisconnected);
@@ -983,11 +1104,14 @@ export function useOperatorBackend() {
     setBackendMode,
     acceptProposal,
     dismissProposal,
-    applyProposal
-  }), [acceptProposal, applyProposal, connectWingReadOnly, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, toggleAudioPreview]);
+    applyProposal,
+    startSoundcheck,
+    stopSoundcheck
+  }), [acceptProposal, applyProposal, connectWingReadOnly, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview]);
 
   return {
     backend,
+    soundcheck,
     modeFromBackend,
     viewData,
     backendActions,

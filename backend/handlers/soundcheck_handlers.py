@@ -157,6 +157,16 @@ def register_handlers(server):
             on_state_change=on_state,
             on_channel_update=on_channel,
             on_observation=on_observation,
+            mixer_client=(
+                server.mixer_client
+                if getattr(getattr(server, "mixer_client", None), "is_connected", False)
+                else None
+            ),
+            audio_capture=(
+                server.audio_capture
+                if getattr(getattr(server, "audio_capture", None), "running", False)
+                else None
+            ),
         )
         server.auto_soundcheck_engine = engine
         server.auto_soundcheck_running = True

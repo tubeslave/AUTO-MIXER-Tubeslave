@@ -150,6 +150,100 @@ def test_engine_routes_actions_through_gated_executor_and_exports_bundle():
     assert bundle["proposals"][0]["action_type"] == "set_fader_db"
 
 
+def test_recommendation_bundle_ids_are_stable_and_upserted():
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False, observe_only=True)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer, config=engine.action_safety_config)
+    engine.correction_executor = GatedCorrectionActionExecutor(
+        engine.safety_controller,
+        config=CorrectionActionExecutorConfig.from_config({
+            "promoted_action_types": {"ChannelFaderMove": True},
+        }),
+    )
+    action = ChannelFaderMove(channel_id=1, target_db=-9.5, reason="stable target")
+
+    for _ in range(600):
+        engine._execute_action(action, runtime_state=RuntimeState.SOURCE_LEARNING)
+
+    bundle = engine.get_soundcheck_recommendation_bundle()
+    assert bundle["recommendation_count"] == 1
+    assert bundle["proposals"][0]["recommendation_id"].startswith("soundcheck:")
+    assert bundle["proposals"][0]["value_semantics"] == "absolute_target"
+    assert bundle["proposals"][0]["relative_only"] is False
+    assert bundle["proposals"][0]["baseline_available"] is True
+
+
+def test_derivation_phase_builds_proposal_without_mixer_write(monkeypatch):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+
+    def derive_one(*, derivation_only=False):
+        assert derivation_only is True
+        engine._set_state(engine.state.__class__.DERIVING, "test derivation")
+        engine._execute_action(
+            ChannelFaderMove(channel_id=1, target_db=-9.5, reason="derived absolute target"),
+            runtime_state=RuntimeState.SOURCE_LEARNING,
+        )
+        engine._applied_channels.add(1)
+
+    monkeypatch.setattr(engine, "_apply_corrections", derive_one)
+    engine._derive_corrections()
+
+    bundle = engine.get_soundcheck_recommendation_bundle()
+    assert bundle["recommendation_count"] == 1
+    assert mixer.calls == []
+    assert engine._applied_channels == set()
+    assert engine.get_status()["recommendation_derivation_complete"] is True
+
+
+class SharedAudioCapture:
+    running = True
+
+    def __init__(self):
+        self.stop_calls = 0
+
+    def stop(self):
+        self.stop_calls += 1
+
+
+class SharedMixer(GatedEngineMixer):
+    def __init__(self):
+        super().__init__()
+        self.disconnect_calls = 0
+
+    def disconnect(self):
+        self.disconnect_calls += 1
+
+
+def test_shared_runtime_is_not_stopped_or_disconnected_by_engine():
+    mixer = SharedMixer()
+    audio = SharedAudioCapture()
+    engine = AutoSoundcheckEngine(
+        observe_only=True,
+        auto_discover=False,
+        mixer_client=mixer,
+        audio_capture=audio,
+    )
+
+    assert engine._connect_mixer() is True
+    assert engine._start_audio() is True
+    engine.stop()
+
+    assert mixer.disconnect_calls == 0
+    assert audio.stop_calls == 0
+    assert engine.mixer_client is mixer
+    status = engine.get_status()
+    assert status["shared_mixer_runtime"] is True
+    assert status["shared_audio_runtime"] is True
+
+
 class ResetTrackingMixer:
     is_connected = True
     state = {}
@@ -611,7 +705,7 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     mixer = DetectorMixer()
     engine = AutoSoundcheckEngine(
         num_channels=2,
-        auto_apply=True,
+        auto_apply=False,
         auto_discover=False,
     )
     engine.mixer_client = mixer
@@ -1127,7 +1221,7 @@ def test_feedback_events_are_cooled_down_and_use_least_busy_eq_band():
     assert eq_blocks[0]["band"] == 3
 
 
-def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
+def test_monitor_analysis_routes_lead_masking_to_no_write_proposal():
     def sine(freq_hz, amplitude):
         t = np.arange(12000, dtype=np.float32) / 48000.0
         return amplitude * np.sin(2.0 * np.pi * freq_hz * t)
@@ -1135,11 +1229,12 @@ def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
     mixer = DetectorMixer()
     engine = AutoSoundcheckEngine(
         num_channels=2,
-        auto_apply=True,
+        auto_apply=False,
         auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
     )
-    engine.mixer_client = mixer
-    engine.safety_controller = AutoFOHSafetyController(mixer)
+    assert engine._connect_mixer() is True
     engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
     engine.audio_capture = DetectorAudioCapture(
         {
@@ -1180,13 +1275,14 @@ def test_monitor_analysis_routes_lead_masking_action_through_safety_layer():
 
     decisions = engine._run_autofoh_monitor_analysis()
 
-    assert len(decisions) == 1
-    assert decisions[0].sent is False
-    assert decisions[0].blocked is True
-    eq_blocks = _blocked_calls(engine, "set_eq_band")
-    assert eq_blocks
-    assert eq_blocks[-1]["channel"] == 2
-    assert not any(call[0] == "set_eq_band" for call in mixer.calls)
+    bundle = engine.get_soundcheck_recommendation_bundle()
+    assert decisions == []
+    assert bundle["recommendation_count"] >= 1
+    assert all(
+        proposal["safety"]["live_mixer_writes"] is False
+        for proposal in bundle["proposals"]
+    )
+    assert mixer.calls == []
 
 
 def test_proxy_audio_rollback_restores_previous_console_state():

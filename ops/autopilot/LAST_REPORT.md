@@ -1,5 +1,20 @@
 # Autopilot Last Report
 
+## M108 local soundcheck workflow checkpoint — 2026-07-11
+
+- Local proposal-first workflow score: `98/100`.
+- Direct web, CLI and constructor apply/emergency overrides fail closed.
+- Observation mode now derives stable absolute recommendations and imports them
+  into the operator queue without mixer writes.
+- Shared mixer/audio services are reused without ownership or lifecycle drift.
+- Active frontend Soundcheck cockpit passed production browser QA; evidence:
+  `reports/frontend/soundcheck-cockpit-20260711.png`.
+- Validation: backend `5855 passed, 1 skipped`; frontend `104 passed`;
+  TypeScript/build passed; no-WING quick gate passed with `contacts_wing=false`,
+  `contacts_backend=false`, `live_write=false`, `live_authority_granted=false`.
+- Scope remains local/no-write. M005 physical disconnect proof and M006 owner
+  review remain external; standing live authority stays unchanged at zero.
+
 ## Текущее состояние
 
 - Milestone: M001, WING read-only preflight evidence gate.

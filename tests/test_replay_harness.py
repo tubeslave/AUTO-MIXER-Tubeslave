@@ -148,41 +148,17 @@ def test_replay_autosoundcheck_feedback_path_records_direct_mutation(monkeypatch
     assert records == []
 
 
-def test_replay_autosoundcheck_feedback_path_records_mutation_with_emergency_override(
+def test_replay_autosoundcheck_feedback_emergency_override_is_fail_closed(
     monkeypatch: pytest.MonkeyPatch,
 ):
     install_transport_blockers(monkeypatch)
-    mixer = ReplayMixer(scenario="autosoundcheck_feedback_direct_mutation", channel_names={1: "Lead Vox"})
-    engine = AutoSoundcheckEngine(
-        num_channels=1,
-        auto_apply=False,
-        auto_discover=False,
-        feedback_emergency_apply=True,
-    )
-    engine.mixer_client = mixer
-    engine.channels = {1: ChannelInfo(channel=1, name="Lead Vox", fader_db=-5.0)}
-
-    engine._handle_feedback_event(
-        1,
-        FeedbackEvent(
-            channel=1,
-            frequency_hz=3150.0,
-            magnitude_db=-6.5,
-            action="notch",
-            confidence=0.95,
-        ),
-    )
-
-    records = mixer.incident_records()
-    assert engine.auto_apply is False
-    assert len(records) == 1
-    assert records[0]["method"] == "set_eq_band"
-    assert records[0]["channel"] == 1
-    assert records[0]["transport_kind"] == "mutation"
-    assert records[0]["context"]["scenario"] == "autosoundcheck_feedback_direct_mutation"
-    assert records[0]["source_file"] is not None
-    assert records[0]["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert records[0]["source_function"] == "_apply_direct_feedback_emergency_notch"
+    with pytest.raises(ValueError, match="supervised"):
+        AutoSoundcheckEngine(
+            num_channels=1,
+            auto_apply=False,
+            auto_discover=False,
+            feedback_emergency_apply=True,
+        )
 
 
 def test_replay_live_apply_blocks_unconfirmed_request_without_mutation(monkeypatch: pytest.MonkeyPatch):

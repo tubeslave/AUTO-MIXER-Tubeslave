@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-05T02:51:16Z
+Last heartbeat UTC: 2026-07-11T08:05:00Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -8,8 +8,17 @@ Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none; `ops/autopilot/WRITER_LEASE/owner.json` is absent and
-`ops/autopilot/WRITER_LEASE/` is ignored as runtime state.
+Writer lease: released after final truth-surface update; runtime lease artifacts
+must be absent for the final validation gate.
+
+Latest local product checkpoint: M108 Soundcheck Workflow 95 completed at
+`98/100`. The canonical soundcheck now derives stable absolute operator
+recommendations in observation mode, direct engine/CLI live-apply and emergency
+feedback overrides fail closed, shared mixer/audio services keep server
+ownership, and the active TypeScript frontend has a real Soundcheck cockpit.
+Validation: `5855 passed, 1 skipped`, frontend `104 passed`, TypeScript/build
+passed, no-WING quick gate passed with no hardware/backend contact and no live
+authority. This local score does not close M005/M006 or widen WING authority.
 
 Next action: do not widen live authority. The decision report is
 `accepted_decision_ready`, and the CH3 fader/gain-down proofs have passed

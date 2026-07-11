@@ -5,12 +5,37 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "d3eb93a62",
-  "last_heartbeat_utc": "2026-07-05T02:51:16Z",
+  "last_heartbeat_utc": "2026-07-11T08:05:00Z",
   "current_writer_lease": null,
   "current_attempt_count": 0,
   "current_blocker": "Supervised CH3 fader and gain-down proofs passed on the real WING Rack with apply, physical readback, rollback and emergency-stop/block evidence (artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json and artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json); the earlier rollback_not_applied failure is closed by the passed rerun. The read-only decision ledger remains accepted_decision_ready. Release-ready live correction families remain 0 until the M006 owner readiness review accepts the proof artifacts, live-allowed safety rows remain 0, and current supervised live-write kinds remain 0; the remaining external items are the M005 supervised disconnect/timeout/stale-state protection proof and the M006 readiness review.",
   "next_action": "Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.",
   "next_operator_action": "Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.",
+  "latest_soundcheck_workflow_95": {
+    "status": "completed",
+    "score": 98,
+    "score_scope": "local_proposal_first_soundcheck_workflow_only",
+    "report": "Docs/reports/SOUNDCHECK_WORKFLOW_95_20260711.md",
+    "screenshot": "reports/frontend/soundcheck-cockpit-20260711.png",
+    "proposal_only": true,
+    "direct_live_apply_blocked": true,
+    "live_authority_granted": false,
+    "readiness_closure_allowed": false,
+    "readiness_matrix_update_allowed": false,
+    "contacts_wing": false,
+    "live_write": false,
+    "validation": {
+      "backend_full_suite": "5855 passed, 1 skipped, 1 warning in 180.53s",
+      "frontend_tests": "104 passed",
+      "frontend_typescript": "passed",
+      "frontend_build": "passed",
+      "no_wing_quick": "passed; failed_checks=[]; contacts_wing=false; contacts_backend=false; live_write=false; live_authority_granted=false"
+    },
+    "external_blockers_unchanged": [
+      "M005 supervised disconnect/timeout/stale-state proof with operator present",
+      "M006 owner readiness review"
+    ]
+  },
   "latest_local_runtime_validation": {
     "validated_at_utc": "2026-07-04T19:22:59Z",
     "scope": "local runtime/tooling only; no live WING proof, readiness closure or live-authority expansion",

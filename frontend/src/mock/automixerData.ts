@@ -19,6 +19,7 @@ import type {
 
 export const navItems: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', section: 'Overview', mark: 'OV' },
+  { id: 'soundcheck', label: 'Soundcheck', section: 'Overview', mark: 'SC' },
   { id: 'channels', label: 'Channel List', section: 'Channels', mark: 'CH' },
   { id: 'groups', label: 'Groups / Buses', section: 'Channels', mark: 'GB' },
   { id: 'agents', label: 'Agents Console', section: 'AI Agents', mark: 'AI' },

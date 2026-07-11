@@ -207,10 +207,10 @@ autofoh:
     readback_tolerance_db: 0.25
     readback_tolerance_ms: 0.05
     artifact_path: artifacts/show_assist_auto_v1/gated_correction_events.jsonl
-    # Промоуты одобрены оператором 2026-07-05 (цель: полный саундчек-режим,
-    # все методы коррекции применяются к реальному пульту через gated
-    # executor c pre-read/readback/rollback). Мьюты и мастер/DCA/шинные
-    # фейдеры остаются proposal-only.
+    # These flags select typed actions for full recommendation envelopes
+    # (pre-read/absolute target/rollback preview). They do not grant live-write
+    # authority and are never copied into the SafetyController allowlist.
+    # Physical apply remains exclusively behind apply_operator_proposal.
     promoted_action_types:
       ChannelGainMove: true
       ChannelFaderMove: true

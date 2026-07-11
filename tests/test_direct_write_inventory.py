@@ -1150,48 +1150,14 @@ def test_auto_soundcheck_feedback_notch_is_blocked_by_default():
     assert mixer.event_log == []
 
 
-def test_auto_soundcheck_feedback_notch_records_write_with_override():
-    mixer = FakeMixer(
-        scenario="auto_soundcheck_feedback_notch_dry_run",
-        channel_names={1: "Lead Vox"},
-    )
-    engine = AutoSoundcheckEngine(
-        num_channels=1,
-        auto_apply=False,
-        auto_discover=False,
-        feedback_emergency_apply=True,
-    )
-    engine.mixer_client = mixer
-    engine.channels = {1: ChannelInfo(channel=1, name="Lead Vox", fader_db=-5.0)}
-
-    engine._handle_feedback_event(
-        1,
-        FeedbackEvent(
-            channel=1,
-            frequency_hz=3150.0,
-            magnitude_db=-6.5,
-            action="notch",
-            confidence=0.95,
-        ),
-    )
-
-    assert engine.auto_apply is False
-    assert [event["method"] for event in mixer.event_log] == ["set_eq_band"]
-
-    event = mixer.event_log[0]
-    assert event["channel"] == 1
-    assert event["value"] == pytest.approx(-6.0)
-    assert event["params"] == {
-        "band": 4,
-        "freq": pytest.approx(3150.0),
-        "gain": pytest.approx(-6.0),
-        "q": pytest.approx(10.0),
-    }
-    assert event["transport_kind"] == "mutation"
-    assert event["context"]["scenario"] == "auto_soundcheck_feedback_notch_dry_run"
-    assert event["source_file"] is not None
-    assert event["source_file"].endswith("backend/auto_soundcheck_engine.py")
-    assert event["source_function"] == "_apply_direct_feedback_emergency_notch"
+def test_auto_soundcheck_feedback_notch_override_is_fail_closed():
+    with pytest.raises(ValueError, match="supervised"):
+        AutoSoundcheckEngine(
+            num_channels=1,
+            auto_apply=False,
+            auto_discover=False,
+            feedback_emergency_apply=True,
+        )
 
 
 def test_auto_soundcheck_feedback_fader_reduce_is_blocked_by_default():
@@ -1221,35 +1187,13 @@ def test_auto_soundcheck_feedback_fader_reduce_is_blocked_by_default():
 
 
 def test_auto_soundcheck_feedback_fader_reduce_stays_blocked_with_notch_override():
-    mixer = FakeMixer(
-        scenario="auto_soundcheck_feedback_fader_reduce_dry_run",
-        channel_names={1: "Lead Vox"},
-    )
-    engine = AutoSoundcheckEngine(
-        num_channels=1,
-        auto_apply=False,
-        auto_discover=False,
-        feedback_emergency_apply=True,
-    )
-    engine.mixer_client = mixer
-    info = ChannelInfo(channel=1, name="Lead Vox", fader_db=-5.0)
-    engine.channels = {1: info}
-
-    engine._handle_feedback_event(
-        1,
-        FeedbackEvent(
-            channel=1,
-            frequency_hz=2500.0,
-            magnitude_db=-4.0,
-            action="fader_reduce",
-            confidence=0.8,
-        ),
-    )
-
-    assert engine.auto_apply is False
-    assert mixer.event_log == []
-    assert mixer.mutation_events() == []
-    assert info.fader_db == pytest.approx(-5.0)
+    with pytest.raises(ValueError, match="supervised"):
+        AutoSoundcheckEngine(
+            num_channels=1,
+            auto_apply=False,
+            auto_discover=False,
+            feedback_emergency_apply=True,
+        )
 
 
 @pytest.mark.asyncio

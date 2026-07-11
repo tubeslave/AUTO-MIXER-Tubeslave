@@ -156,6 +156,30 @@ async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_start_auto_soundcheck_reuses_running_server_runtime(monkeypatch):
+    server = DummyServer()
+    server.mixer_client = type("SharedMixer", (), {"is_connected": True})()
+    server.audio_capture = type("SharedAudio", (), {"running": True})()
+    handlers = register_handlers(server)
+    created = {}
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+            self.state = type("State", (), {"value": "idle"})()
+
+        def start_async(self):
+            pass
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+
+    await handlers["start_auto_soundcheck"]("ws", {"channels": [1]})
+
+    assert created["mixer_client"] is server.mixer_client
+    assert created["audio_capture"] is server.audio_capture
+
+
+@pytest.mark.asyncio
 async def test_auto_engine_imports_soundcheck_recommendations_on_running_state(monkeypatch):
     server = DummyServer()
     handlers = register_handlers(server)

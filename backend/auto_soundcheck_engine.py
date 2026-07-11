@@ -2,14 +2,14 @@
 Auto Soundcheck Engine — headless orchestrator for automatic mixing.
 
 Connects to mixer (dLive or WING), detects audio device (SoundGrid/Dante),
-reads channel names, recognizes instruments, waits for audio signals,
-and automatically applies gain staging, EQ, compressor, and fader corrections
-without user confirmation.
-
-This is the main entry point for fully automatic operation.
+reads channel names, recognizes instruments, waits for audio signals, and builds
+absolute gain, EQ, compressor, pan, routing and fader recommendations. The
+canonical web and CLI paths are proposal-only; live execution is delegated to
+the server's supervised operator proposal gate.
 """
 
 import asyncio
+import hashlib
 import json
 import logging
 import time
@@ -160,6 +160,7 @@ class EngineState(Enum):
     RESETTING = "resetting"
     WAITING_FOR_SIGNAL = "waiting_for_signal"
     ANALYZING = "analyzing"
+    DERIVING = "deriving_recommendations"
     APPLYING = "applying"
     RUNNING = "running"
     ERROR = "error"
@@ -490,7 +491,7 @@ GAIN_CORRECTION_MAX_DB = 12.0
 
 class AutoSoundcheckEngine:
     """
-    Fully automatic soundcheck engine.
+    Proposal-first automatic soundcheck engine.
 
     Workflow:
     0. Auto-discover mixer on the network (WING broadcast / dLive TCP scan)
@@ -502,8 +503,8 @@ class AutoSoundcheckEngine:
     6. For channels with signal:
        a. Analyze spectrum → spectral instrument classification fallback
        b. Compute gain correction (target LUFS per instrument)
-       c. Apply HPF, EQ preset, compressor preset
-       d. Set fader to initial position
+       c. Derive HPF, EQ and compressor targets
+       d. Derive an absolute fader target
     7. Enter running mode: continuous feedback detection + level monitoring
     """
 
@@ -531,6 +532,8 @@ class AutoSoundcheckEngine:
         on_channel_update: Optional[Callable] = None,
         on_observation: Optional[Callable] = None,
         config_path: Optional[str] = None,
+        mixer_client: Optional[Any] = None,
+        audio_capture: Optional[Any] = None,
     ):
         self.mixer_type = mixer_type
         self.mixer_ip = mixer_ip
@@ -546,9 +549,19 @@ class AutoSoundcheckEngine:
         self._comp_v3_proposals: Dict[int, Any] = {}
         self._balance_v3_solution: Optional[Any] = None
         self.balance_genre = "pop_rock"
-        self.auto_apply = bool(auto_apply)
+        if auto_apply:
+            raise ValueError(
+                "Direct AutoSoundcheckEngine auto_apply is disabled; "
+                "use the supervised apply_operator_proposal server gate"
+            )
+        if feedback_emergency_apply:
+            raise ValueError(
+                "Direct feedback emergency writes are disabled; "
+                "use the supervised server emergency workflow"
+            )
+        self.auto_apply = False
         self.observe_only = bool(observe_only)
-        self.feedback_emergency_apply = bool(feedback_emergency_apply)
+        self.feedback_emergency_apply = False
         self.use_decision_engine_v2 = bool(use_decision_engine_v2)
         self.decision_engine_dry_run = bool(decision_engine_dry_run)
         self.auto_discover = auto_discover
@@ -673,17 +686,10 @@ class AutoSoundcheckEngine:
         self.correction_executor_config = CorrectionActionExecutorConfig.from_config(
             autofoh_live_action_executor
         )
-        # Единый источник промоутов: типы, включённые оператором в
-        # live_action_executor.promoted_action_types, разрешаются и на
-        # уровне direct-write политики SafetyController (иначе промоут
-        # исполнителя упирается в proposal-only карантин).
-        self.action_safety_config.promoted_direct_write_action_types = tuple(
-            sorted(
-                name for name, enabled
-                in self.correction_executor_config.promoted_action_types.items()
-                if enabled
-            )
-        )
+        # Configured action types select complete recommendation envelopes.
+        # They never expand SafetyController direct-write authority; physical
+        # execution belongs to the canonical supervised server gate.
+        self.action_safety_config.promoted_direct_write_action_types = ()
         # Pan v3: профиль PA из конфига (mono = консервативный дефолт)
         pan_cfg = autofoh_config.get("pan", {}) or {}
         self.pan_config = PanConfig(
@@ -749,10 +755,13 @@ class AutoSoundcheckEngine:
         sibilance_config = detector_config.get("sibilance_excess", {})
         low_end_config = detector_config.get("low_end", {})
 
-        self.mixer_client = None
+        self.mixer_client = mixer_client
         self._real_mixer_client = None
         self._observation_mixer_client: Optional[ObservationMixerClient] = None
-        self.audio_capture: Optional[AudioCapture] = None
+        self.audio_capture: Optional[AudioCapture] = audio_capture
+        self._owns_mixer_client = mixer_client is None
+        self._owns_audio_capture = audio_capture is None
+        self._derivation_complete = False
         self.feedback_detector: Optional[FeedbackDetector] = None
         self._last_feedback_event_at: Dict[Tuple[int, str, int], float] = {}
         self._last_feedback_channel_action_at: Dict[int, float] = {}
@@ -1210,10 +1219,21 @@ class AutoSoundcheckEngine:
             return
 
         channel = getattr(action, "channel_id", None)
-        proposal_id = f"gated:{len(self._soundcheck_action_proposals) + 1}"
         action_payload = self._action_payload(action)
-        self._soundcheck_action_proposals.append(
+        identity = json.dumps(
             {
+                "action_type": action.action_type,
+                "channel": channel,
+                "current_value": current_value,
+                "requested_state": action_payload,
+            },
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        )
+        proposal_id = f"gated:{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:16]}"
+        proposal = {
                 "recommendation_id": proposal_id,
                 "kind": action.action_type,
                 "action_type": f"typed_correction:{action.action_type}",
@@ -1222,6 +1242,9 @@ class AutoSoundcheckEngine:
                 "target": dict(gated_result.target or {}),
                 "current_state": {"value": current_value, "source": pre_read.get("source")},
                 "requested_state": action_payload,
+                "value_semantics": "absolute_target",
+                "relative_only": False,
+                "baseline_available": current_value is not None,
                 "confidence": confidence,
                 "rationale": rationale,
                 "metadata": metadata,
@@ -1232,6 +1255,7 @@ class AutoSoundcheckEngine:
                     ),
                     "live_mixer_writes": False,
                     "transport_policy": "dry_run_only",
+                    "value_semantics": "absolute_target",
                 },
                 "safety": {
                     "auto_apply_blocked": True,
@@ -1240,7 +1264,11 @@ class AutoSoundcheckEngine:
                     "gate_message": gated_result.message,
                 },
             }
-        )
+        self._soundcheck_action_proposals = [
+            existing for existing in self._soundcheck_action_proposals
+            if existing.get("recommendation_id") != proposal_id
+        ]
+        self._soundcheck_action_proposals.append(proposal)
 
     def get_soundcheck_recommendation_bundle(self) -> Dict[str, Any]:
         bundle = self._soundcheck_recommendation_workflow.build_bundle()
@@ -2088,6 +2116,7 @@ class AutoSoundcheckEngine:
             EngineState.RESETTING: RuntimeState.SILENCE_CAPTURE,
             EngineState.WAITING_FOR_SIGNAL: RuntimeState.LINE_CHECK,
             EngineState.ANALYZING: RuntimeState.SOURCE_LEARNING,
+            EngineState.DERIVING: RuntimeState.SNAPSHOT_LOCK,
             EngineState.APPLYING: RuntimeState.SNAPSHOT_LOCK,
             EngineState.RUNNING: RuntimeState.PRE_SHOW_CHECK,
             EngineState.ERROR: RuntimeState.MANUAL_LOCK,
@@ -2507,6 +2536,15 @@ class AutoSoundcheckEngine:
         If auto_discover is True and no IP is specified, runs network
         discovery first to find the mixer automatically.
         """
+        if self.mixer_client is not None:
+            if getattr(self.mixer_client, "is_connected", True) is False:
+                logger.error("Injected mixer runtime is not connected")
+                return False
+            self._set_state(EngineState.CONNECTING, "Using shared mixer runtime...")
+            self._activate_observation_mode()
+            self._configure_action_runtime()
+            return True
+
         need_discovery = self.auto_discover and (
             self.mixer_ip is None or self.mixer_type is None
         )
@@ -2585,18 +2623,7 @@ class AutoSoundcheckEngine:
             if success:
                 logger.info(f"Connected to {self.mixer_type.upper()} at {self.mixer_ip}:{self.mixer_port}")
                 self._activate_observation_mode()
-                self.safety_controller = AutoFOHSafetyController(
-                    mixer_client=self.mixer_client,
-                    config=self.action_safety_config,
-                )
-                if self.correction_executor_config.enabled:
-                    self.correction_executor = GatedCorrectionActionExecutor(
-                        self.safety_controller,
-                        config=self.correction_executor_config,
-                        event_logger=self._log_autofoh_event,
-                    )
-                else:
-                    self.correction_executor = None
+                self._configure_action_runtime()
                 return True
             else:
                 logger.error(f"Failed to connect to {self.mixer_type.upper()}")
@@ -2606,11 +2633,33 @@ class AutoSoundcheckEngine:
             logger.error(f"Mixer connection error: {e}")
             return False
 
+    def _configure_action_runtime(self) -> None:
+        """Bind safety and recommendation services to the active mixer view."""
+        self.safety_controller = AutoFOHSafetyController(
+            mixer_client=self.mixer_client,
+            config=self.action_safety_config,
+        )
+        if self.correction_executor_config.enabled:
+            self.correction_executor = GatedCorrectionActionExecutor(
+                self.safety_controller,
+                config=self.correction_executor_config,
+                event_logger=self._log_autofoh_event,
+            )
+        else:
+            self.correction_executor = None
+
     # ── 2. Detect & start audio ──────────────────────────────────
 
     def _start_audio(self) -> bool:
         """Scan for audio devices, select the best one, and start capture."""
         self._set_state(EngineState.SCANNING_AUDIO, "Scanning audio devices...")
+
+        if self.audio_capture is not None:
+            if not getattr(self.audio_capture, "running", False):
+                logger.error("Injected audio runtime is not running")
+                return False
+            logger.info("Using shared audio capture runtime")
+            return True
 
         # Step 1: Scan all available audio input devices
         self.audio_devices = scan_audio_devices()
@@ -4243,7 +4292,7 @@ class AutoSoundcheckEngine:
 
     def _run_autofoh_monitor_analysis(self):
         if (
-            not self.auto_apply
+            not (self.auto_apply or self.observe_only)
             or self.audio_capture is None
             or self.safety_controller is None
         ):
@@ -4400,7 +4449,7 @@ class AutoSoundcheckEngine:
 
     # ── 5. Apply corrections ─────────────────────────────────────
 
-    def _apply_corrections(self):
+    def _apply_corrections(self, *, derivation_only: bool = False):
         """Apply full channel strip processing to all active channels.
 
         Order: input trim → polarity/delay → HPF/LPF → expander → EQ →
@@ -4410,7 +4459,13 @@ class AutoSoundcheckEngine:
         Existing console state is preserved by default. Targets are interpreted
         as bounded corrections relative to the snapshot captured before analysis.
         """
-        self._set_state(EngineState.APPLYING, "Applying bounded corrections over current mixer state...")
+        if derivation_only:
+            self._set_state(
+                EngineState.DERIVING,
+                "Deriving absolute operator recommendations; mixer writes remain blocked...",
+            )
+        else:
+            self._set_state(EngineState.APPLYING, "Applying bounded corrections over current mixer state...")
         phase_guard_context = self._build_phase_target_guard_context(
             runtime_state=self.runtime_state
         )
@@ -4593,7 +4648,7 @@ class AutoSoundcheckEngine:
                 "SNAPSHOT_LOCK",
                 RuntimeState.SNAPSHOT_LOCK,
                 metadata={
-                    "applied_channel_ids": sorted(self._applied_channels),
+                    "applied_channel_ids": [] if derivation_only else sorted(self._applied_channels),
                     "safety_action_history_size": len(self.safety_controller.history)
                     if self.safety_controller is not None
                     else 0,
@@ -4622,6 +4677,18 @@ class AutoSoundcheckEngine:
                 len(pending), sorted(pending))
         else:
             logger.info("Чек-лист саундчека: все пункты закрыты")
+
+    def _derive_corrections(self) -> None:
+        """Build a fresh review bundle through the intercepted no-write path."""
+        if not self.observe_only or not isinstance(self.mixer_client, ObservationMixerClient):
+            raise RuntimeError("Recommendation derivation requires the observation mixer boundary")
+        self._soundcheck_recommendation_workflow.clear()
+        self._soundcheck_action_proposals = []
+        applied_before = set(self._applied_channels)
+        self._apply_corrections(derivation_only=True)
+        # Derivation visits active channels, but no change was physically sent.
+        self._applied_channels = applied_before
+        self._derivation_complete = True
 
     def _measurement_taps(self) -> Dict[str, Any]:
         """Карта измерительных USB-тапов (config autofoh.measurement_taps)."""
@@ -7621,9 +7688,13 @@ class AutoSoundcheckEngine:
         # Steps 8-9: Wait for audio signals and analyze
         self._wait_and_analyze()
 
-        # Step 10: Apply bounded corrections over the preserved console state
+        # Step 10: derive reviewable proposals in the canonical no-write mode.
+        # Legacy apply remains an internal-only runtime path and is not exposed
+        # by the web handler or CLI.
         if self.auto_apply:
             self._apply_corrections()
+        elif self.observe_only:
+            self._derive_corrections()
         elif self.soundcheck_profile_capture_multiphase_learning:
             self._capture_learning_phase(
                 "SNAPSHOT_LOCK",
@@ -7736,7 +7807,7 @@ class AutoSoundcheckEngine:
 
         self._evaluate_pending_actions(force=True)
 
-        if self.audio_capture:
+        if self.audio_capture and self._owns_audio_capture:
             try:
                 self.audio_capture.stop()
             except Exception:
@@ -7748,7 +7819,7 @@ class AutoSoundcheckEngine:
             except Exception:
                 pass
 
-        if self.mixer_client:
+        if self.mixer_client and self._owns_mixer_client:
             try:
                 self.mixer_client.disconnect()
             except Exception:
@@ -7856,6 +7927,10 @@ class AutoSoundcheckEngine:
             },
             "live_apply_enabled": bool(self.auto_apply and not self.observe_only),
             "dry_run": bool((not self.auto_apply) or self.observe_only),
+            "pipeline_mode": "proposal_only" if self.observe_only else "legacy_runtime",
+            "recommendation_derivation_complete": bool(self._derivation_complete),
+            "shared_mixer_runtime": not self._owns_mixer_client,
+            "shared_audio_runtime": not self._owns_audio_capture,
             "observe_only": self.observe_only,
             "feedback_reaction_enabled": bool(self.feedback_emergency_apply),
             "feedback_reaction_policy": (
@@ -7969,7 +8044,7 @@ def main():
     parser.add_argument("--sample-rate", type=int, default=48000,
                         help="Sample rate (default: 48000)")
     parser.add_argument("--live-apply", action="store_true",
-                        help="Explicitly apply eligible corrections live")
+                        help="Deprecated: direct live apply is blocked; use the supervised server gate")
     parser.add_argument("--no-apply", action="store_true",
                         help="Analyze only, do not apply corrections")
     parser.add_argument("--allow-feedback-emergency", action="store_true",
@@ -7980,8 +8055,10 @@ def main():
                         help="Only scan for mixers, do not connect")
 
     args = parser.parse_args()
-    if args.live_apply and args.no_apply:
-        parser.error("--live-apply and --no-apply cannot be used together")
+    if args.live_apply:
+        parser.error("--live-apply is disabled; use apply_operator_proposal with operator approval")
+    if args.allow_feedback_emergency:
+        parser.error("--allow-feedback-emergency is disabled outside the supervised server gate")
 
     logging.basicConfig(
         level=getattr(logging, args.log_level),
@@ -7995,8 +8072,8 @@ def main():
         return
 
     auto_discover = not args.no_discover
-    live_apply = bool(args.live_apply and not args.no_apply)
-    feedback_emergency_apply = bool(args.allow_feedback_emergency)
+    live_apply = False
+    feedback_emergency_apply = False
 
     def on_state(state, msg):
         print(f"\n>>> [{state}] {msg}")

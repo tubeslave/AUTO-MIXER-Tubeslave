@@ -20,6 +20,7 @@ import { Dashboard } from './DashboardView';
 import { Memory, RulesLibrary, Training } from './KnowledgeViews';
 import { Performance } from './PerformanceView';
 import { Settings } from './SettingsView';
+import { SoundcheckView } from './SoundcheckView';
 import { AudioRouting, Devices, Logs, OscMidi, SystemConnection } from './SystemViews';
 import { TaskQueue } from './TaskQueueView';
 
@@ -35,7 +36,19 @@ const fallbackDashboardRuntime: DashboardRuntime = {
   pendingDecisions: 23,
   appliedDecisions: 12,
   blockedDecisions: 3,
-  sourceLabel: 'Mock'
+  sourceLabel: 'Mock',
+  masterAvailable: false,
+  integratedLufsAvailable: false,
+  truePeakAvailable: false,
+  shortTermLufsAvailable: false,
+  momentaryLufsAvailable: false,
+  lraAvailable: false,
+  spectrumAvailable: false,
+  aiConfidenceAvailable: false,
+  audioCaptureRunning: false,
+  mainFaderAvailable: false,
+  readCoverageStatus: 'mock',
+  cacheFreshnessStatus: 'mock'
 };
 
 const fallbackDirectorRuntime: DirectorRuntime = {
@@ -142,6 +155,7 @@ function fallbackViewData(): OperatorViewData {
 export function buildView(route: RouteId, ui: UiState, actions: UiActions, data: OperatorViewData = fallbackViewData()): ViewModel {
   switch (route) {
     case 'dashboard': return Dashboard(ui, actions, data);
+    case 'soundcheck': return SoundcheckView(ui, actions, data);
     case 'agents': return AgentsConsole(ui, actions, data);
     case 'communications': return Communications(ui, actions, data);
     case 'task-queue': return TaskQueue(ui, actions, data);

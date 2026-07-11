@@ -50,7 +50,7 @@ def test_cli_requires_explicit_live_apply_flag(monkeypatch):
     assert captured["run_called"] is True
 
 
-def test_cli_live_apply_flag_is_explicit_opt_in(monkeypatch):
+def test_cli_live_apply_flag_is_fail_closed(monkeypatch):
     captured = {}
 
     class FakeEngine:
@@ -63,13 +63,13 @@ def test_cli_live_apply_flag_is_explicit_opt_in(monkeypatch):
     monkeypatch.setattr(auto_soundcheck_module, "AutoSoundcheckEngine", FakeEngine)
     monkeypatch.setattr(sys, "argv", ["auto_soundcheck_engine.py", "--live-apply"])
 
-    auto_soundcheck_module.main()
+    with pytest.raises(SystemExit):
+        auto_soundcheck_module.main()
 
-    assert captured["auto_apply"] is True
-    assert captured["run_called"] is True
+    assert captured == {}
 
 
-def test_cli_feedback_emergency_flag_is_explicit_opt_in(monkeypatch):
+def test_cli_feedback_emergency_flag_is_fail_closed(monkeypatch):
     captured = {}
 
     class FakeEngine:
@@ -82,10 +82,10 @@ def test_cli_feedback_emergency_flag_is_explicit_opt_in(monkeypatch):
     monkeypatch.setattr(auto_soundcheck_module, "AutoSoundcheckEngine", FakeEngine)
     monkeypatch.setattr(sys, "argv", ["auto_soundcheck_engine.py", "--allow-feedback-emergency"])
 
-    auto_soundcheck_module.main()
+    with pytest.raises(SystemExit):
+        auto_soundcheck_module.main()
 
-    assert captured["feedback_emergency_apply"] is True
-    assert captured["run_called"] is True
+    assert captured == {}
 
 
 def test_auto_soundcheck_feedback_default_policy_blocks_direct_feedback_write():
@@ -118,34 +118,13 @@ def test_auto_soundcheck_feedback_default_policy_blocks_direct_feedback_write():
     assert engine.mixer_client.calls == []
 
 
-def test_auto_soundcheck_feedback_emergency_policy_allows_direct_feedback_write_when_enabled():
-    engine = AutoSoundcheckEngine(
-        auto_apply=False,
-        auto_discover=False,
-        feedback_emergency_apply=True,
-    )
-    engine.mixer_client = FakeFeedbackMixer()
-    engine.channels = {1: ChannelInfo(channel=1, name="Lead Vox", fader_db=-5.0)}
-
-    status_before = engine.get_status()
-    assert status_before["feedback_reaction_enabled"] is True
-
-    engine._handle_feedback_event(
-        1,
-        FeedbackEvent(
-            channel=1,
-            frequency_hz=3150.0,
-            magnitude_db=-6.5,
-            action="notch",
-            confidence=0.95,
-        ),
-    )
-
-    status_after = engine.get_status()
-    assert status_after["feedback_reaction_enabled"] is True
-    assert engine.mixer_client.calls == [
-        ("set_eq_band", 1, 4, pytest.approx(3150.0), pytest.approx(-6.0), pytest.approx(10.0))
-    ]
+@pytest.mark.parametrize("kwargs", [
+    {"auto_apply": True},
+    {"feedback_emergency_apply": True},
+])
+def test_direct_engine_live_write_modes_are_fail_closed(kwargs):
+    with pytest.raises(ValueError, match="supervised"):
+        AutoSoundcheckEngine(auto_discover=False, **kwargs)
 
 
 def test_cli_rejects_conflicting_apply_flags(monkeypatch):

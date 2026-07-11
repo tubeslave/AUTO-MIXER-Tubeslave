@@ -3208,21 +3208,13 @@ class AutoMixerServer:
         return self.mixing_agent
 
     def _sync_runtime_from_auto_soundcheck(self):
-        """Expose the active AutoSoundcheckEngine runtime to server-level modules."""
-        engine = getattr(self, "auto_soundcheck_engine", None)
-        if not engine:
-            return
+        """Preserve server ownership of mixer/audio runtime services.
 
-        engine_mixer = getattr(engine, "mixer_client", None)
-        if engine_mixer is not None:
-            self.mixer_client = engine_mixer
-            self.connection_mode = getattr(engine, "mixer_type", None) or self.connection_mode
-            if self.mixing_agent is not None:
-                self.mixing_agent.mixer = engine_mixer
-
-        engine_audio = getattr(engine, "audio_capture", None)
-        if engine_audio is not None:
-            self.audio_capture = engine_audio
+        Soundcheck receives already-running shared services when available. An
+        engine-owned fallback must never replace the server references because
+        it is stopped and disconnected with the engine lifecycle.
+        """
+        return
 
     async def stop_mixing_agent(self):
         """Stop the AI MixingAgent loop while preserving its last status/history."""

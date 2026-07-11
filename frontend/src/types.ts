@@ -37,6 +37,24 @@ export interface BackendUiState {
   proposalApplyResult?: ProposalApplyResult | null;
 }
 
+export interface SoundcheckRuntime {
+  running: boolean;
+  state: string;
+  message: string;
+  error: string;
+  observeOnly: boolean;
+  proposalOnly: boolean;
+  mixerConnected: boolean;
+  audioRunning: boolean;
+  selectedChannels: number[];
+  channelsWithSignal: number;
+  totalChannels: number;
+  recommendationCount: number;
+  derivationComplete: boolean;
+  interceptedWriteCount: number;
+  lastUpdated: string;
+}
+
 export interface ProposalApplyResult {
   proposalId?: string;
   status: string;
@@ -213,6 +231,7 @@ export interface ActionFocus {
 
 export type RouteId =
   | 'dashboard'
+  | 'soundcheck'
   | 'agents'
   | 'communications'
   | 'task-queue'
@@ -558,6 +577,7 @@ export interface ViewModel {
 export interface UiState {
   mode: AutomixerMode;
   backend: BackendUiState;
+  soundcheck: SoundcheckRuntime;
   selectedAgentId: string;
   selectedCommunicationKey: string;
   selectedPerformanceAgent: string;
@@ -612,6 +632,8 @@ export interface UiActions {
   navigate: (route: RouteId) => void;
   runBackendAnalysis: () => void;
   startReplayRun: () => void;
+  startSoundcheck: () => void;
+  stopSoundcheck: () => void;
   pushToast: (message: string, tone?: Tone) => void;
   dismissToast: () => void;
 }
