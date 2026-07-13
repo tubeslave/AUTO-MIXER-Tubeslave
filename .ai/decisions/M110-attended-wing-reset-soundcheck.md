@@ -5,7 +5,9 @@ authority kinds.
 
 1. `capture_wing_master_route_proof` is authenticated, fixed-address,
    observation-only and process-private; its artifact is audit evidence only,
-   and restart requires a new proof.
+   and restart requires a new proof. Capture is bound to one unique physical
+   BEHRINGER WING CoreAudio/USB VID/PID/location/serial identity and exact
+   PortAudio stream, not merely a device name.
 2. Exact capabilities are backend-generated and atomically consumed behind the
    canonical `apply_operator_proposal` boundary.
    The same route-proof owner arms supervised capability-only mode through an
@@ -31,7 +33,11 @@ authority kinds.
 7. The normal allowlist and registry are not widened by M110.
 8. No real WING contact occurs until Council artifacts, implementation,
    adversarial tests, full-suite/no-WING validation, clean source commit and
-   independent review are complete.
+   independent review are complete. A backend-owned CP05 gate binds those
+   results to every entry in the committed Git tree; a later commit closes the
+   gate. A centralized attended-child ingress allowlist blocks raw capture,
+   discovery and alternate-mixer handlers before resource construction while
+   preserving stop/disconnect/emergency cleanup.
 
 Rejected: direct runner OSC, generic query/write endpoints, self-authored route
 JSON, public proof flags, broad legacy reset and automatic family promotion.

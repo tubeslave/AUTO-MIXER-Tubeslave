@@ -15,6 +15,7 @@ import signal
 import subprocess
 import threading
 import time
+from dataclasses import replace
 from pathlib import Path
 import numpy as np
 import pytest
@@ -38,6 +39,7 @@ from runtime_identity import (
     RUNTIME_IDENTITY_SCHEMA,
     runtime_identity_manifest_sha256,
 )
+from master_capture_route_proof import MasterCaptureRouteAuthority
 
 try:
     import server as server_module
@@ -51,28 +53,82 @@ except ImportError:
 
 
 def _configure_unit_master_route_proof(server, tmp_path, proof_id):
-    proof_path = tmp_path / f"{proof_id}.json"
-    proof_path.write_text(
-        json.dumps(
-            {
-                "accepted": True,
-                "proof_id": proof_id,
-                "console_serial": "WING-UNIT",
-                "firmware_version": "3.0.5",
-                "capture_device": "Unit 48ch USB",
-                "capture_device_index": 7,
-                "capture_channel_count": 48,
-                "capture_sample_rate_hz": 48000,
-                "master_channels": [47, 48],
-            },
-            sort_keys=True,
-        ),
-        encoding="utf-8",
+    now = time.time()
+    launch_sha = "a" * 64
+    server._runtime_identity["launch_binding"][
+        "prestart_manifest_sha256"
+    ] = launch_sha
+    server._m110_launch_authority = MagicMock()
+    server._m110_launch_authority.source_snapshot_status.return_value = (
+        True,
+        "m110_live_source_snapshot_current",
     )
-    server._master_capture_route_proof_path = str(proof_path)
-    server._master_capture_route_proof_sha256 = hashlib.sha256(
-        proof_path.read_bytes()
-    ).hexdigest()
+    server.connection_mode = "wing"
+    owner = object()
+    server._ws_auth_required = True
+    server._authenticated_websocket_ids.add(id(owner))
+    server._unit_route_owner = owner
+    server._m110_transport_owner_connection_id = id(owner)
+    server._m110_transport_owner_ref = owner
+    control_dir = tmp_path / "autopilot"
+    server._m110_autopilot_stop_path = control_dir / "STOP"
+    server._m110_autopilot_writer_lease_path = (
+        control_dir / "WRITER_LEASE" / "owner.json"
+    )
+    server._m110_autopilot_writer_lease_dir = (
+        server._m110_autopilot_writer_lease_path.parent
+    )
+    server._m110_legacy_autoloop_lock_path = control_dir / ".codex_autoloop.lock"
+    server.mixer_client = _unit_connected_wing_client()
+    server._master_capture_route_authority = MasterCaptureRouteAuthority(
+        proof_id=proof_id,
+        issued_at_epoch=now,
+        expires_at_epoch=now + 300.0,
+        runtime_instance_nonce=server._runtime_identity["instance_nonce"],
+        runtime_manifest_sha256=server._runtime_identity["manifest_sha256"],
+        launch_manifest_sha256=launch_sha,
+        connection_generation=server._mixer_connection_generation,
+        transport_generation=server._mixer_connection_generation,
+        transport_instance_id=id(server.mixer_client),
+        owner_connection_id=id(owner),
+        emergency_generation=server._manual_write_emergency_generation,
+        console_serial="WING-UNIT",
+        firmware_version="3.0.5",
+        capture_device="Unit WING USB 48ch",
+        capture_device_index=7,
+        capture_channel_count=48,
+        capture_sample_rate_hz=48000,
+        capture_instance_id=0,
+        capture_hardware_uid="usb:1397:050b:WING-UNIT214:00100000",
+        capture_hardware_binding_sha256="d" * 64,
+        capture_usb_serial="WING-UNIT214",
+        capture_usb_location_id=1048576,
+        master_channels=(47, 48),
+        artifact_path=str(tmp_path / f"{proof_id}.json"),
+        artifact_sha256="b" * 64,
+        evidence_sha256="sha256:" + ("c" * 64),
+        _transport_ref=server.mixer_client,
+        _capture_ref=None,
+        _capture_stream_ref=None,
+        _owner_ref=owner,
+    )
+    server._m110_capture_hardware_identity = MagicMock(
+        return_value={
+            "verified": True,
+            "reason": "physical_wing_usb_capture_bound_to_console",
+            "device_name": "Unit WING USB 48ch",
+            "device_index": 7,
+            "console_serial": "WING-UNIT",
+            "hardware_uid": "usb:1397:050b:WING-UNIT214:00100000",
+            "binding_sha256": "d" * 64,
+            "usb": {
+                "vendor_id": 5015,
+                "product_id": 1291,
+                "serial": "WING-UNIT214",
+                "location_id": 1048576,
+            },
+        }
+    )
     return {
         "/$syscfg/$serial": "WING-UNIT",
         "/$syscfg/$firmware": "3.0.5",
@@ -81,6 +137,46 @@ def _configure_unit_master_route_proof(server, tmp_path, proof_id):
         "/io/out/USB/48/grp": "MAIN",
         "/io/out/USB/48/in": 1,
     }
+
+
+def _unit_connected_wing_client():
+    client = object.__new__(server_module.WingClient)
+    client.is_connected = True
+    client.query_parameter = MagicMock()
+    return client
+
+
+def _bind_unit_master_route_capture(server, capture):
+    server._audio_capture_preview_owner = server._unit_route_owner
+    stream = getattr(capture, "_stream", None)
+    if stream is None:
+        stream = object()
+        capture._stream = stream
+    server._master_capture_route_authority = replace(
+        server._master_capture_route_authority,
+        capture_instance_id=id(capture),
+        _capture_ref=capture,
+        _capture_stream_ref=stream,
+    )
+
+
+def _unit_audio_capture_progress_statuses():
+    base = {
+        "running": True,
+        "real_input": True,
+        "source_type": "sounddevice",
+        "callback_age_sec": 0.01,
+        "device_name": "Unit WING USB 48ch",
+        "device_index": 7,
+        "num_channels": 48,
+        "sample_rate": 48000,
+    }
+    return [
+        {**base, "captured_sample_count": 1024},
+        {**base, "captured_sample_count": 1024},
+        {**base, "captured_sample_count": 1024},
+        {**base, "captured_sample_count": 2048},
+    ]
 
 
 def _verified_manual_apply_result(**overrides):
@@ -216,6 +312,179 @@ async def test_connect_wing_failed_attempt_disconnects_failed_client(mock_config
     })
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("blocker_kind", "expected_blocker"),
+    [
+        ("cp05", "m110_cp05_hardware_gate_closed"),
+        ("source", "m110_live_source_snapshot_drift"),
+        ("stop", "autopilot_stop_file_present"),
+        ("lease", "autopilot_writer_lease_present"),
+    ],
+)
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+async def test_m110_preconnect_global_rails_block_before_osc_construction(
+    mock_config,
+    mock_bleed,
+    tmp_path,
+    blocker_kind,
+    expected_blocker,
+):
+    server = AutoMixerServer()
+    owner = object()
+    source = server._runtime_identity["source"]
+    server._runtime_identity["launch_binding"] = {
+        "mode": "m110_attended_runner",
+        "head": source["head"],
+        "tree": source["tree"],
+        "tracked_tree_clean": True,
+    }
+    server._m110_launch_authority = MagicMock()
+    server._m110_launch_authority.source_snapshot_status.return_value = (
+        False,
+        "m110_live_source_snapshot_drift",
+    ) if blocker_kind == "source" else (
+        True,
+        "m110_live_source_snapshot_current",
+    )
+    server._ws_auth_required = True
+    server._authenticated_websocket_ids.add(id(owner))
+    server.operator_mode = "analyze"
+    control_dir = tmp_path / "autopilot"
+    server._m110_autopilot_stop_path = control_dir / "STOP"
+    server._m110_autopilot_writer_lease_path = (
+        control_dir / "WRITER_LEASE" / "owner.json"
+    )
+    server._m110_autopilot_writer_lease_dir = (
+        server._m110_autopilot_writer_lease_path.parent
+    )
+    server._m110_legacy_autoloop_lock_path = control_dir / ".codex_autoloop.lock"
+    if blocker_kind == "stop":
+        server._m110_autopilot_stop_path.parent.mkdir(parents=True)
+        server._m110_autopilot_stop_path.touch()
+    if blocker_kind == "lease":
+        server._m110_autopilot_writer_lease_dir.mkdir(parents=True)
+    server.send_to_client = AsyncMock()
+    gate = (
+        patch(
+            "server.verify_m110_cp05_hardware_gate",
+            side_effect=RuntimeError("m110_cp05_hardware_gate_closed"),
+        )
+        if blocker_kind == "cp05"
+        else patch(
+            "server.verify_m110_cp05_hardware_gate",
+            return_value={"verified": True},
+        )
+    )
+
+    with gate, patch("server.EnhancedOSCClient") as client_type:
+        result = await server.connect_wing(
+            "192.168.1.102",
+            send_port=2223,
+            receive_port=2223,
+            observation_only=True,
+            record_telemetry=False,
+            owner_websocket=owner,
+        )
+
+    assert result is False
+    client_type.assert_not_called()
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["reason"] == "m110_preconnect_safety_gate_failed"
+    assert expected_blocker in payload["blockers"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("message_type", "payload", "response_type"),
+    [
+        (
+            "start_audio_capture_preview",
+            {
+                "device_id": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+                "buffer_seconds": 8.0,
+            },
+            "audio_capture_status",
+        ),
+        ("scan_mixers", {"full_scan": True}, "m110_protocol_status"),
+        ("auto_connect", {}, "m110_protocol_status"),
+        ("connect_dlive", {}, "m110_protocol_status"),
+    ],
+)
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+async def test_m110_ingress_blocks_resource_handlers_before_cp05_or_allowlist(
+    mock_config,
+    mock_bleed,
+    message_type,
+    payload,
+    response_type,
+):
+    server = AutoMixerServer()
+    owner = object()
+    server._runtime_identity["launch_binding"] = {
+        "mode": "m110_attended_runner",
+    }
+    server._ws_auth_required = True
+    server._authenticated_websocket_ids.add(id(owner))
+    server._verify_m110_cp05_hardware_gate = MagicMock(
+        side_effect=RuntimeError("m110_cp05_hardware_gate_closed")
+    )
+    resource_handler = AsyncMock()
+    server._dispatch[message_type] = resource_handler
+    server.send_to_client = AsyncMock()
+
+    await server.handle_client_message(
+        owner,
+        json.dumps({"type": message_type, **payload}),
+    )
+
+    resource_handler.assert_not_awaited()
+    response = server.send_to_client.await_args.args[1]
+    assert response["type"] == response_type
+    assert response["status"] == "blocked"
+    if message_type == "start_audio_capture_preview":
+        assert "m110_cp05_hardware_gate_closed" in response["blockers"]
+    else:
+        assert "m110_message_type_not_allowlisted" in response["blockers"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "message_type",
+    ["stop_audio_capture_preview", "disconnect_wing", "disconnect_mixer"],
+)
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+async def test_m110_ingress_cleanup_remains_available_after_gate_closes(
+    mock_config,
+    mock_bleed,
+    message_type,
+):
+    server = AutoMixerServer()
+    owner = object()
+    server._runtime_identity["launch_binding"] = {
+        "mode": "m110_attended_runner",
+    }
+    server._ws_auth_required = True
+    server._authenticated_websocket_ids.add(id(owner))
+    server._verify_m110_cp05_hardware_gate = MagicMock(
+        side_effect=RuntimeError("m110_cp05_hardware_gate_closed")
+    )
+    cleanup_handler = AsyncMock()
+    server._dispatch[message_type] = cleanup_handler
+
+    await server.handle_client_message(
+        owner,
+        json.dumps({"type": message_type}),
+    )
+
+    cleanup_handler.assert_awaited_once_with(owner, {"type": message_type})
+
+
 # ---------------------------------------------------------------------------
 # AutoMixerServer initialization tests (with mocks)
 # ---------------------------------------------------------------------------
@@ -345,6 +614,70 @@ class TestAutoMixerServerInit:
 
         assert server._ws_auth_required is True
         assert token not in repr(server.auth_manager._tokens)
+        with pytest.raises(OSError):
+            os.fstat(read_fd)
+
+    def test_websocket_launch_token_rejects_regular_file_descriptor(
+        self,
+        tmp_path,
+    ):
+        path = tmp_path / "token.txt"
+        path.write_text("p" * 43, encoding="ascii")
+        fd = os.open(path, os.O_RDONLY)
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_AUTH_TOKEN_FD": str(fd)},
+            clear=False,
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            with pytest.raises(RuntimeError, match="one-shot pipe"):
+                server_module._consume_configured_ws_auth_token()
+
+        with pytest.raises(OSError):
+            os.fstat(fd)
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_m110_rejects_plaintext_environment_websocket_token(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        authority = MagicMock()
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_AUTH_TOKEN": "p" * 43},
+            clear=False,
+        ), patch(
+            "server.consume_m110_attended_launch_authority",
+            return_value=({"mode": "m110_attended_runner"}, authority),
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN_FD", None)
+            with pytest.raises(RuntimeError, match="separate inherited pipe"):
+                AutoMixerServer()
+
+        authority.close.assert_called_once_with()
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_m110_rejects_shared_authority_and_websocket_token_fd(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        read_fd, write_fd = os.pipe()
+        os.close(write_fd)
+        with patch.dict(
+            os.environ,
+            {
+                "AUTOMIXER_WS_AUTH_TOKEN_FD": str(read_fd),
+                "AUTOMIXER_M110_AUTHORITY_FD": str(read_fd),
+            },
+            clear=False,
+        ):
+            with pytest.raises(RuntimeError, match="distinct inherited pipes"):
+                AutoMixerServer()
+
         with pytest.raises(OSError):
             os.fstat(read_fd)
 
@@ -1521,29 +1854,11 @@ class TestAutoMixerServerConfigNormalization:
         tmp_path,
     ):
         server = AutoMixerServer()
-        proof_path = tmp_path / "master-route-proof.json"
-        proof_path.write_text(
-            json.dumps(
-                {
-                    "accepted": True,
-                    "proof_id": "unit-route-proof",
-                    "console_serial": "WING-UNIT",
-                    "firmware_version": "3.0.5",
-                    "capture_device": "Unit 48ch USB",
-                    "capture_device_index": 7,
-                    "capture_channel_count": 48,
-                    "capture_sample_rate_hz": 48000,
-                    "master_channels": [47, 48],
-                },
-                sort_keys=True,
-            ),
-            encoding="utf-8",
+        _configure_unit_master_route_proof(
+            server,
+            tmp_path,
+            "unit-route-proof",
         )
-        server._master_capture_route_proof_path = str(proof_path)
-        server._master_capture_route_proof_sha256 = hashlib.sha256(
-            proof_path.read_bytes()
-        ).hexdigest()
-        server.mixer_client = MagicMock(is_connected=True)
         expected_route = {
             "/$syscfg/$serial": "WING-UNIT",
             "/$syscfg/$firmware": "3.0.5",
@@ -1561,29 +1876,11 @@ class TestAutoMixerServerConfigNormalization:
             }
         )
         server.audio_capture = MagicMock(running=True, num_channels=48)
-        server.audio_capture.get_status.side_effect = [
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 1024,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 2048,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-        ]
+        server.audio_capture.get_status.side_effect = (
+            _unit_audio_capture_progress_statuses()
+        )
         server.audio_capture.get_peak.side_effect = lambda channel: {47: -12.0, 48: -11.0}[channel]
+        _bind_unit_master_route_capture(server, server.audio_capture)
         operation = MagicMock(family_id="fader", operation_id="fader-1")
 
         result = await server._supervised_transaction_audio_recheck(operation, {}, {})
@@ -1611,7 +1908,6 @@ class TestAutoMixerServerConfigNormalization:
             tmp_path,
             "post-audio-route-drift",
         )
-        server.mixer_client = MagicMock(is_connected=True)
         query_count = 0
 
         def query(address, timeout):
@@ -1629,32 +1925,14 @@ class TestAutoMixerServerConfigNormalization:
 
         server.mixer_client.query_parameter.side_effect = query
         server.audio_capture = MagicMock(running=True, num_channels=48)
-        server.audio_capture.get_status.side_effect = [
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 1024,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 2048,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-        ]
+        server.audio_capture.get_status.side_effect = (
+            _unit_audio_capture_progress_statuses()
+        )
         server.audio_capture.get_peak.side_effect = lambda channel: {
             47: -12.0,
             48: -11.0,
         }[channel]
+        _bind_unit_master_route_capture(server, server.audio_capture)
 
         result = await server._supervised_transaction_audio_recheck(
             MagicMock(family_id="fader", operation_id="post-route-drift"),
@@ -1687,7 +1965,6 @@ class TestAutoMixerServerConfigNormalization:
             tmp_path,
             "engine-owned-capture",
         )
-        server.mixer_client = MagicMock(is_connected=True)
         server.mixer_client.query_parameter.side_effect = (
             lambda address, timeout: {
                 "status": "received",
@@ -1697,28 +1974,7 @@ class TestAutoMixerServerConfigNormalization:
             }
         )
         capture = MagicMock(running=True, num_channels=48)
-        capture.get_status.side_effect = [
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 1024,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-            {
-                "running": True,
-                "real_input": True,
-                "callback_age_sec": 0.01,
-                "captured_sample_count": 2048,
-                "device_name": "Unit 48ch USB",
-                "device_index": 7,
-                "num_channels": 48,
-                "sample_rate": 48000,
-            },
-        ]
+        capture.get_status.side_effect = _unit_audio_capture_progress_statuses()
         capture.get_peak.side_effect = lambda channel: {
             47: -12.0,
             48: -11.0,
@@ -1729,6 +1985,7 @@ class TestAutoMixerServerConfigNormalization:
             (),
             {"audio_capture": capture},
         )()
+        _bind_unit_master_route_capture(server, capture)
 
         result = await server._supervised_transaction_audio_recheck(
             MagicMock(family_id="fader", operation_id="engine-capture"),
@@ -1752,28 +2009,11 @@ class TestAutoMixerServerConfigNormalization:
         tmp_path,
     ):
         server = AutoMixerServer()
-        proof_path = tmp_path / "master-route-proof.json"
-        proof_path.write_text(
-            json.dumps(
-                {
-                    "accepted": True,
-                    "proof_id": "stale-input-proof",
-                    "console_serial": "WING-UNIT",
-                    "firmware_version": "3.0.5",
-                    "capture_device": "Unit 48ch USB",
-                    "capture_device_index": 7,
-                    "capture_channel_count": 48,
-                    "capture_sample_rate_hz": 48000,
-                    "master_channels": [47, 48],
-                },
-                sort_keys=True,
-            ),
-            encoding="utf-8",
+        _configure_unit_master_route_proof(
+            server,
+            tmp_path,
+            "stale-input-proof",
         )
-        server._master_capture_route_proof_path = str(proof_path)
-        server._master_capture_route_proof_sha256 = hashlib.sha256(
-            proof_path.read_bytes()
-        ).hexdigest()
         route = {
             "/$syscfg/$serial": "WING-UNIT",
             "/$syscfg/$firmware": "3.0.5",
@@ -1782,7 +2022,6 @@ class TestAutoMixerServerConfigNormalization:
             "/io/out/USB/48/grp": "MAIN",
             "/io/out/USB/48/in": 1,
         }
-        server.mixer_client = MagicMock(is_connected=True)
         server.mixer_client.query_parameter.side_effect = (
             lambda address, timeout: {
                 "status": "received",
@@ -1795,13 +2034,15 @@ class TestAutoMixerServerConfigNormalization:
         server.audio_capture.get_status.return_value = {
             "running": True,
             "real_input": False,
+            "source_type": "sounddevice",
             "callback_age_sec": 60.0,
             "captured_sample_count": 9999,
-            "device_name": "Unit 48ch USB",
+            "device_name": "Unit WING USB 48ch",
             "device_index": 7,
             "num_channels": 48,
             "sample_rate": 48000,
         }
+        _bind_unit_master_route_capture(server, server.audio_capture)
         operation = MagicMock(family_id="fader", operation_id="stale-input")
 
         result = await server._supervised_transaction_audio_recheck(
@@ -1811,8 +2052,8 @@ class TestAutoMixerServerConfigNormalization:
         )
 
         assert result.status == "unavailable"
-        assert result.reason == "master_capture_real_input_stale_or_unavailable"
-        assert result.evidence["capture_real_input_fresh"] is False
+        assert result.reason == "master_capture_route_proof_required"
+        assert result.evidence["route_verified"] is False
         server.audio_capture.get_peak.assert_not_called()
 
     @pytest.mark.asyncio
@@ -1825,28 +2066,11 @@ class TestAutoMixerServerConfigNormalization:
         tmp_path,
     ):
         server = AutoMixerServer()
-        proof_path = tmp_path / "master-route-proof.json"
-        proof_path.write_text(
-            json.dumps(
-                {
-                    "accepted": True,
-                    "proof_id": "route-drift-proof",
-                    "console_serial": "WING-UNIT",
-                    "firmware_version": "3.0.5",
-                    "capture_device": "Unit 48ch USB",
-                    "capture_device_index": 7,
-                    "capture_channel_count": 48,
-                    "capture_sample_rate_hz": 48000,
-                    "master_channels": [47, 48],
-                },
-                sort_keys=True,
-            ),
-            encoding="utf-8",
+        _configure_unit_master_route_proof(
+            server,
+            tmp_path,
+            "route-drift-proof",
         )
-        server._master_capture_route_proof_path = str(proof_path)
-        server._master_capture_route_proof_sha256 = hashlib.sha256(
-            proof_path.read_bytes()
-        ).hexdigest()
         route = {
             "/$syscfg/$serial": "WING-UNIT",
             "/$syscfg/$firmware": "3.0.5",
@@ -1855,7 +2079,6 @@ class TestAutoMixerServerConfigNormalization:
             "/io/out/USB/48/grp": "MAIN",
             "/io/out/USB/48/in": 1,
         }
-        server.mixer_client = MagicMock(is_connected=True)
         server.mixer_client.query_parameter.side_effect = (
             lambda address, timeout: {
                 "status": "received",
@@ -1865,6 +2088,18 @@ class TestAutoMixerServerConfigNormalization:
             }
         )
         server.audio_capture = MagicMock(running=True, num_channels=48)
+        server.audio_capture.get_status.return_value = {
+            "running": True,
+            "real_input": True,
+            "source_type": "sounddevice",
+            "callback_age_sec": 0.01,
+            "captured_sample_count": 2048,
+            "device_name": "Unit WING USB 48ch",
+            "device_index": 7,
+            "num_channels": 48,
+            "sample_rate": 48000,
+        }
+        _bind_unit_master_route_capture(server, server.audio_capture)
         operation = MagicMock(family_id="fader", operation_id="route-drift")
 
         result = await server._supervised_transaction_audio_recheck(

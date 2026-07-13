@@ -14,6 +14,7 @@ import pwd
 import re
 import select
 import signal
+import stat
 import subprocess
 import sys
 import threading
@@ -169,6 +170,27 @@ from runtime_identity import (
     load_packaged_runtime_source_components,
     runtime_identity_manifest_sha256,
 )
+from master_capture_route_proof import (
+    MASTER_CAPTURE_ROUTE_ADDRESSES,
+    MASTER_CAPTURE_ROUTE_EXPECTED,
+    MasterCaptureRouteAuthority,
+    discard_master_capture_route_artifact,
+    new_route_proof_id,
+    route_authority_expiry,
+    route_value_matches,
+    validate_master_capture_route_request,
+    verify_master_capture_route_artifact,
+    write_master_capture_route_artifact,
+)
+from supervised_proof_capability import (
+    M110_AUTHORITY_FD_ENV,
+    M110_RUNTIME_CRITICAL_PATHS,
+    consume_m110_attended_launch_authority,
+)
+from m110_cp05_hardware_gate import verify_m110_cp05_hardware_gate
+from wing_capture_hardware_identity import (
+    collect_wing_capture_hardware_identity,
+)
 
 _REPO_ROOT = os.path.abspath(
     os.environ.get("AUTOMIXER_REPO_ROOT")
@@ -180,6 +202,7 @@ _RUNTIME_BINDING_ENV_NAMES = {
     "AUTOMIXER_M005_PRESTART_PROVENANCE_SCHEMA",
     "AUTOMIXER_M005_PRESTART_PROVENANCE_SHA256",
     "AUTOMIXER_M005_PRESTART_PROVENANCE_SIZE",
+    M110_AUTHORITY_FD_ENV,
 }
 _NON_DOTENV_RUNTIME_ENV_NAMES = _RUNTIME_BINDING_ENV_NAMES | {
     "AUTOMIXER_WS_AUTH_TOKEN",
@@ -194,7 +217,9 @@ def _load_repo_dotenv() -> None:
     # M005 evidence is bound to the proof runner's explicit allowlisted child
     # environment. An ignored local `.env` is not part of release provenance
     # and must not alter its operator mode, write rails, or evidence roots.
-    if os.environ.get("AUTOMIXER_M005_LAUNCH_NONCE"):
+    if os.environ.get("AUTOMIXER_M005_LAUNCH_NONCE") or os.environ.get(
+        M110_AUTHORITY_FD_ENV
+    ):
         return
     path = os.path.join(_REPO_ROOT, ".env")
     if not os.path.isfile(path):
@@ -239,6 +264,10 @@ def _consume_configured_ws_auth_token() -> Optional[str]:
     total = 0
     deadline = time.monotonic() + WS_AUTH_TOKEN_PIPE_TIMEOUT_SECONDS
     try:
+        if not stat.S_ISFIFO(os.fstat(fd).st_mode):
+            raise RuntimeError(
+                "WebSocket launch token descriptor must be a one-shot pipe"
+            )
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -595,8 +624,47 @@ class AutoMixerServer:
         self._ws_allowed_origins = self._build_websocket_allowed_origins()
         # Read and remove the one-time bearer token before constructing runtime
         # identity. Packaged identity binds to its digest, never the plaintext.
-        configured_token_from_fd = bool(os.environ.get("AUTOMIXER_WS_AUTH_TOKEN_FD"))
+        configured_token_fd_text = os.environ.get("AUTOMIXER_WS_AUTH_TOKEN_FD")
+        m110_authority_fd_text = os.environ.get(M110_AUTHORITY_FD_ENV)
+        if (
+            configured_token_fd_text
+            and m110_authority_fd_text
+            and configured_token_fd_text == m110_authority_fd_text
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN_FD", None)
+            os.environ.pop(M110_AUTHORITY_FD_ENV, None)
+            if str(configured_token_fd_text).isdigit():
+                try:
+                    os.close(int(configured_token_fd_text))
+                except OSError:
+                    pass
+            raise RuntimeError(
+                "M110 authority and WebSocket token require distinct inherited pipes"
+            )
+        configured_token_from_fd = bool(configured_token_fd_text)
         configured_token = _consume_configured_ws_auth_token()
+        m110_launch_binding, m110_launch_authority = (
+            consume_m110_attended_launch_authority(_REPO_ROOT)
+        )
+        if m110_launch_binding.get("mode") != "unbound" and (
+            Path(_REPO_ROOT).resolve()
+            != Path(__file__).resolve().parents[1]
+        ):
+            if m110_launch_authority is not None:
+                m110_launch_authority.close()
+            raise RuntimeError(
+                "M110 repository root must be the checkout executing server.py"
+            )
+        if m110_launch_binding.get("mode") != "unbound" and not (
+            configured_token_from_fd
+            and isinstance(configured_token, str)
+            and re.fullmatch(r"[A-Za-z0-9_-]{43}", configured_token)
+        ):
+            if m110_launch_authority is not None:
+                m110_launch_authority.close()
+            raise RuntimeError(
+                "M110 requires its WebSocket bearer token from a separate inherited pipe"
+            )
         runtime_backend_path = Path(
             sys.executable if getattr(sys, "frozen", False) else __file__
         ).resolve()
@@ -605,17 +673,29 @@ class AutoMixerServer:
             runtime_backend_display_path = str(
                 runtime_backend_path.relative_to(Path(_REPO_ROOT).resolve())
             )
-        except ValueError:
+        except (TypeError, ValueError):
             runtime_backend_display_path = str(runtime_backend_path)
         process_started_at = datetime.now(timezone.utc).isoformat(timespec="seconds").replace(
             "+00:00", "Z"
         )
         process_instance_nonce = uuid.uuid4().hex
         proof_launch_binding = consume_proof_launch_binding_environment()
+        if (
+            m110_launch_binding.get("mode") != "unbound"
+            and proof_launch_binding.get("mode") != "unbound"
+        ):
+            if m110_launch_authority is not None:
+                m110_launch_authority.close()
+            raise RuntimeError("M005 and M110 launch bindings are mutually exclusive")
         if getattr(sys, "frozen", False):
-            if proof_launch_binding["mode"] != "unbound":
+            if (
+                proof_launch_binding["mode"] != "unbound"
+                or m110_launch_binding.get("mode") != "unbound"
+            ):
+                if m110_launch_authority is not None:
+                    m110_launch_authority.close()
                 raise RuntimeError(
-                    "Packaged backend cannot claim a source M005 proof-runner binding"
+                    "Packaged backend cannot claim a source proof-runner binding"
                 )
             if not isinstance(_PROCESS_PACKAGED_BUILD_BINDING, dict):
                 raise RuntimeError("Packaged backend build binding is unavailable")
@@ -633,7 +713,12 @@ class AutoMixerServer:
                 }
             )
         else:
-            launch_binding = proof_launch_binding
+            launch_binding = (
+                m110_launch_binding
+                if m110_launch_binding.get("mode") != "unbound"
+                else proof_launch_binding
+            )
+        self._m110_launch_authority = m110_launch_authority
         runtime_source = json.loads(json.dumps(_PROCESS_SOURCE_RUNTIME_COMPONENTS))
         self._runtime_identity = {
             "type": "runtime_identity",
@@ -695,6 +780,7 @@ class AutoMixerServer:
         )
         self._authenticated_websocket_expiry: Dict[int, float] = {}
         self._authenticated_websocket_expiry_close_started: set[int] = set()
+        self._authenticated_websocket_ids: set[int] = set()
         self.auth_manager = AuthManager(enabled=self._ws_auth_required)
         if self._ws_auth_required:
             if not re.fullmatch(r"[A-Za-z0-9_-]{43}", str(configured_token or "")):
@@ -909,6 +995,14 @@ class AutoMixerServer:
         self._master_capture_route_proof_sha256 = str(
             os.getenv("AUTOMIXER_MASTER_CAPTURE_ROUTE_PROOF_SHA256", "")
         ).strip().lower()
+        self._mixer_connection_generation = 0
+        self._master_capture_route_authority: Optional[
+            MasterCaptureRouteAuthority
+        ] = None
+        self._m110_transport_owner_connection_id: Optional[int] = None
+        self._m110_transport_owner_ref: Optional[
+            WebSocketServerProtocol
+        ] = None
         self._manual_write_cooldown_sec = max(
             0.0,
             self._parse_env_float(os.getenv("AUTOMIXER_MANUAL_WRITE_COOLDOWN_SEC"), 2.0),
@@ -928,6 +1022,25 @@ class AutoMixerServer:
         # per-user scope. Configurable evidence roots must never split crash
         # recovery between two processes controlling the same console.
         self._console_runtime_dir = self._resolve_console_runtime_dir()
+        self._master_capture_route_artifact_root = (
+            self._console_runtime_dir / "m110_master_route_proofs"
+        )
+        self._m110_autopilot_stop_path = (
+            Path(_REPO_ROOT) / "ops" / "autopilot" / "STOP"
+        )
+        self._m110_autopilot_writer_lease_path = (
+            Path(_REPO_ROOT)
+            / "ops"
+            / "autopilot"
+            / "WRITER_LEASE"
+            / "owner.json"
+        )
+        self._m110_autopilot_writer_lease_dir = (
+            self._m110_autopilot_writer_lease_path.parent
+        )
+        self._m110_legacy_autoloop_lock_path = (
+            Path(_REPO_ROOT) / ".codex_autoloop.lock"
+        )
         self._console_writer_lock_path = self._console_runtime_dir / "console_writer.lock"
         self._console_write_wal_path = self._console_runtime_dir / "manual_write_wal.jsonl"
         self._soundcheck_parent_journal_path = (
@@ -1269,6 +1382,7 @@ class AutoMixerServer:
         token = None
         if not authenticated:
             self._authenticated_websocket_expiry.pop(id(websocket), None)
+            self._authenticated_websocket_ids.discard(id(websocket))
             await websocket.close(code=1008, reason="authentication_failed")
             return False
         if expires_at is None and not self._ws_token_process_lifetime:
@@ -1278,6 +1392,7 @@ class AutoMixerServer:
             self._authenticated_websocket_expiry[id(websocket)] = expires_at
         else:
             self._authenticated_websocket_expiry.pop(id(websocket), None)
+        self._authenticated_websocket_ids.add(id(websocket))
 
         await self.send_to_client(
             websocket,
@@ -1464,6 +1579,173 @@ class AutoMixerServer:
             },
         )
         return True
+
+    async def _block_m110_protocol_message(
+        self,
+        websocket: WebSocketServerProtocol,
+        message_type: Any,
+        payload: Mapping[str, Any],
+    ) -> bool:
+        """Restrict an attended child before dispatch can touch any resource."""
+
+        if (
+            self._runtime_identity.get("launch_binding", {}).get("mode")
+            != "m110_attended_runner"
+        ):
+            return False
+        always_allowed = {
+            "get_runtime_identity",
+            "get_audio_capture_status",
+            "stop_audio_capture_preview",
+            "disconnect_wing",
+            "disconnect_mixer",
+        } | set(EMERGENCY_FAST_LANE_TYPES)
+        if message_type in always_allowed:
+            return False
+        gate_required = {
+            "connect_wing",
+            "start_audio_capture_preview",
+            "capture_wing_master_route_proof",
+        }
+        blockers: list[str] = []
+        if message_type not in gate_required:
+            blockers.append("m110_message_type_not_allowlisted")
+        else:
+            try:
+                self._verify_m110_cp05_hardware_gate()
+            except Exception as exc:
+                reason = str(exc)
+                blockers.append(
+                    reason
+                    if re.fullmatch(r"m110_cp05_[a-z0-9_]+", reason)
+                    else "m110_cp05_hardware_gate_verification_failed"
+                )
+        if message_type == "start_audio_capture_preview" and not blockers:
+            blockers.extend(
+                self._m110_pre_capture_blockers(websocket, payload)
+            )
+        if not blockers:
+            return False
+        blockers = sorted(set(blockers))
+        common = {
+            "status": "blocked",
+            "success": False,
+            "reason": "m110_protocol_gate_failed",
+            "request_type": (
+                message_type if isinstance(message_type, str) else None
+            ),
+            "blockers": blockers,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+        if message_type == "connect_wing":
+            response = {
+                "type": "connection_status",
+                "connected": False,
+                **common,
+            }
+        elif message_type == "start_audio_capture_preview":
+            response = {
+                "type": "audio_capture_status",
+                "running": False,
+                "preview": True,
+                "owned_by_requester": False,
+                **common,
+            }
+        elif message_type == "capture_wing_master_route_proof":
+            response = {
+                "type": "wing_master_route_proof_result",
+                "accepted": False,
+                "console_mutation_write_attempt_count": 0,
+                **common,
+            }
+        else:
+            response = {"type": "m110_protocol_status", **common}
+        await self.send_to_client(websocket, response)
+        return True
+
+    def _m110_pre_capture_blockers(
+        self,
+        websocket: WebSocketServerProtocol,
+        payload: Mapping[str, Any],
+    ) -> list[str]:
+        blockers: list[str] = []
+        launch_authority = self._m110_launch_authority
+        if launch_authority is None:
+            blockers.append("m110_attended_launch_authority_required")
+        else:
+            source_current, source_reason = launch_authority.source_snapshot_status()
+            if not source_current:
+                blockers.append(source_reason)
+        operator_mode = self.get_operator_mode_status()
+        capabilities = operator_mode.get("capabilities", {})
+        if operator_mode.get("mode") != "analyze":
+            blockers.append("route_proof_requires_analyze_mode")
+        if capabilities.get("can_apply_to_console") is not False:
+            blockers.append("route_proof_requires_zero_apply_authority")
+        if list(capabilities.get("allowed_live_write_kinds") or []):
+            blockers.append("route_proof_requires_empty_live_allowlist")
+        if set(payload) != {
+            "type",
+            "device_id",
+            "num_channels",
+            "sample_rate",
+            "buffer_seconds",
+        }:
+            blockers.append("m110_audio_capture_request_fields_mismatch")
+        device_id = payload.get("device_id")
+        if (
+            not isinstance(device_id, int)
+            or isinstance(device_id, bool)
+            or device_id < 0
+        ):
+            blockers.append("m110_audio_capture_device_index_invalid")
+        if not (
+            payload.get("num_channels") == 48
+            and not isinstance(payload.get("num_channels"), bool)
+            and payload.get("sample_rate") == 48_000
+            and not isinstance(payload.get("sample_rate"), bool)
+            and isinstance(payload.get("buffer_seconds"), (int, float))
+            and not isinstance(payload.get("buffer_seconds"), bool)
+            and math.isfinite(float(payload.get("buffer_seconds")))
+            and float(payload.get("buffer_seconds")) == 8.0
+        ):
+            blockers.append("m110_audio_capture_fixed_dimensions_required")
+        if self._m110_transport_owner_ref is not websocket:
+            blockers.append("m110_audio_capture_transport_owner_required")
+        client = getattr(self, "mixer_client", None)
+        if not (
+            self.connection_mode == "wing"
+            and isinstance(client, (WingClient, EnhancedOSCClient))
+            and getattr(client, "is_connected", False) is True
+            and self._wing_observation_only is True
+        ):
+            blockers.append("m110_observation_wing_transport_required")
+        blockers.extend(self._m110_autopilot_control_blockers())
+        if self._is_shutting_down:
+            blockers.append("server_shutdown_in_progress")
+        if self.auto_soundcheck_running:
+            blockers.append("auto_soundcheck_active")
+        measurement_task = self._system_measurement_task
+        if measurement_task is not None and not measurement_task.done():
+            blockers.append("system_measurement_active")
+        if self._agent_force_auto_apply or self.agent_auto_apply_enabled:
+            blockers.append("agent_live_writer_active")
+        if self._manual_write_emergency_stopped:
+            blockers.append("manual_write_emergency_stop_active")
+        if self._system_emergency_stop_in_progress:
+            blockers.append("system_emergency_stop_in_progress")
+        if self._system_emergency_stop_errors:
+            blockers.append("system_emergency_stop_errors_present")
+        if self._manual_write_wal_integrity_ok is not True:
+            blockers.append("manual_write_wal_integrity_failed")
+        if self._manual_write_recovery_transactions:
+            blockers.append("manual_write_wal_recovery_required")
+        if self._manual_write_prepared_transactions:
+            blockers.append("manual_write_wal_prepared_transaction_present")
+        if self._soundcheck_parent_journal_error:
+            blockers.append("soundcheck_parent_journal_error")
+        return sorted(set(blockers))
 
     def _packaged_offline_block_payload(self, operation: str) -> Dict[str, Any]:
         return {
@@ -1972,6 +2254,7 @@ class AutoMixerServer:
         if not latched_before:
             self._manual_write_emergency_stopped = True
             self._manual_write_emergency_generation += 1
+        self._revoke_m110_route_authority("system_emergency_stop")
         phase_zero_errors = self._freeze_autonomous_writers_now(
             include_agent=(
                 not teardown_complete_before
@@ -9481,6 +9764,11 @@ class AutoMixerServer:
 
     def cleanup_all_controllers(self):
         """Cleanup all active controllers - call before shutdown or on error."""
+        self._revoke_m110_route_authority("server_cleanup")
+        launch_authority = getattr(self, "_m110_launch_authority", None)
+        if launch_authority is not None:
+            launch_authority.close()
+            self._m110_launch_authority = None
         if self._controllers_cleanup_complete:
             logger.debug("Controller cleanup already completed")
             return
@@ -9724,6 +10012,7 @@ class AutoMixerServer:
         if not latched_before:
             self._manual_write_emergency_stopped = True
             self._manual_write_emergency_generation += 1
+        self._revoke_m110_route_authority("server_shutdown")
         self._ws_ingress_emergency_generation += 1
         errors: list[dict[str, str]] = self._freeze_autonomous_writers_now(
             include_agent=not latched_before
@@ -10989,6 +11278,12 @@ class AutoMixerServer:
                 data,
             ):
                 return
+            if await self._block_m110_protocol_message(
+                websocket,
+                msg_type,
+                data,
+            ):
+                return
 
             handler = self._dispatch.get(msg_type)
             if handler is not None:
@@ -11018,6 +11313,7 @@ class AutoMixerServer:
         observation_only: Optional[bool] = None,
         record_telemetry: Optional[bool] = None,
         telemetry_session_label: Optional[str] = None,
+        owner_websocket: Optional[WebSocketServerProtocol] = None,
     ):
         """
         Connect directly to Wing mixer via OSC
@@ -11028,6 +11324,36 @@ class AutoMixerServer:
         """
         if await self.block_packaged_offline_transport("connect_wing"):
             return False
+        m110_launch_active = (
+            self._runtime_identity.get("launch_binding", {}).get("mode")
+            == "m110_attended_runner"
+        )
+        if m110_launch_active:
+            blockers = self._m110_preconnect_blockers(
+                owner_websocket,
+                ip=ip,
+                send_port=send_port,
+                receive_port=receive_port,
+                observation_only=observation_only,
+                record_telemetry=record_telemetry,
+            )
+            if blockers:
+                logger.warning(
+                    "Blocked M110 Wing connect before OSC construction: %s",
+                    blockers,
+                )
+                if owner_websocket is not None:
+                    await self.send_to_client(
+                        owner_websocket,
+                        {
+                            "type": "connection_status",
+                            "connected": False,
+                            "status": "blocked",
+                            "reason": "m110_preconnect_safety_gate_failed",
+                            "blockers": blockers,
+                        },
+                    )
+                return False
         if self._network_runtime_started and not self._ws_auth_required:
             observation_only = True
             record_telemetry = False
@@ -11064,6 +11390,11 @@ class AutoMixerServer:
             success = self.mixer_client.connect()
 
             if success:
+                if m110_launch_active:
+                    self._m110_transport_owner_connection_id = id(
+                        owner_websocket
+                    )
+                    self._m110_transport_owner_ref = owner_websocket
                 if self.mixing_agent is not None:
                     self.mixing_agent.mixer = self.mixer_client
                 self._enforce_agent_dry_run_mode()
@@ -11087,6 +11418,8 @@ class AutoMixerServer:
                     )
                 self.mixer_client = None
                 self.connection_mode = None
+                self._m110_transport_owner_connection_id = None
+                self._m110_transport_owner_ref = None
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": False,
@@ -11096,11 +11429,15 @@ class AutoMixerServer:
         except asyncio.CancelledError:
             self.mixer_client = None
             self.connection_mode = None
+            self._m110_transport_owner_connection_id = None
+            self._m110_transport_owner_ref = None
             raise
         except Exception as e:
             logger.error(f"Error connecting to Wing: {e}")
             self.mixer_client = None
             self.connection_mode = None
+            self._m110_transport_owner_connection_id = None
+            self._m110_transport_owner_ref = None
             await self.broadcast({
                 "type": "connection_status",
                 "connected": False,
@@ -11263,6 +11600,10 @@ class AutoMixerServer:
     async def disconnect_mixer(self):
         """Disconnect from current mixer (Wing or Mixing Station)"""
         self._agent_force_auto_apply = False
+        self._m110_transport_owner_connection_id = None
+        self._m110_transport_owner_ref = None
+        self._mixer_connection_generation += 1
+        self._revoke_m110_route_authority("mixer_disconnected_or_reconnected")
         if self.mixer_client:
             self.mixer_client.disconnect()
             self.mixer_client = None
@@ -14070,104 +14411,1165 @@ class AutoMixerServer:
         self._latest_master_true_peak_timestamp = time.time()
         return True
 
-    def _verified_master_capture_route_proof(self) -> Dict[str, Any]:
-        path_text = self._master_capture_route_proof_path
-        expected_sha256 = self._master_capture_route_proof_sha256
-        if not path_text or not expected_sha256:
-            return {
-                "verified": False,
-                "reason": "proof_path_and_sha256_required",
-            }
-        path = Path(path_text).expanduser()
+    def _revoke_m110_route_authority(self, reason: str) -> None:
+        authority = getattr(self, "_master_capture_route_authority", None)
+        if authority is not None:
+            logger.info(
+                "Revoked M110 route authority %s: %s",
+                authority.proof_id,
+                reason,
+            )
+        self._master_capture_route_authority = None
+
+    @staticmethod
+    def _m110_route_blocked(
+        reason: str,
+        *,
+        details: Optional[Mapping[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "type": "wing_master_route_proof_result",
+            "status": "blocked",
+            "success": False,
+            "accepted": False,
+            "reason": reason,
+            "details": dict(details or {}),
+            "console_mutation_write_attempt_count": 0,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+
+    def _m110_route_global_blockers(
+        self,
+        websocket: WebSocketServerProtocol,
+    ) -> list[str]:
+        blockers: list[str] = []
+        launch_binding = self._runtime_identity.get("launch_binding", {})
+        runtime_source = self._runtime_identity.get("source", {})
+        operator_mode = self.get_operator_mode_status()
+        capabilities = operator_mode.get("capabilities", {})
         try:
-            raw = path.read_bytes()
-        except OSError as exc:
-            return {
-                "verified": False,
-                "reason": "proof_artifact_unreadable",
-                "path": str(path),
-                "error": str(exc),
-            }
-        actual_sha256 = hashlib.sha256(raw).hexdigest()
-        if actual_sha256 != expected_sha256:
-            return {
-                "verified": False,
-                "reason": "proof_sha256_mismatch",
-                "path": str(path),
-                "expected_sha256": expected_sha256,
-                "actual_sha256": actual_sha256,
-            }
+            self._verify_m110_cp05_hardware_gate()
+        except Exception as exc:
+            reason = str(exc)
+            blockers.append(
+                reason
+                if re.fullmatch(r"m110_cp05_[a-z0-9_]+", reason)
+                else "m110_cp05_hardware_gate_verification_failed"
+            )
+        client = getattr(self, "mixer_client", None)
+        if self._m110_launch_authority is None:
+            blockers.append("m110_attended_launch_authority_required")
+        else:
+            source_current, source_reason = (
+                self._m110_launch_authority.source_snapshot_status()
+            )
+            if not source_current:
+                blockers.append(source_reason)
+        if launch_binding.get("mode") != "m110_attended_runner":
+            blockers.append("m110_attended_launch_binding_required")
+        if launch_binding.get("tracked_tree_clean") is not True:
+            blockers.append("m110_tracked_source_tree_clean_required")
+        if (
+            runtime_source.get("head") != launch_binding.get("head")
+            or runtime_source.get("tree") != launch_binding.get("tree")
+        ):
+            blockers.append("m110_runtime_source_binding_mismatch")
+        if not self._ws_auth_required:
+            blockers.append("authenticated_control_session_required")
+        if id(websocket) not in self._authenticated_websocket_ids:
+            blockers.append("authenticated_route_owner_required")
+        if self._m110_transport_owner_ref is not websocket:
+            blockers.append("route_owner_did_not_establish_wing_transport")
+        if self._audio_capture_preview_owner is not websocket:
+            blockers.append("route_owner_must_own_audio_capture")
+        blockers.extend(self._m110_autopilot_control_blockers())
+        if self._packaged_offline_lock:
+            blockers.append("packaged_offline_lock_active")
+        if operator_mode.get("mode") != "analyze":
+            blockers.append("route_proof_requires_analyze_mode")
+        if capabilities.get("can_apply_to_console") is not False:
+            blockers.append("route_proof_requires_zero_apply_authority")
+        if list(capabilities.get("allowed_live_write_kinds") or []):
+            blockers.append("route_proof_requires_empty_live_allowlist")
+        if self.connection_mode != "wing":
+            blockers.append("wing_connection_required")
+        if not isinstance(client, (WingClient, EnhancedOSCClient)):
+            blockers.append("real_wing_transport_required")
+        if not getattr(client, "is_connected", False):
+            blockers.append("mixer_not_connected")
+        if not callable(getattr(client, "query_parameter", None)):
+            blockers.append("physical_readback_transport_unavailable")
+        if self._current_mixer_transport_generation() is None:
+            blockers.append("mixer_transport_generation_unavailable")
+        if self._wing_observation_only is not True:
+            blockers.append("wing_observation_only_required")
+        if self._is_shutting_down:
+            blockers.append("server_shutdown_in_progress")
+        if self.auto_soundcheck_running:
+            blockers.append("auto_soundcheck_active")
+        measurement_task = self._system_measurement_task
+        if measurement_task is not None and not measurement_task.done():
+            blockers.append("system_measurement_active")
+        if self._agent_force_auto_apply or self.agent_auto_apply_enabled:
+            blockers.append("agent_live_writer_active")
+        if self._manual_write_emergency_stopped:
+            blockers.append("manual_write_emergency_stop_active")
+        if self._system_emergency_stop_in_progress:
+            blockers.append("system_emergency_stop_in_progress")
+        if self._system_emergency_stop_errors:
+            blockers.append("system_emergency_stop_errors_present")
+        if self._manual_write_wal_integrity_ok is not True:
+            blockers.append("manual_write_wal_integrity_failed")
+        if self._manual_write_recovery_transactions:
+            blockers.append("manual_write_wal_recovery_required")
+        if self._manual_write_prepared_transactions:
+            blockers.append("manual_write_wal_prepared_transaction_present")
+        if self._soundcheck_parent_journal_error:
+            blockers.append("soundcheck_parent_journal_error")
+        return blockers
+
+    def _m110_preconnect_blockers(
+        self,
+        websocket: Optional[WebSocketServerProtocol],
+        *,
+        ip: Any,
+        send_port: Any,
+        receive_port: Any,
+        observation_only: Any,
+        record_telemetry: Any,
+    ) -> list[str]:
+        """Fail before OSC construction when an attended global rail is unsafe."""
+
+        blockers: list[str] = []
+        launch_binding = self._runtime_identity.get("launch_binding", {})
+        runtime_source = self._runtime_identity.get("source", {})
+        launch_authority = self._m110_launch_authority
+        operator_mode = self.get_operator_mode_status()
+        capabilities = operator_mode.get("capabilities", {})
         try:
-            payload = json.loads(raw)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            return {
-                "verified": False,
-                "reason": "proof_artifact_invalid_json",
-                "path": str(path),
-                "actual_sha256": actual_sha256,
-                "error": str(exc),
-            }
-        if not isinstance(payload, Mapping):
-            return {
-                "verified": False,
-                "reason": "proof_artifact_contract_failed",
-                "path": str(path),
-                "actual_sha256": actual_sha256,
-                "missing_or_invalid": ["object_payload_required"],
-            }
-        required_text = (
-            "proof_id",
-            "console_serial",
-            "firmware_version",
-            "capture_device",
+            self._verify_m110_cp05_hardware_gate()
+        except Exception as exc:
+            reason = str(exc)
+            blockers.append(
+                reason
+                if re.fullmatch(r"m110_cp05_[a-z0-9_]+", reason)
+                else "m110_cp05_hardware_gate_verification_failed"
+            )
+        if launch_authority is None:
+            blockers.append("m110_attended_launch_authority_required")
+        else:
+            source_current, source_reason = launch_authority.source_snapshot_status()
+            if not source_current:
+                blockers.append(source_reason)
+        if launch_binding.get("mode") != "m110_attended_runner":
+            blockers.append("m110_attended_launch_binding_required")
+        if launch_binding.get("tracked_tree_clean") is not True:
+            blockers.append("m110_tracked_source_tree_clean_required")
+        if (
+            runtime_source.get("head") != launch_binding.get("head")
+            or runtime_source.get("tree") != launch_binding.get("tree")
+        ):
+            blockers.append("m110_runtime_source_binding_mismatch")
+        if (
+            websocket is None
+            or not self._ws_auth_required
+            or id(websocket) not in self._authenticated_websocket_ids
+        ):
+            blockers.append("authenticated_route_owner_required")
+        blockers.extend(self._m110_autopilot_control_blockers())
+        if operator_mode.get("mode") != "analyze":
+            blockers.append("route_proof_requires_analyze_mode")
+        if capabilities.get("can_apply_to_console") is not False:
+            blockers.append("route_proof_requires_zero_apply_authority")
+        if list(capabilities.get("allowed_live_write_kinds") or []):
+            blockers.append("route_proof_requires_empty_live_allowlist")
+        if observation_only is not True:
+            blockers.append("wing_observation_only_required")
+        if record_telemetry is not False:
+            blockers.append("wing_telemetry_recording_forbidden")
+        if not (
+            isinstance(send_port, int)
+            and not isinstance(send_port, bool)
+            and send_port == 2223
+            and isinstance(receive_port, int)
+            and not isinstance(receive_port, bool)
+            and receive_port == 2223
+        ):
+            blockers.append("wing_fixed_osc_port_required")
+        try:
+            parsed_ip = ipaddress.ip_address(ip)
+        except (TypeError, ValueError):
+            parsed_ip = None
+        if parsed_ip is None or parsed_ip.version != 4:
+            blockers.append("wing_rfc1918_unicast_host_required")
+        else:
+            private_networks = (
+                ipaddress.ip_network("10.0.0.0/8"),
+                ipaddress.ip_network("172.16.0.0/12"),
+                ipaddress.ip_network("192.168.0.0/16"),
+            )
+            last_octet = str(parsed_ip).rsplit(".", 1)[-1]
+            if (
+                not any(parsed_ip in network for network in private_networks)
+                or last_octet in {"0", "255"}
+            ):
+                blockers.append("wing_rfc1918_unicast_host_required")
+        if self._is_shutting_down:
+            blockers.append("server_shutdown_in_progress")
+        if self.auto_soundcheck_running:
+            blockers.append("auto_soundcheck_active")
+        measurement_task = self._system_measurement_task
+        if measurement_task is not None and not measurement_task.done():
+            blockers.append("system_measurement_active")
+        if self._agent_force_auto_apply or self.agent_auto_apply_enabled:
+            blockers.append("agent_live_writer_active")
+        if self._manual_write_emergency_stopped:
+            blockers.append("manual_write_emergency_stop_active")
+        if self._system_emergency_stop_in_progress:
+            blockers.append("system_emergency_stop_in_progress")
+        if self._system_emergency_stop_errors:
+            blockers.append("system_emergency_stop_errors_present")
+        if self._manual_write_wal_integrity_ok is not True:
+            blockers.append("manual_write_wal_integrity_failed")
+        if self._manual_write_recovery_transactions:
+            blockers.append("manual_write_wal_recovery_required")
+        if self._manual_write_prepared_transactions:
+            blockers.append("manual_write_wal_prepared_transaction_present")
+        if self._soundcheck_parent_journal_error:
+            blockers.append("soundcheck_parent_journal_error")
+        if self._console_write_lock.locked():
+            blockers.append("console_writer_scope_busy")
+        return sorted(set(blockers))
+
+    @staticmethod
+    def _verify_m110_cp05_hardware_gate() -> Dict[str, Any]:
+        return verify_m110_cp05_hardware_gate(
+            repo_root=Path(_REPO_ROOT),
+            critical_paths=M110_RUNTIME_CRITICAL_PATHS,
         )
-        missing = [
-            key for key in required_text if not str(payload.get(key) or "").strip()
-        ]
-        channels = payload.get("master_channels")
-        capture_device_index = payload.get("capture_device_index")
-        capture_channel_count = payload.get("capture_channel_count")
-        capture_sample_rate_hz = payload.get("capture_sample_rate_hz")
-        if payload.get("accepted") is not True:
-            missing.append("accepted_true")
-        if channels != [47, 48]:
-            missing.append("master_channels_47_48")
-        if (
-            isinstance(capture_device_index, bool)
-            or not isinstance(capture_device_index, int)
-            or capture_device_index < 0
+
+    def _m110_autopilot_control_blockers(self) -> list[str]:
+        """Treat STOP or a development writer lease as fatal live blockers."""
+
+        blockers: list[str] = []
+        for path, present_reason, unreadable_reason in (
+            (
+                self._m110_autopilot_stop_path,
+                "autopilot_stop_file_present",
+                "autopilot_stop_file_state_unreadable",
+            ),
+            (
+                self._m110_autopilot_writer_lease_dir,
+                "autopilot_writer_lease_present",
+                "autopilot_writer_lease_state_unreadable",
+            ),
+            (
+                self._m110_legacy_autoloop_lock_path,
+                "legacy_autoloop_lock_present",
+                "legacy_autoloop_lock_state_unreadable",
+            ),
         ):
-            missing.append("capture_device_index_nonnegative_integer")
-        if capture_channel_count != 48 or isinstance(capture_channel_count, bool):
-            missing.append("capture_channel_count_exactly_48")
+            try:
+                path.lstat()
+            except FileNotFoundError:
+                continue
+            except OSError:
+                blockers.append(unreadable_reason)
+            else:
+                blockers.append(present_reason)
+        return blockers
+
+    def _current_mixer_transport_generation(self) -> Optional[int]:
+        """Return an identity that changes after every Wing transport reconnect."""
+
+        client = getattr(self, "mixer_client", None)
+        if isinstance(client, EnhancedOSCClient):
+            identity = getattr(client, "transport_identity", None)
+            if not (
+                isinstance(identity, tuple)
+                and len(identity) == 2
+                and getattr(identity[0], "value", None) == "connected"
+            ):
+                return None
+            generation = identity[1]
+            if (
+                isinstance(generation, int)
+                and not isinstance(generation, bool)
+                and generation >= 1
+            ):
+                return generation
+            return None
+        if isinstance(client, WingClient):
+            return self._mixer_connection_generation
+        return None
+
+    async def _collect_m110_master_route_pass(
+        self,
+        *,
+        emergency_generation: int,
+        connection_generation: int,
+        transport_generation: int,
+    ) -> Dict[str, Any]:
+        client = self.mixer_client
+        query = getattr(client, "query_parameter", None)
+        rows: Dict[str, Any] = {}
+        values: Dict[str, Any] = {}
+        errors: list[str] = []
+        for address in MASTER_CAPTURE_ROUTE_ADDRESSES:
+            if self._manual_write_emergency_generation != emergency_generation:
+                errors.append("emergency_generation_changed")
+                break
+            if self._mixer_connection_generation != connection_generation:
+                errors.append("mixer_connection_generation_changed")
+                break
+            if self._current_mixer_transport_generation() != transport_generation:
+                errors.append("mixer_transport_generation_changed")
+                break
+            try:
+                if inspect.iscoroutinefunction(query):
+                    raw = await query(address, 0.5)
+                else:
+                    raw = await self._cancellation_safe_thread_call(
+                        query,
+                        address,
+                        0.5,
+                    )
+                    raw = await self._maybe_await(raw)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                raw = {
+                    "status": "exception",
+                    "address": address,
+                    "error": type(exc).__name__,
+                }
+            row = dict(raw) if isinstance(raw, Mapping) else {
+                "status": "invalid_response",
+                "address": None,
+                "response_type": type(raw).__name__,
+            }
+            rows[address] = row
+            confirmed = row.get("confirmed_round_trips")
+            if not (
+                row.get("status") == "received"
+                and row.get("address") == address
+                and isinstance(confirmed, int)
+                and not isinstance(confirmed, bool)
+                and confirmed >= 2
+            ):
+                errors.append(f"unconfirmed_physical_readback:{address}")
+            values[address] = row.get("value")
+        serial = values.get("/$syscfg/$serial")
+        firmware = values.get("/$syscfg/$firmware")
+        if not isinstance(serial, str) or not serial.strip():
+            errors.append("console_serial_unavailable")
+        if not isinstance(firmware, str) or not firmware.strip():
+            errors.append("console_firmware_unavailable")
+        elif re.fullmatch(
+            r"3\.0\.5(?:[-+ ][A-Za-z0-9._+-]+)?",
+            firmware.strip(),
+        ) is None:
+            errors.append("console_firmware_not_m110_verified_family")
+        for address, expected in MASTER_CAPTURE_ROUTE_EXPECTED.items():
+            if not route_value_matches(expected, values.get(address)):
+                errors.append(f"route_value_mismatch:{address}")
+        return {
+            "verified": not errors,
+            "reason": (
+                "fixed_master_route_pass_verified"
+                if not errors
+                else "fixed_master_route_pass_failed"
+            ),
+            "addresses": list(MASTER_CAPTURE_ROUTE_ADDRESSES),
+            "values": values,
+            "readbacks": rows,
+            "errors": errors,
+            "confirmed_round_trips_required": 2,
+        }
+
+    @staticmethod
+    def _m110_capture_identity_valid(status: Mapping[str, Any]) -> bool:
+        callback_age = status.get("callback_age_sec")
+        sample_count = status.get("captured_sample_count")
+        device_name = status.get("device_name")
+        return bool(
+            status.get("running") is True
+            and status.get("real_input") is True
+            and status.get("source_type") == "sounddevice"
+            and isinstance(device_name, str)
+            and re.search(
+                r"(?:^|[^a-z0-9])wing(?:[^a-z0-9]|$)",
+                device_name.strip(),
+                flags=re.IGNORECASE,
+            ) is not None
+            and isinstance(status.get("device_index"), int)
+            and not isinstance(status.get("device_index"), bool)
+            and status.get("device_index") >= 0
+            and status.get("num_channels") == 48
+            and not isinstance(status.get("num_channels"), bool)
+            and status.get("sample_rate") == 48_000
+            and not isinstance(status.get("sample_rate"), bool)
+            and isinstance(callback_age, (int, float))
+            and not isinstance(callback_age, bool)
+            and math.isfinite(float(callback_age))
+            and 0.0 <= float(callback_age) <= 1.0
+            and isinstance(sample_count, int)
+            and not isinstance(sample_count, bool)
+            and sample_count >= 0
+        )
+
+    async def _capture_m110_master_window(self) -> Dict[str, Any]:
+        required_samples = 12_000
+        capture = self.audio_capture
+        capture_stream = getattr(capture, "_stream", None)
         if (
-            isinstance(capture_sample_rate_hz, bool)
-            or not isinstance(capture_sample_rate_hz, int)
-            or capture_sample_rate_hz not in {44_100, 48_000}
+            capture is None
+            or capture_stream is None
+            or not getattr(capture, "running", False)
+            or not callable(getattr(capture, "get_status", None))
+            or not callable(getattr(capture, "get_synchronized_buffers", None))
         ):
-            missing.append("capture_sample_rate_hz_44100_or_48000")
-        if missing:
             return {
                 "verified": False,
-                "reason": "proof_artifact_contract_failed",
-                "path": str(path),
-                "actual_sha256": actual_sha256,
-                "missing_or_invalid": missing,
+                "reason": "real_48_channel_capture_required",
+            }
+        try:
+            before = dict(capture.get_status() or {})
+        except Exception as exc:
+            return {
+                "verified": False,
+                "reason": "capture_status_unavailable",
+                "error": type(exc).__name__,
+            }
+        if not self._m110_capture_identity_valid(before):
+            return {
+                "verified": False,
+                "reason": "capture_identity_or_freshness_invalid",
+                "status_before": before,
+            }
+        start_count = int(before["captured_sample_count"])
+        required_end_count = start_count + required_samples
+        progressed = False
+        progress_status: Dict[str, Any] = {}
+        deadline = time.monotonic() + 1.0
+        while time.monotonic() < deadline:
+            await asyncio.sleep(0.025)
+            if (
+                self.audio_capture is not capture
+                or getattr(capture, "_stream", None) is not capture_stream
+            ):
+                return {
+                    "verified": False,
+                    "reason": "capture_instance_or_stream_changed",
+                }
+            progress_status = dict(capture.get_status() or {})
+            if (
+                self._m110_capture_identity_valid(progress_status)
+                and progress_status.get("device_name") == before.get("device_name")
+                and progress_status.get("device_index") == before.get("device_index")
+                and int(progress_status["captured_sample_count"])
+                >= required_end_count
+            ):
+                progressed = True
+                break
+        if not progressed:
+            return {
+                "verified": False,
+                "reason": "capture_sample_progression_missing",
+                "status_before": before,
+                "status_after": progress_status,
+            }
+        try:
+            snapshot = capture.get_synchronized_buffers(
+                [47, 48],
+                required_samples,
+            )
+            after = dict(capture.get_status() or {})
+        except Exception as exc:
+            return {
+                "verified": False,
+                "reason": "synchronized_master_capture_failed",
+                "error": type(exc).__name__,
+            }
+        if not isinstance(snapshot, Mapping) or not self._m110_capture_identity_valid(after):
+            return {
+                "verified": False,
+                "reason": "synchronized_master_capture_invalid",
+            }
+        if (
+            self.audio_capture is not capture
+            or getattr(capture, "_stream", None) is not capture_stream
+        ):
+            return {
+                "verified": False,
+                "reason": "capture_instance_or_stream_changed",
+            }
+        identity_fields = (
+            "source_type",
+            "device_name",
+            "device_index",
+            "num_channels",
+            "sample_rate",
+        )
+        if any(before.get(field) != after.get(field) for field in identity_fields):
+            return {
+                "verified": False,
+                "reason": "capture_identity_changed",
+                "status_before": before,
+                "status_after": after,
+            }
+        snapshot_count = snapshot.get("captured_sample_count")
+        if (
+            not isinstance(snapshot_count, int)
+            or isinstance(snapshot_count, bool)
+            or snapshot_count < required_end_count
+            or int(after["captured_sample_count"]) < required_end_count
+        ):
+            return {
+                "verified": False,
+                "reason": "synchronized_snapshot_not_fresh",
+            }
+        buffers = snapshot.get("buffers")
+        if not isinstance(buffers, Mapping):
+            return {
+                "verified": False,
+                "reason": "synchronized_master_buffers_missing",
+            }
+        peaks: Dict[str, float] = {}
+        sample_counts: Dict[str, int] = {}
+        for channel in (47, 48):
+            values = np.asarray(buffers.get(channel, ()), dtype=np.float64)
+            if values.size != required_samples or not np.isfinite(values).all():
+                return {
+                    "verified": False,
+                    "reason": f"master_channel_capture_invalid:{channel}",
+                }
+            sample_counts[str(channel)] = int(values.size)
+            peak_linear = float(np.max(np.abs(values)))
+            peaks[str(channel)] = float(20.0 * np.log10(peak_linear + 1e-10))
+        if any(peak <= -90.0 for peak in peaks.values()):
+            return {
+                "verified": False,
+                "reason": "master_channel_signal_missing",
+                "sample_peaks_dbfs": peaks,
+            }
+        conservative_true_peak = max(peaks.values()) + 3.0
+        if conservative_true_peak > -1.0:
+            return {
+                "verified": False,
+                "reason": "master_true_peak_headroom_insufficient",
+                "sample_peaks_dbfs": peaks,
+                "conservative_true_peak_dbtp": conservative_true_peak,
             }
         return {
             "verified": True,
-            "reason": "immutable_route_proof_verified",
-            "path": str(path),
-            "sha256": actual_sha256,
-            "proof_id": str(payload["proof_id"]),
-            "console_serial": str(payload["console_serial"]),
-            "firmware_version": str(payload["firmware_version"]),
-            "capture_device": str(payload["capture_device"]),
-            "capture_device_index": int(capture_device_index),
-            "capture_channel_count": int(capture_channel_count),
-            "capture_sample_rate_hz": int(capture_sample_rate_hz),
+            "reason": "fresh_real_master_capture_verified",
+            "device_name": str(after["device_name"]),
+            "device_index": int(after["device_index"]),
+            "source_type": str(after["source_type"]),
+            "capture_instance_id": id(capture),
+            "capture_stream_instance_id": id(capture_stream),
+            # This strong reference is consumed and removed by the caller
+            # before evidence serialization.  It prevents stream object-id
+            # reuse between measurement and authority construction.
+            "_capture_stream_ref": capture_stream,
+            "channel_count": 48,
+            "sample_rate_hz": 48_000,
             "master_channels": [47, 48],
+            "captured_sample_count_before": start_count,
+            "required_fresh_sample_count": required_samples,
+            "captured_sample_count_snapshot": snapshot_count,
+            "captured_sample_count_after": int(after["captured_sample_count"]),
+            "sample_counts": sample_counts,
+            "sample_peaks_dbfs": peaks,
+            "true_peak_allowance_db": 3.0,
+            "conservative_true_peak_dbtp": conservative_true_peak,
+            "headroom_ceiling_dbtp": -1.0,
         }
+
+    async def capture_wing_master_route_proof(
+        self,
+        *,
+        websocket: WebSocketServerProtocol,
+        request: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Issue one same-process route authority from fixed physical evidence."""
+
+        if not isinstance(request, Mapping):
+            return self._m110_route_blocked("route_capture_request_object_required")
+        request_errors = validate_master_capture_route_request(request)
+        if request_errors:
+            return self._m110_route_blocked(
+                "route_capture_request_contract_failed",
+                details={"errors": list(request_errors)},
+            )
+        launch_authority = self._m110_launch_authority
+        if launch_authority is None:
+            return self._m110_route_blocked(
+                "m110_attended_launch_authority_required"
+            )
+        authority_valid, authority_reason = (
+            launch_authority.verify_and_tombstone_request(request)
+        )
+        if not authority_valid:
+            return self._m110_route_blocked(authority_reason)
+        # A valid new attempt supersedes any previous route authority even if
+        # a mutable safety gate (STOP, lease, capture, connection) blocks the
+        # new collection.  It must never be possible for the old authority to
+        # become usable again merely because that gate is later cleared.
+        self._revoke_m110_route_authority("authenticated_new_route_proof_attempt")
+        blockers = self._m110_route_global_blockers(websocket)
+        if blockers:
+            return self._m110_route_blocked(
+                "route_capture_global_safety_gate_failed",
+                details={"blockers": blockers},
+            )
+
+        collection_started_at = time.time()
+        async with self._console_write_scope(
+            deadline_epoch=collection_started_at + 5.0,
+        ) as writer_acquired:
+            if writer_acquired is not True:
+                return self._m110_route_blocked("console_writer_conflict_timeout")
+            self._revoke_m110_route_authority(
+                "authenticated_route_proof_entered_writer_scope"
+            )
+            blockers = self._m110_route_global_blockers(websocket)
+            if blockers:
+                return self._m110_route_blocked(
+                    "route_capture_global_safety_gate_failed_inside_writer_scope",
+                    details={"blockers": blockers},
+                )
+            emergency_generation = self._manual_write_emergency_generation
+            connection_generation = self._mixer_connection_generation
+            transport_generation = self._current_mixer_transport_generation()
+            if transport_generation is None:
+                return self._m110_route_blocked(
+                    "mixer_transport_generation_unavailable"
+                )
+            try:
+                await asyncio.wait_for(self._audio_capture_lock.acquire(), timeout=2.0)
+            except asyncio.TimeoutError:
+                return self._m110_route_blocked("audio_capture_owner_conflict")
+            try:
+                first_pass = await self._collect_m110_master_route_pass(
+                    emergency_generation=emergency_generation,
+                    connection_generation=connection_generation,
+                    transport_generation=transport_generation,
+                )
+                if first_pass.get("verified") is not True:
+                    return self._m110_route_blocked(
+                        "first_fixed_route_pass_failed",
+                        details={"errors": first_pass.get("errors") or []},
+                    )
+                capture_evidence = await self._capture_m110_master_window()
+                if capture_evidence.get("verified") is not True:
+                    return self._m110_route_blocked(
+                        str(
+                            capture_evidence.get("reason")
+                            or "master_capture_evidence_failed"
+                        ),
+                        details={"capture": capture_evidence},
+                    )
+                measured_capture_stream = capture_evidence.pop(
+                    "_capture_stream_ref",
+                    None,
+                )
+                if (
+                    measured_capture_stream is None
+                    or getattr(self.audio_capture, "_stream", None)
+                    is not measured_capture_stream
+                ):
+                    return self._m110_route_blocked(
+                        "capture_stream_changed_after_measurement"
+                    )
+                second_pass = await self._collect_m110_master_route_pass(
+                    emergency_generation=emergency_generation,
+                    connection_generation=connection_generation,
+                    transport_generation=transport_generation,
+                )
+            finally:
+                self._audio_capture_lock.release()
+
+            if second_pass.get("verified") is not True:
+                return self._m110_route_blocked(
+                    "second_fixed_route_pass_failed",
+                    details={"errors": second_pass.get("errors") or []},
+                )
+            if first_pass.get("values") != second_pass.get("values"):
+                return self._m110_route_blocked("fixed_route_passes_inconsistent")
+            if self._manual_write_emergency_generation != emergency_generation:
+                return self._m110_route_blocked("emergency_generation_changed")
+            if self._mixer_connection_generation != connection_generation:
+                return self._m110_route_blocked(
+                    "mixer_connection_generation_changed"
+                )
+            if self._current_mixer_transport_generation() != transport_generation:
+                return self._m110_route_blocked(
+                    "mixer_transport_generation_changed"
+                )
+            if id(self.audio_capture) != capture_evidence.get("capture_instance_id"):
+                return self._m110_route_blocked("capture_instance_changed")
+            route_values = dict(second_pass["values"])
+            hardware_identity = await self._cancellation_safe_thread_call(
+                self._m110_capture_hardware_identity,
+                device_name=str(capture_evidence.get("device_name") or ""),
+                device_index=capture_evidence.get("device_index"),
+                console_serial=str(route_values.get("/$syscfg/$serial") or ""),
+            )
+            if hardware_identity.get("verified") is not True:
+                return self._m110_route_blocked(
+                    "wing_capture_hardware_identity_failed",
+                    details={"hardware_identity": hardware_identity},
+                )
+            capture_evidence = {
+                **capture_evidence,
+                "hardware_identity": hardware_identity,
+            }
+            final_blockers = self._m110_route_global_blockers(websocket)
+            if final_blockers:
+                return self._m110_route_blocked(
+                    "route_capture_global_safety_gate_changed",
+                    details={"blockers": final_blockers},
+                )
+            if time.time() - collection_started_at > 15.0:
+                return self._m110_route_blocked("route_capture_collection_stale")
+
+            issued_at, expires_at = route_authority_expiry()
+            proof_id = new_route_proof_id()
+            runtime_identity = self._runtime_identity
+            launch_binding = runtime_identity.get("launch_binding", {})
+            evidence = {
+                "request": {
+                    "request_id": request["request_id"],
+                    "approval_id": request["approval_id"],
+                    "request_nonce": request["request_nonce"],
+                },
+                "runtime": {
+                    "identity_schema": runtime_identity.get("schema"),
+                    "instance_nonce": runtime_identity.get("instance_nonce"),
+                    "manifest_sha256": runtime_identity.get("manifest_sha256"),
+                    "head": runtime_identity.get("source", {}).get("head"),
+                    "tree": runtime_identity.get("source", {}).get("tree"),
+                    "launch_manifest_sha256": launch_binding.get(
+                        "prestart_manifest_sha256"
+                    ),
+                    "tracked_tree_clean": launch_binding.get(
+                        "tracked_tree_clean"
+                    ),
+                },
+                "console": {
+                    "client_type": type(self.mixer_client).__name__,
+                    "serial": route_values["/$syscfg/$serial"],
+                    "firmware": route_values["/$syscfg/$firmware"],
+                    "connection_generation": connection_generation,
+                    "transport_generation": transport_generation,
+                    "transport_instance_id": id(self.mixer_client),
+                },
+                "route": {
+                    "addresses": list(MASTER_CAPTURE_ROUTE_ADDRESSES),
+                    "expected": dict(MASTER_CAPTURE_ROUTE_EXPECTED),
+                    "pass_1": first_pass,
+                    "pass_2": second_pass,
+                    "logical_query_count": 12,
+                    "confirmed_round_trips_required": 2,
+                    "complete_passes_required": 2,
+                    "consistent": True,
+                },
+                "capture": capture_evidence,
+                "safety": {
+                    "authenticated_control_session": True,
+                    "operator_mode": "analyze",
+                    "observation_only": True,
+                    "console_writer_scope_acquired": True,
+                    "wal_integrity_ok": True,
+                    "recovery_transaction_count": 0,
+                    "emergency_generation": emergency_generation,
+                    "emergency_generation_stable": True,
+                    "console_mutation_write_attempt_count": 0,
+                    "normal_live_allowlist_changed": False,
+                    "live_authority_granted": False,
+                    "readiness_closure_allowed": False,
+                },
+            }
+            try:
+                artifact = write_master_capture_route_artifact(
+                    root=self._master_capture_route_artifact_root,
+                    proof_id=proof_id,
+                    issued_at_epoch=issued_at,
+                    expires_at_epoch=expires_at,
+                    evidence=evidence,
+                )
+            except Exception as exc:
+                logger.error("M110 route artifact write failed: %s", exc, exc_info=True)
+                return self._m110_route_blocked(
+                    "route_proof_artifact_persistence_failed",
+                    details={"error": type(exc).__name__},
+                )
+            artifact_verification = verify_master_capture_route_artifact(
+                root=self._master_capture_route_artifact_root,
+                path=artifact["path"],
+                expected_sha256=artifact["sha256"],
+                expected_proof_id=proof_id,
+                expected_evidence_sha256=artifact["evidence_sha256"],
+            )
+            post_persistence_failures: list[str] = []
+            if artifact_verification.get("verified") is not True:
+                post_persistence_failures.append(
+                    "route_proof_artifact_independent_verification_failed"
+                )
+            if self._manual_write_emergency_generation != emergency_generation:
+                post_persistence_failures.append("emergency_generation_changed")
+            if self._mixer_connection_generation != connection_generation:
+                post_persistence_failures.append(
+                    "mixer_connection_generation_changed"
+                )
+            if self._current_mixer_transport_generation() != transport_generation:
+                post_persistence_failures.append(
+                    "mixer_transport_generation_changed"
+                )
+            post_hardware_identity = await self._cancellation_safe_thread_call(
+                self._m110_capture_hardware_identity,
+                device_name=str(capture_evidence.get("device_name") or ""),
+                device_index=capture_evidence.get("device_index"),
+                console_serial=str(route_values.get("/$syscfg/$serial") or ""),
+            )
+            if not self._m110_hardware_identity_matches(
+                hardware_identity,
+                post_hardware_identity,
+            ):
+                post_persistence_failures.append(
+                    "capture_hardware_identity_changed"
+                )
+            if not self._m110_route_capture_evidence_current(capture_evidence):
+                post_persistence_failures.append(
+                    "capture_identity_or_freshness_changed"
+                )
+            post_persistence_failures.extend(
+                self._m110_route_global_blockers(websocket)
+            )
+            if time.time() - collection_started_at > 15.0:
+                post_persistence_failures.append("route_capture_collection_stale")
+            if post_persistence_failures:
+                try:
+                    discard_master_capture_route_artifact(
+                        root=self._master_capture_route_artifact_root,
+                        path=artifact["path"],
+                    )
+                except Exception as exc:
+                    logger.error(
+                        "Could not discard failed M110 route artifact: %s",
+                        exc,
+                        exc_info=True,
+                    )
+                    post_persistence_failures.append(
+                        "failed_route_artifact_discard_failed"
+                    )
+                return self._m110_route_blocked(
+                    "route_capture_safety_gate_changed_during_artifact_persistence",
+                    details={
+                        "failures": sorted(set(post_persistence_failures)),
+                        "artifact_verification": artifact_verification,
+                    },
+                )
+            authority = MasterCaptureRouteAuthority(
+                proof_id=proof_id,
+                issued_at_epoch=issued_at,
+                expires_at_epoch=expires_at,
+                runtime_instance_nonce=str(runtime_identity.get("instance_nonce") or ""),
+                runtime_manifest_sha256=str(runtime_identity.get("manifest_sha256") or ""),
+                launch_manifest_sha256=str(
+                    launch_binding.get("prestart_manifest_sha256") or ""
+                ),
+                connection_generation=connection_generation,
+                transport_generation=transport_generation,
+                transport_instance_id=id(self.mixer_client),
+                owner_connection_id=id(websocket),
+                emergency_generation=emergency_generation,
+                console_serial=str(route_values["/$syscfg/$serial"]),
+                firmware_version=str(route_values["/$syscfg/$firmware"]),
+                capture_device=str(capture_evidence["device_name"]),
+                capture_device_index=int(capture_evidence["device_index"]),
+                capture_channel_count=48,
+                capture_sample_rate_hz=48_000,
+                capture_instance_id=int(capture_evidence["capture_instance_id"]),
+                capture_hardware_uid=str(hardware_identity["hardware_uid"]),
+                capture_hardware_binding_sha256=str(
+                    hardware_identity["binding_sha256"]
+                ),
+                capture_usb_serial=str(hardware_identity["usb"]["serial"]),
+                capture_usb_location_id=int(
+                    hardware_identity["usb"]["location_id"]
+                ),
+                master_channels=(47, 48),
+                artifact_path=artifact["path"],
+                artifact_sha256=artifact["sha256"],
+                evidence_sha256=artifact["evidence_sha256"],
+                _transport_ref=self.mixer_client,
+                _capture_ref=self.audio_capture,
+                _capture_stream_ref=measured_capture_stream,
+                _owner_ref=websocket,
+            )
+            self._master_capture_route_authority = authority
+            self.record_master_true_peak_evidence(
+                capture_evidence["conservative_true_peak_dbtp"]
+            )
+            return {
+                "type": "wing_master_route_proof_result",
+                "status": "issued",
+                "success": True,
+                "accepted": True,
+                "reason": "process_private_master_capture_route_authority_issued",
+                "proof_id": proof_id,
+                "issued_at_epoch": issued_at,
+                "expires_at_epoch": expires_at,
+                "artifact": artifact,
+                "console_serial": authority.console_serial,
+                "firmware_version": authority.firmware_version,
+                "capture_device": authority.capture_device,
+                "capture_device_index": authority.capture_device_index,
+                "capture_hardware_uid": authority.capture_hardware_uid,
+                "capture_usb_serial": authority.capture_usb_serial,
+                "master_channels": [47, 48],
+                "conservative_true_peak_dbtp": capture_evidence[
+                    "conservative_true_peak_dbtp"
+                ],
+                "console_mutation_write_attempt_count": 0,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+            }
+
+    def _verified_master_capture_route_proof(self) -> Dict[str, Any]:
+        authority = self._master_capture_route_authority
+        if not isinstance(authority, MasterCaptureRouteAuthority):
+            return {
+                "verified": False,
+                "reason": "process_private_route_authority_required",
+                "legacy_path_sha_ignored": bool(
+                    self._master_capture_route_proof_path
+                    or self._master_capture_route_proof_sha256
+                ),
+            }
+        runtime_identity = self._runtime_identity
+        launch_binding = runtime_identity.get("launch_binding", {})
+        launch_authority = self._m110_launch_authority
+        live_source_current = False
+        if launch_authority is not None:
+            live_source_current, _ = launch_authority.source_snapshot_status()
+        checks = {
+            "route_authority_not_expired": time.time() < authority.expires_at_epoch,
+            "runtime_instance_matches": authority.runtime_instance_nonce
+            == runtime_identity.get("instance_nonce"),
+            "runtime_manifest_matches": authority.runtime_manifest_sha256
+            == runtime_identity.get("manifest_sha256"),
+            "launch_manifest_matches": authority.launch_manifest_sha256
+            == launch_binding.get("prestart_manifest_sha256"),
+            "live_source_snapshot_current": live_source_current,
+            "connection_generation_matches": authority.connection_generation
+            == self._mixer_connection_generation,
+            "transport_generation_matches": authority.transport_generation
+            == self._current_mixer_transport_generation(),
+            "transport_instance_matches": authority._transport_ref
+            is self.mixer_client,
+            "wing_transport_type_current": isinstance(
+                self.mixer_client,
+                (WingClient, EnhancedOSCClient),
+            ),
+            "emergency_generation_matches": authority.emergency_generation
+            == self._manual_write_emergency_generation,
+            "authenticated_owner_current": self._ws_auth_required
+            and authority._owner_ref is not None
+            and id(authority._owner_ref)
+            in self._authenticated_websocket_ids,
+            "transport_owner_current": authority._owner_ref
+            is self._m110_transport_owner_ref,
+            "autopilot_control_clear": not self._m110_autopilot_control_blockers(),
+            "capture_identity_current": self._m110_route_capture_authority_current(
+                authority
+            ),
+            "wing_connection_current": self.connection_mode == "wing"
+            and self.mixer_client is not None
+            and getattr(self.mixer_client, "is_connected", False) is True,
+        }
+        failed = [name for name, passed in checks.items() if not passed]
+        if failed:
+            self._revoke_m110_route_authority(";".join(failed))
+            return {
+                "verified": False,
+                "reason": "process_private_route_authority_revoked",
+                "failed_checks": failed,
+            }
+        return authority.verified_view()
+
+    async def _verified_master_capture_route_proof_with_fresh_hardware(
+        self,
+    ) -> Dict[str, Any]:
+        """Refresh macOS USB/CoreAudio identity before authority can gate writes."""
+
+        initial = self._verified_master_capture_route_proof()
+        if initial.get("verified") is not True:
+            return initial
+        authority = self._master_capture_route_authority
+        if not isinstance(authority, MasterCaptureRouteAuthority):
+            return {
+                "verified": False,
+                "reason": "process_private_route_authority_required",
+            }
+        try:
+            current = await self._cancellation_safe_thread_call(
+                self._m110_capture_hardware_identity,
+                device_name=authority.capture_device,
+                device_index=authority.capture_device_index,
+                console_serial=authority.console_serial,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            current = {
+                "verified": False,
+                "reason": "wing_capture_hardware_identity_collection_failed",
+                "error": type(exc).__name__,
+            }
+        if self._master_capture_route_authority is not authority:
+            return {
+                "verified": False,
+                "reason": "route_authority_changed_during_hardware_refresh",
+            }
+        if not self._m110_hardware_identity_matches_authority(
+            authority,
+            current,
+        ):
+            self._revoke_m110_route_authority(
+                "capture_hardware_identity_refresh_failed"
+            )
+            return {
+                "verified": False,
+                "reason": "process_private_route_authority_revoked",
+                "failed_checks": [
+                    "fresh_capture_hardware_identity_current"
+                ],
+                "hardware_identity_reason": current.get("reason"),
+            }
+        refreshed = self._verified_master_capture_route_proof()
+        if refreshed.get("verified") is True:
+            refreshed["fresh_capture_hardware_identity_current"] = True
+            refreshed["capture_hardware_uid"] = current.get("hardware_uid")
+        return refreshed
+
+    def _m110_route_capture_authority_current(
+        self,
+        authority: MasterCaptureRouteAuthority,
+    ) -> bool:
+        engine = getattr(self, "auto_soundcheck_engine", None)
+        candidates = (
+            getattr(self, "audio_capture", None),
+            getattr(engine, "audio_capture", None),
+        )
+        capture = next(
+            (candidate for candidate in candidates if candidate is authority._capture_ref),
+            None,
+        )
+        if capture is None or getattr(capture, "running", False) is not True:
+            return False
+        get_status = getattr(capture, "get_status", None)
+        if not callable(get_status):
+            return False
+        try:
+            status = dict(get_status() or {})
+        except Exception:
+            return False
+        return bool(
+            self._m110_capture_identity_valid(status)
+            and status.get("device_name") == authority.capture_device
+            and status.get("device_index") == authority.capture_device_index
+            and status.get("num_channels") == authority.capture_channel_count
+            and status.get("sample_rate") == authority.capture_sample_rate_hz
+            and authority._capture_stream_ref is not None
+            and getattr(capture, "_stream", None) is authority._capture_stream_ref
+            and bool(authority.capture_hardware_uid)
+            and re.fullmatch(
+                r"[0-9a-f]{64}",
+                authority.capture_hardware_binding_sha256,
+            )
+            is not None
+        )
+
+    @staticmethod
+    def _m110_capture_hardware_identity(
+        *,
+        device_name: str,
+        device_index: int,
+        console_serial: str,
+    ) -> Dict[str, Any]:
+        return collect_wing_capture_hardware_identity(
+            device_name=device_name,
+            device_index=device_index,
+            console_serial=console_serial,
+        )
+
+    @staticmethod
+    def _m110_hardware_identity_matches(
+        expected: Mapping[str, Any],
+        current: Mapping[str, Any],
+    ) -> bool:
+        return bool(
+            expected.get("verified") is True
+            and current.get("verified") is True
+            and current.get("binding_sha256") == expected.get("binding_sha256")
+            and current.get("hardware_uid") == expected.get("hardware_uid")
+            and current.get("usb") == expected.get("usb")
+            and current.get("console_serial") == expected.get("console_serial")
+            and current.get("device_index") == expected.get("device_index")
+        )
+
+    @staticmethod
+    def _m110_hardware_identity_matches_authority(
+        authority: MasterCaptureRouteAuthority,
+        current: Mapping[str, Any],
+    ) -> bool:
+        usb = current.get("usb")
+        return bool(
+            current.get("verified") is True
+            and current.get("device_name") == authority.capture_device
+            and current.get("device_index") == authority.capture_device_index
+            and current.get("console_serial") == authority.console_serial
+            and current.get("hardware_uid") == authority.capture_hardware_uid
+            and current.get("binding_sha256")
+            == authority.capture_hardware_binding_sha256
+            and isinstance(usb, Mapping)
+            and usb.get("serial") == authority.capture_usb_serial
+            and usb.get("location_id") == authority.capture_usb_location_id
+        )
+
+    def _m110_route_capture_evidence_current(
+        self,
+        evidence: Mapping[str, Any],
+    ) -> bool:
+        capture = getattr(self, "audio_capture", None)
+        if (
+            capture is None
+            or id(capture) != evidence.get("capture_instance_id")
+            or getattr(capture, "running", False) is not True
+        ):
+            return False
+        get_status = getattr(capture, "get_status", None)
+        if not callable(get_status):
+            return False
+        try:
+            status = dict(get_status() or {})
+        except Exception:
+            return False
+        return bool(
+            self._m110_capture_identity_valid(status)
+            and status.get("source_type") == evidence.get("source_type")
+            and status.get("device_name") == evidence.get("device_name")
+            and status.get("device_index") == evidence.get("device_index")
+            and status.get("num_channels") == evidence.get("channel_count")
+            and status.get("sample_rate") == evidence.get("sample_rate_hz")
+            and evidence.get("capture_stream_instance_id")
+            == id(getattr(capture, "_stream", None))
+        )
 
     async def _fresh_master_usb_route_readback(
         self,
@@ -14321,7 +15723,9 @@ class AutoMixerServer:
         apply_evidence: Mapping[str, Any],
     ) -> AudioRecheckResult:
         """Fail closed unless a fresh conservative master-peak estimate is safe."""
-        route_proof = self._verified_master_capture_route_proof()
+        route_proof = (
+            await self._verified_master_capture_route_proof_with_fresh_hardware()
+        )
         physical_route_before = (
             await self._fresh_master_usb_route_readback(route_proof)
             if route_proof.get("verified") is True
@@ -17658,6 +19062,13 @@ class AutoMixerServer:
         except Exception as e:
             logger.error(f"Handler error: {e}", exc_info=True)
         finally:
+            # Revoke owner authority synchronously before draining a shielded
+            # in-flight normal handler. The handler may finish rollback/audit,
+            # but it must observe auth/owner loss and cannot issue new M110
+            # authority after the network connection has closed.
+            m110_transport_owner_closing = (
+                self._begin_websocket_disconnect(websocket)
+            )
             normal_worker.cancel()
             with suppress(asyncio.CancelledError):
                 await normal_worker
@@ -17665,8 +19076,14 @@ class AutoMixerServer:
                 expiry_task.cancel()
                 with suppress(asyncio.CancelledError):
                     await expiry_task
-            self._authenticated_websocket_expiry.pop(id(websocket), None)
-            self._authenticated_websocket_expiry_close_started.discard(id(websocket))
+            if m110_transport_owner_closing:
+                await self.disconnect_mixer()
+            authority = getattr(self, "_master_capture_route_authority", None)
+            if (
+                authority is not None
+                and authority.owner_connection_id == id(websocket)
+            ):
+                self._revoke_m110_route_authority("owner_websocket_disconnected")
             for manager_name in (
                 "_decision_queue_snapshot_manager",
                 "_operator_proposal_sequence_state_manager",
@@ -17677,6 +19094,24 @@ class AutoMixerServer:
                     release_owner(websocket)
             if registered:
                 await self.unregister_client(websocket)
+
+    def _begin_websocket_disconnect(
+        self,
+        websocket: WebSocketServerProtocol,
+    ) -> bool:
+        """Tombstone an owner before any shielded handler is drained."""
+
+        self._authenticated_websocket_expiry.pop(id(websocket), None)
+        self._authenticated_websocket_expiry_close_started.discard(id(websocket))
+        self._authenticated_websocket_ids.discard(id(websocket))
+        owner_closing = self._m110_transport_owner_ref is websocket
+        if owner_closing:
+            self._m110_transport_owner_ref = None
+            self._m110_transport_owner_connection_id = None
+            self._revoke_m110_route_authority(
+                "owner_websocket_disconnect_started"
+            )
+        return owner_closing
 
     async def start(self):
         logger.info(f"Starting WebSocket server on {self.ws_host}:{self.ws_port}")

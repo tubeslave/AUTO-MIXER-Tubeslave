@@ -415,7 +415,13 @@ class WingClient(MixerClientBase):
             logger.error(f"Send failed: {e}")
             return False
 
-    def query_parameter(self, address: str, timeout: float = 0.5) -> Dict[str, Any]:
+    def query_parameter(
+        self,
+        address: str,
+        timeout: float = 0.5,
+        *,
+        send_callable: Optional[Callable[..., bool]] = None,
+    ) -> Dict[str, Any]:
         """Query one OSC address and wait briefly for physical readback.
 
         The caller decides whether a timeout can fall back to the state cache.
@@ -444,7 +450,8 @@ class WingClient(MixerClientBase):
                 event.clear()
                 captured["value"] = None
                 captured["args"] = None
-                if not self.send(address):
+                send = send_callable or self.send
+                if not send(address):
                     return {
                         "status": "send_failed",
                         "address": address,

@@ -24,7 +24,15 @@ def register_handlers(server):
             observation_only=data.get("observation_only", data.get("observe_only")),
             record_telemetry=data.get("record_telemetry"),
             telemetry_session_label=data.get("telemetry_session_label"),
+            owner_websocket=websocket,
         )
+
+    async def handle_capture_wing_master_route_proof(websocket, data):
+        result = await server.capture_wing_master_route_proof(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
 
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(
@@ -145,10 +153,14 @@ def register_handlers(server):
                 observation_only=data.get("observation_only", data.get("observe_only")),
                 record_telemetry=data.get("record_telemetry"),
                 telemetry_session_label=data.get("telemetry_session_label"),
+                owner_websocket=websocket,
             )
 
     return {
         "get_runtime_identity": handle_get_runtime_identity,
+        "capture_wing_master_route_proof": (
+            handle_capture_wing_master_route_proof
+        ),
         "connect_wing": handle_connect_wing,
         "connect_dlive": handle_connect_dlive,
         "connect_mixing_station": handle_connect_mixing_station,

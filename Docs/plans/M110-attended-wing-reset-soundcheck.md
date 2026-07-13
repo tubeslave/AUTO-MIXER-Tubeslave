@@ -11,11 +11,11 @@
 | Checkpoint | Goal | Scope | Required evidence | Hardware |
 |---|---|---|---|---|
 | M110-CP00 | Council contract | brief, proposals, critiques, ADR, plan | exact messages, grants, terminals, reset preserve set and rollback | none |
-| M110-CP01 | Main 47/48 provenance | fixed route module/handler/runner/verifier | inherited-FD manifest/HMAC, adversarial route, capture, same-process revocation and no-write tests | none during implementation |
+| M110-CP01 | Main 47/48 provenance | fixed route module/handler/persistent runner/verifier, CoreAudio+USB binding, backend ingress gate | inherited-FD manifest/HMAC, stream/USB drift, semantic artifact, teardown, raw-ingress and no-write tests | none during implementation |
 | M110-CP02 | One-shot proof authority | token store, grants, queue/result/wire/coordinator | replay/concurrency/binding/cancellation and `proof_restored` tests | none during implementation |
 | M110-CP03 | DSP reset and processor enable | maintenance reset, finite physical preserve manifest, atomic params+enable lane | exact 64-address cap, full preimage, no-outside-send, delivered-observer-event, rollback and manifest tests | none during implementation |
 | M110-CP04 | Staged child commit | exact-bundle proof-to-commit capability, single-operation decomposition and replan | identical bundle digest, no sibling inference, local-vs-global blocker and honest readiness tests | none during implementation |
-| M110-CP05 | Final software gate | frontend, no-WING, full suite, static scan, independent review, commit | clean committed source, released development lease | none |
+| M110-CP05 | Final software gate | frontend, no-WING, full suite, static scan, independent review, commit, full Git-tree binding | clean committed source, released development lease, passed canonical marker and source digest | none |
 | M110-HW01 | Route proof | proof-owned backend in analyze/observation mode | issued artifact/ledger, exact console/capture/headroom | attended real WING |
 | M110-HW02 | Exact bundle proofs | one canonical permanent bundle at a time, forced restore | `proof_passed`, WAL `proof_restored`, physical restoration and identical bundle digest | attended real WING |
 | M110-HW03 | DSP reset | exact channels 1–16 maintenance proposal | complete preimage, applied reset, finite-manifest equality, no-outside-send and delivered-observer-event evidence | attended real WING |
@@ -24,8 +24,9 @@
 
 ## Hardware checkpoint order
 
-1. Confirm clean committed HEAD, no STOP/development lease, one backend, healthy
-   WAL and operator presence.
+1. Confirm the backend-owned CP05 marker binds the entire committed Git tree;
+   confirm clean HEAD, no STOP/development lease, one backend, healthy WAL and
+   operator presence.
 2. Connect observation-only and issue Main 47/48 route proof.
 3. Keep the same proof-owned process and use exact
    `arm_m110_attended_control` to enter supervised capability-only mode without
@@ -64,5 +65,10 @@ readback plus WAL recovery before resumption.
 ## Current status
 
 - M110-CP00: accepted for implementation.
-- M110-CP01..CP05: pending.
+- M110-CP01: implementation is present and offline-validated; hardware remains
+  gated by CP05.
+- M110-CP02..CP05: pending.
 - M110-HW01..HW05: forbidden until CP05 is committed and clean.
+- A pending/stale CP05 marker blocks connect, USB capture, route proof and every
+  discovery/alternate-mixer ingress before resource construction; cleanup and
+  emergency messages remain available.

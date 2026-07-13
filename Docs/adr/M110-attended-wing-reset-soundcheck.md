@@ -64,6 +64,19 @@ Between passes it requires fresh real WING audio, exact device/index/48
 channels/48 kHz identity, sample-count progression, signal on both 47/48 and
 conservative true peak `max(sample_peak) + 3 dB <= -1 dBTP`.
 
+The audio identity is hardware-bound, not name-bound. On macOS the backend
+requires exactly one CoreAudio row with the selected exact name, manufacturer
+`BEHRINGER`, USB transport, 48 inputs and 48 kHz, plus exactly one `ioreg` USB
+device named WING with vendor ID `5015` (`0x1397`), product ID `1291`
+(`0x050b`) and a stable location ID. Its USB serial must equal the OSC chassis
+serial or equal that serial followed by exactly three decimal digits. The
+latter is the observed WING USB-interface convention on this console
+(`0100Q1V0604AAE` to `0100Q1V0604AAE214`); arbitrary longer prefixes are
+rejected. The canonical binding digest, hardware UID and exact PortAudio stream
+object are held in the private authority. The OS identity is recollected after
+artifact persistence and before any later audio-gated write; device, stream,
+USB or serial drift revokes authority.
+
 The canonical audit artifact schema is
 `automixer.wing_master_capture_route_proof.v1`. Artifacts live under a fixed
 per-user 0700 root, use 0600 regular non-symlink files, atomic exclusive write,
@@ -143,11 +156,15 @@ owner token. Disconnect, reconnect, route re-proof, emergency generation change
 or proposal terminal state revokes every affected unconsumed token. Consumed
 records are tombstoned for bounded replay detection and never reissued.
 
-The attended runner creates a pipe before spawning the backend. The environment
-contains only `AUTOMIXER_M110_AUTHORITY_FD=<decimal inherited read-fd>`; launch
-nonce, manifest, digest and authority secret are forbidden in environment,
-argv and files. The parent writes exactly one packet to the pipe and closes its
-write end:
+The attended runner creates a pipe before spawning the backend. Of M110 launch
+authority material, the environment contains only
+`AUTOMIXER_M110_AUTHORITY_FD=<decimal inherited read-fd>`; launch nonce,
+manifest, digest and authority secret are forbidden in environment, argv and
+files. Bearer WebSocket authentication uses a distinct inherited
+`AUTOMIXER_WS_AUTH_TOKEN_FD`; it never shares the authority packet. Ordinary
+bounded runtime configuration such as loopback host/port and analyze mode is
+not authority material. The parent writes exactly one packet to the authority
+pipe and closes its write end:
 
 1. four-byte unsigned big-endian manifest length, bounded to 64 KiB;
 2. that many canonical UTF-8 JSON bytes;
@@ -158,26 +175,31 @@ The manifest schema is exactly
 `automixer.m110_attended_prestart_manifest.v1` and has only `schema`, `mode`,
 `head`, `tree`, `launch_nonce` and `files`. `mode` is
 `m110_attended_runner`; `launch_nonce` is fresh 32-lowercase-hex; `files` is a
-path-sorted array of only `path`, `size` and `sha256`. Its paths must equal this
-server-constant `M110_RUNTIME_CRITICAL_PATHS` tuple exactly:
+path-sorted array of only `path`, `size` and `sha256`. Its paths must equal the
+path-sorted server-constant `M110_RUNTIME_CRITICAL_PATHS` tuple exactly:
 
 ```text
+Docs/reports/M110_CP05_SOFTWARE_VALIDATION.json
 backend/audio_capture.py
 backend/decision_queue_wire_contract.py
 backend/handlers/connection_handlers.py
 backend/handlers/product_state_handlers.py
+backend/m110_cp05_hardware_gate.py
 backend/maintenance_dsp_reset.py
 backend/master_capture_route_proof.py
 backend/operator_proposal_queue.py
 backend/operator_proposal_result_store.py
+backend/osc/enhanced_osc_client.py
 backend/runtime_identity.py
 backend/server.py
 backend/soundcheck_transaction_plan.py
 backend/supervised_console_transaction.py
 backend/supervised_family_proof_plan.py
 backend/supervised_proof_capability.py
+backend/wing_capture_hardware_identity.py
 backend/wing_client.py
 backend/wing_supervised_console_adapters.py
+ops/m110/CP05_HARDWARE_GATE.json
 tools/wing_attended_soundcheck_runner.py
 tools/wing_supervised_family_proof_runner.py
 ```
@@ -214,6 +236,30 @@ defend against a malicious same-user process able to inspect process memory or
 write OSC to WING directly; that actor is already outside this repository's
 software authority boundary. Persistent JSON/SHA artifacts still never confer
 live authority.
+
+### CP05 physical-contact gate
+
+No M110 child may contact a physical console, USB capture device or discovery
+surface until the backend-owned CP05 gate passes. The two committed canonical
+markers are `ops/m110/CP05_HARDWARE_GATE.json` and
+`Docs/reports/M110_CP05_SOFTWARE_VALIDATION.json`. The evidence requires all
+focused, frontend, full backend, no-WING, static, lease-release and independent
+review checks to be exactly `true`. The gate SHA binds the evidence; the
+evidence source SHA binds the mode, object type, Git object ID and path of every
+entry in the committed Git tree except the two markers themselves. A later
+clean commit anywhere in the tracked tree therefore closes hardware access
+until CP05 is rerun. Dirty tracked source also closes it.
+
+The same verifier runs in the runner and inside the backend before transport
+construction and route use. An attended backend has a centralized inbound
+allowlist before handler dispatch: identity/status and fail-safe stop/disconnect
+remain available even after the gate closes; fixed `connect_wing`, exact
+48-channel/48 kHz/8-second capture and route proof require the gate;
+scan/auto-connect, dLive, Mixing Station and every unrelated handler are
+blocked. Preconnect also requires current launch source, an RFC1918 unicast host
+(never host octet 0 or 255), fixed port 2223, analyze/zero-apply mode, no STOP
+or writer lease, healthy WAL, no emergency and no active writer. Thus neither
+raw WebSocket messages nor a future caller can bypass CP05.
 
 The fixed capability enum and confirmation literals are:
 
@@ -346,12 +392,17 @@ Final status is honest: `safe_core_ready`,
 
 ### Runner boundary
 
-Route and family proof runners are WebSocket-only and plan-only by default.
-They contain no `WingClient`, UDP, OSC or direct write call, establish the
-inherited one-shot launch pipe above, pass bearer tokens via separate inherited
-file descriptors, bind challenged runtime identity, launch only clean committed
-source and guarantee child teardown. Secrets and tokens never enter argv, logs
-or artifacts.
+Route and family proof runners themselves are WebSocket-only and plan-only by
+default. They contain no `WingClient`, UDP, OSC or direct write call. After the
+CP05 gate and exact operator confirmation, the isolated proof-owned child may
+open OSC. One persistent authenticated WebSocket, one child process, the exact
+WING transport and exact owned capture stream remain alive together from route
+proof through all later capability stages; closing that socket revokes
+authority. The runner establishes the inherited one-shot launch pipe above,
+passes bearer tokens via separate inherited file descriptors, binds challenged
+runtime identity, launches only clean committed source and guarantees shielded
+child/capture/transport teardown even under cancellation. Secrets and tokens
+never enter argv, logs or artifacts.
 
 ## 4. Why this won
 
@@ -386,6 +437,12 @@ unformed mix.
 - Strict request schemas, authentication and packaged-offline blocks.
 - Exact fixed address order; two physical passes; route/identity drift.
 - Capture freshness/identity/progression/stereo signal/headroom boundaries.
+- Unique CoreAudio/USB VID/PID/location/serial binding, exact three-digit USB
+  interface suffix, stream-object swap and fresh hardware drift revocation.
+- Persistent same-WebSocket route session, interleaved/duplicate terminals,
+  independent semantic artifact verification and cancellation-safe teardown.
+- CP05 pending/stale/full-tree bindings and raw M110 start/scan/alternate-mixer
+  ingress block before any OSC, USB capture or discovery constructor.
 - Audit-artifact path/symlink/size/tamper/fsync tests and proof revocation on
   restart/reconnect/TTL/source drift.
 - Token replay, wrong owner, restart, reconnect, expiry, concurrency and every

@@ -38,7 +38,13 @@ RUNTIME_CRITICAL_SOURCE_PATHS = (
     "backend/wing_client.py",
     "backend/supervised_console_parameter_registry.py",
     "backend/supervised_console_transaction.py",
+    "backend/supervised_family_proof_plan.py",
+    "backend/supervised_proof_capability.py",
+    "backend/master_capture_route_proof.py",
+    "backend/maintenance_dsp_reset.py",
     "backend/wing_supervised_console_adapters.py",
+    "tools/wing_attended_soundcheck_runner.py",
+    "tools/wing_supervised_family_proof_runner.py",
 )
 
 
