@@ -2,6 +2,18 @@
 
 ## Current blockers
 
+> M109-CP01 closure (2026-07-13): mandatory working-tree validation based on
+> `abf6b5d5e494bfa5343fab40424d456ea4339ec9` passes with `6368 passed,
+> 1 skipped in 382.42s`; the full no-WING module passes `457/457` and WING
+> truth rails pass `135/135`. Four positive tests are now artifact-history-
+> hermetic. Production validation and physical artifacts are unchanged, and
+> the canonical 13/6/7 aggregate still fails closed. Local engineering is
+> restored to `95/100`; strict real-live/public readiness remains `88/100`.
+> Normal allowlist remains `0`; status is `soundcheck_incomplete`; reset and
+> applied-correction counts remain `0`; live authority remains denied. The
+> older ledger-backed checkpoint below remains the last committed handoff until
+> this validated diff is committed.
+
 > Soundcheck P1 closure (2026-07-12): the local staged execution kernel is
 > `96/100`; full-project local engineering remains `95/100`. Strict real-live
 > soundcheck readiness is `88/100`, not `95/100`. Remaining blockers are an

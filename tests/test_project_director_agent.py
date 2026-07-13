@@ -1454,7 +1454,15 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
     }
     assert (
         directive["wing_readonly_preflight_review_status"]
-        == "candidate_ready_for_manual_review"
+        == "blocked"
+    )
+    assert (
+        directive["wing_readonly_preflight_review_evidence_status"]
+        == "readonly_preflight_artifact_replacement_required"
+    )
+    assert (
+        directive["wing_readonly_preflight_readiness_update_candidate_available"]
+        is False
     )
     latest_run_id = directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
     latest_source_id = directive["wing_readonly_preflight_latest_valid_candidate_source_id"]

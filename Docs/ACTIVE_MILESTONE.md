@@ -6,6 +6,23 @@ Title: WING read-only preflight evidence gate
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
+## M109-CP01 validation restored — 2026-07-13
+
+The mandatory working-tree command based on
+`abf6b5d5e494bfa5343fab40424d456ea4339ec9` now passes: `6368 passed,
+1 skipped in 382.42s`. M109-CP01 made four positive synthetic/contract tests
+artifact-history-hermetic, retained deterministic negative checks, and aligned
+two current-evidence truth rails with the preserved invalid WING attempts.
+Production validation and canonical WING evidence are unchanged.
+
+Validated local engineering is restored to **95/100**. Strict real-live and
+public-release readiness remain **88/100**, below the 95 target: normal
+allowlist `0`, `soundcheck_incomplete`, no DSP reset, no applied correction,
+and no live authority. Active hardening plan:
+`Docs/plans/M109-local-baseline-wire-truth-hardening.md`. The older ledger-backed
+checkpoint below remains the last committed handoff until this validated diff
+is committed.
+
 ## Superseding soundcheck execution status — 2026-07-12
 
 The local P1 monolithic-transaction defect is closed. Normal soundcheck work is

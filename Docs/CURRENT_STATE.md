@@ -2,6 +2,26 @@
 
 Generated: 2026-07-12T22:48:19Z
 
+## M109-CP01 validated working tree — 2026-07-13
+
+- Base HEAD: `abf6b5d5e494bfa5343fab40424d456ea4339ec9`; M109 diff pending commit.
+- Mandatory suite: `6368 passed, 1 skipped in 382.42s`.
+- Full no-WING release-check module: `457 passed`.
+- WING truth rails: `135 passed`.
+- Four positive synthetic/contract tests now use explicit empty evidence;
+  deterministic negative checks still prove the production aggregate fails
+  closed on invalid evidence.
+- Canonical diagnostic remains `artifact_count=13`, `valid=6`, `invalid=7`,
+  violation `wing_readonly_preflight_invalid_artifacts_present`.
+- Validated local engineering: `95/100`. Strict real-live and public-release
+  readiness: `88/100`, target not met.
+- Physical truth is unchanged: normal live allowlist `0`, status
+  `soundcheck_incomplete`, reset applied `false`, corrections applied `0`, live
+  authority `false`.
+- Active plan: `Docs/plans/M109-local-baseline-wire-truth-hardening.md`.
+- The older ledger-backed checkpoint below remains the last committed handoff
+  until this validated diff is committed.
+
 ## Soundcheck execution P1 closure — 2026-07-12
 
 - Local staged execution kernel: `96/100`.

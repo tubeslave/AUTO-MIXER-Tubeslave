@@ -7092,10 +7092,27 @@ def test_no_wing_release_check_rejects_wing_preflight_runner_supported_value_typ
     )
 
 
-def test_no_wing_release_check_tracks_wing_preflight_proof_runner_contract():
+def _inject_empty_wing_readonly_preflight_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evidence = release_check.build_wing_readonly_preflight_evidence(
+        artifact_payloads=(),
+        artifact_roots=(),
+    )
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_evidence",
+        lambda: evidence,
+    )
+
+
+def test_no_wing_release_check_tracks_wing_preflight_proof_runner_contract(
+    monkeypatch,
+):
+    _inject_empty_wing_readonly_preflight_evidence(monkeypatch)
     result = validate_wing_readonly_preflight_evidence_snapshot()
 
-    assert result.status == "passed"
+    assert result.status == "passed", result.detail["violations"]
     assert result.detail["expected_proof_runner"] == (
         WING_READONLY_PREFLIGHT_PROOF_RUNNER
     )
@@ -7153,10 +7170,13 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_proof_runner_mism
     )
 
 
-def test_no_wing_release_check_tracks_wing_preflight_run_summary_contract():
+def test_no_wing_release_check_tracks_wing_preflight_run_summary_contract(
+    monkeypatch,
+):
+    _inject_empty_wing_readonly_preflight_evidence(monkeypatch)
     result = validate_wing_readonly_preflight_evidence_snapshot()
 
-    assert result.status == "passed"
+    assert result.status == "passed", result.detail["violations"]
     assert result.detail["expected_run_summary_status"] == (
         WING_READONLY_PREFLIGHT_RUN_SUMMARY_STATUS
     )
@@ -7242,10 +7262,13 @@ def test_no_wing_release_check_rejects_wing_preflight_evidence_run_summary_contr
     )
 
 
-def test_no_wing_release_check_tracks_wing_preflight_evidence_allowed_value_types():
+def test_no_wing_release_check_tracks_wing_preflight_evidence_allowed_value_types(
+    monkeypatch,
+):
+    _inject_empty_wing_readonly_preflight_evidence(monkeypatch)
     result = validate_wing_readonly_preflight_evidence_snapshot()
 
-    assert result.status == "passed"
+    assert result.status == "passed", result.detail["violations"]
     assert result.detail["expected_supported_value_types"] == sorted(
         WING_READONLY_PREFLIGHT_RUNNER_SUPPORTED_VALUE_TYPES
     )
@@ -13757,6 +13780,8 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     accepted_source_id = (
         "artifacts/wing_readonly_preflight/run/summary.json"
     )
+    _inject_empty_wing_readonly_preflight_evidence(monkeypatch)
+
     def fake_free_port(
         port: int,
         host: str = "127.0.0.1",
@@ -13869,7 +13894,7 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
     )
 
     result_names = [result["name"] for result in summary["results"]]
-    assert summary["status"] == "passed"
+    assert summary["status"] == "passed", summary["failed_checks"]
     assert "read_surface_fixture_evidence_schema" in result_names
     assert "read_surface_remediation_plan_schema" in result_names
     assert "read_surface_physical_readback_capture_plan_schema" in result_names

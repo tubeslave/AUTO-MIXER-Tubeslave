@@ -2337,13 +2337,13 @@ def test_m006_readiness_update_stays_report_only_until_real_m002_m005_proof():
     assert preflight["readiness_closure_allowed_by_evidence"] is False
     assert preflight["live_authority_granted"] is False
     assert preflight["full_autonomous_ready"] is False
-    assert preflight["readiness_update_candidate_available"] is True
+    assert preflight["readiness_update_candidate_available"] is False
     assert (
-        "operator_must_review_readonly_preflight_candidate_before_readiness_update"
+        "operator_must_replace_invalid_readonly_preflight_artifact"
         in preflight["blocked_by"]
     )
     assert preflight["closed_blocker_ids"] == []
-    assert "Manually review the read-only preflight candidate before updating readiness rows." in (
+    assert "Do not update readiness rows from missing or invalid preflight evidence." in (
         preflight["next_required_actions"]
     )
     assert "manual readiness review only" in preflight["claim"]
