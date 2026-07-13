@@ -270,6 +270,7 @@ WING_PROOF_SURFACE_CONTRACT_BY_VALUE_TYPE = {
 class FrozenApplyRequestFacts:
     """Scalar request facts captured before a proposal can be claimed."""
 
+    proposal_id: str
     approved: bool
     approval_id: str
     approval_token: str
@@ -2834,8 +2835,16 @@ def register_handlers(server):
             reason_source="linked_apply",
         )
 
-    def preclaim_apply_blocked_result(proposal, reason, **extra):
-        """Return a compact retry-safe refusal without mutating queue state."""
+    def preclaim_apply_blocked_result(
+        proposal,
+        reason,
+        *,
+        proposal_status_mutation=False,
+        result_evidence_reserved=False,
+        idempotency_reserved=False,
+        **extra,
+    ):
+        """Return a compact no-send refusal with explicit lifecycle truth."""
 
         apply_result = {
             "status": "blocked",
@@ -2858,9 +2867,9 @@ def register_handlers(server):
                     else None
                 ),
                 "proposal_status": getattr(proposal, "status", None),
-                "proposal_status_mutation": False,
-                "result_evidence_reserved": False,
-                "idempotency_reserved": False,
+                "proposal_status_mutation": bool(proposal_status_mutation),
+                "result_evidence_reserved": bool(result_evidence_reserved),
+                "idempotency_reserved": bool(idempotency_reserved),
                 "no_console_send_proven": True,
                 "apply_result": apply_result,
             },
@@ -2896,8 +2905,16 @@ def register_handlers(server):
         return preclaim_apply_blocked_result(
             proposal,
             claim_result.get("reason") or "proposal_apply_claim_failed",
-            result_evidence_reserved=False,
-            idempotency_reserved=False,
+            proposal_status_mutation=(
+                claim_result.get("proposal_status_mutation") is True
+                or getattr(proposal, "status", None) != "pending"
+            ),
+            result_evidence_reserved=(
+                claim_result.get("result_evidence_released") is False
+            ),
+            idempotency_reserved=(
+                claim_result.get("idempotency_reserved") is True
+            ),
         )
 
     async def claim_and_reserve_operator_apply(
@@ -2943,51 +2960,44 @@ def register_handlers(server):
                     request_facts.expected_review_content_digest
                 ),
             )
+            if type(claim) is not dict:
+                raise TypeError("operator_proposal_claim_result_invalid")
         except Exception as exc:
-            if getattr(proposal, "status", None) == "applying":
-                if evidence_lifecycle.trusted_identity is None:
-                    evidence_lifecycle.bind_verified_execution(
-                        SimpleNamespace(
-                            proposal_id=getattr(proposal, "id", None),
-                            review_contract_version=getattr(
-                                proposal,
-                                "review_contract_version",
-                                None,
-                            ),
-                            review_content_digest=getattr(
-                                proposal,
-                                "review_content_digest",
-                                None,
-                            ),
-                        )
-                    )
-                finalized = await finalize_apply_result_cancellation_safe(
-                    proposal,
-                    {
-                        "status": "blocked",
-                        "reason": "operator_proposal_claim_exception",
-                        "exception_type": type(exc).__name__,
-                        "no_console_send_proven": True,
-                    },
-                    evidence_lifecycle=evidence_lifecycle,
-                    idempotency_key=request_facts.idempotency_key,
-                    reason_source="finalizer",
-                )
-                return {
-                    "ready": False,
-                    "reason": "operator_proposal_claim_exception",
-                    "finalized_result": finalized,
-                    "no_console_send_proven": True,
-                }
             released = release_apply_evidence_safely(evidence_lifecycle)
+            aborted = False
+            abort_claim = getattr(
+                server.operator_proposal_queue,
+                "abort_verified_apply_claim",
+                None,
+            )
+            if released and callable(abort_claim):
+                try:
+                    abort_result = abort_claim(
+                        proposal,
+                        expected_proposal_id=request_facts.proposal_id,
+                        expected_review_contract_version=(
+                            request_facts.expected_review_contract_version
+                        ),
+                        expected_review_content_digest=(
+                            request_facts.expected_review_content_digest
+                        ),
+                    )
+                    aborted = bool(abort_result.get("aborted") is True)
+                except Exception:
+                    aborted = False
+            if not released or not aborted:
+                server.operator_proposal_queue.latch_result_persistence_failure()
             return {
                 "ready": False,
                 "reason": (
                     "operator_proposal_claim_exception"
-                    if released
-                    else "operator_proposal_result_persistence_failed"
+                    if released and aborted
+                    else "operator_proposal_claim_cleanup_failed"
                 ),
+                "exception_type": type(exc).__name__,
                 "result_evidence_released": released,
+                "proposal_status_mutation": not aborted,
+                "idempotency_reserved": False,
                 "no_console_send_proven": True,
             }
         if not claim.get("claimed"):
@@ -3008,9 +3018,48 @@ def register_handlers(server):
             }
         try:
             evidence_lifecycle.bind_verified_execution(claim.get("execution"))
+        except Exception as exc:
+            released = release_apply_evidence_safely(evidence_lifecycle)
+            aborted = False
+            abort_claim = getattr(
+                server.operator_proposal_queue,
+                "abort_verified_apply_claim",
+                None,
+            )
+            if released and callable(abort_claim):
+                try:
+                    abort_result = abort_claim(
+                        proposal,
+                        expected_proposal_id=request_facts.proposal_id,
+                        expected_review_contract_version=(
+                            request_facts.expected_review_contract_version
+                        ),
+                        expected_review_content_digest=(
+                            request_facts.expected_review_content_digest
+                        ),
+                    )
+                    aborted = bool(abort_result.get("aborted") is True)
+                except Exception:
+                    aborted = False
+            if not released or not aborted:
+                server.operator_proposal_queue.latch_result_persistence_failure()
+            return {
+                "ready": False,
+                "reason": (
+                    "operator_proposal_claim_execution_invalid"
+                    if released and aborted
+                    else "operator_proposal_claim_cleanup_failed"
+                ),
+                "exception_type": type(exc).__name__,
+                "result_evidence_released": released,
+                "proposal_status_mutation": not aborted,
+                "idempotency_reserved": False,
+                "no_console_send_proven": True,
+            }
+        try:
             reservation = server.reserve_operator_apply_idempotency_key(
                 request_facts.idempotency_key,
-                proposal_id=getattr(proposal, "id", None),
+                proposal_id=request_facts.proposal_id,
                 approval_id=request_facts.approval_id,
             )
         except Exception as exc:
@@ -5330,6 +5379,7 @@ def register_handlers(server):
             )
 
         request_facts = FrozenApplyRequestFacts(
+            proposal_id=request["proposal_id"],
             approved=True,
             approval_id=request["approval_id"],
             approval_token="",
@@ -5437,7 +5487,7 @@ def register_handlers(server):
             revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
             if callable(revoke):
                 revoke(
-                    proposal.id,
+                    request_facts.proposal_id,
                     reason="proposal_expired_before_capability_apply",
                 )
             expired = server.operator_proposal_queue.expire_pending(proposal)
@@ -5535,7 +5585,7 @@ def register_handlers(server):
         if request_facts.idempotency_key in idempotency_store:
             reservation = server.reserve_operator_apply_idempotency_key(
                 request_facts.idempotency_key,
-                proposal_id=proposal.id,
+                proposal_id=request_facts.proposal_id,
                 approval_id=request_facts.approval_id,
             )
             result = preclaim_apply_blocked_result(
@@ -5573,42 +5623,50 @@ def register_handlers(server):
             None,
         )
         if not callable(consume_capability):
-            release_apply_evidence_safely(evidence_lifecycle)
+            released = release_apply_evidence_safely(evidence_lifecycle)
+            reason = (
+                "m110_capability_apply_path_unavailable"
+                if released
+                else "operator_proposal_result_persistence_failed"
+            )
             result = preclaim_apply_blocked_result(
                 proposal,
-                "m110_capability_apply_path_unavailable",
+                reason,
+                result_evidence_reserved=not released,
+                result_persistence_failed=not released,
             )
             return await send_operator_apply_response(
                 websocket,
                 "operator_proposal_apply_blocked",
                 result,
             )
-        consumed = consume_capability(
-            websocket=websocket,
-            request=request,
-            token=token,
-            proposal=proposal,
-        )
-        grant = consumed.get("grant") if isinstance(consumed, dict) else None
-        if not (
-            isinstance(consumed, dict)
-            and consumed.get("consumed") is True
-            and grant is not None
-        ):
-            release_apply_evidence_safely(evidence_lifecycle)
+        try:
+            consumed = consume_capability(
+                websocket=websocket,
+                request=request,
+                token=token,
+                proposal=proposal,
+            )
+        except Exception as exc:
+            token = ""
+            released = release_apply_evidence_safely(evidence_lifecycle)
+            revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
+            if callable(revoke):
+                revoke(
+                    request_facts.proposal_id,
+                    reason="capability_consume_exception",
+                )
+            reason = (
+                "m110_capability_consume_exception"
+                if released
+                else "operator_proposal_result_persistence_failed"
+            )
             result = preclaim_apply_blocked_result(
                 proposal,
-                (
-                    consumed.get("reason")
-                    if isinstance(consumed, dict)
-                    else None
-                )
-                or "m110_capability_consume_failed",
-                blockers=(
-                    consumed.get("blockers")
-                    if isinstance(consumed, dict)
-                    else None
-                ),
+                reason,
+                result_evidence_reserved=not released,
+                exception_type=type(exc).__name__,
+                result_persistence_failed=not released,
             )
             return await send_operator_apply_response(
                 websocket,
@@ -5616,7 +5674,40 @@ def register_handlers(server):
                 result,
             )
         token = ""
-
+        grant = consumed.get("grant") if isinstance(consumed, dict) else None
+        if not (
+            isinstance(consumed, dict)
+            and consumed.get("consumed") is True
+            and grant is not None
+        ):
+            released = release_apply_evidence_safely(evidence_lifecycle)
+            consume_reason = (
+                consumed.get("reason")
+                if isinstance(consumed, dict)
+                else None
+            )
+            reason = (
+                (consume_reason or "m110_capability_consume_failed")
+                if released
+                else "operator_proposal_result_persistence_failed"
+            )
+            result = preclaim_apply_blocked_result(
+                proposal,
+                reason,
+                result_evidence_reserved=not released,
+                blockers=(
+                    consumed.get("blockers")
+                    if isinstance(consumed, dict)
+                    else None
+                ),
+                consume_reason=consume_reason,
+                result_persistence_failed=not released,
+            )
+            return await send_operator_apply_response(
+                websocket,
+                "operator_proposal_apply_blocked",
+                result,
+            )
         try:
             claim_result = await claim_and_reserve_operator_apply(
                 proposal,
@@ -5659,7 +5750,7 @@ def register_handlers(server):
             revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
             if callable(revoke):
                 revoke(
-                    proposal.id,
+                    request_facts.proposal_id,
                     reason="claim_aborted_after_capability_consume",
                 )
             if isinstance(exc, asyncio.CancelledError):
@@ -5695,7 +5786,7 @@ def register_handlers(server):
             revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
             if callable(revoke):
                 revoke(
-                    proposal.id,
+                    request_facts.proposal_id,
                     reason="claim_failed_after_capability_consume",
                 )
             result = claim_failure_apply_result(proposal, claim_result)
@@ -5704,14 +5795,42 @@ def register_handlers(server):
                 "operator_proposal_apply_blocked",
                 result,
             )
-        execution = claim_result["execution"]
         evidence_lifecycle = claim_result["evidence_lifecycle"]
-        _execution_content, execution_proposal = verified_execution_view(
-            execution
-        )
-        transaction_plan = execution_proposal.raw.get(
-            "supervised_transaction_plan"
-        )
+        try:
+            execution = claim_result["execution"]
+            _execution_content, execution_proposal = verified_execution_view(
+                execution
+            )
+            transaction_plan = execution_proposal.raw.get(
+                "supervised_transaction_plan"
+            )
+        except Exception as exc:
+            mark_terminal = getattr(grant, "mark_terminal", None)
+            if callable(mark_terminal):
+                mark_terminal("execution_view_failed_after_capability_consume")
+            result = await finalize_apply_result_cancellation_safe(
+                proposal,
+                {
+                    "status": "blocked",
+                    "reason": "proposal_execution_view_invalid",
+                    "exception_type": type(exc).__name__,
+                    "no_console_send_proven": True,
+                },
+                evidence_lifecycle=evidence_lifecycle,
+                idempotency_key=request_facts.idempotency_key,
+                reason_source="validation",
+            )
+            revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
+            if callable(revoke):
+                revoke(
+                    request_facts.proposal_id,
+                    reason="execution_view_failed_after_capability_consume",
+                )
+            return await send_operator_apply_response(
+                websocket,
+                "operator_proposal_apply_blocked",
+                result,
+            )
         if not isinstance(transaction_plan, dict):
             mark_terminal = getattr(grant, "mark_terminal", None)
             if callable(mark_terminal):
@@ -5727,6 +5846,12 @@ def register_handlers(server):
                 idempotency_key=request_facts.idempotency_key,
                 reason_source="validation",
             )
+            revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
+            if callable(revoke):
+                revoke(
+                    request_facts.proposal_id,
+                    reason="review_changed_after_capability_consume",
+                )
             return await send_operator_apply_response(
                 websocket,
                 "operator_proposal_apply_blocked",
@@ -5772,7 +5897,7 @@ def register_handlers(server):
             revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
             if callable(revoke):
                 revoke(
-                    proposal.id,
+                    request_facts.proposal_id,
                     reason="capability_apply_cancelled_after_consume",
                 )
             mark_terminal = getattr(grant, "mark_terminal", None)
@@ -5795,7 +5920,7 @@ def register_handlers(server):
             revoke = getattr(server, "revoke_m110_capability_for_proposal", None)
             if callable(revoke) and proposal.status != "pending":
                 revoke(
-                    proposal.id,
+                    request_facts.proposal_id,
                     reason="capability_apply_exception_terminal",
                 )
             return await send_operator_apply_response(
@@ -5886,7 +6011,7 @@ def register_handlers(server):
                 )
                 if callable(revoke):
                     revoke(
-                        proposal.id,
+                        request_facts.proposal_id,
                         reason="capability_apply_terminal",
                     )
 
@@ -5963,6 +6088,7 @@ def register_handlers(server):
         ):
             return await handle_m110_capability_apply(websocket, data)
         request_facts = FrozenApplyRequestFacts(
+            proposal_id=str(data.get("proposal_id") or "").strip(),
             approved=data.get("approved") is True,
             approval_id=str(data.get("approval_id") or "").strip(),
             approval_token=str(data.get("approval_token") or ""),

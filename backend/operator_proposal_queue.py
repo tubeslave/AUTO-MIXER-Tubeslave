@@ -1181,6 +1181,54 @@ class OperatorProposalQueue:
             "proposal_status": proposal.status,
         }
 
+    def abort_verified_apply_claim(
+        self,
+        proposal: OperatorProposal,
+        *,
+        expected_proposal_id: Any,
+        expected_review_contract_version: Any,
+        expected_review_content_digest: Any,
+    ) -> Dict[str, Any]:
+        """Return an exact no-send claim to pending after local setup fails.
+
+        This is deliberately narrower than result finalization.  It may only
+        validate an unchanged pending row or undo the exact in-memory
+        ``pending -> applying`` transition while the same reviewed proposal is
+        still present in the pending queue.  Callers must release their durable
+        result reservation before invoking it.
+        """
+
+        with self._review_claim_lock:
+            pending_idx = self._find_pending_index(str(expected_proposal_id or ""))
+            exact_row = bool(
+                pending_idx is not None
+                and self._pending[pending_idx] is proposal
+                and proposal.id == expected_proposal_id
+                and proposal.review_contract_version
+                == expected_review_contract_version
+                and proposal.review_content_digest
+                == expected_review_content_digest
+            )
+            if not exact_row or proposal.status not in {"pending", "applying"}:
+                return {
+                    "aborted": False,
+                    "reason": "verified_apply_claim_identity_mismatch",
+                    "proposal_status": proposal.status,
+                }
+            if proposal.status == "pending":
+                return {
+                    "aborted": True,
+                    "reason": "verified_apply_claim_already_pending",
+                    "proposal_status": proposal.status,
+                }
+            proposal.status = "pending"
+            proposal.updated_at = utc_now()
+            return {
+                "aborted": True,
+                "reason": "verified_apply_claim_aborted_before_send",
+                "proposal_status": proposal.status,
+            }
+
     def _complete_pending(
         self,
         *,

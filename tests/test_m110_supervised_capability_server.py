@@ -449,6 +449,619 @@ async def test_post_consume_claim_exception_releases_evidence_and_grant(
 
 
 @pytest.mark.asyncio
+async def test_consume_exception_releases_evidence_and_revokes_prepared_authority(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-consume-exception",
+                "title": "M110 consume exception",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-consume-exception"
+    )
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        side_effect=RuntimeError("injected_consume_failure")
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-consume-exception",
+        "idempotency_key": "m110-proof:consume-exception",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "2" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "3" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "m110_capability_consume_exception"
+    assert sent["result_evidence_reserved"] is False
+    assert sent["apply_result"]["result_persistence_failed"] is False
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    assert request.get("supervised_capability_token") is None
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_invalid_claim_execution_aborts_claim_and_releases_evidence(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-invalid-claim-execution",
+                "title": "M110 invalid claim execution",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-invalid-claim-execution"
+    )
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    original_claim = server.operator_proposal_queue.claim_verified_for_apply
+
+    def claim_without_execution(*args, **kwargs):
+        result = original_claim(*args, **kwargs)
+        assert result["claimed"] is True
+        return {**result, "execution": None}
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        claim_without_execution
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-invalid-claim-execution",
+        "idempotency_key": "m110-proof:invalid-claim-execution",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "4" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "5" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_claim_execution_invalid"
+    assert sent["proposal_status_mutation"] is False
+    assert sent["result_evidence_reserved"] is False
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    assert server.operator_proposal_queue.result_persistence_failed is False
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_non_mapping_claim_result_exactly_aborts_real_claim(m110_server):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-non-mapping-claim",
+                "title": "M110 non-mapping claim",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-non-mapping-claim"
+    )
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    original_claim = server.operator_proposal_queue.claim_verified_for_apply
+
+    def claim_then_return_none(*args, **kwargs):
+        result = original_claim(*args, **kwargs)
+        assert result["claimed"] is True
+        return None
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        claim_then_return_none
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-non-mapping-claim",
+        "idempotency_key": "m110-proof:non-mapping-claim",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "0" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "1" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_claim_exception"
+    assert sent["proposal_status_mutation"] is False
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_persistence_failed is False
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_claim_identity_drift_cannot_use_mutated_id_to_abort(m110_server):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-claim-identity-before",
+                "title": "M110 claim identity drift",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-claim-identity-before"
+    )
+    frozen_proposal_id = proposal.id
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    original_claim = server.operator_proposal_queue.claim_verified_for_apply
+
+    def claim_then_mutate_identity(*args, **kwargs):
+        result = original_claim(*args, **kwargs)
+        assert result["claimed"] is True
+        proposal.id = "m110-claim-identity-mutated"
+        return {**result, "execution": None}
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        claim_then_mutate_identity
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[frozen_proposal_id] = {
+        "prepared": True
+    }
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": frozen_proposal_id,
+        "approved": True,
+        "approval_id": "m110-approval-claim-identity-drift",
+        "idempotency_key": "m110-proof:claim-identity-drift",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "a" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "b" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_claim_cleanup_failed"
+    assert sent["proposal_status_mutation"] is True
+    assert proposal.status == "applying"
+    assert server.operator_proposal_queue.result_persistence_failed is True
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert frozen_proposal_id not in server._m110_prepared_capability_bundles
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_pending_identity_drift_during_claim_exception_latches_fence(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-pending-identity-before",
+                "title": "M110 pending identity drift",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-pending-identity-before"
+    )
+    frozen_proposal_id = proposal.id
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+
+    def mutate_pending_identity_then_raise(*_args, **_kwargs):
+        proposal.id = "m110-pending-identity-mutated"
+        raise RuntimeError("injected_pending_identity_drift")
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        mutate_pending_identity_then_raise
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[frozen_proposal_id] = {
+        "prepared": True
+    }
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": frozen_proposal_id,
+        "approved": True,
+        "approval_id": "m110-approval-pending-identity-drift",
+        "idempotency_key": "m110-proof:pending-identity-drift",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "e" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "f" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_claim_cleanup_failed"
+    assert sent["proposal_status_mutation"] is True
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_persistence_failed is True
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert frozen_proposal_id not in server._m110_prepared_capability_bundles
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_unexpected_post_claim_status_latches_cleanup_fence(m110_server):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-unexpected-claim-status",
+                "title": "M110 unexpected claim status",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-unexpected-claim-status"
+    )
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+
+    def claim_with_unexpected_status(*_args, **_kwargs):
+        proposal.status = "apply_error"
+        raise RuntimeError("injected_unexpected_claim_status")
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        claim_with_unexpected_status
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-unexpected-claim-status",
+        "idempotency_key": "m110-proof:unexpected-claim-status",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "c" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "d" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_claim_cleanup_failed"
+    assert sent["proposal_status_mutation"] is True
+    assert proposal.status == "apply_error"
+    assert server.operator_proposal_queue.result_persistence_failed is True
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_execution_view_exception_finalizes_claim_and_releases_idempotency(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-execution-view-exception",
+                "title": "M110 execution view exception",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-execution-view-exception"
+    )
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    original_claim = server.operator_proposal_queue.claim_verified_for_apply
+
+    def claim_with_unreadable_execution(*args, **kwargs):
+        result = original_claim(*args, **kwargs)
+        assert result["claimed"] is True
+
+        def fail_content_copy():
+            raise ValueError("injected_execution_view_failure")
+
+        execution = SimpleNamespace(
+            proposal_id=proposal.id,
+            review_contract_version=proposal.review_contract_version,
+            review_content_digest=proposal.review_content_digest,
+            content_copy=fail_content_copy,
+        )
+        return {**result, "execution": execution}
+
+    server.operator_proposal_queue.claim_verified_for_apply = (
+        claim_with_unreadable_execution
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-execution-view-exception",
+        "idempotency_key": "m110-proof:execution-view-exception",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "6" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "7" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["status"] == "apply_blocked"
+    assert sent["apply_result"]["reason"] == "proposal_execution_view_invalid"
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    assert request["idempotency_key"] not in server._operator_apply_idempotency_keys
+    grant.mark_terminal.assert_called_with(
+        "execution_view_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_claim_time_expiry_reports_terminal_mutation_and_no_reservation(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-claim-time-expiry",
+                "title": "M110 claim-time expiry",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-claim-time-expiry"
+    )
+    expiry_checks = 0
+
+    def expires_between_precheck_and_claim():
+        nonlocal expiry_checks
+        expiry_checks += 1
+        return expiry_checks >= 2
+
+    proposal.is_expired = expires_between_precheck_and_claim
+    grant = MagicMock()
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server._m110_prepared_capability_bundles[proposal.id] = {"prepared": True}
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-claim-time-expiry",
+        "idempotency_key": "m110-proof:claim-time-expiry",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "8" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "9" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "proposal_expired"
+    assert sent["proposal_status_mutation"] is True
+    assert sent["result_evidence_reserved"] is False
+    assert proposal.status == "apply_blocked"
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 0
+    assert proposal.id not in server._m110_prepared_capability_bundles
+    grant.mark_terminal.assert_called_with(
+        "claim_failed_after_capability_consume"
+    )
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_post_consume_apply_cancellation_drains_evidence_and_authority(
     m110_server,
 ):
@@ -581,6 +1194,72 @@ async def test_consume_failure_release_error_latches_result_fence(m110_server):
     await server._dispatch["apply_operator_proposal"](websocket, request)
 
     assert server.operator_proposal_queue.result_persistence_failed is True
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 1
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_result_persistence_failed"
+    assert sent["result_evidence_reserved"] is True
+    assert sent["apply_result"]["consume_reason"] == "token_rejected"
+    assert sent["apply_result"]["result_persistence_failed"] is True
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_missing_consume_path_release_error_reports_reserved_evidence(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        server.operator_proposal_queue.create(
+            {
+                "id": "m110-missing-consume-release-error",
+                "title": "M110 missing consume release error",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": _plan(),
+            },
+            server.get_operator_mode_status(),
+        )
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-missing-consume-release-error"
+    )
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    server.consume_m110_capability_for_apply = None
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock()
+    server.send_to_client = AsyncMock()
+    server.operator_proposal_queue.release_result_evidence = MagicMock(
+        side_effect=RuntimeError("injected_release_failure")
+    )
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-approval-missing-consume-release-error",
+        "idempotency_key": "m110-proof:missing-consume-release-error",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": "sha256:" + "1" * 64,
+        "supervised_capability_token": "m110cap_v1_" + "2" * 64,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    sent = server.send_to_client.await_args.args[1]
+    assert sent["reason"] == "operator_proposal_result_persistence_failed"
+    assert sent["result_evidence_reserved"] is True
+    assert sent["apply_result"]["result_persistence_failed"] is True
+    assert server.operator_proposal_queue.result_persistence_failed is True
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 1
     assert proposal.status == "pending"
     server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
 
