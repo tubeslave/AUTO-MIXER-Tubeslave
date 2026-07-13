@@ -57,6 +57,51 @@ function taskQueueMetrics(
   ];
 }
 
+function DecisionQueueContractNotice({ ui, actions }: { ui: UiState; actions: UiActions }) {
+  const queue = ui.decisionQueue;
+  const terminal = queue.availability === 'terminal';
+  const unavailable = ['unavailable', 'error', 'stale', 'terminal'].includes(queue.availability);
+  const toneClass = queue.applyUiDisabled || unavailable
+    ? 'border-danger/35 bg-danger/10 text-danger'
+    : queue.availability === 'loading' || queue.availability === 'degraded'
+      ? 'border-warn/35 bg-warn/10 text-warn'
+      : 'border-online/35 bg-online/10 text-online';
+  const status = terminal
+    ? `Terminal WebSocket close ${queue.terminalClose?.code ?? 1009}: ${queue.terminalClose?.reason ?? queue.error}`
+    : queue.error
+      ? `${queue.availability}: ${queue.error}`
+      : queue.availability;
+  return (
+    <div className={`flex items-center justify-between gap-3 rounded-[6px] border px-2 py-1.5 text-[10px] ${toneClass}`}>
+      <div className="min-w-0">
+        <b>Decision Queue v2: {status}</b>
+        <span className="ml-2">
+          total {queue.counts.totalCount} · loaded {queue.items.length}/{queue.counts.includedCount}
+          {queue.counts.omittedCount ? ` · unpageable ${queue.counts.omittedCount}` : ''}
+          {queue.hazards.count ? ` · hazards ${queue.hazards.codes.join(', ')}` : ''}
+        </span>
+      </div>
+      <div className="flex shrink-0 gap-1">
+        {queue.page.hasMore && (
+          <button
+            className="am-button py-1 text-[9px] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={queue.paginationLoading}
+            onClick={actions.loadNextDecisionQueuePage}
+            type="button"
+          >
+            {queue.paginationLoading ? 'Loading…' : 'Load next page'}
+          </button>
+        )}
+        {unavailable && (
+          <button className="am-button py-1 text-[9px]" onClick={actions.refreshBackend} type="button">
+            {terminal ? 'Manual retry' : 'Refresh queue'}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function applyPlanForIntegrationBundleBlocker(
   plan: ApplyPlanStep[],
   integrationBundleApplyBlocked = false,
@@ -696,6 +741,22 @@ function SupervisedApplyModal({
   onConfirm: () => void;
 }) {
   const proposal = task.proposal;
+  const review = ui.proposalReview;
+  const reviewMatches = review.status === 'verified'
+    && review.proposalId === (task.proposalId ?? task.id)
+    && review.reviewContractVersion === task.reviewContractVersion
+    && review.reviewContentDigest === task.reviewContentDigest
+    && review.currentState?.can_apply === true
+    && review.currentState.expired !== true;
+  const decisionQueueGateBlocked = integrationBundleApplyBlocked
+    && integrationBundleBlockerNotice.includes('Decision Queue');
+  const snapshotExpiresAt = ui.decisionQueue.snapshot
+    ? Date.parse(ui.decisionQueue.snapshot.expiresAt)
+    : Number.NaN;
+  const queueIdentityReady = ui.decisionQueue.availability === 'ready'
+    && !ui.decisionQueue.applyUiDisabled
+    && Number.isFinite(snapshotExpiresAt)
+    && snapshotExpiresAt > Date.now();
   const canRequestBackendGate = ui.mode === 'Supervised'
     && ui.backend.connectionState === 'connected'
     && ui.backend.dataState === 'connected'
@@ -704,20 +765,44 @@ function SupervisedApplyModal({
     && ui.backend.canApplyToConsole
     && Boolean(task.canApply ?? true)
     && !task.reviewOnly
+    && queueIdentityReady
+    && reviewMatches
     && !integrationBundleApplyBlocked;
   const approvalLabel = ui.mode !== 'Supervised'
     ? 'Blocked by mode'
     : integrationBundleApplyBlocked
-      ? 'Blocked by integration bundle'
+      ? decisionQueueGateBlocked
+        ? 'Blocked by Decision Queue gate'
+        : 'Blocked by integration bundle'
+    : review.status === 'loading'
+      ? 'Verifying full proposal detail'
+      : review.status === 'error' || review.status === 'stale'
+        ? 'Proposal detail not verified'
+        : !queueIdentityReady
+          ? 'Decision Queue snapshot blocked'
     : canRequestBackendGate
       ? 'Backend supervised gate'
-      : 'Local prototype approval only';
-  const approvalTone: Tone = ui.mode !== 'Supervised' || integrationBundleApplyBlocked ? 'red' : canRequestBackendGate ? 'yellow' : 'blue';
+      : 'Verified detail required';
+  const approvalTone: Tone = canRequestBackendGate
+    ? 'yellow'
+    : review.status === 'loading' && !integrationBundleApplyBlocked
+      ? 'yellow'
+      : 'red';
   const applyRequest = canRequestBackendGate
     ? 'Ready to request'
-    : ui.mode === 'Supervised' && !integrationBundleApplyBlocked
-      ? 'UI-only simulation'
+    : ui.mode === 'Supervised' && !integrationBundleApplyBlocked && review.status === 'loading'
+      ? `Verifying chunks ${review.receivedChunkCount}/${review.chunkCount || '?'}`
       : 'Blocked';
+  const detailVerificationLabel = reviewMatches
+    ? `Verified ${review.chunkCount} chunk(s) / ${review.totalRawBytes} bytes`
+    : review.status === 'loading'
+      ? `Loading ${review.receivedChunkCount}/${review.chunkCount || '?'}`
+      : review.error || 'Full digest-bound detail required';
+  const detailVerificationTone: Tone = reviewMatches
+    ? 'green'
+    : review.status === 'loading'
+      ? 'yellow'
+      : 'red';
   const backendResult = ui.backend.proposalApplyResult;
   const resultMatches = Boolean(
     backendResult
@@ -750,7 +835,9 @@ function SupervisedApplyModal({
     ? modalGateBlockerStatus.rollbackTone
     : visibleBackendResultMatches ? backendResult?.rollbackTone ?? 'yellow' as Tone : 'yellow' as Tone;
   const finalReadinessStatus = integrationBundleApplyBlocked
-    ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
+    ? decisionQueueGateBlocked
+      ? { value: 'Blocked by Decision Queue gate', tone: 'red' as Tone }
+      : { value: 'Blocked by integration bundle', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };
   const supervisedProposalParameter = taskProposalParameterDisplay(proposal, integrationBundleApplyBlocked);
   const supervisedProposalOldValue = supervisedProposalOldValueDisplay(integrationBundleApplyBlocked);
@@ -772,6 +859,26 @@ function SupervisedApplyModal({
           <div className="mb-3 rounded-[7px] border border-danger/35 bg-danger/10 px-3 py-2 text-[10px] leading-4 text-danger">
             {integrationBundleBlockerNotice}
           </div>
+        )}
+        <div className={`mb-3 rounded-[7px] border px-3 py-2 text-[10px] leading-4 ${
+          reviewMatches
+            ? 'border-online/35 bg-online/10 text-online'
+            : review.status === 'loading'
+              ? 'border-warn/35 bg-warn/10 text-warn'
+              : 'border-danger/35 bg-danger/10 text-danger'
+        }`}>
+          <b>Immutable review detail:</b> {detailVerificationLabel}
+          {review.reviewContentDigest && (
+            <span className="ml-2 font-mono">{review.reviewContentDigest.slice(0, 22)}…</span>
+          )}
+        </div>
+        {reviewMatches && review.document && (
+          <details className="mb-3 rounded-[7px] border border-line bg-row px-3 py-2 text-[10px] text-muted">
+            <summary className="cursor-pointer font-bold text-text">View verified canonical proposal content</summary>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-[9px] leading-4">
+              {JSON.stringify(review.document, null, 2)}
+            </pre>
+          </details>
         )}
         <div className="grid grid-cols-[1.05fr_0.95fr] gap-3">
           <div className="space-y-3">
@@ -803,6 +910,7 @@ function SupervisedApplyModal({
               <div className="space-y-2">
                 {[
                   { label: 'Required approval', value: approvalLabel, tone: approvalTone },
+                  { label: 'Review detail', value: detailVerificationLabel, tone: detailVerificationTone },
                   { label: 'Apply request', value: applyRequestLabel, tone: backendResultTone },
                   { label: 'Readback status', value: readbackLabel, tone: readbackTone },
                   { label: 'Rollback status', value: rollbackLabel, tone: rollbackTone },
@@ -888,17 +996,67 @@ export function TaskQueueWorkspace({
     : undefined;
   const modalEvidence = modalTask ? safetyEvidenceForTask(modalTask, ui.mode) : evidence;
   const blockedReasonMessages = directorBlockedReasonMessages(runtime.blockedReasons);
-  const integrationBundleApplyBlocked = blockedReasonMessages.length > 0;
+  const queueApplyBlocked = ui.decisionQueue.availability !== 'ready'
+    || ui.decisionQueue.applyUiDisabled;
+  const integrationBundleApplyBlocked = blockedReasonMessages.length > 0 || queueApplyBlocked;
+  const provisionalQueueMetrics = taskQueueMetrics(taskRows, integrationBundleApplyBlocked);
+  const queueMetrics: Metric[] = ui.decisionQueue.snapshot
+    ? [
+        {
+          label: 'Total Queue',
+          value: String(ui.decisionQueue.counts.totalCount),
+          sub: `${ui.decisionQueue.items.length} materialized`,
+          tone: 'blue'
+        },
+        {
+          label: integrationBundleApplyBlocked ? 'Apply Blocked' : 'Applyable',
+          value: String(
+            integrationBundleApplyBlocked
+              ? ui.decisionQueue.counts.totalCount
+              : ui.decisionQueue.counts.byApplyState.applyable
+          ),
+          sub: integrationBundleApplyBlocked ? 'global queue gate' : 'exact server count',
+          tone: integrationBundleApplyBlocked ? 'red' : 'green'
+        },
+        {
+          label: 'Review Only',
+          value: String(
+            integrationBundleApplyBlocked
+              ? ui.decisionQueue.counts.totalCount
+              : ui.decisionQueue.counts.byApplyState.blocked
+                + ui.decisionQueue.counts.byApplyState.analysis_only
+          ),
+          sub: 'exact server count',
+          tone: 'red'
+        },
+        {
+          label: 'Pending',
+          value: String(ui.decisionQueue.counts.bySection.pending),
+          sub: 'exact server count',
+          tone: 'yellow'
+        },
+        {
+          label: 'History',
+          value: String(ui.decisionQueue.counts.bySection.history),
+          sub: 'retained terminal rows',
+          tone: 'green'
+        }
+      ]
+    : provisionalQueueMetrics;
   const guardedApplyPlan = applyPlanForIntegrationBundleBlocker(applyPlan, integrationBundleApplyBlocked);
   const modalApplyPlan = applyPlanForIntegrationBundleBlocker(
     modalTask ? applyPlanForTask(modalTask, ui.mode) : applyPlan,
     integrationBundleApplyBlocked,
   );
-  const taskQueueBlockerNotice = blockedReasonMessages.length > 0 && taskRows.length > 0
-    ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
+  const taskQueueBlockerNotice = integrationBundleApplyBlocked && taskRows.length > 0
+    ? blockedReasonMessages.length > 0
+      ? `Promotion planning blocked. Task Queue evidence remains review-only: ${blockedReasonMessages[0]}`
+      : `Decision Queue apply is blocked: ${ui.decisionQueue.error || ui.decisionQueue.hazards.codes.join(', ') || ui.decisionQueue.availability}`
     : '';
-  const supervisedApplyBlockerNotice = blockedReasonMessages.length > 0 && modalTask
-    ? `Promotion planning blocked. Supervised apply remains blocked: ${blockedReasonMessages[0]}`
+  const supervisedApplyBlockerNotice = integrationBundleApplyBlocked && modalTask
+    ? blockedReasonMessages.length > 0
+      ? `Promotion planning blocked. Supervised apply remains blocked: ${blockedReasonMessages[0]}`
+      : `Decision Queue identity/hazard gate blocks Apply: ${ui.decisionQueue.error || ui.decisionQueue.hazards.codes.join(', ') || ui.decisionQueue.availability}`
     : '';
   const guardedConfirmSupervisedApply = (taskId: string) => {
     if (integrationBundleApplyBlocked) return;
@@ -909,8 +1067,9 @@ export function TaskQueueWorkspace({
     <div className="relative grid h-full grid-rows-[auto_1fr_118px] gap-2">
       <div className="space-y-2">
         <div className="grid grid-cols-5 gap-2">
-          {taskQueueMetrics(taskRows, integrationBundleApplyBlocked).map(metric => <MetricCard metric={metric} key={metric.label} />)}
+          {queueMetrics.map(metric => <MetricCard metric={metric} key={metric.label} />)}
         </div>
+        <DecisionQueueContractNotice actions={actions} ui={ui} />
         {taskQueueBlockerNotice && (
           <div className="rounded-[6px] border border-danger/35 bg-danger/10 px-2 py-1.5 text-[10px] leading-4 text-danger">
             {taskQueueBlockerNotice}

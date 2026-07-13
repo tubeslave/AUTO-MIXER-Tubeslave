@@ -14,7 +14,17 @@ function readHashRoute(): RouteId {
 }
 
 export default function App() {
-  const { backend, backendActions, connected, emergencyStop, modeFromBackend, soundcheck, viewData } = useOperatorBackend();
+  const {
+    backend,
+    backendActions,
+    connected,
+    decisionQueue,
+    emergencyStop,
+    modeFromBackend,
+    proposalReview,
+    soundcheck,
+    viewData
+  } = useOperatorBackend();
   const [activeRoute, setActiveRoute] = useState<RouteId>(() => readHashRoute());
   const [mode, setMode] = useState<AutomixerMode>('Assist');
   const [selectedAgentId, selectAgent] = useState('analyzer');
@@ -143,9 +153,14 @@ export default function App() {
         return;
       }
 
-      backendActions.applyProposal(proposalId);
-      setLastAction(`${proposalId} supervised apply requested`);
-      pushToast(`${proposalId} supervised apply request sent to backend.`, 'yellow');
+      const sent = backendActions.applyProposal(proposalId);
+      setLastAction(`${proposalId} ${sent ? 'supervised apply requested' : 'apply blocked'}`);
+      pushToast(
+        sent
+          ? `${proposalId} supervised apply request sent to backend.`
+          : `${proposalId} apply blocked: verified v2 proposal detail is required.`,
+        sent ? 'yellow' : 'red'
+      );
       return;
     }
 
@@ -167,11 +182,14 @@ export default function App() {
   }, [backendActions, connected, mode, pushToast, viewData.tasks]);
 
   const openSupervisedProposal = useCallback((taskId: string) => {
+    const task = viewData.tasks.find(item => item.id === taskId);
+    const proposalId = task?.proposalId ?? taskId;
     selectTask(taskId);
     setSupervisedProposalTaskId(taskId);
+    backendActions.requestProposalDetail(proposalId);
     setLastAction(`${taskId} supervised proposal opened`);
-    pushToast(`${taskId} supervised proposal opened. No mixer write sent.`, 'yellow');
-  }, [pushToast]);
+    pushToast(`${taskId} supervised proposal opened. Verifying immutable detail; no mixer write sent.`, 'yellow');
+  }, [backendActions, pushToast, viewData.tasks]);
 
   const closeSupervisedProposal = useCallback(() => {
     setSupervisedProposalTaskId(null);
@@ -244,8 +262,10 @@ export default function App() {
   const ui: UiState = useMemo(() => ({
     mode,
     backend,
+    decisionQueue,
     soundcheck,
     emergencyStop,
+    proposalReview,
     selectedAgentId,
     selectedCommunicationKey,
     selectedPerformanceAgent,
@@ -267,7 +287,7 @@ export default function App() {
     lastAction,
     snapshotCount,
     toast
-  }), [backend, emergencyStop, mode, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
+  }), [backend, decisionQueue, emergencyStop, mode, proposalReview, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
 
   const actions: UiActions = useMemo(() => ({
     setMode: updateMode,
@@ -295,6 +315,7 @@ export default function App() {
     createSnapshot,
     rollbackLastAction,
     refreshBackend: backendActions.refreshBackend,
+    loadNextDecisionQueuePage: backendActions.loadNextDecisionQueuePage,
     toggleAudioPreview: backendActions.toggleAudioPreview,
     connectWingReadOnly: backendActions.connectWingReadOnly,
     navigate,
@@ -308,7 +329,7 @@ export default function App() {
     triggerEmergencyStop: backendActions.triggerEmergencyStop,
     pushToast,
     dismissToast: () => setToast(null)
-  }), [backendActions.acceptSoundcheckReplan, backendActions.connectWingReadOnly, backendActions.finalizeSoundcheckReadiness, backendActions.reanalyzeSoundcheckStage, backendActions.refreshBackend, backendActions.runBackendAnalysis, backendActions.startSoundcheck, backendActions.stopSoundcheck, backendActions.toggleAudioPreview, backendActions.triggerEmergencyStop, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, navigate, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
+  }), [backendActions.acceptSoundcheckReplan, backendActions.connectWingReadOnly, backendActions.finalizeSoundcheckReadiness, backendActions.loadNextDecisionQueuePage, backendActions.reanalyzeSoundcheckStage, backendActions.refreshBackend, backendActions.runBackendAnalysis, backendActions.startSoundcheck, backendActions.stopSoundcheck, backendActions.toggleAudioPreview, backendActions.triggerEmergencyStop, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, navigate, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
 
   const view = useMemo(() => buildView(activeRoute, ui, actions, viewData), [activeRoute, ui, actions, viewData]);
 

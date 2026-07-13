@@ -1,4 +1,10 @@
 import { BaseWebSocketTransport } from './websocketCore.mjs';
+import {
+  buildDecisionQueueFirstPageRequest,
+  buildDecisionQueueNextPageRequest,
+  buildProposalApplyRequest,
+  buildProposalDetailRequest
+} from './decisionQueueV2.mjs';
 
 class WebSocketService extends BaseWebSocketTransport {
   setServerUrl(url) {
@@ -250,11 +256,26 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
-  getDecisionQueue(limit = 50) {
-    this.send({
-      type: 'get_decision_queue',
-      limit
-    });
+  getDecisionQueue() {
+    return this.send(buildDecisionQueueFirstPageRequest());
+  }
+
+  getDecisionQueueNextPage(cursor, expectedSnapshotRevision) {
+    try {
+      return this.send(buildDecisionQueueNextPageRequest(cursor, expectedSnapshotRevision));
+    } catch (error) {
+      console.error('Decision Queue pagination request was rejected:', error);
+      return false;
+    }
+  }
+
+  getOperatorProposalDetail(identity, chunkIndex = 0) {
+    try {
+      return this.send(buildProposalDetailRequest(identity, chunkIndex));
+    } catch (error) {
+      console.error('Proposal detail request was rejected:', error);
+      return false;
+    }
   }
 
   getDecisionTraces(limit = 50) {
@@ -400,16 +421,20 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
-  applyOperatorProposal(proposalId, approved = false, reason = 'frontend_supervised_apply') {
-    const idempotencyKey = `frontend-${proposalId}-${Date.now()}`;
-    this.send({
-      type: 'apply_operator_proposal',
-      proposal_id: proposalId,
-      approved,
-      reason,
-      approval_id: `frontend-${proposalId}`,
-      idempotency_key: idempotencyKey
-    });
+  applyOperatorProposal(identity, approved = false, reason = 'frontend_supervised_apply') {
+    try {
+      const proposalId = identity?.proposalId;
+      return this.send(buildProposalApplyRequest({
+        identity,
+        approved,
+        reason,
+        approvalId: `frontend-${proposalId}`,
+        idempotencyKey: `frontend-${proposalId}-${Date.now()}`
+      }));
+    } catch (error) {
+      console.error('Proposal apply was rejected before transport:', error);
+      return false;
+    }
   }
 
   // Voice control commands

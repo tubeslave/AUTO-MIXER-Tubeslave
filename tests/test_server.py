@@ -9,6 +9,7 @@ import asyncio
 import errno
 import hashlib
 import json
+import math
 import os
 import signal
 import subprocess
@@ -17,11 +18,19 @@ import time
 from pathlib import Path
 import numpy as np
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import ANY, AsyncMock, patch, MagicMock
 from handlers import automation_handlers, fx_handlers, mixer_handlers, routing_handlers, snapshot_handlers
 from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
+from decision_queue_wire_contract import project_outbound_message
 from operator_proposal_queue import (
+    OperatorProposalQueue,
     SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
+)
+from operator_proposal_result_store import (
+    ResultEvidenceError,
+    ResultEvidenceReservationBinding,
+    ResultEvidenceStore,
+    default_result_store_root,
 )
 from operator_product_state import build_safety_monitor
 from runtime_identity import (
@@ -71,6 +80,22 @@ def _configure_unit_master_route_proof(server, tmp_path, proof_id):
         "/io/out/USB/47/in": 0,
         "/io/out/USB/48/grp": "MAIN",
         "/io/out/USB/48/in": 1,
+    }
+
+
+def _verified_manual_apply_result(**overrides):
+    return {
+        "status": "applied",
+        "success": True,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "wal_terminal": "committed",
+        "audio_recheck_required": False,
+        "audio_recheck_disposition": "not_required_by_manual_write_contract",
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        **overrides,
     }
 
 
@@ -3991,7 +4016,7 @@ class DummyAutoEQController:
 
 
 @pytest.fixture
-def dummy_wing_server():
+def dummy_wing_server(tmp_path):
     with patch("server.WingClient", new=DummyWingLike), \
          patch("server.EnhancedOSCClient", new=DummyWingLike), \
          patch("server.BleedService"), \
@@ -3999,6 +4024,13 @@ def dummy_wing_server():
         server = AutoMixerServer(ws_host="localhost", ws_port=8765)
         server.connection_mode = "wing"
         server.mixer_client = DummyWingLike()
+        server.operator_proposal_queue = OperatorProposalQueue(
+            result_store=ResultEvidenceStore(
+                tmp_path / "dummy-wing-operator-proposal-results",
+                min_free_bytes=0,
+            ),
+            result_evidence_lifecycle_ready=True,
+        )
         yield server
 
 
@@ -4008,6 +4040,137 @@ def minimal_server():
         yield AutoMixerServer(ws_host="localhost", ws_port=8765)
 
 
+def test_production_server_bootstraps_result_evidence_lifecycle_when_recovery_is_clear(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR",
+        str(tmp_path / "clear-result-store"),
+    )
+    with patch("server.BleedService"), patch.object(
+        AutoMixerServer,
+        "_load_config",
+        return_value={},
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+    assert server.operator_proposal_queue.result_evidence_contract_ready is True
+    assert server.operator_proposal_queue.result_recovery_hazards == ()
+
+
+def test_production_server_uses_private_user_state_default_result_store(
+    monkeypatch,
+    tmp_path,
+):
+    home = tmp_path / "private-home"
+    home.mkdir(mode=0o700)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR", raising=False)
+    expected_root = default_result_store_root()
+
+    with patch("server.BleedService"), patch.object(
+        AutoMixerServer,
+        "_load_config",
+        return_value={},
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+    assert server.operator_proposal_queue.result_store.root == expected_root
+    assert expected_root.is_relative_to(home)
+    assert "AUTO-MIXER" in expected_root.parts
+    assert server.operator_proposal_queue.result_evidence_contract_ready is True
+    assert expected_root.stat().st_mode & 0o777 == 0o700
+
+
+def test_production_server_insecure_result_store_override_fails_closed(
+    monkeypatch,
+    tmp_path,
+):
+    insecure_parent = tmp_path / "group-writable"
+    insecure_parent.mkdir(mode=0o770)
+    insecure_parent.chmod(0o770)
+    monkeypatch.setenv(
+        "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR",
+        str(insecure_parent / "results"),
+    )
+
+    with patch("server.BleedService"), patch.object(
+        AutoMixerServer,
+        "_load_config",
+        return_value={},
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+    assert server.operator_proposal_queue.result_evidence_contract_ready is False
+    assert server.operator_proposal_queue.result_persistence_failed is True
+
+
+def test_production_server_keeps_result_evidence_lifecycle_closed_on_recovery_hazard(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR",
+        str(tmp_path / "hazard-result-store"),
+    )
+    hazard = {
+        "code": "operator_proposal_result_recovery_required",
+        "phase": "send_may_have_occurred",
+    }
+    with patch("server.BleedService"), patch.object(
+        AutoMixerServer,
+        "_load_config",
+        return_value={},
+    ), patch.object(
+        ResultEvidenceStore,
+        "recovery_hazards",
+        return_value=(hazard,),
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+    assert server.operator_proposal_queue.result_evidence_contract_ready is False
+    assert server.operator_proposal_queue.result_recovery_hazards == (hazard,)
+
+
+@pytest.mark.asyncio
+async def test_send_to_client_projects_every_generic_payload_once_to_exact_string(
+    minimal_server,
+):
+    websocket = MagicMock()
+    websocket.send = AsyncMock()
+    payload = {
+        "type": "state_update",
+        "title": "Вокал 🎙️",
+        "levels": np.array([-12.5, -6.0], dtype=np.float32),
+    }
+
+    result = await minimal_server.send_to_client(websocket, payload)
+
+    assert result is True
+    websocket.send.assert_awaited_once_with(project_outbound_message(payload))
+
+
+@pytest.mark.asyncio
+async def test_send_to_client_degrades_oversized_generic_without_raw_marker(
+    minimal_server,
+):
+    websocket = MagicMock()
+    websocket.send = AsyncMock()
+    marker = "never-send-this-raw-marker"
+    payload = {"type": "bulk_state", "blob": marker + ("x" * 1_000_000)}
+
+    result = await minimal_server.send_to_client(websocket, payload)
+
+    assert result is True
+    websocket.send.assert_awaited_once()
+    serialized = websocket.send.await_args.args[0]
+    parsed = json.loads(serialized)
+    assert parsed["type"] == "outbound_message_degraded"
+    assert len(serialized.encode("utf-8")) <= 131_072
+    assert marker not in serialized
+
+
 class TestWingDeploymentWriteBoundary:
 
     @staticmethod
@@ -4015,6 +4178,35 @@ class TestWingDeploymentWriteBoundary:
         assert websocket.send.await_count >= 1
         raw = websocket.send.await_args_list[-1].args[0]
         return json.loads(raw)
+
+    @staticmethod
+    def _review_binding(server, proposal_id):
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        assert proposal is not None
+        return {
+            "expected_review_contract_version": proposal.review_contract_version,
+            "expected_review_content_digest": proposal.review_content_digest,
+        }
+
+    @staticmethod
+    def _enable_result_evidence_lifecycle(server, tmp_path):
+        store = ResultEvidenceStore(
+            tmp_path / "operator-proposal-results",
+            min_free_bytes=0,
+        )
+        server.operator_proposal_queue = OperatorProposalQueue(
+            result_store=store,
+            result_evidence_lifecycle_ready=True,
+        )
+        return store
+
+    @staticmethod
+    def _configure_deep_operator_apply(server):
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.connection_mode = "offline"
 
     @staticmethod
     async def _apply_manual_write(
@@ -4036,6 +4228,1260 @@ class TestWingDeploymentWriteBoundary:
             approved=True,
             approval_id=approval_id,
             **kwargs,
+        )
+
+    @pytest.mark.asyncio
+    async def test_operator_proposal_review_binding_and_evidence_gate_block_before_reservation(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server.connection_mode = "offline"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "review-bound-no-send",
+                "title": "Review-bound fader",
+                "requested_change": {
+                    "value_type": "fader",
+                    "channel": 1,
+                    "value": -9.0,
+                },
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="review-bound-no-send"
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                "approved": True,
+                "approval_id": proposal.id,
+                "idempotency_key": "missing-review-binding",
+            },
+        )
+        missing = self._decode_last_message(websocket)
+        assert missing["reason"] == "proposal_review_contract_version_required"
+        assert missing["no_console_send_proven"] is True
+        assert missing["idempotency_reserved"] is False
+        assert missing["proposal_status_mutation"] is False
+        assert proposal.status == "pending"
+        assert "missing-review-binding" not in server._operator_apply_idempotency_keys
+
+        proposal.raw["requested_change"]["value"] = -3.0
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": proposal.id,
+                "idempotency_key": "mutated-review-binding",
+            },
+        )
+        mutated = self._decode_last_message(websocket)
+        assert mutated["reason"] == "proposal_review_content_integrity_error"
+        assert proposal.status == "pending"
+        assert "mutated-review-binding" not in server._operator_apply_idempotency_keys
+        server._apply_manual_console_write.assert_not_called()
+
+        proposal.raw["requested_change"]["value"] = -9.0
+        server.operator_proposal_queue._result_store = None
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": proposal.id,
+                "idempotency_key": "evidence-gate-incomplete",
+            },
+        )
+        evidence = self._decode_last_message(websocket)
+        assert evidence["reason"] == (
+            "operator_proposal_result_evidence_contract_incomplete"
+        )
+        assert evidence["no_console_send_proven"] is True
+        assert proposal.status == "pending"
+        assert "evidence-gate-incomplete" not in server._operator_apply_idempotency_keys
+        server._apply_manual_console_write.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_manual_write_deadline_rechecked_after_pre_read_and_before_retry(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.connection_mode = "offline"
+        server._record_manual_write_event = MagicMock(return_value=None)
+        clock = [100.0]
+
+        async def expiring_pre_read(**_kwargs):
+            clock[0] = 102.0
+            return {
+                "value": -8.0,
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "cache_freshness": {"status": "fresh"},
+            }
+
+        server._manual_write_read_value = AsyncMock(side_effect=expiring_pre_read)
+        with patch("server.time.time", side_effect=lambda: clock[0]):
+            before_send = await server._apply_manual_console_write_unlocked(
+                None,
+                channel=1,
+                value=-9.0,
+                value_type="fader",
+                source="unit:deadline",
+                approved=True,
+                approval_id="deadline-before-send",
+                approval_expires_at_epoch=101.0,
+            )
+        assert before_send["reason"] == "operator_approval_expired"
+        assert before_send["no_console_send_proven"] is True
+        assert before_send["write_attempts"] == 0
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+        clock[0] = 100.0
+        server._manual_write_read_value = AsyncMock(
+            return_value={
+                "value": -8.0,
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "cache_freshness": {"status": "fresh"},
+            }
+        )
+        server._append_manual_write_wal = MagicMock(return_value="unit-wal")
+        server.activate_system_emergency_stop = AsyncMock()
+        server.mixer_client.set_channel_fader = MagicMock(return_value=False)
+
+        async def advance_past_deadline(_delay):
+            clock[0] = 102.0
+
+        with patch("server.time.time", side_effect=lambda: clock[0]), patch(
+            "server.asyncio.sleep",
+            side_effect=advance_past_deadline,
+        ):
+            after_attempt = await server._apply_manual_console_write_unlocked(
+                None,
+                channel=1,
+                value=-9.0,
+                value_type="fader",
+                source="unit:deadline",
+                approved=True,
+                approval_id="deadline-after-attempt",
+                approval_expires_at_epoch=101.0,
+            )
+        assert after_attempt["reason"] == (
+            "operator_approval_expired_after_write_attempt"
+        )
+        assert after_attempt["no_console_send_proven"] is False
+        assert after_attempt["write_state_unknown"] is True
+        assert after_attempt["manual_review_required"] is True
+        assert after_attempt["write_attempts"] == 1
+        assert server.mixer_client.set_channel_fader.call_count == 1
+
+        clock[0] = 100.0
+        server.mixer_client.set_channel_fader.reset_mock()
+
+        def expire_during_evidence_boundary(_token):
+            clock[0] = 102.0
+            return {"transitioned": True, "reason": None}
+
+        server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred = (
+            MagicMock(side_effect=expire_during_evidence_boundary)
+        )
+        with patch("server.time.time", side_effect=lambda: clock[0]):
+            after_boundary = await server._apply_manual_console_write_unlocked(
+                None,
+                channel=1,
+                value=-9.0,
+                value_type="fader",
+                source="unit:deadline",
+                approved=True,
+                approval_id="deadline-after-evidence-boundary",
+                approval_expires_at_epoch=101.0,
+                result_evidence_reservation_binding=object(),
+            )
+        assert after_boundary["reason"] == "operator_approval_expired"
+        assert after_boundary["no_console_send_proven"] is True
+        assert after_boundary["write_attempts"] == 0
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_cross_proposal_evidence_binding_blocks_before_mixer_send(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        server.operator_mode = "supervised"
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.connection_mode = "offline"
+        server._record_manual_write_event = MagicMock(return_value=None)
+        server._manual_write_read_value = AsyncMock(
+            return_value={
+                "value": -8.0,
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "cache_freshness": {"status": "fresh"},
+            }
+        )
+        server._append_manual_write_wal = MagicMock(return_value="unit-wal")
+        server.mixer_client.set_channel_fader.reset_mock()
+        mode = server.get_operator_mode_status()
+        proposals = []
+        reservations = []
+        for suffix in ("a", "b"):
+            created = server.operator_proposal_queue.create(
+                {
+                    "id": f"binding-{suffix}",
+                    "title": f"binding {suffix}",
+                    "requested_change": {
+                        "value_type": "fader",
+                        "channel": 1,
+                        "value": -9.0,
+                    },
+                },
+                mode,
+            )
+            assert created["status"] == "created"
+            proposal = server.operator_proposal_queue.find(
+                proposal_id=f"binding-{suffix}"
+            )
+            proposals.append(proposal)
+            reservations.append(
+                server.operator_proposal_queue.reserve_result_evidence(proposal)[
+                    "reservation_binding"
+                ]
+            )
+        binding_a, binding_b = reservations
+        forged = ResultEvidenceReservationBinding(
+            token=binding_b.token,
+            proposal_id=proposals[0].id,
+            review_content_digest=proposals[0].review_content_digest,
+        )
+
+        blocked = await server._apply_manual_console_write_unlocked(
+            None,
+            channel=1,
+            value=-9.0,
+            value_type="fader",
+            source="unit:cross-binding",
+            approved=True,
+            approval_id="cross-binding",
+            result_evidence_reservation_binding=forged,
+        )
+
+        assert blocked["reason"] == (
+            "operator_proposal_result_evidence_reservation_binding_mismatch"
+        )
+        assert blocked["no_console_send_proven"] is True
+        assert blocked["write_attempts"] == 0
+        assert server.operator_proposal_queue.result_persistence_failed is True
+        server.mixer_client.set_channel_fader.assert_not_called()
+        for binding in (binding_a, binding_b):
+            marker = store.root / f".reservation.{binding.token}"
+            assert marker.exists()
+            assert json.loads(marker.read_text(encoding="utf-8"))["phase"] == (
+                "reserved_no_send"
+            )
+
+    @pytest.mark.asyncio
+    async def test_canonical_manual_success_is_evictable_but_unknown_result_is_not(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.connection_mode = "offline"
+        server._record_manual_write_event = MagicMock(return_value=None)
+        server._append_manual_write_wal = MagicMock(return_value="unit-wal")
+
+        result = await server._apply_manual_console_write_unlocked(
+            None,
+            channel=1,
+            value=-9.0,
+            value_type="fader",
+            source="unit:evictable-success",
+            approved=True,
+            approval_id="evictable-success",
+        )
+
+        assert result["status"] == "applied"
+        assert result["wal_terminal"] == "committed"
+        assert result["physical_verified"] is True
+        assert result["audio_recheck_required"] is False
+        assert result["audio_recheck_disposition"] == (
+            "not_required_by_manual_write_contract"
+        )
+        assert "audio_recheck_passed" not in result
+        store = ResultEvidenceStore(
+            tmp_path / "eviction-results",
+            max_artifacts=1,
+            min_free_bytes=0,
+        )
+        digest = "sha256:" + ("a" * 64)
+        token = store.reserve(
+            proposal_id="verified-manual-success",
+            review_content_digest=digest,
+        )
+        record = store.commit(
+            ResultEvidenceReservationBinding(
+                token=token,
+                proposal_id="verified-manual-success",
+                review_content_digest=digest,
+            ),
+            result,
+        )
+        assert record.pinned is False
+        replacement_digest = "sha256:" + ("b" * 64)
+        replacement_token = store.reserve(
+            proposal_id="replacement",
+            review_content_digest=replacement_digest,
+        )
+        assert not (store.root / record.artifact_name).exists()
+        store.release(
+            ResultEvidenceReservationBinding(
+                token=replacement_token,
+                proposal_id="replacement",
+                review_content_digest=replacement_digest,
+            )
+        )
+
+        unknown_digest = "sha256:" + ("c" * 64)
+        unknown_token = store.reserve(
+            proposal_id="unknown-write",
+            review_content_digest=unknown_digest,
+        )
+        unknown = store.commit(
+            ResultEvidenceReservationBinding(
+                token=unknown_token,
+                proposal_id="unknown-write",
+                review_content_digest=unknown_digest,
+            ),
+            {
+                "status": "error",
+                "no_console_send_proven": False,
+                "write_state_unknown": True,
+                "physical_state_restored": False,
+                "manual_review_required": True,
+            },
+        )
+        with pytest.raises(ResultEvidenceError) as exc_info:
+            store.reserve(
+                proposal_id="must-not-evict-unknown",
+                review_content_digest="sha256:" + ("d" * 64),
+            )
+        assert exc_info.value.code == (
+            "operator_proposal_result_recovery_required"
+        )
+        assert (store.root / unknown.artifact_name).exists()
+
+    @pytest.mark.asyncio
+    async def test_operator_apply_result_capacity_failure_precedes_claim(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        server._apply_manual_console_write = AsyncMock()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "capacity-before-claim",
+                "title": "capacity before claim",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -8.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="capacity-before-claim"
+        )
+        claim = MagicMock(
+            wraps=server.operator_proposal_queue.claim_verified_for_apply
+        )
+        server.operator_proposal_queue.claim_verified_for_apply = claim
+        server.operator_proposal_queue.reserve_result_evidence = MagicMock(
+            return_value={
+                "reserved": False,
+                "reason": "operator_proposal_result_evidence_capacity_exhausted",
+                "reservation_token": None,
+            }
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "capacity-approval",
+                "idempotency_key": "capacity-idempotency",
+            },
+        )
+
+        blocked = self._decode_last_message(websocket)
+        assert blocked["reason"] == (
+            "operator_proposal_result_evidence_capacity_exhausted"
+        )
+        assert blocked["no_console_send_proven"] is True
+        assert blocked["proposal_status_mutation"] is False
+        assert proposal.status == "pending"
+        assert "capacity-idempotency" not in server._operator_apply_idempotency_keys
+        claim.assert_not_called()
+        server._apply_manual_console_write.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_restarted_result_hazard_blocks_handler_before_reserve_claim_or_send(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        root = tmp_path / "restarted-result-hazard"
+        first_store = ResultEvidenceStore(root, min_free_bytes=0)
+        review_digest = "sha256:" + ("7" * 64)
+        token = first_store.reserve(
+            proposal_id="prior-unknown-write",
+            review_content_digest=review_digest,
+        )
+        binding = ResultEvidenceReservationBinding(
+            token=token,
+            proposal_id="prior-unknown-write",
+            review_content_digest=review_digest,
+        )
+        first_store.mark_send_may_have_occurred(binding)
+        prior = first_store.commit(
+            binding,
+            {
+                "status": "error",
+                "no_console_send_proven": False,
+                "write_state_unknown": True,
+                "rollback_state_unknown": True,
+                "physical_state_restored": False,
+                "manual_review_required": True,
+            },
+        )
+        restarted_store = ResultEvidenceStore(root, min_free_bytes=0)
+        server.operator_proposal_queue = OperatorProposalQueue(
+            result_store=restarted_store,
+            result_evidence_lifecycle_ready=True,
+        )
+        self._configure_deep_operator_apply(server)
+        server._apply_manual_console_write = AsyncMock()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "blocked-by-prior-result",
+                "title": "must stay pending",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -8.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="blocked-by-prior-result"
+        )
+        reserve = MagicMock(
+            wraps=server.operator_proposal_queue.reserve_result_evidence
+        )
+        claim = MagicMock(
+            wraps=server.operator_proposal_queue.claim_verified_for_apply
+        )
+        server.operator_proposal_queue.reserve_result_evidence = reserve
+        server.operator_proposal_queue.claim_verified_for_apply = claim
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "recovery-blocked-approval",
+                "idempotency_key": "recovery-blocked-idempotency",
+            },
+        )
+
+        blocked = self._decode_last_message(websocket)
+        assert blocked["reason"] == (
+            "operator_proposal_result_recovery_required"
+        )
+        assert "global_hazards" not in blocked
+        assert blocked["no_console_send_proven"] is True
+        assert blocked["result_evidence_reserved"] is False
+        assert blocked["proposal_status_mutation"] is False
+        assert proposal.status == "pending"
+        assert restarted_store.active_reservation_count == 0
+        assert (root / prior.artifact_name).exists()
+        assert "recovery-blocked-idempotency" not in (
+            server._operator_apply_idempotency_keys
+        )
+        reserve.assert_not_called()
+        claim.assert_not_called()
+        server._apply_manual_console_write.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_preclaim_invalid_change_is_non_mutating_and_uses_public_proposal(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "preclaim-no-change",
+                "title": "no applyable change",
+                "kind": "analysis_note",
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="preclaim-no-change"
+        )
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "preclaim-no-change-approval",
+                "idempotency_key": "preclaim-no-change-idempotency",
+            },
+        )
+
+        blocked = self._decode_last_message(websocket)
+        assert blocked["reason"] == "proposal_has_no_applyable_requested_change"
+        assert blocked["proposal_status_mutation"] is False
+        assert blocked["result_evidence_reserved"] is False
+        assert proposal.status == "pending"
+        assert proposal.result is None
+        assert store.active_reservation_count == 0
+        assert (
+            "preclaim-no-change-idempotency"
+            not in server._operator_apply_idempotency_keys
+        )
+
+    @pytest.mark.asyncio
+    async def test_direct_apply_consumes_bound_result_reservation(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        seen_tokens = []
+
+        async def apply_with_boundary(*_args, **kwargs):
+            binding = kwargs["result_evidence_reservation_binding"]
+            seen_tokens.append(binding.token)
+            boundary = (
+                server.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(binding)
+            )
+            assert boundary["transitioned"] is True
+            return _verified_manual_apply_result(
+                channel=1,
+                value_type="fader",
+                effective_value=-8.5,
+                old_value=-8.0,
+                readback_value=-8.5,
+                readback_status="verified_from_physical_readback",
+                proof_status="verified",
+                rollback_available=True,
+                rollback_value=-8.0,
+            )
+
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=apply_with_boundary
+        )
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "direct-result-lifecycle",
+                "title": "direct result lifecycle",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -8.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="direct-result-lifecycle"
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "direct-result-approval",
+                "idempotency_key": "direct-result-idempotency",
+            },
+        )
+
+        applied = self._decode_last_message(websocket)
+        assert applied["status"] == "applied"
+        assert applied["result_detail_available"] is True
+        assert applied["result_digest"].startswith("sha256:")
+        assert len(seen_tokens) == 1 and len(seen_tokens[0]) == 32
+        assert store.active_reservation_count == 0
+        terminal = server.operator_proposal_queue.find(proposal_id=proposal.id)
+        evidence = server.operator_proposal_queue.load_result_evidence(
+            terminal,
+            expected_result_digest=applied["result_digest"],
+        )
+        assert json.loads(evidence)["status"] == "applied"
+
+        await server._dispatch["get_operator_proposal_result_detail"](
+            websocket,
+            {
+                "contract_version": 2,
+                "proposal_id": proposal.id,
+                "expected_result_digest": applied["result_digest"],
+                "chunk_index": 0,
+            },
+        )
+        detail = self._decode_last_message(websocket)
+        assert detail["type"] == "operator_proposal_result_detail"
+        assert detail["result_digest"] == applied["result_digest"]
+
+    @pytest.mark.asyncio
+    async def test_request_token_is_frozen_before_claim(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        server.validate_operator_approval_token = MagicMock(
+            side_effect=lambda **facts: (
+                facts["token"] == "frozen-token"
+                and facts["requested_change"].get("value") == -7.5
+            )
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        async def apply_with_boundary(*_args, **kwargs):
+            server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+                kwargs["result_evidence_reservation_binding"]
+            )
+            return _verified_manual_apply_result(
+                channel=1,
+                value_type="fader",
+                effective_value=-7.5,
+                readback_status="verified_from_physical_readback",
+                proof_status="verified",
+                rollback_available=True,
+            )
+
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=apply_with_boundary
+        )
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "immutable-request-token",
+                "title": "immutable request token",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -7.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="immutable-request-token"
+        )
+        request = {
+            "proposal_id": proposal.id,
+            **self._review_binding(server, proposal.id),
+            "approved": True,
+            "approval_id": "immutable-request-approval",
+            "approval_token": "frozen-token",
+            "idempotency_key": "immutable-request-idempotency",
+        }
+        original_claim = (
+            server.operator_proposal_queue.claim_verified_for_apply
+        )
+
+        def mutate_request_after_claim(*args, **kwargs):
+            claimed = original_claim(*args, **kwargs)
+            request["approval_token"] = "mutated-after-claim"
+            return claimed
+
+        server.operator_proposal_queue.claim_verified_for_apply = MagicMock(
+            side_effect=mutate_request_after_claim
+        )
+
+        await server._dispatch["apply_operator_proposal"](websocket, request)
+
+        applied = self._decode_last_message(websocket)
+        assert applied["status"] == "applied"
+        assert request["approval_token"] == "mutated-after-claim"
+        assert server.validate_operator_approval_token.call_args.kwargs["token"] == (
+            "frozen-token"
+        )
+
+    @pytest.mark.asyncio
+    async def test_linked_first_step_no_send_is_retryable_and_consumes_reservation(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        now = time.time()
+        server.mixer_client.state.update({"/ch/1/fdr": -8.0, "/ch/2/fdr": -9.0})
+        server.mixer_client.state_timestamps.update(
+            {"/ch/1/fdr": now, "/ch/2/fdr": now}
+        )
+        server._apply_manual_console_write = AsyncMock(
+            return_value={
+                "status": "blocked",
+                "success": False,
+                "reason": "pre_send_safety_block",
+                "no_console_send_proven": True,
+                "write_attempts": 0,
+            }
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "linked-first-step-no-send",
+                "title": "linked first-step no-send",
+                "requested_changes": [
+                    {"value_type": "fader", "channel": 1, "value": -8.5},
+                    {"value_type": "fader", "channel": 2, "value": -9.5},
+                ],
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="linked-first-step-no-send"
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "linked-first-step-approval",
+                "idempotency_key": "linked-first-step-idempotency",
+            },
+        )
+
+        blocked = self._decode_last_message(websocket)
+        assert blocked["status"] == "apply_blocked"
+        assert blocked["reason"] == (
+            "operator_apply_reason_available_in_result_detail"
+        )
+        assert blocked["no_console_send_proven"] is True
+        assert blocked["rollback_attempted"] is False
+        assert blocked["idempotency"]["released"] is True
+        assert blocked["result_detail_available"] is True
+        evidence = server.operator_proposal_queue.load_result_evidence(
+            proposal,
+            expected_result_digest=blocked["result_digest"],
+        )
+        full_result = json.loads(evidence)
+        assert full_result["reason"] == "pre_send_safety_block"
+        assert full_result["no_console_send_proven"] is True
+        assert full_result["rollback_results"] == []
+        assert proposal.status == "pending"
+        assert store.active_reservation_count == 0
+        assert "linked-first-step-idempotency" not in (
+            server._operator_apply_idempotency_keys
+        )
+        assert server._apply_manual_console_write.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_real_handler_proven_no_send_releases_wal_key_for_retry_and_restart(
+        self,
+        dummy_wing_server,
+        tmp_path,
+        monkeypatch,
+    ):
+        server = dummy_wing_server
+        self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        runtime_dir = tmp_path / "handler-wal-runtime"
+        server._console_runtime_dir = runtime_dir
+        server._console_write_wal_path = runtime_dir / "manual_write_wal.jsonl"
+        server._console_writer_lock_path = runtime_dir / "console_writer.lock"
+        server._operator_apply_idempotency_keys = {}
+        server._durable_operator_apply_idempotency_keys = {}
+        server._durable_operator_proposal_ids = set()
+        server._manual_write_prepared_transactions = {}
+        server._manual_write_recovery_transactions = {}
+        server._manual_write_wal_lifecycles = {}
+        server._manual_write_wal_integrity_ok = True
+        server._manual_write_emergency_stopped = False
+        server._manual_write_cooldown_sec = 0.0
+        server._record_manual_write_event = MagicMock(return_value=None)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        append = server._append_manual_write_wal
+
+        def change_console_after_prepare(phase, transaction_id, **payload):
+            path = append(phase, transaction_id, **payload)
+            if phase == "prepared":
+                server.mixer_client.state["/ch/1/fdr"] = -7.0
+            return path
+
+        server._append_manual_write_wal = change_console_after_prepare
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "handler-wal-retry",
+                "title": "handler WAL retry",
+                "requested_change": {
+                    "value_type": "fader",
+                    "channel": 1,
+                    "value": -9.0,
+                },
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="handler-wal-retry"
+        )
+        request = {
+            "proposal_id": proposal.id,
+            **self._review_binding(server, proposal.id),
+            "approved": True,
+            "approval_id": "handler-wal-retry",
+            "idempotency_key": "handler-wal-retry-key",
+        }
+
+        await server._dispatch["apply_operator_proposal"](websocket, request)
+
+        first = self._decode_last_message(websocket)
+        assert first["reason"] == (
+            "operator_apply_reason_available_in_result_detail"
+        )
+        first_evidence = server.operator_proposal_queue.load_result_evidence(
+            proposal,
+            expected_result_digest=first["result_digest"],
+        )
+        assert json.loads(first_evidence)["reason"] == (
+            "manual_write_cas_target_changed_or_unverified"
+        )
+        assert first["idempotency"]["released"] is True
+        assert proposal.status == "pending"
+        assert server.mixer_client.set_channel_fader.call_count == 0
+        assert "handler-wal-retry-key" not in (
+            server._operator_apply_idempotency_keys
+        )
+        assert "handler-wal-retry-key" not in (
+            server._durable_operator_apply_idempotency_keys
+        )
+        phases = [
+            json.loads(line)["phase"]
+            for line in server._manual_write_wal_path().read_text(
+                encoding="utf-8"
+            ).splitlines()
+        ]
+        assert phases == ["prepared", "aborted_before_send"]
+
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        await server._dispatch["apply_operator_proposal"](websocket, request)
+        second = self._decode_last_message(websocket)
+        assert second.get("reason") != "duplicate_idempotency_key"
+        second_evidence = server.operator_proposal_queue.load_result_evidence(
+            proposal,
+            expected_result_digest=second["result_digest"],
+        )
+        assert json.loads(second_evidence)["reason"] == (
+            "manual_write_cas_target_changed_or_unverified"
+        )
+
+        monkeypatch.setenv(
+            "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+            str(runtime_dir),
+        )
+        restarted = AutoMixerServer(ws_host="localhost", ws_port=8766)
+        assert "handler-wal-retry-key" not in (
+            restarted._durable_operator_apply_idempotency_keys
+        )
+        assert "handler-wal-retry" not in restarted._durable_operator_proposal_ids
+        assert restarted._manual_write_recovery_transactions == {}
+
+    @pytest.mark.asyncio
+    async def test_linked_verified_success_persists_evictable_canonical_evidence(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = ResultEvidenceStore(
+            tmp_path / "linked-evictable-results",
+            max_artifacts=1,
+            min_free_bytes=0,
+        )
+        server.operator_proposal_queue = OperatorProposalQueue(
+            result_store=store,
+            result_evidence_lifecycle_ready=True,
+        )
+        self._configure_deep_operator_apply(server)
+        now = time.time()
+        server.mixer_client.state.update({"/ch/1/fdr": -8.0, "/ch/2/fdr": -9.0})
+        server.mixer_client.state_timestamps.update(
+            {"/ch/1/fdr": now, "/ch/2/fdr": now}
+        )
+        call_index = 0
+
+        async def apply_verified(*_args, **kwargs):
+            nonlocal call_index
+            call_index += 1
+            boundary = (
+                server.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    kwargs["result_evidence_reservation_binding"]
+                )
+            )
+            assert boundary["transitioned"] is True
+            channel = kwargs["channel"]
+            return {
+                "status": "applied",
+                "success": True,
+                "channel": channel,
+                "value_type": "fader",
+                "effective_value": kwargs["value"],
+                "old_value": -8.0 if channel == 1 else -9.0,
+                "readback_value": kwargs["value"],
+                "readback_status": "verified_from_physical_readback",
+                "proof_status": "verified",
+                "rollback_available": True,
+                "rollback_value": -8.0 if channel == 1 else -9.0,
+                "no_console_send_proven": False,
+                "physical_verified": True,
+                "wal_terminal": "committed",
+                "audio_recheck_required": False,
+                "audio_recheck_disposition": (
+                    "not_required_by_manual_write_contract"
+                ),
+                "write_state_unknown": False,
+                "rollback_state_unknown": False,
+                "manual_review_required": False,
+            }
+
+        server._apply_manual_console_write = AsyncMock(side_effect=apply_verified)
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "linked-evictable-success",
+                "title": "linked evictable success",
+                "requested_changes": [
+                    {"value_type": "fader", "channel": 1, "value": -8.5},
+                    {"value_type": "fader", "channel": 2, "value": -9.5},
+                ],
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="linked-evictable-success"
+        )
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "linked-evictable-approval",
+                "idempotency_key": "linked-evictable-idempotency",
+            },
+        )
+
+        applied = self._decode_last_message(websocket)
+        assert applied["status"] == "applied"
+        assert call_index == 2
+        assert proposal.result_evidence_pinned is False
+        evidence = json.loads(
+            server.operator_proposal_queue.load_result_evidence(
+                proposal,
+                expected_result_digest=proposal.result_digest,
+            )
+        )
+        assert evidence["physical_verified"] is True
+        assert evidence["wal_terminal"] == "committed"
+        assert evidence["audio_recheck_required"] is False
+        assert evidence["audio_recheck_disposition"] == (
+            "not_required_by_linked_manual_write_contract"
+        )
+        replacement_digest = "sha256:" + ("e" * 64)
+        replacement_token = store.reserve(
+            proposal_id="linked-capacity-replacement",
+            review_content_digest=replacement_digest,
+        )
+        assert not (store.root / f"{proposal.result_digest[7:]}.json").exists()
+        store.release(
+            ResultEvidenceReservationBinding(
+                token=replacement_token,
+                proposal_id="linked-capacity-replacement",
+                review_content_digest=replacement_digest,
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_transaction_apply_consumes_same_preclaim_reservation(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        plan = {
+            "transaction_id": "handler-transaction-lifecycle",
+            "operations": [
+                {
+                    "operation_id": "handler-fader-1",
+                    "family_id": "fader",
+                    "write_kind": "fader",
+                    "channel": 1,
+                    "target_value": -9.0,
+                }
+            ],
+        }
+
+        async def apply_transaction(_plan, **kwargs):
+            boundary = (
+                server.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    kwargs["result_evidence_reservation_binding"]
+                )
+            )
+            assert boundary["transitioned"] is True
+            return _verified_manual_apply_result(
+                soundcheck_readiness={"status": "safe_core_ready"},
+            )
+
+        server.apply_supervised_soundcheck_transaction = AsyncMock(
+            side_effect=apply_transaction
+        )
+        with patch(
+            "operator_proposal_queue._apply_blockers_for_transaction_plan",
+            return_value=[],
+        ):
+            await server._dispatch["create_operator_proposal"](
+                websocket,
+                {
+                    "id": "handler-transaction-proposal",
+                    "title": "handler transaction lifecycle",
+                    "kind": "supervised_soundcheck_transaction",
+                    "supervised_transaction_plan": plan,
+                },
+            )
+            proposal = server.operator_proposal_queue.find(
+                proposal_id="handler-transaction-proposal"
+            )
+            await server._dispatch["apply_operator_proposal"](
+                websocket,
+                {
+                    "proposal_id": proposal.id,
+                    **self._review_binding(server, proposal.id),
+                    "approved": True,
+                    "approval_id": "handler-transaction-approval",
+                    "idempotency_key": "handler-transaction-idempotency",
+                },
+            )
+
+        applied = self._decode_last_message(websocket)
+        assert applied["status"] == "applied"
+        assert applied["result_detail_available"] is True
+        assert store.active_reservation_count == 0
+        binding = server.apply_supervised_soundcheck_transaction.await_args.kwargs[
+            "result_evidence_reservation_binding"
+        ]
+        assert isinstance(binding.token, str) and len(binding.token) == 32
+
+    @pytest.mark.asyncio
+    async def test_post_boundary_cancellation_persists_unknown_truth_once(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        server.activate_system_emergency_stop = AsyncMock()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        async def cancel_after_boundary(*_args, **kwargs):
+            server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+                kwargs["result_evidence_reservation_binding"]
+            )
+            raise asyncio.CancelledError()
+
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=cancel_after_boundary
+        )
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "cancel-after-boundary",
+                "title": "cancel after boundary",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -8.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="cancel-after-boundary"
+        )
+
+        with pytest.raises(asyncio.CancelledError):
+            await server._dispatch["apply_operator_proposal"](
+                websocket,
+                {
+                    "proposal_id": proposal.id,
+                    **self._review_binding(server, proposal.id),
+                    "approved": True,
+                    "approval_id": "cancel-after-boundary-approval",
+                    "idempotency_key": "cancel-after-boundary-idempotency",
+                },
+            )
+
+        terminal = server.operator_proposal_queue.find(proposal_id=proposal.id)
+        assert terminal.status == "apply_error"
+        assert terminal.result["no_console_send_proven"] is False
+        assert terminal.result["manual_review_required"] is True
+        assert terminal.result_detail_available is True
+        assert store.active_reservation_count == 0
+        assert "cancel-after-boundary-idempotency" in (
+            server._operator_apply_idempotency_keys
+        )
+        server.activate_system_emergency_stop.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_post_send_result_persistence_failure_survives_restart(
+        self,
+        dummy_wing_server,
+        tmp_path,
+    ):
+        server = dummy_wing_server
+        store = self._enable_result_evidence_lifecycle(server, tmp_path)
+        self._configure_deep_operator_apply(server)
+        server.mixer_client.state["/ch/1/fdr"] = -8.0
+        server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
+        server.activate_system_emergency_stop = AsyncMock()
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+
+        async def applied_after_boundary(*_args, **kwargs):
+            server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+                kwargs["result_evidence_reservation_binding"]
+            )
+            return _verified_manual_apply_result()
+
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=applied_after_boundary
+        )
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "persistence-failure-after-send",
+                "title": "persistence failure after send",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -8.5,
+            },
+        )
+        proposal = server.operator_proposal_queue.find(
+            proposal_id="persistence-failure-after-send"
+        )
+        store._write_atomic = MagicMock(
+            side_effect=ResultEvidenceError(
+                "operator_proposal_result_evidence_persistence_failed"
+            )
+        )
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal.id,
+                **self._review_binding(server, proposal.id),
+                "approved": True,
+                "approval_id": "persistence-failure-approval",
+                "idempotency_key": "persistence-failure-idempotency",
+            },
+        )
+
+        failed = self._decode_last_message(websocket)
+        assert failed["status"] == "apply_error"
+        assert failed["reason"] == (
+            "operator_proposal_result_persistence_failed"
+        )
+        assert failed["write_state_unknown"] is True
+        assert failed["manual_review_required"] is True
+        assert failed["result_detail_available"] is False
+        assert server.operator_proposal_queue.result_persistence_failed is True
+        assert store.active_reservation_count == 1
+        server.activate_system_emergency_stop.assert_awaited_once()
+
+        restarted_store = ResultEvidenceStore(
+            store.root,
+            min_free_bytes=0,
+        )
+        restarted_queue = OperatorProposalQueue(
+            result_store=restarted_store,
+            result_evidence_lifecycle_ready=True,
+        )
+        assert restarted_queue.result_persistence_failed is False
+        assert restarted_queue.result_evidence_contract_ready is False
+        assert restarted_queue.result_recovery_hazards[0]["phase"] == (
+            "persistence_failed_after_send"
         )
 
     @staticmethod
@@ -4398,13 +5844,14 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        reasons = {item["reason"] for item in payload["blocked_results"]}
-        assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
-        assert payload["status"] == "blocked"
-        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
-        assert "safety_allowed_live_write_kinds_widened" in reasons
-        assert "execution_row_value_type_not_live_allowed" in reasons
-        assert payload["audit_rows"] == []
+        assert payload["type"] == "operator_proposal_pipeline_migration_required"
+        assert payload["status"] == "migration_required"
+        assert payload["reason"] == "server_owned_sequence_state_required"
+        assert payload["blocked_handler"] == (
+            "audit_operator_proposal_apply_sequence_execution"
+        )
+        assert payload["no_additional_console_send_proven"] is True
+        assert payload["soundcheck_completion_blocked"] is True
 
     @pytest.mark.asyncio
     async def test_offline_sequence_execution_audit_retains_current_proven_pan_scope(
@@ -4428,11 +5875,13 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
-        assert payload["status"] == "passed"
-        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
-        assert payload["audit_rows"][0]["value_type"] == "pan"
-        assert payload["blocked_results"] == []
+        assert payload["type"] == "operator_proposal_pipeline_migration_required"
+        assert payload["status"] == "migration_required"
+        assert payload["reason"] == "server_owned_sequence_state_required"
+        assert payload["blocked_handler"] == (
+            "audit_operator_proposal_apply_sequence_execution"
+        )
+        assert payload["no_additional_console_send_proven"] is True
 
     @pytest.mark.asyncio
     async def test_wing_sequence_audit_policy_gate_rejects_pan_scope(self, dummy_wing_server):
@@ -4452,13 +5901,14 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        reasons = {item["reason"] for item in payload["blocked_results"]}
-        assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
-        assert payload["status"] == "blocked"
-        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
-        assert "safety_allowed_live_write_kinds_widened" in reasons
-        assert "audit_row_value_type_not_policy_allowed" in reasons
-        assert payload["policy_evidence"] == []
+        assert payload["type"] == "operator_proposal_pipeline_migration_required"
+        assert payload["status"] == "migration_required"
+        assert payload["reason"] == "server_owned_sequence_state_required"
+        assert payload["blocked_handler"] == (
+            "gate_operator_proposal_apply_sequence_audit_policy"
+        )
+        assert payload["no_additional_console_send_proven"] is True
+        assert payload["soundcheck_completion_blocked"] is True
 
     @pytest.mark.asyncio
     async def test_offline_sequence_audit_policy_gate_retains_current_proven_pan_scope(
@@ -4482,11 +5932,13 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
-        assert payload["status"] == "ready"
-        assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain", "pan"]
-        assert payload["policy_evidence"][0]["value_type"] == "pan"
-        assert payload["blocked_results"] == []
+        assert payload["type"] == "operator_proposal_pipeline_migration_required"
+        assert payload["status"] == "migration_required"
+        assert payload["reason"] == "server_owned_sequence_state_required"
+        assert payload["blocked_handler"] == (
+            "gate_operator_proposal_apply_sequence_audit_policy"
+        )
+        assert payload["no_additional_console_send_proven"] is True
 
     @pytest.mark.asyncio
     async def test_wing_manual_gate_filters_pan_from_operator_mode_scope(self, dummy_wing_server):
@@ -5256,7 +6708,12 @@ class TestWingDeploymentWriteBoundary:
         assert result["reason"] == "invalid_value"
         assert result["surface"] == "set_pan"
         assert result["value_type"] == "pan"
-        assert result["requested_value"] == raw_value
+        if type(raw_value) is float and not math.isfinite(raw_value):
+            assert result["requested_value"] is None
+            assert result["requested_value_omitted"] is True
+        else:
+            assert result["requested_value"] == raw_value
+            assert result["requested_value_omitted"] is False
         assert result["live_write"] is False
         assert result["live_authority_granted"] is False
         assert result["readiness_closure_allowed"] is False
@@ -5758,6 +7215,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "idempotency_key": "unit-auto-boundary",
             },
@@ -5766,13 +7224,16 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "operator_mode_blocks_live_write"
+        assert apply_payload["reason"] == "operator_proposal_global_hazard_active"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "global_hazards" not in apply_payload
+        operator_mode = server.get_operator_mode_status()
         assert (
-            apply_payload["apply_result"]["operator_mode"]["capabilities"]["can_apply_to_console"]
+            operator_mode["capabilities"]["can_apply_to_console"]
             is False
         )
         assert (
-            apply_payload["apply_result"]["operator_mode"]["capabilities"]["allowed_live_write_kinds"]
+            operator_mode["capabilities"]["allowed_live_write_kinds"]
             == []
         )
         server._apply_manual_console_write.assert_not_called()
@@ -5790,7 +7251,7 @@ class TestWingDeploymentWriteBoundary:
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock(
-            return_value={
+            return_value=_verified_manual_apply_result(**{
                 "status": "applied",
                 "channel": 1,
                 "value_type": "fader",
@@ -5800,7 +7261,7 @@ class TestWingDeploymentWriteBoundary:
                 "readback_status": "verified_from_cache",
                 "rollback_available": True,
                 "rollback_value": -8.0,
-            }
+            })
         )
 
         await server._dispatch["create_operator_proposal"](
@@ -5822,6 +7283,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-noboundary",
@@ -5831,9 +7293,10 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_result"
         assert apply_payload["status"] == "applied"
-        assert apply_payload["apply_result"]["status"] == "applied"
-        assert apply_payload["apply_result"]["channel"] == 1
-        assert apply_payload["apply_result"]["value_type"] == "fader"
+        assert apply_payload["apply_status"] == "applied"
+        assert apply_payload["channel"] == 1
+        assert apply_payload["value_type"] == "fader"
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_awaited_once_with(
             websocket,
             channel=1,
@@ -5846,6 +7309,12 @@ class TestWingDeploymentWriteBoundary:
             idempotency_key="unit-auto-noboundary",
             proposal_id=proposal_id,
             expected_current_value=-8.0,
+            approval_expires_at_epoch=(
+                server.operator_proposal_queue.find(
+                    proposal_id=proposal_id
+                ).expiration_epoch()
+            ),
+            result_evidence_reservation_binding=ANY,
         )
 
     @pytest.mark.asyncio
@@ -5875,7 +7344,7 @@ class TestWingDeploymentWriteBoundary:
         proposal_id = created["proposal"]["id"]
         assert created["proposal"]["status"] == "pending"
         assert created["proposal"]["can_apply"] is False
-        assert created["proposal"]["apply_blockers"] == [
+        assert created["proposal"]["apply_blocker_codes"] == [
             SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
         ]
 
@@ -5916,6 +7385,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "legacy-soundcheck-apply",
@@ -5951,7 +7421,7 @@ class TestWingDeploymentWriteBoundary:
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock(
-            return_value={
+            return_value=_verified_manual_apply_result(**{
                 "status": "applied",
                 "channel": 1,
                 "value_type": "gain",
@@ -5961,7 +7431,7 @@ class TestWingDeploymentWriteBoundary:
                 "readback_status": "verified_from_cache",
                 "rollback_available": True,
                 "rollback_value": 0.0,
-            }
+            })
         )
 
         await server._dispatch["create_operator_proposal"](
@@ -5998,14 +7468,14 @@ class TestWingDeploymentWriteBoundary:
         preflight_payload = self._decode_last_message(websocket)
         assert preflight_payload["type"] == "operator_proposal_apply_preflight"
         assert preflight_payload["status"] == "ready"
-        assert preflight_payload["normalized_change"]["wing_surface"] == "input_trim"
-        assert preflight_payload["normalized_change"]["wing_address"] == "/ch/1/in/set/trim"
-        assert preflight_payload["normalized_change"]["proof_direction"] == "negative_input_trim_move_only"
+        assert "normalized_change" not in preflight_payload
+        assert preflight_payload["proposal"]["id"] == proposal_id
 
         await server._dispatch["apply_operator_proposal"](
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-wing-surface-match",
@@ -6015,7 +7485,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_result"
         assert apply_payload["status"] == "applied"
-        assert apply_payload["apply_result"]["value_type"] == "gain"
+        assert apply_payload["apply_status"] == "applied"
+        assert apply_payload["value_type"] == "gain"
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_awaited_once_with(
             websocket,
             channel=1,
@@ -6028,6 +7500,12 @@ class TestWingDeploymentWriteBoundary:
             idempotency_key="unit-wing-surface-match",
             proposal_id=proposal_id,
             expected_current_value=0.0,
+            approval_expires_at_epoch=(
+                server.operator_proposal_queue.find(
+                    proposal_id=proposal_id
+                ).expiration_epoch()
+            ),
+            result_evidence_reservation_binding=ANY,
         )
 
     @pytest.mark.asyncio
@@ -6064,7 +7542,7 @@ class TestWingDeploymentWriteBoundary:
         create_payload = self._decode_last_message(websocket)
         assert create_payload["type"] == "operator_proposal_created"
         assert create_payload["status"] == "created"
-        assert create_payload["proposal"]["requested_change"]["wing_address"] == "/ch/1/fdr"
+        assert "requested_change" not in create_payload["proposal"]
         proposal_id = create_payload["proposal"]["id"]
 
         await server._dispatch["preflight_operator_proposal_apply"](
@@ -6079,13 +7557,14 @@ class TestWingDeploymentWriteBoundary:
         assert preflight_payload["type"] == "operator_proposal_apply_preflight"
         assert preflight_payload["status"] == "blocked"
         assert preflight_payload["reason"] == "wing_surface_contract_mismatch"
-        assert preflight_payload["expected_wing_surface_contract"]["wing_address"] == "/ch/1/in/set/trim"
+        assert "normalized_change" not in preflight_payload
         assert preflight_payload["idempotency"]["reserved"] is False
 
         await server._dispatch["apply_operator_proposal"](
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-wing-surface-mismatch",
@@ -6095,18 +7574,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        apply_result = apply_payload["apply_result"]
-        assert apply_result["reason"] == "wing_surface_contract_mismatch"
-        assert apply_result["expected_wing_surface_contract"]["wing_surface"] == "input_trim"
-        assert apply_result["expected_wing_surface_contract"]["wing_address"] == "/ch/1/in/set/trim"
-        assert {
-            (item["field"], item["expected"], item["actual"])
-            for item in apply_result["mismatched_contract_fields"]
-        } >= {
-            ("wing_surface", "input_trim", "channel_fader"),
-            ("wing_address", "/ch/1/in/set/trim", "/ch/1/fdr"),
-            ("proof_direction", "negative_input_trim_move_only", "negative_db_move_only"),
-        }
+        assert apply_payload["reason"] == "wing_surface_contract_mismatch"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6170,6 +7640,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "operator_authored": True,
@@ -6180,12 +7651,14 @@ class TestWingDeploymentWriteBoundary:
         assert preflight_payload["type"] == "operator_proposal_apply_preflight"
         assert preflight_payload["status"] == "blocked"
         assert preflight_payload["reason"] == "upward_move_requires_operator_authored_proposal"
-        assert preflight_payload["delta_db"] == pytest.approx(round(target_value - old_value, 3))
+        assert "delta_db" not in preflight_payload
+        assert preflight_payload["normalized_change_count"] == 0
 
         await server._dispatch["apply_operator_proposal"](
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "operator_authored": True,
@@ -6196,9 +7669,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        apply_result = apply_payload["apply_result"]
-        assert apply_result["reason"] == "upward_move_requires_operator_authored_proposal"
-        assert apply_result["delta_db"] == pytest.approx(round(target_value - old_value, 3))
+        assert apply_payload["reason"] == "upward_move_requires_operator_authored_proposal"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6254,6 +7727,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-linked-wing-surface-mismatch",
@@ -6263,10 +7737,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        apply_result = apply_payload["apply_result"]
-        assert apply_result["reason"] == "wing_surface_contract_mismatch"
-        assert apply_result["requested_change"]["channel"] == 2
-        assert apply_result["expected_wing_surface_contract"]["wing_address"] == "/ch/2/in/set/trim"
+        assert apply_payload["reason"] == "wing_surface_contract_mismatch"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6297,9 +7770,19 @@ class TestWingDeploymentWriteBoundary:
                     "effective_value": -9.5,
                     "old_value": -9.0,
                     "readback_value": -9.5,
-                    "readback_status": "verified_from_cache",
+                    "readback_status": "verified_from_physical_readback",
                     "rollback_available": True,
                     "rollback_value": -8.0,
+                    "no_console_send_proven": False,
+                    "physical_verified": True,
+                    "wal_terminal": "committed",
+                    "audio_recheck_required": False,
+                    "audio_recheck_disposition": (
+                        "not_required_by_manual_write_contract"
+                    ),
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
                 },
                 {
                     "status": "applied",
@@ -6309,9 +7792,19 @@ class TestWingDeploymentWriteBoundary:
                     "effective_value": -9.5,
                     "old_value": -9.0,
                     "readback_value": -9.5,
-                    "readback_status": "verified_from_cache",
+                    "readback_status": "verified_from_physical_readback",
                     "rollback_available": True,
                     "rollback_value": -9.0,
+                    "no_console_send_proven": False,
+                    "physical_verified": True,
+                    "wal_terminal": "committed",
+                    "audio_recheck_required": False,
+                    "audio_recheck_disposition": (
+                        "not_required_by_manual_write_contract"
+                    ),
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
                 },
             ]
 
@@ -6324,6 +7817,13 @@ class TestWingDeploymentWriteBoundary:
             }
 
         async def apply_with_state_update(*_args, **kwargs):
+            assert (
+                server.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    kwargs["result_evidence_reservation_binding"]
+                )["transitioned"]
+                is True
+            )
             result = apply_results.pop(0)
             if result.get("status") == "applied":
                 address = server._manual_write_address(
@@ -6359,6 +7859,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-idemp",
@@ -6373,6 +7874,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-idemp",
@@ -6380,14 +7882,15 @@ class TestWingDeploymentWriteBoundary:
         )
         second_apply_payload = self._decode_last_message(websocket)
         assert second_apply_payload["type"] == "operator_proposal_apply_blocked"
-        assert second_apply_payload["status"] == "blocked"
+        assert second_apply_payload["status"] == "apply_blocked"
         assert second_apply_payload["reason"] == "proposal_not_pending"
         assert "unit-auto-linked-idemp" in server._operator_apply_idempotency_keys
         assert server._apply_manual_console_write.await_count == 2
 
     @pytest.mark.asyncio
-    async def test_operator_proposal_apply_is_blocked_for_stale_pre_read_when_wing_boundary_disabled(self, dummy_wing_server):
+    async def test_operator_proposal_apply_is_blocked_for_stale_pre_read_when_wing_boundary_disabled(self, dummy_wing_server, tmp_path):
         server = dummy_wing_server
+        self._enable_result_evidence_lifecycle(server, tmp_path)
         server.operator_mode = "auto"
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
@@ -6418,6 +7921,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-stale",
@@ -6427,15 +7931,24 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "pre_read_cache_not_fresh"
-        assert apply_payload["apply_result"]["cache_freshness"]["status"] == "stale"
-        assert apply_payload["apply_result"]["cache_freshness"]["source"] == "state_timestamps"
+        assert apply_payload["reason"] == "pre_read_cache_not_fresh"
+        assert "apply_result" not in apply_payload
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        persisted = json.loads(
+            server.operator_proposal_queue.load_result_evidence(
+                proposal,
+                expected_result_digest=apply_payload["result_digest"],
+            )
+        )
+        assert persisted["cache_freshness"]["status"] == "stale"
+        assert persisted["cache_freshness"]["source"] == "state_timestamps"
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_operator_proposal_apply_is_blocked_for_stale_gain_pre_read_when_wing_boundary_disabled(self, dummy_wing_server):
+    async def test_operator_proposal_apply_is_blocked_for_stale_gain_pre_read_when_wing_boundary_disabled(self, dummy_wing_server, tmp_path):
         server = dummy_wing_server
+        self._enable_result_evidence_lifecycle(server, tmp_path)
         server.operator_mode = "auto"
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
@@ -6466,6 +7979,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-stale-gain",
@@ -6475,9 +7989,17 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "pre_read_cache_not_fresh"
-        assert apply_payload["apply_result"]["cache_freshness"]["status"] == "stale"
-        assert apply_payload["apply_result"]["cache_freshness"]["address"] == "/ch/1/in/set/trim"
+        assert apply_payload["reason"] == "pre_read_cache_not_fresh"
+        assert "apply_result" not in apply_payload
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        persisted = json.loads(
+            server.operator_proposal_queue.load_result_evidence(
+                proposal,
+                expected_result_digest=apply_payload["result_digest"],
+            )
+        )
+        assert persisted["cache_freshness"]["status"] == "stale"
+        assert persisted["cache_freshness"]["address"] == "/ch/1/in/set/trim"
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
 
@@ -6514,6 +8036,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-no-read-gain",
@@ -6523,9 +8046,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "pre_read_unavailable"
-        assert apply_payload["apply_result"]["pre_read_status"] == "readback_unavailable"
-        assert apply_payload["apply_result"]["pre_read_source"] == "unavailable"
+        assert apply_payload["reason"] == "pre_read_unavailable"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
 
@@ -6560,6 +8083,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-unsupported-type",
@@ -6569,11 +8093,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "unsupported_value_type"
-        assert (
-            apply_payload["apply_result"].get("value_type") == "eq"
-            or apply_payload["apply_result"].get("requested_change", {}).get("value_type") == "eq"
-        )
+        assert apply_payload["reason"] == "unsupported_value_type"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6611,6 +8133,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-unsupported-linked",
@@ -6620,11 +8143,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "unsupported_value_type"
-        assert (
-            apply_payload["apply_result"].get("value_type") == "eq"
-            or apply_payload["apply_result"].get("requested_change", {}).get("value_type") == "eq"
-        )
+        assert apply_payload["reason"] == "unsupported_value_type"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6664,6 +8185,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-missing-read",
@@ -6673,13 +8195,9 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "linked_pre_read_unavailable"
-        assert (
-            apply_payload["apply_result"].get("value_type") == "gain"
-            or apply_payload["apply_result"].get("requested_change", {}).get("value_type") == "gain"
-        )
-        assert apply_payload["apply_result"]["pre_read_status"] == "readback_unavailable"
-        assert apply_payload["apply_result"]["pre_read_source"] == "unavailable"
+        assert apply_payload["reason"] == "linked_pre_read_unavailable"
+        assert apply_payload["no_console_send_proven"] is True
+        assert "apply_result" not in apply_payload
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -6730,9 +8248,19 @@ class TestWingDeploymentWriteBoundary:
                     "effective_value": -9.0,
                     "old_value": -8.0,
                     "readback_value": -9.0,
-                    "readback_status": "verified_from_cache",
+                    "readback_status": "verified_from_physical_readback",
                     "rollback_available": True,
                     "rollback_value": -8.0,
+                    "no_console_send_proven": False,
+                    "physical_verified": True,
+                    "wal_terminal": "committed",
+                    "audio_recheck_required": False,
+                    "audio_recheck_disposition": (
+                        "not_required_by_manual_write_contract"
+                    ),
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
                 },
                 {
                     "status": "blocked",
@@ -6744,6 +8272,11 @@ class TestWingDeploymentWriteBoundary:
                     "effective_value": 1.0,
                     "old_value": 1.0,
                     "rollback_available": False,
+                    "no_console_send_proven": True,
+                    "wal_terminal": "aborted_before_send",
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
                 },
                 {
                     "status": "applied",
@@ -6753,11 +8286,21 @@ class TestWingDeploymentWriteBoundary:
                     "effective_value": -8.0,
                     "old_value": -9.0,
                     "readback_value": -8.0,
-                    "readback_status": "verified_from_cache",
+                    "readback_status": "verified_from_physical_readback",
                     "rollback_available": True,
                     "rollback_value": -9.0,
                     "rollback_of": f"{proposal_id}:1",
                     "rollback": True,
+                    "no_console_send_proven": False,
+                    "physical_verified": True,
+                    "wal_terminal": "committed",
+                    "audio_recheck_required": False,
+                    "audio_recheck_disposition": (
+                        "not_required_by_manual_write_contract"
+                    ),
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
                 },
             ]
 
@@ -6770,6 +8313,13 @@ class TestWingDeploymentWriteBoundary:
             }
 
         async def apply_with_state_update(*_args, **kwargs):
+            assert (
+                server.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    kwargs["result_evidence_reservation_binding"]
+                )["transitioned"]
+                is True
+            )
             result = apply_results.pop(0)
             if result.get("status") == "applied":
                 address = server._manual_write_address(
@@ -6788,6 +8338,7 @@ class TestWingDeploymentWriteBoundary:
             websocket,
             {
                 "proposal_id": proposal_id,
+                **self._review_binding(server, proposal_id),
                 "approved": True,
                 "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-fail",
@@ -6797,13 +8348,8 @@ class TestWingDeploymentWriteBoundary:
         apply_payload = self._decode_last_message(websocket)
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
-        assert apply_payload["apply_result"]["reason"] == "linked_apply_failed_rolled_back"
-        assert apply_payload["apply_result"]["failed_result"]["reason"] == "mixer_write_failed"
-        assert apply_payload["apply_result"]["failed_result"]["status"] == "blocked"
-        assert any(
-            step["rollback_of"] == f"{proposal_id}:1"
-            for step in apply_payload["apply_result"]["rollback_results"]
-        )
+        assert apply_payload["reason"] == "linked_apply_failed_rolled_back"
+        assert "apply_result" not in apply_payload
         assert server._apply_manual_console_write.await_count == 3
         first_call = server._apply_manual_console_write.await_args_list[0].kwargs
         second_call = server._apply_manual_console_write.await_args_list[1].kwargs
@@ -6817,6 +8363,47 @@ class TestWingDeploymentWriteBoundary:
         assert third_call["bypass_cooldown"] is True
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
+
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+        assert proposal is not None
+        assert proposal.result_evidence_pinned is False
+        persisted = json.loads(
+            server.operator_proposal_queue.load_result_evidence(
+                proposal,
+                expected_result_digest=proposal.result_digest,
+            )
+        )
+        assert persisted["failed_result"]["reason"] == "mixer_write_failed"
+        assert persisted["failed_result"]["status"] == "blocked"
+        assert any(
+            step["rollback_of"] == f"{proposal_id}:1"
+            for step in persisted["rollback_results"]
+        )
+        for field, expected in {
+            "status": "blocked",
+            "no_console_send_proven": False,
+            "physical_state_restored": True,
+            "terminal_after_console_send": True,
+            "wal_terminal": "rolled_back",
+            "write_state_unknown": False,
+            "rollback_state_unknown": False,
+            "manual_review_required": False,
+        }.items():
+            assert persisted[field] == expected
+            assert proposal.result[field] == expected
+
+        result_store = server.operator_proposal_queue.result_store
+        restarted_store = ResultEvidenceStore(
+            result_store.root,
+            min_free_bytes=0,
+            process_instance_id="b" * 32,
+        )
+        restarted_queue = OperatorProposalQueue(
+            result_store=restarted_store,
+            result_evidence_lifecycle_ready=True,
+        )
+        assert restarted_queue.result_recovery_hazards == ()
+        assert restarted_queue.result_evidence_contract_ready is True
 
     @pytest.mark.asyncio
     async def test_websocket_fader_blocks_when_cache_pre_read_is_stale(self, dummy_wing_server):
@@ -6856,6 +8443,10 @@ class TestWingDeploymentWriteBoundary:
         assert first["status"] == "applied"
         assert payload["status"] == "blocked"
         assert payload["reason"] == "cooldown"
+        assert payload["no_console_send_proven"] is True
+        assert payload["write_state_unknown"] is False
+        assert payload["manual_review_required"] is False
+        assert payload["write_attempts"] == 0
         assert payload["cooldown_sec"] == 10.0
         assert payload["cooldown_remaining_sec"] > 0
         server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)

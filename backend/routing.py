@@ -12,6 +12,13 @@ import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
+from decision_queue_wire_contract import (
+    catastrophic_apply_response_serialized,
+    catastrophic_outbound_response_serialized,
+    project_outbound_message,
+)
+from ws_transport import send_serialized_json
+
 logger = logging.getLogger(__name__)
 
 
@@ -203,13 +210,40 @@ class MessageRouter:
             return
         self._last_broadcast = now
 
-        payload = json.dumps(message)
+        apply_response = bool(
+            type(message) is dict
+            and dict.get(message, "type")
+            in {
+                "operator_proposal_apply_result",
+                "operator_proposal_apply_blocked",
+            }
+        )
+        try:
+            payload = project_outbound_message(message)
+        except Exception:
+            logger.exception("WebSocket route projection failed")
+            try:
+                payload = (
+                    catastrophic_apply_response_serialized()
+                    if apply_response
+                    else catastrophic_outbound_response_serialized()
+                )
+            except Exception:
+                for client in tuple(self._clients):
+                    try:
+                        await client.close(
+                            code=1011,
+                            reason="outbound response projection failed",
+                        )
+                    except Exception:
+                        pass
+                    self._clients.discard(client)
+                return
         disconnected = set()
 
         for client in self._clients:
-            try:
-                await client.send(payload)
-            except Exception:
+            sent = await send_serialized_json(client, payload, logger_=logger)
+            if sent is not True:
                 disconnected.add(client)
 
         for client in disconnected:

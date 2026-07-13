@@ -73,6 +73,16 @@ def _coerce_positive_int(value: Any, *, max_value: int | None = None) -> Optiona
     return integer
 
 
+def _safe_rejected_value_for_wire(value: Any) -> tuple[Any, bool]:
+    """Preserve a small invalid scalar without emitting non-JSON values."""
+
+    if value is None or type(value) in {bool, int, str}:
+        return value, False
+    if type(value) is float and math.isfinite(value):
+        return value, False
+    return None, True
+
+
 async def _send_invalid_live_apply_request(
     server,
     websocket,
@@ -270,6 +280,9 @@ def register_handlers(server):
         error: str | None = None,
     ):
         status = "error" if error else "blocked"
+        wire_requested_value, requested_value_omitted = (
+            _safe_rejected_value_for_wire(requested_value)
+        )
         payload = {
             "type": "manual_write_error" if error else "manual_write_blocked",
             "request_id": data.get("request_id"),
@@ -279,7 +292,8 @@ def register_handlers(server):
             "surface": surface,
             "channel": data.get("channel"),
             "value_type": value_type,
-            "requested_value": requested_value,
+            "requested_value": wire_requested_value,
+            "requested_value_omitted": requested_value_omitted,
             "live_write": False,
             "live_authority_granted": False,
             "readiness_closure_allowed": False,

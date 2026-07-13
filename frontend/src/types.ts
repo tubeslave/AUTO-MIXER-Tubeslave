@@ -36,6 +36,13 @@ export interface BackendUiState {
   lastUpdated: string;
   message: string;
   proposalApplyResult?: ProposalApplyResult | null;
+  transportTerminalClose?: TransportTerminalClose | null;
+}
+
+export interface TransportTerminalClose {
+  code: number;
+  reason: string;
+  manualRetryRequired: boolean;
 }
 
 export interface SoundcheckRuntime {
@@ -148,7 +155,119 @@ export interface ProposalApplyResult {
   readbackTone: Tone;
   rollbackTone: Tone;
   tone: Tone;
+  noConsoleSendProven?: boolean | null;
+  physicalVerified?: boolean | null;
+  physicalStateRestored?: boolean | null;
+  writeStateUnknown?: boolean;
+  rollbackStateUnknown?: boolean;
+  manualReviewRequired?: boolean;
+  walTerminal?: string;
+  audioRecheckPassed?: boolean | null;
   updatedAt: string;
+}
+
+export interface DecisionQueueItem {
+  id: string;
+  entityKind: 'operator_proposal' | 'mixing_agent_action';
+  queueSection: 'pending' | 'history' | 'analysis_only';
+  titlePreview: string;
+  reasonPreview: string;
+  displayTarget: string;
+  kind: string;
+  severity: string;
+  status: string;
+  source: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  expiresAt: string | null;
+  canApply: boolean;
+  requiresApproval: boolean;
+  applyBlockerCodes: string[];
+  applyBlockerCount: number;
+  linkedChangeCount: number;
+  reviewContractVersion: number | null;
+  reviewContractStatus: string;
+  reviewContentDigest: string | null;
+  detailAvailable: boolean;
+  hazardScope: string;
+  priorityClass: string;
+  analysisOnly: boolean;
+  importRequired: boolean;
+}
+
+export interface DecisionQueueState {
+  contractVersion: 2;
+  wireSchema: 'automixer.decision_queue.v2';
+  availability: 'unavailable' | 'loading' | 'ready' | 'degraded' | 'stale' | 'error' | 'terminal';
+  status: string;
+  snapshot: {
+    id: string;
+    revision: string;
+    createdAt: string;
+    expiresAt: string;
+    fullyPageable: boolean;
+  } | null;
+  page: {
+    pageSize: number;
+    returnedCount: number;
+    remainingCount: number;
+    nextCursor: string | null;
+    hasMore: boolean;
+  };
+  counts: {
+    totalCount: number;
+    includedCount: number;
+    omittedCount: number;
+    pinnedTotalCount: number;
+    pinnedIncludedCount: number;
+    pinnedOmittedCount: number;
+    bySection: Record<'pending' | 'history' | 'analysis_only', number>;
+    byPriority: Record<'global_hazard' | 'blocked' | 'high' | 'ordinary' | 'history', number>;
+    byApplyState: Record<'applyable' | 'blocked' | 'analysis_only', number>;
+  };
+  items: DecisionQueueItem[];
+  overflow: {
+    countsOnly: boolean;
+    reason: string | null;
+    unpageableCount: number;
+    pinnedUnpageableCount: number;
+    applyUiDisabled: boolean;
+    hazardDigest: string | null;
+  };
+  hazards: {
+    fatal: boolean;
+    applyUiDisabled: boolean;
+    count: number;
+    codes: string[];
+    overflowCount: number;
+    sourceCounts: Record<'runtime' | 'manual_write' | 'terminal_result', number>;
+    digest: string | null;
+  };
+  applyUiDisabled: boolean;
+  paginationLoading: boolean;
+  error: string;
+  terminalClose: TransportTerminalClose | null;
+}
+
+export interface ProposalReviewState {
+  status: 'idle' | 'loading' | 'verified' | 'error' | 'stale';
+  proposalId: string | null;
+  reviewContractVersion: number | null;
+  reviewContentDigest: string | null;
+  chunkCount: number;
+  receivedChunkCount: number;
+  totalRawBytes: number;
+  currentState: {
+    status: string;
+    updated_at: string | null;
+    expired: boolean;
+    can_apply: boolean;
+    apply_blocker_codes: string[];
+    apply_blocker_count: number;
+  } | null;
+  document: Record<string, unknown> | null;
+  error: string;
+  verifiedAt: string | null;
 }
 
 export interface DecisionTraceRecord {
@@ -427,6 +546,17 @@ export interface Task {
   requestedValueType?: string;
   safetyEvidence?: SafetyEvidenceItem[];
   proposalContract?: ProposalOnlyContract;
+  queueSection?: DecisionQueueItem['queueSection'];
+  entityKind?: DecisionQueueItem['entityKind'];
+  reviewContractVersion?: number | null;
+  reviewContractStatus?: string;
+  reviewContentDigest?: string | null;
+  detailAvailable?: boolean;
+  requiresApproval?: boolean;
+  hazardScope?: string;
+  priorityClass?: string;
+  expiresAt?: string | null;
+  linkedChangeCount?: number;
 }
 
 export interface ProposalOnlyContract {
@@ -672,6 +802,8 @@ export interface UiState {
   backend: BackendUiState;
   soundcheck: SoundcheckRuntime;
   emergencyStop: EmergencyStopUiState;
+  decisionQueue: DecisionQueueState;
+  proposalReview: ProposalReviewState;
   selectedAgentId: string;
   selectedCommunicationKey: string;
   selectedPerformanceAgent: string;
@@ -721,6 +853,7 @@ export interface UiActions {
   createSnapshot: () => void;
   rollbackLastAction: () => void;
   refreshBackend: () => void;
+  loadNextDecisionQueuePage: () => void;
   toggleAudioPreview: () => void;
   connectWingReadOnly: () => void;
   navigate: (route: RouteId) => void;

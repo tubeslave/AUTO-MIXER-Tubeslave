@@ -181,12 +181,14 @@ async def test_sequence_policy_memory_draft_blocks_pan_on_wing_boundary(server):
     )
 
     payload = server.send_to_client.await_args.args[1]
-    reasons = {item["reason"] for item in payload["blocked_results"]}
-    assert payload["status"] == "blocked"
-    assert payload["summary"]["memory_draft_count"] == 0
-    assert payload["safety"]["allowed_live_write_kinds"] == ["fader", "gain"]
-    assert "safety_allowed_live_write_kinds_widened" in reasons
-    assert "policy_evidence_value_type_not_memory_allowed" in reasons
+    assert payload["type"] == "operator_proposal_pipeline_migration_required"
+    assert payload["status"] == "migration_required"
+    assert payload["reason"] == "server_owned_sequence_state_required"
+    assert payload["blocked_handler"] == (
+        "draft_operator_proposal_apply_sequence_policy_memory"
+    )
+    assert payload["no_additional_console_send_proven"] is True
+    assert payload["soundcheck_completion_blocked"] is True
 
 
 @pytest.mark.asyncio

@@ -192,10 +192,19 @@ fatal enum and source are:
   `console_writer_conflict_recorded`;
 - terminal result: `terminal_write_state_unknown`,
   `terminal_rollback_state_unknown`, `terminal_manual_review_after_send`,
+  `operator_proposal_result_recovery_required`,
   `operator_proposal_result_persistence_failed`.
 
 They are derived only from server lifecycle/connection/operator mode, bounded
 manual supervision/lock state, and compact retained/tombstoned result truth.
+Pinned digest-addressed artifacts are also classified during restart. Exact
+stored unknown-write, rollback-unknown and manual-review flags retain their
+exact terminal codes. Any other pinned result that lacks a proven-safe or exact
+fatal disposition uses `operator_proposal_result_recovery_required`. These
+recovered hazards make the evidence contract unavailable before reserve/claim,
+but do not set the in-process `result_persistence_failed` latch; a durable
+`persistence_failed_after_send` marker still contributes its explicit fixed
+hazard code. Recovery never deletes pinned evidence.
 
 Proposal-local master/headroom, feedback, stale-readback and transaction
 blockers remain pinned blocked rows, not inferred global hazards. The hazard
@@ -412,6 +421,23 @@ pre-mutation validation and adversarial spies.
 Rollback is source rollback of v2 handlers/frontend only. Do not restore
 no-digest apply. If v2 cannot be safely served, leave proposals viewable but
 non-applyable and report `soundcheck_incomplete`; no WING write is attempted.
+
+## Implementation evidence — 2026-07-13
+
+- Focused backend contract and Product Layer run: `351 passed`.
+- Active frontend unit/contract run: `198 passed`.
+- Production frontend build: passed.
+- Chromium operator-path E2E run: `13 passed`.
+- Mandatory full backend command:
+  `PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q`:
+  `6670 passed, 1 skipped` in `327.13s`.
+- `git diff --check`: passed.
+- Final independent patch review found no remaining P0/P1/P2. In particular,
+  the wire projector preserves exact fail-closed handler identity for all 42
+  registered migration routes, and both Task Queue workspaces block Apply on
+  unavailable, stale, error or terminal Decision Queue state.
+- These checks made no backend or WING contact, performed no console write,
+  and did not widen the normal live allowlist.
 
 ## Council record
 

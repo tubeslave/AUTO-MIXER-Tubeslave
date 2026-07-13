@@ -99,8 +99,14 @@ from ws_transport import (
     broadcast_json,
     consume_token_buckets,
     is_connection_closed_error,
-    send_json,
+    send_serialized_json,
     websocket_message_type,
+)
+from decision_queue_wire_contract import (
+    catastrophic_apply_response_serialized,
+    catastrophic_outbound_response_serialized,
+    catastrophic_sequence_execution_response_serialized,
+    project_outbound_message,
 )
 from operator_mode_policy import (
     DEFAULT_OPERATOR_MODE,
@@ -111,6 +117,10 @@ from operator_mode_policy import (
     normalize_operator_mode,
 )
 from operator_proposal_queue import OperatorProposalQueue
+from operator_proposal_result_store import (
+    ResultEvidenceStore,
+    default_result_store_root,
+)
 from operator_recommendation_bridge import (
     SAFE_GAIN_SOURCE,
     SOUNDCHECK_SOURCE,
@@ -131,7 +141,10 @@ from soundcheck_transaction_plan import (
     bind_soundcheck_manifest_content_sha256,
     soundcheck_manifest_content_sha256,
 )
-from processing_proposal_adapters import build_operator_correction_payload
+from processing_proposal_adapters import (
+    build_quarantined_operator_correction_payload,
+    compact_quarantined_operator_mapping,
+)
 from automation_trace import (
     TRACE_PROVENANCE_SCHEMA,
     AutomationDecisionTrace,
@@ -827,7 +840,19 @@ class AutoMixerServer:
         self._auto_mode_unlocked = self._parse_env_bool(
             os.getenv("AUTOMIXER_AUTO_MODE_UNLOCKED", "false")
         )
-        self.operator_proposal_queue = OperatorProposalQueue()
+        result_store_root = Path(
+            os.getenv(
+                "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR",
+                str(default_result_store_root()),
+            )
+        )
+        self.operator_proposal_queue = OperatorProposalQueue(
+            result_store=ResultEvidenceStore(result_store_root),
+            # The canonical handlers own reserve -> durable send-boundary ->
+            # terminal commit/release on every apply lane.  The queue still
+            # forces readiness false when startup recovery finds any hazard.
+            result_evidence_lifecycle_ready=True,
+        )
 
         # Default safety mode for Wing test/observation runs
         self._wing_observation_only = self._parse_env_bool(
@@ -915,12 +940,15 @@ class AutoMixerServer:
         self._supervised_transaction_ids: Dict[str, str] = {}
         self._manual_write_prepared_transactions: Dict[str, Dict[str, Any]] = {}
         self._manual_write_recovery_transactions: Dict[str, Dict[str, Any]] = {}
+        self._manual_write_wal_lifecycles: Dict[str, Dict[str, Any]] = {}
+        self._manual_write_wal_integrity_ok = True
         self._recover_manual_write_wal_state()
         self._soundcheck_parent_journal_error: Optional[str] = None
         self._recover_soundcheck_parent_journal_state()
         self.automation_trace_store = AutomationTraceStore(manual_write_artifacts_dir)
         self.decision_memory_store = DecisionMemoryStore(manual_write_artifacts_dir)
         self._console_write_lock = asyncio.Lock()
+        self._console_writer_conflict_recorded = False
         self._console_write_owner_task: Optional[asyncio.Task[Any]] = None
         self._console_write_active_idempotency_keys: set[str] = set()
 
@@ -1251,11 +1279,9 @@ class AutoMixerServer:
         else:
             self._authenticated_websocket_expiry.pop(id(websocket), None)
 
-        await send_json(
+        await self.send_to_client(
             websocket,
             {"type": "authentication_status", "authenticated": True},
-            converter=convert_numpy_types,
-            logger_=logger,
         )
         return True
 
@@ -6566,8 +6592,7 @@ class AutoMixerServer:
         if not method_id:
             return None
 
-        request_payload = dict(request or {})
-        extra_payload = dict(extra or {})
+        request_payload = compact_quarantined_operator_mapping(request or {})
         target = (
             request_payload.get("channel")
             or request_payload.get("target_bus")
@@ -6588,36 +6613,7 @@ class AutoMixerServer:
             "request": request_payload,
             "operator_confirmation_required": True,
         }
-        proposal = {
-            "id": f"quarantined_wing_write:{surface}",
-            "method_id": method_id,
-            "source": "wing_deployment_boundary",
-            "title": f"{surface}: blocked WING write",
-            "reason": (
-                "Direct WING write surface is quarantined; this is "
-                "operator-review evidence only."
-            ),
-            "target": target,
-            "kind": "quarantined_write_surface",
-            "severity": "high",
-            "confidence": 1.0,
-            "blockers": blockers,
-            "raw": {
-                "surface": surface,
-                "result_type": result_type,
-                "request": request_payload,
-                "extra": extra_payload,
-            },
-            "evidence": {
-                "live_write": False,
-                "queue_mutation": False,
-                "deployment_write_surface_quarantined": True,
-                "readback_required_before_promotion": True,
-                "rollback_required_before_promotion": True,
-            },
-        }
-        return build_operator_correction_payload(
-            proposal=proposal,
+        return build_quarantined_operator_correction_payload(
             method_id=method_id,
             target=target,
             proposed_action=proposed_action,
@@ -6649,9 +6645,9 @@ class AutoMixerServer:
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
         if request:
-            payload["request"] = request
+            payload["request"] = compact_quarantined_operator_mapping(request)
         if extra:
-            payload.update(extra)
+            payload.update(compact_quarantined_operator_mapping(extra))
         operator_correction = self._quarantined_write_operator_correction(
             surface=surface,
             result_type=result_type,
@@ -6943,6 +6939,13 @@ class AutoMixerServer:
             "proof_status": "blocked",
             "source": source,
             "approval_id": approval_id,
+            "no_console_send_proven": True,
+            "physical_verified": False,
+            "terminal_after_console_send": False,
+            "write_state_unknown": False,
+            "rollback_state_unknown": False,
+            "manual_review_required": False,
+            "write_attempts": 0,
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
         if extra:
@@ -7197,6 +7200,105 @@ class AutoMixerServer:
         for created in reversed(missing):
             cls._fsync_directory(created.parent)
 
+    @staticmethod
+    def _wal_lifecycle_proves_no_send(lifecycle: Any) -> bool:
+        """Accept only the exact durable sequence that cannot include a send."""
+
+        if not isinstance(lifecycle, Mapping):
+            return False
+        phases = tuple(lifecycle.get("phases") or ())
+        prepared = lifecycle.get("prepared")
+        return bool(
+            phases == ("prepared", "aborted_before_send")
+            and isinstance(prepared, Mapping)
+            and prepared.get("schema") == "automixer.manual_write_wal.v1"
+            and str(prepared.get("transaction_id") or "").strip()
+            == str(lifecycle.get("transaction_id") or "").strip()
+        )
+
+    def _wal_binding_fully_proven_no_send(
+        self,
+        *,
+        field: str,
+        value: str,
+        scope: Optional[str] = None,
+    ) -> bool:
+        matches = []
+        for lifecycle in self._manual_write_wal_lifecycles.values():
+            prepared = lifecycle.get("prepared")
+            if not isinstance(prepared, Mapping):
+                continue
+            if scope is not None and str(
+                prepared.get("scope") or ""
+            ).strip() != scope:
+                continue
+            if str(prepared.get(field) or "").strip() == value:
+                matches.append(lifecycle)
+        return bool(
+            self._manual_write_wal_integrity_ok
+            and matches
+            and all(self._wal_lifecycle_proves_no_send(item) for item in matches)
+        )
+
+    def _update_runtime_wal_binding_state(
+        self,
+        transaction_id: str,
+        lifecycle: Mapping[str, Any],
+    ) -> None:
+        """Refresh durable dedupe state without dropping the live handler claim."""
+
+        prepared = lifecycle.get("prepared")
+        if not isinstance(prepared, Mapping):
+            return
+        scope = str(prepared.get("scope") or "").strip()
+        key = str(prepared.get("idempotency_key") or "").strip()
+        proposal_id = str(prepared.get("proposal_id") or "").strip()
+        first_seen = {
+            "created_at": prepared.get("timestamp"),
+            "proposal_id": prepared.get("proposal_id"),
+            "approval_id": prepared.get("approval_id"),
+            "restored_from_wal": True,
+            "transaction_id": transaction_id,
+        }
+        if proposal_id:
+            if self._wal_binding_fully_proven_no_send(
+                field="proposal_id",
+                value=proposal_id,
+            ):
+                self._durable_operator_proposal_ids.discard(proposal_id)
+            else:
+                self._durable_operator_proposal_ids.add(proposal_id)
+        if not key:
+            return
+        key_fully_no_send = self._wal_binding_fully_proven_no_send(
+            field="idempotency_key",
+            value=key,
+            scope=scope,
+        )
+        if scope == "supervised_transaction":
+            if key_fully_no_send:
+                if (
+                    self._supervised_transaction_idempotency_keys.get(key)
+                    == transaction_id
+                ):
+                    self._supervised_transaction_idempotency_keys.pop(key, None)
+                if self._supervised_transaction_ids.get(transaction_id) == key:
+                    self._supervised_transaction_ids.pop(transaction_id, None)
+            else:
+                self._supervised_transaction_idempotency_keys[key] = transaction_id
+                self._supervised_transaction_ids[transaction_id] = key
+            return
+        if scope != "operator_proposal":
+            return
+        if key_fully_no_send:
+            current = self._durable_operator_apply_idempotency_keys.get(key)
+            if not isinstance(current, Mapping) or str(
+                current.get("transaction_id") or ""
+            ) == transaction_id:
+                self._durable_operator_apply_idempotency_keys.pop(key, None)
+        else:
+            self._durable_operator_apply_idempotency_keys[key] = first_seen
+
     def _append_manual_write_wal(
         self,
         phase: str,
@@ -7224,37 +7326,44 @@ class AutoMixerServer:
                 handle.flush()
                 os.fsync(handle.fileno())
             self._fsync_directory(path.parent)
-            if phase in MANUAL_WRITE_WAL_TERMINAL_PHASES:
+            prior_lifecycle = self._manual_write_wal_lifecycles.get(
+                transaction_id,
+                {},
+            )
+            lifecycle = {
+                "transaction_id": transaction_id,
+                "phases": [*(prior_lifecycle.get("phases") or ()), phase],
+                "prepared": prior_lifecycle.get("prepared"),
+                "latest_event": event,
+            }
+            if phase == "prepared" and lifecycle["prepared"] is None:
+                lifecycle["prepared"] = event
+            self._manual_write_wal_lifecycles[transaction_id] = lifecycle
+            exact_no_send = self._wal_lifecycle_proves_no_send(lifecycle)
+            terminal_resolved = bool(
+                phase in MANUAL_WRITE_WAL_TERMINAL_PHASES
+                and (phase != "aborted_before_send" or exact_no_send)
+            )
+            if terminal_resolved:
                 self._manual_write_recovery_transactions.pop(transaction_id, None)
                 self._manual_write_prepared_transactions.pop(transaction_id, None)
             else:
                 if phase == "prepared":
-                    self._manual_write_prepared_transactions[transaction_id] = event
-                prepared = self._manual_write_prepared_transactions.get(
-                    transaction_id,
-                    {},
-                )
+                    self._manual_write_prepared_transactions.setdefault(
+                        transaction_id,
+                        event,
+                    )
+                prepared = lifecycle.get("prepared") or {}
                 self._manual_write_recovery_transactions[transaction_id] = {
                     **prepared,
                     "phase": phase,
+                    "phase_sequence": list(lifecycle["phases"]),
                     "latest_event": event,
                 }
-            proposal_id = str(event.get("proposal_id") or "").strip()
-            if proposal_id:
-                self._durable_operator_proposal_ids.add(proposal_id)
-            idempotency_key = str(event.get("idempotency_key") or "").strip()
-            if (
-                phase == "prepared"
-                and idempotency_key
-                and event.get("scope") == "operator_proposal"
-            ):
-                self._durable_operator_apply_idempotency_keys[idempotency_key] = {
-                    "created_at": event.get("timestamp"),
-                    "proposal_id": event.get("proposal_id"),
-                    "approval_id": event.get("approval_id"),
-                    "restored_from_wal": True,
-                    "transaction_id": transaction_id,
-                }
+            self._update_runtime_wal_binding_state(
+                transaction_id,
+                lifecycle,
+            )
             return str(path)
         except Exception as exc:
             logger.error(
@@ -7270,8 +7379,9 @@ class AutoMixerServer:
         path = self._manual_write_wal_path()
         if not path.exists():
             return
-        latest: Dict[str, Dict[str, Any]] = {}
-        prepared_records: Dict[str, Dict[str, Any]] = {}
+        invalid: Dict[str, Dict[str, Any]] = {}
+        lifecycles: Dict[str, Dict[str, Any]] = {}
+        integrity_ok = True
         try:
             with path.open("r", encoding="utf-8") as handle:
                 for line_number, raw_line in enumerate(handle, start=1):
@@ -7280,74 +7390,147 @@ class AutoMixerServer:
                     try:
                         event = json.loads(raw_line)
                     except (TypeError, ValueError, json.JSONDecodeError) as exc:
-                        latest[f"wal_parse_error:{line_number}"] = {
+                        integrity_ok = False
+                        invalid[f"wal_parse_error:{line_number}"] = {
                             "phase": "wal_parse_error",
                             "error": str(exc),
+                            "line_number": line_number,
+                        }
+                        continue
+                    if (
+                        not isinstance(event, Mapping)
+                        or event.get("schema") != "automixer.manual_write_wal.v1"
+                    ):
+                        integrity_ok = False
+                        invalid[f"wal_invalid_record:{line_number}"] = {
+                            "phase": "wal_invalid_record",
                             "line_number": line_number,
                         }
                         continue
                     transaction_id = str(event.get("transaction_id") or "").strip()
                     phase = str(event.get("phase") or "").strip()
                     if not transaction_id or not phase:
-                        latest[f"wal_invalid_record:{line_number}"] = {
+                        integrity_ok = False
+                        invalid[f"wal_invalid_record:{line_number}"] = {
                             "phase": "wal_invalid_record",
                             "line_number": line_number,
                         }
                         continue
-                    idempotency_key = str(
-                        event.get("idempotency_key") or ""
-                    ).strip()
-                    proposal_id = str(event.get("proposal_id") or "").strip()
-                    if proposal_id:
-                        self._durable_operator_proposal_ids.add(proposal_id)
-                    if idempotency_key:
-                        if event.get("scope") == "supervised_transaction":
-                            self._supervised_transaction_idempotency_keys.setdefault(
-                                idempotency_key,
-                                transaction_id,
-                            )
-                            self._supervised_transaction_ids.setdefault(
-                                transaction_id,
-                                idempotency_key,
-                            )
-                        else:
-                            durable_record = {
-                                "created_at": event.get("timestamp"),
-                                "proposal_id": event.get("proposal_id"),
-                                "approval_id": event.get("approval_id"),
-                                "restored_from_wal": True,
-                                "transaction_id": transaction_id,
-                            }
-                            self._durable_operator_apply_idempotency_keys[
-                                idempotency_key
-                            ] = durable_record
-                            self._operator_apply_idempotency_keys.setdefault(
-                                idempotency_key,
-                                durable_record,
-                            )
-                    if phase == "prepared":
-                        prepared_records[transaction_id] = event
-                    latest[transaction_id] = event
+                    lifecycle = lifecycles.setdefault(
+                        transaction_id,
+                        {
+                            "transaction_id": transaction_id,
+                            "phases": [],
+                            "prepared": None,
+                            "latest_event": None,
+                        },
+                    )
+                    lifecycle["phases"].append(phase)
+                    if phase == "prepared" and lifecycle["prepared"] is None:
+                        lifecycle["prepared"] = event
+                    lifecycle["latest_event"] = event
         except OSError as exc:
-            latest["wal_read_error"] = {
+            integrity_ok = False
+            invalid["wal_read_error"] = {
                 "phase": "wal_read_error",
                 "error": str(exc),
             }
+        self._manual_write_wal_integrity_ok = integrity_ok
+        self._manual_write_wal_lifecycles = lifecycles
 
-        unresolved = {
-            transaction_id: {
-                **prepared_records.get(transaction_id, {}),
-                "phase": str(event.get("phase") or ""),
+        live_operator_keys = {
+            key: value
+            for key, value in self._operator_apply_idempotency_keys.items()
+            if not (
+                isinstance(value, Mapping)
+                and value.get("restored_from_wal") is True
+            )
+        }
+        self._operator_apply_idempotency_keys = live_operator_keys
+        self._durable_operator_apply_idempotency_keys = {}
+        self._durable_operator_proposal_ids = set()
+        self._supervised_transaction_idempotency_keys = {}
+        self._supervised_transaction_ids = {}
+
+        key_groups: Dict[tuple[str, str], list[Dict[str, Any]]] = {}
+        proposal_groups: Dict[str, list[Dict[str, Any]]] = {}
+        for lifecycle in lifecycles.values():
+            prepared = lifecycle.get("prepared")
+            if not isinstance(prepared, Mapping):
+                continue
+            key = str(prepared.get("idempotency_key") or "").strip()
+            scope = str(prepared.get("scope") or "").strip()
+            proposal_id = str(prepared.get("proposal_id") or "").strip()
+            if key:
+                key_groups.setdefault((scope, key), []).append(lifecycle)
+            if proposal_id:
+                proposal_groups.setdefault(proposal_id, []).append(lifecycle)
+
+        for proposal_id, group in proposal_groups.items():
+            if not (
+                integrity_ok
+                and all(self._wal_lifecycle_proves_no_send(item) for item in group)
+            ):
+                self._durable_operator_proposal_ids.add(proposal_id)
+
+        for (scope, key), group in key_groups.items():
+            fully_no_send = bool(
+                integrity_ok
+                and group
+                and all(self._wal_lifecycle_proves_no_send(item) for item in group)
+            )
+            if fully_no_send:
+                continue
+            representative = group[0]
+            prepared = representative.get("prepared") or {}
+            transaction_id = str(representative.get("transaction_id") or "")
+            if scope == "supervised_transaction":
+                self._supervised_transaction_idempotency_keys[key] = transaction_id
+                for lifecycle in group:
+                    lifecycle_transaction_id = str(
+                        lifecycle.get("transaction_id") or ""
+                    )
+                    if lifecycle_transaction_id:
+                        self._supervised_transaction_ids[
+                            lifecycle_transaction_id
+                        ] = key
+                continue
+            if scope != "operator_proposal":
+                continue
+            durable_record = {
+                "created_at": prepared.get("timestamp"),
+                "proposal_id": prepared.get("proposal_id"),
+                "approval_id": prepared.get("approval_id"),
+                "restored_from_wal": True,
+                "transaction_id": transaction_id,
+            }
+            self._durable_operator_apply_idempotency_keys[key] = durable_record
+            self._operator_apply_idempotency_keys.setdefault(key, durable_record)
+
+        unresolved: Dict[str, Dict[str, Any]] = dict(invalid)
+        for transaction_id, lifecycle in lifecycles.items():
+            event = lifecycle.get("latest_event") or {}
+            phase = str(event.get("phase") or "")
+            exact_no_send = self._wal_lifecycle_proves_no_send(lifecycle)
+            terminal_resolved = bool(
+                phase in MANUAL_WRITE_WAL_TERMINAL_PHASES
+                and (phase != "aborted_before_send" or exact_no_send)
+            )
+            if terminal_resolved:
+                continue
+            prepared = lifecycle.get("prepared") or {}
+            unresolved[transaction_id] = {
+                **prepared,
+                "phase": phase,
+                "phase_sequence": list(lifecycle.get("phases") or ()),
                 "latest_event": event,
             }
-            for transaction_id, event in latest.items()
-            if str(event.get("phase") or "")
-            not in MANUAL_WRITE_WAL_TERMINAL_PHASES
-        }
         self._manual_write_prepared_transactions = {
-            transaction_id: prepared_records[transaction_id]
+            transaction_id: lifecycle["prepared"]
             for transaction_id in unresolved
-            if transaction_id in prepared_records
+            if transaction_id in lifecycles
+            for lifecycle in (lifecycles[transaction_id],)
+            if isinstance(lifecycle.get("prepared"), Mapping)
         }
         self._manual_write_recovery_transactions = unresolved
         if unresolved:
@@ -8145,6 +8328,8 @@ class AutoMixerServer:
             else:
                 remaining = float(deadline_epoch) - time.time()
                 if remaining <= 0.0:
+                    if self._console_write_lock.locked():
+                        self._console_writer_conflict_recorded = True
                     yield False
                     return
                 try:
@@ -8153,6 +8338,7 @@ class AutoMixerServer:
                         timeout=remaining,
                     )
                 except asyncio.TimeoutError:
+                    self._console_writer_conflict_recorded = True
                     yield False
                     return
             local_lock_acquired = True
@@ -8178,6 +8364,7 @@ class AutoMixerServer:
                             break
                         await asyncio.sleep(0.05)
                 if not process_lock_acquired:
+                    self._console_writer_conflict_recorded = True
                     os.close(lock_fd)
                     yield False
                     return
@@ -8204,7 +8391,27 @@ class AutoMixerServer:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """Serialize every physical console mutation through one server lock."""
-        async with self._console_write_scope():
+        approval_deadline = self._coerce_finite_float(
+            kwargs.get("approval_expires_at_epoch")
+        )
+        async with self._console_write_scope(
+            deadline_epoch=approval_deadline,
+        ) as writer_acquired:
+            if writer_acquired is not True:
+                return self._manual_write_blocked_result(
+                    reason=(
+                        "operator_approval_expired"
+                        if approval_deadline is not None
+                        and approval_deadline <= time.time()
+                        else "console_writer_conflict_timeout"
+                    ),
+                    channel=kwargs.get("channel"),
+                    value=kwargs.get("value"),
+                    value_type=kwargs.get("value_type"),
+                    source=str(kwargs.get("source") or ""),
+                    approval_id=kwargs.get("approval_id"),
+                    extra={"no_console_send_proven": True},
+                )
             return await self._apply_manual_console_write_unlocked(
                 websocket,
                 **kwargs,
@@ -8227,8 +8434,23 @@ class AutoMixerServer:
         bypass_cooldown: bool = False,
         record_event: bool = True,
         emergency_recovery: bool = False,
+        approval_expires_at_epoch: Any = None,
+        result_evidence_reservation_binding: Any = None,
     ) -> Dict[str, Any]:
         write_kind = self._normalize_manual_write_kind(value_type)
+        approval_deadline = self._coerce_finite_float(
+            approval_expires_at_epoch
+        )
+        if approval_deadline is not None and approval_deadline <= time.time():
+            return self._manual_write_blocked_result(
+                reason="operator_approval_expired",
+                channel=channel,
+                value=value,
+                value_type=write_kind or value_type,
+                source=source,
+                approval_id=approval_id,
+                extra={"no_console_send_proven": True},
+            )
         if self._packaged_offline_lock:
             return self._manual_write_blocked_result(
                 reason="packaged_offline_lock_active",
@@ -8403,6 +8625,20 @@ class AutoMixerServer:
             address=address,
             prefer_physical=True,
         )
+        if approval_deadline is not None and approval_deadline <= time.time():
+            return self._manual_write_blocked_result(
+                reason="operator_approval_expired",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "no_console_send_proven": True,
+                    "write_attempts": 0,
+                },
+            )
         old_value = pre_read.get("value")
         old_value_float = self._coerce_optional_float(old_value)
         old_value_bool = self._coerce_optional_bool(old_value)
@@ -8473,6 +8709,20 @@ class AutoMixerServer:
         retry_delay_sec = self._manual_write_retry_delay_sec()
         write_attempts = 0
         write_result: Any = False
+        if approval_deadline is not None and approval_deadline <= time.time():
+            return self._manual_write_blocked_result(
+                reason="operator_approval_expired",
+                channel=channel_int,
+                value=requested_value,
+                value_type=write_kind,
+                source=source,
+                approval_id=approval_id,
+                extra={
+                    "address": address,
+                    "no_console_send_proven": True,
+                    "write_attempts": 0,
+                },
+            )
         wal_path = self._append_manual_write_wal(
             "prepared",
             transaction_id,
@@ -8555,9 +8805,118 @@ class AutoMixerServer:
                         "current_readback_value": cas_read.get("value"),
                         "current_readback_status": cas_read.get("status"),
                         "current_readback_source": cas_read.get("source"),
+                        "no_console_send_proven": True,
+                        "write_attempts": 0,
+                    },
+                )
+        if result_evidence_reservation_binding is not None:
+            evidence_boundary = (
+                self.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    result_evidence_reservation_binding
+                )
+            )
+            if evidence_boundary.get("transitioned") is not True:
+                abort_path = self._append_manual_write_wal(
+                    "aborted_before_send",
+                    transaction_id,
+                    reason=evidence_boundary.get("reason"),
+                    write_attempts=0,
+                )
+                if not abort_path:
+                    await self.activate_system_emergency_stop(
+                        f"manual_write_wal_abort_failed:{transaction_id}"
+                    )
+                return self._manual_write_blocked_result(
+                    reason=evidence_boundary.get("reason"),
+                    channel=channel_int,
+                    value=requested_value,
+                    value_type=write_kind,
+                    source=source,
+                    approval_id=approval_id,
+                    extra={
+                        "transaction_id": transaction_id,
+                        "address": address,
+                        "no_console_send_proven": True,
+                        "write_attempts": 0,
+                        "result_persistence_failed": True,
+                        "emergency_stop_activated": not bool(abort_path),
+                    },
+                )
+            if approval_deadline is not None and approval_deadline <= time.time():
+                self._append_manual_write_wal(
+                    "aborted_before_send",
+                    transaction_id,
+                    reason=(
+                        "operator_approval_expired_after_result_evidence_boundary"
+                    ),
+                    write_attempts=0,
+                )
+                return self._manual_write_blocked_result(
+                    reason="operator_approval_expired",
+                    channel=channel_int,
+                    value=requested_value,
+                    value_type=write_kind,
+                    source=source,
+                    approval_id=approval_id,
+                    extra={
+                        "transaction_id": transaction_id,
+                        "address": address,
+                        "no_console_send_proven": True,
+                        "write_attempts": 0,
                     },
                 )
         while True:
+            if approval_deadline is not None and approval_deadline <= time.time():
+                phase = (
+                    "aborted_before_send"
+                    if write_attempts == 0
+                    else "manual_review_required"
+                )
+                self._append_manual_write_wal(
+                    phase,
+                    transaction_id,
+                    reason="operator_approval_expired",
+                    write_attempts=write_attempts,
+                )
+                if write_attempts == 0:
+                    return self._manual_write_blocked_result(
+                        reason="operator_approval_expired",
+                        channel=channel_int,
+                        value=requested_value,
+                        value_type=write_kind,
+                        source=source,
+                        approval_id=approval_id,
+                        extra={
+                            "transaction_id": transaction_id,
+                            "address": address,
+                            "no_console_send_proven": True,
+                            "write_attempts": 0,
+                        },
+                    )
+                await self.activate_system_emergency_stop(
+                    f"manual_write_approval_expired_after_send:{transaction_id}"
+                )
+                return self._manual_write_blocked_result(
+                    reason="operator_approval_expired_after_write_attempt",
+                    channel=channel_int,
+                    value=requested_value,
+                    value_type=write_kind,
+                    source=source,
+                    approval_id=approval_id,
+                    extra={
+                        "transaction_id": transaction_id,
+                        "address": address,
+                        "no_console_send_proven": False,
+                        "terminal_after_console_send": True,
+                        "write_state_unknown": True,
+                        "rollback_state_unknown": True,
+                        "manual_review_required": True,
+                        "physical_state_restored": False,
+                        "write_attempts": write_attempts,
+                        "emergency_stop_activated": True,
+                    },
+                )
             if (
                 self._manual_write_emergency_generation != write_emergency_generation
                 or (self._manual_write_emergency_stopped and not emergency_recovery)
@@ -8580,7 +8939,15 @@ class AutoMixerServer:
                     value_type=write_kind,
                     source=source,
                     approval_id=approval_id,
-                    extra={"transaction_id": transaction_id},
+                    extra={
+                        "transaction_id": transaction_id,
+                        "no_console_send_proven": write_attempts == 0,
+                        "terminal_after_console_send": write_attempts > 0,
+                        "write_state_unknown": write_attempts > 0,
+                        "rollback_state_unknown": write_attempts > 0,
+                        "manual_review_required": write_attempts > 0,
+                        "write_attempts": write_attempts,
+                    },
                 )
             write_attempts += 1
             if not self._append_manual_write_wal(
@@ -8608,6 +8975,27 @@ class AutoMixerServer:
                         "old_value": old_value,
                         "write_attempts": write_attempts - 1,
                         "emergency_stop_activated": True,
+                    },
+                )
+            if approval_deadline is not None and approval_deadline <= time.time():
+                self._append_manual_write_wal(
+                    "aborted_before_send",
+                    transaction_id,
+                    reason="operator_approval_expired_after_send_started_wal",
+                    write_attempts=write_attempts - 1,
+                )
+                return self._manual_write_blocked_result(
+                    reason="operator_approval_expired",
+                    channel=channel_int,
+                    value=requested_value,
+                    value_type=write_kind,
+                    source=source,
+                    approval_id=approval_id,
+                    extra={
+                        "transaction_id": transaction_id,
+                        "address": address,
+                        "no_console_send_proven": True,
+                        "write_attempts": write_attempts - 1,
                     },
                 )
             try:
@@ -8642,6 +9030,12 @@ class AutoMixerServer:
                     "approval_id": approval_id,
                     "transaction_id": transaction_id,
                     "write_attempts": write_attempts,
+                    "no_console_send_proven": False,
+                    "terminal_after_console_send": True,
+                    "write_state_unknown": True,
+                    "rollback_state_unknown": True,
+                    "manual_review_required": True,
+                    "physical_state_restored": False,
                     "wal_path": wal_path,
                     "emergency_stop_activated": True,
                     "manual_write_supervision": self.get_manual_write_supervision_status(),
@@ -8676,6 +9070,12 @@ class AutoMixerServer:
                         "effective_value": effective_value,
                         "old_value": old_value,
                         "write_attempts": write_attempts,
+                        "no_console_send_proven": False,
+                        "terminal_after_console_send": True,
+                        "write_state_unknown": True,
+                        "rollback_state_unknown": True,
+                        "manual_review_required": True,
+                        "physical_state_restored": False,
                         "emergency_stop_activated": True,
                     },
                 )
@@ -8730,6 +9130,12 @@ class AutoMixerServer:
                     "pre_read_value": old_value,
                     "method": method_name,
                     "write_attempts": write_attempts,
+                    "no_console_send_proven": False,
+                    "terminal_after_console_send": True,
+                    "write_state_unknown": True,
+                    "rollback_state_unknown": True,
+                    "manual_review_required": True,
+                    "physical_state_restored": False,
                     "transaction_id": transaction_id,
                     "wal_path": wal_path,
                     "emergency_stop_activated": True,
@@ -8780,6 +9186,12 @@ class AutoMixerServer:
                     "effective_value": effective_value,
                     "old_value": old_value,
                     "write_attempts": write_attempts,
+                    "no_console_send_proven": False,
+                    "terminal_after_console_send": True,
+                    "write_state_unknown": True,
+                    "rollback_state_unknown": True,
+                    "manual_review_required": True,
+                    "physical_state_restored": False,
                     "wal_path": wal_path,
                     "error": str(exc),
                     "emergency_stop_activated": True,
@@ -8824,6 +9236,12 @@ class AutoMixerServer:
             "readback_source": readback_source,
             "readback_cache_freshness": readback_cache_freshness,
             "proof_status": proof_status,
+            "no_console_send_proven": False,
+            "physical_verified": physically_verified,
+            "audio_recheck_required": False,
+            "audio_recheck_disposition": (
+                "not_required_by_manual_write_contract"
+            ),
             "rollback_available": rollback_available,
             "rollback_value": rollback_value,
             "rollback_address": address if rollback_available else None,
@@ -8868,6 +9286,28 @@ class AutoMixerServer:
                 write_attempts=write_attempts,
             )
 
+        result["wal_terminal"] = (
+            "committed"
+            if durably_committed
+            else (
+                "manual_review_required"
+                if not physically_verified
+                else "commit_failed"
+            )
+        )
+        if durably_committed:
+            result.update(
+                {
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
+                }
+            )
+        else:
+            result["manual_review_required"] = True
+            if not physically_verified:
+                result["write_state_unknown"] = True
+                result["physical_state_restored"] = False
         if not durably_committed:
             await self.activate_system_emergency_stop(
                 f"manual_write_unverified:{transaction_id}"
@@ -9743,11 +10183,59 @@ class AutoMixerServer:
         """True if the exception indicates the client already closed the connection."""
         return is_connection_closed_error(e)
 
-    async def send_to_client(self, websocket: WebSocketServerProtocol, message: dict):
-        return await send_json(
+    async def send_to_client(
+        self,
+        websocket: WebSocketServerProtocol,
+        message: dict,
+        *,
+        trusted_receipt=None,
+    ):
+        message_type = (
+            dict.get(message, "type") if type(message) is dict else None
+        )
+        apply_response = bool(
+            message_type in {
+                "operator_proposal_apply_result",
+                "operator_proposal_apply_blocked",
+            }
+        )
+        sequence_execution_response = bool(
+            message_type
+            == "operator_proposal_apply_sequence_execution_result"
+        )
+        try:
+            serialized = project_outbound_message(
+                message,
+                trusted_receipt=trusted_receipt,
+            )
+        except Exception:
+            logger.exception("WebSocket outbound response projection failed")
+            try:
+                serialized = (
+                    catastrophic_sequence_execution_response_serialized()
+                    if sequence_execution_response
+                    else (
+                        catastrophic_apply_response_serialized()
+                        if apply_response
+                        else catastrophic_outbound_response_serialized()
+                    )
+                )
+            except Exception:
+                logger.exception("Catastrophic outbound response unavailable")
+                try:
+                    await websocket.close(
+                        code=1011,
+                        reason="outbound response projection failed",
+                    )
+                except Exception:
+                    logger.debug(
+                        "Failed to close client after projection failure",
+                        exc_info=True,
+                    )
+                return False
+        return await send_serialized_json(
             websocket,
-            message,
-            converter=convert_numpy_types,
+            serialized,
             logger_=logger,
         )
 
@@ -14139,6 +14627,7 @@ class AutoMixerServer:
         idempotency_key: Any,
         proof_run: bool = False,
         approval_expires_at_epoch: Any = None,
+        result_evidence_reservation_binding: Any = None,
     ) -> Dict[str, Any]:
         """Serialize and deduplicate one reviewed multi-parameter transaction."""
         approval_deadline = self._coerce_finite_float(approval_expires_at_epoch)
@@ -14212,6 +14701,9 @@ class AutoMixerServer:
                 idempotency_key=idempotency_key,
                 proof_run=proof_run,
                 approval_deadline_epoch=approval_deadline,
+                result_evidence_reservation_binding=(
+                    result_evidence_reservation_binding
+                ),
             )
             if isinstance(plan_payload, Mapping) and str(
                 plan_payload.get("run_id") or ""
@@ -14268,6 +14760,7 @@ class AutoMixerServer:
         idempotency_key: Any,
         proof_run: bool = False,
         approval_deadline_epoch: float | None = None,
+        result_evidence_reservation_binding: Any = None,
     ) -> Dict[str, Any]:
         """Run one reviewed plan through the canonical physical transaction gate."""
         if proof_run:
@@ -14550,6 +15043,14 @@ class AutoMixerServer:
             emergency_generation_getter=lambda: self._manual_write_emergency_generation,
             emergency_stop=self.activate_system_emergency_stop,
             prepared_callback=persist_transaction_prepare,
+            before_apply_callback=(
+                lambda: self.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    result_evidence_reservation_binding
+                ).get("transitioned")
+                if result_evidence_reservation_binding is not None
+                else True
+            ),
         )
         context = ConsoleTransactionContext(
             approved=approved is True,
@@ -14708,6 +15209,14 @@ class AutoMixerServer:
         )
         payload["physical_verified"] = result.status == "applied"
         payload["audio_recheck_passed"] = result.status == "applied"
+        if result.status == "applied" and terminal_phase == "committed":
+            payload.update(
+                {
+                    "write_state_unknown": False,
+                    "rollback_state_unknown": False,
+                    "manual_review_required": False,
+                }
+            )
         payload["audible_state_verified"] = audible_state_verified
         payload["success"] = result.status == "applied"
         if payload.get("status") != "applied":
@@ -17158,6 +17667,14 @@ class AutoMixerServer:
                     await expiry_task
             self._authenticated_websocket_expiry.pop(id(websocket), None)
             self._authenticated_websocket_expiry_close_started.discard(id(websocket))
+            for manager_name in (
+                "_decision_queue_snapshot_manager",
+                "_operator_proposal_sequence_state_manager",
+            ):
+                manager = getattr(self, manager_name, None)
+                release_owner = getattr(manager, "release_owner", None)
+                if callable(release_owner):
+                    release_owner(websocket)
             if registered:
                 await self.unregister_client(websocket)
 

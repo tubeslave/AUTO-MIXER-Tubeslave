@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import replace
 
 import pytest
@@ -112,6 +113,7 @@ def coordinator(
     generation=lambda: 7,
     emergency=None,
     prepared_callback=None,
+    before_apply_callback=None,
 ):
     emergency_calls = []
 
@@ -125,9 +127,111 @@ def coordinator(
             emergency_generation_getter=generation,
             emergency_stop=emergency or stop,
             prepared_callback=prepared_callback,
+            before_apply_callback=before_apply_callback,
         ),
         emergency_calls,
     )
+
+
+@pytest.mark.asyncio
+async def test_deadline_is_rechecked_after_durable_send_boundary(
+    monkeypatch,
+):
+    adapter = FakeAdapter("eq_hpf")
+    row = contract("eq_hpf", "eq")
+    clock = [100.0]
+
+    def persist_send_boundary():
+        clock[0] = 102.0
+        return True
+
+    service, _ = coordinator(
+        {"eq_hpf": row},
+        {"eq_hpf": adapter},
+        before_apply_callback=persist_send_boundary,
+    )
+    plan = ConsoleTransactionPlan(
+        "txn-boundary-expiry",
+        (operation("eq-1"),),
+        "deadline",
+    )
+    transaction_context = replace(context(), approval_deadline_epoch=101.0)
+    monkeypatch.setattr(
+        "supervised_console_transaction.time.time",
+        lambda: clock[0],
+    )
+
+    result = await service.execute(plan, transaction_context)
+
+    assert result.status == "blocked"
+    assert result.reason == (
+        "operator_approval_expired_after_durable_send_boundary"
+    )
+    assert adapter.calls == [("snapshot", "eq-1")]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("boundary_mode", "expected_reason"),
+    [
+        ("cancelled", "durable_send_boundary_cancelled"),
+        ("exception", "durable_send_boundary_failed"),
+        ("false", "durable_send_boundary_failed"),
+        (
+            "approval_expired",
+            "operator_approval_expired_after_durable_send_boundary",
+        ),
+    ],
+)
+async def test_second_durable_boundary_abort_rolls_back_first_operation(
+    monkeypatch,
+    boundary_mode,
+    expected_reason,
+):
+    adapter = FakeAdapter("eq_hpf")
+    row = contract("eq_hpf", "eq")
+    boundary_calls = 0
+    clock = [100.0]
+
+    def persist_send_boundary():
+        nonlocal boundary_calls
+        boundary_calls += 1
+        if boundary_calls == 1:
+            return True
+        if boundary_mode == "cancelled":
+            raise asyncio.CancelledError()
+        if boundary_mode == "exception":
+            raise RuntimeError("synthetic boundary failure")
+        if boundary_mode == "approval_expired":
+            clock[0] = 102.0
+            return True
+        return False
+
+    service, emergency_calls = coordinator(
+        {"eq_hpf": row},
+        {"eq_hpf": adapter},
+        before_apply_callback=persist_send_boundary,
+    )
+    plan = ConsoleTransactionPlan(
+        f"txn-second-boundary-{boundary_mode}",
+        (operation("eq-1"), operation("eq-2")),
+        "two operations",
+    )
+    transaction_context = replace(context(), approval_deadline_epoch=101.0)
+    monkeypatch.setattr(
+        "supervised_console_transaction.time.time",
+        lambda: clock[0],
+    )
+
+    result = await service.execute(plan, transaction_context)
+
+    assert result.status == "rolled_back"
+    assert result.reason == expected_reason
+    assert result.applied_operation_ids == ["eq-1"]
+    assert result.rollback_operation_ids == ["eq-1"]
+    assert ("apply", "eq-2") not in adapter.calls
+    assert ("rollback", "eq-1") in adapter.calls
+    assert emergency_calls == []
 
 
 @pytest.mark.asyncio

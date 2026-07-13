@@ -219,3 +219,48 @@ class TestOSCPatternMatching:
         """A bare '*' pattern matches everything."""
         assert MessageRouter._match_osc_pattern("*", "/ch/1/fdr") is True
         assert MessageRouter._match_osc_pattern("*", "/any/address") is True
+
+
+@pytest.mark.asyncio
+async def test_broadcast_uses_one_exact_bounded_projection_for_every_client():
+    router = MessageRouter(broadcast_interval=0.0)
+    first = FakeWebSocket("first")
+    second = FakeWebSocket("second")
+    await router.add_client(first)
+    await router.add_client(second)
+    payload = {"type": "state_update", "title": "Вокал 🎙️", "value": -3.5}
+
+    await router.broadcast(payload)
+
+    assert len(first.sent) == 1
+    assert first.sent == second.sent
+    assert json.loads(first.sent[0]) == payload
+
+
+@pytest.mark.asyncio
+async def test_broadcast_degrades_oversized_generic_and_untrusted_apply_payloads():
+    router = MessageRouter(broadcast_interval=0.0)
+    websocket = FakeWebSocket("bounded")
+    await router.add_client(websocket)
+    marker = "routing-raw-marker"
+
+    await router.broadcast(
+        {"type": "bulk_state", "blob": marker + ("x" * 1_000_000)}
+    )
+    oversized = json.loads(websocket.sent[-1])
+    assert oversized["type"] == "outbound_message_degraded"
+    assert marker not in websocket.sent[-1]
+    assert len(websocket.sent[-1].encode("utf-8")) <= 131_072
+
+    await router.broadcast(
+        {
+            "type": "operator_proposal_apply_result",
+            "status": "applied",
+            "no_console_send_proven": True,
+        }
+    )
+    apply_fallback = json.loads(websocket.sent[-1])
+    assert apply_fallback["type"] == "operator_proposal_apply_result"
+    assert apply_fallback["status"] == "apply_error"
+    assert apply_fallback["no_console_send_proven"] is None
+    assert apply_fallback["write_state_unknown"] is True

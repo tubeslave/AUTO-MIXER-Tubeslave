@@ -136,7 +136,10 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert summary["cooldown_apply_result"]["apply_result"]["reason"] == "cooldown"
     assert summary["rollback_result"]["rollback_readback_status"] == "verified_from_physical_readback"
     assert summary["rollback_result"]["rollback_proof_status"] == "verified"
-    assert summary["post_emergency_apply_result"]["apply_result"]["reason"] == "emergency_stop_active"
+    assert summary["post_emergency_apply_result"]["apply_result"]["reason"] == (
+        "operator_proposal_global_hazard_active"
+    )
+    assert summary["emergency_stop_proof_status"] == "verified"
     assert [call["method"] for call in summary["fake_mixer_write_calls"]] == [
         "set_channel_gain",
         "set_channel_gain",

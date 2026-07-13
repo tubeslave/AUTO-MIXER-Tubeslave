@@ -19,6 +19,12 @@ from backend.decision_memory import (
     normalize_decision_memory_entry,
 )
 from backend.operator_analysis import build_operator_analysis_report
+from operator_proposal_queue import OperatorProposalQueue
+from operator_proposal_result_store import ResultEvidenceStore
+from decision_queue_wire_contract import (
+    LEGACY_CLIENT_ECHO_CONSUMER_HANDLERS,
+    project_outbound_message,
+)
 from backend.shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 from backend.operator_product_state import (
     DEFAULT_SUPERVISED_PROOF_REPORT_DIRS,
@@ -231,9 +237,127 @@ class FakeSafeGainCalibrator:
 
 
 @pytest.fixture
-def server():
+def server(tmp_path):
     with patch.object(AutoMixerServer, "_load_config", return_value={}), patch("server.BleedService"):
-        yield AutoMixerServer()
+        instance = AutoMixerServer()
+        instance.operator_proposal_queue = OperatorProposalQueue(
+            result_store=ResultEvidenceStore(
+                tmp_path / "operator-product-state-results",
+                min_free_bytes=0,
+            ),
+            result_evidence_lifecycle_ready=True,
+        )
+        yield instance
+
+
+def _review_binding(server, proposal_id):
+    proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
+    assert proposal is not None
+    return {
+        "expected_review_contract_version": proposal.review_contract_version,
+        "expected_review_content_digest": proposal.review_content_digest,
+    }
+
+
+def _verified_manual_apply_result(**overrides):
+    return {
+        "status": "applied",
+        "success": True,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "wal_terminal": "committed",
+        "audio_recheck_required": False,
+        "audio_recheck_disposition": "not_required_by_manual_write_contract",
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        **overrides,
+    }
+
+
+def _assert_post_executor_migration_required(payload, handler_name):
+    assert payload == {
+        "type": "operator_proposal_pipeline_migration_required",
+        "contract_version": 2,
+        "status": "migration_required",
+        "success": False,
+        "reason": "server_owned_sequence_state_required",
+        "blocked_handler": handler_name,
+        "no_additional_console_send_proven": True,
+        "manual_review_required": True,
+        "soundcheck_completion_blocked": True,
+        "memory_mutation": False,
+        "policy_mutation": False,
+        "queue_mutation": False,
+        "model_mutation": False,
+        "live_authority_granted": False,
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "handler_name",
+    sorted(LEGACY_CLIENT_ECHO_CONSUMER_HANDLERS),
+)
+async def test_legacy_client_echo_consumers_require_server_owned_state(
+    server,
+    tmp_path,
+    handler_name,
+):
+    queue = server.operator_proposal_queue
+    initial_summary = queue.summary()
+    initial_idempotency = set(server._operator_apply_idempotency_keys)
+    reserve_result_evidence = MagicMock(wraps=queue.reserve_result_evidence)
+    claim_verified_for_apply = MagicMock(wraps=queue.claim_verified_for_apply)
+    queue.reserve_result_evidence = reserve_result_evidence
+    queue.claim_verified_for_apply = claim_verified_for_apply
+    server._apply_manual_console_write = AsyncMock()
+    server._append_manual_write_wal = MagicMock()
+    server.send_to_client = AsyncMock()
+    sentinel = tmp_path / "legacy-client-echo-sentinel.txt"
+    sentinel.write_text("unchanged", encoding="utf-8")
+
+    await server._dispatch[handler_name](
+        object(),
+        {
+            "apply": True,
+            "operator_ack": True,
+            "approved": True,
+            "execute": True,
+            "receipts": [{"status": "applied", "physical_verified": True}],
+            "target_store": str(tmp_path / "hostile-store"),
+            "root_path": str(tmp_path),
+            "blob": "x" * 200_000,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    _assert_post_executor_migration_required(payload, handler_name)
+    assert len(json.dumps(payload, sort_keys=True).encode("utf-8")) <= 131_072
+    assert queue.summary() == initial_summary
+    assert set(server._operator_apply_idempotency_keys) == initial_idempotency
+    assert sentinel.read_text(encoding="utf-8") == "unchanged"
+    assert not (tmp_path / "hostile-store").exists()
+    reserve_result_evidence.assert_not_called()
+    claim_verified_for_apply.assert_not_called()
+    server._apply_manual_console_write.assert_not_called()
+    server._append_manual_write_wal.assert_not_called()
+
+
+def test_all_legacy_queue_import_consumers_are_fail_closed(server):
+    prefix = "verify_operator_proposal_apply_sequence_policy_queue_import_"
+    canonical_server_owned_handlers = {
+        f"{prefix}preflight_result",
+        f"{prefix}sequence_plan_result",
+        f"{prefix}dry_run_result",
+        f"{prefix}execution_gate_result",
+    }
+    registered = {name for name in server._dispatch if name.startswith(prefix)}
+
+    assert registered == (
+        set(LEGACY_CLIENT_ECHO_CONSUMER_HANDLERS)
+        | canonical_server_owned_handlers
+    )
 
 
 def test_channel_inventory_uses_cached_runtime_state_without_scanning(server):
@@ -8616,8 +8740,18 @@ async def test_product_state_handlers_round_trip(server, tmp_path):
     assert by_type["snapshots_scenes_snapshot"]["safety"]["scene_load_allowed"] is False
     assert by_type["user_presets_snapshot"]["safety"]["queries_console"] is False
     assert by_type["user_presets_snapshot"]["safety"]["preset_recall_allowed"] is False
-    assert by_type["decision_queue"]["reason"] == "mixing_agent_runtime_not_initialized"
-    assert by_type["decision_queue"]["proposal_queue_available"] is True
+    decision_queue = by_type["decision_queue"]
+    assert decision_queue["contract_version"] == 1
+    assert decision_queue["status"] == "ok"
+    assert decision_queue["deprecated"] is True
+    assert decision_queue["migration_required"] is True
+    assert decision_queue["apply_authority"] is False
+    assert decision_queue["summary"] == {
+        "pending_count": 0,
+        "history_count": 0,
+        "returned_pending_count": 0,
+        "returned_history_count": 0,
+    }
     assert by_type["decision_traces"]["summary"]["trace_count"] == 0
     assert by_type["safety_monitor"]["live_write_policy"]["direct_writes_allowed"] is False
     assert by_type["replay_runs"]["summary"]["offline_only"] is True
@@ -9143,6 +9277,8 @@ async def test_decision_queue_summarizes_apply_preflight_candidates(server):
 
 @pytest.mark.asyncio
 async def test_operator_proposal_apply_is_blocked_outside_supervised_mode(server):
+    server.mixer_client = CachedMixer()
+    server.connection_mode = "offline"
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -9152,13 +9288,20 @@ async def test_operator_proposal_apply_is_blocked_outside_supervised_mode(server
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "unit-outside-mode"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "idempotency_key": "unit-outside-mode",
+            **_review_binding(server, proposal_id),
+        },
     )
 
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_blocked"
-    assert payload["status"] == "apply_blocked"
-    assert payload["apply_result"]["reason"] == "operator_mode_blocks_live_write"
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "operator_proposal_global_hazard_active"
+    assert payload["no_console_send_proven"] is True
+    assert "global_hazards" not in payload
     assert build_decision_queue(server)["summary"]["pending_count"] == 1
 
 
@@ -9182,13 +9325,18 @@ async def test_supervised_apply_blocks_incomplete_requested_change(server):
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "unit-incomplete"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "idempotency_key": "unit-incomplete",
+            **_review_binding(server, proposal_id),
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_blocked"
-    assert payload["status"] == "apply_blocked"
+    assert payload["status"] == "blocked"
     assert payload["apply_result"]["reason"] == "proposal_has_no_applyable_requested_change"
 
 
@@ -9223,7 +9371,12 @@ async def test_non_fader_gain_operator_proposal_is_review_only(server):
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "idempotency_key": "unit-eq-review"},
+        {
+            "proposal_id": proposal["id"],
+            "approved": True,
+            "idempotency_key": "unit-eq-review",
+            **_review_binding(server, proposal["id"]),
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -9241,32 +9394,30 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
     server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     server._apply_manual_console_write = AsyncMock(side_effect=[
-        {
-            "status": "applied",
-            "channel": 9,
-            "value_type": "fader",
-            "effective_value": -0.5,
-            "old_value": 0.0,
-            "readback_value": -0.5,
-            "readback_status": "verified_from_cache",
-            "rollback_available": True,
-            "rollback_value": 0.0,
-            "approval_id": "linked-unit:1",
-            "source": "operator_proposal_linked:proposal:1",
-        },
-        {
-            "status": "applied",
-            "channel": 10,
-            "value_type": "fader",
-            "effective_value": -0.5,
-            "old_value": 0.0,
-            "readback_value": -0.5,
-            "readback_status": "verified_from_cache",
-            "rollback_available": True,
-            "rollback_value": 0.0,
-            "approval_id": "linked-unit:2",
-            "source": "operator_proposal_linked:proposal:2",
-        },
+        _verified_manual_apply_result(
+            channel=9,
+            value_type="fader",
+            effective_value=-0.5,
+            old_value=0.0,
+            readback_value=-0.5,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=0.0,
+            approval_id="linked-unit:1",
+            source="operator_proposal_linked:proposal:1",
+        ),
+        _verified_manual_apply_result(
+            channel=10,
+            value_type="fader",
+            effective_value=-0.5,
+            old_value=0.0,
+            readback_value=-0.5,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=0.0,
+            approval_id="linked-unit:2",
+            source="operator_proposal_linked:proposal:2",
+        ),
     ])
     server.send_to_client = AsyncMock()
 
@@ -9289,7 +9440,13 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-unit"},
+        {
+            "proposal_id": proposal["id"],
+            "approved": True,
+            "approval_id": "linked-unit",
+            "idempotency_key": "linked-unit",
+            **_review_binding(server, proposal["id"]),
+        },
     )
 
     assert server._apply_manual_console_write.await_count == 2
@@ -9329,7 +9486,13 @@ async def test_supervised_linked_apply_blocks_when_pre_read_is_missing(server):
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-pre-read"},
+        {
+            "proposal_id": proposal["id"],
+            "approved": True,
+            "approval_id": "linked-unit",
+            "idempotency_key": "linked-pre-read",
+            **_review_binding(server, proposal["id"]),
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -9348,39 +9511,43 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
     server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
     apply_results = [
-        {
-            "status": "applied",
-            "channel": 9,
-            "value_type": "fader",
-            "effective_value": -0.5,
-            "old_value": 0.0,
-            "readback_value": -0.5,
-            "readback_status": "verified_from_cache",
-            "rollback_available": True,
-            "rollback_value": 0.0,
-            "approval_id": "linked-unit:1",
-            "source": "operator_proposal_linked:proposal:1",
-        },
+        _verified_manual_apply_result(
+            channel=9,
+            value_type="fader",
+            effective_value=-0.5,
+            old_value=0.0,
+            readback_value=-0.5,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=0.0,
+            approval_id="linked-unit:1",
+            source="operator_proposal_linked:proposal:1",
+        ),
         {
             "status": "blocked",
+            "success": False,
             "reason": "mixer_write_failed",
             "channel": 10,
             "value_type": "fader",
             "rollback_available": False,
+            "no_console_send_proven": True,
+            "wal_terminal": "aborted_before_send",
+            "write_state_unknown": False,
+            "rollback_state_unknown": False,
+            "manual_review_required": False,
         },
-        {
-            "status": "applied",
-            "channel": 9,
-            "value_type": "fader",
-            "effective_value": 0.0,
-            "old_value": -0.5,
-            "readback_value": 0.0,
-            "readback_status": "verified_from_cache",
-            "rollback_available": True,
-            "rollback_value": -0.5,
-            "approval_id": "rollback:linked-unit:1",
-            "source": "operator_proposal_linked_rollback:proposal",
-        },
+        _verified_manual_apply_result(
+            channel=9,
+            value_type="fader",
+            effective_value=0.0,
+            old_value=-0.5,
+            readback_value=0.0,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=-0.5,
+            approval_id="rollback:linked-unit:1",
+            source="operator_proposal_linked_rollback:proposal",
+        ),
     ]
 
     async def physical_read(*, address, **_kwargs):
@@ -9392,6 +9559,9 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
         }
 
     async def apply_with_state_update(*_args, **kwargs):
+        assert server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+            kwargs["result_evidence_reservation_binding"]
+        )["transitioned"] is True
         result = apply_results.pop(0)
         if result.get("status") == "applied":
             address = f"/ch/{kwargs['channel']}/fdr"
@@ -9420,7 +9590,13 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "approval_id": "linked-unit", "idempotency_key": "linked-rollback"},
+        {
+            "proposal_id": proposal["id"],
+            "approved": True,
+            "approval_id": "linked-unit",
+            "idempotency_key": "linked-rollback",
+            **_review_binding(server, proposal["id"]),
+        },
     )
 
     assert server._apply_manual_console_write.await_count == 3
@@ -9445,12 +9621,23 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
+        "success": True,
         "channel": 2,
         "value_type": "fader",
         "effective_value": -3.0,
-    })
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "wal_terminal": "committed",
+        "audio_recheck_required": False,
+        "audio_recheck_disposition": (
+            "not_required_by_manual_write_contract"
+        ),
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -9466,7 +9653,14 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "approval_id": "operator-unit-supervised-apply", "reason": "operator approved", "idempotency_key": "unit-supervised-apply"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": "operator-unit-supervised-apply",
+            "reason": "operator approved",
+            "idempotency_key": "unit-supervised-apply",
+            **_review_binding(server, proposal_id),
+        },
     )
 
     server._apply_manual_console_write.assert_awaited_once()
@@ -9479,13 +9673,27 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_result"
     assert payload["status"] == "applied"
+    trusted_receipt = server.send_to_client.await_args.kwargs["trusted_receipt"]
+    assert trusted_receipt.proposal_id == proposal_id
+    assert trusted_receipt.apply_status == "applied"
+    assert trusted_receipt.physical_verified is True
     queue = build_decision_queue(server)
     assert queue["summary"]["pending_count"] == 0
     assert queue["summary"]["applied_count"] == 1
 
 
 @pytest.mark.asyncio
-async def test_supervised_operator_proposal_apply_blocks_stale_cache_pre_read(server):
+async def test_supervised_operator_proposal_apply_blocks_stale_cache_pre_read(
+    server,
+    tmp_path,
+):
+    server.operator_proposal_queue = OperatorProposalQueue(
+        result_store=ResultEvidenceStore(
+            tmp_path / "operator-proposal-results",
+            min_free_bytes=0,
+        ),
+        result_evidence_lifecycle_ready=True,
+    )
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
     server.mixer_client.state_timestamps["/ch/2/fdr"] = time.time() - 120.0
@@ -9512,6 +9720,7 @@ async def test_supervised_operator_proposal_apply_blocks_stale_cache_pre_read(se
             "approved": True,
             "approval_id": "stale-pre-read-approval",
             "idempotency_key": "stale-pre-read",
+            **_review_binding(server, proposal["id"]),
         },
     )
 
@@ -9547,7 +9756,11 @@ async def test_supervised_apply_requires_idempotency_key(server):
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            **_review_binding(server, proposal_id),
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -9899,6 +10112,7 @@ async def test_plan_operator_proposal_apply_sequence_builds_read_only_plan_from_
         "proposal_id": "plan-ready",
         "approved": True,
         "idempotency_key": "plan-preflight:plan-ready",
+        **_review_binding(server, "plan-ready"),
     }
     planned_change = step["normalized_changes"][0]
     assert planned_change["change_index"] == 0
@@ -10028,6 +10242,8 @@ async def test_plan_operator_proposal_apply_sequence_blocks_unsupported_kind_for
             "updated_at": current["updated_at"],
             "requested_change": current["requested_change"],
             "requested_changes": current["requested_changes"],
+            "review_contract_version": current["review_contract_version"],
+            "review_content_digest": current["review_content_digest"],
         },
         "idempotency": {
             "provided": True,
@@ -10231,6 +10447,7 @@ async def test_dry_run_operator_proposal_apply_sequence_reports_would_apply_with
         "proposal_id": "dry-run-ready",
         "approved": True,
         "idempotency_key": "dry-run:dry-run-ready",
+        **_review_binding(server, "dry-run-ready"),
     }
     assert result["current_proposal"]["status"] == "pending"
     assert result["normalized_changes"][0]["value_type"] == "fader"
@@ -10530,6 +10747,7 @@ async def test_gate_operator_proposal_apply_sequence_execution_reports_ready_wit
         "approved": True,
         "approval_id": "gate-ready-operator",
         "idempotency_key": "gate-ready:gate-ready",
+        **_review_binding(server, "gate-ready"),
     }
     assert candidate["current_proposal"]["status"] == "pending"
     assert candidate["normalized_changes"][0]["value_type"] == "fader"
@@ -10638,10 +10856,182 @@ async def _build_gate_ready_apply_sequence(server, *, idempotency_prefix):
 
 
 @pytest.mark.asyncio
+async def test_sequence_wire_roundtrip_uses_owner_bound_state_without_full_plan_echo(
+    server,
+):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(
+        return_value=_verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-8.5,
+        )
+    )
+    websocket = MagicMock()
+    websocket.send = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        websocket,
+        {
+            "id": "wire-sequence-ready",
+            "title": "Lead Vocal: wire sequence state",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        websocket,
+        {
+            "approved": True,
+            "idempotency_key_prefix": "wire-sequence",
+        },
+    )
+    batch = json.loads(websocket.send.await_args.args[0])
+    assert batch["status"] == "ok"
+    assert batch["sequence_state"]["stage"] == "batch_preflight"
+    assert "raw" not in json.dumps(batch)
+
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        websocket,
+        {
+            "sequence_state": batch["sequence_state"],
+            "wire_projection": batch["wire_projection"],
+        },
+    )
+    plan = json.loads(websocket.send.await_args.args[0])
+    assert plan["status"] == "ok"
+    assert plan["summary"]["planned_apply_count"] == 1
+    assert plan["sequence_state"]["stage"] == "sequence_plan"
+    assert "normalized_changes" not in json.dumps(plan)
+
+    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
+        websocket,
+        {
+            "sequence_state": plan["sequence_state"],
+            "wire_projection": plan["wire_projection"],
+        },
+    )
+    dry_run = json.loads(websocket.send.await_args.args[0])
+    assert dry_run["status"] == "ok"
+    assert dry_run["summary"]["would_apply_count"] == 1
+    assert dry_run["sequence_state"]["stage"] == "dry_run"
+
+    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
+        websocket,
+        {
+            "sequence_state": dry_run["sequence_state"],
+            "wire_projection": dry_run["wire_projection"],
+            "operator_ack": True,
+            "approval_id": "wire-sequence-operator",
+        },
+    )
+    gate = json.loads(websocket.send.await_args.args[0])
+    assert gate["status"] == "ready"
+    assert gate["summary"]["ready_for_executor_count"] == 1
+    assert gate["sequence_state"]["stage"] == "execution_gate"
+
+    await server._dispatch["execute_operator_proposal_apply_sequence"](
+        websocket,
+        {
+            "sequence_state": gate["sequence_state"],
+            "wire_projection": gate["wire_projection"],
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+            "approval_id": "wire-sequence-operator",
+        },
+    )
+    execution = json.loads(websocket.send.await_args.args[0])
+    assert execution["status"] == "applied"
+    assert execution["summary"]["applied_count"] == 1
+    assert execution["execution_results"][0]["apply_receipt"][
+        "physical_verified"
+    ] is True
+    server._apply_manual_console_write.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_sequence_state_reference_dominates_forged_legacy_rows(
+    server,
+):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server.send_to_client = AsyncMock()
+    clock = [100.0]
+    server._operator_proposal_sequence_state_manager._clock = lambda: clock[0]
+    owner = object()
+
+    await server._dispatch["create_operator_proposal"](
+        owner,
+        {
+            "id": "sequence-state-owner-bound",
+            "title": "Lead Vocal: owner-bound sequence state",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    await server._dispatch["preflight_operator_proposal_apply_batch"](
+        owner,
+        {
+            "approved": True,
+            "idempotency_key_prefix": "sequence-state-owner",
+        },
+    )
+    batch = server.send_to_client.await_args.args[1]
+    reference = batch["sequence_state"]
+    forged_legacy_rows = batch["preflight_results"]
+
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        object(),
+        {
+            "sequence_state": reference,
+            "preflight_results": forged_legacy_rows,
+        },
+    )
+    cross_owner = server.send_to_client.await_args.args[1]
+    assert cross_owner["status"] == "blocked"
+    assert cross_owner["reason"] == "sequence_state_owner_mismatch"
+    assert cross_owner["summary"]["planned_apply_count"] == 0
+
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        owner,
+        {
+            "sequence_state": {
+                **reference,
+                "content_digest": "sha256:" + "0" * 64,
+            },
+            "preflight_results": forged_legacy_rows,
+        },
+    )
+    wrong_digest = server.send_to_client.await_args.args[1]
+    assert wrong_digest["status"] == "blocked"
+    assert wrong_digest["reason"] == "sequence_state_digest_mismatch"
+    assert wrong_digest["summary"]["planned_apply_count"] == 0
+
+    clock[0] = 131.0
+    await server._dispatch["plan_operator_proposal_apply_sequence"](
+        owner,
+        {
+            "sequence_state": reference,
+            "preflight_results": forged_legacy_rows,
+        },
+    )
+    expired = server.send_to_client.await_args.args[1]
+    assert expired["status"] == "blocked"
+    assert expired["reason"] == "sequence_state_expired"
+    assert expired["summary"]["planned_apply_count"] == 0
+
+
+@pytest.mark.asyncio
 async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_via_apply_handler(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -10655,7 +11045,7 @@ async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_v
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -10738,13 +11128,176 @@ async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_v
     assert payload["safety"]["direct_manual_console_write_called"] is False
     assert payload["execution_results"][0]["proposal_id"] == "execute-ready"
     assert payload["execution_results"][0]["status"] == "applied"
-    assert (
-        payload["execution_results"][0]["apply_request"]["idempotency_key"]
-        == "execute-ready:execute-ready"
-    )
+    receipt = payload["execution_results"][0]["apply_receipt"]
+    assert receipt["proposal_id"] == "execute-ready"
+    assert receipt["status"] == "applied"
+    assert receipt["physical_verified"] is True
+    assert receipt["wal_terminal"] == "committed"
+    assert receipt["idempotency_key_digest"].startswith("sha256:")
+    assert "apply_request" not in payload["execution_results"][0]
+    assert "proposal" not in payload["execution_results"][0]
+    assert "apply_result" not in payload["execution_results"][0]
     assert build_decision_queue(server)["summary"]["pending_count"] == 0
     assert build_decision_queue(server)["summary"]["applied_count"] == 1
     assert "execute-ready:execute-ready" in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_sequence_aggregate_factory_failure_after_apply_emits_fixed_unknown(
+    server,
+    monkeypatch,
+):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(
+        return_value=_verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-8.5,
+            old_value=-8.0,
+            readback_value=-8.5,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=-8.0,
+        )
+    )
+    server.activate_system_emergency_stop = AsyncMock(
+        return_value={"status": "stopped", "teardown_complete": True}
+    )
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "sequence-projection-failure",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix="sequence-projection-failure",
+    )
+    handler = server._dispatch["execute_operator_proposal_apply_sequence"]
+    handler_module = sys.modules[handler.__module__]
+    monkeypatch.setattr(
+        handler_module,
+        "_freeze_trusted_sequence_execution_receipt",
+        MagicMock(side_effect=RuntimeError("synthetic aggregate failure")),
+    )
+
+    await handler(
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+            "approval_id": "sequence-projection-failure-operator",
+        },
+    )
+
+    raw_payload = server.send_to_client.await_args.args[1]
+    assert server.send_to_client.await_args.kwargs["trusted_receipt"] is None
+    server.activate_system_emergency_stop.assert_awaited_once()
+    projected = json.loads(project_outbound_message(raw_payload))
+    assert projected["type"] == "operator_proposal_apply_sequence_execution_result"
+    assert projected["status"] == "unknown"
+    assert projected["success"] is False
+    assert projected["no_console_send_proven"] is None
+    assert projected["write_state_unknown"] is True
+    assert projected["manual_review_required"] is True
+    assert projected["emergency_stop_required"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("receipt_failure", ["missing", "identity_mismatch"])
+async def test_execute_operator_proposal_apply_sequence_stops_unknown_on_untrusted_child_receipt(
+    server,
+    monkeypatch,
+    receipt_failure,
+):
+    server.operator_mode = "supervised"
+    server.mixer_client = CachedMixer()
+    server._apply_manual_console_write = AsyncMock(
+        return_value=_verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-8.5,
+        )
+    )
+    server.activate_system_emergency_stop = AsyncMock(
+        return_value={"status": "stopped", "teardown_complete": True}
+    )
+    server.send_to_client = AsyncMock()
+
+    proposal_id = f"execute-untrusted-{receipt_failure}"
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": proposal_id,
+            "title": "Lead Vocal: untrusted sequence receipt",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -8.5,
+            "reason": "unit",
+        },
+    )
+    gate_payload = await _build_gate_ready_apply_sequence(
+        server,
+        idempotency_prefix=proposal_id,
+    )
+
+    handler = server._dispatch["execute_operator_proposal_apply_sequence"]
+    handler_module = sys.modules[handler.__module__]
+    original_compactor = handler_module.compact_trusted_apply_receipt_reference
+
+    def untrusted_compactor(receipt):
+        if receipt_failure == "missing":
+            return None
+        compact = original_compactor(receipt)
+        assert compact is not None
+        return {**compact, "proposal_id": "forged-proposal-id"}
+
+    monkeypatch.setattr(
+        handler_module,
+        "compact_trusted_apply_receipt_reference",
+        untrusted_compactor,
+    )
+
+    await handler(
+        object(),
+        {
+            "execution_gate_payload": gate_payload,
+            "execute": True,
+            "operator_ack": True,
+            "approved": True,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["status"] == "unknown"
+    assert payload["success"] is False
+    assert payload["reason"] == "sequence_executor_stopped_on_unknown"
+    assert payload["summary"]["unknown_count"] == 1
+    assert payload["summary"]["stopped_on_block"] is True
+    assert payload["summary"]["manual_review_required"] is True
+    assert payload["summary"]["possible_console_send_count"] == 1
+    row = payload["execution_results"][0]
+    assert row["status"] == "unknown"
+    assert row["apply_receipt"] is None
+    assert row["manual_review_required"] is True
+    assert row["no_console_send_proven"] is None
+    assert row["executor_emergency_stop_activated"] is True
+    assert row["executor_emergency_stop_teardown_complete"] is True
+    assert row["executor_emergency_stop_required"] is False
+    server.activate_system_emergency_stop.assert_awaited_once()
+    serialized_payload = json.dumps(payload, sort_keys=True)
+    assert f"{proposal_id}:{proposal_id}" not in serialized_payload
+    assert '"apply_request"' not in serialized_payload
+    assert '"proposal"' not in serialized_payload
+    assert '"apply_result"' not in serialized_payload
 
 
 @pytest.mark.asyncio
@@ -10920,10 +11473,10 @@ async def test_execute_operator_proposal_apply_sequence_blocks_forged_unsupporte
 
 
 @pytest.mark.asyncio
-async def test_audit_operator_proposal_apply_sequence_execution_passes_verified_executor_result(server):
+async def test_audit_operator_proposal_apply_sequence_execution_requires_server_owned_state(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -10937,7 +11490,7 @@ async def test_audit_operator_proposal_apply_sequence_execution_passes_verified_
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -10973,73 +11526,17 @@ async def test_audit_operator_proposal_apply_sequence_execution_passes_verified_
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
-    assert payload["status"] == "passed"
-    assert payload["success"] is True
-    assert payload["source_execution_status"] == "applied"
-    assert payload["summary"] == {
-        "input_execution_result_count": 1,
-        "audited_count": 1,
-        "passed_count": 1,
-        "blocked_count": 0,
-        "passed_proposal_ids": ["audit-ready"],
-        "blocked_proposal_ids": [],
-        "audit_only": True,
-        "execution_allowed_by_audit": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-    }
-    assert payload["safety"] == {
-        "audit_only": True,
-        "execution_result_payload_required": True,
-        "does_not_call_apply_operator_proposal": True,
-        "does_not_call_manual_console_write": True,
-        "live_apply_entrypoint_required": "apply_operator_proposal",
-        "allowed_live_write_kinds": ["fader", "gain", "pan"],
-        "execution_allowed_by_audit": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-    }
-    assert payload["audit_rows"] == [
-        {
-            "proposal_id": "audit-ready",
-            "execution_result_index": 0,
-            "status": "passed",
-            "value_type": "fader",
-            "channel": 2,
-            "effective_value": -8.5,
-            "idempotency_key": "audit-ready:audit-ready",
-            "readback_status": "verified_from_cache",
-            "proof_status": "verified",
-            "rollback_available": True,
-            "live_apply_entrypoint": "apply_operator_proposal",
-        }
-    ]
-    assert payload["blocked_results"] == []
-    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+    _assert_post_executor_migration_required(
+        payload,
+        "audit_operator_proposal_apply_sequence_execution",
+    )
 
 
 @pytest.mark.asyncio
-async def test_audit_operator_proposal_apply_sequence_execution_blocks_forged_direct_write_claim(server):
+async def test_audit_operator_proposal_apply_sequence_execution_rejects_client_echo(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11053,7 +11550,7 @@ async def test_audit_operator_proposal_apply_sequence_execution_blocks_forged_di
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11094,28 +11591,17 @@ async def test_audit_operator_proposal_apply_sequence_execution_blocks_forged_di
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_execution_audit"
-    assert payload["status"] == "blocked"
-    assert payload["success"] is False
-    assert payload["summary"]["audit_only"] is True
-    assert payload["summary"]["live_write"] is False
-    assert payload["summary"]["apply_attempted"] is False
-    assert payload["summary"]["manual_console_write_called"] is False
-    assert payload["summary"]["live_authority_granted"] is False
-    assert payload["audit_rows"][0]["proposal_id"] == "audit-forged"
-    assert payload["audit_rows"][0]["status"] == "passed"
-    reasons = [item["reason"] for item in payload["blocked_results"]]
-    assert "summary_direct_manual_console_write_called_true" in reasons
-    assert "safety_direct_manual_console_write_called_true" in reasons
-    assert "safety_allowed_live_write_kinds_widened" in reasons
-    assert "audit-forged:audit-forged" in server._operator_apply_idempotency_keys
+    _assert_post_executor_migration_required(
+        payload,
+        "audit_operator_proposal_apply_sequence_execution",
+    )
 
 
 @pytest.mark.asyncio
-async def test_gate_operator_proposal_apply_sequence_audit_policy_marks_passed_audit_ready(server):
+async def test_gate_operator_proposal_apply_sequence_audit_policy_requires_server_owned_state(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11129,7 +11615,7 @@ async def test_gate_operator_proposal_apply_sequence_audit_policy_marks_passed_a
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11170,87 +11656,17 @@ async def test_gate_operator_proposal_apply_sequence_audit_policy_marks_passed_a
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
-    assert payload["status"] == "ready"
-    assert payload["success"] is True
-    assert payload["source_audit_status"] == "passed"
-    assert payload["summary"] == {
-        "input_audit_row_count": 1,
-        "policy_evidence_ready_count": 1,
-        "blocked_count": 0,
-        "policy_evidence_ready_proposal_ids": ["policy-ready"],
-        "blocked_proposal_ids": [],
-        "policy_gate_only": True,
-        "audit_payload_required": True,
-        "execution_allowed_by_policy_gate": False,
-        "execution_allowed_by_audit": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "policy_mutation": False,
-        "runtime_memory_mutation": False,
-        "model_mutation": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-        "full_autonomous_ready": False,
-    }
-    assert payload["safety"] == {
-        "policy_gate_only": True,
-        "audit_payload_required": True,
-        "does_not_call_apply_operator_proposal": True,
-        "does_not_call_manual_console_write": True,
-        "allowed_live_write_kinds": ["fader", "gain", "pan"],
-        "execution_allowed_by_policy_gate": False,
-        "execution_allowed_by_audit": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "policy_mutation": False,
-        "runtime_memory_mutation": False,
-        "model_mutation": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-        "full_autonomous_ready": False,
-    }
-    assert payload["policy_evidence"] == [
-        {
-            "proposal_id": "policy-ready",
-            "audit_row_index": 0,
-            "status": "policy_evidence_ready",
-            "eligible_for_supervised_sequence_policy": True,
-            "execution_allowed_by_policy_gate": False,
-            "policy_mutation_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "value_type": "fader",
-            "channel": 2,
-            "effective_value": -8.5,
-            "idempotency_key": "policy-ready:policy-ready",
-            "readback_status": "verified_from_cache",
-            "proof_status": "verified",
-            "rollback_available": True,
-            "live_apply_entrypoint": "apply_operator_proposal",
-        }
-    ]
-    assert payload["blocked_results"] == []
-    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+    _assert_post_executor_migration_required(
+        payload,
+        "gate_operator_proposal_apply_sequence_audit_policy",
+    )
 
 
 @pytest.mark.asyncio
-async def test_gate_operator_proposal_apply_sequence_audit_policy_blocks_forged_live_authority(server):
+async def test_gate_operator_proposal_apply_sequence_audit_policy_rejects_client_echo(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11264,7 +11680,7 @@ async def test_gate_operator_proposal_apply_sequence_audit_policy_blocks_forged_
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11297,42 +11713,17 @@ async def test_gate_operator_proposal_apply_sequence_audit_policy_blocks_forged_
         {"execution_result_payload": execution_payload},
     )
     forged_audit = dict(server.send_to_client.await_args.args[1])
-    forged_audit["summary"] = dict(forged_audit["summary"])
-    forged_audit["safety"] = dict(forged_audit["safety"])
-    forged_audit["summary"]["live_authority_granted"] = True
-    forged_audit["safety"]["live_authority_granted"] = True
-    forged_audit["safety"]["allowed_live_write_kinds"] = ["fader", "gain", "eq"]
-
-    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
-        object(),
-        {"execution_audit_payload": forged_audit},
+    _assert_post_executor_migration_required(
+        forged_audit,
+        "audit_operator_proposal_apply_sequence_execution",
     )
-
-    assert server._apply_manual_console_write.await_count == 1
-    payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_audit_policy_gate"
-    assert payload["status"] == "blocked"
-    assert payload["success"] is False
-    assert payload["summary"]["policy_gate_only"] is True
-    assert payload["summary"]["live_write"] is False
-    assert payload["summary"]["apply_attempted"] is False
-    assert payload["summary"]["policy_mutation"] is False
-    assert payload["summary"]["live_authority_granted"] is False
-    assert payload["summary"]["full_autonomous_ready"] is False
-    assert payload["policy_evidence"][0]["proposal_id"] == "policy-forged"
-    assert payload["policy_evidence"][0]["status"] == "policy_evidence_ready"
-    reasons = [item["reason"] for item in payload["blocked_results"]]
-    assert "summary_live_authority_granted_true" in reasons
-    assert "safety_live_authority_granted_true" in reasons
-    assert "safety_allowed_live_write_kinds_widened" in reasons
-    assert "policy-forged:policy-forged" in server._operator_apply_idempotency_keys
 
 
 @pytest.mark.asyncio
-async def test_draft_operator_proposal_apply_sequence_policy_memory_creates_read_only_draft(server):
+async def test_draft_operator_proposal_apply_sequence_policy_memory_requires_server_owned_state(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11346,7 +11737,7 @@ async def test_draft_operator_proposal_apply_sequence_policy_memory_creates_read
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11392,114 +11783,17 @@ async def test_draft_operator_proposal_apply_sequence_policy_memory_creates_read
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
-    assert payload["status"] == "ready"
-    assert payload["success"] is True
-    assert payload["source_policy_gate_status"] == "ready"
-    assert payload["summary"] == {
-        "input_policy_evidence_count": 1,
-        "memory_draft_count": 1,
-        "blocked_count": 0,
-        "memory_draft_proposal_ids": ["memory-draft-ready"],
-        "blocked_proposal_ids": [],
-        "memory_draft_only": True,
-        "policy_gate_payload_required": True,
-        "append_only_memory_write_allowed_by_draft": False,
-        "requires_separate_memory_writer": True,
-        "execution_allowed_by_draft": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "policy_mutation": False,
-        "memory_mutation": False,
-        "runtime_memory_mutation": False,
-        "model_mutation": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-        "full_autonomous_ready": False,
-    }
-    assert payload["safety"] == {
-        "memory_draft_only": True,
-        "policy_gate_payload_required": True,
-        "does_not_call_apply_operator_proposal": True,
-        "does_not_call_manual_console_write": True,
-        "allowed_live_write_kinds": ["fader", "gain", "pan"],
-        "append_only_memory_write_allowed_by_draft": False,
-        "requires_separate_memory_writer": True,
-        "execution_allowed_by_draft": False,
-        "live_write": False,
-        "apply_attempted": False,
-        "queue_mutation": False,
-        "proposal_status_mutation": False,
-        "idempotency_reserved": False,
-        "manual_console_write_called": False,
-        "mutates_console_state": False,
-        "queries_console": False,
-        "policy_mutation": False,
-        "memory_mutation": False,
-        "runtime_memory_mutation": False,
-        "model_mutation": False,
-        "live_widening_allowed": False,
-        "live_authority_granted": False,
-        "full_autonomous_ready": False,
-    }
-    assert payload["memory_draft_records"] == [
-        {
-            "draft_id": (
-                "operator-sequence-policy-memory:"
-                "memory-draft-ready:memory-draft:memory-draft-ready"
-            ),
-            "proposal_id": "memory-draft-ready",
-            "policy_evidence_index": 0,
-            "status": "memory_draft_ready",
-            "learning_scope": "supervised_fader_gain_sequence_execution",
-            "target_memory_path": ".ai/memory/project.md",
-            "target_section": "Project Memory Lessons",
-            "append_only": True,
-            "memory_write_allowed_by_draft": False,
-            "append_only_memory_write_allowed_by_draft": False,
-            "requires_separate_memory_writer": True,
-            "operator_ack_required_for_write": True,
-            "memory_mutation": False,
-            "runtime_memory_mutation": False,
-            "policy_mutation": False,
-            "model_mutation": False,
-            "queue_mutation": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "evidence": {
-                "value_type": "fader",
-                "channel": 2,
-                "effective_value": -8.5,
-                "idempotency_key": "memory-draft:memory-draft-ready",
-                "readback_status": "verified_from_cache",
-                "proof_status": "verified",
-                "rollback_available": True,
-                "live_apply_entrypoint": "apply_operator_proposal",
-            },
-            "draft_text": (
-                "Supervised fader/gain sequence execution was verified from "
-                "`memory-draft-ready` with `fader` evidence, idempotency "
-                "`memory-draft:memory-draft-ready`, readback `verified_from_cache`, "
-                "and rollback available. Future policy or autonomous use still "
-                "requires separate audited gates and safety limits."
-            ),
-        }
-    ]
-    assert payload["blocked_results"] == []
-    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+    _assert_post_executor_migration_required(
+        payload,
+        "draft_operator_proposal_apply_sequence_policy_memory",
+    )
 
 
 @pytest.mark.asyncio
-async def test_draft_operator_proposal_apply_sequence_policy_memory_blocks_forged_memory_write_claim(server):
+async def test_draft_operator_proposal_apply_sequence_policy_memory_rejects_client_echo(server):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11513,7 +11807,7 @@ async def test_draft_operator_proposal_apply_sequence_policy_memory_blocks_forge
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11551,43 +11845,17 @@ async def test_draft_operator_proposal_apply_sequence_policy_memory_blocks_forge
         {"execution_audit_payload": audit_payload},
     )
     forged_policy_gate = dict(server.send_to_client.await_args.args[1])
-    forged_policy_gate["summary"] = dict(forged_policy_gate["summary"])
-    forged_policy_gate["safety"] = dict(forged_policy_gate["safety"])
-    forged_policy_gate["summary"]["runtime_memory_mutation"] = True
-    forged_policy_gate["safety"]["runtime_memory_mutation"] = True
-    forged_policy_gate["summary"]["policy_mutation"] = True
-
-    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        {"policy_gate_payload": forged_policy_gate},
+    _assert_post_executor_migration_required(
+        forged_policy_gate,
+        "gate_operator_proposal_apply_sequence_audit_policy",
     )
-
-    assert server._apply_manual_console_write.await_count == 1
-    payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
-    assert payload["status"] == "blocked"
-    assert payload["success"] is False
-    assert payload["summary"]["memory_draft_only"] is True
-    assert payload["summary"]["append_only_memory_write_allowed_by_draft"] is False
-    assert payload["summary"]["memory_mutation"] is False
-    assert payload["summary"]["runtime_memory_mutation"] is False
-    assert payload["summary"]["policy_mutation"] is False
-    assert payload["summary"]["live_authority_granted"] is False
-    assert payload["summary"]["full_autonomous_ready"] is False
-    assert payload["memory_draft_records"][0]["proposal_id"] == "memory-draft-forged"
-    assert payload["memory_draft_records"][0]["status"] == "memory_draft_ready"
-    reasons = [item["reason"] for item in payload["blocked_results"]]
-    assert "summary_runtime_memory_mutation_true" in reasons
-    assert "safety_runtime_memory_mutation_true" in reasons
-    assert "summary_policy_mutation_true" in reasons
-    assert "memory-forged:memory-draft-forged" in server._operator_apply_idempotency_keys
 
 
 @pytest.mark.asyncio
-async def test_write_operator_proposal_apply_sequence_policy_memory_requires_operator_ack(server, tmp_path):
+async def test_write_operator_proposal_apply_sequence_policy_memory_no_ack_does_not_mutate(server, tmp_path):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11601,7 +11869,7 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_requires_ope
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11657,37 +11925,18 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_requires_ope
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
-    assert payload["status"] == "memory_write_operator_ack_required"
+    assert payload["status"] == "memory_write_replacement_required"
     assert payload["success"] is False
-    assert payload["summary"]["write_result_count"] == 0
-    assert payload["summary"]["append_only_memory_write_applied"] is False
-    assert payload["summary"]["operator_ack_required"] is True
-    assert payload["summary"]["operator_ack"] is False
-    assert payload["summary"]["apply_requested"] is True
-    assert payload["summary"]["target_memory_path"] == ".ai/memory/project.md"
-    for field in (
-        "live_write",
-        "apply_attempted",
-        "queue_mutation",
-        "manual_console_write_called",
-        "policy_mutation",
-        "memory_file_mutation",
-        "runtime_memory_mutation",
-        "model_mutation",
-        "live_authority_granted",
-        "full_autonomous_ready",
-    ):
-        assert payload["summary"][field] is False
-    reasons = [item["reason"] for item in payload["blocked_results"]]
-    assert "operator_ack_required_before_append_only_memory_write" in reasons
+    assert payload["summary"]["memory_file_mutation"] is False
+    assert payload["safety"]["memory_file_mutation"] is False
     assert not (tmp_path / ".ai/memory/project.md").exists()
 
 
 @pytest.mark.asyncio
-async def test_write_operator_proposal_apply_sequence_policy_memory_blocks_forged_target_path(server, tmp_path):
+async def test_write_operator_proposal_apply_sequence_policy_memory_rejects_client_target_path(server, tmp_path):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11701,7 +11950,7 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_blocks_forge
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11744,45 +11993,19 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_blocks_forge
         {"policy_gate_payload": policy_gate_payload},
     )
     forged_memory_draft_payload = dict(server.send_to_client.await_args.args[1])
-    forged_record = dict(forged_memory_draft_payload["memory_draft_records"][0])
-    forged_record["target_memory_path"] = ".env"
-    forged_memory_draft_payload["memory_draft_records"] = [forged_record]
-
-    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        {
-            "memory_draft_payload": forged_memory_draft_payload,
-            "apply": True,
-            "operator_ack": True,
-            "root_path": str(tmp_path),
-        },
+    _assert_post_executor_migration_required(
+        forged_memory_draft_payload,
+        "draft_operator_proposal_apply_sequence_policy_memory",
     )
-
-    assert server._apply_manual_console_write.await_count == 1
-    payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
-    assert payload["status"] == "memory_write_replacement_required"
-    assert payload["success"] is False
-    assert payload["summary"]["write_result_count"] == 0
-    assert payload["summary"]["append_only_memory_write_applied"] is False
-    assert payload["summary"]["memory_file_mutation"] is False
-    assert payload["summary"]["runtime_memory_mutation"] is False
-    assert payload["summary"]["live_authority_granted"] is False
-    assert payload["summary"]["full_autonomous_ready"] is False
-    assert payload["safety"]["append_only_memory_file_write_applied"] is False
-    assert payload["safety"]["memory_file_mutation"] is False
-    assert payload["safety"]["live_write"] is False
-    reasons = [item["reason"] for item in payload["blocked_results"]]
-    assert "memory_draft_record_target_path_not_allowed" in reasons
     assert not (tmp_path / ".env").exists()
     assert not (tmp_path / ".ai/memory/project.md").exists()
 
 
 @pytest.mark.asyncio
-async def test_write_operator_proposal_apply_sequence_policy_memory_appends_with_operator_ack(server, tmp_path):
+async def test_write_operator_proposal_apply_sequence_policy_memory_does_not_append_client_echo(server, tmp_path):
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -11796,7 +12019,7 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_appends_with
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -8.0,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -11852,29 +12075,11 @@ async def test_write_operator_proposal_apply_sequence_policy_memory_appends_with
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
-    assert payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
-    assert payload["status"] == "append_only_memory_write_applied"
-    assert payload["success"] is True
-    assert payload["summary"]["write_result_count"] == 1
-    assert payload["summary"]["append_only_memory_write_applied"] is True
-    assert payload["summary"]["memory_file_mutation"] is True
-    assert payload["summary"]["runtime_memory_mutation"] is False
-    assert payload["summary"]["live_authority_granted"] is False
-    assert payload["summary"]["full_autonomous_ready"] is False
-    assert payload["safety"]["append_only_memory_file_write_applied"] is True
-    assert payload["safety"]["memory_file_mutation"] is True
-    assert payload["safety"]["live_write"] is False
-    assert payload["write_results"][0]["target_memory_path"] == ".ai/memory/project.md"
-    assert payload["write_results"][0]["applied"] is True
-    assert payload["write_results"][0]["bytes_appended"] > 0
-
-    memory_file = tmp_path / ".ai/memory/project.md"
-    assert memory_file.exists()
-    content = memory_file.read_text(encoding="utf-8")
-    assert "### Supervised sequence policy memory" in content
-    assert "memory-write-applied" in content
-    assert "memory-write:memory-write-applied" in content
-    assert "no live, queue, model, or policy mutation" in content
+    _assert_post_executor_migration_required(
+        payload,
+        "write_operator_proposal_apply_sequence_policy_memory",
+    )
+    assert not (tmp_path / ".ai/memory/project.md").exists()
 
 
 @pytest.mark.asyncio
@@ -11884,17 +12089,22 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
-    server._apply_manual_console_write = AsyncMock(return_value={
-        "status": "applied",
-        "channel": 2,
-        "value_type": "fader",
-        "effective_value": -3.0,
-        "old_value": -2.5,
-        "readback_value": -3.0,
-        "readback_status": "verified_from_cache",
-        "rollback_available": True,
-        "rollback_value": -2.5,
-    })
+    async def verified_apply(*_args, **kwargs):
+        assert server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+            kwargs["result_evidence_reservation_binding"]
+        )["transitioned"] is True
+        return _verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-3.0,
+            old_value=-2.5,
+            readback_value=-3.0,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=-2.5,
+        )
+
+    server._apply_manual_console_write = AsyncMock(side_effect=verified_apply)
     server.send_to_client = AsyncMock()
 
     for proposal_id in ("dup-1", "dup-2"):
@@ -11917,6 +12127,7 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
             "approved": True,
             "approval_id": "dup-1-approval",
             "idempotency_key": "same-key",
+            **_review_binding(server, "dup-1"),
         },
     )
     await server._dispatch["apply_operator_proposal"](
@@ -11926,6 +12137,7 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
             "approved": True,
             "approval_id": "dup-2-approval",
             "idempotency_key": "same-key",
+            **_review_binding(server, "dup-2"),
         },
     )
 
@@ -11947,20 +12159,22 @@ async def test_supervised_apply_claim_blocks_double_click_and_history_replay(ser
     write_started = asyncio.Event()
     release_write = asyncio.Event()
 
-    async def delayed_apply(*_args, **_kwargs):
+    async def delayed_apply(*_args, **kwargs):
+        assert server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred(
+            kwargs["result_evidence_reservation_binding"]
+        )["transitioned"] is True
         write_started.set()
         await release_write.wait()
-        return {
-            "status": "applied",
-            "channel": 2,
-            "value_type": "fader",
-            "effective_value": -3.0,
-            "old_value": -2.5,
-            "readback_value": -3.0,
-            "readback_status": "verified_from_cache",
-            "rollback_available": True,
-            "rollback_value": -2.5,
-        }
+        return _verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-3.0,
+            old_value=-2.5,
+            readback_value=-3.0,
+            readback_status="verified_from_cache",
+            rollback_available=True,
+            rollback_value=-2.5,
+        )
 
     server._apply_manual_console_write = AsyncMock(side_effect=delayed_apply)
     server.send_to_client = AsyncMock()
@@ -11975,6 +12189,7 @@ async def test_supervised_apply_claim_blocks_double_click_and_history_replay(ser
             "reason": "unit",
         },
     )
+    review_binding = _review_binding(server, "double-click")
 
     first = asyncio.create_task(
         server._dispatch["apply_operator_proposal"](
@@ -11984,6 +12199,7 @@ async def test_supervised_apply_claim_blocks_double_click_and_history_replay(ser
                 "approved": True,
                 "approval_id": "double-click-1",
                 "idempotency_key": "double-click-key-1",
+                **review_binding,
             },
         )
     )
@@ -11995,6 +12211,7 @@ async def test_supervised_apply_claim_blocks_double_click_and_history_replay(ser
             "approved": True,
             "approval_id": "double-click-2",
             "idempotency_key": "double-click-key-2",
+            **review_binding,
         },
     )
 
@@ -12014,6 +12231,7 @@ async def test_supervised_apply_claim_blocks_double_click_and_history_replay(ser
             "approved": True,
             "approval_id": "double-click-replay",
             "idempotency_key": "double-click-replay-key",
+            **review_binding,
         },
     )
     replay = server.send_to_client.await_args.args[1]
@@ -12046,7 +12264,7 @@ async def test_supervised_apply_claims_before_async_pre_read(server):
         }
 
     server._manual_write_read_value = AsyncMock(side_effect=delayed_pre_read)
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -12056,7 +12274,7 @@ async def test_supervised_apply_claims_before_async_pre_read(server):
         "readback_status": "verified_from_physical_readback",
         "rollback_available": True,
         "rollback_value": -2.5,
-    })
+    }))
     server.send_to_client = AsyncMock()
     await server._dispatch["create_operator_proposal"](
         object(),
@@ -12075,6 +12293,7 @@ async def test_supervised_apply_claims_before_async_pre_read(server):
             object(),
             {
                 "proposal_id": "pre-read-race",
+                **_review_binding(server, "pre-read-race"),
                 "approved": True,
                 "approval_id": "pre-read-race-1",
                 "idempotency_key": "pre-read-race-key-1",
@@ -12086,6 +12305,7 @@ async def test_supervised_apply_claims_before_async_pre_read(server):
         object(),
         {
             "proposal_id": "pre-read-race",
+            **_review_binding(server, "pre-read-race"),
             "approved": True,
             "approval_id": "pre-read-race-2",
             "idempotency_key": "pre-read-race-key-2",
@@ -12099,6 +12319,192 @@ async def test_supervised_apply_claims_before_async_pre_read(server):
     await first
     assert server._apply_manual_console_write.await_count == 1
     assert build_decision_queue(server)["summary"]["applied_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_supervised_pre_read_exception_releases_claim_evidence_and_idempotency(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {"/ch/2/fdr": time.time()}
+    server._manual_write_read_value = AsyncMock(
+        side_effect=RuntimeError("synthetic pre-read failure")
+    )
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "pre-read-exception",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "pre-read-exception",
+            **_review_binding(server, "pre-read-exception"),
+            "approved": True,
+            "approval_id": "pre-read-exception-approval",
+            "idempotency_key": "pre-read-exception-key",
+        },
+    )
+
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="pre-read-exception"
+    )
+    payload = server.send_to_client.await_args.args[1]
+    store = server.operator_proposal_queue.result_store
+    assert payload["status"] == "apply_blocked"
+    assert payload["apply_result"]["reason"] == "operator_proposal_pre_read_exception"
+    assert payload["apply_result"]["no_console_send_proven"] is True
+    assert payload["apply_result"]["wal_terminal"] == "not_prepared"
+    assert proposal.status == "pending"
+    assert proposal.result_detail_available is True
+    assert store.active_reservation_count == 0
+    assert store.current_apply_hazards() == ()
+    assert "pre-read-exception-key" not in server._operator_apply_idempotency_keys
+    server._apply_manual_console_write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_claim_failure_release_error_latches_result_lifecycle_closed(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {"/ch/2/fdr": time.time()}
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "claim-release-failure",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+    server.operator_proposal_queue.claim_verified_for_apply = MagicMock(
+        return_value={"claimed": False, "reason": "proposal_not_pending"}
+    )
+    server.operator_proposal_queue.release_result_evidence = MagicMock(
+        side_effect=OSError("synthetic release failure")
+    )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "claim-release-failure",
+            **_review_binding(server, "claim-release-failure"),
+            "approved": True,
+            "approval_id": "claim-release-failure-approval",
+            "idempotency_key": "claim-release-failure-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="claim-release-failure"
+    )
+    assert payload["reason"] == "operator_proposal_result_persistence_failed"
+    assert payload["no_console_send_proven"] is True
+    assert proposal.status == "pending"
+    assert server.operator_proposal_queue.result_persistence_failed is True
+    assert server.operator_proposal_queue.result_evidence_contract_ready is False
+    assert server.operator_proposal_queue.result_store.active_reservation_count == 1
+    assert "claim-release-failure-key" not in server._operator_apply_idempotency_keys
+    server._apply_manual_console_write.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_supervised_pre_read_cancellation_cleanup_is_shielded_and_retryable(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {"/ch/2/fdr": time.time()}
+    pre_read_started = asyncio.Event()
+
+    async def never_finishes_pre_read(**_kwargs):
+        pre_read_started.set()
+        await asyncio.Event().wait()
+
+    server._manual_write_read_value = AsyncMock(side_effect=never_finishes_pre_read)
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "pre-read-cancelled",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+    apply_data = {
+        "proposal_id": "pre-read-cancelled",
+        **_review_binding(server, "pre-read-cancelled"),
+        "approved": True,
+        "approval_id": "pre-read-cancelled-approval",
+        "idempotency_key": "pre-read-cancelled-key",
+    }
+
+    task = asyncio.create_task(
+        server._dispatch["apply_operator_proposal"](object(), apply_data)
+    )
+    await pre_read_started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="pre-read-cancelled"
+    )
+    store = server.operator_proposal_queue.result_store
+    assert proposal.status == "pending"
+    assert proposal.result["reason"] == "operator_proposal_pre_read_cancelled"
+    assert proposal.result["no_console_send_proven"] is True
+    assert proposal.result["wal_terminal"] == "not_prepared"
+    assert store.active_reservation_count == 0
+    assert store.current_apply_hazards() == ()
+    assert "pre-read-cancelled-key" not in server._operator_apply_idempotency_keys
+    server._apply_manual_console_write.assert_not_awaited()
+
+    server._manual_write_read_value = AsyncMock(
+        return_value={
+            "value": -2.5,
+            "status": "verified_from_physical_readback",
+            "source": "physical_readback",
+            "cache_freshness": {"status": "fresh"},
+        }
+    )
+    server._apply_manual_console_write = AsyncMock(
+        return_value=_verified_manual_apply_result(
+            channel=2,
+            value_type="fader",
+            effective_value=-3.0,
+            old_value=-2.5,
+            readback_value=-3.0,
+            readback_status="verified_from_physical_readback",
+            rollback_available=True,
+            rollback_value=-2.5,
+        )
+    )
+    await server._dispatch["apply_operator_proposal"](object(), apply_data)
+
+    assert server.operator_proposal_queue.find(
+        proposal_id="pre-read-cancelled"
+    ).status == "applied"
+    assert store.active_reservation_count == 0
+    assert store.current_apply_hazards() == ()
 
 
 @pytest.mark.asyncio
@@ -12130,6 +12536,7 @@ async def test_supervised_apply_exception_is_terminal_and_latches_emergency(serv
         object(),
         {
             "proposal_id": "post-claim-exception",
+            **_review_binding(server, "post-claim-exception"),
             "approved": True,
             "approval_id": "post-claim-exception-approval",
             "idempotency_key": "post-claim-exception-key",
@@ -12160,6 +12567,8 @@ async def test_possible_transaction_send_is_terminal_and_keeps_outer_idempotency
         },
     }
     server.get_operator_mode_status = lambda: operator_mode
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
     server.refresh_soundcheck_child_preflight = AsyncMock(
         return_value={"refreshed": True}
     )
@@ -12215,6 +12624,7 @@ async def test_possible_transaction_send_is_terminal_and_keeps_outer_idempotency
             object(),
             {
                 "proposal_id": "possible-send-proposal",
+                **_review_binding(server, "possible-send-proposal"),
                 "approved": True,
                 "approval_id": "possible-send-approval",
                 "idempotency_key": "possible-send-idempotency",
@@ -12254,6 +12664,7 @@ async def test_supervised_apply_requires_literal_true_approval(server, approved)
         object(),
         {
             "proposal_id": proposal_id,
+            **_review_binding(server, proposal_id),
             "approved": approved,
             "approval_id": f"approval-{approved!r}",
             "idempotency_key": f"strict-approval-key-{approved!r}",
@@ -12359,6 +12770,7 @@ async def test_linked_apply_without_recoverable_preimage_is_terminal(server):
         object(),
         {
             "proposal_id": "linked-no-preimage",
+            **_review_binding(server, "linked-no-preimage"),
             "approved": True,
             "approval_id": "linked-no-preimage-approval",
             "idempotency_key": "linked-no-preimage-key",
@@ -12394,14 +12806,18 @@ async def test_supervised_apply_blocks_expired_proposal_before_idempotency_reser
             "value": -3.0,
             "reason": "unit",
             "ttl_seconds": 5,
+            "expires_at": "2000-01-01T00:00:00Z",
         },
     )
-    proposal = server.operator_proposal_queue.find(proposal_id="expired-proposal")
-    proposal.expires_at = "2000-01-01T00:00:00Z"
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": "expired-proposal", "approved": True, "idempotency_key": "expired-key"},
+        {
+            "proposal_id": "expired-proposal",
+            **_review_binding(server, "expired-proposal"),
+            "approved": True,
+            "idempotency_key": "expired-key",
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -12440,6 +12856,7 @@ async def test_supervised_apply_blocks_cumulative_delta_before_manual_gate(serve
         object(),
         {
             "proposal_id": proposal_id,
+            **_review_binding(server, proposal_id),
             "approved": True,
             "approval_id": "cumulative-limit-approval",
             "idempotency_key": "cumulative-limit",
@@ -12478,6 +12895,7 @@ async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
         object(),
         {
             "proposal_id": proposal_id,
+            **_review_binding(server, proposal_id),
             "approved": True,
             "approval_id": "large-delta-approval",
             "idempotency_key": "large-delta",
@@ -12498,12 +12916,17 @@ async def test_supervised_apply_uses_normalized_clamped_value_after_validation(s
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/in/set/trim": 18.0}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "gain",
         "effective_value": 18.0,
-    })
+        "old_value": 18.0,
+        "readback_value": 18.0,
+        "readback_status": "verified_from_cache",
+        "rollback_available": True,
+        "rollback_value": 18.0,
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -12521,6 +12944,7 @@ async def test_supervised_apply_uses_normalized_clamped_value_after_validation(s
         object(),
         {
             "proposal_id": proposal_id,
+            **_review_binding(server, proposal_id),
             "approved": True,
             "approval_id": "clamped-gain-approval",
             "idempotency_key": "clamped-gain",
@@ -12542,7 +12966,7 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/2/fdr": -2.5}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
-    server._apply_manual_console_write = AsyncMock(return_value={
+    server._apply_manual_console_write = AsyncMock(return_value=_verified_manual_apply_result(**{
         "status": "applied",
         "channel": 2,
         "value_type": "fader",
@@ -12556,7 +12980,7 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
         "proof_status": "verified",
         "rollback_available": True,
         "rollback_value": -2.5,
-    })
+    }))
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -12574,6 +12998,7 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
         object(),
         {
             "proposal_id": proposal_id,
+            **_review_binding(server, proposal_id),
             "approved": True,
             "approval_id": "trace-key-approval",
             "idempotency_key": "trace-key",
@@ -13177,6 +13602,11 @@ async def test_import_safe_gain_suggestions_handler_feeds_operator_queue(server)
     server.mixer_client = CachedMixer()
     server.safe_gain_calibrator = FakeSafeGainCalibrator()
     server.send_to_client = AsyncMock()
+    expected_requested_change = build_safe_gain_operator_proposals(
+        server.safe_gain_calibrator.get_suggestions(),
+        channel_mapping=server.safe_gain_calibrator.channel_mapping,
+        mixer_client=server.mixer_client,
+    )[0]["requested_change"]
 
     await server._dispatch["import_safe_gain_suggestions"](object(), {})
 
@@ -13187,6 +13617,99 @@ async def test_import_safe_gain_suggestions_handler_feeds_operator_queue(server)
     queue = build_decision_queue(server)
     assert queue["summary"]["pending_count"] == 1
     assert queue["pending_actions"][0]["requested_change"]["value"] == 3.5
+    stored = server.operator_proposal_queue.find(proposal_id="safe_gain:1:2")
+    assert stored is not None
+    assert len(stored.review_content_bytes) < 1_048_576
+    correction = stored.raw["operator_correction"]
+    projection = correction["queue_review_projection"]
+    assert projection == {
+        "schema": "operator_recommendation_queue_review/v2",
+        "canonical_review_surface": "operator_correction",
+        "omitted_redundant_aggregate_fields": [
+            "operator_evidence_packet",
+            "operator_explanation_packet",
+            "operator_review_summary",
+        ],
+        "reference_rewrites": {
+            "operator_evidence_packet": "operator_correction",
+            "operator_explanation_packet": "operator_readable_explanation",
+            "operator_review_summary": "operator_correction",
+            "review_operator_evidence_packet": "review_operator_correction",
+        },
+        "retained_constituent_review_fields": sorted(
+            key for key in correction if key != "queue_review_projection"
+        ),
+        "execution_semantics_changed": False,
+    }
+    assert "operator_evidence_packet" not in correction
+    assert "operator_explanation_packet" not in correction
+    assert "operator_review_summary" not in correction
+    assert correction["source_evidence"]["evidence"]["input_level_evidence"][
+        "peak_db"
+    ] == -5.5
+    assert correction["rollback_readback_contract"]["rollback_required_before_promotion"] is True
+    execution_fields = (
+        "value_type",
+        "channel",
+        "value",
+        "current_value",
+        "delta_db",
+        "old_value",
+        "proposed_value",
+        "rollback_value",
+        "readback_required",
+    )
+    assert {
+        key: stored.raw["requested_change"].get(key) for key in execution_fields
+    } == {key: expected_requested_change.get(key) for key in execution_fields}
+
+    def string_values(value):
+        if isinstance(value, dict):
+            for child in value.values():
+                yield from string_values(child)
+        elif isinstance(value, list):
+            for child in value:
+                yield from string_values(child)
+        elif isinstance(value, str):
+            yield value
+
+    semantic_correction = {
+        key: value
+        for key, value in correction.items()
+        if key != "queue_review_projection"
+    }
+    dangling_tokens = {
+        "operator_evidence_packet",
+        "operator_explanation_packet",
+        "operator_review_summary",
+        "review_operator_evidence_packet",
+    }
+    assert dangling_tokens.isdisjoint(set(string_values(semantic_correction)))
+
+    record_fields = {
+        row["field"]: row for row in correction["operator_review_record_field_details"]
+    }
+    assert record_fields["evidence_packet_reference"]["source"] == "operator_correction"
+    assert record_fields["evidence_packet_reference"]["sources"] == [
+        "operator_correction",
+        "operator_review_record_template",
+    ]
+    assert record_fields["operator_explanation_acknowledgement"]["source"] == (
+        "operator_readable_explanation"
+    )
+    assert record_fields["operator_explanation_acknowledgement"]["sources"] == [
+        "operator_readable_explanation",
+        "operator_review_record_template",
+    ]
+    review_action = next(
+        row
+        for row in correction["operator_next_action_details"]
+        if row.get("action") == "review_operator_correction"
+    )
+    assert review_action["operator_action"] == "review_operator_correction"
+    assert review_action["action_type"] == "review_operator_correction"
+    assert review_action["source"] == "operator_correction"
+    assert review_action["sources"] == ["operator_correction"]
 
 
 def _source_identity_queue_import_fixture():
@@ -13484,6 +14007,30 @@ def _sequence_policy_queue_import_fixture():
             ordering_preview=ordering_preview,
         )
     )
+
+
+def _seed_sequence_policy_queue(server, proposals, plan):
+    """Seed canonical queue state without exercising the blocked public importer."""
+
+    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer import (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer,
+    )
+
+    preview = (
+        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
+            queue_ordering_plan=plan,
+            proposal_payloads=proposals,
+        )
+    )
+    assert preview["status"] == (
+        "sequence_memory_trust_promotion_queue_importer_dry_run_ready"
+    )
+    for spec in preview["queue_import_specs"]:
+        created = server.operator_proposal_queue.create(
+            dict(spec["operator_proposal_payload"]),
+            server.get_operator_mode_status(),
+        )
+        assert created["success"] is True
 
 
 @pytest.mark.asyncio
@@ -13788,7 +14335,7 @@ async def test_sequence_policy_queue_import_handler_requires_ack_for_apply(serve
 
 
 @pytest.mark.asyncio
-async def test_sequence_policy_queue_import_handler_imports_with_ack_without_live_write(server):
+async def test_sequence_policy_queue_import_handler_apply_with_ack_requires_server_owned_state(server):
     proposals, plan = _sequence_policy_queue_import_fixture()
     server.mixer_client = MagicMock()
     server.mixer_client.set_fader = MagicMock()
@@ -13809,18 +14356,11 @@ async def test_sequence_policy_queue_import_handler_imports_with_ack_without_liv
 
     payload = server.send_to_client.await_args.args[1]
     queue = build_decision_queue(server)
-    assert payload["status"] == "sequence_memory_trust_promotion_queue_importer_applied"
-    assert payload["summary"]["queue_import_result_count"] == 2
-    assert payload["summary"]["queue_mutation"] is True
-    assert payload["summary"]["live_write"] is False
-    assert payload["summary"]["imported_proposal_ids"] == [
-        "proposal-sequence-fader",
-        "proposal-other",
-    ]
-    assert queue["summary"]["pending_count"] == 2
-    assert queue["pending_actions"][0]["id"] == "proposal-sequence-fader"
-    assert queue["pending_actions"][0]["requested_change"]["value_type"] == "fader"
-    assert queue["pending_actions"][1]["id"] == "proposal-other"
+    _assert_post_executor_migration_required(
+        payload,
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan",
+    )
+    assert queue["summary"]["pending_count"] == 0
     server.mixer_client.set_fader.assert_not_called()
     server._apply_manual_console_write.assert_not_called()
 
@@ -13898,17 +14438,7 @@ async def test_decision_queue_summarizes_sequence_policy_queue_import_visibility
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        {
-            "queue_ordering_plan": plan,
-            "proposal_payloads": proposals,
-            "apply": True,
-            "operator_ack": True,
-        },
-    )
+    _seed_sequence_policy_queue(server, proposals, plan)
 
     queue = build_decision_queue(server)
     summary = queue["summary"]
@@ -14031,17 +14561,7 @@ async def test_sequence_policy_queue_import_preflight_plan_handler_feeds_batch_p
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        {
-            "queue_ordering_plan": plan,
-            "proposal_payloads": proposals,
-            "apply": True,
-            "operator_ack": True,
-        },
-    )
+    _seed_sequence_policy_queue(server, proposals, plan)
 
     await server._dispatch[
         "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
@@ -14112,17 +14632,7 @@ async def test_sequence_policy_queue_import_preflight_result_consumer_feeds_sequ
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        {
-            "queue_ordering_plan": plan,
-            "proposal_payloads": proposals,
-            "apply": True,
-            "operator_ack": True,
-        },
-    )
+    _seed_sequence_policy_queue(server, proposals, plan)
     await server._dispatch[
         "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
     ](
@@ -14216,17 +14726,7 @@ async def test_sequence_policy_queue_import_sequence_plan_result_consumer_feeds_
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        {
-            "queue_ordering_plan": plan,
-            "proposal_payloads": proposals,
-            "apply": True,
-            "operator_ack": True,
-        },
-    )
+    _seed_sequence_policy_queue(server, proposals, plan)
     await server._dispatch[
         "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
     ](
@@ -14344,17 +14844,7 @@ async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execut
     server._apply_manual_console_write = AsyncMock()
     server.send_to_client = AsyncMock()
 
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        {
-            "queue_ordering_plan": plan,
-            "proposal_payloads": proposals,
-            "apply": True,
-            "operator_ack": True,
-        },
-    )
+    _seed_sequence_policy_queue(server, proposals, plan)
     await server._dispatch[
         "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
     ](
@@ -14558,7 +15048,7 @@ async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execut
 
 
 @pytest.mark.asyncio
-async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audit_without_extra_write(server, tmp_path):
+async def test_sequence_policy_queue_import_requires_server_owned_state_without_extra_write(server, tmp_path):
     proposals, plan = _sequence_policy_queue_import_fixture()
     server.operator_mode = "supervised"
     server.mixer_client = CachedMixer()
@@ -14590,7050 +15080,44 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
             "operator_ack": True,
         },
     )
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    ](
-        object(),
-        {
-            "idempotency_key_prefix": "seq-import-audit",
-        },
-    )
-    plan_payload = server.send_to_client.await_args.args[1]
-    request = dict(plan_payload["batch_preflight_request"])
-    request["approved"] = True
-    await server._dispatch["preflight_operator_proposal_apply_batch"](
-        object(),
-        request,
-    )
-    preflight_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_preflight_result"
-    ](
-        object(),
-        {
-            "queue_import_preflight_plan": plan_payload,
-            "batch_preflight_result": preflight_payload,
-        },
-    )
-    preflight_consumer_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch["plan_operator_proposal_apply_sequence"](
-        object(),
-        preflight_consumer_payload["sequence_plan_request"],
-    )
-    sequence_plan_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_sequence_plan_result"
-    ](
-        object(),
-        {
-            "preflight_result_consumer": preflight_consumer_payload,
-            "sequence_plan_result": sequence_plan_payload,
-        },
-    )
-    sequence_plan_consumer_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
-        object(),
-        sequence_plan_consumer_payload["dry_run_request"],
-    )
-    dry_run_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_dry_run_result"
-    ](
-        object(),
-        {
-            "sequence_plan_result_consumer": sequence_plan_consumer_payload,
-            "dry_run_result": dry_run_payload,
-        },
-    )
-    dry_run_consumer_payload = server.send_to_client.await_args.args[1]
-    gate_request = dict(dry_run_consumer_payload["execution_gate_request"])
-    gate_request["operator_ack"] = True
-    gate_request["approval_id"] = "seq-import-audit-operator"
-    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
-        object(),
-        gate_request,
-    )
-    gate_payload = server.send_to_client.await_args.args[1]
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_gate_result"
-    ](
-        object(),
-        {
-            "dry_run_result_consumer": dry_run_consumer_payload,
-            "execution_gate_result": gate_payload,
-        },
-    )
-    gate_consumer_payload = server.send_to_client.await_args.args[1]
-    executor_request = dict(gate_consumer_payload["executor_request"])
-    executor_request["execute"] = True
-    executor_request["operator_ack"] = True
-    executor_request["approved"] = True
-
-    await server._dispatch["execute_operator_proposal_apply_sequence"](
-        object(),
-        executor_request,
-    )
-
-    execution_payload = server.send_to_client.await_args.args[1]
-    assert execution_payload["type"] == "operator_proposal_apply_sequence_execution_result"
-    assert execution_payload["status"] == "applied"
-    assert execution_payload["summary"]["applied_count"] == 1
-    assert execution_payload["summary"]["sequence_executor_called_apply_operator_proposal"] is True
-    assert execution_payload["summary"]["direct_live_write"] is False
-    assert server._apply_manual_console_write.await_count == 1
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_result"
-    ](
-        object(),
-        {
-            "execution_gate_result_consumer": gate_consumer_payload,
-            "execution_result": execution_payload,
-        },
-    )
-
-    execution_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        execution_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_result_consumer"
-    )
-    assert (
-        execution_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_execution_result"
-    )
-    assert (
-        execution_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_audit_request_available"
-    )
-    assert execution_consumer_payload["summary"]["expected_execution_result_count"] == 1
-    assert execution_consumer_payload["summary"]["execution_result_count"] == 1
-    assert execution_consumer_payload["summary"]["applied_execution_result_count"] == 1
-    assert execution_consumer_payload["summary"]["blocked_execution_result_count"] == 0
-    assert execution_consumer_payload["summary"]["audit_request_available"] is True
-    assert execution_consumer_payload["summary"]["audit_handler_invoked"] is False
-    assert execution_consumer_payload["summary"]["audit_created"] is False
-    assert execution_consumer_payload["summary"]["live_write"] is False
-    assert execution_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert execution_consumer_payload["audit_request"]["handler"] == (
-        "audit_operator_proposal_apply_sequence_execution"
-    )
-    assert (
-        execution_consumer_payload["audit_request"]["execution_result_payload"][
-            "execution_results"
-        ][0]["apply_request"]["idempotency_key"]
-        == "seq-import-audit:proposal-sequence-fader"
-    )
-
-    await server._dispatch["audit_operator_proposal_apply_sequence_execution"](
-        object(),
-        execution_consumer_payload["audit_request"],
-    )
-
-    audit_payload = server.send_to_client.await_args.args[1]
-    assert audit_payload["type"] == "operator_proposal_apply_sequence_execution_audit"
-    assert audit_payload["status"] == "passed"
-    assert audit_payload["summary"]["passed_count"] == 1
-    assert audit_payload["summary"]["live_write"] is False
-    assert audit_payload["summary"]["idempotency_reserved"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result"
-    ](
-        object(),
-        {
-            "execution_result_consumer": execution_consumer_payload,
-            "execution_audit_result": audit_payload,
-        },
-    )
-
-    audit_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        audit_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_execution_audit_result_consumer"
-    )
-    assert (
-        audit_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_execution_audit_result"
-    )
-    assert (
-        audit_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_audit_policy_gate_request_available"
-    )
-    assert audit_consumer_payload["summary"]["expected_execution_audit_row_count"] == 1
-    assert audit_consumer_payload["summary"]["execution_audit_row_count"] == 1
-    assert audit_consumer_payload["summary"]["passed_execution_audit_row_count"] == 1
-    assert audit_consumer_payload["summary"]["blocked_execution_audit_row_count"] == 0
-    assert audit_consumer_payload["summary"]["audit_policy_gate_request_available"] is True
-    assert audit_consumer_payload["summary"]["audit_policy_gate_handler_invoked"] is False
-    assert audit_consumer_payload["summary"]["policy_gate_created"] is False
-    assert audit_consumer_payload["summary"]["live_write"] is False
-    assert audit_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert audit_consumer_payload["summary"]["policy_mutation"] is False
-    assert audit_consumer_payload["audit_policy_gate_request"]["handler"] == (
-        "gate_operator_proposal_apply_sequence_audit_policy"
-    )
-    assert (
-        audit_consumer_payload["audit_policy_gate_request"][
-            "execution_audit_payload"
-        ]["audit_rows"][0]["idempotency_key"]
-        == "seq-import-audit:proposal-sequence-fader"
-    )
-
-    await server._dispatch["gate_operator_proposal_apply_sequence_audit_policy"](
-        object(),
-        audit_consumer_payload["audit_policy_gate_request"],
-    )
-
-    policy_gate_payload = server.send_to_client.await_args.args[1]
-    assert policy_gate_payload["type"] == (
-        "operator_proposal_apply_sequence_audit_policy_gate"
-    )
-    assert policy_gate_payload["status"] == "ready"
-    assert policy_gate_payload["summary"]["policy_evidence_ready_count"] == 1
-    assert policy_gate_payload["summary"]["live_write"] is False
-    assert policy_gate_payload["summary"]["policy_mutation"] is False
-    assert policy_gate_payload["summary"]["full_autonomous_ready"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result"
-    ](
-        object(),
-        {
-            "execution_audit_result_consumer": audit_consumer_payload,
-            "audit_policy_gate_result": policy_gate_payload,
-        },
-    )
-
-    policy_gate_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        policy_gate_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_audit_policy_gate_result_consumer"
-    )
-    assert (
-        policy_gate_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_audit_policy_gate_result"
-    )
-    assert (
-        policy_gate_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_draft_request_available"
-    )
-    assert policy_gate_consumer_payload["summary"]["expected_policy_evidence_count"] == 1
-    assert policy_gate_consumer_payload["summary"]["policy_evidence_count"] == 1
-    assert policy_gate_consumer_payload["summary"]["ready_policy_evidence_count"] == 1
-    assert policy_gate_consumer_payload["summary"]["blocked_policy_evidence_count"] == 0
-    assert policy_gate_consumer_payload["summary"]["memory_draft_request_available"] is True
-    assert policy_gate_consumer_payload["summary"]["memory_draft_handler_invoked"] is False
-    assert policy_gate_consumer_payload["summary"]["memory_draft_created"] is False
-    assert policy_gate_consumer_payload["summary"]["memory_write_allowed_by_consumer"] is False
-    assert policy_gate_consumer_payload["summary"]["live_write"] is False
-    assert policy_gate_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert policy_gate_consumer_payload["summary"]["policy_mutation"] is False
-    assert policy_gate_consumer_payload["memory_draft_request"]["handler"] == (
-        "draft_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert (
-        policy_gate_consumer_payload["memory_draft_request"]["policy_gate_payload"][
-            "policy_evidence"
-        ][0]["idempotency_key"]
-        == "seq-import-audit:proposal-sequence-fader"
-    )
-
-    await server._dispatch["draft_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        policy_gate_consumer_payload["memory_draft_request"],
-    )
-
-    draft_payload = server.send_to_client.await_args.args[1]
-    assert draft_payload["type"] == "operator_proposal_apply_sequence_policy_memory_draft"
-    assert draft_payload["status"] == "ready"
-    assert draft_payload["summary"]["memory_draft_count"] == 1
-    assert draft_payload["summary"]["memory_draft_only"] is True
-    assert draft_payload["summary"]["memory_mutation"] is False
-    assert draft_payload["summary"]["runtime_memory_mutation"] is False
-    assert draft_payload["summary"]["policy_mutation"] is False
-    assert draft_payload["summary"]["full_autonomous_ready"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result"
-    ](
-        object(),
-        {
-            "audit_policy_gate_result_consumer": policy_gate_consumer_payload,
-            "memory_draft_result": draft_payload,
-        },
-    )
-
-    memory_draft_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        memory_draft_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_draft_result_consumer"
-    )
-    assert (
-        memory_draft_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_draft_result"
-    )
-    assert (
-        memory_draft_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_writer_request_available"
-    )
-    assert memory_draft_consumer_payload["summary"]["expected_memory_draft_count"] == 1
-    assert memory_draft_consumer_payload["summary"]["memory_draft_record_count"] == 1
-    assert (
-        memory_draft_consumer_payload["summary"]["ready_memory_draft_record_count"]
-        == 1
-    )
-    assert (
-        memory_draft_consumer_payload["summary"]["blocked_memory_draft_record_count"]
-        == 0
-    )
-    assert memory_draft_consumer_payload["summary"]["memory_writer_request_available"] is True
-    assert memory_draft_consumer_payload["summary"]["memory_writer_handler_invoked"] is False
-    assert memory_draft_consumer_payload["summary"]["memory_file_write_applied"] is False
-    assert memory_draft_consumer_payload["summary"]["memory_write_allowed_by_consumer"] is False
-    assert memory_draft_consumer_payload["summary"]["live_write"] is False
-    assert memory_draft_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert memory_draft_consumer_payload["memory_writer_request"]["handler"] == (
-        "write_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert memory_draft_consumer_payload["memory_writer_request"]["apply"] is False
-    assert memory_draft_consumer_payload["memory_writer_request"]["operator_ack"] is False
-    assert (
-        memory_draft_consumer_payload["memory_writer_request"][
-            "memory_draft_payload"
-        ]["memory_draft_records"][0]["evidence"]["idempotency_key"]
-        == "seq-import-audit:proposal-sequence-fader"
-    )
-
-    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        memory_draft_consumer_payload["memory_writer_request"],
-    )
-
-    writer_payload = server.send_to_client.await_args.args[1]
-    assert writer_payload["type"] == "operator_proposal_apply_sequence_policy_memory_writer"
-    assert writer_payload["status"] == "append_only_memory_write_dry_run_ready"
-    assert writer_payload["summary"]["memory_draft_record_count"] == 1
-    assert writer_payload["summary"]["append_only_memory_write_applied"] is False
-    assert writer_payload["summary"]["apply_requested"] is False
-    assert writer_payload["summary"]["operator_ack"] is False
-    assert writer_payload["summary"]["memory_file_mutation"] is False
-    assert writer_payload["summary"]["runtime_memory_mutation"] is False
-    assert writer_payload["summary"]["policy_mutation"] is False
-    assert writer_payload["summary"]["full_autonomous_ready"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
-    ](
-        object(),
-        {
-            "memory_draft_result_consumer": memory_draft_consumer_payload,
-            "memory_writer_dry_run_result": writer_payload,
-        },
-    )
-
-    writer_dry_run_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        writer_dry_run_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_dry_run_result_consumer"
-    )
-    assert (
-        writer_dry_run_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_dry_run_result"
-    )
-    assert (
-        writer_dry_run_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_writer_apply_request_available"
-    )
-    assert (
-        writer_dry_run_consumer_payload["summary"][
-            "expected_memory_writer_dry_run_count"
-        ]
-        == 1
-    )
-    assert (
-        writer_dry_run_consumer_payload["summary"][
-            "memory_writer_dry_run_record_count"
-        ]
-        == 1
-    )
-    assert writer_dry_run_consumer_payload["summary"]["dry_run_blocker_count"] == 1
-    assert writer_dry_run_consumer_payload["summary"]["invalid_record_count"] == 0
-    assert (
-        writer_dry_run_consumer_payload["summary"][
-            "memory_writer_apply_request_available"
-        ]
-        is True
-    )
-    assert writer_dry_run_consumer_payload["summary"]["memory_writer_handler_invoked"] is False
-    assert writer_dry_run_consumer_payload["summary"]["memory_file_write_applied"] is False
-    assert (
-        writer_dry_run_consumer_payload["summary"]["memory_write_allowed_by_consumer"]
-        is False
-    )
-    assert writer_dry_run_consumer_payload["summary"]["live_write"] is False
-    assert writer_dry_run_consumer_payload["memory_writer_apply_request"]["handler"] == (
-        "write_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert writer_dry_run_consumer_payload["memory_writer_apply_request"]["apply"] is False
-    assert (
-        writer_dry_run_consumer_payload["memory_writer_apply_request"]["operator_ack"]
-        is False
-    )
-    assert (
-        writer_dry_run_consumer_payload["memory_writer_apply_request"][
-            "operator_must_set_apply_true"
-        ]
-        is True
-    )
-    assert (
-        writer_dry_run_consumer_payload["memory_writer_apply_request"][
-            "operator_must_set_operator_ack_true"
-        ]
-        is True
-    )
-    assert (
-        writer_dry_run_consumer_payload["memory_writer_apply_request"][
-            "memory_draft_payload"
-        ]["memory_draft_records"][0]["proposal_id"]
-        == "proposal-sequence-fader"
-    )
-
-    writer_apply_request = dict(
-        writer_dry_run_consumer_payload["memory_writer_apply_request"]
-    )
-    writer_apply_request["apply"] = True
-    writer_apply_request["operator_ack"] = True
-    writer_apply_request["root_path"] = str(tmp_path)
-
-    await server._dispatch["write_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        writer_apply_request,
-    )
-
-    writer_apply_payload = server.send_to_client.await_args.args[1]
-    assert writer_apply_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_writer"
-    )
-    assert writer_apply_payload["status"] == "append_only_memory_write_applied"
-    assert writer_apply_payload["success"] is True
-    assert writer_apply_payload["summary"]["write_result_count"] == 1
-    assert writer_apply_payload["summary"]["append_only_memory_write_applied"] is True
-    assert writer_apply_payload["summary"]["operator_ack"] is True
-    assert writer_apply_payload["summary"]["apply_requested"] is True
-    assert writer_apply_payload["summary"]["memory_file_mutation"] is True
-    assert writer_apply_payload["summary"]["runtime_memory_mutation"] is False
-    assert writer_apply_payload["summary"]["policy_mutation"] is False
-    assert writer_apply_payload["summary"]["model_mutation"] is False
-    assert writer_apply_payload["summary"]["live_authority_granted"] is False
-    assert writer_apply_payload["summary"]["full_autonomous_ready"] is False
-    assert writer_apply_payload["safety"]["append_only_memory_file_write_applied"] is True
-    assert writer_apply_payload["safety"]["memory_file_mutation"] is True
-    assert writer_apply_payload["safety"]["live_write"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result"
-    ](
-        object(),
-        {
-            "memory_writer_dry_run_result_consumer": writer_dry_run_consumer_payload,
-            "memory_writer_apply_result": writer_apply_payload,
-            "root_path": str(tmp_path),
-        },
-    )
-
-    writer_apply_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        writer_apply_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_writer_apply_result_consumer"
-    )
-    assert (
-        writer_apply_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_writer_apply_result"
-    )
-    assert (
-        writer_apply_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_index_request_available"
-    )
-    assert writer_apply_consumer_payload["summary"]["expected_memory_write_result_count"] == 1
-    assert writer_apply_consumer_payload["summary"]["memory_write_result_count"] == 1
-    assert writer_apply_consumer_payload["summary"]["invalid_record_count"] == 0
-    assert writer_apply_consumer_payload["summary"]["memory_index_request_available"] is True
-    assert writer_apply_consumer_payload["summary"]["memory_index_handler_invoked"] is False
-    assert writer_apply_consumer_payload["summary"]["memory_index_created"] is False
-    assert writer_apply_consumer_payload["summary"]["source_memory_file_write_applied"] is True
-    assert (
-        writer_apply_consumer_payload["summary"][
-            "memory_file_write_applied_by_consumer"
-        ]
-        is False
-    )
-    assert writer_apply_consumer_payload["summary"]["memory_file_mutation"] is False
-    assert writer_apply_consumer_payload["summary"]["runtime_memory_mutation"] is False
-    assert writer_apply_consumer_payload["summary"]["policy_mutation"] is False
-    assert writer_apply_consumer_payload["summary"]["model_mutation"] is False
-    assert writer_apply_consumer_payload["summary"]["live_authority_granted"] is False
-    assert writer_apply_consumer_payload["summary"]["full_autonomous_ready"] is False
-    assert writer_apply_consumer_payload["memory_index_request"]["handler"] == (
-        "index_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert (
-        writer_apply_consumer_payload["memory_index_request"]["root_path"]
-        == str(tmp_path)
-    )
-    assert (
-        writer_apply_consumer_payload["memory_index_request"]["target_memory_path"]
-        == ".ai/memory/project.md"
-    )
-
-    await server._dispatch["index_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        writer_apply_consumer_payload["memory_index_request"],
-    )
-
-    memory_index_payload = server.send_to_client.await_args.args[1]
-    assert memory_index_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_index"
-    )
-    assert memory_index_payload["handler"] == (
-        "index_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert memory_index_payload["status"] == "append_only_sequence_memory_index_available"
-    assert memory_index_payload["safety"]["read_only"] is True
-    assert memory_index_payload["safety"]["memory_file_read"] is True
-    assert memory_index_payload["safety"]["live_write"] is False
-    assert memory_index_payload["safety"]["policy_mutation"] is False
-    assert memory_index_payload["safety"]["runtime_memory_mutation"] is False
-    assert memory_index_payload["safety"]["model_mutation"] is False
-    assert memory_index_payload["summary"]["memory_record_count"] == 1
-    assert memory_index_payload["summary"]["invalid_record_count"] == 0
-    assert memory_index_payload["summary"]["indexed_proposal_ids"] == [
-        "proposal-sequence-fader"
-    ]
-    assert memory_index_payload["summary"]["live_authority_granted"] is False
-    assert memory_index_payload["summary"]["full_autonomous_ready"] is False
-    assert (
-        memory_index_payload["memory_records"][0]["proposal_id"]
-        == "proposal-sequence-fader"
-    )
-
-    fresh_sequence_review_context = {
-        "status": "fresh",
-        "field_count": 4,
-        "fresh_field_count": 4,
-        "stale_field_count": 0,
-        "read_only": True,
-        "live_write": False,
-        "apply_attempted": False,
-        "queries_console": False,
-        "queue_mutation": False,
-        "policy_mutation": False,
-    }
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result"
-    ](
-        object(),
-        {
-            "memory_writer_apply_result_consumer": writer_apply_consumer_payload,
-            "memory_index_result": memory_index_payload,
-            "current_sequence_review_freshness": fresh_sequence_review_context,
-        },
-    )
-
-    memory_index_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        memory_index_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_index_result_consumer"
-    )
-    assert (
-        memory_index_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_index_result"
-    )
-    assert (
-        memory_index_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_trust_review_request_available"
-    )
-    assert (
-        memory_index_consumer_payload["summary"]["expected_memory_index_record_count"]
-        == 1
-    )
-    assert memory_index_consumer_payload["summary"]["memory_index_record_count"] == 1
-    assert memory_index_consumer_payload["summary"]["invalid_record_count"] == 0
-    assert (
-        memory_index_consumer_payload["summary"][
-            "memory_trust_review_request_available"
-        ]
-        is True
-    )
-    assert (
-        memory_index_consumer_payload["summary"][
-            "memory_trust_review_handler_invoked"
-        ]
-        is False
-    )
-    assert memory_index_consumer_payload["summary"]["memory_trust_review_created"] is False
-    assert memory_index_consumer_payload["summary"]["source_memory_index_available"] is True
-    assert (
-        memory_index_consumer_payload["summary"][
-            "fresh_sequence_review_context_status"
-        ]
-        == "fresh"
-    )
-    assert memory_index_consumer_payload["summary"]["memory_file_mutation"] is False
-    assert memory_index_consumer_payload["summary"]["runtime_memory_mutation"] is False
-    assert memory_index_consumer_payload["summary"]["policy_mutation"] is False
-    assert memory_index_consumer_payload["summary"]["model_mutation"] is False
-    assert memory_index_consumer_payload["summary"]["live_authority_granted"] is False
-    assert memory_index_consumer_payload["summary"]["full_autonomous_ready"] is False
-    assert (
-        memory_index_consumer_payload["memory_trust_review_request"]["handler"]
-        == "review_operator_proposal_apply_sequence_policy_memory_trust"
-    )
-    assert (
-        memory_index_consumer_payload["memory_trust_review_request"][
-            "memory_index"
-        ]["status"]
-        == "append_only_sequence_memory_index_available"
-    )
-
-    await server._dispatch[
-        "review_operator_proposal_apply_sequence_policy_memory_trust"
-    ](
-        object(),
-        memory_index_consumer_payload["memory_trust_review_request"],
-    )
-
-    memory_trust_review_payload = server.send_to_client.await_args.args[1]
-    assert memory_trust_review_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_review"
-    )
-    assert memory_trust_review_payload["handler"] == (
-        "review_operator_proposal_apply_sequence_policy_memory_trust"
-    )
-    assert (
-        memory_trust_review_payload["status"]
-        == "sequence_memory_trust_review_candidate_available"
-    )
-    assert memory_trust_review_payload["summary"]["memory_record_count"] == 1
-    assert memory_trust_review_payload["summary"]["trust_review_candidate_count"] == 1
-    assert (
-        memory_trust_review_payload["summary"][
-            "current_sequence_review_freshness_status"
-        ]
-        == "fresh"
-    )
-    assert memory_trust_review_payload["summary"]["execution_allowed_by_review"] is False
-    assert memory_trust_review_payload["summary"]["policy_mutation"] is False
-    assert memory_trust_review_payload["summary"]["runtime_memory_mutation"] is False
-    assert memory_trust_review_payload["summary"]["model_mutation"] is False
-    assert memory_trust_review_payload["summary"]["live_authority_granted"] is False
-    assert memory_trust_review_payload["summary"]["full_autonomous_ready"] is False
-    assert (
-        memory_trust_review_payload["trust_review_candidates"][0]["proposal_id"]
-        == "proposal-sequence-fader"
-    )
-    assert (
-        memory_trust_review_payload["trust_review_candidates"][0][
-            "operator_review_required"
-        ]
-        is True
-    )
-    assert (
-        memory_trust_review_payload["trust_review_candidates"][0][
-            "execution_allowed_by_review"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result"
-    ](
-        object(),
-        {
-            "memory_index_result_consumer": memory_index_consumer_payload,
-            "memory_trust_review_result": memory_trust_review_payload,
-        },
-    )
-
-    trust_review_consumer_payload = server.send_to_client.await_args.args[1]
-    assert (
-        trust_review_consumer_payload["type"]
-        == "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_review_result_consumer"
-    )
-    assert (
-        trust_review_consumer_payload["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_review_result"
-    )
-    assert (
-        trust_review_consumer_payload["status"]
-        == "sequence_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_request_available"
-    )
-    assert (
-        trust_review_consumer_payload["summary"][
-            "expected_trust_review_candidate_count"
-        ]
-        == 1
-    )
-    assert trust_review_consumer_payload["summary"]["trust_review_candidate_count"] == 1
-    assert trust_review_consumer_payload["summary"]["invalid_record_count"] == 0
-    assert (
-        trust_review_consumer_payload["summary"][
-            "acceptance_ledger_request_available"
-        ]
-        is True
-    )
-    assert (
-        trust_review_consumer_payload["summary"][
-            "acceptance_ledger_handler_invoked"
-        ]
-        is False
-    )
-    assert trust_review_consumer_payload["summary"]["acceptance_ledger_created"] is False
-    assert trust_review_consumer_payload["summary"]["operator_acceptance_required"] is True
-    assert trust_review_consumer_payload["summary"]["memory_file_mutation"] is False
-    assert trust_review_consumer_payload["summary"]["runtime_memory_mutation"] is False
-    assert trust_review_consumer_payload["summary"]["policy_mutation"] is False
-    assert trust_review_consumer_payload["summary"]["model_mutation"] is False
-    assert trust_review_consumer_payload["summary"]["live_authority_granted"] is False
-    assert trust_review_consumer_payload["summary"]["full_autonomous_ready"] is False
-    assert (
-        trust_review_consumer_payload["acceptance_ledger_request"]["handler"]
-        == "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    )
-    assert (
-        trust_review_consumer_payload["acceptance_ledger_request"][
-            "acceptance_records"
-        ]
-        == []
-    )
-    assert (
-        trust_review_consumer_payload["acceptance_record_templates"][0]["proposal_id"]
-        == "proposal-sequence-fader"
-    )
-    assert trust_review_consumer_payload["acceptance_record_templates"][0][
-        "operator_must_choose_decision"
-    ] is True
-    assert trust_review_consumer_payload["acceptance_record_templates"][0][
-        "sequence_policy_promotion_allowed_by_acceptance"
-    ] is False
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    ](
-        object(),
-        trust_review_consumer_payload["acceptance_ledger_request"],
-    )
-
-    acceptance_ledger_payload = server.send_to_client.await_args.args[1]
-    assert acceptance_ledger_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
-    )
-    assert acceptance_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    )
-    assert (
-        acceptance_ledger_payload["status"]
-        == "operator_sequence_memory_trust_acceptance_required"
-    )
-    assert acceptance_ledger_payload["summary"]["trust_review_candidate_count"] == 1
-    assert acceptance_ledger_payload["summary"]["acceptance_record_count"] == 0
-    assert acceptance_ledger_payload["summary"]["accepted_record_count"] == 0
-    assert acceptance_ledger_payload["summary"]["rejected_record_count"] == 0
-    assert acceptance_ledger_payload["summary"]["unreviewed_candidate_count"] == 1
-    assert acceptance_ledger_payload["summary"]["operator_review_required"] is True
-    assert (
-        acceptance_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        acceptance_ledger_payload["summary"]["execution_allowed_by_acceptance"]
-        is False
-    )
-    assert acceptance_ledger_payload["summary"]["policy_mutation_allowed_by_acceptance"] is False
-    assert (
-        acceptance_ledger_payload["summary"][
-            "runtime_memory_mutation_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert acceptance_ledger_payload["summary"]["live_authority_granted"] is False
-    assert acceptance_ledger_payload["summary"]["full_autonomous_ready"] is False
-
-    acceptance_template = trust_review_consumer_payload[
-        "acceptance_record_templates"
-    ][0]
-    operator_acceptance_record = {
-        "acceptance_id": "sequence-memory-trust-acceptance-product-layer-1",
-        "review_candidate_id": acceptance_template["review_candidate_id"],
-        "memory_record_id": acceptance_template["memory_record_id"],
-        "proposal_id": acceptance_template["proposal_id"],
-        "learning_scope": acceptance_template["learning_scope"],
-        "value_type": acceptance_template["value_type"],
-        "idempotency_key": acceptance_template["idempotency_key"],
-        "decision": "accepted",
-        "reviewed_by": "operator",
-        "reviewed_at": "2026-06-06T13:00:00Z",
-    }
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    ](
-        object(),
-        {
-            **trust_review_consumer_payload["acceptance_ledger_request"],
-            "acceptance_records": [operator_acceptance_record],
-        },
-    )
-
-    accepted_ledger_payload = server.send_to_client.await_args.args[1]
-    assert accepted_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    )
-    assert (
-        accepted_ledger_payload["status"]
-        == "operator_sequence_memory_trust_acceptance_records_available"
-    )
-    assert accepted_ledger_payload["summary"]["acceptance_record_count"] == 1
-    assert accepted_ledger_payload["summary"]["accepted_record_count"] == 1
-    assert accepted_ledger_payload["summary"]["rejected_record_count"] == 0
-    assert accepted_ledger_payload["summary"]["unreviewed_candidate_count"] == 0
-    assert (
-        accepted_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert accepted_ledger_payload["summary"]["execution_allowed_by_acceptance"] is False
-    assert accepted_ledger_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_acceptance_ledger_result"
-    ](
-        object(),
-        {
-            "memory_trust_review_result_consumer": trust_review_consumer_payload,
-            "memory_trust_acceptance_ledger_result": accepted_ledger_payload,
-        },
-    )
-
-    acceptance_ledger_consumer_payload = server.send_to_client.await_args.args[1]
-    assert acceptance_ledger_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_memory_trust_acceptance_ledger_result_consumer"
-    )
-    assert acceptance_ledger_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_memory_trust_acceptance_ledger_result"
-    )
-    assert acceptance_ledger_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_plan_request_available"
-    )
-    assert (
-        acceptance_ledger_consumer_payload["summary"][
-            "promotion_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        acceptance_ledger_consumer_payload["summary"]["promotion_plan_handler_invoked"]
-        is False
-    )
-    assert (
-        acceptance_ledger_consumer_payload["summary"]["promotion_plan_created"]
-        is False
-    )
-    assert acceptance_ledger_consumer_payload["summary"]["memory_file_mutation"] is False
-    assert (
-        acceptance_ledger_consumer_payload["summary"]["runtime_memory_mutation"]
-        is False
-    )
-    assert acceptance_ledger_consumer_payload["summary"]["policy_mutation"] is False
-    assert acceptance_ledger_consumer_payload["summary"]["model_mutation"] is False
-    assert (
-        acceptance_ledger_consumer_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        acceptance_ledger_consumer_payload["promotion_plan_request"]["handler"]
-        == "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        acceptance_ledger_consumer_payload["promotion_plan_request"],
-    )
-
-    promotion_plan_payload = server.send_to_client.await_args.args[1]
-    assert promotion_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
-    )
-    assert promotion_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert (
-        promotion_plan_payload["status"]
-        == "sequence_memory_trust_promotion_plan_candidate_available"
-    )
-    assert promotion_plan_payload["summary"]["promotion_candidate_count"] == 1
-    assert (
-        promotion_plan_payload["summary"][
-            "sequence_policy_promotion_allowed_by_plan"
-        ]
-        is False
-    )
-    assert promotion_plan_payload["summary"]["execution_allowed_by_plan"] is False
-    assert promotion_plan_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_plan_result"
-    ](
-        object(),
-        {
-            "memory_trust_acceptance_ledger_result_consumer": (
-                acceptance_ledger_consumer_payload
-            ),
-            "promotion_plan_result": promotion_plan_payload,
-        },
-    )
-
-    promotion_plan_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer"
-    )
-    assert promotion_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_plan_result"
-    )
-    assert promotion_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_contract_request_available"
-    )
-    assert (
-        promotion_plan_consumer_payload["summary"][
-            "promotion_contract_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_plan_consumer_payload["summary"][
-            "promotion_contract_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_plan_consumer_payload["summary"]["promotion_contract_created"]
-        is False
-    )
-    assert promotion_plan_consumer_payload["summary"]["memory_file_mutation"] is False
-    assert (
-        promotion_plan_consumer_payload["summary"]["runtime_memory_mutation"]
-        is False
-    )
-    assert promotion_plan_consumer_payload["summary"]["policy_mutation"] is False
-    assert promotion_plan_consumer_payload["summary"]["model_mutation"] is False
-    assert (
-        promotion_plan_consumer_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_plan_consumer_payload["promotion_contract_request"]["handler"]
-        == "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert (
-        promotion_plan_consumer_payload["promotion_contract_request"][
-            "operator_must_supply_current_sequence_policy_context"
-        ]
-        is True
-    )
-    assert (
-        promotion_plan_consumer_payload["promotion_contract_request"][
-            "operator_must_supply_rollback_evidence"
-        ]
-        is True
-    )
-
-    await server._dispatch[
-        "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        {
-            **promotion_plan_consumer_payload["promotion_contract_request"],
-            "current_sequence_policy_context": {
-                "status": "fresh",
-                "field_count": 4,
-                "fresh_field_count": 4,
-                "read_only": True,
-                "live_write": False,
-                "apply_attempted": False,
-                "queries_console": False,
-                "queue_mutation": False,
-                "policy_mutation": False,
-            },
-            "rollback_evidence": {
-                "status": "ready",
-                "read_only": True,
-                "live_write": False,
-                "apply_attempted": False,
-                "mutates_console_state": False,
-                "queries_console": False,
-                "queue_mutation": False,
-                "policy_mutation": False,
-                "model_mutation": False,
-                "runtime_memory_mutation": False,
-                "live_authority_granted": False,
-                "full_autonomous_ready": False,
-                "rollback_strategy": (
-                    "manual_revert_to_previous_sequence_policy_state"
-                ),
-                "previous_policy_state": "not_trusted_for_sequence_policy",
-                "target_policy_store": "operator_sequence_policy_trust_gate",
-                "reviewed_by": "operator",
-                "reviewed_at": "2026-06-06T14:00:00Z",
-            },
-        },
-    )
-
-    promotion_contract_payload = server.send_to_client.await_args.args[1]
-    assert promotion_contract_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
-    )
-    assert promotion_contract_payload["handler"] == (
-        "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_contract_payload["status"] == (
-        "manual_sequence_memory_trust_promotion_contract_ready"
-    )
-    assert promotion_contract_payload["summary"]["contract_record_count"] == 1
-    assert (
-        promotion_contract_payload["summary"][
-            "sequence_policy_promotion_allowed_by_contract"
-        ]
-        is False
-    )
-    assert promotion_contract_payload["summary"]["execution_allowed_by_contract"] is False
-    assert promotion_contract_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_contract_result"
-    ](
-        object(),
-        {
-            "promotion_plan_result_consumer": promotion_plan_consumer_payload,
-            "promotion_contract_result": promotion_contract_payload,
-        },
-    )
-
-    promotion_contract_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_contract_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_contract_result_consumer"
-    )
-    assert promotion_contract_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_contract_result"
-    )
-    assert promotion_contract_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_acceptance_ledger_request_available"
-    )
-    assert (
-        promotion_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_contract_consumer_payload["summary"]["memory_file_mutation"]
-        is False
-    )
-    assert (
-        promotion_contract_consumer_payload["summary"]["runtime_memory_mutation"]
-        is False
-    )
-    assert promotion_contract_consumer_payload["summary"]["policy_mutation"] is False
-    assert promotion_contract_consumer_payload["summary"]["model_mutation"] is False
-    assert (
-        promotion_contract_consumer_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_contract_consumer_payload["promotion_acceptance_ledger_request"][
-            "handler"
-        ]
-        == "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    )
-    assert (
-        promotion_contract_consumer_payload["promotion_acceptance_ledger_request"][
-            "acceptance_records"
-        ]
-        == []
-    )
-    assert (
-        promotion_contract_consumer_payload["promotion_acceptance_record_templates"][0][
-            "proposal_id"
-        ]
-        == "proposal-sequence-fader"
-    )
-    assert (
-        promotion_contract_consumer_payload["promotion_acceptance_record_templates"][0][
-            "operator_must_choose_decision"
-        ]
-        is True
-    )
-    assert (
-        promotion_contract_consumer_payload["promotion_acceptance_record_templates"][0][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    ](
-        object(),
-        promotion_contract_consumer_payload["promotion_acceptance_ledger_request"],
-    )
-
-    promotion_acceptance_ledger_payload = server.send_to_client.await_args.args[1]
-    assert promotion_acceptance_ledger_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
-    )
-    assert promotion_acceptance_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    )
-    assert promotion_acceptance_ledger_payload["status"] == (
-        "operator_sequence_memory_trust_promotion_acceptance_required"
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"][
-            "promotion_contract_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"]["acceptance_record_count"]
-        == 0
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"][
-            "unreviewed_contract_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"][
-            "execution_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_acceptance_ledger_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    promotion_acceptance_template = promotion_contract_consumer_payload[
-        "promotion_acceptance_record_templates"
-    ][0]
-    operator_promotion_acceptance_record = {
-        "promotion_acceptance_id": "sequence-memory-promotion-acceptance-product-layer-1",
-        "promotion_contract_record_id": promotion_acceptance_template[
-            "promotion_contract_record_id"
-        ],
-        "promotion_candidate_id": promotion_acceptance_template[
-            "promotion_candidate_id"
-        ],
-        "proposal_id": promotion_acceptance_template["proposal_id"],
-        "learning_scope": promotion_acceptance_template["learning_scope"],
-        "value_type": promotion_acceptance_template["value_type"],
-        "idempotency_key": promotion_acceptance_template["idempotency_key"],
-        "previous_policy_state": promotion_acceptance_template[
-            "previous_policy_state"
-        ],
-        "rollback_strategy": promotion_acceptance_template["rollback_strategy"],
-        "decision": "accepted",
-        "reviewed_by": "operator",
-        "reviewed_at": "2026-06-06T14:30:00Z",
-    }
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    ](
-        object(),
-        {
-            **promotion_contract_consumer_payload[
-                "promotion_acceptance_ledger_request"
-            ],
-            "acceptance_records": [operator_promotion_acceptance_record],
-        },
-    )
-
-    accepted_promotion_ledger_payload = server.send_to_client.await_args.args[1]
-    assert accepted_promotion_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    )
-    assert accepted_promotion_ledger_payload["status"] == (
-        "operator_sequence_memory_trust_promotion_acceptance_records_available"
-    )
-    assert accepted_promotion_ledger_payload["summary"]["acceptance_record_count"] == 1
-    assert accepted_promotion_ledger_payload["summary"]["accepted_record_count"] == 1
-    assert accepted_promotion_ledger_payload["summary"]["rejected_record_count"] == 0
-    assert (
-        accepted_promotion_ledger_payload["summary"][
-            "unreviewed_contract_record_count"
-        ]
-        == 0
-    )
-    assert (
-        accepted_promotion_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        accepted_promotion_ledger_payload["summary"][
-            "execution_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert accepted_promotion_ledger_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result"
-    ](
-        object(),
-        {
-            "promotion_contract_result_consumer": promotion_contract_consumer_payload,
-            "promotion_acceptance_ledger_result": accepted_promotion_ledger_payload,
-        },
-    )
-
-    promotion_acceptance_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_acceptance_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer"
-    )
-    assert promotion_acceptance_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result"
-    )
-    assert promotion_acceptance_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_execution_plan_request_available"
-    )
-    assert (
-        promotion_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_created"
-        ]
-        is False
-    )
-    assert promotion_acceptance_consumer_payload["summary"]["policy_mutation"] is False
-    assert (
-        promotion_acceptance_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_acceptance_consumer_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_acceptance_consumer_payload["promotion_execution_plan_request"][
-            "handler"
-        ]
-        == "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    ](
-        object(),
-        promotion_acceptance_consumer_payload["promotion_execution_plan_request"],
-    )
-
-    promotion_execution_plan_payload = server.send_to_client.await_args.args[1]
-    assert promotion_execution_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
-    )
-    assert promotion_execution_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    )
-    assert promotion_execution_plan_payload["status"] == (
-        "manual_sequence_memory_trust_promotion_execution_candidate_available"
-    )
-    assert (
-        promotion_execution_plan_payload["summary"]["execution_candidate_count"]
-        == 1
-    )
-    assert (
-        promotion_execution_plan_payload["summary"]["execution_allowed_by_plan"]
-        is False
-    )
-    assert (
-        promotion_execution_plan_payload["summary"][
-            "sequence_policy_promotion_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_execution_plan_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
-    ](
-        object(),
-        {
-            "promotion_acceptance_ledger_result_consumer": (
-                promotion_acceptance_consumer_payload
-            ),
-            "promotion_execution_plan_result": promotion_execution_plan_payload,
-        },
-    )
-
-    promotion_execution_plan_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_execution_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer"
-    )
-    assert promotion_execution_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
-    )
-    assert promotion_execution_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_dry_run_request_available"
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["handler"]
-        == "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert (
-        promotion_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["apply"]
-        is False
-    )
-    assert (
-        promotion_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["operator_ack"]
-        is False
-    )
-
-    await server._dispatch[
-        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    ](
-        object(),
-        promotion_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ],
-    )
-
-    promotion_executor_dry_run_payload = server.send_to_client.await_args.args[1]
-    assert promotion_executor_dry_run_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
-    )
-    assert promotion_executor_dry_run_payload["handler"] == (
-        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert promotion_executor_dry_run_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_dry_run_ready"
-    )
-    assert promotion_executor_dry_run_payload["summary"]["dry_run_record_count"] == 1
-    assert (
-        promotion_executor_dry_run_payload["summary"][
-            "execution_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_payload["summary"][
-            "sequence_policy_promotion_applied"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_payload["summary"][
-            "policy_mutation_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_payload["summary"][
-            "runtime_memory_mutation_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
-    ](
-        object(),
-        {
-            "promotion_execution_plan_result_consumer": (
-                promotion_execution_plan_consumer_payload
-            ),
-            "promotion_executor_dry_run_result": promotion_executor_dry_run_payload,
-        },
-    )
-
-    promotion_executor_dry_run_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_executor_dry_run_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer"
-    )
-    assert promotion_executor_dry_run_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
-    )
-    assert promotion_executor_dry_run_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_request_available"
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
-            "handler"
-        ]
-        == "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
-            "apply"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_dry_run_consumer_payload["promotion_executor_request"][
-            "operator_ack"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_executor_dry_run_consumer_payload["promotion_executor_request"],
-    )
-
-    promotion_executor_payload = server.send_to_client.await_args.args[1]
-    assert promotion_executor_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert promotion_executor_payload["handler"] == (
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_executor_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_ready"
-    )
-    assert promotion_executor_payload["summary"]["apply_result_count"] == 0
-    assert promotion_executor_payload["summary"]["apply_requested"] is False
-    assert promotion_executor_payload["summary"]["operator_ack"] is False
-    assert (
-        promotion_executor_payload["summary"]["sequence_policy_promotion_applied"]
-        is False
-    )
-    assert (
-        promotion_executor_payload["summary"]["runtime_memory_mutation"]
-        is False
-    )
-    assert (
-        promotion_executor_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert promotion_executor_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    ](
-        object(),
-        {
-            "promotion_executor_dry_run_result_consumer": (
-                promotion_executor_dry_run_consumer_payload
-            ),
-            "promotion_executor_result": promotion_executor_payload,
-        },
-    )
-
-    promotion_executor_preview_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_executor_preview_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
-    )
-    assert promotion_executor_preview_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    )
-    assert promotion_executor_preview_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_result_consumer_blocked"
-    )
-    assert (
-        promotion_executor_preview_consumer_payload["summary"][
-            "promotion_apply_audit_request_available"
-        ]
-        is False
-    )
-    assert (
-        "applied_sequence_memory_trust_promotion_executor_result_required_before_apply_audit"
-        in promotion_executor_preview_consumer_payload["summary"]["blocked_by"]
-    )
-
-    promotion_executor_apply_request = dict(
-        promotion_executor_dry_run_consumer_payload["promotion_executor_request"]
-    )
-    promotion_executor_apply_request.update(
-        {
-            "apply": True,
-            "operator_ack": True,
-            "target_store": {},
-        }
-    )
-    await server._dispatch[
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_executor_apply_request,
-    )
-
-    promotion_executor_applied_payload = server.send_to_client.await_args.args[1]
-    assert promotion_executor_applied_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_applied"
-    )
-    assert promotion_executor_applied_payload["summary"]["apply_result_count"] == 1
-    assert promotion_executor_applied_payload["summary"]["apply_requested"] is True
-    assert promotion_executor_applied_payload["summary"]["operator_ack"] is True
-    assert (
-        promotion_executor_applied_payload["summary"][
-            "sequence_policy_promotion_applied"
-        ]
-        is True
-    )
-    assert (
-        promotion_executor_applied_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is True
-    )
-    assert (
-        promotion_executor_applied_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    ](
-        object(),
-        {
-            "promotion_executor_dry_run_result_consumer": (
-                promotion_executor_dry_run_consumer_payload
-            ),
-            "promotion_executor_result": promotion_executor_applied_payload,
-        },
-    )
-
-    promotion_executor_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_executor_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
-    )
-    assert promotion_executor_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    )
-    assert promotion_executor_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_request_available"
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_executor_result_consumer_payload["promotion_apply_audit_request"][
-            "handler"
-        ]
-        == "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-
-    await server._dispatch[
-        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_executor_result_consumer_payload["promotion_apply_audit_request"],
-    )
-
-    promotion_apply_audit_payload = server.send_to_client.await_args.args[1]
-    assert promotion_apply_audit_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
-    )
-    assert promotion_apply_audit_payload["handler"] == (
-        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_apply_audit_payload["status"] == (
-        "sequence_memory_trust_promotion_apply_audit_records_available"
-    )
-    assert promotion_apply_audit_payload["summary"]["executor_apply_result_count"] == 1
-    assert promotion_apply_audit_payload["summary"]["apply_audit_record_count"] == 1
-    assert promotion_apply_audit_payload["summary"]["runtime_memory_mutation"] is False
-    assert (
-        promotion_apply_audit_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_apply_audit_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert promotion_apply_audit_payload["summary"]["rollback_verified"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
-    ](
-        object(),
-        {
-            "promotion_executor_result_consumer": (
-                promotion_executor_result_consumer_payload
-            ),
-            "promotion_apply_audit_result": promotion_apply_audit_payload,
-        },
-    )
-
-    promotion_apply_audit_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_apply_audit_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer"
-    )
-    assert promotion_apply_audit_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
-    )
-    assert promotion_apply_audit_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_rollback_verification_request_available"
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"][
-            "promotion_rollback_verification_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"][
-            "promotion_rollback_verification_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"][
-            "promotion_rollback_verification_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_apply_audit_result_consumer_payload[
-            "promotion_rollback_verification_request"
-        ]["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    ](
-        object(),
-        promotion_apply_audit_result_consumer_payload[
-            "promotion_rollback_verification_request"
-        ],
-    )
-
-    promotion_rollback_verification_payload = server.send_to_client.await_args.args[1]
-    assert promotion_rollback_verification_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
-    )
-    assert promotion_rollback_verification_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    )
-    assert promotion_rollback_verification_payload["status"] == (
-        "sequence_memory_trust_promotion_rollback_verification_not_ready"
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "apply_audit_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "verification_record_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "unverified_apply_audit_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert promotion_rollback_verification_payload["summary"]["rollback_verified"] is False
-    assert promotion_rollback_verification_payload["verified_records"] == []
-
-    apply_audit_record = promotion_apply_audit_payload["audit_records"][0]
-    rollback_verification_request = dict(
-        promotion_apply_audit_result_consumer_payload[
-            "promotion_rollback_verification_request"
-        ]
-    )
-    rollback_verification_request["verification_records"] = [
-        {
-            "rollback_verification_id": "queue-import-rollback-verification-1",
-            "promotion_apply_audit_id": apply_audit_record[
-                "promotion_apply_audit_id"
-            ],
-            "promotion_executor_apply_id": apply_audit_record[
-                "promotion_executor_apply_id"
-            ],
-            "proposal_id": apply_audit_record["proposal_id"],
-            "learning_scope": apply_audit_record["learning_scope"],
-            "value_type": apply_audit_record["value_type"],
-            "source_idempotency_key": apply_audit_record[
-                "source_idempotency_key"
-            ],
-            "policy_key": apply_audit_record["policy_key"],
-            "target_policy_store": apply_audit_record["target_policy_store"],
-            "target_policy_path": apply_audit_record["target_policy_path"],
-            "target_policy_state": apply_audit_record["target_policy_state"],
-            "rollback_target_policy_state": apply_audit_record[
-                "rollback_target_policy_state"
-            ],
-            "rollback_strategy": apply_audit_record["rollback_strategy"],
-            "verification_evidence_status": "reviewed",
-            "decision": "verified",
-            "verified_by": "operator",
-            "verified_at": "2026-06-06T14:00:00Z",
-            "current_sequence_review_freshness": fresh_sequence_review_context,
-            "rollback_verified": True,
-            "read_only": True,
-            "operator_review_required": True,
-            "separate_sequence_policy_gate_required": True,
-            "live_write": False,
-            "apply_attempted": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "queue_mutation": False,
-            "model_mutation": False,
-            "runtime_memory_mutation": False,
-            "sequence_policy_trust_store_mutation": False,
-            "proposal_state_mutation": False,
-            "sequence_execution_allowed_by_verification": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "can_import_to_queue": False,
-            "can_apply_live": False,
-        }
-    ]
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    ](
-        object(),
-        rollback_verification_request,
-    )
-
-    promotion_rollback_verified_payload = server.send_to_client.await_args.args[1]
-    assert promotion_rollback_verified_payload["status"] == (
-        "operator_sequence_memory_trust_promotion_rollback_verified_records_available"
-    )
-    assert (
-        promotion_rollback_verified_payload["summary"][
-            "rollback_verified_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_rollback_verified_payload["summary"][
-            "sequence_execution_allowed_by_verification"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verified_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
-    ](
-        object(),
-        {
-            "promotion_apply_audit_result_consumer": (
-                promotion_apply_audit_result_consumer_payload
-            ),
-            "promotion_rollback_verification_result": (
-                promotion_rollback_verified_payload
-            ),
-        },
-    )
-
-    promotion_rollback_verification_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_rollback_verification_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer"
-    )
-    assert promotion_rollback_verification_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
-    )
-    assert promotion_rollback_verification_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_request_available"
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_rollback_verification_result_consumer_payload[
-            "promotion_sequence_policy_gate_request"
-        ]["handler"]
-        == "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    )
-
-    await server._dispatch[
-        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    ](
-        object(),
-        promotion_rollback_verification_result_consumer_payload[
-            "promotion_sequence_policy_gate_request"
-        ],
-    )
-
-    promotion_sequence_policy_gate_payload = server.send_to_client.await_args.args[1]
-    assert promotion_sequence_policy_gate_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
-    )
-    assert promotion_sequence_policy_gate_payload["handler"] == (
-        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    )
-    assert promotion_sequence_policy_gate_payload["status"] == (
-        "verified_sequence_memory_trust_promotion_policy_records_available"
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"][
-            "rollback_verified_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"][
-            "sequence_policy_gate_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"]["eligible_record_count"]
-        == 1
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["policy_records"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_payload["policy_records"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
-    ](
-        object(),
-        {
-            "promotion_rollback_verification_result_consumer": (
-                promotion_rollback_verification_result_consumer_payload
-            ),
-            "promotion_sequence_policy_gate_result": (
-                promotion_sequence_policy_gate_payload
-            ),
-        },
-    )
-
-    promotion_sequence_policy_gate_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_sequence_policy_gate_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer"
-    )
-    assert promotion_sequence_policy_gate_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
-    )
-    assert promotion_sequence_policy_gate_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_policy_consumer_request_available"
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "promotion_policy_consumer_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "promotion_policy_consumer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "promotion_policy_consumer_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]["handler"]
-        == "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    )
-    assert (
-        promotion_sequence_policy_gate_result_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]["proposals_required_from_operator"]
-        is True
-    )
-    policy_record = promotion_sequence_policy_gate_payload["policy_records"][0]
-    policy_consumer_request = dict(
-        promotion_sequence_policy_gate_result_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]
-    )
-    policy_consumer_request["proposals"] = [
-        {
-            "proposal_id": policy_record["proposal_id"],
-            "method_id": "safe_gain",
-            "kind": "fader",
-            "target": "ch/02",
-            "severity": "high",
-            "confidence": 0.82,
-            "evidence": {
-                "idempotency_key": policy_record["source_idempotency_key"],
-            },
-        }
-    ]
-    await server._dispatch[
-        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    ](
-        object(),
-        policy_consumer_request,
-    )
-
-    promotion_policy_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_policy_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
-    )
-    assert promotion_policy_consumer_payload["handler"] == (
-        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    )
-    assert promotion_policy_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_policy_consumer_records_available"
-    )
-    assert (
-        promotion_policy_consumer_payload["summary"]["consumer_record_count"]
-        == 1
-    )
-    assert (
-        promotion_policy_consumer_payload["summary"]["proposal_order_mutation"]
-        is False
-    )
-    assert promotion_policy_consumer_payload["summary"]["queue_mutation"] is False
-    assert (
-        promotion_policy_consumer_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_payload["summary"][
-            "sequence_policy_change_allowed_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_payload["summary"][
-            "sequence_execution_allowed_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_payload["consumer_records"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_payload["consumer_records"][0]["can_apply_live"]
-        is False
-    )
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
-    ](
-        object(),
-        {
-            "promotion_sequence_policy_gate_result_consumer": (
-                promotion_sequence_policy_gate_result_consumer_payload
-            ),
-            "promotion_policy_consumer_result": promotion_policy_consumer_payload,
-        },
-    )
-
-    promotion_policy_consumer_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_policy_consumer_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer"
-    )
-    assert promotion_policy_consumer_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
-    )
-    assert promotion_policy_consumer_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_request_available"
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]["handler"]
-        == "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    )
-    assert (
-        promotion_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]["proposals_required_from_operator"]
-        is True
-    )
-
-    ordering_preview_request = dict(
-        promotion_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]
-    )
-    ordering_preview_request["proposals"] = policy_consumer_request["proposals"]
-    await server._dispatch[
-        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    ](
-        object(),
-        ordering_preview_request,
-    )
-
-    promotion_ordering_preview_payload = server.send_to_client.await_args.args[1]
-    assert promotion_ordering_preview_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
-    )
-    assert promotion_ordering_preview_payload["handler"] == (
-        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    )
-    assert promotion_ordering_preview_payload["status"] == (
-        "sequence_memory_trust_promotion_ordering_preview_available"
-    )
-    assert (
-        promotion_ordering_preview_payload["summary"]["ordered_preview_count"]
-        == 1
-    )
-    assert (
-        promotion_ordering_preview_payload["summary"]["proposal_order_mutation"]
-        is False
-    )
-    assert promotion_ordering_preview_payload["summary"]["queue_mutation"] is False
-    assert (
-        promotion_ordering_preview_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_payload["summary"][
-            "sequence_policy_change_allowed_by_ordering_preview"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_payload["summary"][
-            "sequence_execution_allowed_by_ordering_preview"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_payload["ordered_proposals"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_payload["ordered_proposals"][0]["can_apply_live"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result"
-    ](
-        object(),
-        {
-            "promotion_policy_consumer_result_consumer": (
-                promotion_policy_consumer_result_consumer_payload
-            ),
-            "promotion_ordering_preview_result": promotion_ordering_preview_payload,
-        },
-    )
-
-    promotion_ordering_preview_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_ordering_preview_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer"
-    )
-    assert promotion_ordering_preview_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result"
-    )
-    assert promotion_ordering_preview_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_request_available"
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_ordering_preview_result_consumer_payload[
-            "promotion_queue_ordering_plan_request"
-        ]["handler"]
-        == "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    ](
-        object(),
-        promotion_ordering_preview_result_consumer_payload[
-            "promotion_queue_ordering_plan_request"
-        ],
-    )
-
-    promotion_queue_ordering_plan_payload = server.send_to_client.await_args.args[1]
-    assert promotion_queue_ordering_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
-    )
-    assert promotion_queue_ordering_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    )
-    assert promotion_queue_ordering_plan_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_ordering_plan_available"
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["summary"][
-            "queue_ordering_plan_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["summary"]["proposal_order_mutation"]
-        is False
-    )
-    assert promotion_queue_ordering_plan_payload["summary"]["queue_mutation"] is False
-    assert (
-        promotion_queue_ordering_plan_payload["summary"][
-            "queue_import_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["summary"][
-            "sequence_execution_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["summary"]["live_authority_granted"]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["queue_ordering_plan_records"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_payload["queue_ordering_plan_records"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
-    ](
-        object(),
-        {
-            "promotion_ordering_preview_result_consumer": (
-                promotion_ordering_preview_result_consumer_payload
-            ),
-            "promotion_queue_ordering_plan_result": (
-                promotion_queue_ordering_plan_payload
-            ),
-        },
-    )
-
-    promotion_queue_ordering_plan_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_queue_ordering_plan_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer"
-    )
-    assert promotion_queue_ordering_plan_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
-    )
-    assert promotion_queue_ordering_plan_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_importer_request_available"
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "proposal_payloads_required_from_operator"
-        ]
-        is True
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"]["apply"]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "operator_ack"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_ordering_plan_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    queue_importer_request = dict(
-        promotion_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]
-    )
-    queue_importer_request["proposal_payloads"] = policy_consumer_request["proposals"]
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        queue_importer_request,
-    )
-
-    promotion_queue_importer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_queue_importer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
-    )
-    assert promotion_queue_importer_payload["handler"] == (
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    )
-    assert promotion_queue_importer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_importer_dry_run_ready"
-    )
-    assert (
-        promotion_queue_importer_payload["summary"]["queue_import_spec_count"]
-        == 1
-    )
-    assert (
-        promotion_queue_importer_payload["summary"]["queue_import_result_count"]
-        == 0
-    )
-    assert promotion_queue_importer_payload["summary"]["apply_requested"] is False
-    assert promotion_queue_importer_payload["summary"]["operator_ack"] is False
-    assert promotion_queue_importer_payload["summary"]["queue_mutation"] is False
-    assert promotion_queue_importer_payload["summary"]["live_write"] is False
-    assert (
-        promotion_queue_importer_payload["queue_import_specs"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_queue_importer_payload["queue_import_specs"][0]["can_apply_live"]
-        is False
-    )
-    assert server._apply_manual_console_write.await_count == 1
-    assert "seq-import-audit:proposal-sequence-fader" in (
-        server._operator_apply_idempotency_keys
-    )
-    assert build_decision_queue(server)["summary"]["applied_count"] == 1
+    payload = server.send_to_client.await_args.args[1]
+    _assert_post_executor_migration_required(
+        payload,
+        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan",
+    )
+    server._apply_manual_console_write.assert_not_called()
+    assert not (tmp_path / ".ai/memory/project.md").exists()
 
 
 @pytest.mark.asyncio
-async def test_sequence_policy_queue_import_promotion_queue_importer_result_consumer_feeds_preflight_plan_without_live_write(
-    server,
-    tmp_path,
-):
-    from backend.operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
-        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer,
-    )
-    from tests.test_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer import (
-        _queue_ordering_plan_ready,
-    )
-
+async def test_sequence_policy_promotion_executor_apply_with_ack_requires_server_owned_state(server):
+    target_store = {"existing-policy": {"state": "preserved"}}
+    original_store = deepcopy(target_store)
     server.send_to_client = AsyncMock()
-    server.operator_mode = "supervised"
-    server.mixer_client = CachedMixer()
     server._apply_manual_console_write = AsyncMock()
-    promotion_ordering_preview_result_consumer, queue_ordering_plan, proposals = (
-        _queue_ordering_plan_ready(tmp_path)
-    )
-    promotion_queue_ordering_plan_result_consumer = (
-        build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer(
-            promotion_ordering_preview_result_consumer=(
-                promotion_ordering_preview_result_consumer
-            ),
-            promotion_queue_ordering_plan_result=queue_ordering_plan,
-        )
-    )
-    queue_importer_request = dict(
-        promotion_queue_ordering_plan_result_consumer[
-            "promotion_queue_importer_request"
-        ]
-    )
-    applyable_proposals = deepcopy(proposals)
-    for proposal in applyable_proposals:
-        if proposal.get("proposal_id") == "proposal-first":
-            proposal["kind"] = "fader"
-            proposal["requested_change"] = {
-                "value_type": "fader",
-                "channel": 2,
-                "value": -8.5,
-                "current_value": -8.0,
-                "rollback_value": -8.0,
-            }
-    queue_importer_request["proposal_payloads"] = applyable_proposals
-    queue_importer_request["apply"] = True
-    queue_importer_request["operator_ack"] = True
-
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        queue_importer_request,
-    )
-
-    queue_importer_payload = server.send_to_client.await_args.args[1]
-    assert queue_importer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_importer_applied"
-    )
-    assert queue_importer_payload["summary"]["queue_mutation"] is True
-    assert queue_importer_payload["summary"]["live_write"] is False
-    assert build_decision_queue(server)["summary"]["pending_count"] == 1
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    ](
-        object(),
-        {
-            "promotion_queue_ordering_plan_result_consumer": (
-                promotion_queue_ordering_plan_result_consumer
-            ),
-            "promotion_queue_importer_result": queue_importer_payload,
-            "idempotency_key_prefix": "promotion-import",
-            "limit": 5,
-        },
-    )
-
-    consumer_payload = server.send_to_client.await_args.args[1]
-    assert consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer"
-    )
-    assert consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    )
-    assert consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_import_preflight_plan_request_available"
-    )
-    assert (
-        consumer_payload["summary"]["promotion_preflight_plan_request_available"]
-        is True
-    )
-    assert consumer_payload["summary"]["promotion_preflight_plan_handler_invoked"] is False
-    assert consumer_payload["summary"]["promotion_preflight_plan_created"] is False
-    assert consumer_payload["summary"]["queue_mutation"] is False
-    assert consumer_payload["summary"]["live_write"] is False
-
-    preflight_plan_request = consumer_payload["promotion_preflight_plan_request"]
-    assert preflight_plan_request["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    )
-    assert preflight_plan_request["read_only_template"] is True
-    assert preflight_plan_request["idempotency_key_prefix"] == "promotion-import"
-    assert preflight_plan_request["limit"] == 5
-    assert preflight_plan_request["queue_mutation"] is False
-    assert preflight_plan_request["live_write"] is False
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    ](
-        object(),
-        preflight_plan_request,
-    )
-
-    preflight_plan_payload = server.send_to_client.await_args.args[1]
-    assert preflight_plan_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
-    )
-    assert preflight_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    )
-    assert preflight_plan_payload["summary"]["preflight_candidate_count"] == 1
-    assert preflight_plan_payload["summary"]["idempotency_reserved"] is False
-    assert preflight_plan_payload["summary"]["queue_mutation"] is False
-    assert preflight_plan_payload["summary"]["live_write"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
-    ](
-        object(),
-        {
-            "promotion_queue_importer_result_consumer": consumer_payload,
-            "promotion_queue_import_preflight_plan_result": preflight_plan_payload,
-        },
-    )
-
-    preflight_plan_consumer_payload = server.send_to_client.await_args.args[1]
-    assert preflight_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer"
-    )
-    assert preflight_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
-    )
-    assert preflight_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_batch_preflight_request_available"
-    )
-    assert (
-        preflight_plan_consumer_payload["summary"][
-            "promotion_batch_preflight_request_available"
-        ]
-        is True
-    )
-    assert (
-        preflight_plan_consumer_payload["summary"][
-            "promotion_batch_preflight_handler_invoked"
-        ]
-        is False
-    )
-    assert preflight_plan_consumer_payload["summary"]["queue_mutation"] is False
-    assert preflight_plan_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert preflight_plan_consumer_payload["summary"]["live_write"] is False
-
-    batch_preflight_request = dict(
-        preflight_plan_consumer_payload["promotion_batch_preflight_request"]
-    )
-    assert batch_preflight_request["handler"] == "preflight_operator_proposal_apply_batch"
-    assert batch_preflight_request["approved"] is False
-    assert batch_preflight_request["operator_must_set_approved_true"] is True
-    assert batch_preflight_request["idempotency_key_prefix"] == "promotion-import"
-    assert batch_preflight_request["limit"] == 5
-    assert batch_preflight_request["queue_mutation"] is False
-    assert batch_preflight_request["idempotency_reserved"] is False
-    batch_preflight_request["approved"] = True
-
-    await server._dispatch["preflight_operator_proposal_apply_batch"](
-        object(),
-        batch_preflight_request,
-    )
-
-    batch_preflight_payload = server.send_to_client.await_args.args[1]
-    assert batch_preflight_payload["type"] == "operator_proposal_apply_preflight_batch"
-    assert batch_preflight_payload["status"] == "ok"
-    assert batch_preflight_payload["summary"]["selected_count"] == 1
-    assert batch_preflight_payload["summary"]["ready_count"] == 1
-    assert batch_preflight_payload["summary"]["idempotency_key_prefix"] == (
-        "promotion-import"
-    )
-    assert batch_preflight_payload["summary"]["queue_mutation"] is False
-    assert batch_preflight_payload["summary"]["idempotency_reserved"] is False
-    assert batch_preflight_payload["summary"]["live_write"] is False
-    assert server._apply_manual_console_write.await_count == 0
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
-    ](
-        object(),
-        {
-            "promotion_preflight_plan_result_consumer": (
-                preflight_plan_consumer_payload
-            ),
-            "promotion_batch_preflight_result": batch_preflight_payload,
-        },
-    )
-
-    batch_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert batch_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer"
-    )
-    assert batch_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
-    )
-    assert batch_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_sequence_plan_request_available"
-    )
-    assert (
-        batch_result_consumer_payload["summary"][
-            "promotion_sequence_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        batch_result_consumer_payload["summary"]["sequence_plan_handler_invoked"]
-        is False
-    )
-    assert batch_result_consumer_payload["summary"]["sequence_plan_created"] is False
-    assert batch_result_consumer_payload["summary"]["queue_mutation"] is False
-    assert batch_result_consumer_payload["summary"]["idempotency_reserved"] is False
-    assert batch_result_consumer_payload["summary"]["live_write"] is False
-
-    sequence_plan_request = batch_result_consumer_payload[
-        "promotion_sequence_plan_request"
-    ]
-    assert sequence_plan_request["handler"] == "plan_operator_proposal_apply_sequence"
-    assert sequence_plan_request["read_only_template"] is True
-    assert (
-        sequence_plan_request["promotion_sequence_plan_request_template_only"]
-        is True
-    )
-    assert len(sequence_plan_request["preflight_results"]) == 1
-    assert sequence_plan_request["queue_mutation"] is False
-    assert sequence_plan_request["idempotency_reserved"] is False
-
-    await server._dispatch["plan_operator_proposal_apply_sequence"](
-        object(),
-        sequence_plan_request,
-    )
-
-    sequence_plan_payload = server.send_to_client.await_args.args[1]
-    assert sequence_plan_payload["type"] == "operator_proposal_apply_sequence_plan"
-    assert sequence_plan_payload["status"] == "ok"
-    assert sequence_plan_payload["summary"]["planned_apply_count"] == 1
-    assert sequence_plan_payload["summary"]["planned_apply_proposal_ids"] == [
-        "proposal-first"
-    ]
-    assert sequence_plan_payload["summary"]["execution_allowed_by_plan"] is False
-    assert sequence_plan_payload["summary"]["queue_mutation"] is False
-    assert sequence_plan_payload["summary"]["idempotency_reserved"] is False
-    assert sequence_plan_payload["summary"]["live_write"] is False
-    assert sequence_plan_payload["summary"]["manual_console_write_called"] is False
-    assert (
-        sequence_plan_payload["planned_apply_sequence"][0]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-    assert "promotion-import:proposal-first" not in (
-        server._operator_apply_idempotency_keys
-    )
-    assert server._apply_manual_console_write.await_count == 0
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result"
-    ](
-        object(),
-        {
-            "promotion_batch_preflight_result_consumer": (
-                batch_result_consumer_payload
-            ),
-            "promotion_sequence_plan_result": sequence_plan_payload,
-        },
-    )
-
-    sequence_plan_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert sequence_plan_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_plan_result_consumer"
-    )
-    assert sequence_plan_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_plan_result"
-    )
-    assert sequence_plan_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_dry_run_request_available"
-    )
-    assert (
-        sequence_plan_result_consumer_payload["summary"][
-            "promotion_dry_run_request_available"
-        ]
-        is True
-    )
-    assert (
-        sequence_plan_result_consumer_payload["summary"]["dry_run_handler_invoked"]
-        is False
-    )
-    assert sequence_plan_result_consumer_payload["summary"]["dry_run_created"] is False
-    assert (
-        sequence_plan_result_consumer_payload["summary"]["idempotency_reserved"]
-        is False
-    )
-    assert sequence_plan_result_consumer_payload["summary"]["live_write"] is False
-
-    dry_run_request = sequence_plan_result_consumer_payload[
-        "promotion_dry_run_request"
-    ]
-    assert dry_run_request["handler"] == "dry_run_operator_proposal_apply_sequence"
-    assert dry_run_request["read_only_template"] is True
-    assert dry_run_request["promotion_dry_run_request_template_only"] is True
-    assert dry_run_request["dry_run_created"] is False
-    assert dry_run_request["idempotency_reserved"] is False
-
-    await server._dispatch["dry_run_operator_proposal_apply_sequence"](
-        object(),
-        dry_run_request,
-    )
-
-    dry_run_payload = server.send_to_client.await_args.args[1]
-    assert dry_run_payload["type"] == "operator_proposal_apply_sequence_dry_run"
-    assert dry_run_payload["status"] == "ok"
-    assert dry_run_payload["summary"]["would_apply_count"] == 1
-    assert dry_run_payload["summary"]["would_apply_proposal_ids"] == [
-        "proposal-first"
-    ]
-    assert dry_run_payload["summary"]["execution_allowed_by_dry_run"] is False
-    assert dry_run_payload["summary"]["queue_mutation"] is False
-    assert dry_run_payload["summary"]["idempotency_reserved"] is False
-    assert dry_run_payload["summary"]["live_write"] is False
-    assert dry_run_payload["summary"]["manual_console_write_called"] is False
-    assert (
-        dry_run_payload["dry_run_results"][0]["apply_request"]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-    assert "promotion-import:proposal-first" not in (
-        server._operator_apply_idempotency_keys
-    )
-    assert server._apply_manual_console_write.await_count == 0
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result"
-    ](
-        object(),
-        {
-            "promotion_sequence_plan_result_consumer": (
-                sequence_plan_result_consumer_payload
-            ),
-            "promotion_dry_run_result": dry_run_payload,
-        },
-    )
-
-    dry_run_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert dry_run_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_dry_run_result_consumer"
-    )
-    assert dry_run_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_dry_run_result"
-    )
-    assert dry_run_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_execution_gate_request_available"
-    )
-    assert (
-        dry_run_result_consumer_payload["summary"][
-            "promotion_execution_gate_request_available"
-        ]
-        is True
-    )
-    assert (
-        dry_run_result_consumer_payload["summary"]["execution_gate_handler_invoked"]
-        is False
-    )
-    assert (
-        dry_run_result_consumer_payload["summary"]["execution_gate_created"]
-        is False
-    )
-    assert (
-        dry_run_result_consumer_payload["summary"]["idempotency_reserved"]
-        is False
-    )
-    assert dry_run_result_consumer_payload["summary"]["live_write"] is False
-
-    gate_request = dict(
-        dry_run_result_consumer_payload["promotion_execution_gate_request"]
-    )
-    assert gate_request["handler"] == (
-        "gate_operator_proposal_apply_sequence_execution"
-    )
-    assert gate_request["operator_ack"] is False
-    assert gate_request["operator_must_set_operator_ack_true"] is True
-    assert gate_request["read_only_template"] is True
-    assert gate_request["promotion_execution_gate_request_template_only"] is True
-    assert gate_request["execution_gate_created"] is False
-    assert gate_request["idempotency_reserved"] is False
-    gate_request["operator_ack"] = True
-    gate_request["approval_id"] = "promotion-import-operator"
-
-    await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
-        object(),
-        gate_request,
-    )
-
-    gate_payload = server.send_to_client.await_args.args[1]
-    assert gate_payload["type"] == "operator_proposal_apply_sequence_execution_gate"
-    assert gate_payload["status"] == "ready"
-    assert gate_payload["summary"]["ready_for_executor_count"] == 1
-    assert gate_payload["summary"]["ready_for_executor_proposal_ids"] == [
-        "proposal-first"
-    ]
-    assert gate_payload["summary"]["operator_ack_received"] is True
-    assert gate_payload["summary"]["execution_allowed_by_gate"] is False
-    assert gate_payload["summary"]["requires_separate_executor"] is True
-    assert gate_payload["summary"]["queue_mutation"] is False
-    assert gate_payload["summary"]["idempotency_reserved"] is False
-    assert gate_payload["summary"]["live_write"] is False
-    assert gate_payload["summary"]["manual_console_write_called"] is False
-    assert (
-        gate_payload["ready_for_executor"][0]["apply_request"]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-    assert "promotion-import:proposal-first" not in (
-        server._operator_apply_idempotency_keys
-    )
-    assert server._apply_manual_console_write.await_count == 0
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result"
-    ](
-        object(),
-        {
-            "promotion_dry_run_result_consumer": dry_run_result_consumer_payload,
-            "promotion_execution_gate_result": gate_payload,
-        },
-    )
-
-    gate_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert gate_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_gate_result_consumer"
-    )
-    assert gate_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_gate_result"
-    )
-    assert gate_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_request_available"
-    )
-    assert (
-        gate_result_consumer_payload["summary"][
-            "promotion_executor_request_available"
-        ]
-        is True
-    )
-    assert (
-        gate_result_consumer_payload["summary"][
-            "sequence_executor_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        gate_result_consumer_payload["summary"]["sequence_executor_created"]
-        is False
-    )
-    assert (
-        gate_result_consumer_payload["summary"]["idempotency_reserved"]
-        is False
-    )
-    assert gate_result_consumer_payload["summary"]["live_write"] is False
-
-    executor_request = gate_result_consumer_payload["promotion_executor_request"]
-    assert executor_request["handler"] == "execute_operator_proposal_apply_sequence"
-    assert executor_request["execute"] is False
-    assert executor_request["operator_ack"] is False
-    assert executor_request["approved"] is False
-    assert executor_request["operator_must_set_execute_true"] is True
-    assert executor_request["operator_must_set_operator_ack_true"] is True
-    assert executor_request["operator_must_set_approved_true"] is True
-    assert executor_request["read_only_template"] is True
-    assert executor_request["promotion_executor_request_template_only"] is True
-    assert executor_request["sequence_executor_created"] is False
-    assert executor_request["idempotency_reserved"] is False
-    assert executor_request["live_authority_granted"] is False
-    assert len(executor_request["execution_gate_payload"]["ready_for_executor"]) == 1
-
-    promotion_execution_payload = {
-        "type": "operator_proposal_apply_sequence_execution_result",
-        "status": "applied",
-        "success": True,
-        "reason": None,
-        "generated_at": 123.0,
-        "operator_mode": {"mode": "supervised"},
-        "summary": {
-            "input_candidate_count": 1,
-            "attempted_count": 1,
-            "applied_count": 1,
-            "blocked_count": 0,
-            "applied_proposal_ids": ["proposal-first"],
-            "blocked_proposal_ids": [],
-            "operator_mode_allows_apply_now": True,
-            "operator_ack_received": True,
-            "execute_requested": True,
-            "approved": True,
-            "requires_gate_ready": True,
-            "uses_existing_apply_operator_proposal": True,
-            "sequence_executor_called_apply_operator_proposal": True,
-            "live_apply_entrypoint": "apply_operator_proposal",
-            "live_write": True,
-            "direct_live_write": False,
-            "apply_attempted": True,
-            "queue_mutation": True,
-            "proposal_status_mutation": True,
-            "idempotency_reserved": True,
-            "idempotency_reserved_by_executor_directly": False,
-            "idempotency_reservation_delegated_to_apply_operator_proposal": True,
-            "manual_console_write_called_by_apply_operator_proposal": True,
-            "manual_console_write_called_by_sequence_executor": False,
-            "direct_manual_console_write_called": False,
-            "mutates_console_state": True,
-            "queries_console": False,
-            "live_widening_allowed": False,
-            "stopped_on_block": False,
-            "queue_freshness_checked": True,
-        },
-        "safety": {
-            "sequence_executor": True,
-            "execution_gate_payload_required": True,
-            "ready_for_executor_required": True,
-            "requires_execute_true": True,
-            "requires_operator_ack": True,
-            "requires_approved_true": True,
-            "requires_gate_ready": True,
-            "uses_existing_apply_operator_proposal": True,
-            "live_apply_entrypoint": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "live_write": True,
-            "direct_live_write": False,
-            "apply_attempted": True,
-            "queue_mutation_by_executor_directly": False,
-            "proposal_status_mutation_by_executor_directly": False,
-            "idempotency_reserved_by_executor_directly": False,
-            "idempotency_reservation_delegated_to_apply_operator_proposal": True,
-            "does_not_call_manual_console_write_directly": True,
-            "manual_console_write_called_by_sequence_executor": False,
-            "direct_manual_console_write_called": False,
-            "manual_console_write_called_by_apply_operator_proposal": True,
-            "mutates_console_state": True,
-            "queries_console": False,
-            "live_widening_allowed": False,
-        },
-        "execution_results": [
-            {
-                "planned_apply_index": 0,
-                "proposal_id": "proposal-first",
-                "candidate_index": 0,
-                "status": "applied",
-                "apply_attempted": True,
-                "apply_request": {
-                    "type": "apply_operator_proposal",
-                    "proposal_id": "proposal-first",
-                    "approved": True,
-                    "idempotency_key": "promotion-import:proposal-first",
-                },
-                "proposal": {
-                    "id": "proposal-first",
-                    "status": "applied",
-                    "can_apply": False,
-                },
-                "apply_result": {
-                    "status": "applied",
-                    "channel": 2,
-                    "value_type": "fader",
-                    "effective_value": -8.5,
-                    "old_value": -8.0,
-                    "pre_read_status": "verified_from_cache",
-                    "pre_read_source": "mixer_state_cache",
-                    "readback_value": -8.5,
-                    "readback_status": "verified_from_cache",
-                    "readback_source": "mixer_state_cache",
-                    "proof_status": "verified",
-                    "rollback_available": True,
-                    "rollback_value": -8.0,
-                },
-            }
-        ],
-        "blocked_results": [],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_result"
-    ](
-        object(),
-        {
-            "promotion_execution_gate_result_consumer": (
-                gate_result_consumer_payload
-            ),
-            "promotion_execution_result": promotion_execution_payload,
-        },
-    )
-
-    execution_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert execution_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_result_consumer"
-    )
-    assert execution_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_result"
-    )
-    assert execution_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_execution_audit_request_available"
-    )
-    assert (
-        execution_result_consumer_payload["summary"][
-            "promotion_execution_audit_request_available"
-        ]
-        is True
-    )
-    assert (
-        execution_result_consumer_payload["summary"][
-            "execution_audit_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        execution_result_consumer_payload["summary"]["execution_audit_created"]
-        is False
-    )
-    assert (
-        execution_result_consumer_payload["summary"]["idempotency_reserved"]
-        is False
-    )
-    assert execution_result_consumer_payload["summary"]["live_write"] is False
-
-    audit_request = execution_result_consumer_payload[
-        "promotion_execution_audit_request"
-    ]
-    assert audit_request["handler"] == (
-        "audit_operator_proposal_apply_sequence_execution"
-    )
-    assert audit_request["read_only_template"] is True
-    assert audit_request["promotion_execution_audit_request_template_only"] is True
-    assert audit_request["execution_audit_created"] is False
-    assert audit_request["idempotency_reserved"] is False
-    assert audit_request["live_authority_granted"] is False
-    assert (
-        audit_request["execution_result_payload"]["execution_results"][0][
-            "apply_request"
-        ]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-
-    promotion_execution_audit_payload = {
-        "type": "operator_proposal_apply_sequence_execution_audit",
-        "status": "passed",
-        "success": True,
-        "reason": None,
-        "generated_at": 123.0,
-        "source_execution_status": "applied",
-        "summary": {
-            "input_execution_result_count": 1,
-            "audited_count": 1,
-            "passed_count": 1,
-            "blocked_count": 0,
-            "passed_proposal_ids": ["proposal-first"],
-            "blocked_proposal_ids": [],
-            "audit_only": True,
-            "execution_allowed_by_audit": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-        },
-        "safety": {
-            "audit_only": True,
-            "execution_result_payload_required": True,
-            "does_not_call_apply_operator_proposal": True,
-            "does_not_call_manual_console_write": True,
-            "live_apply_entrypoint_required": "apply_operator_proposal",
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "execution_allowed_by_audit": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-        },
-        "audit_rows": [
-            {
-                "proposal_id": "proposal-first",
-                "execution_result_index": 0,
-                "status": "passed",
-                "value_type": "fader",
-                "channel": 2,
-                "effective_value": -8.5,
-                "idempotency_key": "promotion-import:proposal-first",
-                "readback_status": "verified_from_cache",
-                "proof_status": "verified",
-                "rollback_available": True,
-                "live_apply_entrypoint": "apply_operator_proposal",
-            }
-        ],
-        "blocked_results": [],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_audit_result"
-    ](
-        object(),
-        {
-            "promotion_execution_result_consumer": (
-                execution_result_consumer_payload
-            ),
-            "promotion_execution_audit_result": promotion_execution_audit_payload,
-        },
-    )
-
-    execution_audit_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert execution_audit_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_audit_result_consumer"
-    )
-    assert execution_audit_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_audit_result"
-    )
-    assert execution_audit_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_audit_policy_gate_request_available"
-    )
-    assert (
-        execution_audit_result_consumer_payload["summary"][
-            "promotion_audit_policy_gate_request_available"
-        ]
-        is True
-    )
-    assert (
-        execution_audit_result_consumer_payload["summary"][
-            "audit_policy_gate_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        execution_audit_result_consumer_payload["summary"]["policy_gate_created"]
-        is False
-    )
-    assert (
-        execution_audit_result_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert execution_audit_result_consumer_payload["summary"]["live_write"] is False
-
-    policy_gate_request = execution_audit_result_consumer_payload[
-        "promotion_audit_policy_gate_request"
-    ]
-    assert policy_gate_request["handler"] == (
-        "gate_operator_proposal_apply_sequence_audit_policy"
-    )
-    assert policy_gate_request["read_only_template"] is True
-    assert policy_gate_request["promotion_audit_policy_gate_request_template_only"] is True
-    assert policy_gate_request["policy_gate_created"] is False
-    assert policy_gate_request["policy_mutation"] is False
-    assert policy_gate_request["live_authority_granted"] is False
-    assert (
-        policy_gate_request["execution_audit_payload"]["audit_rows"][0][
-            "idempotency_key"
-        ]
-        == "promotion-import:proposal-first"
-    )
-
-    promotion_audit_policy_gate_payload = {
-        "type": "operator_proposal_apply_sequence_audit_policy_gate",
-        "status": "ready",
-        "success": True,
-        "reason": None,
-        "generated_at": 123.0,
-        "source_audit_status": "passed",
-        "summary": {
-            "input_audit_row_count": 1,
-            "policy_evidence_ready_count": 1,
-            "blocked_count": 0,
-            "policy_evidence_ready_proposal_ids": ["proposal-first"],
-            "blocked_proposal_ids": [],
-            "policy_gate_only": True,
-            "audit_payload_required": True,
-            "execution_allowed_by_policy_gate": False,
-            "execution_allowed_by_audit": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "safety": {
-            "policy_gate_only": True,
-            "audit_payload_required": True,
-            "does_not_call_apply_operator_proposal": True,
-            "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "execution_allowed_by_policy_gate": False,
-            "execution_allowed_by_audit": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "policy_evidence": [
-            {
-                "proposal_id": "proposal-first",
-                "audit_row_index": 0,
-                "status": "policy_evidence_ready",
-                "eligible_for_supervised_sequence_policy": True,
-                "execution_allowed_by_policy_gate": False,
-                "policy_mutation_allowed": False,
-                "live_authority_granted": False,
-                "full_autonomous_ready": False,
-                "value_type": "fader",
-                "channel": 2,
-                "effective_value": -8.5,
-                "idempotency_key": "promotion-import:proposal-first",
-                "readback_status": "verified_from_cache",
-                "proof_status": "verified",
-                "rollback_available": True,
-                "live_apply_entrypoint": "apply_operator_proposal",
-            }
-        ],
-        "blocked_results": [],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_audit_policy_gate_result"
-    ](
-        object(),
-        {
-            "promotion_execution_audit_result_consumer": (
-                execution_audit_result_consumer_payload
-            ),
-            "promotion_audit_policy_gate_result": (
-                promotion_audit_policy_gate_payload
-            ),
-        },
-    )
-
-    audit_policy_gate_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert audit_policy_gate_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_audit_policy_gate_result_consumer"
-    )
-    assert audit_policy_gate_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_audit_policy_gate_result"
-    )
-    assert audit_policy_gate_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_draft_request_available"
-    )
-    assert (
-        audit_policy_gate_result_consumer_payload["summary"][
-            "promotion_memory_draft_request_available"
-        ]
-        is True
-    )
-    assert (
-        audit_policy_gate_result_consumer_payload["summary"][
-            "memory_draft_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        audit_policy_gate_result_consumer_payload["summary"]["memory_draft_created"]
-        is False
-    )
-    assert (
-        audit_policy_gate_result_consumer_payload["summary"]["memory_file_mutation"]
-        is False
-    )
-    assert audit_policy_gate_result_consumer_payload["summary"]["live_write"] is False
-
-    memory_draft_request = audit_policy_gate_result_consumer_payload[
-        "promotion_memory_draft_request"
-    ]
-    assert memory_draft_request["handler"] == (
-        "draft_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert memory_draft_request["read_only_template"] is True
-    assert memory_draft_request["promotion_memory_draft_request_template_only"] is True
-    assert memory_draft_request["memory_draft_created"] is False
-    assert memory_draft_request["memory_file_mutation"] is False
-    assert memory_draft_request["live_authority_granted"] is False
-    assert (
-        memory_draft_request["policy_gate_payload"]["policy_evidence"][0][
-            "idempotency_key"
-        ]
-        == "promotion-import:proposal-first"
-    )
-
-    promotion_memory_draft_payload = {
-        "type": "operator_proposal_apply_sequence_policy_memory_draft",
-        "status": "ready",
-        "success": True,
-        "reason": None,
-        "generated_at": 123.0,
-        "source_policy_gate_status": "ready",
-        "summary": {
-            "input_policy_evidence_count": 1,
-            "memory_draft_count": 1,
-            "blocked_count": 0,
-            "memory_draft_proposal_ids": ["proposal-first"],
-            "blocked_proposal_ids": [],
-            "memory_draft_only": True,
-            "policy_gate_payload_required": True,
-            "append_only_memory_write_allowed_by_draft": False,
-            "requires_separate_memory_writer": True,
-            "execution_allowed_by_draft": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "safety": {
-            "memory_draft_only": True,
-            "policy_gate_payload_required": True,
-            "does_not_call_apply_operator_proposal": True,
-            "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "append_only_memory_write_allowed_by_draft": False,
-            "requires_separate_memory_writer": True,
-            "execution_allowed_by_draft": False,
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "memory_draft_records": [
-            {
-                "draft_id": (
-                    "operator-sequence-policy-memory:"
-                    "proposal-first:promotion-import:proposal-first"
-                ),
-                "proposal_id": "proposal-first",
-                "policy_evidence_index": 0,
-                "status": "memory_draft_ready",
-                "learning_scope": "supervised_fader_gain_sequence_execution",
-                "target_memory_path": ".ai/memory/project.md",
-                "target_section": "Project Memory Lessons",
-                "append_only": True,
-                "memory_write_allowed_by_draft": False,
-                "append_only_memory_write_allowed_by_draft": False,
-                "requires_separate_memory_writer": True,
-                "operator_ack_required_for_write": True,
-                "memory_mutation": False,
-                "runtime_memory_mutation": False,
-                "policy_mutation": False,
-                "model_mutation": False,
-                "queue_mutation": False,
-                "live_authority_granted": False,
-                "full_autonomous_ready": False,
-                "evidence": {
-                    "value_type": "fader",
-                    "channel": 2,
-                    "effective_value": -8.5,
-                    "idempotency_key": "promotion-import:proposal-first",
-                    "readback_status": "verified_from_cache",
-                    "proof_status": "verified",
-                    "rollback_available": True,
-                    "live_apply_entrypoint": "apply_operator_proposal",
-                },
-                "draft_text": (
-                    "Supervised fader/gain sequence execution was verified "
-                    "from `proposal-first` with `fader` evidence, idempotency "
-                    "`promotion-import:proposal-first`, readback "
-                    "`verified_from_cache`, and rollback available. Future "
-                    "policy or autonomous use still requires separate audited "
-                    "gates and safety limits."
-                ),
-            }
-        ],
-        "blocked_results": [],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_draft_result"
-    ](
-        object(),
-        {
-            "promotion_audit_policy_gate_result_consumer": (
-                audit_policy_gate_result_consumer_payload
-            ),
-            "promotion_memory_draft_result": promotion_memory_draft_payload,
-        },
-    )
-
-    memory_draft_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert memory_draft_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_draft_result_consumer"
-    )
-    assert memory_draft_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_draft_result"
-    )
-    assert memory_draft_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_request_available"
-    )
-    assert (
-        memory_draft_result_consumer_payload["summary"][
-            "promotion_memory_writer_request_available"
-        ]
-        is True
-    )
-    assert (
-        memory_draft_result_consumer_payload["summary"][
-            "memory_writer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        memory_draft_result_consumer_payload["summary"][
-            "memory_file_write_applied"
-        ]
-        is False
-    )
-    assert (
-        memory_draft_result_consumer_payload["summary"]["memory_file_mutation"]
-        is False
-    )
-    assert memory_draft_result_consumer_payload["summary"]["live_write"] is False
-
-    memory_writer_request = memory_draft_result_consumer_payload[
-        "promotion_memory_writer_request"
-    ]
-    assert memory_writer_request["handler"] == (
-        "write_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert memory_writer_request["apply"] is False
-    assert memory_writer_request["operator_ack"] is False
-    assert memory_writer_request["promotion_memory_writer_request_template_only"] is True
-    assert memory_writer_request["memory_file_write_applied"] is False
-    assert memory_writer_request["memory_file_mutation"] is False
-    assert memory_writer_request["live_authority_granted"] is False
-    assert (
-        memory_writer_request["memory_draft_payload"]["memory_draft_records"][0][
-            "evidence"
-        ]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-
-    promotion_memory_writer_dry_run_payload = {
-        "type": "operator_proposal_apply_sequence_policy_memory_writer",
-        "status": "append_only_memory_write_dry_run_ready",
-        "success": False,
-        "reason": "sequence_policy_memory_write_not_applied",
-        "generated_at": 123.0,
-        "source_memory_draft_status": "ready",
-        "summary": {
-            "memory_draft_record_count": 1,
-            "invalid_record_count": 1,
-            "write_result_count": 0,
-            "append_only_memory_write_applied": False,
-            "operator_ack_required": True,
-            "operator_ack": False,
-            "apply_requested": False,
-            "target_memory_path": ".ai/memory/project.md",
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_file_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "blocked_by": [
-                "operator_ack_and_apply_required_before_append_only_memory_write"
-            ],
-        },
-        "safety": {
-            "operator_required": True,
-            "operator_ack_required": True,
-            "apply_requested": False,
-            "operator_ack": False,
-            "append_only_memory_file_write_applied": False,
-            "target_memory_path": ".ai/memory/project.md",
-            "does_not_call_apply_operator_proposal": True,
-            "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_file_mutation": False,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "write_results": [],
-        "blocked_results": [
-            {
-                "draft_id": None,
-                "memory_draft_index": None,
-                "status": "blocked",
-                "reason": (
-                    "operator_ack_and_apply_required_before_append_only_memory_write"
-                ),
-            }
-        ],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_dry_run_result"
-    ](
-        object(),
-        {
-            "promotion_memory_draft_result_consumer": (
-                memory_draft_result_consumer_payload
-            ),
-            "promotion_memory_writer_dry_run_result": (
-                promotion_memory_writer_dry_run_payload
-            ),
-        },
-    )
-
-    memory_writer_dry_run_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert memory_writer_dry_run_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_dry_run_result_consumer"
-    )
-    assert memory_writer_dry_run_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_dry_run_result"
-    )
-    assert memory_writer_dry_run_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_writer_apply_request_available"
-    )
-    assert (
-        memory_writer_dry_run_result_consumer_payload["summary"][
-            "promotion_memory_writer_apply_request_available"
-        ]
-        is True
-    )
-    assert (
-        memory_writer_dry_run_result_consumer_payload["summary"][
-            "memory_writer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        memory_writer_dry_run_result_consumer_payload["summary"][
-            "memory_file_write_applied"
-        ]
-        is False
-    )
-    assert (
-        memory_writer_dry_run_result_consumer_payload["summary"][
-            "memory_file_mutation"
-        ]
-        is False
-    )
-    assert (
-        memory_writer_dry_run_result_consumer_payload["summary"]["live_write"]
-        is False
-    )
-
-    writer_apply_request = memory_writer_dry_run_result_consumer_payload[
-        "promotion_memory_writer_apply_request"
-    ]
-    assert writer_apply_request["handler"] == (
-        "write_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert writer_apply_request["apply"] is False
-    assert writer_apply_request["operator_ack"] is False
-    assert (
-        writer_apply_request["promotion_memory_writer_apply_request_template_only"]
-        is True
-    )
-    assert writer_apply_request["memory_file_write_applied"] is False
-    assert writer_apply_request["memory_file_mutation"] is False
-    assert writer_apply_request["live_authority_granted"] is False
-    assert (
-        writer_apply_request["memory_draft_payload"]["memory_draft_records"][0][
-            "evidence"
-        ]["idempotency_key"]
-        == "promotion-import:proposal-first"
-    )
-
-    writer_records = writer_apply_request["memory_draft_payload"][
-        "memory_draft_records"
-    ]
-    promotion_memory_writer_apply_payload = {
-        "type": "operator_proposal_apply_sequence_policy_memory_writer",
-        "status": "append_only_memory_write_applied",
-        "success": True,
-        "reason": None,
-        "generated_at": 123.0,
-        "source_memory_draft_status": "ready",
-        "summary": {
-            "memory_draft_record_count": 1,
-            "invalid_record_count": 0,
-            "write_result_count": 1,
-            "append_only_memory_write_applied": True,
-            "operator_ack_required": True,
-            "operator_ack": True,
-            "apply_requested": True,
-            "target_memory_path": ".ai/memory/project.md",
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_file_mutation": True,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "blocked_by": [],
-        },
-        "safety": {
-            "operator_required": True,
-            "operator_ack_required": True,
-            "apply_requested": True,
-            "operator_ack": True,
-            "append_only_memory_file_write_applied": True,
-            "target_memory_path": ".ai/memory/project.md",
-            "does_not_call_apply_operator_proposal": True,
-            "does_not_call_manual_console_write": True,
-            "allowed_live_write_kinds": ["fader", "gain", "pan"],
-            "live_write": False,
-            "apply_attempted": False,
-            "queue_mutation": False,
-            "proposal_status_mutation": False,
-            "idempotency_reserved": False,
-            "manual_console_write_called": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "policy_mutation": False,
-            "memory_file_mutation": True,
-            "runtime_memory_mutation": False,
-            "model_mutation": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-        },
-        "write_results": [
-            {
-                "draft_id": writer_records[0]["draft_id"],
-                "target_memory_path": ".ai/memory/project.md",
-                "applied": True,
-                "bytes_appended": 192,
-            }
-        ],
-        "blocked_results": [],
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_apply_result"
-    ](
-        object(),
-        {
-            "promotion_memory_writer_dry_run_result_consumer": (
-                memory_writer_dry_run_result_consumer_payload
-            ),
-            "promotion_memory_writer_apply_result": (
-                promotion_memory_writer_apply_payload
-            ),
-            "root_path": str(tmp_path),
-        },
-    )
-
-    memory_writer_apply_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert memory_writer_apply_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_writer_apply_result_consumer"
-    )
-    assert memory_writer_apply_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_writer_apply_result"
-    )
-    assert memory_writer_apply_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_index_request_available"
-    )
-    assert (
-        memory_writer_apply_result_consumer_payload["summary"][
-            "promotion_memory_index_request_available"
-        ]
-        is True
-    )
-    assert (
-        memory_writer_apply_result_consumer_payload["summary"][
-            "source_memory_file_write_applied"
-        ]
-        is True
-    )
-    assert (
-        memory_writer_apply_result_consumer_payload["summary"][
-            "memory_file_write_applied_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        memory_writer_apply_result_consumer_payload["summary"]["memory_file_mutation"]
-        is False
-    )
-    assert (
-        memory_writer_apply_result_consumer_payload["summary"]["live_write"]
-        is False
-    )
-
-    memory_index_request = memory_writer_apply_result_consumer_payload[
-        "promotion_memory_index_request"
-    ]
-    assert memory_index_request["handler"] == (
-        "index_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert memory_index_request["root_path"] == str(tmp_path)
-    assert memory_index_request["read_only_template"] is True
-    assert memory_index_request[
-        "promotion_memory_index_request_template_only"
-    ] is True
-    assert memory_index_request["memory_index_handler_invoked"] is False
-    assert memory_index_request["memory_index_created"] is False
-    assert memory_index_request["memory_file_mutation"] is False
-    assert memory_index_request["live_authority_granted"] is False
-    assert memory_index_request["promotion_memory_writer_apply_result_consumer"][
-        "memory_write_result_proposal_ids"
-    ] == ["proposal-first"]
-
-    memory_target = tmp_path / ".ai" / "memory" / "project.md"
-    memory_target.parent.mkdir(parents=True, exist_ok=True)
-    memory_target.write_text(
-        "\n".join(
-            [
-                "# Project Memory",
-                "",
-                "---",
-                "",
-                "### Supervised sequence policy memory",
-                "",
-                f"- Draft ID: `{writer_records[0]['draft_id']}`",
-                "- Proposal ID: `proposal-first`",
-                "- Learning scope: `supervised_fader_gain_sequence_execution`",
-                "- Value type: `fader`",
-                "- Channel: `2`",
-                "- Effective value: `-8.5`",
-                "- Idempotency key: `promotion-import:proposal-first`",
-                "- Readback status: `verified_from_cache`",
-                "- Proof status: `verified`",
-                "- Runtime authority: no live, queue, model, or policy mutation",
-                "",
-                "Promotion sequence policy memory was verified.",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    await server._dispatch["index_operator_proposal_apply_sequence_policy_memory"](
-        object(),
-        memory_index_request,
-    )
-
-    promotion_memory_index_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_index_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_index"
-    )
-    assert promotion_memory_index_payload["handler"] == (
-        "index_operator_proposal_apply_sequence_policy_memory"
-    )
-    assert (
-        promotion_memory_index_payload["status"]
-        == "append_only_sequence_memory_index_available"
-    )
-    assert promotion_memory_index_payload["safety"]["read_only"] is True
-    assert promotion_memory_index_payload["safety"]["memory_file_read"] is True
-    assert promotion_memory_index_payload["safety"]["live_write"] is False
-    assert promotion_memory_index_payload["safety"]["policy_mutation"] is False
-    assert promotion_memory_index_payload["safety"]["runtime_memory_mutation"] is False
-    assert promotion_memory_index_payload["safety"]["model_mutation"] is False
-    assert promotion_memory_index_payload["summary"]["memory_record_count"] == 1
-    assert promotion_memory_index_payload["summary"]["invalid_record_count"] == 0
-    assert promotion_memory_index_payload["summary"]["indexed_proposal_ids"] == [
-        "proposal-first"
-    ]
-    assert (
-        promotion_memory_index_payload["memory_records"][0]["draft_id"]
-        == writer_records[0]["draft_id"]
-    )
-    assert (
-        promotion_memory_index_payload["memory_records"][0][
-            "execution_allowed_by_index"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_index_payload["memory_records"][0][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    fresh_sequence_review_context = {
-        "status": "fresh",
-        "field_count": 4,
-        "fresh_field_count": 4,
-        "stale_field_count": 0,
-        "read_only": True,
-        "live_write": False,
-        "apply_attempted": False,
-        "queries_console": False,
-        "queue_mutation": False,
-        "policy_mutation": False,
-    }
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_index_result"
-    ](
-        object(),
-        {
-            "promotion_memory_writer_apply_result_consumer": (
-                memory_writer_apply_result_consumer_payload
-            ),
-            "promotion_memory_index_result": promotion_memory_index_payload,
-            "current_sequence_review_freshness": fresh_sequence_review_context,
-        },
-    )
-
-    memory_index_result_consumer_payload = server.send_to_client.await_args.args[1]
-    assert memory_index_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_index_result_consumer"
-    )
-    assert memory_index_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_index_result"
-    )
-    assert memory_index_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_review_request_available"
-    )
-    assert (
-        memory_index_result_consumer_payload["summary"][
-            "promotion_memory_trust_review_request_available"
-        ]
-        is True
-    )
-    assert (
-        memory_index_result_consumer_payload["summary"][
-            "source_memory_index_available"
-        ]
-        is True
-    )
-    assert (
-        memory_index_result_consumer_payload["summary"][
-            "memory_trust_review_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        memory_index_result_consumer_payload["summary"][
-            "memory_trust_review_created"
-        ]
-        is False
-    )
-    assert (
-        memory_index_result_consumer_payload["summary"]["memory_file_mutation"]
-        is False
-    )
-    assert memory_index_result_consumer_payload["summary"]["live_write"] is False
-
-    trust_review_request = memory_index_result_consumer_payload[
-        "promotion_memory_trust_review_request"
-    ]
-    assert trust_review_request["handler"] == (
-        "review_operator_proposal_apply_sequence_policy_memory_trust"
-    )
-    assert trust_review_request["read_only_template"] is True
-    assert trust_review_request[
-        "promotion_memory_trust_review_request_template_only"
-    ] is True
-    assert trust_review_request["memory_trust_review_handler_invoked"] is False
-    assert trust_review_request["memory_trust_review_created"] is False
-    assert trust_review_request["memory_file_mutation"] is False
-    assert trust_review_request["live_authority_granted"] is False
-    assert trust_review_request["promotion_memory_index_result_consumer"][
-        "memory_index_record_proposal_ids"
-    ] == ["proposal-first"]
-
-    await server._dispatch["review_operator_proposal_apply_sequence_policy_memory_trust"](
-        object(),
-        trust_review_request,
-    )
-
-    promotion_memory_trust_review_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_trust_review_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_review"
-    )
-    assert promotion_memory_trust_review_payload["handler"] == (
-        "review_operator_proposal_apply_sequence_policy_memory_trust"
-    )
-    assert promotion_memory_trust_review_payload["status"] == (
-        "sequence_memory_trust_review_candidate_available"
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"][
-            "trust_review_candidate_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"][
-            "execution_allowed_by_review"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"]["model_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_trust_review_payload["summary"][
-            "full_autonomous_ready"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_review_result"
-    ](
-        object(),
-        {
-            "promotion_memory_index_result_consumer": (
-                memory_index_result_consumer_payload
-            ),
-            "promotion_memory_trust_review_result": (
-                promotion_memory_trust_review_payload
-            ),
-        },
-    )
-
-    promotion_trust_review_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_trust_review_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_review_result_consumer"
-    )
-    assert promotion_trust_review_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_review_result"
-    )
-    assert promotion_trust_review_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_request_available"
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"][
-            "promotion_acceptance_ledger_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"][
-            "acceptance_ledger_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"][
-            "acceptance_ledger_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"][
-            "operator_acceptance_required"
-        ]
-        is True
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"][
-            "memory_file_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_trust_review_result_consumer_payload["summary"]["live_write"]
-        is False
-    )
-
-    acceptance_ledger_request = promotion_trust_review_result_consumer_payload[
-        "promotion_acceptance_ledger_request"
-    ]
-    assert acceptance_ledger_request["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    )
-    assert acceptance_ledger_request["read_only_template"] is True
-    assert acceptance_ledger_request[
-        "promotion_acceptance_ledger_request_template_only"
-    ] is True
-    assert acceptance_ledger_request["acceptance_ledger_handler_invoked"] is False
-    assert acceptance_ledger_request["acceptance_ledger_created"] is False
-    assert acceptance_ledger_request["acceptance_records"] == []
-    assert acceptance_ledger_request["memory_file_mutation"] is False
-    assert acceptance_ledger_request["runtime_memory_mutation"] is False
-    assert acceptance_ledger_request["policy_mutation"] is False
-    assert acceptance_ledger_request["live_authority_granted"] is False
-
-    acceptance_template = promotion_trust_review_result_consumer_payload[
-        "promotion_acceptance_record_templates"
-    ][0]
-    assert acceptance_template["proposal_id"] == "proposal-first"
-    assert acceptance_template["operator_must_choose_decision"] is True
-    assert acceptance_template["sequence_policy_trust_store_mutation"] is False
-    assert acceptance_template["proposal_state_mutation"] is False
-    assert acceptance_template["can_import_to_queue"] is False
-    assert acceptance_template["can_apply_live"] is False
-
-    operator_promotion_acceptance_record = {
-        "acceptance_id": "promotion-sequence-memory-trust-acceptance-product-1",
-        "review_candidate_id": acceptance_template["review_candidate_id"],
-        "memory_record_id": acceptance_template["memory_record_id"],
-        "proposal_id": acceptance_template["proposal_id"],
-        "learning_scope": acceptance_template["learning_scope"],
-        "value_type": acceptance_template["value_type"],
-        "idempotency_key": acceptance_template["idempotency_key"],
-        "decision": "accepted",
-        "reviewed_by": "operator",
-        "reviewed_at": "2026-06-06T13:30:00Z",
-    }
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    ](
-        object(),
-        {
-            **acceptance_ledger_request,
-            "acceptance_records": [operator_promotion_acceptance_record],
-        },
-    )
-
-    promotion_memory_trust_acceptance_ledger_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_trust_acceptance_ledger_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_acceptance_ledger"
-    )
-    assert promotion_memory_trust_acceptance_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_acceptance"
-    )
-    assert promotion_memory_trust_acceptance_ledger_payload["status"] == (
-        "operator_sequence_memory_trust_acceptance_records_available"
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "acceptance_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "accepted_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "unreviewed_candidate_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "execution_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_trust_acceptance_ledger_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_acceptance_ledger_result"
-    ](
-        object(),
-        {
-            "promotion_memory_trust_review_result_consumer": (
-                promotion_trust_review_result_consumer_payload
-            ),
-            "promotion_memory_trust_acceptance_ledger_result": (
-                promotion_memory_trust_acceptance_ledger_payload
-            ),
-        },
-    )
-
-    promotion_memory_acceptance_ledger_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_acceptance_ledger_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_memory_trust_acceptance_ledger_result_consumer"
-    )
-    assert promotion_memory_acceptance_ledger_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_memory_trust_acceptance_ledger_result"
-    )
-    assert promotion_memory_acceptance_ledger_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_plan_request_available"
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "promotion_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "promotion_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "promotion_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "memory_file_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    promotion_plan_request = promotion_memory_acceptance_ledger_consumer_payload[
-        "promotion_plan_request"
-    ]
-    assert promotion_plan_request["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_plan_request["read_only_template"] is True
-    assert (
-        promotion_plan_request[
-            "promotion_memory_trust_acceptance_ledger_result_consumer_only"
-        ]
-        is True
-    )
-    assert promotion_plan_request["promotion_plan_handler_invoked"] is False
-    assert promotion_plan_request["promotion_plan_created"] is False
-    assert promotion_plan_request["execution_allowed_by_consumer"] is False
-    assert promotion_plan_request["policy_mutation"] is False
-    assert promotion_plan_request["live_authority_granted"] is False
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_plan_request,
-    )
-
-    promotion_memory_plan_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_plan"
-    )
-    assert promotion_memory_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_memory_plan_payload["status"] == (
-        "sequence_memory_trust_promotion_plan_candidate_available"
-    )
-    assert promotion_memory_plan_payload["summary"]["promotion_candidate_count"] == 1
-    assert (
-        promotion_memory_plan_payload["summary"][
-            "sequence_policy_promotion_allowed_by_plan"
-        ]
-        is False
-    )
-    assert promotion_memory_plan_payload["summary"]["execution_allowed_by_plan"] is False
-    assert promotion_memory_plan_payload["summary"]["live_authority_granted"] is False
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_plan_result"
-    ](
-        object(),
-        {
-            "promotion_memory_trust_acceptance_ledger_result_consumer": (
-                promotion_memory_acceptance_ledger_consumer_payload
-            ),
-            "promotion_plan_result": promotion_memory_plan_payload,
-        },
-    )
-
-    promotion_memory_plan_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_plan_result_consumer"
-    )
-    assert promotion_memory_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_plan_result"
-    )
-    assert promotion_memory_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_contract_request_available"
-    )
-    assert (
-        promotion_memory_plan_consumer_payload["summary"][
-            "promotion_contract_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_plan_consumer_payload["summary"][
-            "promotion_contract_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_plan_consumer_payload["summary"][
-            "promotion_contract_created"
-        ]
-        is False
-    )
-    assert promotion_memory_plan_consumer_payload["summary"]["live_authority_granted"] is False
-
-    promotion_contract_request = promotion_memory_plan_consumer_payload[
-        "promotion_contract_request"
-    ]
-    assert promotion_contract_request["handler"] == (
-        "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_contract_request["read_only_template"] is True
-    assert promotion_contract_request["promotion_contract_handler_invoked"] is False
-    assert promotion_contract_request["promotion_contract_created"] is False
-    assert (
-        promotion_contract_request[
-            "operator_must_supply_current_sequence_policy_context"
-        ]
-        is True
-    )
-    assert promotion_contract_request["operator_must_supply_rollback_evidence"] is True
-    assert promotion_contract_request["execution_allowed_by_consumer"] is False
-    assert promotion_contract_request["policy_mutation"] is False
-    assert promotion_contract_request["live_authority_granted"] is False
-
-    await server._dispatch[
-        "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        {
-            **promotion_contract_request,
-            "current_sequence_policy_context": {
-                "status": "fresh",
-                "field_count": 4,
-                "fresh_field_count": 4,
-                "read_only": True,
-                "live_write": False,
-                "apply_attempted": False,
-                "queries_console": False,
-                "queue_mutation": False,
-                "policy_mutation": False,
-            },
-            "rollback_evidence": {
-                "status": "ready",
-                "read_only": True,
-                "live_write": False,
-                "apply_attempted": False,
-                "mutates_console_state": False,
-                "queries_console": False,
-                "queue_mutation": False,
-                "policy_mutation": False,
-                "model_mutation": False,
-                "runtime_memory_mutation": False,
-                "live_authority_granted": False,
-                "full_autonomous_ready": False,
-                "rollback_strategy": (
-                    "manual_revert_to_previous_sequence_policy_state"
-                ),
-                "previous_policy_state": "not_trusted_for_sequence_policy",
-                "target_policy_store": "operator_sequence_policy_trust_gate",
-                "reviewed_by": "operator",
-                "reviewed_at": "2026-06-06T14:00:00Z",
-            },
-        },
-    )
-
-    promotion_memory_contract_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_contract_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_contract"
-    )
-    assert promotion_memory_contract_payload["handler"] == (
-        "contract_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_memory_contract_payload["status"] == (
-        "manual_sequence_memory_trust_promotion_contract_ready"
-    )
-    assert (
-        promotion_memory_contract_payload["summary"]["contract_record_count"]
-        == 1
-    )
-    assert (
-        promotion_memory_contract_payload["summary"][
-            "sequence_policy_promotion_allowed_by_contract"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_payload["summary"][
-            "execution_allowed_by_contract"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_contract_result"
-    ](
-        object(),
-        {
-            "promotion_plan_result_consumer": promotion_memory_plan_consumer_payload,
-            "promotion_contract_result": promotion_memory_contract_payload,
-        },
-    )
-
-    promotion_memory_contract_consumer_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_contract_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_contract_result_consumer"
-    )
-    assert promotion_memory_contract_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_contract_result"
-    )
-    assert promotion_memory_contract_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_acceptance_ledger_request_available"
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"][
-            "promotion_acceptance_ledger_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"][
-            "memory_file_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"]["policy_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_contract_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_contract_consumer_payload[
-            "promotion_acceptance_ledger_request"
-        ]["handler"]
-        == "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    )
-    assert (
-        promotion_memory_contract_consumer_payload[
-            "promotion_acceptance_ledger_request"
-        ]["acceptance_records"]
-        == []
-    )
-    assert (
-        promotion_memory_contract_consumer_payload[
-            "promotion_acceptance_record_templates"
-        ][0]["proposal_id"]
-        == "proposal-first"
-    )
-    assert (
-        promotion_memory_contract_consumer_payload[
-            "promotion_acceptance_record_templates"
-        ][0]["operator_must_choose_decision"]
-        is True
-    )
-    assert (
-        promotion_memory_contract_consumer_payload[
-            "promotion_acceptance_record_templates"
-        ][0]["sequence_policy_promotion_allowed_by_acceptance"]
-        is False
-    )
-
-    promotion_memory_acceptance_template = promotion_memory_contract_consumer_payload[
-        "promotion_acceptance_record_templates"
-    ][0]
-    operator_memory_promotion_acceptance_record = {
-        "promotion_acceptance_id": (
-            "promotion-memory-sequence-acceptance-product-layer-1"
-        ),
-        "promotion_contract_record_id": promotion_memory_acceptance_template[
-            "promotion_contract_record_id"
-        ],
-        "promotion_candidate_id": promotion_memory_acceptance_template[
-            "promotion_candidate_id"
-        ],
-        "proposal_id": promotion_memory_acceptance_template["proposal_id"],
-        "learning_scope": promotion_memory_acceptance_template["learning_scope"],
-        "value_type": promotion_memory_acceptance_template["value_type"],
-        "idempotency_key": promotion_memory_acceptance_template[
-            "idempotency_key"
-        ],
-        "previous_policy_state": promotion_memory_acceptance_template[
-            "previous_policy_state"
-        ],
-        "rollback_strategy": promotion_memory_acceptance_template[
-            "rollback_strategy"
-        ],
-        "decision": "accepted",
-        "reviewed_by": "operator",
-        "reviewed_at": "2026-06-06T14:45:00Z",
-    }
-
-    await server._dispatch[
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    ](
-        object(),
-        {
-            **promotion_memory_contract_consumer_payload[
-                "promotion_acceptance_ledger_request"
-            ],
-            "acceptance_records": [
-                operator_memory_promotion_acceptance_record
-            ],
-        },
-    )
-
-    promotion_memory_acceptance_ledger_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_acceptance_ledger_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance_ledger"
-    )
-    assert promotion_memory_acceptance_ledger_payload["handler"] == (
-        "record_operator_proposal_apply_sequence_policy_memory_trust_promotion_acceptance"
-    )
-    assert promotion_memory_acceptance_ledger_payload["status"] == (
-        "operator_sequence_memory_trust_promotion_acceptance_records_available"
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "acceptance_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "accepted_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "unreviewed_contract_record_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "sequence_policy_promotion_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "execution_allowed_by_acceptance"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_ledger_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result"
-    ](
-        object(),
-        {
-            "promotion_memory_contract_result_consumer": (
-                promotion_memory_contract_consumer_payload
-            ),
-            "promotion_acceptance_ledger_result": (
-                promotion_memory_acceptance_ledger_payload
-            ),
-        },
-    )
-
-    promotion_memory_acceptance_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_acceptance_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_acceptance_ledger_result_consumer"
-    )
-    assert promotion_memory_acceptance_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_acceptance_ledger_result"
-    )
-    assert promotion_memory_acceptance_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_execution_plan_request_available"
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "promotion_execution_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_acceptance_consumer_payload[
-            "promotion_execution_plan_request"
-        ]["handler"]
-        == "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    ](
-        object(),
-        promotion_memory_acceptance_consumer_payload[
-            "promotion_execution_plan_request"
-        ],
-    )
-
-    promotion_memory_execution_plan_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_execution_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_execution_plan"
-    )
-    assert promotion_memory_execution_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_execution"
-    )
-    assert promotion_memory_execution_plan_payload["status"] == (
-        "manual_sequence_memory_trust_promotion_execution_candidate_available"
-    )
-    assert (
-        promotion_memory_execution_plan_payload["summary"][
-            "execution_candidate_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_execution_plan_payload["summary"][
-            "execution_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_payload["summary"][
-            "sequence_policy_promotion_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
-    ](
-        object(),
-        {
-            "promotion_memory_acceptance_ledger_result_consumer": (
-                promotion_memory_acceptance_consumer_payload
-            ),
-            "promotion_execution_plan_result": (
-                promotion_memory_execution_plan_payload
-            ),
-        },
-    )
-
-    promotion_memory_execution_plan_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_execution_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_execution_plan_result_consumer"
-    )
-    assert promotion_memory_execution_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_execution_plan_result"
-    )
-    assert promotion_memory_execution_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_dry_run_request_available"
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "promotion_executor_dry_run_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["handler"]
-        == "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["apply"]
-        is False
-    )
-    assert (
-        promotion_memory_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ]["operator_ack"]
-        is False
-    )
-
-    await server._dispatch[
-        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    ](
-        object(),
-        promotion_memory_execution_plan_consumer_payload[
-            "promotion_executor_dry_run_request"
-        ],
-    )
-
-    promotion_memory_executor_dry_run_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_executor_dry_run_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor_dry_run"
-    )
-    assert promotion_memory_executor_dry_run_payload["handler"] == (
-        "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert promotion_memory_executor_dry_run_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_dry_run_ready"
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "dry_run_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "execution_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "sequence_policy_promotion_applied"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "policy_mutation_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "runtime_memory_mutation_allowed_by_dry_run"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
-    ](
-        object(),
-        {
-            "promotion_memory_execution_plan_result_consumer": (
-                promotion_memory_execution_plan_consumer_payload
-            ),
-            "promotion_executor_dry_run_result": (
-                promotion_memory_executor_dry_run_payload
-            ),
-        },
-    )
-
-    promotion_memory_executor_dry_run_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_executor_dry_run_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_dry_run_result_consumer"
-    )
-    assert promotion_memory_executor_dry_run_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_dry_run_result"
-    )
-    assert promotion_memory_executor_dry_run_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_request_available"
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "promotion_executor_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload[
-            "promotion_executor_request"
-        ]["handler"]
-        == "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload[
-            "promotion_executor_request"
-        ]["apply"]
-        is False
-    )
-    assert (
-        promotion_memory_executor_dry_run_consumer_payload[
-            "promotion_executor_request"
-        ]["operator_ack"]
-        is False
-    )
 
     await server._dispatch[
         "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
     ](
         object(),
-        promotion_memory_executor_dry_run_consumer_payload[
-            "promotion_executor_request"
-        ],
-    )
-
-    promotion_memory_executor_payload = server.send_to_client.await_args.args[1]
-    assert promotion_memory_executor_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert promotion_memory_executor_payload["handler"] == (
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_memory_executor_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_ready"
-    )
-    assert promotion_memory_executor_payload["summary"]["apply_result_count"] == 0
-    assert promotion_memory_executor_payload["summary"]["apply_requested"] is False
-    assert promotion_memory_executor_payload["summary"]["operator_ack"] is False
-    assert (
-        promotion_memory_executor_payload["summary"][
-            "sequence_policy_promotion_applied"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_payload["summary"]["runtime_memory_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_executor_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_payload["summary"]["live_authority_granted"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    ](
-        object(),
         {
-            "promotion_memory_executor_dry_run_result_consumer": (
-                promotion_memory_executor_dry_run_consumer_payload
-            ),
-            "promotion_executor_result": promotion_memory_executor_payload,
-        },
-    )
-
-    promotion_memory_executor_preview_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_executor_preview_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
-    )
-    assert promotion_memory_executor_preview_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    )
-    assert promotion_memory_executor_preview_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_executor_result_consumer_blocked"
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "promotion_apply_audit_request_available"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "promotion_apply_audit_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "promotion_apply_audit_created"
-        ]
-        is False
-    )
-    assert (
-        "applied_sequence_memory_trust_promotion_executor_result_required_before_apply_audit"
-        in promotion_memory_executor_preview_consumer_payload["summary"][
-            "blocked_by"
-        ]
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_preview_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        "promotion_executor"
-        not in promotion_memory_executor_preview_consumer_payload[
-            "promotion_apply_audit_request"
-        ]
-    )
-
-    promotion_memory_target_store = {}
-    promotion_memory_executor_apply_request = dict(
-        promotion_memory_executor_dry_run_consumer_payload[
-            "promotion_executor_request"
-        ]
-    )
-    promotion_memory_executor_apply_request.update(
-        {
+            "executor_dry_run": {
+                "status": "promotion_executor_dry_run_ready",
+                "execution_records": [],
+            },
+            "target_store": target_store,
             "apply": True,
             "operator_ack": True,
-            "target_store": promotion_memory_target_store,
-        }
-    )
-
-    await server._dispatch[
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_memory_executor_apply_request,
-    )
-
-    promotion_memory_executor_applied_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_executor_applied_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
-    )
-    assert promotion_memory_executor_applied_payload["handler"] == (
-        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_memory_executor_applied_payload["status"] == (
-        "sequence_memory_trust_promotion_executor_applied"
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"][
-            "apply_result_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"]["apply_requested"]
-        is True
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"]["operator_ack"]
-        is True
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"][
-            "sequence_policy_promotion_applied"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_executor_applied_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert promotion_memory_target_store
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    ](
-        object(),
-        {
-            "promotion_memory_executor_dry_run_result_consumer": (
-                promotion_memory_executor_dry_run_consumer_payload
-            ),
-            "promotion_executor_result": (
-                promotion_memory_executor_applied_payload
-            ),
         },
     )
 
-    promotion_memory_executor_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_executor_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_executor_result_consumer"
-    )
-    assert promotion_memory_executor_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_executor_result"
-    )
-    assert promotion_memory_executor_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_apply_audit_request_available"
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "promotion_apply_audit_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_executor_result_consumer_payload[
-            "promotion_apply_audit_request"
-        ]["handler"]
-        == "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-
-    await server._dispatch[
-        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    ](
-        object(),
-        promotion_memory_executor_result_consumer_payload[
-            "promotion_apply_audit_request"
-        ],
-    )
-
-    promotion_memory_apply_audit_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_apply_audit_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_apply_audit"
-    )
-    assert promotion_memory_apply_audit_payload["handler"] == (
-        "audit_operator_proposal_apply_sequence_policy_memory_trust_promotion"
-    )
-    assert promotion_memory_apply_audit_payload["status"] == (
-        "sequence_memory_trust_promotion_apply_audit_records_available"
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"][
-            "executor_apply_result_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"][
-            "apply_audit_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_payload["summary"]["rollback_verified"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
-    ](
-        object(),
-        {
-            "promotion_memory_executor_result_consumer": (
-                promotion_memory_executor_result_consumer_payload
-            ),
-            "promotion_apply_audit_result": (
-                promotion_memory_apply_audit_payload
-            ),
-        },
-    )
-
-    promotion_memory_apply_audit_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_apply_audit_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_apply_audit_result_consumer"
-    )
-    assert promotion_memory_apply_audit_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_apply_audit_result"
-    )
-    assert promotion_memory_apply_audit_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_rollback_verification_request_available"
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "promotion_rollback_verification_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "promotion_rollback_verification_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "promotion_rollback_verification_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_apply_audit_consumer_payload[
-            "promotion_rollback_verification_request"
-        ]["handler"]
-        == "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    ](
-        object(),
-        promotion_memory_apply_audit_consumer_payload[
-            "promotion_rollback_verification_request"
-        ],
-    )
-
-    promotion_memory_rollback_verification_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_rollback_verification_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback_verification"
-    )
-    assert promotion_memory_rollback_verification_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    )
-    assert promotion_memory_rollback_verification_payload["status"] == (
-        "sequence_memory_trust_promotion_rollback_verification_not_ready"
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "apply_audit_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "verification_record_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "unverified_apply_audit_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verification_payload["summary"][
-            "rollback_verified"
-        ]
-        is False
-    )
-    assert promotion_memory_rollback_verification_payload["verified_records"] == []
-
-    promotion_memory_apply_audit_record = (
-        promotion_memory_apply_audit_payload["audit_records"][0]
-    )
-    promotion_memory_rollback_verification_request = dict(
-        promotion_memory_apply_audit_consumer_payload[
-            "promotion_rollback_verification_request"
-        ]
-    )
-    promotion_memory_rollback_verification_request["verification_records"] = [
-        {
-            "rollback_verification_id": (
-                "promotion-memory-rollback-verification-product-1"
-            ),
-            "promotion_apply_audit_id": promotion_memory_apply_audit_record[
-                "promotion_apply_audit_id"
-            ],
-            "promotion_executor_apply_id": promotion_memory_apply_audit_record[
-                "promotion_executor_apply_id"
-            ],
-            "proposal_id": promotion_memory_apply_audit_record["proposal_id"],
-            "learning_scope": promotion_memory_apply_audit_record[
-                "learning_scope"
-            ],
-            "value_type": promotion_memory_apply_audit_record["value_type"],
-            "source_idempotency_key": promotion_memory_apply_audit_record[
-                "source_idempotency_key"
-            ],
-            "policy_key": promotion_memory_apply_audit_record["policy_key"],
-            "target_policy_store": promotion_memory_apply_audit_record[
-                "target_policy_store"
-            ],
-            "target_policy_path": promotion_memory_apply_audit_record[
-                "target_policy_path"
-            ],
-            "target_policy_state": promotion_memory_apply_audit_record[
-                "target_policy_state"
-            ],
-            "rollback_target_policy_state": promotion_memory_apply_audit_record[
-                "rollback_target_policy_state"
-            ],
-            "rollback_strategy": promotion_memory_apply_audit_record[
-                "rollback_strategy"
-            ],
-            "verification_evidence_status": "reviewed",
-            "decision": "verified",
-            "verified_by": "operator",
-            "verified_at": "2026-06-06T15:00:00Z",
-            "current_sequence_review_freshness": fresh_sequence_review_context,
-            "rollback_verified": True,
-            "read_only": True,
-            "operator_review_required": True,
-            "separate_sequence_policy_gate_required": True,
-            "live_write": False,
-            "apply_attempted": False,
-            "mutates_console_state": False,
-            "queries_console": False,
-            "queue_mutation": False,
-            "model_mutation": False,
-            "runtime_memory_mutation": False,
-            "sequence_policy_trust_store_mutation": False,
-            "proposal_state_mutation": False,
-            "sequence_execution_allowed_by_verification": False,
-            "live_widening_allowed": False,
-            "live_authority_granted": False,
-            "full_autonomous_ready": False,
-            "can_import_to_queue": False,
-            "can_apply_live": False,
-        }
-    ]
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_memory_trust_promotion_rollback"
-    ](
-        object(),
-        promotion_memory_rollback_verification_request,
-    )
-
-    promotion_memory_rollback_verified_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_rollback_verified_payload["status"] == (
-        "operator_sequence_memory_trust_promotion_rollback_verified_records_available"
-    )
-    assert (
-        promotion_memory_rollback_verified_payload["summary"][
-            "rollback_verified_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_rollback_verified_payload["summary"][
-            "sequence_execution_allowed_by_verification"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verified_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verified_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_verified_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
-    ](
-        object(),
-        {
-            "promotion_memory_apply_audit_result_consumer": (
-                promotion_memory_apply_audit_consumer_payload
-            ),
-            "promotion_rollback_verification_result": (
-                promotion_memory_rollback_verified_payload
-            ),
-        },
-    )
-
-    promotion_memory_rollback_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_rollback_result_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_rollback_verification_result_consumer"
-    )
-    assert promotion_memory_rollback_result_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_rollback_verification_result"
-    )
-    assert promotion_memory_rollback_result_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_request_available"
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "promotion_sequence_policy_gate_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_rollback_result_consumer_payload[
-            "promotion_sequence_policy_gate_request"
-        ]["handler"]
-        == "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    )
-
-    await server._dispatch[
-        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    ](
-        object(),
-        promotion_memory_rollback_result_consumer_payload[
-            "promotion_sequence_policy_gate_request"
-        ],
-    )
-
-    promotion_memory_sequence_policy_gate_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_sequence_policy_gate_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy_gate"
-    )
-    assert promotion_memory_sequence_policy_gate_payload["handler"] == (
-        "gate_operator_proposal_apply_sequence_policy_memory_trust_promotion_sequence_policy"
-    )
-    assert promotion_memory_sequence_policy_gate_payload["status"] == (
-        "verified_sequence_memory_trust_promotion_policy_records_available"
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "rollback_verified_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "sequence_policy_gate_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "eligible_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "proposal_state_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "sequence_execution_allowed_by_gate"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "sequence_policy_change_allowed_by_gate"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["policy_records"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_payload["policy_records"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
-    ](
-        object(),
-        {
-            "promotion_memory_rollback_verification_result_consumer": (
-                promotion_memory_rollback_result_consumer_payload
-            ),
-            "promotion_sequence_policy_gate_result": (
-                promotion_memory_sequence_policy_gate_payload
-            ),
-        },
-    )
-
-    promotion_memory_sequence_policy_gate_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_sequence_policy_gate_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_sequence_policy_gate_result_consumer"
-    )
-    assert promotion_memory_sequence_policy_gate_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_sequence_policy_gate_result"
-    )
-    assert promotion_memory_sequence_policy_gate_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_policy_consumer_request_available"
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "promotion_policy_consumer_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "promotion_policy_consumer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "promotion_policy_consumer_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "policy_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "runtime_memory_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]["handler"]
-        == "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    )
-    assert (
-        promotion_memory_sequence_policy_gate_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]["proposals_required_from_operator"]
-        is True
-    )
-    policy_record = promotion_memory_sequence_policy_gate_payload[
-        "policy_records"
-    ][0]
-    policy_consumer_request = dict(
-        promotion_memory_sequence_policy_gate_consumer_payload[
-            "promotion_policy_consumer_request"
-        ]
-    )
-    policy_consumer_request["proposals"] = [
-        {
-            "proposal_id": policy_record["proposal_id"],
-            "method_id": "safe_gain",
-            "kind": "fader",
-            "target": "ch/02",
-            "severity": "high",
-            "confidence": 0.82,
-            "evidence": {
-                "idempotency_key": policy_record["source_idempotency_key"],
-            },
-        }
-    ]
-    await server._dispatch[
-        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    ](
-        object(),
-        policy_consumer_request,
-    )
-
-    promotion_memory_policy_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_policy_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_policy_consumer"
-    )
-    assert promotion_memory_policy_consumer_payload["handler"] == (
-        "consume_operator_proposal_apply_sequence_policy_memory_trust_promotion_policy"
-    )
-    assert promotion_memory_policy_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_policy_consumer_records_available"
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "consumer_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "sequence_policy_change_allowed_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "sequence_execution_allowed_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["consumer_records"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_payload["consumer_records"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
-    ](
-        object(),
-        {
-            "promotion_memory_sequence_policy_gate_result_consumer": (
-                promotion_memory_sequence_policy_gate_consumer_payload
-            ),
-            "promotion_policy_consumer_result": (
-                promotion_memory_policy_consumer_payload
-            ),
-        },
-    )
-
-    promotion_memory_policy_consumer_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_policy_consumer_result_consumer_payload[
-        "type"
-    ] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_policy_consumer_result_consumer"
-    )
-    assert promotion_memory_policy_consumer_result_consumer_payload[
-        "handler"
-    ] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_policy_consumer_result"
-    )
-    assert promotion_memory_policy_consumer_result_consumer_payload[
-        "status"
-    ] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_ordering_preview_request_available"
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "promotion_ordering_preview_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]["handler"]
-        == "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    )
-    assert (
-        promotion_memory_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]["proposals_required_from_operator"]
-        is True
-    )
-
-    ordering_preview_request = dict(
-        promotion_memory_policy_consumer_result_consumer_payload[
-            "promotion_ordering_preview_request"
-        ]
-    )
-    ordering_preview_request["proposals"] = policy_consumer_request["proposals"]
-    await server._dispatch[
-        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    ](
-        object(),
-        ordering_preview_request,
-    )
-
-    promotion_memory_ordering_preview_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_ordering_preview_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering_preview"
-    )
-    assert promotion_memory_ordering_preview_payload["handler"] == (
-        "preview_operator_proposal_apply_sequence_policy_memory_trust_promotion_ordering"
-    )
-    assert promotion_memory_ordering_preview_payload["status"] == (
-        "sequence_memory_trust_promotion_ordering_preview_available"
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "ordered_preview_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "sequence_policy_trust_store_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "sequence_policy_change_allowed_by_ordering_preview"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "sequence_execution_allowed_by_ordering_preview"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["ordered_proposals"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_payload["ordered_proposals"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result"
-    ](
-        object(),
-        {
-            "promotion_memory_policy_consumer_result_consumer": (
-                promotion_memory_policy_consumer_result_consumer_payload
-            ),
-            "promotion_ordering_preview_result": (
-                promotion_memory_ordering_preview_payload
-            ),
-        },
-    )
-
-    promotion_memory_ordering_preview_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_ordering_preview_result_consumer_payload[
-        "type"
-    ] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_ordering_preview_result_consumer"
-    )
-    assert promotion_memory_ordering_preview_result_consumer_payload[
-        "handler"
-    ] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_ordering_preview_result"
-    )
-    assert promotion_memory_ordering_preview_result_consumer_payload[
-        "status"
-    ] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_request_available"
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "promotion_queue_ordering_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_ordering_preview_result_consumer_payload[
-            "promotion_queue_ordering_plan_request"
-        ]["handler"]
-        == "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    ](
-        object(),
-        promotion_memory_ordering_preview_result_consumer_payload[
-            "promotion_queue_ordering_plan_request"
-        ],
-    )
-
-    promotion_memory_queue_ordering_plan_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_ordering_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering_plan"
-    )
-    assert promotion_memory_queue_ordering_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_ordering"
-    )
-    assert promotion_memory_queue_ordering_plan_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_ordering_plan_available"
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"][
-            "queue_ordering_plan_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"][
-            "proposal_order_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"][
-            "queue_import_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"][
-            "sequence_execution_allowed_by_plan"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload[
-            "queue_ordering_plan_records"
-        ][0]["can_import_to_queue"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_payload[
-            "queue_ordering_plan_records"
-        ][0]["can_apply_live"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
-    ](
-        object(),
-        {
-            "promotion_memory_ordering_preview_result_consumer": (
-                promotion_memory_ordering_preview_result_consumer_payload
-            ),
-            "promotion_queue_ordering_plan_result": (
-                promotion_memory_queue_ordering_plan_payload
-            ),
-        },
-    )
-
-    promotion_memory_queue_ordering_plan_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_ordering_plan_result_consumer_payload[
-        "type"
-    ] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_ordering_plan_result_consumer"
-    )
-    assert promotion_memory_queue_ordering_plan_result_consumer_payload[
-        "handler"
-    ] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_ordering_plan_result"
-    )
-    assert promotion_memory_queue_ordering_plan_result_consumer_payload[
-        "status"
-    ] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_importer_request_available"
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "promotion_queue_importer_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "proposal_payloads_required_from_operator"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "apply"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "operator_ack"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]["handler"]
-        == "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]["apply"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]["operator_ack"]
-        is False
-    )
-
-    # Isolate the memory-promotion queue import from the earlier direct branch.
-    server.operator_proposal_queue = server.operator_proposal_queue.__class__()
-
-    queue_importer_request = dict(
-        promotion_memory_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]
-    )
-    queue_importer_request["proposal_payloads"] = policy_consumer_request[
-        "proposals"
-    ]
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        queue_importer_request,
-    )
-
-    promotion_memory_queue_importer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_importer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
-    )
-    assert promotion_memory_queue_importer_payload["handler"] == (
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    )
-    assert promotion_memory_queue_importer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_importer_dry_run_ready"
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"][
-            "queue_import_spec_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"][
-            "queue_import_result_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"]["apply_requested"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"]["operator_ack"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_payload["summary"]["live_write"]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_payload["queue_import_specs"][0][
-            "can_import_to_queue"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_payload["queue_import_specs"][0][
-            "can_apply_live"
-        ]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    ](
-        object(),
-        {
-            "promotion_memory_queue_ordering_plan_result_consumer": (
-                promotion_memory_queue_ordering_plan_result_consumer_payload
-            ),
-            "promotion_queue_importer_result": (
-                promotion_memory_queue_importer_payload
-            ),
-            "idempotency_key_prefix": "promotion-import",
-            "limit": 5,
-        },
-    )
-
-    promotion_memory_queue_importer_result_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_importer_result_consumer_payload[
-        "type"
-    ] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer"
-    )
-    assert promotion_memory_queue_importer_result_consumer_payload[
-        "handler"
-    ] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    )
-    assert promotion_memory_queue_importer_result_consumer_payload[
-        "status"
-    ] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer_blocked"
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "queue_ordering_plan_record_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "queue_import_spec_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "queue_import_result_count"
-        ]
-        == 0
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "importer_dry_run_seen"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "promotion_queue_import_preflight_plan_request_available"
-        ]
-        is False
-    )
-    assert (
-        "applied_sequence_policy_queue_importer_result_required_before_preflight_plan"
-        in promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "blocked_by"
-        ]
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_result_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    assert (
-        "promotion_queue_importer_result"
-        not in promotion_memory_queue_importer_result_consumer_payload[
-            "promotion_queue_import_preflight_plan_request"
-        ]
-    )
-
-    applied_queue_importer_request = dict(
-        promotion_memory_queue_ordering_plan_result_consumer_payload[
-            "promotion_queue_importer_request"
-        ]
-    )
-    applied_queue_importer_proposals = deepcopy(policy_consumer_request["proposals"])
-    for proposal in applied_queue_importer_proposals:
-        if proposal.get("proposal_id") == policy_record["proposal_id"]:
-            proposal["kind"] = "fader"
-            proposal["requested_change"] = {
-                "value_type": "fader",
-                "channel": 2,
-                "value": -8.5,
-                "current_value": -8.0,
-                "rollback_value": -8.0,
-            }
-    applied_queue_importer_request["proposal_payloads"] = (
-        applied_queue_importer_proposals
-    )
-    applied_queue_importer_request["apply"] = True
-    applied_queue_importer_request["operator_ack"] = True
-    await server._dispatch[
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    ](
-        object(),
-        applied_queue_importer_request,
-    )
-
-    promotion_memory_queue_importer_applied_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_importer_applied_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer"
-    )
-    assert promotion_memory_queue_importer_applied_payload["handler"] == (
-        "import_operator_proposal_apply_sequence_policy_queue_ordering_plan"
-    )
-    assert promotion_memory_queue_importer_applied_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_importer_applied"
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "queue_import_spec_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "queue_import_result_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "apply_requested"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "operator_ack"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "queue_mutation"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["summary"][
-            "live_write"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["queue_import_results"][
-            0
-        ]["queue_import_applied"]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_applied_payload["queue_import_results"][
-            0
-        ]["live_write"]
-        is False
-    )
-    assert build_decision_queue(server)["summary"]["pending_count"] == 1
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    ](
-        object(),
-        {
-            "promotion_memory_queue_ordering_plan_result_consumer": (
-                promotion_memory_queue_ordering_plan_result_consumer_payload
-            ),
-            "promotion_queue_importer_result": (
-                promotion_memory_queue_importer_applied_payload
-            ),
-            "idempotency_key_prefix": "promotion-import",
-            "limit": 5,
-        },
-    )
-
-    promotion_memory_queue_importer_applied_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_queue_importer_applied_consumer_payload[
-        "type"
-    ] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_queue_importer_result_consumer"
-    )
-    assert promotion_memory_queue_importer_applied_consumer_payload[
-        "handler"
-    ] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_queue_importer_result"
-    )
-    assert promotion_memory_queue_importer_applied_consumer_payload[
-        "status"
-    ] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_queue_import_preflight_plan_request_available"
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "promotion_queue_import_preflight_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "promotion_queue_import_preflight_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "promotion_queue_import_preflight_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "proposal_status_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "idempotency_reserved"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_queue_importer_applied_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    promotion_preflight_request = (
-        promotion_memory_queue_importer_applied_consumer_payload[
-            "promotion_queue_import_preflight_plan_request"
-        ]
-    )
-    assert promotion_preflight_request["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    )
-    assert promotion_preflight_request["read_only_template"] is True
-    assert promotion_preflight_request["idempotency_key_prefix"] == (
-        "promotion-import"
-    )
-    assert promotion_preflight_request["limit"] == 5
-    assert promotion_preflight_request["queue_mutation"] is False
-    assert promotion_preflight_request["live_write"] is False
-    assert (
-        promotion_preflight_request["imported_proposal_ids"]
-        == [policy_record["proposal_id"]]
-    )
-
-    await server._dispatch[
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    ](
-        object(),
-        promotion_preflight_request,
-    )
-
-    promotion_memory_preflight_plan_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_preflight_plan_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_preflight_plan"
-    )
-    assert promotion_memory_preflight_plan_payload["handler"] == (
-        "plan_operator_proposal_apply_sequence_policy_queue_import_preflight"
-    )
-    assert promotion_memory_preflight_plan_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_preflight_plan_available"
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"][
-            "preflight_candidate_count"
-        ]
-        == 1
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"][
-            "preflight_candidate_proposal_ids"
-        ]
-        == [policy_record["proposal_id"]]
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"][
-            "batch_preflight_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"][
-            "idempotency_reserved"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_preflight_plan_payload["summary"]["live_write"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
-    ](
-        object(),
-        {
-            "promotion_memory_queue_importer_result_consumer": (
-                promotion_memory_queue_importer_applied_consumer_payload
-            ),
-            "promotion_queue_import_preflight_plan_result": (
-                promotion_memory_preflight_plan_payload
-            ),
-        },
-    )
-
-    promotion_memory_preflight_plan_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_preflight_plan_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_preflight_plan_result_consumer"
-    )
-    assert promotion_memory_preflight_plan_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_preflight_plan_result"
-    )
-    assert promotion_memory_preflight_plan_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_batch_preflight_request_available"
-    )
-    assert (
-        promotion_memory_preflight_plan_consumer_payload["summary"][
-            "promotion_batch_preflight_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_preflight_plan_consumer_payload["summary"][
-            "promotion_batch_preflight_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_preflight_plan_consumer_payload["summary"][
-            "queue_mutation"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_preflight_plan_consumer_payload["summary"][
-            "idempotency_reserved"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_preflight_plan_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    promotion_batch_preflight_request = (
-        promotion_memory_preflight_plan_consumer_payload[
-            "promotion_batch_preflight_request"
-        ]
-    )
-    assert promotion_batch_preflight_request["handler"] == (
-        "preflight_operator_proposal_apply_batch"
-    )
-    assert promotion_batch_preflight_request["approved"] is False
-    assert (
-        promotion_batch_preflight_request["operator_must_set_approved_true"]
-        is True
-    )
-    assert promotion_batch_preflight_request["proposal_ids"] == [
-        policy_record["proposal_id"]
-    ]
-    assert promotion_batch_preflight_request["idempotency_key_prefix"] == (
-        "promotion-import"
-    )
-    assert promotion_batch_preflight_request["limit"] == 5
-    assert promotion_batch_preflight_request["queue_mutation"] is False
-    assert (
-        promotion_batch_preflight_request["idempotency_reserved"]
-        is False
-    )
-    assert (
-        promotion_batch_preflight_request["live_authority_granted"]
-        is False
-    )
-
-    approved_batch_preflight_request = dict(promotion_batch_preflight_request)
-    approved_batch_preflight_request["approved"] = True
-    await server._dispatch["preflight_operator_proposal_apply_batch"](
-        object(),
-        approved_batch_preflight_request,
-    )
-
-    promotion_memory_batch_preflight_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["type"]
-        == "operator_proposal_apply_preflight_batch"
-    )
-    assert promotion_memory_batch_preflight_payload["status"] == "ok"
-    assert (
-        promotion_memory_batch_preflight_payload["summary"]["selected_count"]
-        == 1
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["summary"]["ready_count"]
-        == 1
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["summary"][
-            "idempotency_key_prefix"
-        ]
-        == "promotion-import"
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["summary"]["queue_mutation"]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["summary"][
-            "idempotency_reserved"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_payload["summary"]["live_write"]
-        is False
-    )
-
-    await server._dispatch[
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
-    ](
-        object(),
-        {
-            "promotion_memory_preflight_plan_result_consumer": (
-                promotion_memory_preflight_plan_consumer_payload
-            ),
-            "promotion_batch_preflight_result": (
-                promotion_memory_batch_preflight_payload
-            ),
-        },
-    )
-
-    promotion_memory_batch_preflight_consumer_payload = (
-        server.send_to_client.await_args.args[1]
-    )
-    assert promotion_memory_batch_preflight_consumer_payload["type"] == (
-        "operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_import_promotion_batch_preflight_result_consumer"
-    )
-    assert promotion_memory_batch_preflight_consumer_payload["handler"] == (
-        "verify_operator_proposal_apply_sequence_policy_queue_import_promotion_batch_preflight_result"
-    )
-    assert promotion_memory_batch_preflight_consumer_payload["status"] == (
-        "sequence_memory_trust_promotion_queue_import_promotion_sequence_plan_request_available"
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "promotion_sequence_plan_request_available"
-        ]
-        is True
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "sequence_plan_handler_invoked"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "sequence_plan_created"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "sequence_execution_allowed_by_consumer"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "idempotency_reserved"
-        ]
-        is False
-    )
-    assert (
-        promotion_memory_batch_preflight_consumer_payload["summary"][
-            "live_authority_granted"
-        ]
-        is False
-    )
-    promotion_sequence_plan_request = (
-        promotion_memory_batch_preflight_consumer_payload[
-            "promotion_sequence_plan_request"
-        ]
-    )
-    assert promotion_sequence_plan_request["handler"] == (
-        "plan_operator_proposal_apply_sequence"
-    )
-    assert promotion_sequence_plan_request["read_only_template"] is True
-    assert (
-        promotion_sequence_plan_request[
-            "promotion_sequence_plan_request_template_only"
-        ]
-        is True
-    )
-    assert len(promotion_sequence_plan_request["preflight_results"]) == 1
-    assert promotion_sequence_plan_request["queue_mutation"] is False
-    assert promotion_sequence_plan_request["idempotency_reserved"] is False
-    assert promotion_sequence_plan_request["live_authority_granted"] is False
-
-    assert "promotion-import:proposal-first" not in (
-        server._operator_apply_idempotency_keys
-    )
-    assert server._apply_manual_console_write.await_count == 0
+    payload = server.send_to_client.await_args.args[1]
+    _assert_post_executor_migration_required(
+        payload,
+        "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion",
+    )
+    assert target_store == original_store
+    server._apply_manual_console_write.assert_not_called()
 
 
 def test_import_soundcheck_recommendations_respects_analyze_mode(server):

@@ -12,6 +12,7 @@ from operator_proposal_queue import (
     OperatorProposalQueue,
     SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
 )
+from operator_proposal_result_store import ResultEvidenceStore
 from operator_recommendation_bridge import build_soundcheck_operator_proposals
 from operator_product_state import build_decision_queue
 from server import AutoMixerServer
@@ -54,6 +55,36 @@ def supervised_mode(*allowed_live_write_kinds):
             "can_apply_to_console": True,
             "allowed_live_write_kinds": list(allowed_live_write_kinds),
         },
+    }
+
+
+def evidence_queue(tmp_path, name):
+    return OperatorProposalQueue(
+        result_store=ResultEvidenceStore(
+            tmp_path / name,
+            min_free_bytes=0,
+        )
+    )
+
+
+def reserve_evidence(queue, proposal):
+    reservation = queue.reserve_result_evidence(proposal)
+    assert reservation["reserved"] is True
+    return reservation["reservation_binding"]
+
+
+def verified_apply_result():
+    return {
+        "status": "applied",
+        "success": True,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "wal_terminal": "committed",
+        "audio_recheck_required": False,
+        "audio_recheck_disposition": "not_required_by_manual_write_contract",
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
     }
 
 
@@ -101,15 +132,15 @@ def test_unmatched_soundcheck_fader_stays_operator_review_only():
 
     queue = OperatorProposalQueue()
     created = queue.create(proposals[0], supervised_mode("fader"))
-    queued = created["proposal"]
 
-    assert queued["status"] == "pending"
-    assert queued["can_apply"] is False
-    assert queued["requires_approval"] is False
-    assert queued["apply_blockers"] == [
-        SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
-    ]
-    assert queued["raw"]["operator_review_only"] is True
+    # This legacy review packet repeats several full evidence surfaces and is
+    # larger than the v2 per-proposal immutable-review admission limit.  It
+    # remains review-only and is now rejected before consuming its ID rather
+    # than entering an unbounded WebSocket queue.
+    assert created["status"] == "blocked"
+    assert created["reason"] == "proposal_review_content_too_large"
+    assert created["review_content_bytes"] > created["max_review_content_bytes"]
+    assert queue.proposal_id_was_seen("soundcheck:legacy-fader") is False
 
 
 def test_operator_queue_nested_plan_is_immutable_on_ingress_and_egress():
@@ -154,6 +185,7 @@ def test_operator_queue_nested_plan_is_immutable_on_ingress_and_egress():
 async def test_proven_no_send_transaction_block_releases_retry_reservations(
     _mock_config,
     _mock_bleed,
+    tmp_path,
 ):
     class FakeWing:
         is_connected = True
@@ -237,8 +269,47 @@ async def test_proven_no_send_transaction_block_releases_retry_reservations(
     assert first["reason"] == second["reason"] == "apply_cas_target_changed"
     assert first["no_console_send_proven"] is True
     assert second["no_console_send_proven"] is True
+    assert first["wal_terminal"] == second["wal_terminal"] == "not_prepared"
+    assert first["physical_verified"] is False
+    assert second["physical_verified"] is False
     assert server._supervised_transaction_idempotency_keys == {}
     assert server._supervised_transaction_ids == {}
+
+    queue = evidence_queue(tmp_path, "actual-not-prepared-result")
+    created = queue.create(
+        {
+            "id": "actual-not-prepared-result",
+            "title": "No-send transaction result",
+            "requested_change": {
+                "value_type": "fader",
+                "channel": 3,
+                "value": -12.0,
+            },
+        },
+        supervised_mode("fader"),
+    )
+    proposal = queue.find(proposal_id=created["proposal"]["id"])
+    reservation = reserve_evidence(queue, proposal)
+    assert queue.claim_for_apply(proposal)["claimed"] is True
+
+    completed = queue.mark_apply_result(
+        proposal,
+        first,
+        evidence_reservation_binding=reservation,
+    )
+
+    assert completed["status"] == "apply_blocked"
+    assert proposal.result_evidence_pinned is False
+    restarted = OperatorProposalQueue(
+        result_store=ResultEvidenceStore(
+            queue.result_store.root,
+            min_free_bytes=0,
+            process_instance_id="c" * 32,
+        ),
+        result_evidence_lifecycle_ready=True,
+    )
+    assert restarted.result_recovery_hazards == ()
+    assert restarted.result_evidence_contract_ready is True
 
 
 @patch("server.BleedService")
@@ -247,6 +318,7 @@ async def test_proven_no_send_transaction_block_releases_retry_reservations(
 async def test_verified_transaction_rollback_is_terminal_fresh_analysis_block(
     _mock_config,
     _mock_bleed,
+    tmp_path,
 ):
     class FakeWing:
         is_connected = True
@@ -350,7 +422,7 @@ async def test_verified_transaction_rollback_is_terminal_fresh_analysis_block(
     assert apply_result["terminal_after_console_send"] is True
     assert apply_result["fresh_analysis_required"] is True
 
-    queue = OperatorProposalQueue()
+    queue = evidence_queue(tmp_path, "verified-rollback")
     created = queue.create(
         {
             "id": "verified-rollback-proposal",
@@ -364,8 +436,13 @@ async def test_verified_transaction_rollback_is_terminal_fresh_analysis_block(
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
-    terminal = queue.mark_apply_result(proposal, apply_result)
+    terminal = queue.mark_apply_result(
+        proposal,
+        apply_result,
+        evidence_reservation_binding=evidence_token,
+    )
 
     assert terminal["status"] == "apply_blocked"
     assert terminal["proposal"]["status"] == "apply_blocked"
@@ -641,8 +718,8 @@ def test_decision_queue_limit_bounds_evidence_rich_pending_rows():
     assert snapshot["summary"]["pending_count"] == 2
 
 
-def test_applied_or_claimed_proposal_cannot_be_claimed_again():
-    queue = OperatorProposalQueue()
+def test_applied_or_claimed_proposal_cannot_be_claimed_again(tmp_path):
+    queue = evidence_queue(tmp_path, "claim-once")
     created = queue.create(
         {
             "id": "claim-once",
@@ -657,13 +734,18 @@ def test_applied_or_claimed_proposal_cannot_be_claimed_again():
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
 
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
     assert queue.claim_for_apply(proposal) == {
         "claimed": False,
         "reason": "proposal_not_pending",
         "proposal_status": "applying",
     }
-    queue.mark_apply_result(proposal, {"status": "applied"})
+    queue.mark_apply_result(
+        proposal,
+        verified_apply_result(),
+        evidence_reservation_binding=evidence_token,
+    )
     historical = queue.find(proposal_id=proposal.id)
     assert historical.status == "applied"
     assert queue.claim_for_apply(historical)["claimed"] is False
@@ -672,8 +754,9 @@ def test_applied_or_claimed_proposal_cannot_be_claimed_again():
 @pytest.mark.parametrize("no_send_value", [False, None, "missing"])
 def test_possible_console_send_is_terminal_even_when_result_says_blocked(
     no_send_value,
+    tmp_path,
 ):
-    queue = OperatorProposalQueue()
+    queue = evidence_queue(tmp_path, f"possible-send-{no_send_value}")
     created = queue.create(
         {
             "id": "possible-send-terminal",
@@ -687,6 +770,7 @@ def test_possible_console_send_is_terminal_even_when_result_says_blocked(
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
 
     apply_result = {
@@ -698,7 +782,11 @@ def test_possible_console_send_is_terminal_even_when_result_says_blocked(
     }
     if no_send_value != "missing":
         apply_result["no_console_send_proven"] = no_send_value
-    result = queue.mark_apply_result(proposal, apply_result)
+    result = queue.mark_apply_result(
+        proposal,
+        apply_result,
+        evidence_reservation_binding=evidence_token,
+    )
 
     assert result["status"] == "apply_error"
     assert result["proposal"]["status"] == "apply_error"
@@ -713,8 +801,8 @@ def test_possible_console_send_is_terminal_even_when_result_says_blocked(
     ] == ["/ch/3/fdr"]
 
 
-def test_explicit_possible_send_is_terminal_without_optional_event_markers():
-    queue = OperatorProposalQueue()
+def test_explicit_possible_send_is_terminal_without_optional_event_markers(tmp_path):
+    queue = evidence_queue(tmp_path, "possible-send-no-markers")
     created = queue.create(
         {
             "id": "possible-send-no-markers",
@@ -728,6 +816,7 @@ def test_explicit_possible_send_is_terminal_without_optional_event_markers():
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
 
     result = queue.mark_apply_result(
@@ -737,6 +826,7 @@ def test_explicit_possible_send_is_terminal_without_optional_event_markers():
             "reason": "write_authority_revoked",
             "no_console_send_proven": False,
         },
+        evidence_reservation_binding=evidence_token,
     )
 
     assert result["status"] == "apply_error"
@@ -757,8 +847,8 @@ def test_explicit_possible_send_is_terminal_without_optional_event_markers():
         "proposal_expired",
     ],
 )
-def test_claimed_expiry_is_terminal_and_requires_fresh_analysis(reason):
-    queue = OperatorProposalQueue()
+def test_claimed_expiry_is_terminal_and_requires_fresh_analysis(reason, tmp_path):
+    queue = evidence_queue(tmp_path, f"expiry-{reason}")
     created = queue.create(
         {
             "id": f"terminal-expiry-{reason}",
@@ -772,6 +862,7 @@ def test_claimed_expiry_is_terminal_and_requires_fresh_analysis(reason):
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
 
     result = queue.mark_apply_result(
@@ -781,6 +872,7 @@ def test_claimed_expiry_is_terminal_and_requires_fresh_analysis(reason):
             "reason": reason,
             "no_console_send_proven": True,
         },
+        evidence_reservation_binding=evidence_token,
     )
 
     assert result["status"] == "apply_blocked"
@@ -790,8 +882,8 @@ def test_claimed_expiry_is_terminal_and_requires_fresh_analysis(reason):
     assert queue.find(proposal_id=proposal.id).status == "apply_blocked"
 
 
-def test_historical_proposal_id_cannot_be_reused():
-    queue = OperatorProposalQueue()
+def test_historical_proposal_id_cannot_be_reused(tmp_path):
+    queue = evidence_queue(tmp_path, "immutable-id")
     created = queue.create(
         {
             "id": "immutable-id",
@@ -805,8 +897,13 @@ def test_historical_proposal_id_cannot_be_reused():
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
-    assert queue.mark_apply_result(proposal, {"status": "applied"})["status"] == "applied"
+    assert queue.mark_apply_result(
+        proposal,
+        verified_apply_result(),
+        evidence_reservation_binding=evidence_token,
+    )["status"] == "applied"
 
     duplicate = queue.create(
         {
@@ -827,8 +924,8 @@ def test_historical_proposal_id_cannot_be_reused():
 
 
 @pytest.mark.parametrize("action", ["accept", "dismiss"])
-def test_applying_proposal_cannot_be_accepted_or_dismissed(action):
-    queue = OperatorProposalQueue()
+def test_applying_proposal_cannot_be_accepted_or_dismissed(action, tmp_path):
+    queue = evidence_queue(tmp_path, f"lifecycle-{action}")
     created = queue.create(
         {
             "id": f"lifecycle-{action}",
@@ -842,6 +939,7 @@ def test_applying_proposal_cannot_be_accepted_or_dismissed(action):
         supervised_mode("fader"),
     )
     proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
     assert queue.claim_for_apply(proposal)["claimed"] is True
     assert proposal.to_dict()["can_apply"] is False
 
@@ -850,7 +948,11 @@ def test_applying_proposal_cannot_be_accepted_or_dismissed(action):
     assert result["status"] == "blocked"
     assert result["reason"] == "proposal_not_pending"
     assert queue.summary()["pending_count"] == 1
-    assert queue.mark_apply_result(proposal, {"status": "applied"})["status"] == "applied"
+    assert queue.mark_apply_result(
+        proposal,
+        verified_apply_result(),
+        evidence_reservation_binding=evidence_token,
+    )["status"] == "applied"
     assert queue.summary()["history_count"] == 1
 
 

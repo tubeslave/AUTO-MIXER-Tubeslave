@@ -176,6 +176,91 @@ test('adaptTasks preserves SafeGain ensemble evidence for read-only cockpit disp
   assert.equal(task.safetyEvidence[5].tone, 'green');
 });
 
+test('adaptDecisionQueueV2 preserves compact server order and never invents fallback tasks', async () => {
+  const { adaptDecisionQueueV2 } = await importTypeScript('services/operatorAdapters.ts');
+  const queue = {
+    contractVersion: 2,
+    wireSchema: 'automixer.decision_queue.v2',
+    items: [
+      {
+        id: 'P-high',
+        entityKind: 'operator_proposal',
+        queueSection: 'pending',
+        titlePreview: 'Server first',
+        reasonPreview: 'First reason',
+        displayTarget: 'CH 1',
+        kind: 'fader',
+        severity: 'high',
+        status: 'pending',
+        source: 'backend',
+        createdAt: '2026-07-13T10:00:00Z',
+        updatedAt: '2026-07-13T10:00:00Z',
+        expiresAt: '2026-07-13T10:01:00Z',
+        canApply: true,
+        requiresApproval: true,
+        applyBlockerCodes: [],
+        applyBlockerCount: 0,
+        linkedChangeCount: 0,
+        reviewContractVersion: 2,
+        reviewContractStatus: 'bound',
+        reviewContentDigest: `sha256:${'1'.repeat(64)}`,
+        detailAvailable: true,
+        hazardScope: 'proposal_local',
+        priorityClass: 'high',
+        analysisOnly: false,
+        importRequired: false,
+      },
+      {
+        id: 'P-blocked',
+        entityKind: 'operator_proposal',
+        queueSection: 'history',
+        titlePreview: 'Server second',
+        reasonPreview: 'Second reason',
+        displayTarget: 'CH 2',
+        kind: 'gain',
+        severity: 'medium',
+        status: 'dismissed',
+        source: 'backend',
+        createdAt: null,
+        updatedAt: null,
+        expiresAt: null,
+        canApply: false,
+        requiresApproval: false,
+        applyBlockerCodes: ['terminal'],
+        applyBlockerCount: 1,
+        linkedChangeCount: 0,
+        reviewContractVersion: 2,
+        reviewContractStatus: 'bound',
+        reviewContentDigest: `sha256:${'2'.repeat(64)}`,
+        detailAvailable: true,
+        hazardScope: 'proposal_local',
+        priorityClass: 'history',
+        analysisOnly: false,
+        importRequired: false,
+      },
+    ],
+  };
+
+  const tasks = adaptDecisionQueueV2(queue);
+  assert.deepEqual(tasks.map(task => task.id), ['P-high', 'P-blocked']);
+  assert.equal(tasks[0].reviewContentDigest, `sha256:${'1'.repeat(64)}`);
+  assert.equal(tasks[0].safetyEvidence.length, 0);
+  assert.equal(tasks[1].reviewOnly, true);
+  assert.deepEqual(adaptDecisionQueueV2({ ...queue, items: [] }), []);
+});
+
+test('active Task Queue keeps a real v2 empty snapshot empty outside explicit demo mode', async () => {
+  const source = await fs.readFile(
+    path.join(srcRoot, 'services/useOperatorBackend.ts'),
+    'utf8',
+  );
+
+  assert.match(source, /const queueTasks = isExplicitDemoMode\(\)/);
+  assert.match(source, /\? mockTasks\s*: adaptDecisionQueueV2\(decisionQueue\)/);
+  assert.match(source, /const tasks = queueTasks/);
+  assert.doesNotMatch(source, /const tasks = \[\.\.\.queueTasks, \.\.\.reviewOnlyTasks\]/);
+});
+
 test('adaptTasks surfaces operator review old-new-rollback fields before generic evidence', async () => {
   const { adaptTasks } = await importTypeScript('services/operatorAdapters.ts');
 
@@ -4582,6 +4667,9 @@ test('task details apply entrypoint is guarded by integration bundle blocker', a
   assert.match(source, /const applyBlocked = integrationBundleApplyBlocked \|\| task\.canApply === false \|\| task\.reviewOnly/);
   assert.match(source, /requestTaskApply\(task, ui, actions, integrationBundleApplyBlocked\)/);
   assert.match(viewSource, /directorBlockedReasonMessages\(data\.directorRuntime\.blockedReasons\)\.length > 0/);
+  assert.match(viewSource, /data\.decisionQueue\.availability !== 'ready'/);
+  assert.match(viewSource, /data\.decisionQueue\.applyUiDisabled/);
+  assert.match(viewSource, /\|\| queueApplyBlocked/);
   assert.match(viewSource, /integrationBundleApplyBlocked=\{integrationBundleApplyBlocked\}/);
   assert.equal(source.includes('queueMutation'), false);
 });
@@ -4937,7 +5025,8 @@ test('supervised apply final readiness is guarded when integration bundle is blo
 
   assert.match(source, /function SupervisedApplyModal\(\{/);
   assert.match(source, /const finalReadinessStatus = integrationBundleApplyBlocked/);
-  assert.match(source, /value: 'Blocked by integration bundle', tone: 'red' as Tone/);
+  assert.match(source, /decisionQueueGateBlocked[\s\S]*'Blocked by Decision Queue gate'[\s\S]*'Blocked by integration bundle'/);
+  assert.match(source, /tone: 'red' as Tone/);
   assert.match(source, /value: ui\.backend\.statusLabel, tone: ui\.backend\.statusTone/);
   assert.match(source, /label: 'Final readiness', value: finalReadinessStatus\.value, tone: finalReadinessStatus\.tone/);
   assert.match(source, /disabled=\{!canRequestBackendGate\}/);

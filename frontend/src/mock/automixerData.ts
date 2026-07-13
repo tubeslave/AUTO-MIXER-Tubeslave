@@ -152,6 +152,17 @@ export function decisionPolicyForMode(mode: AutomixerMode): DecisionPolicy {
 }
 
 export function proposalPreviewForTask(task: Task): ProposalPreview {
+  if (task.entityKind) {
+    return {
+      parameter: task.requestedValueType?.replace(/_/g, ' ') || task.entityKind.replace(/_/g, ' '),
+      delta: 'Detail required',
+      risk: task.priority,
+      proof: task.reviewContentDigest ? 'Digest-bound detail required' : 'Review identity missing',
+      rollback: 'Available only in verified detail/result',
+      tone: task.canApply ? 'yellow' : 'red'
+    };
+  }
+
   if (task.reviewOnly) {
     const contract = task.proposalContract;
     const valueType = task.requestedValueType?.replace(/_/g, ' ') || 'review';
@@ -247,6 +258,41 @@ export function safetyEvidenceForTask(task: Task, mode: AutomixerMode): SafetyEv
     const ensemble = task.safetyEvidence.filter(row => row.label.toLowerCase().includes('ensemble'));
     const remaining = task.safetyEvidence.filter(row => !row.label.toLowerCase().includes('ensemble'));
     return [...ensemble, ...remaining].slice(0, 6);
+  }
+
+  if (task.entityKind) {
+    return [
+      {
+        label: 'Review contract',
+        value: task.reviewContractVersion === 2 ? 'v2 bound' : task.reviewContractStatus || 'missing',
+        tone: task.reviewContractVersion === 2 ? 'green' : 'red'
+      },
+      {
+        label: 'Review digest',
+        value: task.reviewContentDigest ? 'present' : 'missing',
+        tone: task.reviewContentDigest ? 'yellow' : 'red'
+      },
+      {
+        label: 'Full detail',
+        value: task.detailAvailable ? 'verification required' : 'unavailable',
+        tone: task.detailAvailable ? 'yellow' : 'red'
+      },
+      {
+        label: 'List apply state',
+        value: task.canApply ? 'candidate only' : 'blocked',
+        tone: task.canApply ? 'yellow' : 'red'
+      },
+      {
+        label: 'Approval',
+        value: task.requiresApproval ? 'operator required' : 'not granted',
+        tone: 'yellow'
+      },
+      {
+        label: 'Blockers',
+        value: task.applyBlockers?.length ? task.applyBlockers.join(', ') : 'none in compact row',
+        tone: task.applyBlockers?.length ? 'red' : 'yellow'
+      }
+    ];
   }
 
   if (task.reviewOnly) {

@@ -53,10 +53,65 @@ AUTHORITY_DENIAL_FIELDS = {
 }
 # Operator recommendations feed the current WING deployment apply rail.
 RECOMMENDATION_APPLY_VALUE_TYPES = set(WING_DEPLOYMENT_LIVE_WRITE_KINDS)
+QUEUE_REVIEW_PROJECTION_SCHEMA = "operator_recommendation_queue_review/v2"
+QUEUE_REDUNDANT_OPERATOR_CORRECTION_AGGREGATES = (
+    "operator_evidence_packet",
+    "operator_explanation_packet",
+    "operator_review_summary",
+)
+QUEUE_REVIEW_REFERENCE_REWRITES = {
+    "operator_evidence_packet": "operator_correction",
+    "operator_explanation_packet": "operator_readable_explanation",
+    "operator_review_summary": "operator_correction",
+    "review_operator_evidence_packet": "review_operator_correction",
+}
+QUEUE_REVIEW_REFERENCE_FIELDS = {
+    "operator_next_action_details": (
+        "action",
+        "operator_action",
+        "action_type",
+        "source",
+        "sources",
+    ),
+    "operator_review_checklist_details": (
+        "operator_action",
+        "related_next_actions",
+    ),
+    "operator_review_record_field_details": ("source", "sources"),
+    "why_safe_details": ("operator_action",),
+}
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def _rewrite_queue_review_references(correction: Dict[str, Any]) -> None:
+    """Retarget generated review links after redundant aggregates are omitted."""
+
+    for collection, fields in QUEUE_REVIEW_REFERENCE_FIELDS.items():
+        raw_rows = correction.get(collection)
+        if not isinstance(raw_rows, list):
+            continue
+        rewritten_rows = []
+        for raw_row in raw_rows:
+            if not isinstance(raw_row, dict):
+                rewritten_rows.append(raw_row)
+                continue
+            row = dict(raw_row)
+            for field in fields:
+                value = row.get(field)
+                if isinstance(value, str):
+                    row[field] = QUEUE_REVIEW_REFERENCE_REWRITES.get(value, value)
+                elif isinstance(value, list):
+                    row[field] = [
+                        QUEUE_REVIEW_REFERENCE_REWRITES.get(item, item)
+                        if isinstance(item, str)
+                        else item
+                        for item in value
+                    ]
+            rewritten_rows.append(row)
+        correction[collection] = rewritten_rows
 
 
 def _coerce_int(value: Any) -> Optional[int]:
@@ -917,7 +972,30 @@ def import_operator_proposals(
     existing_count = 0
     blocked_count = 0
     for proposal in proposals:
-        result = queue.create(proposal, operator_mode)
+        queue_payload = dict(proposal)
+        operator_correction = proposal.get("operator_correction")
+        if isinstance(operator_correction, dict):
+            queue_correction = dict(operator_correction)
+            omitted = [
+                field
+                for field in QUEUE_REDUNDANT_OPERATOR_CORRECTION_AGGREGATES
+                if field in queue_correction
+            ]
+            for field in omitted:
+                queue_correction.pop(field, None)
+            if omitted:
+                _rewrite_queue_review_references(queue_correction)
+                queue_correction["queue_review_projection"] = {
+                    "schema": QUEUE_REVIEW_PROJECTION_SCHEMA,
+                    "canonical_review_surface": "operator_correction",
+                    "omitted_redundant_aggregate_fields": omitted,
+                    "reference_rewrites": dict(QUEUE_REVIEW_REFERENCE_REWRITES),
+                    "retained_constituent_review_fields": sorted(queue_correction),
+                    "execution_semantics_changed": False,
+                }
+            queue_payload["operator_correction"] = queue_correction
+
+        result = queue.create(queue_payload, operator_mode)
         results.append(result)
         if result.get("status") == "created":
             created_count += 1

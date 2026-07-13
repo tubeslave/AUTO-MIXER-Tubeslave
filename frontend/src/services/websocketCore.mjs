@@ -74,6 +74,7 @@ export class BaseWebSocketTransport {
     this.authenticationTimeout = Math.max(1, Number(authenticationTimeout) || 5000);
     this.authenticationTimer = null;
     this.ready = false;
+    this.terminalClose = null;
     this._pendingConnectReject = null;
     purgeLegacyConnectionStorage();
   }
@@ -87,6 +88,7 @@ export class BaseWebSocketTransport {
     if (nextUrl === this.url) return;
 
     this.url = nextUrl;
+    this.terminalClose = null;
     purgeLegacyConnectionStorage();
 
     if (reconnect) {
@@ -98,6 +100,7 @@ export class BaseWebSocketTransport {
 
   setAuthToken(token, { reconnect = true } = {}) {
     this.authToken = String(token || '');
+    this.terminalClose = null;
     // Bearer tokens and operator-selected endpoints are memory-only. Purge
     // values left by older builds from both browser storage scopes.
     purgeLegacyConnectionStorage();
@@ -116,6 +119,20 @@ export class BaseWebSocketTransport {
     );
   }
 
+  getTerminalClose() {
+    return this.terminalClose ? { ...this.terminalClose } : null;
+  }
+
+  retryTerminalClose() {
+    const previous = this.getTerminalClose();
+    this.terminalClose = null;
+    this.shouldReconnect = true;
+    if (previous) {
+      this.notifyListeners('transport_manual_retry', previous);
+    }
+    return this.connect();
+  }
+
   clearAuthenticationTimer() {
     if (this.authenticationTimer) {
       clearTimeout(this.authenticationTimer);
@@ -130,6 +147,12 @@ export class BaseWebSocketTransport {
 
     if (this.connectPromise) {
       return this.connectPromise;
+    }
+
+    if (this.terminalClose) {
+      return Promise.reject(new Error(
+        `WebSocket terminal close ${this.terminalClose.code}; manual retry required`
+      ));
     }
 
     if (!this.WebSocketImpl) {
@@ -291,19 +314,42 @@ export class BaseWebSocketTransport {
 
     socket.onclose = (event) => {
       if (this.ws !== socket) return;
-      if (authToken && Number(event?.code) === 1008) {
+      const closeCode = Number(event?.code) || 1006;
+      const closeReason = typeof event?.reason === 'string' ? event.reason : '';
+      const frameTooLarge = closeCode === 1009;
+      if (authToken && closeCode === 1008) {
         authenticationRejected = true;
         this.shouldReconnect = false;
         notifyAuthenticationFailure();
+      }
+      if (frameTooLarge) {
+        this.terminalClose = {
+          code: closeCode,
+          reason: closeReason,
+          manualRetryRequired: true
+        };
+        this.shouldReconnect = false;
+        this.notifyListeners('transport_terminal_close', {
+          code: closeCode,
+          reason: closeReason,
+          manual_retry_required: true
+        });
       }
       this.ready = false;
       this.ws = null;
       this.clearAuthenticationTimer();
       if (!settled) {
-        settleFailure(new Error('WebSocket closed before becoming ready'));
+        settleFailure(new Error(
+          `WebSocket closed before becoming ready (${closeCode}${closeReason ? `: ${closeReason}` : ''})`
+        ));
       }
-      this.notifyListeners('disconnected', {});
-      if (this.shouldReconnect && !authenticationRejected) {
+      this.notifyListeners('disconnected', {
+        code: closeCode,
+        reason: closeReason,
+        terminal: frameTooLarge,
+        manual_retry_required: frameTooLarge
+      });
+      if (this.shouldReconnect && !authenticationRejected && !frameTooLarge) {
         this.scheduleReconnect();
       }
     };
@@ -359,6 +405,14 @@ export class BaseWebSocketTransport {
         return false;
       }
     } else {
+      if (this.terminalClose) {
+        console.error(
+          'WebSocket is terminally closed; manual retry is required.',
+          this.terminalClose.code,
+          this.terminalClose.reason
+        );
+        return false;
+      }
       const state = this.ws ? this.ws.readyState : 'null';
       console.error('WebSocket is not authenticated and ready. ReadyState:', state);
       if (state === 0) {

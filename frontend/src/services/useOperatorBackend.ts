@@ -9,12 +9,12 @@ import {
   adaptChannels,
   adaptCommunicationsSnapshot,
   adaptDashboardRuntime,
+  adaptDecisionQueueV2,
   adaptDecisionTraces,
   adaptDevices,
   adaptDirectorRuntime,
   adaptOverviewMetrics,
   adaptPerformanceRecords,
-  adaptProposalOnlyContractTasks,
   adaptReplayRuns,
   adaptMemorySnapshot,
   adaptModuleStatusRecords,
@@ -25,7 +25,6 @@ import {
   adaptSafetyMonitor,
   adaptTelemetryAlertsSnapshot,
   adaptTrainingSnapshot,
-  adaptTasks,
   adaptTopologyLinks,
   adaptTopologyNodes,
   appendBackendLog,
@@ -38,6 +37,15 @@ import {
   classifyReadbackToneValue,
   classifyRollbackToneValue
 } from './operatorStatusTone.mjs';
+import {
+  createUnavailableDecisionQueueState,
+  isVerifiedProposalReviewForApply,
+  markDecisionQueueLoading,
+  parseDecisionQueueFrame,
+  proposalReviewIdentityFromQueueItem,
+  verifyProposalDetailFrame,
+  verifyProposalDetailFrames
+} from './decisionQueueV2.mjs';
 import {
   agents as mockAgents,
   buses as mockBuses,
@@ -60,6 +68,7 @@ import type {
   Channel,
   Communication,
   DashboardRuntime,
+  DecisionQueueState,
   DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
@@ -71,6 +80,7 @@ import type {
   ModuleStatusRecord,
   PerformanceRecord,
   ProposalApplyResult,
+  ProposalReviewState,
   ReplayRunRecord,
   RuleLibrarySnapshotRow,
   RoutingSegment,
@@ -148,6 +158,22 @@ const idleEmergencyStop: EmergencyStopUiState = {
   message: 'Emergency stop ready. Arm, then confirm immediately.',
   updatedAt: '',
   reconciliationRequired: false
+};
+
+const idleDecisionQueue = createUnavailableDecisionQueueState() as DecisionQueueState;
+
+const idleProposalReview: ProposalReviewState = {
+  status: 'idle',
+  proposalId: null,
+  reviewContractVersion: null,
+  reviewContentDigest: null,
+  chunkCount: 0,
+  receivedChunkCount: 0,
+  totalRawBytes: 0,
+  currentState: null,
+  document: null,
+  error: '',
+  verifiedAt: null
 };
 
 const EMERGENCY_STOP_ACK_TIMEOUT_MS = 5000;
@@ -407,6 +433,7 @@ export interface OperatorViewData {
   buses: BusRecord[];
   agents: Agent[];
   tasks: Task[];
+  decisionQueue: DecisionQueueState;
   decisionTraces: DecisionTraceRecord[];
   safetyMonitor: SafetyMonitorState;
   replayRuns: ReplayRunRecord[];
@@ -469,11 +496,20 @@ function shouldAutoConnect() {
   }
 }
 
+function isExplicitDemoMode() {
+  try {
+    return new URLSearchParams(globalThis.location?.search ?? '').get('demo') === '1';
+  } catch {
+    return false;
+  }
+}
+
 function connectionMessage(state: BackendConnectionState) {
   if (state === 'connected') return 'Product Layer connected.';
   if (state === 'connecting') return 'Connecting to Product Layer.';
-  if (state === 'error') return 'Backend connection failed. UI stays on mock fallback.';
-  return mockBackendState.message;
+  if (state === 'error') return 'Backend connection failed. Runtime data is unavailable.';
+  if (isExplicitDemoMode()) return mockBackendState.message;
+  return 'Product Layer is unavailable. Runtime data is not replaced with demo values.';
 }
 
 function socketIsOpen() {
@@ -631,29 +667,64 @@ function activeSoundcheckChannels(payload: unknown): number[] {
 
 function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): ProposalApplyResult {
   const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
-  const rawResult = data.apply_result && typeof data.apply_result === 'object'
+  const rawResult = data.contract_version === 2
+    ? data
+    : data.apply_result && typeof data.apply_result === 'object'
     ? data.apply_result as Record<string, unknown>
     : data;
   const status = String(data.status ?? rawResult.status ?? fallbackStatus);
   const reason = String(rawResult.reason ?? data.reason ?? '');
-  const readbackStatus = String(rawResult.readback_status ?? 'not verified');
-  const rollbackAvailable = Boolean(rawResult.rollback_available);
+  const noConsoleSendProven = typeof rawResult.no_console_send_proven === 'boolean'
+    ? rawResult.no_console_send_proven
+    : null;
+  const physicalVerified = typeof rawResult.physical_verified === 'boolean'
+    ? rawResult.physical_verified
+    : null;
+  const physicalStateRestored = typeof rawResult.physical_state_restored === 'boolean'
+    ? rawResult.physical_state_restored
+    : null;
+  const writeStateUnknown = rawResult.write_state_unknown === true;
+  const rollbackStateUnknown = rawResult.rollback_state_unknown === true;
+  const manualReviewRequired = rawResult.manual_review_required === true;
+  const readbackStatus = String(
+    rawResult.readback_status
+    ?? (writeStateUnknown
+      ? 'write state unknown'
+      : physicalVerified === true
+        ? 'physical readback verified'
+        : noConsoleSendProven === true
+          ? 'no console send proven'
+          : 'physical readback not verified')
+  );
+  const rollbackAvailable = Boolean(rawResult.rollback_available)
+    || rawResult.result_detail_available === true;
   const rollbackResults = Array.isArray(rawResult.rollback_results) ? rawResult.rollback_results : [];
-  const rollbackFailed = rollbackResults.some(item => {
+  const rollbackFailed = rollbackStateUnknown || physicalStateRestored === false || rollbackResults.some(item => {
     const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
     return row.status !== 'applied' || row.rollback_verified === false;
   });
   const explicitRollbackStatus = String(
     rawResult.rollback_status ?? rawResult.rollback_reason ?? ''
   ).trim();
-  const rollbackStatus = explicitRollbackStatus || (rollbackFailed
+  const rollbackStatus = rollbackStateUnknown
+    ? 'rollback state unknown'
+    : explicitRollbackStatus || (rollbackFailed
     ? 'rollback failed/unavailable'
+    : physicalStateRestored === true
+      ? 'physical state restored'
     : rollbackResults.length
       ? 'rollback executed'
       : rollbackAvailable
         ? 'rollback available'
         : 'rollback unavailable');
-  const tone = classifyApplyToneValue(status, reason, rollbackFailed) as Tone;
+  const unsafeTerminal = writeStateUnknown
+    || rollbackStateUnknown
+    || manualReviewRequired
+    || rawResult.emergency_stop_required === true
+    || (status === 'applied' && physicalVerified !== true);
+  const tone = (unsafeTerminal
+    ? 'red'
+    : classifyApplyToneValue(status, reason, rollbackFailed)) as Tone;
   const blocked = tone === 'red';
   return {
     proposalId: proposalIdFromPayload(payload),
@@ -666,6 +737,16 @@ function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): P
     readbackTone: classifyReadbackTone(readbackStatus),
     rollbackTone: classifyRollbackTone(rollbackStatus),
     tone,
+    noConsoleSendProven,
+    physicalVerified,
+    physicalStateRestored,
+    writeStateUnknown,
+    rollbackStateUnknown,
+    manualReviewRequired,
+    walTerminal: stringValue(rawResult.wal_terminal),
+    audioRecheckPassed: typeof rawResult.audio_recheck_passed === 'boolean'
+      ? rawResult.audio_recheck_passed
+      : null,
     updatedAt: new Date().toLocaleTimeString()
   };
 }
@@ -854,6 +935,24 @@ function mergeMixerUpdateIntoPayloads(
   };
 }
 
+type ProposalReviewIdentity = {
+  proposalId: string;
+  reviewContractVersion: number;
+  reviewContentDigest: string;
+};
+
+type ProposalDetailFetchSession = {
+  token: number;
+  identity: ProposalReviewIdentity;
+  frames: unknown[];
+  metadata: {
+    chunkCount: number;
+    totalRawBytes: number;
+    contentSha256: string;
+    currentStateKey: string;
+  } | null;
+};
+
 export function useOperatorBackend() {
   const [connectionState, setConnectionState] = useState<BackendConnectionState>(() => (
     socketIsOpen() ? 'connected' : shouldAutoConnect() ? 'connecting' : 'mock'
@@ -862,9 +961,37 @@ export function useOperatorBackend() {
   const [modeFromBackend, setModeFromBackend] = useState<AutomixerMode | null>(null);
   const [logs, setLogs] = useState<LogRecord[]>(mockLogs);
   const [proposalApplyResult, setProposalApplyResult] = useState<ProposalApplyResult | null>(null);
+  const [decisionQueue, setDecisionQueue] = useState<DecisionQueueState>(idleDecisionQueue);
+  const [proposalReview, setProposalReview] = useState<ProposalReviewState>(idleProposalReview);
   const [soundcheck, setSoundcheck] = useState<SoundcheckRuntime>(idleSoundcheckRuntime);
   const [emergencyStop, setEmergencyStop] = useState<EmergencyStopUiState>(idleEmergencyStop);
   const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const decisionQueueRef = useRef<DecisionQueueState>(idleDecisionQueue);
+  const proposalReviewRef = useRef<ProposalReviewState>(idleProposalReview);
+  const proposalDetailFetchRef = useRef<ProposalDetailFetchSession | null>(null);
+  const proposalDetailTokenRef = useRef(0);
+  const paginationRequestRef = useRef(false);
+  const staleCursorRetryUsedRef = useRef(false);
+
+  const replaceDecisionQueue = useCallback((next: DecisionQueueState) => {
+    decisionQueueRef.current = next;
+    setDecisionQueue(next);
+    setPayloads(current => ({ ...current, decisions: next }));
+  }, []);
+
+  const replaceProposalReview = useCallback((next: ProposalReviewState) => {
+    proposalReviewRef.current = next;
+    setProposalReview(next);
+  }, []);
+
+  const invalidateProposalReview = useCallback((reason = '') => {
+    proposalDetailFetchRef.current = null;
+    replaceProposalReview(reason ? {
+      ...idleProposalReview,
+      status: 'stale',
+      error: reason
+    } : idleProposalReview);
+  }, [replaceProposalReview]);
 
   const clearEmergencyStopAckTimer = useCallback(() => {
     if (emergencyStopAckTimer.current !== null) {
@@ -878,7 +1005,11 @@ export function useOperatorBackend() {
     websocketService.getManualWriteSupervision();
     websocketService.getDashboardSnapshot();
     websocketService.getChannelInventory(48);
-    websocketService.getDecisionQueue(50);
+    paginationRequestRef.current = false;
+    staleCursorRetryUsedRef.current = false;
+    invalidateProposalReview('decision_queue_snapshot_refresh');
+    replaceDecisionQueue(markDecisionQueueLoading(decisionQueueRef.current) as DecisionQueueState);
+    websocketService.getDecisionQueue();
     websocketService.getDecisionTraces(50);
     websocketService.getSafetyMonitor();
     websocketService.getReplayRuns(20);
@@ -896,7 +1027,7 @@ export function useOperatorBackend() {
     websocketService.getAudioCaptureStatus();
     websocketService.getAutoSoundcheckStatus();
     websocketService.subscribeMeters();
-  }, []);
+  }, [invalidateProposalReview, replaceDecisionQueue]);
 
   const refreshBackend = useCallback(() => {
     if (socketIsOpen()) {
@@ -905,17 +1036,42 @@ export function useOperatorBackend() {
     }
 
     setConnectionState('connecting');
-    websocketService.connect()
-      .then(() => {
-        setConnectionState('connected');
-        setLogs(current => appendBackendLog(current, 'backend', 'Product Layer websocket connected.', 'SUCCESS'));
-        requestSnapshot();
-      })
-      .catch(() => {
+    const terminalClose = websocketService.getTerminalClose?.();
+    const connectPromise = terminalClose
+      ? websocketService.retryTerminalClose()
+      : websocketService.connect();
+    connectPromise.catch(() => {
         setConnectionState('error');
-        setLogs(current => appendBackendLog(current, 'backend', 'Product Layer unavailable; mock fallback remains active.', 'WARN'));
+        setLogs(current => appendBackendLog(current, 'backend', 'Product Layer unavailable; runtime data remains unavailable.', 'WARN'));
       });
   }, [requestSnapshot]);
+
+  const loadNextDecisionQueuePage = useCallback(() => {
+    const current = decisionQueueRef.current;
+    if (
+      !socketIsOpen()
+      || current.paginationLoading
+      || !current.snapshot
+      || !current.page.hasMore
+      || !current.page.nextCursor
+    ) return;
+    paginationRequestRef.current = true;
+    staleCursorRetryUsedRef.current = false;
+    replaceDecisionQueue(markDecisionQueueLoading(current, { pagination: true }) as DecisionQueueState);
+    const sent = websocketService.getDecisionQueueNextPage(
+      current.page.nextCursor,
+      current.snapshot.revision
+    );
+    if (!sent) {
+      replaceDecisionQueue({
+        ...current,
+        availability: 'error',
+        paginationLoading: false,
+        applyUiDisabled: true,
+        error: 'decision_queue_next_page_not_sent'
+      });
+    }
+  }, [replaceDecisionQueue]);
 
   const runBackendAnalysis = useCallback(() => {
     if (!socketIsOpen()) {
@@ -986,11 +1142,110 @@ export function useOperatorBackend() {
     websocketService.dismissOperatorProposal(proposalId, 'frontend_operator_dismiss');
   }, []);
 
+  const requestProposalDetail = useCallback((proposalId: string) => {
+    const item = decisionQueueRef.current.items.find(row => row.id === proposalId);
+    const identity = item ? proposalReviewIdentityFromQueueItem(item) : null;
+    if (!identity || !socketIsOpen()) {
+      replaceProposalReview({
+        ...idleProposalReview,
+        status: 'error',
+        proposalId,
+        error: identity
+          ? 'proposal_detail_transport_unavailable'
+          : 'proposal_detail_identity_unavailable'
+      });
+      return false;
+    }
+    const token = proposalDetailTokenRef.current + 1;
+    proposalDetailTokenRef.current = token;
+    proposalDetailFetchRef.current = {
+      token,
+      identity,
+      frames: [],
+      metadata: null
+    };
+    replaceProposalReview({
+      ...idleProposalReview,
+      status: 'loading',
+      proposalId: identity.proposalId,
+      reviewContractVersion: identity.reviewContractVersion,
+      reviewContentDigest: identity.reviewContentDigest
+    });
+    const sent = websocketService.getOperatorProposalDetail(identity, 0);
+    if (!sent) {
+      proposalDetailFetchRef.current = null;
+      replaceProposalReview({
+        ...idleProposalReview,
+        status: 'error',
+        proposalId,
+        error: 'proposal_detail_request_not_sent'
+      });
+    }
+    return sent;
+  }, [replaceProposalReview]);
+
+  const blockFrontendApply = useCallback((proposalId: string, reason: string) => {
+    setProposalApplyResult({
+      proposalId,
+      status: 'apply_blocked',
+      reason,
+      applyRequest: 'apply blocked',
+      readbackStatus: 'no backend apply request sent',
+      rollbackStatus: 'not required; no apply request sent',
+      rollbackAvailable: false,
+      readbackTone: 'red',
+      rollbackTone: 'yellow',
+      tone: 'red',
+      noConsoleSendProven: true,
+      physicalVerified: false,
+      physicalStateRestored: null,
+      writeStateUnknown: false,
+      rollbackStateUnknown: false,
+      manualReviewRequired: false,
+      audioRecheckPassed: null,
+      updatedAt: new Date().toLocaleTimeString()
+    });
+    setLogs(current => appendBackendLog(
+      current,
+      'operator_proposal_apply',
+      `Apply blocked in frontend: ${reason}.`,
+      'WARN'
+    ));
+    return false;
+  }, []);
+
   const applyProposal = useCallback((proposalId: string) => {
+    const queue = decisionQueueRef.current;
+    const item = queue.items.find(row => row.id === proposalId);
+    const identity = item ? proposalReviewIdentityFromQueueItem(item) : null;
+    const review = proposalReviewRef.current;
+    const snapshotExpiry = queue.snapshot ? Date.parse(queue.snapshot.expiresAt) : Number.NaN;
+    if (!socketIsOpen()) return blockFrontendApply(proposalId, 'proposal_apply_transport_unavailable');
+    if (
+      queue.availability !== 'ready'
+      || queue.applyUiDisabled
+      || !queue.snapshot
+      || !Number.isFinite(snapshotExpiry)
+      || snapshotExpiry <= Date.now()
+    ) {
+      return blockFrontendApply(proposalId, 'decision_queue_snapshot_not_applyable');
+    }
+    if (!item?.canApply || !identity) {
+      return blockFrontendApply(proposalId, 'proposal_list_identity_not_applyable');
+    }
+    if (!isVerifiedProposalReviewForApply(review, identity)) {
+      return blockFrontendApply(proposalId, 'verified_proposal_detail_required');
+    }
+    const sent = websocketService.applyOperatorProposal(
+      identity,
+      true,
+      'frontend_verified_detail_operator_approved_apply'
+    );
+    if (!sent) return blockFrontendApply(proposalId, 'proposal_apply_request_not_sent');
     setProposalApplyResult({
       proposalId,
       status: 'requested',
-      reason: 'frontend_supervised_operator_approved_apply',
+      reason: 'frontend_verified_detail_operator_approved_apply',
       applyRequest: 'apply requested',
       readbackStatus: 'waiting for backend readback',
       rollbackStatus: 'waiting for rollback proof',
@@ -1000,8 +1255,8 @@ export function useOperatorBackend() {
       tone: 'yellow',
       updatedAt: new Date().toLocaleTimeString()
     });
-    websocketService.applyOperatorProposal(proposalId, true, 'frontend_supervised_operator_approved_apply');
-  }, []);
+    return true;
+  }, [blockFrontendApply]);
 
   const startSoundcheck = useCallback(() => {
     if (!socketIsOpen()) {
@@ -1175,8 +1430,176 @@ export function useOperatorBackend() {
       setLogs(current => appendBackendLog(current, 'channel_inventory', 'Channel inventory received.', 'SUCCESS'));
     };
     const handleDecisions = (payload: unknown) => {
-      setPayloads(current => ({ ...current, decisions: payload }));
-      setLogs(current => appendBackendLog(current, 'decision_queue', 'Decision queue received.', 'SUCCESS'));
+      try {
+        const previous = decisionQueueRef.current;
+        const next = parseDecisionQueueFrame(payload, previous) as DecisionQueueState;
+        const identityChanged = Boolean(
+          previous.snapshot
+          && (
+            previous.snapshot.id !== next.snapshot?.id
+            || previous.snapshot.revision !== next.snapshot?.revision
+          )
+        );
+        paginationRequestRef.current = false;
+        staleCursorRetryUsedRef.current = false;
+        if (identityChanged) invalidateProposalReview('decision_queue_snapshot_changed');
+        replaceDecisionQueue(next);
+        setLogs(current => appendBackendLog(
+          current,
+          'decision_queue',
+          next.items.length === 0
+            ? 'Decision Queue v2 received: zero real items.'
+            : `Decision Queue v2 received: ${next.items.length}/${next.counts.includedCount} materialized item(s).`,
+          next.applyUiDisabled ? 'WARN' : 'SUCCESS'
+        ));
+      } catch (error) {
+        paginationRequestRef.current = false;
+        invalidateProposalReview('decision_queue_contract_invalid');
+        replaceDecisionQueue({
+          ...createUnavailableDecisionQueueState({
+            availability: 'error',
+            error: error instanceof Error ? error.message : 'decision_queue_contract_invalid'
+          }),
+          applyUiDisabled: true
+        } as DecisionQueueState);
+        setLogs(current => appendBackendLog(
+          current,
+          'decision_queue',
+          'Decision Queue response failed the v2 contract and was rejected.',
+          'ERROR'
+        ));
+      }
+    };
+    const handleDecisionQueueError = (payload: unknown) => {
+      const data = recordValue(payload);
+      const reason = stringValue(data.reason, 'decision_queue_error');
+      if (
+        paginationRequestRef.current
+        && reason === 'decision_queue_cursor_stale'
+        && !staleCursorRetryUsedRef.current
+      ) {
+        staleCursorRetryUsedRef.current = true;
+        paginationRequestRef.current = false;
+        invalidateProposalReview('decision_queue_cursor_stale');
+        replaceDecisionQueue(markDecisionQueueLoading(decisionQueueRef.current) as DecisionQueueState);
+        const sent = websocketService.getDecisionQueue();
+        if (sent) {
+          setLogs(current => appendBackendLog(
+            current,
+            'decision_queue',
+            'Decision Queue cursor became stale; one fresh first-page request was sent.',
+            'WARN'
+          ));
+          return;
+        }
+      }
+      paginationRequestRef.current = false;
+      invalidateProposalReview(reason);
+      replaceDecisionQueue(createUnavailableDecisionQueueState({
+        availability: 'error',
+        error: reason
+      }) as DecisionQueueState);
+      setLogs(current => appendBackendLog(
+        current,
+        'decision_queue',
+        `Decision Queue unavailable: ${reason}.`,
+        'ERROR'
+      ));
+    };
+    const handleProposalDetail = async (payload: unknown) => {
+      const session = proposalDetailFetchRef.current;
+      if (!session) return;
+      try {
+        const chunkIndex = session.frames.length;
+        const verifiedFrame = await verifyProposalDetailFrame(
+          payload,
+          session.identity,
+          chunkIndex,
+          session.metadata
+        );
+        if (proposalDetailFetchRef.current?.token !== session.token) return;
+        session.frames.push(payload);
+        session.metadata ??= {
+          chunkCount: verifiedFrame.chunkCount,
+          totalRawBytes: verifiedFrame.totalRawBytes,
+          contentSha256: verifiedFrame.contentSha256,
+          currentStateKey: verifiedFrame.currentStateKey
+        };
+        replaceProposalReview({
+          ...idleProposalReview,
+          status: 'loading',
+          proposalId: session.identity.proposalId,
+          reviewContractVersion: session.identity.reviewContractVersion,
+          reviewContentDigest: session.identity.reviewContentDigest,
+          chunkCount: verifiedFrame.chunkCount,
+          receivedChunkCount: session.frames.length,
+          totalRawBytes: verifiedFrame.totalRawBytes,
+          currentState: verifiedFrame.currentState as ProposalReviewState['currentState']
+        });
+        if (session.frames.length < verifiedFrame.chunkCount) {
+          const sent = websocketService.getOperatorProposalDetail(
+            session.identity,
+            session.frames.length
+          );
+          if (!sent) throw new Error('proposal_detail_next_chunk_not_sent');
+          return;
+        }
+        const verified = await verifyProposalDetailFrames(session.frames, session.identity);
+        if (proposalDetailFetchRef.current?.token !== session.token) return;
+        proposalDetailFetchRef.current = null;
+        replaceProposalReview({
+          status: 'verified',
+          proposalId: verified.proposalId,
+          reviewContractVersion: verified.reviewContractVersion,
+          reviewContentDigest: verified.reviewContentDigest,
+          chunkCount: verified.chunkCount,
+          receivedChunkCount: verified.chunkCount,
+          totalRawBytes: verified.totalRawBytes,
+          currentState: verified.currentState as ProposalReviewState['currentState'],
+          document: verified.document as Record<string, unknown>,
+          error: '',
+          verifiedAt: verified.verifiedAt
+        });
+        setLogs(current => appendBackendLog(
+          current,
+          'operator_proposal_detail',
+          `Proposal ${verified.proposalId} detail verified across ${verified.chunkCount} chunk(s).`,
+          'SUCCESS'
+        ));
+      } catch (error) {
+        if (proposalDetailFetchRef.current?.token !== session.token) return;
+        proposalDetailFetchRef.current = null;
+        replaceProposalReview({
+          ...idleProposalReview,
+          status: 'error',
+          proposalId: session.identity.proposalId,
+          reviewContractVersion: session.identity.reviewContractVersion,
+          reviewContentDigest: session.identity.reviewContentDigest,
+          error: error instanceof Error ? error.message : 'proposal_detail_verification_failed'
+        });
+        setLogs(current => appendBackendLog(
+          current,
+          'operator_proposal_detail',
+          'Proposal detail verification failed; Apply remains blocked.',
+          'ERROR'
+        ));
+      }
+    };
+    const handleProposalDetailError = (payload: unknown) => {
+      const session = proposalDetailFetchRef.current;
+      if (!session) return;
+      const data = recordValue(payload);
+      const responseProposalId = stringValue(data.proposal_id);
+      if (responseProposalId && responseProposalId !== session.identity.proposalId) return;
+      proposalDetailFetchRef.current = null;
+      replaceProposalReview({
+        ...idleProposalReview,
+        status: 'error',
+        proposalId: session.identity.proposalId,
+        reviewContractVersion: session.identity.reviewContractVersion,
+        reviewContentDigest: session.identity.reviewContentDigest,
+        error: stringValue(data.reason, 'operator_proposal_detail_error')
+      });
     };
     const handleDecisionTraces = (payload: unknown) => {
       setPayloads(current => ({ ...current, decisionTraces: payload }));
@@ -1425,9 +1848,49 @@ export function useOperatorBackend() {
       const data = recordValue(payload);
       setPayloads(current => mergeMixerUpdateIntoPayloads(current, data));
     };
-    const handleDisconnected = () => {
-      setConnectionState(previous => previous === 'mock' ? 'mock' : 'offline');
+    const handleTransportTerminalClose = (payload: unknown) => {
+      const data = recordValue(payload);
+      const code = numberValue(data.code, 1009);
+      const reason = stringValue(data.reason, 'websocket_frame_too_large');
+      paginationRequestRef.current = false;
+      invalidateProposalReview(`transport_terminal_close:${code}:${reason}`);
+      replaceDecisionQueue(createUnavailableDecisionQueueState({
+        availability: 'terminal',
+        error: `WebSocket closed ${code}: ${reason}`,
+        terminalClose: {
+          code,
+          reason,
+          manualRetryRequired: true
+        }
+      }) as DecisionQueueState);
+      setConnectionState('error');
+      setLogs(current => appendBackendLog(
+        current,
+        'backend',
+        `WebSocket closed ${code}: ${reason}. Automatic reconnect is disabled; manual retry is required.`,
+        'ERROR'
+      ));
+    };
+    const handleDisconnected = (payload: unknown) => {
+      const data = recordValue(payload);
+      const terminal = data.terminal === true || numberValue(data.code) === 1009;
+      setConnectionState(previous => previous === 'mock'
+        ? 'mock'
+        : terminal
+          ? 'error'
+          : 'offline');
       setProposalApplyResult(null);
+      paginationRequestRef.current = false;
+      if (!terminal) {
+        invalidateProposalReview('backend_disconnected');
+        replaceDecisionQueue({
+          ...decisionQueueRef.current,
+          availability: 'stale',
+          applyUiDisabled: true,
+          paginationLoading: false,
+          error: 'backend_disconnected'
+        });
+      }
       setSoundcheck(current => ({
         ...current,
         running: false,
@@ -1450,12 +1913,21 @@ export function useOperatorBackend() {
         updatedAt: new Date().toLocaleTimeString(),
         reconciliationRequired: true
       } : current);
-      setLogs(current => appendBackendLog(current, 'backend', 'Product Layer disconnected; using mock fallback.', 'WARN'));
+      setLogs(current => appendBackendLog(
+        current,
+        'backend',
+        terminal
+          ? 'Product Layer terminally disconnected; manual retry is required.'
+          : 'Product Layer disconnected; retained runtime data is stale and Apply is blocked.',
+        terminal ? 'ERROR' : 'WARN'
+      ));
     };
     const handleConnected = () => {
       setPayloads({});
       setModeFromBackend(null);
       setProposalApplyResult(null);
+      invalidateProposalReview();
+      replaceDecisionQueue(markDecisionQueueLoading(idleDecisionQueue) as DecisionQueueState);
       setConnectionState('connected');
       setLogs(current => appendBackendLog(
         current,
@@ -1469,6 +1941,9 @@ export function useOperatorBackend() {
     websocketService.on('dashboard_snapshot', handleDashboard);
     websocketService.on('channel_inventory', handleChannels);
     websocketService.on('decision_queue', handleDecisions);
+    websocketService.on('decision_queue_error', handleDecisionQueueError);
+    websocketService.on('operator_proposal_detail', handleProposalDetail);
+    websocketService.on('operator_proposal_detail_error', handleProposalDetailError);
     websocketService.on('decision_traces', handleDecisionTraces);
     websocketService.on('safety_monitor', handleSafetyMonitor);
     websocketService.on('replay_runs', handleReplayRuns);
@@ -1506,6 +1981,7 @@ export function useOperatorBackend() {
     websocketService.on('soundcheck_finalize_result', handleSoundcheckControlResult);
     websocketService.on('connection_status', handleConnectionStatus);
     websocketService.on('mixer_update', handleMixerUpdate);
+    websocketService.on('transport_terminal_close', handleTransportTerminalClose);
     websocketService.on('disconnected', handleDisconnected);
     websocketService.on('connected', handleConnected);
 
@@ -1517,7 +1993,7 @@ export function useOperatorBackend() {
         .then(() => undefined)
         .catch(() => {
           setConnectionState('error');
-          setLogs(current => appendBackendLog(current, 'backend', 'Product Layer unavailable; mock fallback remains active.', 'WARN'));
+          setLogs(current => appendBackendLog(current, 'backend', 'Product Layer unavailable; runtime data remains unavailable.', 'WARN'));
         });
     }
 
@@ -1525,6 +2001,9 @@ export function useOperatorBackend() {
       websocketService.off('dashboard_snapshot', handleDashboard);
       websocketService.off('channel_inventory', handleChannels);
       websocketService.off('decision_queue', handleDecisions);
+      websocketService.off('decision_queue_error', handleDecisionQueueError);
+      websocketService.off('operator_proposal_detail', handleProposalDetail);
+      websocketService.off('operator_proposal_detail_error', handleProposalDetailError);
       websocketService.off('decision_traces', handleDecisionTraces);
       websocketService.off('safety_monitor', handleSafetyMonitor);
       websocketService.off('replay_runs', handleReplayRuns);
@@ -1562,13 +2041,14 @@ export function useOperatorBackend() {
       websocketService.off('soundcheck_finalize_result', handleSoundcheckControlResult);
       websocketService.off('connection_status', handleConnectionStatus);
       websocketService.off('mixer_update', handleMixerUpdate);
+      websocketService.off('transport_terminal_close', handleTransportTerminalClose);
       websocketService.off('disconnected', handleDisconnected);
       websocketService.off('connected', handleConnected);
       if (socketIsOpen()) {
         websocketService.unsubscribeMeters();
       }
     };
-  }, [clearEmergencyStopAckTimer, refreshBackend, requestSnapshot]);
+  }, [clearEmergencyStopAckTimer, invalidateProposalReview, refreshBackend, replaceDecisionQueue, replaceProposalReview, requestSnapshot]);
 
   const backend: BackendUiState = useMemo(() => {
     const rawSourcePayload = payloads.dashboard ?? payloads.mode ?? {};
@@ -1597,10 +2077,15 @@ export function useOperatorBackend() {
       hasRuntimeData,
       isPartialData: dataState === 'partial',
       staleSnapshot: dataState === 'stale',
-      sourceLabel: hasRuntimeData ? base.sourceLabel : mockBackendState.sourceLabel,
+      sourceLabel: hasRuntimeData
+        ? base.sourceLabel
+        : isExplicitDemoMode()
+          ? mockBackendState.sourceLabel
+          : 'Runtime unavailable',
       statusLabel: dataState === 'partial' ? 'Partial data' : dataState === 'stale' ? 'Stale data' : base.statusLabel,
       statusTone: dataState === 'partial' || dataState === 'stale' ? 'yellow' : base.statusTone,
-      proposalApplyResult
+      proposalApplyResult,
+      transportTerminalClose: websocketService.getTerminalClose?.() ?? null
     };
   }, [connectionState, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.mode, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training, proposalApplyResult]);
 
@@ -1609,9 +2094,14 @@ export function useOperatorBackend() {
     const derivedBuses = adaptBusesFromChannels(channels, mockBuses);
     const buses = adaptBusesSnapshot(payloads.groups, derivedBuses);
     const agents = adaptAgents(payloads.agents, mockAgents);
-    const queueTasks = adaptTasks(payloads.decisions, mockTasks);
-    const reviewOnlyTasks = payloads.pipelinePreview ? adaptProposalOnlyContractTasks(payloads.pipelinePreview) : [];
-    const tasks = [...queueTasks, ...reviewOnlyTasks];
+    const queueTasks = isExplicitDemoMode()
+      && ['unavailable', 'loading', 'error'].includes(decisionQueue.availability)
+      ? mockTasks
+      : adaptDecisionQueueV2(decisionQueue);
+    // Task Queue is a lossless projection of Decision Queue v2. Pipeline
+    // previews have their own surfaces and must not make a real `items: []`
+    // snapshot appear non-empty.
+    const tasks = queueTasks;
     const decisionTraces = adaptDecisionTraces(payloads.decisionTraces);
     const replayRuns = adaptReplayRuns(payloads.replayRuns);
     const channelIntelligence = adaptChannelIntelligence(payloads.channelIntelligence);
@@ -1640,6 +2130,7 @@ export function useOperatorBackend() {
       buses,
       agents,
       tasks,
+      decisionQueue,
       decisionTraces,
       safetyMonitor,
       replayRuns,
@@ -1669,7 +2160,7 @@ export function useOperatorBackend() {
         communications: payloadSource(payloads.communications, payloads.dashboard ? 'runtime_derived' : 'mock')
       }
     };
-  }, [backend, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training]);
+  }, [backend, decisionQueue, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training]);
 
   const backendActions = useMemo(() => ({
     refreshBackend,
@@ -1680,17 +2171,21 @@ export function useOperatorBackend() {
     setBackendMode,
     acceptProposal,
     dismissProposal,
+    requestProposalDetail,
     applyProposal,
+    loadNextDecisionQueuePage,
     startSoundcheck,
     stopSoundcheck,
     acceptSoundcheckReplan,
     reanalyzeSoundcheckStage,
     finalizeSoundcheckReadiness,
     triggerEmergencyStop
-  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, reanalyzeSoundcheckStage, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, triggerEmergencyStop]);
+  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, loadNextDecisionQueuePage, reanalyzeSoundcheckStage, refreshBackend, requestProposalDetail, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, triggerEmergencyStop]);
 
   return {
     backend,
+    decisionQueue,
+    proposalReview,
     soundcheck,
     emergencyStop,
     modeFromBackend,

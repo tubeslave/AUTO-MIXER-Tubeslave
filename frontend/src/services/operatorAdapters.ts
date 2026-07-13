@@ -7,6 +7,7 @@ import type {
   Communication,
   DashboardRuntime,
   DashboardRuntimeTrace,
+  DecisionQueueState,
   DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
@@ -3631,6 +3632,41 @@ export function adaptTasks(payload: unknown, fallback: Task[]): Task[] {
   });
 }
 
+export function adaptDecisionQueueV2(queue: DecisionQueueState): Task[] {
+  if (queue.contractVersion !== 2 || queue.wireSchema !== 'automixer.decision_queue.v2') {
+    return [];
+  }
+
+  return queue.items.map(item => ({
+    id: item.id,
+    proposalId: item.entityKind === 'operator_proposal' ? item.id : undefined,
+    priority: priorityFromSeverity(item.severity),
+    title: item.titlePreview,
+    agent: item.source,
+    status: taskStatusFromBackend(item.status),
+    time: timeLabel(item.updatedAt ?? item.createdAt, 'unknown'),
+    target: item.displayTarget,
+    canApply: item.canApply,
+    backendStatus: item.status,
+    reason: item.reasonPreview,
+    reviewOnly: !item.canApply || item.analysisOnly,
+    applyBlockers: item.applyBlockerCodes,
+    requestedValueType: item.kind,
+    queueSection: item.queueSection,
+    entityKind: item.entityKind,
+    reviewContractVersion: item.reviewContractVersion,
+    reviewContractStatus: item.reviewContractStatus,
+    reviewContentDigest: item.reviewContentDigest,
+    detailAvailable: item.detailAvailable,
+    requiresApproval: item.requiresApproval,
+    hazardScope: item.hazardScope,
+    priorityClass: item.priorityClass,
+    expiresAt: item.expiresAt,
+    linkedChangeCount: item.linkedChangeCount,
+    safetyEvidence: []
+  }));
+}
+
 export function adaptProposalOnlyContractTasks(payload: unknown): Task[] {
   const data = asRecord(payload);
   const rows = asArray(data.proposal_only_contracts);
@@ -3707,6 +3743,25 @@ export function adaptAgents(payload: unknown, fallback: Agent[]): Agent[] {
   });
 }
 
+function decisionQueueSummary(payload: unknown, fallback: unknown = {}): UnknownRecord {
+  const data = asRecord(payload);
+  const legacy = asRecord(data.summary);
+  if (Object.keys(legacy).length) return legacy;
+  const counts = asRecord(data.counts);
+  const bySection = asRecord(counts.bySection ?? counts.by_section);
+  const byApplyState = asRecord(counts.byApplyState ?? counts.by_apply_state);
+  if (!Object.keys(counts).length) return asRecord(fallback);
+  return {
+    pending_count: metricNum(bySection.pending, 0),
+    history_count: metricNum(bySection.history, 0),
+    applied_count: 0,
+    blocked_count: metricNum(byApplyState.blocked, 0),
+    analysis_only_count: metricNum(byApplyState.analysis_only, 0),
+    total_count: metricNum(counts.totalCount ?? counts.total_count, 0),
+    omitted_count: metricNum(counts.omittedCount ?? counts.omitted_count, 0)
+  };
+}
+
 export function adaptOverviewMetrics(
   dashboard: unknown,
   agentRoster: unknown,
@@ -3715,7 +3770,7 @@ export function adaptOverviewMetrics(
 ): Metric[] {
   const dash = asRecord(dashboard);
   const agentSummary = asRecord(asRecord(agentRoster).summary);
-  const decisionSummary = asRecord(asRecord(decisionQueue).summary ?? dash.decision_summary);
+  const decisionSummary = decisionQueueSummary(decisionQueue, dash.decision_summary);
   const channelSummary = asRecord(dash.channel_summary);
   const safety = asRecord(dash.safety);
   if (!Object.keys(dash).length && !Object.keys(agentSummary).length && !Object.keys(decisionSummary).length) {
@@ -3743,7 +3798,7 @@ export function adaptDashboardRuntime(
   const master = asRecord(dash.master_bus);
   const analyzer = asRecord(dash.analyzer ?? dash.analysis ?? dash.spectrum);
   const channelSummary = asRecord(dash.channel_summary);
-  const decisionSummary = asRecord(asRecord(decisionQueue).summary ?? dash.decision_summary);
+  const decisionSummary = decisionQueueSummary(decisionQueue, dash.decision_summary);
   const roster = asRecord(agentRoster);
   const agentSummary = asRecord(roster.summary);
   const agentRows = asArray(roster.agents);
@@ -4087,7 +4142,7 @@ export function adaptPerformanceRecords(
   const rows = asArray(roster.agents);
   if (!rows.length) return hasAgentsField ? [] : fallback;
 
-  const summary = asRecord(asRecord(decisionQueue).summary);
+  const summary = decisionQueueSummary(decisionQueue);
   const pendingCount = Math.trunc(metricNum(summary.pending_count, 0));
   const historyCount = Math.trunc(metricNum(summary.history_count, 0));
 

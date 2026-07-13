@@ -77,6 +77,16 @@ def wal_phases(path):
     ]
 
 
+def wal_event(transaction_id, phase, **extra):
+    return {
+        "schema": "automixer.manual_write_wal.v1",
+        "timestamp": "2026-07-13T10:00:00Z",
+        "transaction_id": transaction_id,
+        "phase": phase,
+        **extra,
+    }
+
+
 def test_startup_latches_on_unresolved_wal_and_reset_cannot_clear_it(
     tmp_path,
     monkeypatch,
@@ -550,6 +560,216 @@ async def test_verified_manual_write_commits_durably_and_restart_is_clean(
     assert duplicate["reserved"] is False
     assert duplicate["reason"] == "duplicate_idempotency_key"
     assert duplicate["first_seen"]["restored_from_wal"] is True
+
+
+@pytest.mark.asyncio
+async def test_exact_prepared_abort_releases_manual_key_in_process_and_restart(
+    tmp_path,
+    monkeypatch,
+):
+    server = build_server(tmp_path, monkeypatch)
+    mixer = configure_physical_fader(server)
+    key = "retry-after-proven-no-send"
+    proposal_id = "retry-proposal"
+    assert server.reserve_operator_apply_idempotency_key(
+        key,
+        proposal_id=proposal_id,
+        approval_id="first-attempt",
+    )["reserved"] is True
+    append = server._append_manual_write_wal
+
+    def change_console_after_prepare(phase, transaction_id, **payload):
+        path = append(phase, transaction_id, **payload)
+        if phase == "prepared":
+            mixer.state["/ch/1/fdr"] = -7.0
+        return path
+
+    server._append_manual_write_wal = change_console_after_prepare
+    result = await server._apply_manual_console_write(
+        None,
+        channel=1,
+        value=-9.0,
+        value_type="fader",
+        source="unit:proven-no-send-retry",
+        approved=True,
+        approval_id="first-attempt",
+        idempotency_key=key,
+        proposal_id=proposal_id,
+        expected_current_value=-8.0,
+    )
+
+    assert result["reason"] == "manual_write_cas_target_changed_or_unverified"
+    assert mixer.sent == []
+    assert wal_phases(tmp_path / "manual_write_wal.jsonl") == [
+        "prepared",
+        "aborted_before_send",
+    ]
+    assert key not in server._durable_operator_apply_idempotency_keys
+    assert proposal_id not in server._durable_operator_proposal_ids
+    assert server.release_operator_apply_idempotency_key_if_no_send(
+        key,
+        proposal_id=proposal_id,
+    ) is True
+    assert server.reserve_operator_apply_idempotency_key(
+        key,
+        proposal_id=proposal_id,
+        approval_id="same-process-retry",
+    )["reserved"] is True
+
+    restarted = build_server(tmp_path, monkeypatch)
+    assert restarted._manual_write_recovery_transactions == {}
+    assert restarted._manual_write_emergency_stopped is False
+    assert key not in restarted._durable_operator_apply_idempotency_keys
+    assert proposal_id not in restarted._durable_operator_proposal_ids
+    assert restarted.reserve_operator_apply_idempotency_key(
+        key,
+        proposal_id=proposal_id,
+        approval_id="restart-retry",
+    )["reserved"] is True
+
+
+def test_send_started_then_abort_stays_locked_and_requires_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    key = "contradictory-abort-key"
+    proposal_id = "contradictory-abort-proposal"
+    rows = [
+        wal_event(
+            "contradictory-abort",
+            "prepared",
+            scope="operator_proposal",
+            idempotency_key=key,
+            proposal_id=proposal_id,
+        ),
+        wal_event("contradictory-abort", "send_started"),
+        wal_event("contradictory-abort", "aborted_before_send"),
+    ]
+    (tmp_path / "manual_write_wal.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    server = build_server(tmp_path, monkeypatch)
+
+    assert server._manual_write_emergency_stopped is True
+    assert "contradictory-abort" in server._manual_write_recovery_transactions
+    assert key in server._durable_operator_apply_idempotency_keys
+    assert proposal_id in server._durable_operator_proposal_ids
+    assert server.reserve_operator_apply_idempotency_key(
+        key,
+        proposal_id=proposal_id,
+    )["reason"] == "duplicate_idempotency_key"
+
+
+def test_duplicate_key_unlocks_only_when_every_transaction_proves_no_send(
+    tmp_path,
+    monkeypatch,
+):
+    key = "duplicate-lifecycle-key"
+    proposal_id = "duplicate-lifecycle-proposal"
+    rows = [
+        wal_event(
+            "safe-transaction",
+            "prepared",
+            scope="operator_proposal",
+            idempotency_key=key,
+            proposal_id=proposal_id,
+        ),
+        wal_event("safe-transaction", "aborted_before_send"),
+        wal_event(
+            "committed-transaction",
+            "prepared",
+            scope="operator_proposal",
+            idempotency_key=key,
+            proposal_id=proposal_id,
+        ),
+        wal_event("committed-transaction", "send_started"),
+        wal_event("committed-transaction", "send_completed"),
+        wal_event("committed-transaction", "committed"),
+    ]
+    (tmp_path / "manual_write_wal.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    server = build_server(tmp_path, monkeypatch)
+
+    assert server._manual_write_recovery_transactions == {}
+    assert key in server._durable_operator_apply_idempotency_keys
+    assert proposal_id in server._durable_operator_proposal_ids
+
+
+@pytest.mark.parametrize("reverse_order", [False, True])
+def test_mixed_scope_same_key_recovery_is_order_independent(
+    tmp_path,
+    monkeypatch,
+    reverse_order,
+):
+    key = "mixed-scope-key"
+    operator_rows = [
+        wal_event(
+            "operator-safe",
+            "prepared",
+            scope="operator_proposal",
+            idempotency_key=key,
+            proposal_id="operator-safe-proposal",
+        ),
+        wal_event("operator-safe", "aborted_before_send"),
+    ]
+    transaction_rows = [
+        wal_event(
+            "transaction-committed",
+            "prepared",
+            scope="supervised_transaction",
+            idempotency_key=key,
+        ),
+        wal_event("transaction-committed", "committed"),
+    ]
+    groups = [operator_rows, transaction_rows]
+    if reverse_order:
+        groups.reverse()
+    rows = [row for group in groups for row in group]
+    (tmp_path / "manual_write_wal.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows),
+        encoding="utf-8",
+    )
+
+    server = build_server(tmp_path, monkeypatch)
+
+    assert key not in server._durable_operator_apply_idempotency_keys
+    assert "operator-safe-proposal" not in server._durable_operator_proposal_ids
+    assert server._supervised_transaction_idempotency_keys[key] == (
+        "transaction-committed"
+    )
+    assert server._supervised_transaction_ids["transaction-committed"] == key
+
+
+def test_corrupt_tail_never_unlocks_otherwise_safe_no_send_key(
+    tmp_path,
+    monkeypatch,
+):
+    key = "safe-before-corrupt-tail"
+    rows = [
+        wal_event(
+            "safe-before-corrupt",
+            "prepared",
+            scope="operator_proposal",
+            idempotency_key=key,
+            proposal_id="safe-before-corrupt-proposal",
+        ),
+        wal_event("safe-before-corrupt", "aborted_before_send"),
+    ]
+    (tmp_path / "manual_write_wal.jsonl").write_text(
+        "".join(json.dumps(row) + "\n" for row in rows) + '{"cut_off":',
+        encoding="utf-8",
+    )
+
+    server = build_server(tmp_path, monkeypatch)
+
+    assert server._manual_write_emergency_stopped is True
+    assert key in server._durable_operator_apply_idempotency_keys
+    assert "safe-before-corrupt-proposal" in server._durable_operator_proposal_ids
 
 
 @pytest.mark.asyncio

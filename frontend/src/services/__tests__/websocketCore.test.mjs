@@ -153,6 +153,49 @@ test('emits connected again after automatic reconnect', async () => {
   ]);
 });
 
+test('close 1009 preserves code and reason, stops reconnect, and requires manual retry', async () => {
+  const transport = createTransport();
+  const terminalEvents = [];
+  const disconnectedEvents = [];
+  transport.on('transport_terminal_close', payload => terminalEvents.push(payload));
+  transport.on('disconnected', payload => disconnectedEvents.push(payload));
+
+  const firstConnect = transport.connect();
+  const firstSocket = FakeWebSocket.instances[0];
+  firstSocket.open();
+  await firstConnect;
+  firstSocket.close(1009, 'decision_queue_frame_too_large');
+
+  await new Promise(resolve => setTimeout(resolve, 15));
+  assert.equal(FakeWebSocket.instances.length, 1);
+  assert.equal(transport.shouldReconnect, false);
+  assert.deepEqual(transport.getTerminalClose(), {
+    code: 1009,
+    reason: 'decision_queue_frame_too_large',
+    manualRetryRequired: true
+  });
+  assert.deepEqual(terminalEvents, [{
+    code: 1009,
+    reason: 'decision_queue_frame_too_large',
+    manual_retry_required: true
+  }]);
+  assert.deepEqual(disconnectedEvents.at(-1), {
+    code: 1009,
+    reason: 'decision_queue_frame_too_large',
+    terminal: true,
+    manual_retry_required: true
+  });
+  await assert.rejects(transport.connect(), /manual retry required/);
+  assert.equal(transport.send({ type: 'get_decision_queue' }), false);
+
+  const retry = transport.retryTerminalClose();
+  const replacement = FakeWebSocket.instances[1];
+  replacement.open();
+  await retry;
+  assert.equal(transport.isReady(), true);
+  assert.equal(transport.getTerminalClose(), null);
+});
+
 test('stale close does not clear an active replacement socket', async () => {
   const transport = createTransport();
 

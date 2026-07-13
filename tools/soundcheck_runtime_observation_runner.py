@@ -29,7 +29,7 @@ READ_REQUESTS = (
     {"type": "get_operator_mode"},
     {"type": "get_dashboard_snapshot"},
     {"type": "get_channel_inventory", "total_channels": 48},
-    {"type": "get_decision_queue", "limit": 50},
+    {"type": "get_decision_queue", "contract_version": 2, "page_size": 50},
     {"type": "get_safety_monitor"},
 )
 WRITE_REQUEST_TYPES = {

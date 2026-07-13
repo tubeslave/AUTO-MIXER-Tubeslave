@@ -7,6 +7,8 @@ clients, and no live executor imports.
 
 from __future__ import annotations
 
+import math
+
 from typing import Any, Dict, Iterable, List, Optional
 
 try:
@@ -7578,6 +7580,166 @@ def _proposal_adapter_output(
         blockers=blockers,
     )
     return output
+
+
+_COMPACT_OPERATOR_VALUE_OMITTED = object()
+
+
+def _compact_quarantined_operator_value(
+    value: Any,
+    *,
+    depth: int = 0,
+    remaining_nodes: Optional[List[int]] = None,
+) -> Any:
+    """Copy a small native-JSON request without coercing hostile values.
+
+    Quarantined write responses are explanatory no-send receipts.  They must
+    not embed the multi-megabyte proposal review graph, but retaining a small
+    operator-authored request is useful for diagnosing which direct write was
+    refused.  Unsupported, non-finite, oversized, or deeply nested values are
+    omitted instead of making the entire safety receipt unserialisable.
+    """
+
+    if remaining_nodes is None:
+        remaining_nodes = [256]
+    if remaining_nodes[0] <= 0 or depth > 6:
+        return _COMPACT_OPERATOR_VALUE_OMITTED
+    remaining_nodes[0] -= 1
+    if value is None or type(value) is bool:
+        return value
+    if type(value) is int:
+        return (
+            value
+            if value.bit_length() <= 256
+            else _COMPACT_OPERATOR_VALUE_OMITTED
+        )
+    if type(value) is float:
+        return value if math.isfinite(value) else _COMPACT_OPERATOR_VALUE_OMITTED
+    if type(value) is str:
+        try:
+            encoded = value.encode("utf-8")
+        except UnicodeEncodeError:
+            return _COMPACT_OPERATOR_VALUE_OMITTED
+        return value if len(encoded) <= 2_048 else _COMPACT_OPERATOR_VALUE_OMITTED
+    if type(value) is dict:
+        if len(value) > 64:
+            return _COMPACT_OPERATOR_VALUE_OMITTED
+        output: Dict[str, Any] = {}
+        for key, child in value.items():
+            if type(key) is not str:
+                continue
+            try:
+                key_bytes = key.encode("utf-8")
+            except UnicodeEncodeError:
+                continue
+            if len(key_bytes) > 128:
+                continue
+            compact = _compact_quarantined_operator_value(
+                child,
+                depth=depth + 1,
+                remaining_nodes=remaining_nodes,
+            )
+            if compact is not _COMPACT_OPERATOR_VALUE_OMITTED:
+                output[key] = compact
+        return output
+    if type(value) in {list, tuple}:
+        if len(value) > 64:
+            return _COMPACT_OPERATOR_VALUE_OMITTED
+        output = []
+        for child in value:
+            compact = _compact_quarantined_operator_value(
+                child,
+                depth=depth + 1,
+                remaining_nodes=remaining_nodes,
+            )
+            if compact is not _COMPACT_OPERATOR_VALUE_OMITTED:
+                output.append(compact)
+        return output
+    return _COMPACT_OPERATOR_VALUE_OMITTED
+
+
+def compact_quarantined_operator_mapping(value: Any) -> Dict[str, Any]:
+    """Return the bounded native-JSON subset of one quarantine mapping."""
+
+    compact = _compact_quarantined_operator_value(value)
+    return compact if type(compact) is dict else {}
+
+
+def build_quarantined_operator_correction_payload(
+    *,
+    method_id: str,
+    target: Any,
+    proposed_action: Dict[str, Any],
+    blockers: Iterable[str],
+) -> Dict[str, Any]:
+    """Build a bounded, explicitly non-authoritative quarantine explanation."""
+
+    inputs = _operator_contract_inputs(
+        method_id=method_id,
+        requested_change_value_type=None,
+        value_type=None,
+        target_kind=None,
+        old_value_source=None,
+    )
+    profile = OPERATOR_CORRECTION_CONTRACTS_BY_VALUE_TYPE.get(
+        inputs["value_type"],
+        DEFAULT_OPERATOR_CORRECTION_CONTRACT,
+    )
+    compact_action = compact_quarantined_operator_mapping(proposed_action)
+    compact_blockers: List[str] = []
+    for value in blockers:
+        compact = _compact_quarantined_operator_value(value)
+        if type(compact) is str and compact:
+            compact_blockers.append(compact)
+        if len(compact_blockers) >= 16:
+            break
+    compact_target = _compact_quarantined_operator_value(target)
+    if compact_target is _COMPACT_OPERATOR_VALUE_OMITTED:
+        compact_target = None
+    future_readback = {
+        "required_before_live_promotion": True,
+        "old_value_source": inputs["old_value_source"],
+        "target_kind": inputs["target_kind"],
+        "readback_targets": list(profile["future_wing_readback_targets"]),
+        "blocked_live_actions": list(profile["blocked_live_actions"]),
+        "read_only_or_dry_run_only": True,
+        "live_apply_allowed": False,
+        "queue_import_allowed": False,
+        "live_authority_granted": False,
+        "operator_review_required": True,
+        "hardware_proof_required": True,
+        "blocks_live_promotion": True,
+        "blocks_queue_import": True,
+    }
+    return {
+        "contract_schema": "automixer.quarantined-operator-correction.v1",
+        "source_evidence": {
+            "method_id": method_id,
+            "source": "wing_deployment_boundary",
+            "target": compact_target,
+            "no_console_send_proven": True,
+        },
+        "proposed_correction": compact_action,
+        "safety_blockers": compact_blockers,
+        "future_wing_readback_contract": future_readback,
+        "denial_reason": (
+            "real_wing_hardware_readback_rollback_and_operator_review_required"
+        ),
+        "operator_next_step": (
+            "capture_real_wing_readback_and_rollback_proof_before_live_promotion"
+        ),
+        "read_only_or_dry_run_only": True,
+        "live_apply_allowed": False,
+        "queue_import_allowed": False,
+        "can_apply_live": False,
+        "can_import_to_queue": False,
+        "live_authority_granted": False,
+        "mutates_mixer": False,
+        "operator_review_required": True,
+        "future_wing_readback_required": True,
+        "blocks_live_promotion": True,
+        "blocks_queue_import": True,
+    }
 
 
 def adapt_operator_analysis_gain_fader_proposals(

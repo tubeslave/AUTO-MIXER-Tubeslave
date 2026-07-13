@@ -28,6 +28,7 @@ def isolate_automixer_env(tmp_path):
         'AUTOMIXER_MODEL_FALLBACKS',
         'AUTOMIXER_PACKAGED_OFFLINE_LOCK',
         'AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR',
+        'AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR',
         'AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR',
         'AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR',
         'AUTOMIXER_MASTER_CAPTURE_ROUTE_VERIFIED',
@@ -40,6 +41,9 @@ def isolate_automixer_env(tmp_path):
         os.environ.pop(key, None)
     os.environ['AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR'] = str(
         tmp_path / 'manual_write_gate'
+    )
+    os.environ['AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR'] = str(
+        tmp_path / 'operator_proposal_results'
     )
     os.environ['AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR'] = str(
         tmp_path / 'console_runtime'

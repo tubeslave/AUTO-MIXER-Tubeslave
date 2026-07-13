@@ -158,12 +158,14 @@ class SupervisedConsoleTransactionCoordinator:
             MaybeAwaitable,
         ]
         | None = None,
+        before_apply_callback: Callable[[], MaybeAwaitable] | None = None,
     ) -> None:
         self.family_contracts = dict(family_contracts)
         self.adapters = dict(adapters)
         self.emergency_generation_getter = emergency_generation_getter
         self.emergency_stop = emergency_stop
         self.prepared_callback = prepared_callback
+        self.before_apply_callback = before_apply_callback
         self._idempotency_keys: Dict[str, str] = {}
         self._lock = asyncio.Lock()
 
@@ -426,6 +428,36 @@ class SupervisedConsoleTransactionCoordinator:
                     AdapterStepResult,
                 ]
             ] = []
+
+            async def abort_before_next_apply(
+                reason: str,
+                *,
+                cancellation_safe: bool = False,
+            ) -> None:
+                """Contain a durable-boundary abort after earlier operations."""
+
+                result.reason = reason
+                if not applied:
+                    result.status = "blocked"
+                    return
+                if not cancellation_safe:
+                    await self._rollback_applied(result, applied, context)
+                    return
+                rollback_task = asyncio.create_task(
+                    self._rollback_applied(result, applied, context)
+                )
+                while not rollback_task.done():
+                    try:
+                        await asyncio.shield(rollback_task)
+                    except asyncio.CancelledError:
+                        result.events.append(
+                            {
+                                "phase": "rollback_cancellation_deferred",
+                                "reason": reason,
+                            }
+                        )
+                        continue
+                await rollback_task
             already_satisfied_operation_ids: set[str] = set()
             atomic_group = bool(
                 len(plan.operations) >= 2
@@ -664,6 +696,48 @@ class SupervisedConsoleTransactionCoordinator:
                     else:
                         result.status = "blocked"
                     return result
+
+                if self.before_apply_callback is not None:
+                    try:
+                        boundary_result = await _maybe_await(
+                            self.before_apply_callback()
+                        )
+                    except asyncio.CancelledError:
+                        await abort_before_next_apply(
+                            "durable_send_boundary_cancelled",
+                            cancellation_safe=True,
+                        )
+                        return result
+                    except Exception as exc:
+                        result.events.append(
+                            {
+                                "operation_id": operation.operation_id,
+                                "phase": "durable_send_boundary",
+                                "reason": type(exc).__name__,
+                                "error": str(exc),
+                            }
+                        )
+                        await abort_before_next_apply(
+                            "durable_send_boundary_failed"
+                        )
+                        return result
+                    if boundary_result is not True:
+                        await abort_before_next_apply(
+                            "durable_send_boundary_failed"
+                        )
+                        return result
+                    result.events.append(
+                        {
+                            "operation_id": operation.operation_id,
+                            "phase": "durable_send_boundary",
+                            "result": "send_may_have_occurred_persisted",
+                        }
+                    )
+                    if not self._approval_is_current(context):
+                        await abort_before_next_apply(
+                            "operator_approval_expired_after_durable_send_boundary"
+                        )
+                        return result
 
                 try:
                     apply_result = await adapter.apply(operation, snapshot)

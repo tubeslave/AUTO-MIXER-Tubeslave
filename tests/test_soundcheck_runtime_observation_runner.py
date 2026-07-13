@@ -185,6 +185,14 @@ async def test_runtime_observation_collects_readonly_dashboard_and_meter(
         "get_safety_monitor",
         "unsubscribe_meters",
     ]
+    decision_queue_request = next(
+        request for request in websocket.sent if request["type"] == "get_decision_queue"
+    )
+    assert decision_queue_request == {
+        "type": "get_decision_queue",
+        "contract_version": 2,
+        "page_size": 50,
+    }
     assert not set(sent_types) & runner.WRITE_REQUEST_TYPES
 
     summary = read_summary(tmp_path)

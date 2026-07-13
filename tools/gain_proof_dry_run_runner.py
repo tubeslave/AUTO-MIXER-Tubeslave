@@ -114,7 +114,13 @@ class FakeProofMixer:
 async def dispatch(server: Any, recorder: EventRecorder, message_type: str, payload: Dict[str, Any]) -> Dict[str, Any]:
     captured: list[Dict[str, Any]] = []
 
-    async def capture_send(_websocket: Any, response: Dict[str, Any]) -> None:
+    async def capture_send(
+        _websocket: Any,
+        response: Dict[str, Any],
+        *,
+        trusted_receipt: Any = None,
+    ) -> None:
+        del trusted_receipt
         captured.append(response)
         recorder.record("recv", response)
 
@@ -155,6 +161,22 @@ def extract_apply_result(payload: Dict[str, Any]) -> Dict[str, Any]:
     if isinstance(result, dict):
         return result
     return payload
+
+
+def proposal_review_binding(payload: Dict[str, Any]) -> Dict[str, Any]:
+    proposal = payload.get("proposal")
+    if not isinstance(proposal, dict):
+        raise RuntimeError("proposal review identity missing from create response")
+    version = proposal.get("review_contract_version")
+    digest = proposal.get("review_content_digest")
+    if not isinstance(version, int) or isinstance(version, bool):
+        raise RuntimeError("proposal review contract version missing")
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        raise RuntimeError("proposal review content digest missing")
+    return {
+        "expected_review_contract_version": version,
+        "expected_review_content_digest": digest,
+    }
 
 
 def verified(result: Dict[str, Any]) -> bool:
@@ -240,7 +262,14 @@ async def run(args: argparse.Namespace) -> int:
             patch.object(AutoMixerServer, "_load_config", return_value={}),
             patch.dict(
                 os.environ,
-                {"AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR": str(manual_write_artifacts_dir)},
+                {
+                    "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR": str(
+                        manual_write_artifacts_dir
+                    ),
+                    "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR": str(
+                        run_dir / "operator_proposal_results"
+                    ),
+                },
             ),
             patch.object(
                 AutoMixerServer,
@@ -262,6 +291,7 @@ async def run(args: argparse.Namespace) -> int:
             server._manual_write_artifacts_dir,
             server.automation_trace_store.path,
             server.decision_memory_store.path,
+            server.operator_proposal_queue._result_store.root,
         )
         if not all(path.resolve().is_relative_to(run_dir.resolve()) for path in isolated_paths):
             raise RuntimeError("dry-run evidence path escaped the run artifact directory")
@@ -288,6 +318,7 @@ async def run(args: argparse.Namespace) -> int:
             "apply_operator_proposal",
             {
                 "proposal_id": proposal_id,
+                **proposal_review_binding(proposal_result),
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:apply-approved:{run_id}",
                 "idempotency_key": f"gain-proof-dry-run:apply-approved:{run_id}",
@@ -325,6 +356,7 @@ async def run(args: argparse.Namespace) -> int:
             "apply_operator_proposal",
             {
                 "proposal_id": cooldown_id,
+                **proposal_review_binding(cooldown_result),
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:cooldown-approved:{run_id}",
                 "idempotency_key": f"gain-proof-dry-run:cooldown-approved:{run_id}",
@@ -381,6 +413,7 @@ async def run(args: argparse.Namespace) -> int:
             "apply_operator_proposal",
             {
                 "proposal_id": emergency_id,
+                **proposal_review_binding(emergency_proposal_result),
                 "approved": True,
                 "approval_id": f"gain-proof-dry-run:emergency-approved:{run_id}",
                 "idempotency_key": f"gain-proof-dry-run:emergency-approved:{run_id}",
@@ -390,9 +423,27 @@ async def run(args: argparse.Namespace) -> int:
         summary["emergency_stop_result"] = emergency
         summary["emergency_proposal_result"] = emergency_proposal_result
         summary["post_emergency_apply_result"] = emergency_apply
-        summary["emergency_stop_proof_status"] = "verified" if extract_apply_result(emergency_apply).get("reason") == "emergency_stop_active" else ""
+        emergency_apply_result = extract_apply_result(emergency_apply)
+        emergency_reason = emergency_apply_result.get("reason")
+        emergency_latched = bool(
+            (emergency.get("manual_write_supervision") or {}).get(
+                "emergency_stopped"
+            )
+        )
+        emergency_block_proven = bool(
+            emergency_reason
+            in {
+                "emergency_stop_active",
+                "operator_proposal_global_hazard_active",
+            }
+            and emergency_apply_result.get("no_console_send_proven") is True
+            and emergency_latched
+        )
+        summary["emergency_stop_proof_status"] = (
+            "verified" if emergency_block_proven else ""
+        )
         summary["blocked_followup_status"] = "verified" if extract_apply_result(cooldown_apply).get("reason") == "cooldown" else ""
-        if extract_apply_result(emergency_apply).get("reason") != "emergency_stop_active":
+        if not emergency_block_proven:
             summary.update({"status": "failed", "reason": "emergency_stop_not_blocked"})
             recorder.write_summary(summary)
             print(json.dumps(summary, indent=2, sort_keys=True))

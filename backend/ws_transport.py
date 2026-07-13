@@ -197,6 +197,28 @@ async def send_json(
             return None
 
 
+async def send_serialized_json(
+    websocket: Any,
+    serialized: str,
+    *,
+    logger_: logging.Logger | None = None,
+) -> bool | None:
+    """Send one already-finalized JSON string without reserialization."""
+
+    if not isinstance(serialized, str):
+        raise TypeError("serialized WebSocket payload must be str")
+    active_logger = logger_ or logger
+    try:
+        await websocket.send(serialized)
+        return True
+    except Exception as exc:
+        if is_connection_closed_error(exc):
+            active_logger.debug("Send failed (client closed): %s", exc)
+            return False
+        active_logger.error("Error sending to client: %s", exc)
+        return None
+
+
 async def broadcast_json(
     clients: Iterable[Any],
     message: dict,

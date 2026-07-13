@@ -50,7 +50,7 @@ test.describe('Automixer frontend prototype', () => {
       }
     });
 
-    await page.goto('/#/task-queue');
+    await page.goto('/?demo=1#/task-queue');
     await expect(page.getByText('4. Task Queue')).toBeVisible();
     await expect(page.getByText('Decision Chain')).toBeVisible();
     await expect(page.getByText('Proposal Preview')).toBeVisible();
@@ -60,16 +60,13 @@ test.describe('Automixer frontend prototype', () => {
     await expect(page.getByText('Mode changed to Supervised AutoMix. Mock fallback only.', { exact: true })).toBeVisible();
 
     const leadVocalRow = page.locator('.am-table-row').filter({ hasText: 'Reduce Lead Vocal presence' });
-    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
+    await expect(leadVocalRow).toContainText('Blocked');
+    await expect(leadVocalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
+    await leadVocalRow.getByRole('button', { name: 'Detail' }).click();
+    await expect(page.getByText('Decision Queue apply is blocked: unavailable')).toBeVisible();
+    await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Reduce Lead Vocal presence');
 
-    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toBeVisible();
-    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Current console snapshot');
-    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Snapshot required');
-    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('UI-only simulation');
-    await expect(page.getByRole('button', { name: 'Apply Blocked' })).toBeDisabled();
-    await expect(leadVocalRow).toContainText('Pending');
-
-    await page.goto('/#/channels');
+    await page.goto('/?demo=1#/channels');
     const kickInRow = page.locator('.am-table-row').filter({ hasText: 'Kick In' });
     await kickInRow.getByRole('button', { name: 'Inspect' }).click();
 
@@ -80,8 +77,8 @@ test.describe('Automixer frontend prototype', () => {
     expect(unsafeRequests).toEqual([]);
   });
 
-  test('mode policy gates task apply actions locally', async ({ page }) => {
-    await page.goto('/#/task-queue');
+  test('mock queue stays review-only across automation modes', async ({ page }) => {
+    await page.goto('/?demo=1#/task-queue');
     await expect(page.getByText('4. Task Queue')).toBeVisible();
     await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assist');
 
@@ -89,21 +86,18 @@ test.describe('Automixer frontend prototype', () => {
 
     await page.getByLabel('Automation mode').selectOption('Analyze');
     await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Analysis Mode');
-    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
-    const blockedFocus = page.locator('section').filter({ hasText: 'Action Focus' }).filter({ hasText: 'Apply Blocked' });
-    await expect(blockedFocus).toContainText('Analyze mode is read-only');
-    await expect(leadVocalRow).toContainText('Pending');
+    await expect(leadVocalRow).toContainText('Blocked');
+    await expect(leadVocalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
 
     await page.getByLabel('Automation mode').selectOption('Assist');
     await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Assisted Mixing');
-    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByText('Assisted Mixing does not apply changes')).toBeVisible();
-    await expect(leadVocalRow).toContainText('Review');
+    await expect(leadVocalRow).toContainText('Blocked');
+    await expect(leadVocalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
 
     await page.getByLabel('Automation mode').selectOption('Auto');
     await expect(page.locator('section').filter({ hasText: 'Mode Guard' })).toContainText('Full Autonomous Mixing');
-    await leadVocalRow.getByRole('button', { name: 'Apply' }).click();
-    await expect(page.getByText('Full Autonomous Mixing mode simulated the apply locally')).toBeVisible();
+    await expect(leadVocalRow).toContainText('Blocked');
+    await expect(leadVocalRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toHaveCount(0);
   });
 
@@ -264,57 +258,57 @@ test.describe('Automixer frontend prototype', () => {
   });
 
   test('selected rows update read-only detail panels', async ({ page }) => {
-    await page.goto('/#/communications');
+    await page.goto('/?demo=1#/communications');
     await page.locator('.am-table-row').filter({ hasText: 'Review Snare transient' }).click();
     await expect(page.locator('section').filter({ hasText: 'Selected Message' })).toContainText('Review Snare transient');
 
-    await page.goto('/#/memory');
+    await page.goto('/?demo=1#/memory');
     await page.locator('.am-table-row').filter({ hasText: 'Bass DI compression memory' }).click();
     await expect(page.locator('section').filter({ hasText: 'Memory Inspector' })).toContainText('Bass DI compression memory');
     await expect(page.locator('section').filter({ hasText: 'Memory Inspector' })).toContainText('Dynamics');
 
-    await page.goto('/#/groups');
+    await page.goto('/?demo=1#/groups');
     await page.locator('.am-table-row').filter({ hasText: 'Bass Bus' }).click();
     await expect(page.locator('section').filter({ hasText: 'Bus Details' })).toContainText('Bass Bus');
 
-    await page.goto('/#/training');
+    await page.goto('/?demo=1#/training');
     await page.locator('.am-table-row').filter({ hasText: 'Rock drums transient map' }).click();
     const trainingDetail = page.locator('section').filter({ hasText: 'Training Queue' }).filter({ hasText: 'Auto learn' });
     await expect(trainingDetail).toContainText('Rock drums transient map');
     await expect(trainingDetail).toContainText('84 examples');
 
-    await page.goto('/#/rules');
+    await page.goto('/?demo=1#/rules');
     await page.locator('.am-table-row').filter({ hasText: 'No boost without headroom' }).click();
     await expect(page.locator('section').filter({ hasText: 'Rule Inspector' })).toContainText('No boost without headroom');
     await expect(page.locator('section').filter({ hasText: 'Rule Inspector' })).toContainText('Locked');
 
-    await page.goto('/#/performance');
+    await page.goto('/?demo=1#/performance');
     await page.locator('.am-table-row').filter({ hasText: 'Learning Agent' }).click();
     await expect(page.locator('section').filter({ hasText: 'Performance Inspector' })).toContainText('Learning Agent');
     await expect(page.locator('section').filter({ hasText: 'Performance Inspector' })).toContainText('Watch');
 
-    await page.goto('/#/settings');
+    await page.goto('/?demo=1#/settings');
     await page.getByRole('button', { name: 'Write Policy' }).first().click();
     await expect(page.locator('section').filter({ hasText: 'Settings Inspector' })).toContainText('Write Policy');
     await expect(page.locator('section').filter({ hasText: 'Settings Inspector' })).toContainText('Direct OSC');
 
-    await page.goto('/#/system');
+    await page.goto('/?demo=1#/system');
     await page.getByRole('button', { name: /WING Rack/ }).click();
     await expect(page.locator('section').filter({ hasText: 'Connection Status' })).toContainText('WING Rack');
 
-    await page.goto('/#/routing');
+    await page.goto('/?demo=1#/routing');
     await page.getByRole('button', { name: /Bass Bus/ }).click();
     await expect(page.locator('section').filter({ hasText: 'Routing Segment' })).toContainText('Bass Bus');
 
-    await page.goto('/#/osc-midi');
+    await page.goto('/?demo=1#/osc-midi');
     await page.locator('.am-table-row').filter({ hasText: 'OSC connection established' }).click();
     await expect(page.locator('section').filter({ hasText: 'OSC / MIDI Message' }).first()).toContainText('OSC connection established');
 
-    await page.goto('/#/devices');
+    await page.goto('/?demo=1#/devices');
     await page.locator('.am-table-row').filter({ hasText: 'Stage Box 1' }).click();
     await expect(page.locator('section').filter({ hasText: 'Selected Device' })).toContainText('Stage Box 1');
 
-    await page.goto('/#/logs');
+    await page.goto('/?demo=1#/logs');
     await page.locator('.am-table-row').filter({ hasText: 'Redundant link not available' }).click();
     await expect(page.locator('section').filter({ hasText: 'Log Details' })).toContainText('Redundant link not available');
   });
@@ -794,76 +788,112 @@ test.describe('Automixer backend Product Layer adapter', () => {
         },
         get_decision_queue: {
           type: 'decision_queue',
+          contract_version: 2,
+          wire_schema: 'automixer.decision_queue.v2',
           status: 'ok',
-          available: true,
-          operator_mode: {
-            mode: 'supervised',
-            label: 'Supervised',
-            live_write_policy: 'supervised_approval_required',
-            apply_path: 'supervised_manual_gate',
-            capabilities: {
-              can_create_proposals: true,
-              can_apply_to_console: true,
-              requires_approval: true,
-              allowed_live_write_kinds: ['fader', 'gain']
-            }
+          success: true,
+          snapshot: {
+            id: 'backend-fixture-snapshot-1',
+            revision: `sha256:${'1'.repeat(64)}`,
+            created_at: '2026-07-13T16:00:00Z',
+            expires_at: '2099-07-13T16:00:30Z',
+            fully_pageable: true
           },
-          summary: {
-            pending_count: 1,
-            history_count: 2,
-            applied_count: 1,
-            blocked_count: 0
+          page: {
+            page_size: 50,
+            returned_count: 1,
+            remaining_count: 0,
+            next_cursor: null,
+            has_more: false
           },
-          pending_actions: [
+          counts: {
+            total_count: 1,
+            included_count: 1,
+            omitted_count: 0,
+            pinned_total_count: 0,
+            pinned_included_count: 0,
+            pinned_omitted_count: 0,
+            by_section: { pending: 1, history: 0, analysis_only: 0 },
+            by_priority: { global_hazard: 0, blocked: 0, high: 1, ordinary: 0, history: 0 },
+            by_apply_state: { applyable: 1, blocked: 0, analysis_only: 0 }
+          },
+          items: [
             {
               id: 'proposal-backend-1',
-              title: 'Backend SafeGain trim move',
-              target: 'Backend Lead Vox',
+              entity_kind: 'operator_proposal',
+              queue_section: 'pending',
+              title_preview: 'Backend SafeGain trim move',
+              reason_preview: 'SafeGain measured input headroom and suggests an input trim adjustment. Ensemble context inactive (ensemble_time_context_stale); operator review only.',
+              display_target: 'Backend Lead Vox',
               kind: 'gain',
               severity: 'high',
               status: 'pending',
               source: 'Backend Decision Agent',
-              reason: 'SafeGain measured input headroom and suggests an input trim adjustment. Ensemble context inactive (ensemble_time_context_stale); time stale; sources 1/2; lag 10/2 samples; operator review only.',
               created_at: '2026-05-19T20:29:00Z',
-              requested_change: {
-                value_type: 'gain',
-                channel: 2,
-                value: -9.5,
-                safety_evidence: [
-                  {
-                    label: 'Ensemble context',
-                    value: 'ensemble_time_context_stale',
-                    reason: 'ensemble_time_context_stale'
-                  },
-                  {
-                    label: 'Ensemble time coherence',
-                    value: 'stale',
-                    reason: 'ensemble_time_context_stale'
-                  },
-                  {
-                    label: 'Ensemble time sources',
-                    value: 1,
-                    target: 2
-                  },
-                  {
-                    label: 'Ensemble lag samples',
-                    value: 10,
-                    target: 2
-                  },
-                  {
-                    label: 'Ensemble apply policy',
-                    value: 'operator_review_only'
-                  },
-                  {
-                    label: 'Distortion risk',
-                    value: 'low'
-                  }
-                ]
-              },
-              can_apply: true
+              updated_at: '2026-05-19T20:29:00Z',
+              expires_at: '2099-07-13T16:10:00Z',
+              can_apply: true,
+              requires_approval: true,
+              apply_blocker_codes: [],
+              apply_blocker_count: 0,
+              linked_change_count: 0,
+              review_contract_version: 2,
+              review_contract_status: 'bound',
+              review_content_digest: 'sha256:4134fde7a13e5a2140bd40272ddc960cda07e049a4059f4191b03573c31497fb',
+              detail_available: true,
+              hazard_scope: 'proposal_local',
+              priority_class: 'high',
+              analysis_only: false,
+              import_required: false
             }
           ],
-          history: []
+          overflow: {
+            counts_only: false,
+            reason: null,
+            unpageable_count: 0,
+            pinned_unpageable_count: 0,
+            apply_ui_disabled: false,
+            hazard_digest: `sha256:${'0'.repeat(64)}`
+          },
+          hazards: {
+            fatal: false,
+            apply_ui_disabled: false,
+            count: 0,
+            codes: [],
+            overflow_count: 0,
+            source_counts: { runtime: 0, manual_write: 0, terminal_result: 0 },
+            digest: `sha256:${'0'.repeat(64)}`
+          },
+          wire: { max_bytes: 131072, serialized_bytes: 2048 }
+        },
+        get_operator_proposal_detail: {
+          type: 'operator_proposal_detail',
+          contract_version: 2,
+          status: 'ok',
+          success: true,
+          proposal_id: 'proposal-backend-1',
+          review_contract_version: 2,
+          review_content_digest: 'sha256:4134fde7a13e5a2140bd40272ddc960cda07e049a4059f4191b03573c31497fb',
+          current_state: {
+            status: 'pending',
+            updated_at: '2026-07-13T16:00:00Z',
+            expired: false,
+            can_apply: true,
+            apply_blocker_codes: [],
+            apply_blocker_count: 0
+          },
+          content: {
+            encoding: 'base64',
+            media_type: 'application/vnd.automixer.operator-proposal-review+json;version=2',
+            chunk_index: 0,
+            chunk_count: 1,
+            raw_chunk_bytes: 376,
+            total_raw_bytes: 376,
+            chunk_sha256: '4134fde7a13e5a2140bd40272ddc960cda07e049a4059f4191b03573c31497fb',
+            content_sha256: '4134fde7a13e5a2140bd40272ddc960cda07e049a4059f4191b03573c31497fb',
+            data: 'eyJzY2hlbWEiOiJhdXRvbWl4ZXIub3BlcmF0b3JfcHJvcG9zYWwucmV2aWV3X2NvbnRlbnQudjIiLCJwcm9wb3NhbF9pZCI6InByb3Bvc2FsLWJhY2tlbmQtMSIsInJldmlld19jb250cmFjdF92ZXJzaW9uIjoyLCJ0aXRsZSI6IkJhY2tlbmQgU2FmZUdhaW4gdHJpbSBtb3ZlIiwidGFyZ2V0IjoiQmFja2VuZCBMZWFkIFZveCIsInJlYXNvbiI6IlNhZmVHYWluIG1lYXN1cmVkIGlucHV0IGhlYWRyb29tIGFuZCBzdWdnZXN0cyBhbiBpbnB1dCB0cmltIGFkanVzdG1lbnQuIiwicmVxdWVzdGVkX2NoYW5nZSI6eyJ2YWx1ZV90eXBlIjoiZ2FpbiIsImNoYW5uZWwiOjIsInZhbHVlIjotOS41fSwicm9sbGJhY2siOnsiYXZhaWxhYmxlIjp0cnVlLCJ2YWx1ZSI6LTh9fQ=='
+          },
+          wire: { max_bytes: 131072, serialized_bytes: 1536 }
         },
         get_decision_traces: {
           type: 'decision_traces',
@@ -1490,21 +1520,24 @@ test.describe('Automixer backend Product Layer adapter', () => {
         },
         apply_operator_proposal: {
           type: 'operator_proposal_apply_result',
+          contract_version: 2,
           status: 'applied',
           success: true,
-          proposal: {
-            id: 'proposal-backend-1',
-            title: 'Backend SafeGain trim move'
-          },
-          apply_result: {
-            status: 'applied',
-            channel: 2,
-            value_type: 'gain',
-            effective_value: -9.5,
-            readback_status: 'verified_from_cache',
-            rollback_available: true,
-            rollback_value: -8
-          }
+          proposal_id: 'proposal-backend-1',
+          apply_status: 'applied',
+          channel: 2,
+          value_type: 'gain',
+          effective_value: -9.5,
+          no_console_send_proven: false,
+          physical_verified: true,
+          write_state_unknown: false,
+          rollback_state_unknown: false,
+          manual_review_required: false,
+          wal_terminal: 'committed',
+          readback_status: 'verified_from_cache',
+          rollback_available: true,
+          result_detail_available: true,
+          result_digest: `sha256:${'2'.repeat(64)}`
         }
       };
 
@@ -1572,15 +1605,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await page.locator('.am-table-row').filter({ hasText: 'Backend SafeGain trim move' }).click();
     await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Backend Reason');
     await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Ensemble context inactive');
-    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('Ensemble context');
-    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('stale');
-    await expect(page.locator('section').filter({ hasText: 'Safety Evidence' }).first()).toContainText('1/2');
-    await expect(page.getByText('Backend Auto EQ: proposal contract only').first()).toBeVisible();
-    const reviewOnlyRow = page.locator('.am-table-row').filter({ hasText: 'Backend Auto EQ: proposal contract only' });
-    await expect(reviewOnlyRow.getByRole('button', { name: 'Apply' })).toHaveCount(0);
-    await reviewOnlyRow.getByRole('button', { name: 'Detail' }).click();
-    await expect(page.locator('aside').getByText('Apply Blockers').first()).toBeVisible();
-    await expect(page.locator('aside').getByText('unsupported value type:eq').first()).toBeVisible();
+    await expect(page.locator('aside').filter({ hasText: 'Task Details' })).toContainText('Digest-bound detail required');
     await expect(page.getByText('Backend Decision Agent').first()).toBeVisible();
     await expect(page.getByText('Backend Lead Vox').first()).toBeVisible();
     await expect(page.getByText('Replay Engine / Evidence').first()).toBeVisible();
@@ -1595,6 +1620,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
     await page.locator('.am-table-row').filter({ hasText: 'Backend SafeGain trim move' }).getByRole('button', { name: 'Apply' }).click();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Lead Vox');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend supervised gate');
+    await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Immutable review detail: Verified 1 chunk(s) / 376 bytes');
     await page.getByRole('button', { name: 'Request Supervised Apply' }).click();
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('Backend Result');
     await expect(page.getByRole('dialog', { name: 'Supervised Apply Proposal' })).toContainText('verified_from_cache');
@@ -1712,6 +1738,7 @@ test.describe('Automixer backend Product Layer adapter', () => {
       'get_dashboard_snapshot',
       'get_channel_inventory',
       'get_decision_queue',
+      'get_operator_proposal_detail',
       'get_decision_traces',
       'get_safety_monitor',
       'get_replay_runs',
