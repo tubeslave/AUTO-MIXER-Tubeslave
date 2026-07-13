@@ -8,6 +8,14 @@ logger = logging.getLogger(__name__)
 
 
 def register_handlers(server):
+    async def handle_get_runtime_identity(websocket, data):
+        await server.send_to_client(
+            websocket,
+            server.get_runtime_identity_status(
+                request_challenge_nonce=data.get("challenge_nonce")
+            ),
+        )
+
     async def handle_connect_wing(websocket, data):
         await server.connect_wing(
             data.get("ip"),
@@ -41,6 +49,11 @@ def register_handlers(server):
 
     async def handle_scan_mixers(websocket, data):
         """Scan the network for all available mixers (WING + dLive)."""
+        if await server.block_packaged_offline_transport(
+            "scan_mixers",
+            websocket=websocket,
+        ):
+            return
         full_scan = data.get("full_scan", False)
         subnet = data.get("subnet", None)
 
@@ -74,6 +87,11 @@ def register_handlers(server):
 
     async def handle_auto_connect(websocket, data):
         """Auto-discover and connect to the best mixer on the network."""
+        if await server.block_packaged_offline_transport(
+            "auto_connect",
+            websocket=websocket,
+        ):
+            return
         preferred_type = data.get("preferred_type", None)
         preferred_ip = data.get("preferred_ip", None)
         full_scan = data.get("full_scan", False)
@@ -130,6 +148,7 @@ def register_handlers(server):
             )
 
     return {
+        "get_runtime_identity": handle_get_runtime_identity,
         "connect_wing": handle_connect_wing,
         "connect_dlive": handle_connect_dlive,
         "connect_mixing_station": handle_connect_mixing_station,

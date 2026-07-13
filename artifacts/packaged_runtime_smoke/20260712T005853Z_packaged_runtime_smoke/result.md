@@ -1,0 +1,17 @@
+# Packaged runtime smoke
+
+- Overall: PASS
+- Started packaged app: PASS
+- Secure IPC bootstrap: PASS
+- Invalid or expired token rejected: PASS
+- Fresh token recovery authenticated: PASS
+- Immutable offline lock reported: PASS
+- Mixer connect/discovery operations blocked: PASS
+- Stale session token removed on reload: PASS
+- Hardware controls hidden: PASS
+- External process-group connections: 0
+- Canonical WING log unchanged: PASS
+- Console WAL unchanged: PASS
+- Source binding: dirty_tree_non_clean_checkout
+
+This artifact proves an offline packaged runtime launch only. It grants no live authority and is not macOS notarization evidence.

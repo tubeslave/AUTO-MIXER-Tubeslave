@@ -260,6 +260,11 @@ def wing_readonly_preflight_review_overlay(project_root: Path) -> dict:
         or (accepted_source_ids[-1] if accepted_source_ids else None)
         or (artifact_sources[-1] if artifact_sources else None)
     )
+    latest_run_id = (
+        Path(latest_source_id).parent.name
+        if latest_source_id
+        else artifact_report.get("latest_valid_candidate_run_id")
+    )
     return {
         "wing_readonly_preflight_review_status": artifact_report.get("status"),
         "wing_readonly_preflight_review_evidence_status": artifact_report.get(
@@ -268,9 +273,7 @@ def wing_readonly_preflight_review_overlay(project_root: Path) -> dict:
         "wing_readonly_preflight_readiness_update_candidate_available": (
             artifact_report.get("readiness_update_candidate_available") is True
         ),
-        "wing_readonly_preflight_latest_valid_candidate_run_id": artifact_report.get(
-            "latest_valid_candidate_run_id"
-        ),
+        "wing_readonly_preflight_latest_valid_candidate_run_id": latest_run_id,
         "wing_readonly_preflight_latest_valid_candidate_source_id": latest_source_id,
         "wing_readonly_preflight_latest_unreviewed_candidate_source_id": (
             latest_unreviewed_source_id

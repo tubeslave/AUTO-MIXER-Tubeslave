@@ -1,5 +1,9 @@
 # WING Real Hardware Readiness
 
+> Historical snapshot. Current authority/readiness truth is owned by
+> `ops/autopilot/STATE.json` and
+> `Docs/reports/SOUNDCHECK_PLAN_DECOMPOSITION_20260712.md`.
+
 Generated: `2026-07-01T22:17:48Z`
 Last updated: `2026-07-01T23:18:47Z`
 

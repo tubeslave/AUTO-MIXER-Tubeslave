@@ -122,6 +122,145 @@ test.describe('Automixer frontend prototype', () => {
     await expect(page.getByText('Compact Operator')).toBeVisible();
     await expect(page.getByText('Selected Channel')).toBeVisible();
     await expect(page.getByLabel('Compact mode')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Arm emergency stop' })).toBeVisible();
+  });
+
+  test('emergency stop fails visibly when the backend is offline', async ({ page }) => {
+    await page.goto('/#/dashboard');
+
+    await page.getByRole('button', { name: 'Arm emergency stop' }).click();
+    await expect(page.getByRole('dialog', { name: 'Confirm system emergency stop' })).toBeVisible();
+    await page.getByRole('button', { name: 'Confirm STOP' }).click();
+
+    await expect(page.getByRole('button', { name: 'Arm emergency stop' })).toContainText('STOP ERROR');
+    await expect(page.getByRole('status').filter({ hasText: 'STOP NOT SENT' })).toBeVisible();
+  });
+
+  test('emergency stop is always visible and shows the backend acknowledgement', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+      (window as unknown as { __emergencyStopRequests: unknown[] }).__emergencyStopRequests = [];
+
+      class EmergencyStopWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = EmergencyStopWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+
+        constructor() {
+          setTimeout(() => {
+            this.readyState = EmergencyStopWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          if (message.type !== 'emergency_stop') return;
+          (window as unknown as { __emergencyStopRequests: unknown[] }).__emergencyStopRequests.push(message);
+          setTimeout(() => this.onmessage?.({
+            data: JSON.stringify({
+              type: 'emergency_stop_applied',
+              status: 'stopped',
+              success: true,
+              manual_write_supervision: {
+                emergency_stopped: true,
+                reset_required: true
+              }
+            })
+          }), 0);
+        }
+
+        close() {
+          this.readyState = EmergencyStopWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: EmergencyStopWebSocket
+      });
+    });
+
+    await page.goto('/#/dashboard');
+    await expect(page.getByRole('button', { name: 'Arm emergency stop' })).toBeVisible();
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('Compact Operator')).toBeVisible();
+    await page.getByRole('button', { name: 'Arm emergency stop' }).click();
+    await expect(page.getByRole('dialog', { name: 'Confirm system emergency stop' })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { __emergencyStopRequests: unknown[] }).__emergencyStopRequests)).toEqual([]);
+
+    await page.getByRole('button', { name: 'Confirm STOP' }).click();
+    await expect(page.getByRole('button', { name: 'Reassert emergency stop' })).toContainText('STOP ACTIVE');
+    await expect(page.getByRole('status').filter({ hasText: 'backend confirmed the emergency latch is engaged' })).toBeVisible();
+    expect(await page.evaluate(() => (window as unknown as { __emergencyStopRequests: unknown[] }).__emergencyStopRequests)).toEqual([{
+      type: 'emergency_stop',
+      reason: 'frontend_operator_emergency_stop'
+    }]);
+    await page.getByRole('button', { name: 'Reassert emergency stop' }).click();
+    await expect(page.getByRole('dialog', { name: 'Confirm system emergency stop' })).toBeVisible();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+  });
+
+  test('supervision truth confirms a stop when the direct ACK is lost', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+
+      class SupervisionOnlyWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = SupervisionOnlyWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+
+        constructor() {
+          setTimeout(() => {
+            this.readyState = SupervisionOnlyWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          if (message.type !== 'emergency_stop') return;
+          setTimeout(() => this.onmessage?.({
+            data: JSON.stringify({
+              type: 'manual_write_supervision_status',
+              emergency_stopped: true,
+              reset_required: true
+            })
+          }), 0);
+        }
+
+        close() {
+          this.readyState = SupervisionOnlyWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: SupervisionOnlyWebSocket
+      });
+    });
+
+    await page.goto('/#/dashboard');
+    await page.getByRole('button', { name: 'Arm emergency stop' }).click();
+    await page.getByRole('button', { name: 'Confirm STOP' }).click();
+
+    await expect(page.getByRole('button', { name: 'Reassert emergency stop' })).toContainText('STOP ACTIVE');
+    await expect(page.getByRole('status').filter({ hasText: 'backend supervision confirms the emergency latch is engaged' })).toBeVisible();
   });
 
   test('selected rows update read-only detail panels', async ({ page }) => {
@@ -182,6 +321,86 @@ test.describe('Automixer frontend prototype', () => {
 });
 
 test.describe('Automixer backend Product Layer adapter', () => {
+  test('Electron bootstrap authenticates before any Product Layer request', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('automixer_backend_autoconnect', 'on');
+      const sentTypes: string[] = [];
+      (window as any).__electronSentTypes = sentTypes;
+      (window as any).electron = {
+        getWebSocketAuthBootstrap: async () => ({
+          token: 'e'.repeat(43),
+          clientId: 'automixer-ui',
+          websocketUrl: 'ws://127.0.0.1:8765',
+          packagedOfflineLock: false
+        })
+      };
+
+      class ElectronAuthenticatedWebSocket {
+        static CONNECTING = 0;
+        static OPEN = 1;
+        static CLOSING = 2;
+        static CLOSED = 3;
+        readyState = ElectronAuthenticatedWebSocket.CONNECTING;
+        onopen: null | (() => void) = null;
+        onmessage: null | ((event: { data: string }) => void) = null;
+        onerror: null | ((event: unknown) => void) = null;
+        onclose: null | (() => void) = null;
+
+        constructor() {
+          setTimeout(() => {
+            this.readyState = ElectronAuthenticatedWebSocket.OPEN;
+            this.onopen?.();
+          }, 0);
+        }
+
+        send(raw: string) {
+          const message = JSON.parse(raw);
+          sentTypes.push(message.type);
+          if (message.type === 'authenticate') {
+            setTimeout(() => this.onmessage?.({
+              data: JSON.stringify({
+                type: 'authentication_status',
+                authenticated: true
+              })
+            }), 0);
+            return;
+          }
+          if (message.type === 'get_dashboard_snapshot') {
+            setTimeout(() => this.onmessage?.({
+              data: JSON.stringify({
+                type: 'dashboard_snapshot',
+                generated_at: '2026-07-11T22:30:00Z',
+                connection: { connected: false, connection_mode: 'wing' },
+                safety: { ready_for_live: { ready: false, checks: {} } }
+              })
+            }), 0);
+          }
+        }
+
+        close() {
+          this.readyState = ElectronAuthenticatedWebSocket.CLOSED;
+          this.onclose?.();
+        }
+      }
+
+      Object.defineProperty(window, 'WebSocket', {
+        configurable: true,
+        value: ElectronAuthenticatedWebSocket
+      });
+    });
+
+    await page.goto('/#/dashboard');
+    await expect(page.locator('body')).toContainText('Product Layer partial');
+    const result = await page.evaluate(() => ({
+      sentTypes: (window as any).__electronSentTypes,
+      persistedToken: window.sessionStorage.getItem('automixer_ws_auth_token')
+    }));
+
+    expect(result.sentTypes[0]).toBe('authenticate');
+    expect(result.sentTypes).toContain('get_dashboard_snapshot');
+    expect(result.persistedToken).toBeNull();
+  });
+
   test('shows partial backend state when only some Product Layer payloads arrive', async ({ page }) => {
     await page.addInitScript(() => {
       window.localStorage.setItem('automixer_backend_autoconnect', 'on');
@@ -1257,6 +1476,18 @@ test.describe('Automixer backend Product Layer adapter', () => {
           ],
           blockers: []
         },
+        get_telemetry_alerts_snapshot: {
+          type: 'telemetry_alerts_snapshot',
+          generated_at: '2026-05-19T20:30:09Z',
+          source: 'backend_fixture_telemetry_alerts',
+          status: 'ok',
+          summary: {
+            alert_count: 0,
+            read_only: true,
+            live_write: false
+          },
+          alerts: []
+        },
         apply_operator_proposal: {
           type: 'operator_proposal_apply_result',
           status: 'applied',
@@ -1327,8 +1558,8 @@ test.describe('Automixer backend Product Layer adapter', () => {
     });
 
     await page.goto('/#/dashboard');
-    await expect(page.getByRole('banner').getByText('Partial data', { exact: true })).toBeVisible();
-    await expect(page.getByRole('banner').getByText(/Product Layer partial/i)).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Live data', { exact: true })).toBeVisible();
+    await expect(page.getByRole('banner').getByText(/Product Layer live/i)).toBeVisible();
     await expect(page.getByRole('banner').getByText('WING 10.10.10.20')).toBeVisible();
     await expect(page.getByText('-18.2').first()).toBeVisible();
     await expect(page.getByText('-2.4').first()).toBeVisible();

@@ -48,6 +48,8 @@ state policy, and tests continue to apply.
 4. Add a proof runner that defaults to fake-mixer proof and requires explicit
    flags for physical WING writes.
 5. Mark frontend mock fallback as not live-ready.
+6. Keep correction-event logs below the per-user runtime directory; runtime or
+   tests must never append to tracked source-tree artifacts.
 
 ## Test plan
 

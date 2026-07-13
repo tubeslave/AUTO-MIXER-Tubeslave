@@ -7,10 +7,12 @@ All tests work without hardware or network (all external connections mocked).
 
 import asyncio
 import errno
+import hashlib
 import json
 import os
 import signal
 import subprocess
+import threading
 import time
 from pathlib import Path
 import numpy as np
@@ -19,8 +21,14 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from handlers import automation_handlers, fx_handlers, mixer_handlers, routing_handlers, snapshot_handlers
 from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
 from operator_product_state import build_safety_monitor
+from runtime_identity import (
+    RUNTIME_CRITICAL_SOURCE_PATHS,
+    RUNTIME_IDENTITY_SCHEMA,
+    runtime_identity_manifest_sha256,
+)
 
 try:
+    import server as server_module
     from server import convert_numpy_types, AutoMixerServer
 except ImportError:
     pytest.skip("server module not importable", allow_module_level=True)
@@ -28,6 +36,39 @@ try:
     from ai.agent import AgentMode
 except ImportError:
     AgentMode = None
+
+
+def _configure_unit_master_route_proof(server, tmp_path, proof_id):
+    proof_path = tmp_path / f"{proof_id}.json"
+    proof_path.write_text(
+        json.dumps(
+            {
+                "accepted": True,
+                "proof_id": proof_id,
+                "console_serial": "WING-UNIT",
+                "firmware_version": "3.0.5",
+                "capture_device": "Unit 48ch USB",
+                "capture_device_index": 7,
+                "capture_channel_count": 48,
+                "capture_sample_rate_hz": 48000,
+                "master_channels": [47, 48],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    server._master_capture_route_proof_path = str(proof_path)
+    server._master_capture_route_proof_sha256 = hashlib.sha256(
+        proof_path.read_bytes()
+    ).hexdigest()
+    return {
+        "/$syscfg/$serial": "WING-UNIT",
+        "/$syscfg/$firmware": "3.0.5",
+        "/io/out/USB/47/grp": "MAIN",
+        "/io/out/USB/47/in": 0,
+        "/io/out/USB/48/grp": "MAIN",
+        "/io/out/USB/48/in": 1,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -153,6 +194,60 @@ async def test_connect_wing_failed_attempt_disconnects_failed_client(mock_config
 
 class TestAutoMixerServerInit:
 
+    def test_default_websocket_origins_block_untrusted_browser_pages(self):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_ALLOWED_ORIGINS", None)
+            assert AutoMixerServer._build_websocket_allowed_origins() == (
+                None,
+                "http://127.0.0.1:3000",
+                "http://localhost:3000",
+            )
+
+    def test_websocket_origins_accept_only_explicit_exact_http_origins(self):
+        with patch.dict(
+            os.environ,
+            {
+                "AUTOMIXER_WS_ALLOWED_ORIGINS": (
+                    "https://console.example.test, http://localhost:3000"
+                )
+            },
+            clear=False,
+        ):
+            assert AutoMixerServer._build_websocket_allowed_origins() == (
+                None,
+                "http://127.0.0.1:3000",
+                "http://localhost:3000",
+                "https://console.example.test",
+            )
+
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_ALLOWED_ORIGINS": "*"},
+            clear=False,
+        ), pytest.raises(RuntimeError, match=r"exact http\(s\) origins"):
+            AutoMixerServer._build_websocket_allowed_origins()
+
+    @pytest.mark.parametrize(
+        "origin",
+        [
+            "https://*.example.test",
+            "https://user@example.test",
+            "https://example.test?source=unsafe",
+            "https://example.test/path",
+            "https://example.test#fragment",
+            "https://example.test:99999",
+            "http://console.example.test",
+            "http://192.168.1.20:3000",
+        ],
+    )
+    def test_websocket_origins_reject_non_origin_url_features(self, origin):
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_ALLOWED_ORIGINS": origin},
+            clear=False,
+        ), pytest.raises(RuntimeError, match=r"exact http\(s\) origins"):
+            AutoMixerServer._build_websocket_allowed_origins()
+
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     def test_basic_init(self, mock_config, mock_bleed):
@@ -164,41 +259,328 @@ class TestAutoMixerServerInit:
         assert server.connection_mode is None
         assert server.connected_clients == set()
         assert server.live_mode is False
+        assert server._ws_max_clients == 10
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     def test_custom_host_port(self, mock_config, mock_bleed):
-        """Remote bind is accepted only with a configured bearer token."""
+        """Direct non-loopback WebSocket binds are refused even with a token."""
         with patch.dict(os.environ, {
-            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_AUTH_TOKEN": "r" * 43,
             "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
         }):
-            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
-        assert server.ws_host == "0.0.0.0"
-        assert server.ws_port == 9999
+            with pytest.raises(RuntimeError, match="Non-loopback WebSocket binds are disabled"):
+                AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+            assert "AUTOMIXER_WS_AUTH_TOKEN" not in os.environ
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_with_token_requires_auth_and_scrubs_plaintext_environment(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        token = "e" * 43
+        with patch.dict(
+            os.environ,
+            {
+                "AUTOMIXER_WS_AUTH_TOKEN": token,
+                "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+            },
+        ):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+            assert "AUTOMIXER_WS_AUTH_TOKEN" not in os.environ
+
         assert server._ws_auth_required is True
+        assert token not in server.auth_manager._tokens
+        assert token not in repr(server.auth_manager._tokens)
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_consumes_launch_token_from_one_shot_inherited_fd(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        token = "p" * 43
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, token.encode("ascii"))
+        os.close(write_fd)
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_AUTH_TOKEN_FD": str(read_fd)},
+            clear=False,
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+            assert "AUTOMIXER_WS_AUTH_TOKEN_FD" not in os.environ
+
+        assert server._ws_auth_required is True
+        assert token not in repr(server.auth_manager._tokens)
+        with pytest.raises(OSError):
+            os.fstat(read_fd)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_electron_fd_launcher_token_remains_valid_for_process_lifetime(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        token = "l" * 43
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, token.encode("ascii"))
+        os.close(write_fd)
+        with patch.dict(
+            os.environ,
+            {
+                "AUTOMIXER_WS_AUTH_TOKEN_FD": str(read_fd),
+                "AUTOMIXER_WS_TOKEN_PROCESS_LIFETIME": "true",
+                "AUTOMIXER_PACKAGED_APP": "true",
+                "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+            },
+            clear=False,
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(return_value=json.dumps({
+            "type": "authenticate",
+            "token": token,
+            "client_id": "automixer-ui",
+        }))
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is True
+        assert server._ws_token_process_lifetime is True
+        assert id(websocket) not in server._authenticated_websocket_expiry
+        websocket.close.assert_not_awaited()
+
+    def test_launch_token_pipe_deadline_covers_partial_payload_without_eof(self):
+        read_fd, write_fd = os.pipe()
+        os.write(write_fd, b"partial")
+        started = time.monotonic()
+        try:
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AUTOMIXER_WS_AUTH_TOKEN_FD": str(read_fd)},
+                    clear=False,
+                ),
+                patch.object(
+                    server_module,
+                    "WS_AUTH_TOKEN_PIPE_TIMEOUT_SECONDS",
+                    0.02,
+                ),
+            ):
+                os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+                with pytest.raises(RuntimeError, match="Timed out"):
+                    server_module._consume_configured_ws_auth_token()
+        finally:
+            os.close(write_fd)
+
+        assert time.monotonic() - started < 0.5
+        with pytest.raises(OSError):
+            os.fstat(read_fd)
+
+    def test_repo_dotenv_cannot_activate_plaintext_control_token(
+        self,
+        tmp_path,
+    ):
+        (tmp_path / ".env").write_text(
+            "AUTOMIXER_WS_AUTH_TOKEN=" + ("d" * 43) + "\n",
+            encoding="utf-8",
+        )
+        with (
+            patch.object(server_module, "_REPO_ROOT", str(tmp_path)),
+            patch.dict(os.environ, {}, clear=False),
+        ):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server_module._load_repo_dotenv()
+            assert "AUTOMIXER_WS_AUTH_TOKEN" not in os.environ
+
+    def test_m005_bound_backend_ignores_all_untracked_repo_dotenv_inputs(
+        self,
+        tmp_path,
+    ):
+        poisoned = {
+            "AUTOMIXER_OPERATOR_MODE": "auto",
+            "AUTOMIXER_AUTO_MODE_UNLOCKED": "true",
+            "AUTOMIXER_WING_OBSERVATION_MODE": "false",
+            "AUTOMIXER_WING_DEPLOYMENT_WRITE_BOUNDARY_ENABLED": "false",
+            "AUTOMIXER_WING_REPLAY_READINESS_DIR": "/tmp/poisoned-readiness",
+        }
+        (tmp_path / ".env").write_text(
+            "".join(f"{name}={value}\n" for name, value in poisoned.items()),
+            encoding="utf-8",
+        )
+        with (
+            patch.object(server_module, "_REPO_ROOT", str(tmp_path)),
+            patch.dict(
+                os.environ,
+                {"AUTOMIXER_M005_LAUNCH_NONCE": "a" * 32},
+                clear=False,
+            ),
+        ):
+            for name in poisoned:
+                os.environ.pop(name, None)
+            server_module._load_repo_dotenv()
+            assert all(name not in os.environ for name in poisoned)
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_rejects_ambiguous_environment_and_fd_token_sources(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        read_fd, write_fd = os.pipe()
+        try:
+            with patch.dict(
+                os.environ,
+                {
+                    "AUTOMIXER_WS_AUTH_TOKEN": "a" * 43,
+                    "AUTOMIXER_WS_AUTH_TOKEN_FD": str(read_fd),
+                },
+                clear=False,
+            ):
+                with pytest.raises(RuntimeError, match="exactly one WebSocket token"):
+                    AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        finally:
+            os.close(read_fd)
+            os.close(write_fd)
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_without_token_remains_cli_compatible(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+
+        assert server._ws_auth_required is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_runtime_identity_binds_process_nonce_and_exact_source_backend(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        identity = server.get_runtime_identity_status()
+
+        assert identity["schema"] == RUNTIME_IDENTITY_SCHEMA
+        assert identity["runtime_kind"] == "source"
+        assert len(identity["instance_nonce"]) == 32
+        assert identity["process"]["instance_nonce"] == identity["instance_nonce"]
+        assert identity["process"]["started_at_utc"] == identity["started_at_utc"]
+        assert identity["process"]["pid"] == os.getpid()
+        assert identity["websocket"] == {
+            "host": "127.0.0.1",
+            "port": 8765,
+            "loopback_only": True,
+        }
+        assert identity["read_only_identity"] is True
+        assert identity["live_authority_granted"] is False
+        assert identity["launch_binding"]["mode"] == "unbound"
+        assert identity["launch_binding"]["proof_eligible"] is False
+        assert [row["path"] for row in identity["code"]["files"]] == sorted(
+            RUNTIME_CRITICAL_SOURCE_PATHS
+        )
+        assert identity["source"]["head"]
+        assert identity["source"]["tree"]
+        assert identity["manifest_sha256"] == runtime_identity_manifest_sha256(identity)
+        server_path = Path(__file__).resolve().parents[1] / "backend" / "server.py"
+        server_bytes = server_path.read_bytes()
+        assert identity["backend"] == {
+            "path": "backend/server.py",
+            "exists": True,
+            "size": len(server_bytes),
+            "sha256": hashlib.sha256(server_bytes).hexdigest(),
+        }
+
+        server.send_to_client = AsyncMock()
+        websocket = object()
+        await server._dispatch["get_runtime_identity"](
+            websocket,
+            {"challenge_nonce": "b" * 32},
+        )
+        challenged = {**identity, "request_challenge_nonce": "b" * 32}
+        server.send_to_client.assert_awaited_once_with(websocket, challenged)
+
+        mutated = server.get_runtime_identity_status()
+        mutated["process"]["pid"] = -1
+        assert server.get_runtime_identity_status()["process"]["pid"] == os.getpid()
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_runtime_identity_accepts_only_complete_preprocess_launch_binding(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        binding = {
+            "AUTOMIXER_M005_LAUNCH_NONCE": "c" * 32,
+            "AUTOMIXER_M005_PRESTART_PROVENANCE_SCHEMA": (
+                "automixer.m005_current_release_provenance.v1"
+            ),
+            "AUTOMIXER_M005_PRESTART_PROVENANCE_SHA256": "d" * 64,
+            "AUTOMIXER_M005_PRESTART_PROVENANCE_SIZE": "1234",
+        }
+        with patch.dict(os.environ, binding, clear=False):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+
+        assert server._runtime_identity["launch_binding"] == {
+            "mode": "proof_runner",
+            "launch_nonce": "c" * 32,
+            "prestart_provenance_schema": (
+                "automixer.m005_current_release_provenance.v1"
+            ),
+            "prestart_provenance_size": 1234,
+            "prestart_provenance_sha256": "d" * 64,
+            "bound_before_process_start": True,
+            "proof_eligible": True,
+        }
+        for key in binding:
+            assert key not in os.environ
+
+        invalid = dict(binding)
+        invalid["AUTOMIXER_M005_LAUNCH_NONCE"] = "not-a-nonce"
+        with patch.dict(os.environ, invalid, clear=False):
+            with pytest.raises(RuntimeError, match="Invalid M005 process-start"):
+                AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     def test_remote_bind_without_token_fails_closed(self, mock_config, mock_bleed):
         with patch.dict(os.environ, {}, clear=False):
             os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
-            with pytest.raises(RuntimeError, match="requires AUTOMIXER_WS_AUTH_TOKEN"):
+            with pytest.raises(RuntimeError, match="Non-loopback WebSocket binds are disabled"):
                 AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
-    async def test_remote_websocket_authenticates_first_frame(self, mock_config, mock_bleed):
+    async def test_token_authenticated_loopback_websocket_authenticates_first_frame(self, mock_config, mock_bleed):
+        token = "r" * 43
         with patch.dict(os.environ, {
-            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_AUTH_TOKEN": token,
             "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
         }):
-            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=9999)
         websocket = MagicMock()
         websocket.recv = AsyncMock(return_value=json.dumps({
             "type": "authenticate",
-            "token": "test-remote-token",
+            "token": token,
             "client_id": "automixer-ui",
         }))
         websocket.send = AsyncMock()
@@ -212,12 +594,12 @@ class TestAutoMixerServerInit:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
-    async def test_remote_websocket_rejects_bad_token(self, mock_config, mock_bleed):
+    async def test_token_authenticated_loopback_websocket_rejects_bad_token(self, mock_config, mock_bleed):
         with patch.dict(os.environ, {
-            "AUTOMIXER_WS_AUTH_TOKEN": "test-remote-token",
+            "AUTOMIXER_WS_AUTH_TOKEN": "r" * 43,
             "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
         }):
-            server = AutoMixerServer(ws_host="0.0.0.0", ws_port=9999)
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=9999)
         websocket = MagicMock()
         websocket.recv = AsyncMock(return_value=json.dumps({
             "type": "authenticate",
@@ -228,6 +610,185 @@ class TestAutoMixerServerInit:
 
         assert await server._authenticate_websocket(websocket) is False
         websocket.close.assert_awaited_once_with(code=1008, reason="authentication_failed")
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_websocket_auth_rejects_non_string_token_without_exception(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "r" * 43,
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=9999)
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(return_value=json.dumps({
+            "type": "authenticate",
+            "token": ["not", "a", "token"],
+            "client_id": "automixer-ui",
+        }))
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is False
+        websocket.close.assert_awaited_once_with(code=1008, reason="authentication_failed")
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_websocket_auth_attempt_bucket_limits_invalid_token_flood(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "r" * 43,
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=9999)
+        exhausted = server_module.TokenBucket(1e-9, 1)
+        exhausted._tokens = 0.0
+        server._ws_auth_attempt_bucket = exhausted
+        websocket = MagicMock()
+        websocket.recv = AsyncMock()
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is False
+        websocket.recv.assert_not_awaited()
+        websocket.close.assert_awaited_once_with(
+            code=1013,
+            reason="authentication_rate_limited",
+        )
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_loopback_token_authenticates_before_client_registration(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(
+            os.environ,
+            {
+                "AUTOMIXER_WS_AUTH_TOKEN": "e" * 43,
+                "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+            },
+        ):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(
+            return_value=json.dumps(
+                {
+                    "type": "authenticate",
+                    "token": "e" * 43,
+                    "client_id": "automixer-ui",
+                }
+            )
+        )
+        websocket.send = AsyncMock()
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is True
+        assert json.loads(websocket.send.await_args.args[0]) == {
+            "type": "authentication_status",
+            "authenticated": True,
+        }
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_auth_rejects_weak_token(self, mock_config, mock_bleed):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "too-short",
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            with pytest.raises(RuntimeError, match="43-character base64url"):
+                AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+
+    @pytest.mark.parametrize("ttl", ["nan", "inf", "0", "0.01", "24.1", "invalid"])
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_loopback_auth_rejects_unbounded_ttl(
+        self,
+        mock_config,
+        mock_bleed,
+        ttl,
+    ):
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": "t" * 43,
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+            "AUTOMIXER_WS_TOKEN_TTL_HOURS": ttl,
+        }):
+            with pytest.raises(RuntimeError, match="1 minute to 24 hours"):
+                AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_websocket_auth_rejects_missing_client_id(self, mock_config, mock_bleed):
+        token = "t" * 43
+        with patch.dict(os.environ, {
+            "AUTOMIXER_WS_AUTH_TOKEN": token,
+            "AUTOMIXER_WS_CLIENT_ID": "automixer-ui",
+        }):
+            server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        websocket = MagicMock()
+        websocket.recv = AsyncMock(return_value=json.dumps({
+            "type": "authenticate",
+            "token": token,
+        }))
+        websocket.close = AsyncMock()
+
+        assert await server._authenticate_websocket(websocket) is False
+        websocket.close.assert_awaited_once_with(
+            code=1008,
+            reason="authentication_failed",
+        )
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_authenticated_websocket_closes_at_session_expiry(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        websocket = MagicMock()
+        websocket.close = AsyncMock()
+        expires_at = time.time() - 1
+        server._authenticated_websocket_expiry[id(websocket)] = expires_at
+
+        await server._expire_authenticated_websocket(websocket, expires_at)
+
+        websocket.close.assert_awaited_once_with(
+            code=1008,
+            reason="authentication_expired",
+        )
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_disconnect_stops_only_websocket_owned_audio_preview(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer(ws_host="127.0.0.1", ws_port=8765)
+        websocket = object()
+        capture = MagicMock()
+        capture.running = True
+        server.audio_capture = capture
+        server._audio_capture_preview_owner = websocket
+        server.connected_clients.add(websocket)
+
+        await server.unregister_client(websocket)
+
+        capture.stop.assert_called_once_with()
+        assert server.audio_capture is None
+        assert server._audio_capture_preview_owner is None
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -302,6 +863,98 @@ class TestAutoMixerServerInit:
             pytest.raises(RuntimeError, match="Refusing automatic kill"),
         ):
             await server.start()
+
+    def test_entrypoint_returns_nonzero_after_fatal_startup_error(self):
+        fake_server = MagicMock()
+        fake_server.start.return_value = object()
+
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "AUTOMIXER_WS_HOST": "127.0.0.1",
+                    "AUTOMIXER_WS_PORT": "8765",
+                },
+                clear=False,
+            ),
+            patch("server.atexit.register"),
+            patch("server.AutoMixerServer", return_value=fake_server),
+            patch("server.asyncio.run", side_effect=RuntimeError("fatal bind failure")),
+        ):
+            assert server_module.main() == 1
+
+        fake_server.cleanup_all_controllers.assert_called_once_with()
+        assert server_module._server_instance is None
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_start_passes_fail_closed_origins_to_websocket_server(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        fake_server = MagicMock()
+        fake_server.close = MagicMock()
+        fake_server.wait_closed = AsyncMock()
+        captured = {}
+
+        async def fake_serve(*args, **kwargs):
+            captured.update(kwargs)
+            server._shutdown_event.set()
+            return fake_server
+
+        with patch("server.websockets.serve", side_effect=fake_serve):
+            await server.start()
+
+        assert captured["origins"] == server._ws_allowed_origins
+        assert "https://evil.example" not in captured["origins"]
+        assert captured["max_size"] == 256 * 1024
+        assert captured["max_queue"] == 16
+        fake_server.close.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_start_retry_preserves_websocket_transport_bounds(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        bind_error = OSError()
+        bind_error.errno = errno.EADDRINUSE
+        fake_server = MagicMock()
+        fake_server.close = MagicMock()
+        fake_server.wait_closed = AsyncMock()
+        calls = []
+
+        async def fake_serve(*args, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                raise bind_error
+            server._shutdown_event.set()
+            return fake_server
+
+        with (
+            patch.dict(
+                os.environ,
+                {"AUTOMIXER_FORCE_CLEANUP_WS_PORT": "true"},
+                clear=False,
+            ),
+            patch.object(server, "_force_cleanup_ws_port"),
+            patch("server.asyncio.sleep", new=AsyncMock()),
+            patch("server.websockets.serve", side_effect=fake_serve),
+        ):
+            await server.start()
+
+        assert len(calls) == 2
+        for kwargs in calls:
+            assert kwargs["origins"] == server._ws_allowed_origins
+            assert kwargs["max_size"] == 256 * 1024
+            assert kwargs["max_queue"] == 16
+        fake_server.close.assert_called_once_with()
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -383,6 +1036,326 @@ class TestAutoMixerServerInit:
         assert event["timestamp"].endswith("Z")
         assert "+00:00" not in event["timestamp"]
         assert event["result"]["value"] == -12.5
+
+
+_INGRESS_END = object()
+
+
+class ControlledIngressWebSocket:
+    def __init__(self, messages=()):
+        self._incoming = asyncio.Queue()
+        for message in messages:
+            self._incoming.put_nowait(message)
+        self._incoming.put_nowait(_INGRESS_END)
+        self.sent = []
+        self.closed = []
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        message = await self._incoming.get()
+        if message is _INGRESS_END:
+            raise StopAsyncIteration
+        return message
+
+    async def send(self, payload):
+        self.sent.append(payload)
+
+    async def close(self, *, code, reason):
+        self.closed.append((code, reason))
+
+
+class StreamingIngressWebSocket(ControlledIngressWebSocket):
+    def __init__(self):
+        self._incoming = asyncio.Queue()
+        self.sent = []
+        self.closed = []
+
+    async def feed(self, message):
+        await self._incoming.put(message)
+
+    async def finish(self):
+        await self._incoming.put(_INGRESS_END)
+
+
+class TestWebSocketIngressSafety:
+
+    @patch("server.BleedService")
+    @patch.object(
+        AutoMixerServer,
+        "_load_config",
+        return_value={"websocket": {"max_clients": 2}},
+    )
+    def test_configured_max_clients_is_loaded(self, mock_config, mock_bleed):
+        server = AutoMixerServer()
+        assert server._ws_max_clients == 2
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_client_cap_includes_authentication_in_progress(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._ws_max_clients = 1
+        authenticating = object()
+        rejected = ControlledIngressWebSocket()
+
+        assert server._reserve_websocket_admission(authenticating) is True
+        await server.handler(rejected)
+
+        assert rejected.closed == [(1013, "server_capacity")]
+        assert rejected not in server.connected_clients
+        server._release_websocket_admission(authenticating)
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_pending_authentication_has_separate_small_cap(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._ws_max_clients = 10
+        pending = [object(), object(), object()]
+
+        assert server._reserve_websocket_admission(pending[0]) is True
+        assert server._reserve_websocket_admission(pending[1]) is True
+        assert server._reserve_websocket_admission(pending[2]) is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_twentieth_rate_reject_closes_with_try_again_later(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        exhausted = server_module.TokenBucket(1e-9, 100)
+        exhausted._tokens = 0.0
+        server._ws_global_ingress_bucket = exhausted
+        websocket = ControlledIngressWebSocket(
+            ['{"type":"normal"}'] * 20
+        )
+
+        await server.handler(websocket)
+
+        assert websocket.closed == [(1013, "ingress_overload")]
+        assert websocket not in server.connected_clients
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_normal_lane_preserves_fifo_handler_order(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        websocket = StreamingIngressWebSocket()
+        all_seen = asyncio.Event()
+        events = []
+
+        async def handle_message(_websocket, raw):
+            message_type = json.loads(raw)["type"]
+            if message_type == "one":
+                await asyncio.sleep(0)
+            events.append(message_type)
+            if len(events) == 3:
+                all_seen.set()
+
+        server.handle_client_message = AsyncMock(side_effect=handle_message)
+        handler_task = asyncio.create_task(server.handler(websocket))
+
+        for message_type in ("one", "two", "three"):
+            await websocket.feed(json.dumps({"type": message_type}))
+        await asyncio.wait_for(all_seen.wait(), timeout=1)
+        await websocket.finish()
+        await asyncio.wait_for(handler_task, timeout=1)
+
+        assert events == ["one", "two", "three"]
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_disconnect_does_not_cancel_inflight_normal_handler(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        websocket = StreamingIngressWebSocket()
+        started = asyncio.Event()
+        release = asyncio.Event()
+        completed = asyncio.Event()
+        cancelled = False
+
+        async def handle_message(_websocket, _raw):
+            nonlocal cancelled
+            started.set()
+            try:
+                await release.wait()
+            except asyncio.CancelledError:
+                cancelled = True
+                raise
+            completed.set()
+
+        server.handle_client_message = AsyncMock(side_effect=handle_message)
+        handler_task = asyncio.create_task(server.handler(websocket))
+        await websocket.feed('{"type":"slow_transaction"}')
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        await websocket.finish()
+        await asyncio.sleep(0)
+        assert handler_task.done() is False
+        assert cancelled is False
+
+        release.set()
+        await asyncio.wait_for(handler_task, timeout=1)
+
+        assert completed.is_set()
+        assert cancelled is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_emergency_fast_lane_preempts_and_invalidates_stale_fifo(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        websocket = StreamingIngressWebSocket()
+        slow_started = asyncio.Event()
+        release_slow = asyncio.Event()
+        emergency_seen = asyncio.Event()
+        after_seen = asyncio.Event()
+        events = []
+
+        async def handle_message(_websocket, raw):
+            message_type = json.loads(raw)["type"]
+            if message_type == "slow":
+                events.append("slow-start")
+                slow_started.set()
+                await release_slow.wait()
+                events.append("slow-end")
+            elif message_type == "emergency_stop":
+                server._manual_write_emergency_stopped = True
+                server._manual_write_emergency_generation += 1
+                events.append("emergency")
+                emergency_seen.set()
+            elif message_type == "after":
+                events.append("after")
+                after_seen.set()
+            else:
+                events.append(message_type)
+
+        server.handle_client_message = AsyncMock(side_effect=handle_message)
+        handler_task = asyncio.create_task(server.handler(websocket))
+
+        await websocket.feed('{"type":"slow"}')
+        await asyncio.wait_for(slow_started.wait(), timeout=1)
+        await websocket.feed('{"type":"queued-before-stop"}')
+        await websocket.feed('{"type":"emergency_stop"}')
+        await asyncio.wait_for(emergency_seen.wait(), timeout=1)
+        release_slow.set()
+        await websocket.feed('{"type":"after"}')
+        await asyncio.wait_for(after_seen.wait(), timeout=1)
+        await websocket.finish()
+        await asyncio.wait_for(handler_task, timeout=1)
+
+        assert events == ["slow-start", "emergency", "slow-end", "after"]
+        assert server._ws_ingress_emergency_generation == 1
+        assert websocket not in server.connected_clients
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_emergency_bypasses_exhausted_global_bucket(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        exhausted = server_module.TokenBucket(1e-9, 100)
+        exhausted._tokens = 0.0
+        server._ws_global_ingress_bucket = exhausted
+        emergency_seen = asyncio.Event()
+
+        async def handle_message(_websocket, raw):
+            assert json.loads(raw)["type"] == "emergency_stop_agent"
+            server._manual_write_emergency_stopped = True
+            emergency_seen.set()
+
+        server.handle_client_message = AsyncMock(side_effect=handle_message)
+        websocket = StreamingIngressWebSocket()
+        handler_task = asyncio.create_task(server.handler(websocket))
+
+        await websocket.feed('{"type":"emergency_stop_agent"}')
+        await asyncio.wait_for(emergency_seen.wait(), timeout=1)
+        await websocket.finish()
+        await asyncio.wait_for(handler_task, timeout=1)
+
+        server.handle_client_message.assert_awaited_once()
+        assert websocket.closed == []
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_expired_session_drops_buffered_control_before_dispatch(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        websocket = StreamingIngressWebSocket()
+        server._authenticated_websocket_expiry[id(websocket)] = time.time() - 1
+        server.handle_client_message = AsyncMock()
+
+        handler_task = asyncio.create_task(server.handler(websocket))
+        await websocket.feed('{"type":"set_operator_mode","mode":"supervised"}')
+        await asyncio.wait_for(handler_task, timeout=1)
+
+        server.handle_client_message.assert_not_awaited()
+        assert websocket.closed == [(1008, "authentication_expired")]
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_expired_tombstone_drops_every_already_queued_control_frame(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        websocket = StreamingIngressWebSocket()
+        server._authenticated_websocket_expiry[id(websocket)] = time.time() - 1
+        server.handle_client_message = AsyncMock()
+        queue = asyncio.Queue()
+        for payload in (
+            '{"type":"set_operator_mode","mode":"supervised"}',
+            '{"type":"set_operator_mode","mode":"auto"}',
+        ):
+            queue.put_nowait(server_module.QueuedIngressMessage(
+                payload=payload,
+                emergency_generation=server._ws_ingress_emergency_generation,
+            ))
+
+        worker = asyncio.create_task(
+            server._run_websocket_normal_lane(websocket, queue)
+        )
+        await asyncio.wait_for(queue.join(), timeout=1)
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
+
+        server.handle_client_message.assert_not_awaited()
+        assert websocket.closed == [(1008, "authentication_expired")]
+        assert id(websocket) in server._authenticated_websocket_expiry
 
 
 class TestAutoMixerServerConfigNormalization:
@@ -513,14 +1486,420 @@ class TestAutoMixerServerConfigNormalization:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_measures_master_47_48_with_true_peak_allowance(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        proof_path = tmp_path / "master-route-proof.json"
+        proof_path.write_text(
+            json.dumps(
+                {
+                    "accepted": True,
+                    "proof_id": "unit-route-proof",
+                    "console_serial": "WING-UNIT",
+                    "firmware_version": "3.0.5",
+                    "capture_device": "Unit 48ch USB",
+                    "capture_device_index": 7,
+                    "capture_channel_count": 48,
+                    "capture_sample_rate_hz": 48000,
+                    "master_channels": [47, 48],
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        server._master_capture_route_proof_path = str(proof_path)
+        server._master_capture_route_proof_sha256 = hashlib.sha256(
+            proof_path.read_bytes()
+        ).hexdigest()
+        server.mixer_client = MagicMock(is_connected=True)
+        expected_route = {
+            "/$syscfg/$serial": "WING-UNIT",
+            "/$syscfg/$firmware": "3.0.5",
+            "/io/out/USB/47/grp": "MAIN",
+            "/io/out/USB/47/in": 0,
+            "/io/out/USB/48/grp": "MAIN",
+            "/io/out/USB/48/in": 1,
+        }
+        server.mixer_client.query_parameter.side_effect = (
+            lambda address, timeout: {
+                "status": "received",
+                "address": address,
+                "value": expected_route[address],
+                "confirmed_round_trips": 2,
+            }
+        )
+        server.audio_capture = MagicMock(running=True, num_channels=48)
+        server.audio_capture.get_status.side_effect = [
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 1024,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 2048,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+        ]
+        server.audio_capture.get_peak.side_effect = lambda channel: {47: -12.0, 48: -11.0}[channel]
+        operation = MagicMock(family_id="fader", operation_id="fader-1")
+
+        result = await server._supervised_transaction_audio_recheck(operation, {}, {})
+
+        assert result.status == "passed"
+        assert result.evidence["master_channels"] == [47, 48]
+        assert result.evidence["master_sample_peaks_dbfs"] == [-12.0, -11.0]
+        assert result.evidence["master_true_peak_dbtp"] == -8.0
+        assert result.evidence["route_proof"]["verified"] is True
+        assert result.evidence["physical_route_readback"]["verified"] is True
+        assert result.evidence["capture_sample_progressed"] is True
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_rejects_route_change_after_audio_window(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        route = _configure_unit_master_route_proof(
+            server,
+            tmp_path,
+            "post-audio-route-drift",
+        )
+        server.mixer_client = MagicMock(is_connected=True)
+        query_count = 0
+
+        def query(address, timeout):
+            nonlocal query_count
+            query_count += 1
+            value = route[address]
+            if query_count > 12 and address == "/io/out/USB/47/grp":
+                value = "BUS"
+            return {
+                "status": "received",
+                "address": address,
+                "value": value,
+                "confirmed_round_trips": 2,
+            }
+
+        server.mixer_client.query_parameter.side_effect = query
+        server.audio_capture = MagicMock(running=True, num_channels=48)
+        server.audio_capture.get_status.side_effect = [
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 1024,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 2048,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+        ]
+        server.audio_capture.get_peak.side_effect = lambda channel: {
+            47: -12.0,
+            48: -11.0,
+        }[channel]
+
+        result = await server._supervised_transaction_audio_recheck(
+            MagicMock(family_id="fader", operation_id="post-route-drift"),
+            {},
+            {},
+        )
+
+        assert result.status == "unavailable"
+        assert result.reason == "master_capture_route_physical_readback_mismatch"
+        assert result.evidence[
+            "physical_route_readback_before_audio"
+        ]["verified"] is True
+        assert result.evidence[
+            "physical_route_readback_after_audio"
+        ]["verified"] is False
+        assert server._latest_master_true_peak_dbtp is None
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_uses_active_engine_owned_capture(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        route = _configure_unit_master_route_proof(
+            server,
+            tmp_path,
+            "engine-owned-capture",
+        )
+        server.mixer_client = MagicMock(is_connected=True)
+        server.mixer_client.query_parameter.side_effect = (
+            lambda address, timeout: {
+                "status": "received",
+                "address": address,
+                "value": route[address],
+                "confirmed_round_trips": 2,
+            }
+        )
+        capture = MagicMock(running=True, num_channels=48)
+        capture.get_status.side_effect = [
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 1024,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+            {
+                "running": True,
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 2048,
+                "device_name": "Unit 48ch USB",
+                "device_index": 7,
+                "num_channels": 48,
+                "sample_rate": 48000,
+            },
+        ]
+        capture.get_peak.side_effect = lambda channel: {
+            47: -12.0,
+            48: -11.0,
+        }[channel]
+        server.audio_capture = None
+        server.auto_soundcheck_engine = type(
+            "Engine",
+            (),
+            {"audio_capture": capture},
+        )()
+
+        result = await server._supervised_transaction_audio_recheck(
+            MagicMock(family_id="fader", operation_id="engine-capture"),
+            {},
+            {},
+        )
+
+        assert result.status == "passed"
+        assert result.evidence["capture_owner"] == (
+            "active_auto_soundcheck_engine"
+        )
+        assert result.evidence["master_channels"] == [47, 48]
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_rejects_stale_cached_real_input(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        proof_path = tmp_path / "master-route-proof.json"
+        proof_path.write_text(
+            json.dumps(
+                {
+                    "accepted": True,
+                    "proof_id": "stale-input-proof",
+                    "console_serial": "WING-UNIT",
+                    "firmware_version": "3.0.5",
+                    "capture_device": "Unit 48ch USB",
+                    "capture_device_index": 7,
+                    "capture_channel_count": 48,
+                    "capture_sample_rate_hz": 48000,
+                    "master_channels": [47, 48],
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        server._master_capture_route_proof_path = str(proof_path)
+        server._master_capture_route_proof_sha256 = hashlib.sha256(
+            proof_path.read_bytes()
+        ).hexdigest()
+        route = {
+            "/$syscfg/$serial": "WING-UNIT",
+            "/$syscfg/$firmware": "3.0.5",
+            "/io/out/USB/47/grp": "MAIN",
+            "/io/out/USB/47/in": 0,
+            "/io/out/USB/48/grp": "MAIN",
+            "/io/out/USB/48/in": 1,
+        }
+        server.mixer_client = MagicMock(is_connected=True)
+        server.mixer_client.query_parameter.side_effect = (
+            lambda address, timeout: {
+                "status": "received",
+                "address": address,
+                "value": route[address],
+                "confirmed_round_trips": 2,
+            }
+        )
+        server.audio_capture = MagicMock(running=True, num_channels=48)
+        server.audio_capture.get_status.return_value = {
+            "running": True,
+            "real_input": False,
+            "callback_age_sec": 60.0,
+            "captured_sample_count": 9999,
+            "device_name": "Unit 48ch USB",
+            "device_index": 7,
+            "num_channels": 48,
+            "sample_rate": 48000,
+        }
+        operation = MagicMock(family_id="fader", operation_id="stale-input")
+
+        result = await server._supervised_transaction_audio_recheck(
+            operation,
+            {},
+            {},
+        )
+
+        assert result.status == "unavailable"
+        assert result.reason == "master_capture_real_input_stale_or_unavailable"
+        assert result.evidence["capture_real_input_fresh"] is False
+        server.audio_capture.get_peak.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_rejects_current_usb_route_drift(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        proof_path = tmp_path / "master-route-proof.json"
+        proof_path.write_text(
+            json.dumps(
+                {
+                    "accepted": True,
+                    "proof_id": "route-drift-proof",
+                    "console_serial": "WING-UNIT",
+                    "firmware_version": "3.0.5",
+                    "capture_device": "Unit 48ch USB",
+                    "capture_device_index": 7,
+                    "capture_channel_count": 48,
+                    "capture_sample_rate_hz": 48000,
+                    "master_channels": [47, 48],
+                },
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        server._master_capture_route_proof_path = str(proof_path)
+        server._master_capture_route_proof_sha256 = hashlib.sha256(
+            proof_path.read_bytes()
+        ).hexdigest()
+        route = {
+            "/$syscfg/$serial": "WING-UNIT",
+            "/$syscfg/$firmware": "3.0.5",
+            "/io/out/USB/47/grp": "BUS",
+            "/io/out/USB/47/in": 0,
+            "/io/out/USB/48/grp": "MAIN",
+            "/io/out/USB/48/in": 1,
+        }
+        server.mixer_client = MagicMock(is_connected=True)
+        server.mixer_client.query_parameter.side_effect = (
+            lambda address, timeout: {
+                "status": "received",
+                "address": address,
+                "value": route[address],
+                "confirmed_round_trips": 2,
+            }
+        )
+        server.audio_capture = MagicMock(running=True, num_channels=48)
+        operation = MagicMock(family_id="fader", operation_id="route-drift")
+
+        result = await server._supervised_transaction_audio_recheck(
+            operation,
+            {},
+            {},
+        )
+
+        assert result.status == "unavailable"
+        assert result.reason == "master_capture_route_physical_readback_mismatch"
+        assert result.evidence["route_verified"] is False
+        server.audio_capture.get_peak.assert_not_called()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_supervised_audio_recheck_rejects_env_flag_without_immutable_proof(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._master_capture_route_verified = True
+        server._master_capture_route_proof_id = "self-asserted-only"
+        server.audio_capture = MagicMock(running=True, num_channels=48)
+        server.audio_capture.get_peak.side_effect = lambda channel: {
+            47: -12.0,
+            48: -11.0,
+        }[channel]
+        operation = MagicMock(family_id="fader", operation_id="fader-1")
+
+        result = await server._supervised_transaction_audio_recheck(
+            operation,
+            {},
+            {},
+        )
+
+        assert result.status == "unavailable"
+        assert result.reason == "master_capture_route_proof_required"
+        assert result.evidence["route_verified"] is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_system_emergency_stop_covers_all_active_writer_variants(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         server.auto_soundcheck_engine = MagicMock()
-        server.auto_soundcheck_task = MagicMock()
-        server.mixing_agent = MagicMock()
+        legacy_cleanup_finished = asyncio.Event()
+
+        async def legacy_soundcheck():
+            try:
+                await asyncio.Event().wait()
+            finally:
+                await asyncio.sleep(0.01)
+                legacy_cleanup_finished.set()
+
+        server.auto_soundcheck_task = asyncio.create_task(legacy_soundcheck())
+        await asyncio.sleep(0)
+        agent = MagicMock()
+        server.mixing_agent = agent
         server.multi_channel_auto_eq_controller = MagicMock(spec=["stop_all"])
         server.voice_control = MagicMock(spec=["stop_listening"])
-        server.phase_alignment_controller = MagicMock(spec=["stop"])
+        server.phase_alignment_controller = MagicMock(spec=["stop_analysis"])
 
         result = await server.activate_system_emergency_stop("unit:all_writers")
 
@@ -528,11 +1907,463 @@ class TestAutoMixerServerConfigNormalization:
         assert server._manual_write_emergency_stopped is True
         assert server._manual_write_emergency_generation == 1
         assert server.auto_soundcheck_task is None
-        server.mixing_agent.emergency_stop.assert_called_once_with()
-        server.mixing_agent.stop.assert_called_once_with()
+        assert legacy_cleanup_finished.is_set()
+        agent.emergency_stop.assert_called_once_with()
+        agent.stop.assert_called_once_with()
         server.multi_channel_auto_eq_controller.stop_all.assert_called_once_with()
         server.voice_control.stop_listening.assert_called_once_with()
-        server.phase_alignment_controller.stop.assert_called_once_with()
+        server.phase_alignment_controller.stop_analysis.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_reports_engine_failure_but_closes_everything(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        server.auto_soundcheck_engine = MagicMock()
+        server.auto_soundcheck_engine.stop.side_effect = RuntimeError("thread stuck")
+        client = MagicMock()
+        client.close = AsyncMock()
+        server.connected_clients.add(client)
+        server.cleanup_all_controllers = MagicMock()
+
+        await server.graceful_shutdown()
+
+        assert server._shutdown_event.is_set()
+        assert server._shutdown_errors == [
+            {"step": "auto_soundcheck_engine", "error": "RuntimeError"}
+        ]
+        server.cleanup_all_controllers.assert_called_once_with()
+        client.close.assert_awaited_once_with(1001, "Server shutting down")
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_records_controller_cleanup_failure(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        server.gain_staging = MagicMock()
+        server.gain_staging.stop.side_effect = RuntimeError("gain stop failed")
+
+        await server.graceful_shutdown()
+
+        assert server._shutdown_event.is_set()
+        assert {"step": "controller_cleanup", "error": "RuntimeError"} in (
+            server._shutdown_errors
+        )
+        assert server.gain_staging is not None
+        assert server._controllers_cleanup_complete is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_latches_write_and_ingress_gates_before_first_await(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        stop_entered = asyncio.Event()
+        release_stop = asyncio.Event()
+
+        class BlockingTrainingService:
+            async def stop(self):
+                stop_entered.set()
+                await release_stop.wait()
+
+        server.agent_training_service = BlockingTrainingService()
+        manual_generation = server._manual_write_emergency_generation
+        ingress_generation = server._ws_ingress_emergency_generation
+
+        shutdown_task = asyncio.create_task(server.graceful_shutdown())
+        await asyncio.wait_for(stop_entered.wait(), timeout=1)
+
+        assert server._is_shutting_down is True
+        assert server._manual_write_emergency_stopped is True
+        assert server._manual_write_emergency_generation == manual_generation + 1
+        assert server._ws_ingress_emergency_generation == ingress_generation + 1
+        assert server.auto_soundcheck_running is False
+        assert server.auto_soundcheck_observe_only is True
+
+        release_stop.set()
+        await asyncio.wait_for(shutdown_task, timeout=1)
+        assert server._shutdown_errors == []
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_drains_console_write_scope_before_mixer_disconnect(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        server.agent_training_service = None
+        mixer = MagicMock()
+        server.mixer_client = mixer
+        lock_held = asyncio.Event()
+        release_lock = asyncio.Event()
+
+        async def in_flight_console_transaction():
+            async with server._console_write_lock:
+                lock_held.set()
+                await release_lock.wait()
+
+        transaction = asyncio.create_task(in_flight_console_transaction())
+        await asyncio.wait_for(lock_held.wait(), timeout=1)
+        shutdown_task = asyncio.create_task(server.graceful_shutdown())
+        await asyncio.sleep(0)
+
+        assert shutdown_task.done() is False
+        mixer.disconnect.assert_not_called()
+
+        release_lock.set()
+        await asyncio.wait_for(transaction, timeout=1)
+        await asyncio.wait_for(shutdown_task, timeout=1)
+        mixer.disconnect.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_freezes_autonomous_writers_before_client_close_await(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        server.agent_training_service = None
+        server.cleanup_all_controllers = MagicMock()
+        gain = MagicMock(spec=["set_automation_frozen", "stop"])
+        fader = MagicMock(spec=["set_automation_frozen", "stop"])
+        fader_v2 = MagicMock(spec=["set_automation_frozen", "stop"])
+        agent = MagicMock(spec=["emergency_stop", "stop"])
+        server.gain_staging = gain
+        server.auto_fader_controller = fader
+        server.auto_fader_v2_controller = fader_v2
+        server.mixing_agent = agent
+        close_entered = asyncio.Event()
+        release_close = asyncio.Event()
+
+        client = MagicMock()
+
+        async def blocked_close(*_args, **_kwargs):
+            close_entered.set()
+            await release_close.wait()
+
+        client.close = AsyncMock(side_effect=blocked_close)
+        server.connected_clients.add(client)
+
+        shutdown_task = asyncio.create_task(server.graceful_shutdown())
+        await asyncio.wait_for(close_entered.wait(), timeout=1)
+
+        gain.set_automation_frozen.assert_called_once_with(True)
+        fader.set_automation_frozen.assert_called_once_with(True)
+        fader_v2.set_automation_frozen.assert_called_once_with(True)
+        agent.emergency_stop.assert_called_once_with()
+        assert server.agent_auto_apply_enabled is False
+
+        release_close.set()
+        await asyncio.wait_for(shutdown_task, timeout=1)
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_emergency_stop_joins_safe_gain_worker_before_success(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        stop_event = threading.Event()
+        worker_finished = threading.Event()
+
+        def worker():
+            stop_event.wait(1.0)
+            worker_finished.set()
+
+        thread = threading.Thread(target=worker, daemon=True)
+        calibrator = MagicMock()
+        server.safe_gain_calibrator = calibrator
+        server._safe_gain_audio_thread_stop = stop_event
+        server._safe_gain_audio_thread = thread
+        thread.start()
+
+        result = await server.activate_system_emergency_stop("unit:safe_gain")
+
+        assert result["success"] is True
+        assert worker_finished.is_set()
+        assert thread.is_alive() is False
+        calibrator.reset.assert_called_once_with()
+        assert server.safe_gain_calibrator is None
+        assert server._safe_gain_audio_thread is None
+        assert server._safe_gain_audio_thread_stop is None
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_voice_command_after_emergency_latch_never_writes_mixer(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server.mixer_client = MagicMock()
+        server._manual_write_emergency_stopped = True
+        server.broadcast = AsyncMock()
+
+        await server._execute_voice_command({
+            "type": "set_fader",
+            "channel": 1,
+            "value": -12.0,
+        })
+
+        server.mixer_client.set_channel_fader.assert_not_called()
+        payload = server.broadcast.await_args.args[0]
+        assert payload["type"] == "voice_command_error"
+        assert payload["reason"] == "emergency_stop_active"
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_emergency_voice_stop_keeps_listening_flag_until_stream_cleanup(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+
+        class VoiceRuntime:
+            def __init__(self):
+                self.is_listening = True
+                self.stream_open = True
+
+            def stop_listening(self):
+                if not self.is_listening:
+                    return
+                self.stream_open = False
+                self.is_listening = False
+
+        voice = VoiceRuntime()
+        server.voice_control = voice
+
+        result = await server.activate_system_emergency_stop("unit:voice_stream")
+
+        assert result["success"] is True
+        assert voice.stream_open is False
+        assert voice.is_listening is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_post_latch_normal_message_never_reaches_dispatch(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        dispatched = AsyncMock()
+        server._dispatch = {"start_resource": dispatched}
+        server._is_shutting_down = True
+
+        await server.handle_client_message(object(), '{"type":"start_resource"}')
+
+        dispatched.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_graceful_shutdown_waits_for_existing_emergency_fast_lane_task(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._shutdown_event = asyncio.Event()
+        server.agent_training_service = None
+        emergency_entered = asyncio.Event()
+        release_emergency = asyncio.Event()
+
+        async def emergency_finalizer():
+            emergency_entered.set()
+            await release_emergency.wait()
+
+        emergency_task = asyncio.create_task(emergency_finalizer())
+        server._ws_emergency_fast_lane_task = emergency_task
+        await asyncio.wait_for(emergency_entered.wait(), timeout=1)
+
+        shutdown_task = asyncio.create_task(server.graceful_shutdown())
+        await asyncio.sleep(0)
+        assert shutdown_task.done() is False
+
+        release_emergency.set()
+        await asyncio.wait_for(emergency_task, timeout=1)
+        await asyncio.wait_for(shutdown_task, timeout=1)
+        assert server._shutdown_errors == []
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_duplicate_system_emergency_stop_does_not_advance_generation(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        agent = MagicMock()
+        server.mixing_agent = agent
+
+        first = await server.activate_system_emergency_stop("unit:first")
+        duplicate = await server.activate_system_emergency_stop("unit:duplicate")
+
+        assert first["coalesced"] is False
+        assert duplicate["coalesced"] is True
+        assert first["generation"] == duplicate["generation"] == 1
+        agent.emergency_stop.assert_called_once_with()
+        agent.stop.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_wal_only_latch_does_not_skip_system_emergency_teardown(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server._manual_write_emergency_stopped = True
+        server._manual_write_emergency_generation = 1
+        server._system_emergency_teardown_complete = False
+        controller = MagicMock(spec=["set_automation_frozen", "stop"])
+        server.auto_fader_controller = controller
+
+        result = await server.activate_system_emergency_stop("unit:wal_latch")
+
+        assert result["success"] is True
+        assert result["teardown_complete"] is True
+        controller.set_automation_frozen.assert_called_once_with(True)
+        controller.stop.assert_called_once_with()
+        assert server._system_emergency_teardown_complete is True
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_system_emergency_stop_drains_slow_soundcheck_off_event_loop(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        stop_started = threading.Event()
+        release_stop = threading.Event()
+
+        def slow_stop():
+            stop_started.set()
+            assert release_stop.wait(1.0)
+
+        engine = MagicMock()
+        engine.stop.side_effect = slow_stop
+        server.auto_soundcheck_engine = engine
+        server.auto_soundcheck_running = True
+
+        task = asyncio.create_task(
+            server.activate_system_emergency_stop("unit:slow-soundcheck")
+        )
+        try:
+            assert await asyncio.to_thread(stop_started.wait, 1.0)
+            await asyncio.wait_for(asyncio.sleep(0.01), timeout=0.1)
+            assert task.done() is False
+            reset = server.reset_manual_write_emergency_stop(
+                approved=True,
+                approval_id="unit-reset-too-early",
+            )
+            assert reset["status"] == "blocked"
+            assert reset["reason"] == "emergency_stop_teardown_in_progress"
+            assert server._manual_write_emergency_stopped is True
+        finally:
+            release_stop.set()
+
+        result = await asyncio.wait_for(task, timeout=1.0)
+        assert result["status"] == "stopped"
+        assert server.auto_soundcheck_engine is None
+        engine.stop.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_system_emergency_stop_continues_after_engine_failure_and_can_retry(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        engine = MagicMock()
+        engine.stop.side_effect = RuntimeError("engine stop failed")
+        server.auto_soundcheck_engine = engine
+        server.auto_soundcheck_running = True
+        agent = MagicMock()
+        server.mixing_agent = agent
+
+        first = await server.activate_system_emergency_stop("unit:engine-failure")
+
+        assert first["status"] == "stop_incomplete"
+        assert first["success"] is False
+        assert server.auto_soundcheck_engine is engine
+        agent.emergency_stop.assert_called_once_with()
+        agent.stop.assert_called_once_with()
+        reset = server.reset_manual_write_emergency_stop(
+            approved=True,
+            approval_id="unit-reset-incomplete",
+        )
+        assert reset["reason"] == "emergency_stop_teardown_incomplete"
+
+        engine.stop.side_effect = None
+        retry = await server.activate_system_emergency_stop("unit:retry")
+
+        assert retry["status"] == "stopped"
+        assert retry["success"] is True
+        assert retry["coalesced"] is True
+        assert server.auto_soundcheck_engine is None
+        assert engine.stop.call_count == 2
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_system_emergency_controller_stop_does_not_block_event_loop(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        stop_started = threading.Event()
+        release_stop = threading.Event()
+
+        def slow_stop():
+            stop_started.set()
+            assert release_stop.wait(1.0)
+
+        server.gain_staging = MagicMock()
+        server.gain_staging.stop.side_effect = slow_stop
+        task = asyncio.create_task(server.activate_system_emergency_stop("unit:slow-controller"))
+        try:
+            assert await asyncio.to_thread(stop_started.wait, 1.0)
+            await asyncio.wait_for(asyncio.sleep(0.01), timeout=0.1)
+            assert task.done() is False
+        finally:
+            release_stop.set()
+
+        result = await asyncio.wait_for(task, timeout=1.0)
+        assert result["status"] == "stopped"
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
@@ -727,8 +2558,19 @@ class TestAutoMixerServerConfigNormalization:
                 "2": {"error": "backup failed"},
             }
         }), encoding="utf-8")
+        rollback_path = tmp_path / "rollback.json"
+        rollback_path.write_text(
+            json.dumps({"channels": {}}),
+            encoding="utf-8",
+        )
 
-        await server.restore_snapshot("ws", str(snapshot_path))
+        await server.restore_snapshot(
+            "ws",
+            str(snapshot_path),
+            dry_run=False,
+            confirm_maintenance=True,
+            rollback_snapshot_path=str(rollback_path),
+        )
 
         server.send_to_client.assert_awaited_once_with("ws", {
             "type": "restore_result",
@@ -736,6 +2578,40 @@ class TestAutoMixerServerConfigNormalization:
             "error": "Snapshot does not contain any restorable channels",
             "path": str(snapshot_path),
         })
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_real_snapshot_handler_signature_and_confirmation_fail_closed(
+        self,
+        mock_config,
+        mock_bleed,
+        tmp_path,
+    ):
+        server = AutoMixerServer()
+        server.send_to_client = AsyncMock()
+        server.mixer_client = MagicMock(is_connected=True)
+        handlers = snapshot_handlers.register_handlers(server)
+        snapshot_path = tmp_path / "snapshot.json"
+        snapshot_path.write_text(
+            json.dumps({"channels": {"1": {"channel": 1, "fader": -9.0}}}),
+            encoding="utf-8",
+        )
+
+        await handlers["undo_restore_snapshot"](
+            "ws",
+            {
+                "snapshot_path": str(snapshot_path),
+                "dry_run": False,
+                "confirm_maintenance": "true",
+                "rollback_snapshot_path": str(tmp_path / "rollback.json"),
+            },
+        )
+
+        payload = server.send_to_client.await_args.args[1]
+        assert payload["type"] == "restore_result"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "maintenance_confirmation_required"
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
@@ -803,7 +2679,7 @@ class TestAutoMixerServerCleanup:
         assert server.auto_soundcheck_observe_only is False
         assert server.auto_soundcheck_task is None
         server.gain_staging.stop.assert_called_once()
-        server.phase_alignment_controller.stop.assert_called_once()
+        server.phase_alignment_controller.stop_analysis.assert_called_once()
         server.multi_channel_auto_eq_controller.stop_all.assert_called_once()
         server.auto_fader_controller.stop.assert_called_once()
         server.send_to_client.assert_awaited_once_with("ws", {
@@ -814,32 +2690,252 @@ class TestAutoMixerServerCleanup:
 
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
-    def test_cleanup_all_controllers_clears_references_even_when_stop_raises(self, mock_config, mock_bleed):
+    def test_cleanup_all_controllers_retains_failed_resources_and_reports_incomplete(self, mock_config, mock_bleed):
         server = AutoMixerServer()
         server.gain_staging = MagicMock()
         server.gain_staging.stop.side_effect = RuntimeError("gain stop failed")
         server.multi_channel_auto_eq_controller = MagicMock()
         server.multi_channel_auto_eq_controller.stop_all.side_effect = RuntimeError("eq stop failed")
         server.phase_alignment_controller = MagicMock()
-        server.phase_alignment_controller.stop.side_effect = RuntimeError("phase stop failed")
+        server.phase_alignment_controller.stop_analysis.side_effect = RuntimeError("phase stop failed")
         server.auto_fader_controller = MagicMock()
         server.auto_fader_controller.stop.side_effect = RuntimeError("fader stop failed")
 
-        server.cleanup_all_controllers()
+        with pytest.raises(RuntimeError, match="Controller cleanup incomplete"):
+            server.cleanup_all_controllers()
 
-        assert server.gain_staging is None
-        assert server.multi_channel_auto_eq_controller is None
-        assert server.phase_alignment_controller is None
-        assert server.auto_fader_controller is None
+        assert server.gain_staging is not None
+        assert server.multi_channel_auto_eq_controller is not None
+        assert server.phase_alignment_controller is not None
+        assert server.auto_fader_controller is not None
+        assert server._controllers_cleanup_complete is False
 
 
 class TestAutoMixerServerRuntimeErrors:
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_unauthenticated_network_runtime_is_forced_read_only(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer()
+        server.operator_mode = "supervised"
+        server._auto_mode_unlocked = True
+        server._wing_observation_only = False
+        server._wing_record_telemetry = True
+
+        server._activate_network_runtime_safety_boundary()
+
+        assert server.operator_mode == "analyze"
+        assert server._auto_mode_unlocked is False
+        assert server._wing_observation_only is True
+        assert server._wing_record_telemetry is False
+        assert server.get_operator_mode_status()["unauthenticated_read_only"] is True
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "message_type",
+        [
+            "set_operator_mode",
+            "create_operator_proposal",
+            "apply_operator_proposal",
+            "disconnect_mixer",
+            "set_fader",
+            "set_gain",
+        ],
+    )
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_unauthenticated_source_blocks_control_before_dispatch(
+        self,
+        mock_config,
+        mock_bleed,
+        message_type,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer()
+        server.send_to_client = AsyncMock()
+        handler = AsyncMock()
+        server._dispatch[message_type] = handler
+
+        await server.handle_client_message(
+            "ws",
+            json.dumps(
+                {
+                    "type": message_type,
+                    "mode": "supervised",
+                    "approved": True,
+                    "approval_id": "forged",
+                    "idempotency_key": "forged",
+                }
+            ),
+        )
+
+        handler.assert_not_awaited()
+        payload = server.send_to_client.await_args.args[1]
+        assert payload["type"] == "control_authentication_required"
+        assert payload["request_type"] == message_type
+        assert payload["reason"] == "authenticated_control_session_required"
+        assert payload["live_authority_granted"] is False
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_unauthenticated_source_allows_only_explicit_observation_connect(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer()
+        server.send_to_client = AsyncMock()
+        handler = AsyncMock()
+        server._dispatch["connect_wing"] = handler
+
+        await server.handle_client_message(
+            "ws",
+            json.dumps({"type": "connect_wing", "ip": "192.0.2.1"}),
+        )
+        handler.assert_not_awaited()
+        assert server.send_to_client.await_args.args[1]["status"] == "blocked"
+
+        server.send_to_client.reset_mock()
+        await server.handle_client_message(
+            "ws",
+            json.dumps(
+                {
+                    "type": "connect_wing",
+                    "ip": "192.0.2.1",
+                    "observation_only": True,
+                }
+            ),
+        )
+        handler.assert_awaited_once()
+        server.send_to_client.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_unauthenticated_source_allows_read_queries_and_meters(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer()
+        server.send_to_client = AsyncMock()
+        get_handler = AsyncMock()
+        meter_handler = AsyncMock()
+        server._dispatch["get_dashboard_snapshot"] = get_handler
+        server._dispatch["subscribe_meters"] = meter_handler
+
+        await server.handle_client_message(
+            "ws",
+            '{"type":"get_dashboard_snapshot"}',
+        )
+        await server.handle_client_message(
+            "ws",
+            '{"type":"subscribe_meters"}',
+        )
+
+        get_handler.assert_awaited_once()
+        meter_handler.assert_awaited_once()
+        server.send_to_client.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_unauthenticated_future_get_name_is_blocked_by_default(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("AUTOMIXER_WS_AUTH_TOKEN", None)
+            server = AutoMixerServer()
+        server.send_to_client = AsyncMock()
+        handler = AsyncMock()
+        server._dispatch["get_future_control_surface"] = handler
+
+        await server.handle_client_message(
+            "ws",
+            '{"type":"get_future_control_surface"}',
+        )
+
+        handler.assert_not_awaited()
+        assert server.send_to_client.await_args.args[1]["status"] == "blocked"
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_unauthenticated_read_allowlist_matches_real_dispatch(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        assert server_module.UNAUTHENTICATED_READ_ONLY_MESSAGE_TYPES <= set(
+            server._dispatch
+        )
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_authenticated_source_control_reaches_dispatch(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        with patch.dict(
+            os.environ,
+            {"AUTOMIXER_WS_AUTH_TOKEN": "a" * 43},
+            clear=False,
+        ):
+            server = AutoMixerServer()
+        handler = AsyncMock()
+        server._dispatch["set_operator_mode"] = handler
+
+        await server.handle_client_message(
+            "ws",
+            '{"type":"set_operator_mode","mode":"supervised"}',
+        )
+
+        handler.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_handle_client_message_does_not_info_log_payload(
+        self,
+        mock_config,
+        mock_bleed,
+        caplog,
+    ):
+        server = AutoMixerServer()
+        server._ws_auth_required = True
+        server._dispatch["safe_noop"] = AsyncMock()
+        secret_marker = "must-not-enter-info-logs"
+        caplog.set_level("INFO", logger="server")
+
+        await server.handle_client_message(
+            "ws",
+            json.dumps({"type": "safe_noop", "private": secret_marker}),
+        )
+
+        assert secret_marker not in caplog.text
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_handle_client_message_reraises_cancelled_error(self, mock_config, mock_bleed):
         server = AutoMixerServer()
+        server._ws_auth_required = True
         server.send_to_client = AsyncMock()
         cancelling_handler = AsyncMock(side_effect=asyncio.CancelledError())
         server._dispatch["cancel_me"] = cancelling_handler
@@ -854,6 +2950,7 @@ class TestAutoMixerServerRuntimeErrors:
     @patch.object(AutoMixerServer, "_load_config", return_value={})
     async def test_handle_client_message_ignores_closed_socket_when_reporting_error(self, mock_config, mock_bleed):
         server = AutoMixerServer()
+        server._ws_auth_required = True
         failing_handler = AsyncMock(side_effect=RuntimeError("boom"))
         server._dispatch["explode"] = failing_handler
         server.send_to_client = AsyncMock(side_effect=Exception("connection closed"))
@@ -1828,6 +3925,7 @@ class DummyWingLike:
                 "status": "received",
                 "address": address,
                 "value": self.state.get(address),
+                "confirmed_round_trips": 2,
             }
         )
         self.set_channel_fader = MagicMock(
@@ -1907,6 +4005,28 @@ class TestWingDeploymentWriteBoundary:
         assert websocket.send.await_count >= 1
         raw = websocket.send.await_args_list[-1].args[0]
         return json.loads(raw)
+
+    @staticmethod
+    async def _apply_manual_write(
+        server,
+        *,
+        channel=1,
+        value=-6.0,
+        value_type="fader",
+        approval_id="unit-approval",
+        **kwargs,
+    ):
+        return await server._apply_manual_console_write(
+            None,
+            channel=channel,
+            value=value,
+            value_type=value_type,
+            source="unit:canonical_operator_proposal_path",
+            reason="unit canonical proposal path",
+            approved=True,
+            approval_id=approval_id,
+            **kwargs,
+        )
 
     @staticmethod
     def _assert_quarantined_operator_correction(payload, method_id, blocked_actions):
@@ -2706,7 +4826,7 @@ class TestWingDeploymentWriteBoundary:
         controller.apply_to_mixer.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_websocket_fader_requires_supervised_approval_for_wing(self, dummy_wing_server):
+    async def test_websocket_fader_requires_canonical_operator_proposal_for_wing(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
         websocket = MagicMock()
@@ -2718,7 +4838,35 @@ class TestWingDeploymentWriteBoundary:
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "manual_write_blocked"
         assert payload["status"] == "blocked"
-        assert payload["reason"] == "approval_required"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("approved", [1, "true", "false", {}, []])
+    async def test_websocket_manual_write_rejects_non_literal_approval(
+        self,
+        dummy_wing_server,
+        approved,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_fader"](
+            websocket,
+            {
+                "channel": 1,
+                "value": -6.0,
+                "approved": approved,
+                "approval_id": "non-literal-approval",
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
@@ -2738,12 +4886,12 @@ class TestWingDeploymentWriteBoundary:
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "manual_write_blocked"
         assert payload["status"] == "blocked"
-        assert payload["reason"] == "wing_observation_only_active"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
         assert payload["manual_write_supervision"]["wing_observation_only"] is True
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_websocket_fader_routes_approved_write_through_manual_gate(self, dummy_wing_server):
+    async def test_websocket_fader_approved_payload_cannot_bypass_operator_proposal(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
         websocket = MagicMock()
@@ -2756,19 +4904,88 @@ class TestWingDeploymentWriteBoundary:
         )
 
         payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_applied"
-        assert payload["status"] == "applied"
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
         assert payload["value_type"] == "fader"
-        assert payload["old_value"] == -8.0
-        assert payload["pre_read_status"] == "verified_from_physical_readback"
-        assert payload["pre_read_source"] == "physical_readback"
-        assert payload["readback_status"] == "verified_from_physical_readback"
-        assert payload["readback_value"] == -6.0
-        assert payload["proof_status"] == "verified"
-        assert payload["rollback_available"] is True
-        assert payload["rollback_value"] == -8.0
-        assert payload["rollback_status"] == "not_attempted"
-        server.mixer_client.set_channel_fader.assert_called_once_with(1, -6.0)
+        server.mixer_client.query_parameter.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_websocket_gain_approved_payload_cannot_bypass_operator_proposal(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["set_gain"](
+            websocket,
+            {"channel": 1, "value": 12.0, "approved": True, "approval_id": "unit-gain-bypass"},
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
+        assert payload["value_type"] == "gain"
+        server.mixer_client.query_parameter.assert_not_called()
+        server.mixer_client.set_channel_gain.assert_not_called()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("message_type", "value", "mixer_method"),
+        [
+            ("set_fader", -6.0, "set_channel_fader"),
+            ("set_gain", 12.0, "set_channel_gain"),
+        ],
+    )
+    async def test_direct_wing_write_stays_proposal_only_when_legacy_boundary_flag_is_disabled(
+        self,
+        dummy_wing_server,
+        message_type,
+        value,
+        mixer_method,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers[message_type](
+            websocket,
+            {
+                "channel": 1,
+                "value": value,
+                "approved": True,
+                "approval_id": "unit-disabled-flag-bypass",
+                "confirm_live_apply": True,
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
+        server.mixer_client.query_parameter.assert_not_called()
+        getattr(server.mixer_client, mixer_method).assert_not_called()
+
+    def test_real_wing_safety_boundary_cannot_be_disabled_by_legacy_flag(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+
+        assert server._is_wing_deployment_write_boundary_active() is True
+        status = server.get_operator_mode_status()
+        assert status["capabilities"]["can_apply_to_console"] is False
+        assert status["capabilities"]["allowed_live_write_kinds"] == []
 
     @pytest.mark.asyncio
     async def test_websocket_mute_is_quarantined_for_wing_boundary(self, dummy_wing_server):
@@ -3498,10 +5715,9 @@ class TestWingDeploymentWriteBoundary:
         payload = self._decode_last_message(websocket)
         assert payload["type"] == "manual_write_blocked"
         assert payload["status"] == "blocked"
-        assert payload["reason"] == "operator_mode_blocks_live_write"
+        assert payload["reason"] == "direct_wing_write_requires_operator_proposal"
         assert payload["approval_id"] == "unit-auto-wing"
         assert payload["manual_write_supervision"]["deployment_write_boundary_active"] is True
-        assert payload["allowed_live_write_kinds"] == []
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
@@ -3553,12 +5769,13 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_operator_proposal_apply_is_allowed_for_auto_mode_when_wing_boundary_disabled(self, dummy_wing_server):
+    async def test_operator_proposal_apply_is_allowed_for_auto_mode_on_non_wing_connection(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "auto"
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time()
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -3596,6 +5813,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-noboundary",
             },
         )
@@ -3615,6 +5833,9 @@ class TestWingDeploymentWriteBoundary:
             reason="unit",
             approved=True,
             approval_id=proposal_id,
+            idempotency_key="unit-auto-noboundary",
+            proposal_id=proposal_id,
+            expected_current_value=-8.0,
         )
 
     @pytest.mark.asyncio
@@ -3624,6 +5845,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state["/ch/1/in/set/trim"] = 0.0
         server.mixer_client.state_timestamps["/ch/1/in/set/trim"] = time.time()
         websocket = MagicMock()
@@ -3685,6 +5907,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-wing-surface-match",
             },
         )
@@ -3702,6 +5925,9 @@ class TestWingDeploymentWriteBoundary:
             reason="unit",
             approved=True,
             approval_id=proposal_id,
+            idempotency_key="unit-wing-surface-match",
+            proposal_id=proposal_id,
+            expected_current_value=0.0,
         )
 
     @pytest.mark.asyncio
@@ -3711,6 +5937,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -3760,6 +5987,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-wing-surface-mismatch",
             },
         )
@@ -3806,6 +6034,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state[address] = old_value
         server.mixer_client.state_timestamps[address] = time.time()
         websocket = MagicMock()
@@ -3842,6 +6071,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "operator_authored": True,
                 "idempotency_key": f"unit-wing-proof-positive-{value_type}-preflight",
             },
@@ -3849,16 +6079,15 @@ class TestWingDeploymentWriteBoundary:
         preflight_payload = self._decode_last_message(websocket)
         assert preflight_payload["type"] == "operator_proposal_apply_preflight"
         assert preflight_payload["status"] == "blocked"
-        assert preflight_payload["reason"] == "wing_proof_direction_requires_negative_delta"
+        assert preflight_payload["reason"] == "upward_move_requires_operator_authored_proposal"
         assert preflight_payload["delta_db"] == pytest.approx(round(target_value - old_value, 3))
-        assert preflight_payload["proof_direction"] == proof_direction
-        assert preflight_payload["expected_wing_surface_contract"]["wing_address"] == address
 
         await server._dispatch["apply_operator_proposal"](
             websocket,
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "operator_authored": True,
                 "idempotency_key": f"unit-wing-proof-positive-{value_type}",
             },
@@ -3868,10 +6097,8 @@ class TestWingDeploymentWriteBoundary:
         assert apply_payload["type"] == "operator_proposal_apply_blocked"
         assert apply_payload["status"] == "apply_blocked"
         apply_result = apply_payload["apply_result"]
-        assert apply_result["reason"] == "wing_proof_direction_requires_negative_delta"
+        assert apply_result["reason"] == "upward_move_requires_operator_authored_proposal"
         assert apply_result["delta_db"] == pytest.approx(round(target_value - old_value, 3))
-        assert apply_result["proof_direction"] == proof_direction
-        assert apply_result["expected_wing_surface_contract"]["wing_address"] == address
         server._apply_manual_console_write.assert_not_called()
         server.mixer_client.set_channel_gain.assert_not_called()
         server.mixer_client.set_channel_fader.assert_not_called()
@@ -3883,6 +6110,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         now = time.time()
         server.mixer_client.state["/ch/1/fdr"] = -8.0
         server.mixer_client.state_timestamps["/ch/1/fdr"] = now
@@ -3927,6 +6155,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-linked-wing-surface-mismatch",
             },
         )
@@ -3949,6 +6178,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state.update({
             "/ch/1/fdr": -9.0,
             "/ch/2/fdr": -9.0,
@@ -3958,8 +6188,7 @@ class TestWingDeploymentWriteBoundary:
             "/ch/1/fdr": now,
             "/ch/2/fdr": now,
         })
-        server._apply_manual_console_write = AsyncMock(
-            side_effect=[
+        apply_results = [
                 {
                     "status": "applied",
                     "success": True,
@@ -3985,6 +6214,28 @@ class TestWingDeploymentWriteBoundary:
                     "rollback_value": -9.0,
                 },
             ]
+
+        async def physical_read(*, address, **_kwargs):
+            return {
+                "value": server.mixer_client.state.get(address),
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "cache_freshness": {"status": "fresh"},
+            }
+
+        async def apply_with_state_update(*_args, **kwargs):
+            result = apply_results.pop(0)
+            if result.get("status") == "applied":
+                address = server._manual_write_address(
+                    kwargs["channel"],
+                    kwargs["value_type"],
+                )
+                server.mixer_client.state[address] = result["effective_value"]
+            return result
+
+        server._manual_write_read_value = AsyncMock(side_effect=physical_read)
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=apply_with_state_update
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4009,6 +6260,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-idemp",
             },
         )
@@ -4022,13 +6274,15 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-idemp",
             },
         )
         second_apply_payload = self._decode_last_message(websocket)
         assert second_apply_payload["type"] == "operator_proposal_apply_blocked"
         assert second_apply_payload["status"] == "blocked"
-        assert second_apply_payload["reason"] == "duplicate_idempotency_key"
+        assert second_apply_payload["reason"] == "proposal_not_pending"
+        assert "unit-auto-linked-idemp" in server._operator_apply_idempotency_keys
         assert server._apply_manual_console_write.await_count == 2
 
     @pytest.mark.asyncio
@@ -4038,6 +6292,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time() - 120.0
         server.mixer_client.query_parameter = None
         websocket = MagicMock()
@@ -4064,6 +6319,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-stale",
             },
         )
@@ -4084,6 +6340,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state_timestamps["/ch/1/in/set/trim"] = time.time() - 120.0
         server.mixer_client.query_parameter = None
         websocket = MagicMock()
@@ -4110,6 +6367,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-stale-gain",
             },
         )
@@ -4130,6 +6388,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = None
         websocket = MagicMock()
@@ -4156,6 +6415,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-no-read-gain",
             },
         )
@@ -4176,6 +6436,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -4200,6 +6461,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-unsupported-type",
             },
         )
@@ -4223,6 +6485,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -4249,6 +6512,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-unsupported-linked",
             },
         )
@@ -4272,6 +6536,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server._apply_manual_console_write = AsyncMock()
@@ -4300,6 +6565,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-missing-read",
             },
         )
@@ -4325,6 +6591,7 @@ class TestWingDeploymentWriteBoundary:
         server._auto_mode_unlocked = True
         server._wing_deployment_write_boundary_enabled = False
         server._wing_observation_only = False
+        server.connection_mode = "offline"
         websocket = MagicMock()
         websocket.send = AsyncMock()
         server.mixer_client.state.update({
@@ -4353,8 +6620,7 @@ class TestWingDeploymentWriteBoundary:
         assert create_payload["type"] == "operator_proposal_created"
         assert create_payload["status"] == "created"
         proposal_id = create_payload["proposal"]["id"]
-        server._apply_manual_console_write = AsyncMock(
-            side_effect=[
+        apply_results = [
                 {
                     "status": "applied",
                     "success": True,
@@ -4394,6 +6660,28 @@ class TestWingDeploymentWriteBoundary:
                     "rollback": True,
                 },
             ]
+
+        async def physical_read(*, address, **_kwargs):
+            return {
+                "value": server.mixer_client.state.get(address),
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "cache_freshness": {"status": "fresh"},
+            }
+
+        async def apply_with_state_update(*_args, **kwargs):
+            result = apply_results.pop(0)
+            if result.get("status") == "applied":
+                address = server._manual_write_address(
+                    kwargs["channel"],
+                    kwargs["value_type"],
+                )
+                server.mixer_client.state[address] = result["effective_value"]
+            return result
+
+        server._manual_write_read_value = AsyncMock(side_effect=physical_read)
+        server._apply_manual_console_write = AsyncMock(
+            side_effect=apply_with_state_update
         )
 
         await server._dispatch["apply_operator_proposal"](
@@ -4401,6 +6689,7 @@ class TestWingDeploymentWriteBoundary:
             {
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": proposal_id,
                 "idempotency_key": "unit-auto-linked-fail",
             },
         )
@@ -4435,17 +6724,11 @@ class TestWingDeploymentWriteBoundary:
         server.operator_mode = "supervised"
         server.mixer_client.state_timestamps["/ch/1/fdr"] = time.time() - 120.0
         server.mixer_client.query_parameter = None
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-stale-cache"},
+        payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-stale-cache",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_blocked"
         assert payload["status"] == "blocked"
         assert payload["reason"] == "pre_read_cache_not_fresh"
         assert payload["pre_read_status"] == "verified_from_cache"
@@ -4460,21 +6743,17 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.operator_mode = "supervised"
         server._manual_write_cooldown_sec = 10.0
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-approval-1"},
+        first = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-approval-1",
         )
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -5.0, "approved": True, "approval_id": "unit-approval-2"},
+        payload = await self._apply_manual_write(
+            server,
+            value=-5.0,
+            approval_id="unit-approval-2",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_blocked"
+        assert first["status"] == "applied"
         assert payload["status"] == "blocked"
         assert payload["reason"] == "cooldown"
         assert payload["cooldown_sec"] == 10.0
@@ -4485,23 +6764,18 @@ class TestWingDeploymentWriteBoundary:
     async def test_websocket_gain_reports_physical_readback_and_rollback_metadata(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
         def apply_gain(channel, value):
             server.mixer_client.state[f"/ch/{channel}/in/set/trim"] = value
             return True
 
         server.mixer_client.set_channel_gain.side_effect = apply_gain
 
-        await handlers["set_gain"](
-            websocket,
-            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-gain"},
+        payload = await self._apply_manual_write(
+            server,
+            value=2.0,
+            value_type="gain",
+            approval_id="unit-gain",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_applied"
         assert payload["status"] == "applied"
         assert payload["value_type"] == "gain"
         assert payload["old_value"] == 1.0
@@ -4525,23 +6799,18 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.state = {"/ch/1/in/set/trim": 1.0}
         server.mixer_client.state_timestamps = {"/ch/1/in/set/trim": time.time()}
         server.mixer_client.query_parameter = None
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
         def apply_gain_without_timestamp(channel, value):
             server.mixer_client.state[f"/ch/{channel}/in/set/trim"] = value
             return True
 
         server.mixer_client.set_channel_gain.side_effect = apply_gain_without_timestamp
 
-        await handlers["set_gain"](
-            websocket,
-            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-gain-cache-not-updated"},
+        payload = await self._apply_manual_write(
+            server,
+            value=2.0,
+            value_type="gain",
+            approval_id="unit-gain-cache-not-updated",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_unverified"
         assert payload["status"] == "sent_unverified"
         assert payload["readback_value"] is None
         assert payload["readback_status"] == "readback_unavailable"
@@ -4558,7 +6827,7 @@ class TestWingDeploymentWriteBoundary:
         physical = {"/ch/1/in/set/trim": 1.0}
 
         def query_parameter(address):
-            return {"status": "received", "address": address, "value": physical.get(address)}
+            return {"status": "received", "address": address, "value": physical.get(address), "confirmed_round_trips": 2}
 
         def apply_gain(channel, value):
             physical[f"/ch/{channel}/in/set/trim"] = value
@@ -4566,17 +6835,12 @@ class TestWingDeploymentWriteBoundary:
 
         server.mixer_client.query_parameter = MagicMock(side_effect=query_parameter)
         server.mixer_client.set_channel_gain.side_effect = apply_gain
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_gain"](
-            websocket,
-            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-gain-physical"},
+        payload = await self._apply_manual_write(
+            server,
+            value=2.0,
+            value_type="gain",
+            approval_id="unit-gain-physical",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_applied"
         assert payload["status"] == "applied"
         assert payload["old_value"] == 1.0
         assert payload["pre_read_status"] == "verified_from_physical_readback"
@@ -4590,6 +6854,131 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_gain.assert_called_once_with(1, 2.0)
 
     @pytest.mark.asyncio
+    async def test_manual_physical_read_rejects_numeric_value_without_verified_query_contract(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+
+        for raw in (
+            {"status": "timeout", "value": -8.0, "confirmed_round_trips": 2},
+            {"status": "error", "value": -8.0, "confirmed_round_trips": 2},
+            {"status": "received", "value": -8.0},
+            {"status": "received", "value": -8.0, "confirmed_round_trips": 1},
+            {"status": "received", "value": -8.0, "confirmed_round_trips": True},
+            {"status": "received", "value": -8.0, "confirmed_round_trips": "2"},
+            {
+                "status": "received",
+                "address": "/ch/2/fdr",
+                "value": -8.0,
+                "confirmed_round_trips": 2,
+            },
+        ):
+            server.mixer_client.query_parameter = MagicMock(return_value=raw)
+            result = await server._manual_write_read_value(
+                channel=1,
+                value_type="fader",
+                address="/ch/1/fdr",
+                prefer_physical=True,
+                allow_cache_fallback=False,
+            )
+            assert result["status"] == "readback_unavailable"
+            assert result["source"] == "physical_readback"
+            assert result["value"] is None
+            assert result["error"] == "physical_query_contract_unverified"
+
+    @pytest.mark.asyncio
+    async def test_sync_physical_query_does_not_block_asyncio_event_loop(self, dummy_wing_server):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        query_started = threading.Event()
+        release_query = threading.Event()
+
+        def blocking_query(address):
+            query_started.set()
+            release_query.wait(timeout=1.0)
+            return {
+                "status": "received",
+                "address": address,
+                "value": -8.0,
+                "confirmed_round_trips": 2,
+            }
+
+        server.mixer_client.query_parameter = blocking_query
+        timer = threading.Timer(0.3, release_query.set)
+        timer.start()
+        started_at = time.monotonic()
+        try:
+            read_task = asyncio.create_task(
+                server._manual_write_read_value(
+                    channel=1,
+                    value_type="fader",
+                    address="/ch/1/fdr",
+                    prefer_physical=True,
+                    allow_cache_fallback=False,
+                )
+            )
+            while not query_started.is_set():
+                await asyncio.sleep(0.005)
+
+            # If query_parameter runs on the event-loop thread, this checkpoint
+            # cannot execute until the 300 ms safety timer releases the query.
+            await asyncio.sleep(0)
+            assert time.monotonic() - started_at < 0.20
+
+            release_query.set()
+            result = await asyncio.wait_for(read_task, timeout=1.0)
+        finally:
+            release_query.set()
+            timer.cancel()
+
+        assert result["status"] == "verified_from_physical_readback"
+        assert result["value"] == -8.0
+
+    @pytest.mark.asyncio
+    async def test_cancelled_sync_physical_query_drains_worker_before_task_exits(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.mixer_client.state = {}
+        query_started = threading.Event()
+        release_query = threading.Event()
+
+        def blocking_query(address):
+            query_started.set()
+            release_query.wait(timeout=1.0)
+            return {
+                "status": "received",
+                "address": address,
+                "value": -8.0,
+                "confirmed_round_trips": 2,
+            }
+
+        server.mixer_client.query_parameter = blocking_query
+        task = asyncio.create_task(
+            server._manual_write_read_value(
+                channel=1,
+                value_type="fader",
+                address="/ch/1/fdr",
+                prefer_physical=True,
+                allow_cache_fallback=False,
+            )
+        )
+        try:
+            while not query_started.is_set():
+                await asyncio.sleep(0.005)
+            task.cancel()
+            await asyncio.sleep(0.02)
+            assert task.done() is False
+            release_query.set()
+            with pytest.raises(asyncio.CancelledError):
+                await asyncio.wait_for(task, timeout=1.0)
+        finally:
+            release_query.set()
+
+    @pytest.mark.asyncio
     async def test_websocket_gain_accepts_wing_trim_quantized_physical_readback(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
@@ -4597,7 +6986,7 @@ class TestWingDeploymentWriteBoundary:
         physical = {"/ch/4/in/set/trim": 0.0}
 
         def query_parameter(address):
-            return {"status": "received", "address": address, "value": physical.get(address)}
+            return {"status": "received", "address": address, "value": physical.get(address), "confirmed_round_trips": 2}
 
         def apply_gain(channel, value):
             physical[f"/ch/{channel}/in/set/trim"] = -0.1999988555908203
@@ -4605,17 +6994,13 @@ class TestWingDeploymentWriteBoundary:
 
         server.mixer_client.query_parameter = MagicMock(side_effect=query_parameter)
         server.mixer_client.set_channel_gain.side_effect = apply_gain
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_gain"](
-            websocket,
-            {"channel": 4, "value": -0.25, "approved": True, "approval_id": "unit-gain-quantized"},
+        payload = await self._apply_manual_write(
+            server,
+            channel=4,
+            value=-0.25,
+            value_type="gain",
+            approval_id="unit-gain-quantized",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_applied"
         assert payload["status"] == "applied"
         assert payload["old_value"] == 0.0
         assert payload["readback_value"] == -0.1999988555908203
@@ -4629,7 +7014,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/3/in/set/trim", "value": 1.25}
+            return_value={
+                "status": "received",
+                "address": "/ch/3/in/set/trim",
+                "value": 1.25,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4660,13 +7050,48 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.set_channel_mute.assert_not_called()
 
     @pytest.mark.asyncio
+    async def test_query_mixer_parameter_never_promotes_cache_after_physical_timeout(
+        self, dummy_wing_server
+    ):
+        server = dummy_wing_server
+        server.mixer_client.state = {"/ch/3/fdr": -12.1}
+        server.mixer_client.query_parameter = MagicMock(
+            return_value={"status": "timeout", "address": "/ch/3/fdr", "value": None}
+        )
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        await handlers["query_mixer_parameter"](
+            websocket,
+            {
+                "request_id": "m005:stale-probe",
+                "channel": 3,
+                "value_type": "fader",
+                "address": "/ch/3/fdr",
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["type"] == "mixer_parameter_value"
+        assert payload["status"] == "readback_unavailable"
+        assert payload["source"] == "physical_readback"
+        assert payload["value"] is None
+        assert payload["raw"]["status"] == "timeout"
+
+    @pytest.mark.asyncio
     async def test_query_mixer_parameter_reads_dsp_health_paths_without_writing(
         self, dummy_wing_server
     ):
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/3/gate/thr", "value": -42.0}
+            return_value={
+                "status": "received",
+                "address": "/ch/3/gate/thr",
+                "value": -42.0,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4721,7 +7146,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": address, "value": value}
+            return_value={
+                "status": "received",
+                "address": address,
+                "value": value,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4776,7 +7206,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/3/mute", "value": 1}
+            return_value={
+                "status": "received",
+                "address": "/ch/3/mute",
+                "value": 1,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4811,7 +7246,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/3/pan", "value": -25.0}
+            return_value={
+                "status": "received",
+                "address": "/ch/3/pan",
+                "value": -25.0,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4846,7 +7286,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/12/pan", "value": -40.0}
+            return_value={
+                "status": "received",
+                "address": "/ch/12/pan",
+                "value": -40.0,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4880,7 +7325,12 @@ class TestWingDeploymentWriteBoundary:
         server = dummy_wing_server
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
-            return_value={"status": "received", "address": "/ch/8/pan", "value": 30.0}
+            return_value={
+                "status": "received",
+                "address": "/ch/8/pan",
+                "value": 30.0,
+                "confirmed_round_trips": 2,
+            }
         )
         websocket = MagicMock()
         websocket.send = AsyncMock()
@@ -4943,17 +7393,12 @@ class TestWingDeploymentWriteBoundary:
         server.mixer_client.query_parameter = MagicMock(
             return_value={"status": "timeout", "address": "/ch/1/in/set/trim", "value": None}
         )
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_gain"](
-            websocket,
-            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-gain-missing-read"},
+        payload = await self._apply_manual_write(
+            server,
+            value=2.0,
+            value_type="gain",
+            approval_id="unit-gain-missing-read",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_blocked"
         assert payload["status"] == "blocked"
         assert payload["reason"] == "pre_read_unavailable"
         assert payload["pre_read_status"] == "readback_unavailable"
@@ -4965,17 +7410,11 @@ class TestWingDeploymentWriteBoundary:
     async def test_websocket_fader_blocks_outside_supervised_mode_for_wing(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "assist"
-        websocket = MagicMock()
-        websocket.send = AsyncMock()
-        handlers = mixer_handlers.register_handlers(server)
-
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-approval"},
+        payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-approval",
         )
-
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_blocked"
         assert payload["reason"] == "operator_mode_blocks_live_write"
         server.mixer_client.set_channel_fader.assert_not_called()
 
@@ -5505,16 +7944,16 @@ class TestWingDeploymentWriteBoundary:
         websocket = MagicMock()
         websocket.send = AsyncMock()
         automation = automation_handlers.register_handlers(server)
-        mixer = mixer_handlers.register_handlers(server)
 
         await automation["emergency_stop"](websocket, {})
-        await mixer["set_gain"](
-            websocket,
-            {"channel": 1, "value": 2.0, "approved": True, "approval_id": "unit-approval"},
+        payload = await self._apply_manual_write(
+            server,
+            value=2.0,
+            value_type="gain",
+            approval_id="unit-approval",
         )
 
-        payload = self._decode_last_message(websocket)
-        assert payload["type"] == "manual_write_blocked"
+        assert payload["status"] == "blocked"
         assert payload["reason"] == "emergency_stop_active"
         server.mixer_client.set_channel_gain.assert_not_called()
 
@@ -5611,11 +8050,11 @@ class TestWingDeploymentWriteBoundary:
             return True
 
         server.mixer_client.set_channel_fader.side_effect = apply_fader
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
             {
@@ -5632,6 +8071,43 @@ class TestWingDeploymentWriteBoundary:
         assert server.mixer_client.set_channel_fader.call_count == 1
 
     @pytest.mark.asyncio
+    async def test_rollback_last_manual_write_rejects_string_false_approval(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "supervised"
+        server._manual_write_cooldown_sec = 0.0
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        handlers = mixer_handlers.register_handlers(server)
+
+        def apply_fader(channel, value):
+            server.mixer_client.state[f"/ch/{channel}/fdr"] = value
+            return True
+
+        server.mixer_client.set_channel_fader.side_effect = apply_fader
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
+        )
+
+        await handlers["rollback_last_manual_write"](
+            websocket,
+            {
+                "approved": "false",
+                "approval_id": "rollback-string-false",
+                "transaction_id": apply_payload["transaction_id"],
+            },
+        )
+
+        payload = self._decode_last_message(websocket)
+        assert payload["status"] == "blocked"
+        assert payload["reason"] == "approval_required"
+        assert server.mixer_client.set_channel_fader.call_count == 1
+
+    @pytest.mark.asyncio
     async def test_rollback_last_manual_write_blocks_when_pre_read_times_out(self, dummy_wing_server):
         server = dummy_wing_server
         server.operator_mode = "supervised"
@@ -5640,11 +8116,11 @@ class TestWingDeploymentWriteBoundary:
         websocket.send = AsyncMock()
         handlers = mixer_handlers.register_handlers(server)
 
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
 
         server.mixer_client.state = {}
         server.mixer_client.query_parameter = MagicMock(
@@ -5679,11 +8155,11 @@ class TestWingDeploymentWriteBoundary:
         websocket.send = AsyncMock()
         handlers = mixer_handlers.register_handlers(server)
 
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-cas-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-cas-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
         server.mixer_client.state["/ch/1/fdr"] = -5.0
 
         await handlers["rollback_last_manual_write"](
@@ -5718,11 +8194,11 @@ class TestWingDeploymentWriteBoundary:
 
         server.mixer_client.set_channel_fader.side_effect = apply_fader
 
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
             {
@@ -5775,11 +8251,11 @@ class TestWingDeploymentWriteBoundary:
 
         server.mixer_client.set_channel_fader.side_effect = apply_fader
 
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
             {
@@ -5817,11 +8293,11 @@ class TestWingDeploymentWriteBoundary:
 
         server.mixer_client.set_channel_fader.side_effect = apply_then_leave_stale
 
-        await handlers["set_fader"](
-            websocket,
-            {"channel": 1, "value": -6.0, "approved": True, "approval_id": "unit-apply"},
+        apply_payload = await self._apply_manual_write(
+            server,
+            value=-6.0,
+            approval_id="unit-apply",
         )
-        apply_payload = self._decode_last_message(websocket)
         await handlers["rollback_last_manual_write"](
             websocket,
             {

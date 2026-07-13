@@ -1,22 +1,166 @@
 # Current State
 
-Generated: 2026-07-05T02:51:16Z
+Generated: 2026-07-12T22:48:19Z
+
+## Soundcheck execution P1 closure — 2026-07-12
+
+- Local staged execution kernel: `96/100`.
+- Strict real-live soundcheck readiness: `88/100`; target `95/100` not met.
+- Full-project local engineering remains `95/100`; strict public release
+  remains `88/100` and false.
+- The archived 51-operation plan had 39 physical changes and 12
+  already-satisfied operations. Before this repair, 15 local residuals would
+  have blocked the monolithic transaction and executed `0/51`.
+- Parent/child decomposition, local versus global blockers, bounded replans,
+  down-only fader-vector translation, content identity, approval/deadline
+  revocation, per-source path proof and honest terminal readiness are now
+  implemented and covered by adversarial tests.
+- Stage-local reanalysis is candidate-based and atomic across engine, server,
+  journal and queue. Accepted bundle identity is frozen, observation shadow is
+  transactional/default-deny, and failed/cancelled attempts retry from the
+  same base revision. Independent final review found no remaining P0/P1/P2 in
+  this implementation scope.
+- Normal live allowlist, live safety rows and release-ready family count remain
+  `0`. No WING contact or live write occurred in this repair pass.
+- Post-lease no-WING evidence at
+  `artifacts/no_wing_release_check/20260712T224514Z_no_wing_release_check`
+  passed `66/66` checks and detached manifest verification with no WING/backend
+  contact and all five canonical stores unchanged.
+- Current-tree physical staged proof, real `safe_core_ready`, real
+  `show_mix_ready`, actual WING path-query latency, broader constructive
+  alternatives, current-source M005 provenance/M006 technical promotion and
+  room/PA release validation remain open.
+
+Canonical report:
+`Docs/reports/SOUNDCHECK_PLAN_DECOMPOSITION_20260712.md`.
+
+## Earlier final engineering checkpoint — 2026-07-12
+
+- Local engineering readiness is `95/100`; the requested local target is met.
+- The current strict pre-release score is `88/100`; the threshold remains
+  `95/100`, public release ready: `false` (scope: no standing supervised
+  transaction authority).
+- M005 disconnect/timeout/stale-state behavior is closed by
+  `artifacts/wing_timeout_disconnect_proof/20260711T131505Z_wing_m005_disconnect_timeout_stale_proof/summary.json`
+  and the owner's confirmation. It is not yet rebound to current-source public
+  release provenance; this does not require another cable pull for the local
+  engineering score.
+- The narrow M006 owner decision is recorded at
+  `artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_20260712T095437Z.json`.
+  Its technical verifier remains blocked with
+  `reason=m006_owner_decision_failed_closed` on current-source M005 provenance;
+  readiness-matrix update and live authority remain false.
+- Final backend verification: `6364 passed, 1 skipped` in `378.90s`; frontend:
+  `190` unit/contracts, production build and `13` Chromium E2E tests.
+- Latest local package:
+  `frontend/dist/local/20260712T124936Z_f1894655-feea-48d3-b184-a41c5cb6d739_local/build-profile.json`;
+  latest packaged smoke:
+  `artifacts/packaged_runtime_smoke/20260712T125342Z_145618f8-ef94-4eda-9b90-43eb995a3289_packaged_runtime_smoke/result.json`.
+  It passed all 18 identity checks, contacted no external host or WING, kept all
+  four canonical stores unchanged and remains `releaseEligible=false`.
+- Final no-WING gate:
+  `artifacts/no_wing_release_check/20260712T135456Z_no_wing_release_check/summary.json`;
+  `65/65` checks and detached manifest verification passed.
+- Real WING read-only signal observation:
+  `artifacts/soundcheck_runtime_observation/20260712T093447Z_soundcheck_runtime_observation/summary.json`;
+  30.003 seconds, 285 real-input/signal/master-signal frames, 48 channels, up to
+  47 active channels, Main/analyzer 47/48 and zero live/write events. The final
+  post-validation retry at `20260712T131015Z` correctly blocked on current USB
+  silence; route readback still showed USB 47/48 = MAIN L/R and Main unmuted at
+  0 dB.
+
+Current blocker from `STATE.json`: The monolithic soundcheck defect is closed locally: staged execution kernel readiness is 96/100 and full-project local engineering remains 95/100. Strict real-live soundcheck readiness is 88/100 because the normal live allowlist is 0, the current-tree staged child flow has no physical WING completion proof, real safe_core_ready/show_mix_ready are unproven, source-path query latency is unproven, and EQ boost/compressor makeup/gain-up/send-up substitutions remain operator-review-only. M005 behavior is closed and narrow M006 owner intent is recorded, but current-source provenance and technical promotion remain fail-closed. Strict public-release readiness stays 88/100 and standing live authority remains denied.
+
+## Current external validation requirements
+
+- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
+- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
+
+Next operator action from `STATE.json`: Do not widen live authority. Rebind the closed M005 disconnect/timeout/stale-state behavior to current-source provenance without another cable pull unless explicitly requested, rerun the M006 technical readiness review verifier against the recorded narrow owner decision, then perform an operator-present current-tree staged-child proof on the exact WING with source-path latency, rollback, safe_core_ready/show_mix_ready and room/PA evidence. Complete clean-checkout reproduction, Developer ID signing/notarization/Gatekeeper and production remote-auth recovery separately.
+
+Latest ledger handoff row: `soundcheck_atomic_reanalysis_final_validation` at `2026-07-12T22:48:19Z`.
+
+Latest ledger handoff row: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
+
+Strict public-release score reason from `STATE.json`: Strict public-release score 88/100 is separate from the achieved local engineering score of 95/100. Verified hardening includes canonical proposal-only WING WebSocket surfaces, strict address-bound physical readback and rollback CAS, one per-user writer lock and recovery WAL, atomic proposal claims, exact browser Origin and memory-only Electron token bootstrap, fail-closed read-time quarantine for legacy, offline and nested unbound physical claims with bounded tail reads, runtime identity v2, an M005 proof-owned initial non-observation connection before baseline plus observation-only reconnect, all exceptions after apply or rollback requiring manual review, and an atomic staged reanalysis candidate/commit/discard lifecycle with exact accepted-bundle identity and default-deny observation shadow. The final source-content-bound Electron 43 arm64 local smoke at artifacts/packaged_runtime_smoke/20260712T125342Z_145618f8-ef94-4eda-9b90-43eb995a3289_packaged_runtime_smoke/result.json passed 18/18 identity checks with a self-hashed embedded source manifest, authenticated launcher-token and observed backend PID binding, backend ready in 5207/20000 ms, zero external or WING sockets, and all four canonical stores unchanged. Final local validation passed 6364 backend tests, 190 frontend tests and 13 Chromium E2E tests. The post-lease five-store no-WING gate at artifacts/no_wing_release_check/20260712T224514Z_no_wing_release_check passed all 66 checks plus detached manifest verification with zero WING/backend contact, zero live writes and unchanged canonical stores. M005 behavioral proof is closed and the narrow M006 owner decision is recorded, but current-source provenance still blocks technical promotion. Public release remains blocked by immutable source/console/firmware/master-route evidence, clean-checkout package reproduction, Developer ID signing, notarization and Gatekeeper acceptance, production HTTPS/WSS token recovery, and operator-present room/PA listening validation.
+
+Full-project release truth is now owned by
+`ops/autopilot/STATE.json.strict_pre_release_review`: current readiness is
+`88/100`, public release ready is `false`, and standing supervised transaction
+authority is empty. Older scoped scores and checkpoint snapshots below are
+historical context, not current full-release claims.
+
+## Historical superseding verification — 2026-07-12
+
+- Current strict readiness remains `88/100`; the `95/100` target is not met and
+  public release readiness remains false.
+- Latest verified source-bound local package:
+  `frontend/dist/local/20260712T072932Z_9e3d9f29-5ccf-41ca-a46e-f70933a45b23_local/build-profile.json`.
+  It is dirty-tree-bound, ad-hoc signed and `releaseEligible=false`.
+- Latest packaged runtime smoke:
+  `artifacts/packaged_runtime_smoke/20260712T073254Z_af976647-7612-419d-a5a5-9922930b203e_packaged_runtime_smoke/result.json`.
+  The packaged backend was ready in `5038/20000 ms`; all `18/18` challenged
+  runtime identity v2 checks bind the self-hashed embedded 15-file source manifest, exact
+  backend, authenticated launcher token and observed process PID; all `360`
+  app and `345` backend Mach-O files are arm64; no external or WING socket
+  opened; all four canonical stores, the backend bundle, package files and app
+  tree were unchanged.
+- The final four-store no-WING gate at
+  `artifacts/no_wing_release_check/20260712T070641Z_no_wing_release_check/summary.json`
+  passed all `65` checks with no failed or environment-blocked checks, no
+  backend/WING contact, no live write or authority, and all four canonical
+  stores unchanged. Detached manifest verification also passed.
+- Canonical dry-run history is preserved, not cleaned: `32/32` synthetic WAL
+  rows and `25,730` dry-run trace rows remain append-only audit history. Read
+  models now quarantine them plus unbound nested physical claims as
+  offline/legacy-unbound/unverified, exclude them from physical proof counts
+  and preserve their original values in metadata. The latest 500 rows contain
+  0 applied, 0 verified and 0 remaining unbound nested physical claims.
+- Historical M005 behavior is not current-release proof. A new physical run
+  must start from a clean checkout; the runner launches the exact source
+  backend after the first provenance event, binds runtime identity v2 and
+  performs a verified initial non-observation connection before baseline.
+  The canonical artifact root is Git-ignored to avoid self-generated status
+  drift; the recovery connection is observation-only. The run also requires
+  the canonical loopback URL, operator gate and a pre-existing owner-confirmed
+  WING Rack serial/firmware `3.0.5` challenge. M006 recomputes these checks from
+  the current packet.
+
+## Current external validation requirements
+
+- Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
+- Owner readiness review after the current M005 verifier accepts the attended artifact, updating the MVP readiness matrix only from that accepted M005 packet plus the accepted CH3 fader and gain-down proof artifacts (M006)
+
+Next operator action from `STATE.json`: Do not widen live authority. From a clean checkout, create an operator-confirmed WING Rack firmware 3.0.5 serial challenge under artifacts/wing_console_identity_owner_challenge/<run>/summary.json bound to the accepted read-only source; then run attended physical M005 disconnect/timeout/stale-state proof through ws://127.0.0.1:8765. The runner must launch the exact backend/server.py after first-event provenance, bind runtime identity v2, verify an initial non-observation WING connection before baseline, require the operator-gated cable pull, then use an observation-only reconnect with hashed events. Only if the current verifier returns m005_current_release_accepted=true may M006 readiness review be recomputed for a narrow owner decision.
+
+Latest ledger handoff row: `strict_readiness_88_final_source_bound_package_resmoke` at `2026-07-12T07:33:27Z`.
+
+The current strict pre-release score is `88/100`; the threshold remains
+`95/100`, public release ready: `false` (scope: no standing supervised
+transaction authority). Score 88/100 reflects verified local hardening: canonical proposal-only WING WebSocket surfaces; strict address-bound physical readback and rollback CAS; one per-user writer lock and recovery WAL; atomic proposal claims; exact browser Origin and memory-only Electron token bootstrap; fail-closed read-time quarantine for legacy, offline and nested unbound physical claims with bounded tail reads; runtime identity v2; an M005 proof-owned initial non-observation connection before baseline plus observation-only reconnect; and all exceptions after apply or rollback requiring manual review. The final source-content-bound Electron 43 arm64 local smoke at artifacts/packaged_runtime_smoke/20260712T073254Z_af976647-7612-419d-a5a5-9922930b203e_packaged_runtime_smoke/result.json passed 18/18 identity checks with a self-hashed embedded source manifest, authenticated launcher-token and observed backend PID binding, backend ready in 5038/20000 ms, all 360 app and 345 backend Mach-O files arm64, zero external or WING sockets, and all four canonical stores unchanged. Final local validation passed 6091 backend tests, 168 frontend tests, 10 Chromium E2E tests and all 65 four-store no-WING checks with detached manifest verification. Release remains blocked by a clean attended exact-console M005 run, immutable source/console/firmware/master-route evidence, M006 owner promotion, clean-checkout package reproduction, Developer ID signing, notarization and Gatekeeper acceptance, production HTTPS/WSS token recovery, and operator-present room/PA listening validation.
 
 ## Repository snapshot
 
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
+- Current inspected HEAD:
+  `e21778f0be8e7d88a552927fcd8a375351e0c07e`. The audit fixes remain an
+  uncommitted dirty tail; no commit or clean-checkout claim is made.
 - Latest verified product/runtime commit:
-  `d3eb93a62 Bind M005 readbacks to proof target`
+  `e21778f0be8e7d88a552927fcd8a375351e0c07e Full project audit base`. The
+  final dirty-tail full suite passed after the packaged-identity/M005 slice;
+  this commit id names the inspected base and is not a clean-tree claim.
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `df54ea7ec Sync M006 event log path truth surfaces`
-- Tracked worktree state before this sync: clean after the M005 physical
-  readback target-binding guard commit `d3eb93a62`; ignored large/superseded local
-  evidence remains local-only.
+- Current worktree state is dirty and contains the audited hardening tail plus
+  generated evidence. The current package proof is explicitly bound as
+  `dirty_tree_non_clean_checkout`; no clean-checkout release claim is made.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
-- Complete tracked file count from `rg --files`: 24825.
+- Current workspace-visible file count from `rg --files`: 25473; Git index
+  entry count from `git ls-files`: 26889. These counts are inventory context,
+  not release evidence.
 - Existing root agent file: only `./AGENTS.md`.
 - Canonical docs tree: `Docs/`. On this macOS checkout `docs` resolves to the
   same tree, but new durable files are written as `Docs/...`.
@@ -484,8 +628,18 @@ Generated: 2026-07-05T02:51:16Z
   is intentionally ignored: the large runtime observation `events.jsonl` and
   two superseded drift-audit attempts. This commit split does not close M005 or
   M006 and grants no live authority.
-- The strict pre-release score is `95/100`; the threshold remains `95/100`,
-  public release ready: `true` (scope: supervised narrow WING fader/gain-down MVP only). Score 95/100 is evidence-backed: supervised CH3 fader and gain-down proofs passed with apply, physical readback, rollback and emergency-stop/block evidence; the earlier rollback_not_applied failure is closed, and a release-ready live correction family review (M006) plus the M005 timeout/disconnect proof remain the next gates. This score grants no autonomy, no non-fader/gain live family and no readiness-matrix closure by itself.
+- The strict pre-release score is `88/100`; the threshold remains `95/100`,
+  public release ready: `false` (scope: no standing supervised transaction
+  authority). Current local proof includes fail-closed legacy trace quarantine,
+  bounded trace-tail reads, runtime identity v2 with proof-owned process-start
+  binding, manual-review semantics after uncertain apply/rollback transport,
+  and the ad-hoc-signed arm64 smoke at
+  `artifacts/packaged_runtime_smoke/20260712T060214Z_bb83311f-1043-4f35-9ff5-6933708e0abe_packaged_runtime_smoke/result.json`.
+  The backend started in `4917/20000 ms`, opened no external/WING sockets and
+  preserved all four canonical stores. Release remains blocked by a clean
+  attended exact-console M005 proof, M006 owner promotion, clean-checkout
+  reproduction, Developer ID/notary/Gatekeeper, production remote-auth
+  recovery and operator-present room/PA validation.
 - `ops/autopilot/STATE.json` now exposes the same safe handoff text as
   `next_operator_action` and `next_action`. The WING MVP rails require those
   fields to stay synchronized with the rollback/gain-proof external validation
@@ -722,7 +876,7 @@ Generated: 2026-07-05T02:51:16Z
   `0` unexpected or interesting missing safety/evidence keys.
 - The no-WING top-level Markdown coverage section now also self-checks its own
   required field lines. The fresh no-WING bundle
-  `artifacts/no_wing_release_check/20260703T101148Z_no_wing_release_check`
+  `artifacts/no_wing_release_check/20260712T033415Z_no_wing_release_check`
   reports `no_wing_summary_markdown_top_level_coverage_missing_field_lines: []`,
   `no_wing_summary_markdown_top_level_coverage_field_lines_rendered: true`,
   `live_authority_granted: false`, `readiness_closure_allowed_by_packet: false`
@@ -2149,8 +2303,9 @@ Generated: 2026-07-05T02:51:16Z
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `d3eb93a62` passed with
-  `5513 passed, 1 skipped, 1 warning`. This includes the M005 physical
+- The latest verified full-suite run for `e21778f0be8e7d88a552927fcd8a375351e0c07e` passed with
+  `6364 passed, 1 skipped`. The result covers the current uncommitted
+  hardening tail on top of that verified base commit. This includes the M005 physical
   reconnect-target guard, the M006 owner-decision
   M005 event-log path binding, the M006 owner-decision reconnect-event
   packet-check binding, the M006 packet-verifier

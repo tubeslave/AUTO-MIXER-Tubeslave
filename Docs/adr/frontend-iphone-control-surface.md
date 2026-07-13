@@ -1,5 +1,10 @@
 # Frontend iPhone Control Surface
 
+Status: **Superseded** by
+`Docs/adr/secure-remote-browser-access-20260712.md`. The HTTP/direct-LAN
+decision below is retained only as historical context and must not be used as a
+deployment instruction.
+
 ## Context
 
 The operator needs a focused iPhone/iPad frontend for controlling AUTO-MIXER from the

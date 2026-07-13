@@ -1,5 +1,10 @@
 # Soundcheck Workflow 95 — Final Review
 
+> Superseded scope note (2026-07-12): this `98/100` score covers proposal-first
+> derivation/UI only. It is not an executable-mix readiness score. See
+> `Docs/reports/SOUNDCHECK_PLAN_DECOMPOSITION_20260712.md` for the corrected
+> staged execution and strict-live assessment.
+
 Date: 2026-07-11
 
 ## Result
@@ -65,4 +70,3 @@ sequence is operator-present M005 disconnect/timeout/stale-state proof followed
 by M006 owner readiness review. Until then, release-ready live correction
 families, live-allowed safety rows and current supervised live-write kinds remain
 zero.
-

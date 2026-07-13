@@ -7,10 +7,11 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(server):
     async def handle_start_realtime_correction(websocket, data):
-        logger.info("=" * 60)
-        logger.info("RECEIVED start_realtime_correction MESSAGE")
-        logger.info(f"Data: {data}")
-        logger.info("=" * 60)
+        logger.info(
+            "Received start_realtime_correction channels=%s mode=%s",
+            len(data.get("channels", [])),
+            data.get("mode", "lufs"),
+        )
         await server.start_realtime_correction(
             device_id=data.get("device_id"),
             channels=data.get("channels", []),
@@ -22,10 +23,7 @@ def register_handlers(server):
         )
 
     async def handle_stop_realtime_correction(websocket, data):
-        logger.info("=" * 60)
-        logger.info("RECEIVED stop_realtime_correction MESSAGE")
-        logger.info(f"Data: {data}")
-        logger.info("=" * 60)
+        logger.info("Received stop_realtime_correction")
         await server.stop_realtime_correction()
 
     async def handle_get_gain_staging_status(websocket, data):

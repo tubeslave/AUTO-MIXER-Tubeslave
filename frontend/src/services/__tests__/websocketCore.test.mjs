@@ -24,6 +24,8 @@ class FakeWebSocket {
     this.onmessage = null;
     this.onerror = null;
     this.onclose = null;
+    this.closeCode = null;
+    this.closeReason = null;
     FakeWebSocket.instances.push(this);
   }
 
@@ -31,10 +33,12 @@ class FakeWebSocket {
     this.sentMessages.push(message);
   }
 
-  close() {
+  close(code = 1000, reason = '') {
+    this.closeCode = code;
+    this.closeReason = reason;
     this.readyState = FakeWebSocket.CLOSED;
     if (this.onclose) {
-      this.onclose();
+      this.onclose({ code, reason });
     }
   }
 
@@ -126,6 +130,29 @@ test('disconnect() disables scheduled reconnect after close', async () => {
   assert.equal(FakeWebSocket.instances.length, 1);
 });
 
+test('emits connected again after automatic reconnect', async () => {
+  const transport = createTransport();
+  const events = [];
+  transport.on('connected', payload => events.push(`connected:${payload.url}`));
+  transport.on('disconnected', () => events.push('disconnected'));
+
+  const firstConnect = transport.connect();
+  FakeWebSocket.instances[0].open();
+  await firstConnect;
+  FakeWebSocket.instances[0].close();
+
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(FakeWebSocket.instances.length, 2);
+  FakeWebSocket.instances[1].open();
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.deepEqual(events, [
+    'connected:ws://localhost:8765',
+    'disconnected',
+    'connected:ws://localhost:8765'
+  ]);
+});
+
 test('stale close does not clear an active replacement socket', async () => {
   const transport = createTransport();
 
@@ -190,7 +217,7 @@ test('send() serializes messages when socket is open', async () => {
   assert.deepEqual(socket.sentMessages, ['{"type":"ping","id":7}']);
 });
 
-test('authentication frame is always the first remote frame and token is session-only', async () => {
+test('authentication frame is always first and token persistence requests are ignored', async () => {
   const store = new Map();
   globalThis.sessionStorage = {
     getItem: key => store.get(key) || null,
@@ -202,15 +229,198 @@ test('authentication frame is always the first remote frame and token is session
   const socket = FakeWebSocket.instances[0];
 
   socket.open();
+  assert.equal(transport.isReady(), false);
+  assert.deepEqual(socket.sentMessages, [
+    '{"type":"authenticate","token":"secret-test-token","client_id":"automixer-ui"}'
+  ]);
+  socket.emitMessage({ type: 'authentication_status', authenticated: true });
   await connectPromise;
+  assert.equal(transport.isReady(), true);
   transport.send({ type: 'ping' });
 
   assert.deepEqual(socket.sentMessages, [
     '{"type":"authenticate","token":"secret-test-token","client_id":"automixer-ui"}',
     '{"type":"ping"}'
   ]);
-  transport.setAuthToken('next-token', { reconnect: false });
-  assert.equal(store.get('automixer_ws_auth_token'), 'next-token');
+  transport.setAuthToken('next-token', { persist: true, reconnect: false });
+  assert.equal(transport.authToken, 'next-token');
+  assert.equal(store.has('automixer_ws_auth_token'), false);
+});
+
+test('authenticated connection stays pending and blocks application frames before auth ACK', async () => {
+  const transport = createTransport({ authToken: 'launch-only-token' });
+  const connectedEvents = [];
+  transport.on('connected', payload => connectedEvents.push(payload));
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+  assert.equal(transport.isReady(), false);
+  assert.equal(transport.send({ type: 'get_dashboard_snapshot' }), false);
+  assert.equal(connectedEvents.length, 0);
+  assert.deepEqual(socket.sentMessages, [
+    '{"type":"authenticate","token":"launch-only-token","client_id":"automixer-ui"}'
+  ]);
+
+  socket.emitMessage({ type: 'authentication_status', authenticated: true });
+  await connectPromise;
+
+  assert.equal(transport.isReady(), true);
+  assert.equal(connectedEvents.length, 1);
+  assert.equal(connectedEvents[0].authenticated, true);
+  assert.equal(transport.send({ type: 'get_dashboard_snapshot' }), true);
+  assert.equal(JSON.parse(socket.sentMessages[1]).type, 'get_dashboard_snapshot');
+});
+
+test('negative authentication status fails closed, clears token, and emits one safe event', async () => {
+  const transport = createTransport({ authToken: 'wrong-token' });
+  const connectedEvents = [];
+  const authenticationFailures = [];
+  transport.on('connected', payload => connectedEvents.push(payload));
+  transport.on('authentication_failed', payload => authenticationFailures.push(payload));
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+  socket.emitMessage({ type: 'authentication_status', authenticated: false });
+
+  await assert.rejects(connectPromise, /authentication failed/);
+  assert.equal(transport.isReady(), false);
+  assert.equal(transport.shouldReconnect, false);
+  assert.equal(socket.closeCode, 1008);
+  assert.equal(connectedEvents.length, 0);
+  assert.equal(transport.authToken, '');
+  assert.deepEqual(authenticationFailures, [{ code: 'authentication_failed' }]);
+});
+
+test('new memory-only token can recover after terminal authentication failure', async () => {
+  const transport = createTransport({ authToken: 'expired-token' });
+  const firstConnect = transport.connect();
+  const firstSocket = FakeWebSocket.instances[0];
+  firstSocket.open();
+  firstSocket.emitMessage({ type: 'authentication_status', authenticated: false });
+  await assert.rejects(firstConnect);
+
+  transport.setAuthToken('fresh-operator-token', { persist: false, reconnect: false });
+  const secondConnect = transport.connect();
+  const secondSocket = FakeWebSocket.instances[1];
+  secondSocket.open();
+  secondSocket.emitMessage({ type: 'authentication_status', authenticated: true });
+  await secondConnect;
+
+  assert.equal(transport.isReady(), true);
+  assert.equal(JSON.parse(secondSocket.sentMessages[0]).token, 'fresh-operator-token');
+});
+
+test('active authenticated session expiry clears token and returns to enrollment', async () => {
+  const transport = createTransport({ authToken: 'e'.repeat(43) });
+  const failures = [];
+  transport.on('authentication_failed', payload => failures.push(payload));
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  socket.emitMessage({ type: 'authentication_status', authenticated: true });
+  await connectPromise;
+
+  socket.close(1008, 'authentication_expired');
+  await new Promise(resolve => setTimeout(resolve, 10));
+
+  assert.equal(transport.isReady(), false);
+  assert.equal(transport.authToken, '');
+  assert.equal(transport.shouldReconnect, false);
+  assert.deepEqual(failures, [{ code: 'authentication_failed' }]);
+  assert.equal(FakeWebSocket.instances.length, 1);
+});
+
+test('backend close-only policy rejection is terminal and does not reconnect', async () => {
+  const transport = createTransport({ authToken: 'backend-rejected-token' });
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+  socket.close(1008, 'authentication_failed');
+
+  await assert.rejects(connectPromise, /closed before becoming ready/);
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(transport.isReady(), false);
+  assert.equal(transport.shouldReconnect, false);
+  assert.equal(FakeWebSocket.instances.length, 1);
+});
+
+test('missing authentication ACK times out and closes fail-closed', async () => {
+  const transport = createTransport({
+    authToken: 'unacknowledged-token',
+    authenticationTimeout: 5
+  });
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+
+  await assert.rejects(connectPromise, /authentication timed out/);
+  assert.equal(transport.isReady(), false);
+  assert.equal(transport.shouldReconnect, false);
+  assert.equal(socket.closeCode, 1008);
+});
+
+test('pre-auth transport close retries and becomes ready after a later auth ACK', async () => {
+  const transport = createTransport({ authToken: 'delayed-backend-token' });
+  const events = [];
+  transport.on('connected', () => events.push('connected'));
+  const firstConnect = transport.connect();
+  const firstSocket = FakeWebSocket.instances[0];
+
+  firstSocket.open();
+  firstSocket.close(1006, 'backend_not_ready');
+  await assert.rejects(firstConnect, /closed before becoming ready/);
+
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(FakeWebSocket.instances.length, 2);
+  const secondSocket = FakeWebSocket.instances[1];
+  secondSocket.open();
+  secondSocket.emitMessage({ type: 'authentication_status', authenticated: true });
+  await new Promise(resolve => setTimeout(resolve, 0));
+
+  assert.equal(transport.isReady(), true);
+  assert.deepEqual(events, ['connected']);
+  assert.equal(JSON.parse(secondSocket.sentMessages[0]).type, 'authenticate');
+});
+
+test('stale session token is ignored unless explicitly supplied by the caller', async () => {
+  const store = new Map([['automixer_ws_auth_token', 'stale-token']]);
+  globalThis.sessionStorage = {
+    getItem: key => store.get(key) || null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const transport = createTransport();
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+
+  socket.open();
+  await connectPromise;
+
+  assert.equal(transport.authToken, '');
+  assert.deepEqual(socket.sentMessages, []);
+  assert.equal(transport.isReady(), true);
+});
+
+test('Electron-style memory-only token bootstrap never persists to session storage', () => {
+  const store = new Map([['automixer_ws_auth_token', 'legacy-stored-token']]);
+  globalThis.sessionStorage = {
+    getItem: key => store.get(key) || null,
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
+  };
+  const transport = createTransport();
+
+  transport.setAuthToken('memory-only-launch-token', {
+    persist: false,
+    reconnect: false
+  });
+
+  assert.equal(transport.authToken, 'memory-only-launch-token');
+  assert.equal(store.has('automixer_ws_auth_token'), false);
 });
 
 test('infers websocket host from browser page host', () => {
@@ -222,18 +432,109 @@ test('infers websocket host from browser page host', () => {
   assert.equal(inferWebSocketUrl(), 'ws://192.168.1.20:8765');
 });
 
-test('setUrl normalizes and persists manual websocket host', () => {
-  const store = new Map();
+test('setUrl normalizes in memory and purges legacy saved endpoint', () => {
+  const store = new Map([['automixer_ws_url', 'ws://stale.example:8765']]);
   globalThis.localStorage = {
     getItem: key => store.get(key) || null,
-    setItem: (key, value) => store.set(key, value)
+    setItem: (key, value) => store.set(key, value),
+    removeItem: key => store.delete(key)
   };
 
   const transport = createTransport({ url: 'ws://localhost:8765' });
   transport.setUrl('192.168.1.30:8765', { reconnect: false });
 
   assert.equal(transport.getUrl(), 'ws://192.168.1.30:8765');
-  assert.equal(store.get('automixer_ws_url'), 'ws://192.168.1.30:8765');
+  assert.equal(store.has('automixer_ws_url'), false);
+});
+
+test('insecure or unauthenticated remote endpoints are blocked before WebSocket construction', async () => {
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: {
+      protocol: 'http:',
+      hostname: '192.168.1.20',
+      host: '192.168.1.20'
+    }
+  });
+  const insecure = createTransport({ url: 'ws://192.168.1.20:8765' });
+  await assert.rejects(insecure.connect(), /policy blocked/);
+  assert.equal(FakeWebSocket.instances.length, 0);
+
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: {
+      protocol: 'https:',
+      hostname: 'mix.example',
+      host: 'mix.example'
+    }
+  });
+  const missingToken = createTransport({ url: 'wss://mix.example/ws' });
+  await assert.rejects(missingToken.connect(), /policy blocked/);
+  assert.equal(FakeWebSocket.instances.length, 0);
+});
+
+test('same-origin HTTPS WSS remote authenticates without writing browser storage', async () => {
+  const localStore = new Map([['automixer_ws_url', 'ws://stale.example:8765']]);
+  const sessionStore = new Map([['automixer_ws_auth_token', 'stale-token']]);
+  globalThis.localStorage = {
+    getItem: key => localStore.get(key) || null,
+    setItem: (key, value) => localStore.set(key, value),
+    removeItem: key => localStore.delete(key)
+  };
+  globalThis.sessionStorage = {
+    getItem: key => sessionStore.get(key) || null,
+    setItem: (key, value) => sessionStore.set(key, value),
+    removeItem: key => sessionStore.delete(key)
+  };
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: {
+      protocol: 'https:',
+      hostname: 'mix.example',
+      host: 'mix.example'
+    }
+  });
+  assert.equal(inferWebSocketUrl(), 'wss://mix.example/ws');
+  const transport = createTransport({
+    url: inferWebSocketUrl(),
+    authToken: 'r'.repeat(43)
+  });
+  const connectPromise = transport.connect();
+  const socket = FakeWebSocket.instances[0];
+  socket.open();
+  socket.emitMessage({ type: 'authentication_status', authenticated: true });
+  await connectPromise;
+
+  assert.equal(transport.isReady(), true);
+  assert.equal(localStore.size, 0);
+  assert.equal(sessionStore.size, 0);
+});
+
+test('remote page cannot redirect its bearer token to a loopback WebSocket', async () => {
+  Object.defineProperty(globalThis, 'location', {
+    configurable: true,
+    value: {
+      protocol: 'https:',
+      hostname: 'mix.example',
+      host: 'mix.example'
+    }
+  });
+  const transport = createTransport({
+    url: 'ws://127.0.0.1:8765',
+    authToken: 'r'.repeat(43)
+  });
+  await assert.rejects(transport.connect(), /policy blocked/);
+  assert.equal(FakeWebSocket.instances.length, 0);
+});
+
+test('privacy-restricted throwing storage cannot break memory-only bootstrap', () => {
+  globalThis.localStorage = {
+    removeItem: () => { throw new Error('storage blocked'); }
+  };
+  globalThis.sessionStorage = {
+    removeItem: () => { throw new Error('storage blocked'); }
+  };
+  assert.doesNotThrow(() => createTransport({ authToken: 'e'.repeat(43) }));
 });
 
 test('main cockpit source does not call direct live write websocket methods', () => {
@@ -265,4 +566,12 @@ test('main cockpit source does not call direct live write websocket methods', ()
 
   const operatorBackend = fs.readFileSync(path.join(srcRoot, 'services/useOperatorBackend.ts'), 'utf8');
   assert.match(operatorBackend, /applyOperatorProposal\(/);
+  assert.match(operatorBackend, /websocketService\.emergencyStop\(\)/);
+
+  const websocketSource = fs.readFileSync(path.join(srcRoot, 'services/websocket.js'), 'utf8');
+  assert.match(websocketSource, /emergencyStop\(\)\s*\{\s*return this\.send\(\{\s*type: 'emergency_stop',\s*reason: 'frontend_operator_emergency_stop'/s);
+
+  const cockpitShell = fs.readFileSync(path.join(srcRoot, 'components/prototype/AutomixerComponents.tsx'), 'utf8');
+  assert.equal((cockpitShell.match(/<EmergencyStopControl/g) || []).length, 2, 'desktop and compact shells must both expose emergency stop');
+  assert.match(cockpitShell, /Confirm system emergency stop/);
 });

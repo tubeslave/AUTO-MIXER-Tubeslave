@@ -2,6 +2,64 @@
 
 ## Current blockers
 
+> Soundcheck P1 closure (2026-07-12): the local staged execution kernel is
+> `96/100`; full-project local engineering remains `95/100`. Strict real-live
+> soundcheck readiness is `88/100`, not `95/100`. Remaining blockers are an
+> exactly empty normal live allowlist, no current-tree physical staged-child
+> completion, no real `safe_core_ready`/`show_mix_ready` proof, unmeasured WING
+> latency for the two-pass source-path sweep, and operator-review-only EQ
+> boost/compressor makeup/gain-up/send-up substitutions. M005 behavior is
+> closed and M006 owner intent is recorded; current-source provenance and
+> technical promotion remain fail-closed. No live authority changed.
+
+> Final architecture review (2026-07-12): the staged reanalysis lifecycle is
+> now candidate/commit/discard with exact accepted-bundle identity,
+> derivation+monitor+console-writer fencing, transactional observation shadow
+> and cancellation-safe cleanup. No remaining P0/P1/P2 was found in this local
+> scope. These fixes do not change the external strict-live blockers or grant
+> WING authority.
+
+> Superseding update (2026-07-12): local engineering readiness is `95/100`;
+> strict public-release readiness remains `88/100`. M005
+> disconnect/timeout/stale-state behavior is closed by the passed physical
+> artifact and owner confirmation. The narrow M006 owner decision is recorded,
+> while technical promotion remains blocked with
+> `reason=m006_owner_decision_failed_closed` on current-source provenance.
+> Standing supervised live-write kinds, live-allowed safety rows and
+> release-ready live families remain empty.
+> Expander, generic dynamics/de-esser, FX model/insert/return, group, matrix,
+> output processing, routing and scene/preset are also unproven/proposal-only.
+> The latest local Electron 43 arm64 packaged-runtime smoke passed without WING
+> contact, but it is dirty-tree-bound, ad-hoc signed, `releaseEligible=false`
+> and not public-release evidence. It binds all 360 app and 345 backend Mach-O
+> files to arm64, passes all 18 challenged identity checks, starts the backend
+> in 5207/20000 ms and preserves all four
+> canonical stores. It remains below the public-release `95/100` gate.
+
+Current blocker from `STATE.json`: The monolithic soundcheck defect is closed locally: staged execution kernel readiness is 96/100 and full-project local engineering remains 95/100. Strict real-live soundcheck readiness is 88/100 because the normal live allowlist is 0, the current-tree staged child flow has no physical WING completion proof, real safe_core_ready/show_mix_ready are unproven, source-path query latency is unproven, and EQ boost/compressor makeup/gain-up/send-up substitutions remain operator-review-only. M005 behavior is closed and narrow M006 owner intent is recorded, but current-source provenance and technical promotion remain fail-closed. Strict public-release readiness stays 88/100 and standing live authority remains denied.
+
+- The 2026-07-11 M005 artifact is accepted as behavioral closure but is not
+  current-source public-release provenance. Do not repeat the physical cable
+  pull unless the owner explicitly requests it.
+- Current M006 owner verification recomputes the packet from the accepted M005
+  input; the recorded owner decision cannot promote readiness until that
+  provenance passes.
+
+## Current external validation requirements
+
+- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
+- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
+
+Next operator action from `STATE.json`: Do not widen live authority. Rebind the closed M005 disconnect/timeout/stale-state behavior to current-source provenance without another cable pull unless explicitly requested, rerun the M006 technical readiness review verifier against the recorded narrow owner decision, then perform an operator-present current-tree staged-child proof on the exact WING with source-path latency, rollback, safe_core_ready/show_mix_ready and room/PA evidence. Complete clean-checkout reproduction, Developer ID signing/notarization/Gatekeeper and production remote-auth recovery separately.
+
+Latest ledger handoff row: `soundcheck_atomic_reanalysis_final_validation` at `2026-07-12T22:48:19Z`.
+
+Latest ledger handoff row: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
+
+Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
+
+## Historical blocker trace — superseded
+
 - M001 remains waiting for external validation, but the real WING Rack read-only
   artifact operator decision gate is no longer the active blocker. The current
   decision report is `accepted_decision_ready` with 1 accepted, 2 rejected, 0
@@ -181,10 +239,10 @@ Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-rea
   disconnect proof runner, and `9ce9e29ba` for the report-only M006 owner
   readiness packet. The large runtime observation `events.jsonl` and two
   superseded drift-audit attempts are ignored as local evidence only.
-- Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
+- Next operator action from `STATE.json`: Do not widen live authority. Treat M005 disconnect/timeout/stale-state behavior as closed and the narrow M006 readiness review owner decision as recorded; do not repeat the physical cable pull unless the owner explicitly requests it. For public release, rebind or migrate the closed M005 evidence to a clean current-source provenance packet, rerun the M006 technical verifier, reproduce the package from a clean checkout, complete Developer ID signing/notarization/Gatekeeper checks, and perform operator-present room/PA audible rollback validation.
 - Latest ledger handoff row:
-  `m005_readback_target_binding_required` at
-  `2026-07-05T02:51:16Z`. That row preserves the same `current_blocker`,
+  `local_engineering_95_final_tree_full_suite_no_wing_validation` at
+  `2026-07-12T13:56:06Z`. That row preserves the same `current_blocker`,
   `next_operator_action` and `external_validation_requirements` as
   `STATE.json`, so the safe handoff can be audited after mutable state moves.
 - Live authority remains denied: release-ready live correction families remain
@@ -194,8 +252,8 @@ Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-rea
   blocker state: it shows `accepted_decision_ready`, 1 accepted, 2 rejected,
   0 invalid and 0 unreviewed decision records; the earlier
   `rollback_not_applied` supervised-proof blocker is closed by the passed
-  CH3 fader and gain-down proofs, and the open items are the M005
-  disconnect/timeout/stale-state proof and the M006 readiness review.
+  CH3 fader and gain-down proofs. M005 behavior and M006 owner intent are now
+  closed; current-source promotion remains fail-closed.
 - `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md` is scoped as
   read-only preflight evidence handoff only. It no longer stands alone as the
   current next-action source after `accepted_decision_ready`; current
@@ -207,10 +265,10 @@ Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-rea
 - Future heartbeat wake-ups must verify native Goal transition tools before
   replacing a thread Goal.
 
-## Current external validation requirements
+## Historical external validation requirements — superseded
 
-- Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
-- Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
+- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
+- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
 
 ## Not blockers
 

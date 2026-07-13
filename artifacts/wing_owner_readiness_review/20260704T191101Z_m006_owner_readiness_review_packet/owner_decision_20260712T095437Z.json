@@ -1,0 +1,85 @@
+{
+  "schema": "automixer.m006_owner_readiness_decision.v1",
+  "generated_at_utc": "2026-07-12T09:54:37Z",
+  "status": "accepted_for_readiness_matrix_update",
+  "decision": "accepted",
+  "reviewed_by": "project_owner_via_codex_task_019f52a4-2a15-78d1-97ad-9d151e151c72",
+  "reviewed_at_utc": "2026-07-12T09:54:37Z",
+  "packet_summary": "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json",
+  "packet_verifier_summary": "artifacts/wing_owner_readiness_review_verifier/20260711T131654Z_m006_owner_readiness_packet_verifier/summary.json",
+  "m005_summary": "artifacts/wing_timeout_disconnect_proof/20260711T131505Z_wing_m005_disconnect_timeout_stale_proof/summary.json",
+  "accepted_safety_row_ids": [
+    "fader_supervised",
+    "gain_supervised"
+  ],
+  "accepted_live_write_kinds": [
+    "fader",
+    "gain"
+  ],
+  "accepted_proof_artifacts": [
+    "artifacts/wing_operator_proposal_validation/20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
+    "artifacts/wing_operator_proposal_validation/20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json"
+  ],
+  "rejected_safety_row_ids": [
+    "bus_group_matrix",
+    "dynamics_compressor",
+    "eq_autoeq",
+    "fx_sends_inserts",
+    "gate_expander",
+    "mute_supervised",
+    "pan_phase_delay",
+    "routing_snapshots_scenes"
+  ],
+  "readiness_matrix_update_candidate": true,
+  "live_authority_granted": false,
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "contacts_wing": false,
+  "contacts_backend": false,
+  "live_write": false,
+  "m005_acceptance": {
+    "physical_cable_loss": true,
+    "stale_readback_unavailable": true,
+    "blocked_write_while_disconnected": true,
+    "reconnect_recovery_verified": true,
+    "rollback_request_sent": false,
+    "request_audit_contains_rollback": false,
+    "authority_denied_during_m005": true
+  },
+  "scope_guardrails": {
+    "gain_up_allowed": false,
+    "fader_boosts_allowed": false,
+    "direct_write_allowed": false,
+    "full_auto_apply_allowed": false,
+    "non_fader_gain_surfaces_allowed": false
+  },
+  "allowed_after_acceptance": [
+    "fader_supervised narrow supervised fader evidence may be accepted for readiness-matrix update only",
+    "gain_supervised narrow supervised gain-down/input-trim evidence may be accepted for readiness-matrix update only"
+  ],
+  "must_remain_blocked": [
+    "EQ",
+    "compressor",
+    "gate",
+    "FX",
+    "routing",
+    "mute",
+    "pan",
+    "master",
+    "scene",
+    "full auto apply",
+    "fader boosts",
+    "gain-up from short soundcheck material",
+    "direct writes outside apply_operator_proposal"
+  ],
+  "acceptance_prerequisites": [
+    "M005 packet verifier summary exists under artifacts/wing_owner_readiness_review_verifier",
+    "M005 packet verifier status is ready_for_owner_review with failed_checks=[]",
+    "M005 summary path matches the verifier report and proves physical cable-loss",
+    "M005 proves stale readback unavailable, blocked write while disconnected and reconnect recovery",
+    "M005 rollback_request_sent=false and request/event audits contain no rollback_last_manual_write",
+    "M005 baseline/stale/reconnect readback payloads and events are bound to the requested channel/value_type/address",
+    "Owner explicitly accepts only fader_supervised and gain_supervised proof artifacts"
+  ],
+  "operator_notes": "Owner stated in the Codex task on 2026-07-12 that M005 was completed on 2026-07-11 and explicitly authorized M006. This file records that narrow owner decision. The current packet and decision verifiers remain authoritative and may block promotion if current-release provenance no longer matches."
+}

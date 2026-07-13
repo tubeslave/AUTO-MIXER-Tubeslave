@@ -1,0 +1,19 @@
+{
+ "status": "ISSUES",
+ "lufs_integrated": -29.37,
+ "true_peak_dbtp": -10.8,
+ "crest_db": 14.4,
+ "lr_balance_db": 0.02,
+ "correlation": -0.133,
+ "mono_fold_ratio": 0.434,
+ "tilt_deviation_db": 6.32,
+ "vocal_presence_db": 12.92,
+ "issues": [
+  "громкость микса -29.4 LUFS вне -20.0±6.0",
+  "межканальная корреляция -0.13 < 0 — фазовые проблемы",
+  "mono-fold 0.43 < 0.5 — сумма теряет энергию",
+  "спектр отклоняется от 'pink' на 6.3 дБ (медиана)"
+ ],
+ "method": "master_mix_eval",
+ "source": "main_postfader"
+}

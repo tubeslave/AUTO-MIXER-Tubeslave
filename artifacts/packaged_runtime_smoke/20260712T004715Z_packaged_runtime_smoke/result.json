@@ -1,0 +1,160 @@
+{
+  "schema": "automixer.packaged_runtime_smoke.v1",
+  "generatedAt": "2026-07-12T00:47:15.433Z",
+  "runId": "20260712T004715Z_packaged_runtime_smoke",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveWrites": false,
+  "liveAuthorityGranted": false,
+  "pass": false,
+  "appPath": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app",
+  "before": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 8497,
+      "sha256": "86a361a7411f3e9d20a7e2d60cb26b0a65977f2cfa45acd5fc8ef468f10cf566"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 69312,
+        "sha256": "585c2b26aa7733fa1f8f6bc112919ebe174a9955ce1c889cb9465cb8f4644761"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 267649344,
+        "sha256": "e1136190c53d1e03379764da56f602d8b6544cd3b6f751404b3484b6021e947a"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5563678,
+        "sha256": "2d77d04b38c6ae681a499959d210312700c3e355b2a672ec53f244ca8fb2d931"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 2974,
+        "sha256": "be3cc32415d991346854eb557854933f942ec4526f459f092ec53bd1bf8d1931"
+      }
+    }
+  },
+  "provenance": {
+    "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+    "worktreeDirty": true,
+    "statusSha256": "6ee4026c186589fd67827937203f93ba684e9f9501c89a1bce821a57ee85b0b7",
+    "trackedDiffSha256": "c65c246a27cf80e0e919881a8fec251c986a42aeee9a2efae45cbd1460202318",
+    "sourceBindingStrength": "dirty_tree_non_clean_checkout"
+  },
+  "runtime": {
+    "cdpReady": true,
+    "cdpReadyMs": 2237,
+    "browser": "Chrome/120.0.6099.291",
+    "protocolVersion": "1.3",
+    "pageUrls": [
+      "http://127.0.0.1:64428/"
+    ],
+    "backendReadyMs": 62733,
+    "backendWaitAfterUiMs": 60175
+  },
+  "bootstrap": {
+    "validShape": true,
+    "tokenLength": 43,
+    "tokenSha256": "cf6510296aa0a7f075e09b1ef35d90d22a5c897eed2dd32725f889b19635d61c",
+    "clientId": "automixer-ui",
+    "websocketUrl": "ws://127.0.0.1:8765"
+  },
+  "invalidToken": {
+    "rejected": true,
+    "code": 1008,
+    "reason": "authentication_failed"
+  },
+  "runtimeProbe": {
+    "authenticated": true,
+    "mode": {
+      "mode": "analyze",
+      "packagedOfflineLock": true,
+      "mixerTransportLocked": true
+    },
+    "blockedOperations": [
+      "auto_connect",
+      "connect_wing",
+      "scan_mixers"
+    ]
+  },
+  "blockedOperationsPass": true,
+  "error": "page.waitForFunction: Timeout 120000ms exceeded.\n    at main (/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/scripts/smoke-packaged-runtime.mjs:587:16)",
+  "browserCloseCompleted": true,
+  "after": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 8497,
+      "sha256": "86a361a7411f3e9d20a7e2d60cb26b0a65977f2cfa45acd5fc8ef468f10cf566"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 69312,
+        "sha256": "585c2b26aa7733fa1f8f6bc112919ebe174a9955ce1c889cb9465cb8f4644761"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 267649344,
+        "sha256": "e1136190c53d1e03379764da56f602d8b6544cd3b6f751404b3484b6021e947a"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5563678,
+        "sha256": "2d77d04b38c6ae681a499959d210312700c3e355b2a672ec53f244ca8fb2d931"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 2974,
+        "sha256": "be3cc32415d991346854eb557854933f942ec4526f459f092ec53bd1bf8d1931"
+      }
+    }
+  },
+  "canonicalLogUnchanged": true,
+  "consoleWalUnchanged": true,
+  "packageFilesUnchanged": true,
+  "stderrTail": [
+    "Backend Error: INFO:websockets.server:connection open",
+    "Backend Error: INFO:websockets.server:connection open",
+    "Backend Error: INFO:websockets.server:connection open",
+    "Backend Error: INFO:websockets.server:connection open",
+    "[18091:0712/035021.962030:ERROR:network_service_instance_impl.cc(601)] Network service crashed, restarting service.",
+    "[18091:0712/035021.963687:ERROR:gpu_process_host.cc(993)] GPU process exited unexpectedly: exit_code=15",
+    "Backend Error: INFO:__main__:Received signal SIGTERM, shutting down...",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Closing 1 client connections...",
+    "INFO:__main__:Client connection closed",
+    "INFO:__main__:Client disconnected. Total clients: 0",
+    "INFO:__main__:Graceful shutdown complete",
+    "INFO:websockets.server:server closing",
+    "ERROR:websockets.server:connection handler failed",
+    "Traceback (most recent call last):",
+    "File \"websockets/asyncio/server.py\", line 376, in conn_handler",
+    "File \"server.py\", line 9790, in handler",
+    "File \"server.py\", line 615, in _authenticate_websocket",
+    "File \"asyncio/tasks.py\", line 488, in wait_for",
+    "File \"websockets/asyncio/connection.py\", line 324, in recv",
+    "websockets.exceptions.ConnectionClosedOK: sent 1001 (going away); then received 1001 (going away)",
+    "INFO:websockets.server:server closed",
+    "INFO:__main__:Server stopped",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Server shutdown complete",
+    "INFO:__main__:Atexit cleanup triggered",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up"
+  ]
+}

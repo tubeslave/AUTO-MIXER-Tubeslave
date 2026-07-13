@@ -227,7 +227,8 @@ ratio = max_ratio - (max_ratio - 1) * factor  # Перкуссия получи�
 
 ## Git
 
-- Ветка: `main` (единственная)
+- Интеграционная ветка origin: `master`; рабочие изменения делаются в отдельных
+  prefixed branches/worktrees. Не предполагать существование `main`.
 - Commit messages: на английском, императив (`Fix GCC-PHAT argument order`, `Add feedback detector`)
 - Каждый коммит должен проходить `pytest`
 - Не коммитить: `__pycache__`, `node_modules`, `venv`, `.DS_Store`, модели ML (> 100 MB)

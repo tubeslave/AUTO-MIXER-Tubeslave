@@ -12,7 +12,10 @@ This document describes the current repository state.
 
 - The repository contains several overlapping architectures rather than one clean runtime.
 - The canonical live coordinator is `backend/server.py`.
-- The canonical live input trim path is `backend/server.py -> backend/arrangement_automation/live_input_trim_controller.py`.
+- `backend/arrangement_automation/live_input_trim_controller.py` is the intended
+  canonical trim implementation, but the current `backend/server.py` does not
+  instantiate it; its product recommendation endpoint therefore reports
+  unavailable/read-only rather than falling back to another writer.
 - `automixer/production_mix_v1` is an offline-first pipeline, not an approved live console path.
 - `backend/auto_soundcheck_engine.py` is active but overlapping, not the canonical live runtime.
 - Panic stop is not system-wide. Current documentation scope is manual `LiveApplyService` paths only.
@@ -26,7 +29,6 @@ This document describes the current repository state.
 - `backend/handlers/`: WebSocket handler layer registered through `register_all_handlers()`.
 - `backend/audio_capture.py`: shared live audio ingestion service.
 - `backend/live_apply.py`: current gated manual live-write service for supported operations.
-- `backend/arrangement_automation/live_input_trim_controller.py`: canonical live trim path.
 - `backend/wing_client.py` and `backend/osc/enhanced_osc_client.py`: live Wing console transport layer.
 
 ### Active Offline Runtime
@@ -39,7 +41,9 @@ This document describes the current repository state.
 
 - `start_soundcheck.py -> backend/auto_soundcheck_engine.py`: headless soundcheck flow that can still reach real-write surfaces.
 - `backend/auto_fader.py`: live automation path with direct fader writes outside `LiveApplyService`.
-- `backend/arrangement_automation/controller.py`: live arrangement automation with direct fader application behavior.
+- `backend/arrangement_automation/controller.py`: prototype code can perform
+  direct fader application, but the product handler is now explicitly
+  fail-closed and does not instantiate the controller.
 
 ### Safety-Critical Exception Candidate
 
@@ -64,6 +68,8 @@ This document describes the current repository state.
 - `ai_mixing_pipeline/`: offline-only AI mixing pipeline with render/evaluate/report intent.
 - `backend/auto_fader_v2/`: partial secondary auto-fader surface with shared bleed-analysis components and freeze hooks, but no documented canonical ownership.
 - `backend/ai/` and `backend/ml/`: separate ML/agent-era surfaces that do not define the current canonical live path.
+- `backend/arrangement_automation/live_input_trim_controller.py`: intended
+  canonical trim controller, currently unwired in the server product runtime.
 
 ### Unclear Ownership
 
@@ -80,8 +86,9 @@ This document describes the current repository state.
 
 ### Frontend WebSocket UI
 
-- `frontend/src/services/websocket.js` is the visible control surface for the browser UI.
-- It connects to `ws://localhost:8765` and sends message-type commands for mixer control, automation, voice control, and snapshot operations.
+- The active cockpit uses the memory-only authenticated WebSocket core. The
+  older `frontend/src/services/websocket.js` and iPhone component remain legacy
+  source and are not the active remote route.
 
 ### Main Coordinator
 
@@ -95,7 +102,9 @@ This document describes the current repository state.
 - `backend/handlers/mixer_handlers.py` is the current manual write surface for `set_fader`, `set_gain`, `set_eq`, and `set_compressor`.
 - `backend/handlers/voice_handlers.py` is the frontend-facing entrypoint for voice-control lifecycle.
 - `backend/handlers/snapshot_handlers.py` exposes direct snapshot load/save operations through the current mixer client.
-- `backend/handlers/arrangement_automation_handlers.py` exposes arrangement automation start/stop/tick/live-apply controls.
+- `backend/handlers/arrangement_automation_handlers.py` exposes only explicit
+  fail-closed start/stop/tick/live-apply responses; every operation reports
+  `arrangement_automation_not_promoted` and grants no live authority.
 - `backend/handlers/automation_handlers.py` exposes freeze and emergency-stop style controls, but those semantics do not equal a system-wide console-write panic stop.
 
 ### Audio Input Path
@@ -104,10 +113,13 @@ This document describes the current repository state.
 - It owns ring buffers, device detection, subscriber fan-out, and test fallback generation.
 - Live modules are expected to reuse this service rather than create independent capture loops.
 
-### Canonical Live Trim Path
+### Intended Live Trim Path (currently unwired)
 
-- `backend/arrangement_automation/live_input_trim_controller.py` is the canonical live input trim path confirmed by the board.
-- It uses role-aware, bleed-aware, meter-aware logic and applies supported writes through `LiveApplyService`.
+- `backend/arrangement_automation/live_input_trim_controller.py` is the intended
+  canonical live input trim module confirmed by the board.
+- It is not instantiated by the current server. The registered recommendation
+  API returns a read-only unavailable state until an explicit, reviewed wiring
+  change binds it to the supervised transaction/readback/rollback contract.
 
 ### Current Gated Write Service
 
@@ -125,7 +137,9 @@ This document describes the current repository state.
 ### Automation Paths
 
 - `backend/auto_fader.py` contains an active auto-fader path with direct fader writes and only local freeze protections.
-- `backend/arrangement_automation/controller.py` contains arrangement-aware fader automation with controller-local safety logic, but it is still a direct bypass path rather than a `LiveApplyService`-gated path.
+- `backend/arrangement_automation/controller.py` contains direct-apply capable
+  prototype logic, but the server product path does not instantiate it and its
+  WebSocket surface is fail-closed.
 - `backend/auto_soundcheck_engine.py` can analyze and apply multiple correction types, but it remains overlapping rather than canonical.
 - `backend/auto_fader_v2/` exists as a secondary auto-fader surface and shared bleed-analysis dependency, but current ownership and deployment status are unclear.
 

@@ -15,7 +15,8 @@ from lufs_gain_staging import LUFSMeter, TruePeakMeter
 
 logger = logging.getLogger(__name__)
 
-# Canonical WING compressor ratio index labels from Docs/TOOLS.md.
+# Legacy display quantizer retained for signal-analysis compatibility. Live WING
+# OSC writes use compressor_adaptation's fw3.0.5 string-enum table instead.
 WING_RATIO_VALUES = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
 WING_RATIO_STRINGS = [
     "1:1",

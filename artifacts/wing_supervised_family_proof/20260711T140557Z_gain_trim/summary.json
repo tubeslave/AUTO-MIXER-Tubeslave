@@ -1,0 +1,136 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:gain_trim:trim_down",
+      "peak_dbfs": [
+        -12.9,
+        -12.9
+      ],
+      "timestamp_utc": "2026-07-11T14:05:57Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "gain_trim",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:gain_trim:trim_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:gain_trim:trim_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:gain_trim:trim_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/in/set/trim",
+                "sent": true,
+                "value": -0.5
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:gain_trim:trim_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/trim": {
+                "address": "/ch/3/in/set/trim",
+                "args": [
+                  "-0.5",
+                  0.4472222328186035,
+                  -0.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -0.5
+              }
+            },
+            "values": {
+              "/ch/3/in/set/trim": -0.5
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:gain_trim:trim_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:gain_trim:trim_down",
+            "peak_dbfs": [
+              -12.9,
+              -12.9
+            ],
+            "timestamp_utc": "2026-07-11T14:05:57Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:gain_trim:trim_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/trim": {
+                "address": "/ch/3/in/set/trim",
+                "args": [
+                  "0.0",
+                  0.5,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              }
+            },
+            "restored": {
+              "/ch/3/in/set/trim": 0.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:gain_trim:trim_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:gain_trim:2026-07-11T14:05:57Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:05:57Z",
+  "wing_ip": "192.168.1.102"
+}

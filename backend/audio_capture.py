@@ -16,6 +16,49 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+LIVE_CAPTURE_MAX_CHANNELS = 64
+LIVE_CAPTURE_MIN_SAMPLE_RATE = 8_000
+LIVE_CAPTURE_MAX_SAMPLE_RATE = 192_000
+LIVE_CAPTURE_MIN_BUFFER_SECONDS = 0.25
+LIVE_CAPTURE_MAX_BUFFER_SECONDS = 30.0
+LIVE_CAPTURE_MAX_BUFFER_BYTES = 256 * 1024 * 1024
+
+
+def validate_live_capture_dimensions(
+    num_channels: int,
+    sample_rate: int,
+    buffer_seconds: float,
+) -> tuple[int, int, float]:
+    """Validate a live allocation before constructing per-channel buffers."""
+
+    if isinstance(num_channels, bool) or not 1 <= int(num_channels) <= LIVE_CAPTURE_MAX_CHANNELS:
+        raise ValueError(f"num_channels must be between 1 and {LIVE_CAPTURE_MAX_CHANNELS}")
+    if isinstance(sample_rate, bool) or not (
+        LIVE_CAPTURE_MIN_SAMPLE_RATE
+        <= int(sample_rate)
+        <= LIVE_CAPTURE_MAX_SAMPLE_RATE
+    ):
+        raise ValueError(
+            f"sample_rate must be between {LIVE_CAPTURE_MIN_SAMPLE_RATE} and "
+            f"{LIVE_CAPTURE_MAX_SAMPLE_RATE}"
+        )
+    buffer_seconds = float(buffer_seconds)
+    if not np.isfinite(buffer_seconds) or not (
+        LIVE_CAPTURE_MIN_BUFFER_SECONDS
+        <= buffer_seconds
+        <= LIVE_CAPTURE_MAX_BUFFER_SECONDS
+    ):
+        raise ValueError(
+            f"buffer_seconds must be between {LIVE_CAPTURE_MIN_BUFFER_SECONDS} "
+            f"and {LIVE_CAPTURE_MAX_BUFFER_SECONDS}"
+        )
+    estimated_bytes = int(num_channels) * int(sample_rate) * buffer_seconds * 4
+    if estimated_bytes > LIVE_CAPTURE_MAX_BUFFER_BYTES:
+        raise ValueError(
+            "requested audio capture buffer exceeds the 256 MiB live safety limit"
+        )
+    return int(num_channels), int(sample_rate), buffer_seconds
+
 try:
     import sounddevice as sd
     HAS_SOUNDDEVICE = True
@@ -248,6 +291,8 @@ class AudioCapture:
         self.block_size = block_size
         self.source_type = source_type
         self.device_name = device_name
+        self._resolved_device_name: Optional[str] = None
+        self._resolved_device_index: Optional[int] = None
 
         buffer_size = int(sample_rate * buffer_seconds)
         self._buffers: Dict[int, ChannelBuffer] = {
@@ -265,6 +310,13 @@ class AudioCapture:
         self._capture_thread: Optional[threading.Thread] = None
         self._stream = None
         self._lock = threading.Lock()
+        # A callback block is one alignment generation. Writers hold this lock
+        # across every channel update and the generation counter; multi-channel
+        # readers can therefore never combine adjacent callback blocks.
+        self._data_lock = threading.Lock()
+        self.allow_silence_fallback = True
+        self._last_callback_monotonic: Optional[float] = None
+        self._captured_sample_count = 0
         self._test_phase: Dict[int, float] = {ch: 0.0 for ch in range(1, num_channels + 1)}
 
         logger.info(
@@ -282,6 +334,11 @@ class AudioCapture:
             if HAS_SOUNDDEVICE:
                 self._start_sounddevice()
             else:
+                if not self.allow_silence_fallback:
+                    self._running = False
+                    raise RuntimeError(
+                        "sounddevice is unavailable; refusing synthetic silence fallback"
+                    )
                 logger.warning("sounddevice not available, falling back to silence")
                 self.source_type = AudioSourceType.SILENCE
                 self._start_test_generator()
@@ -293,15 +350,37 @@ class AudioCapture:
     def stop(self):
         """Stop audio capture."""
         self._running = False
+        errors = []
         if self._stream:
+            stream = self._stream
             try:
-                self._stream.stop()
-                self._stream.close()
-            except Exception:
-                pass
-            self._stream = None
+                stream.stop()
+            except Exception as stop_error:
+                logger.error("Failed to stop sounddevice stream cleanly: %s", stop_error)
+                errors.append(("stream_stop", stop_error))
+            try:
+                stream.close()
+            except Exception as close_error:
+                logger.error("Failed to close sounddevice stream cleanly: %s", close_error)
+                errors.append(("stream_close", close_error))
+            if not errors:
+                self._stream = None
         if self._capture_thread and self._capture_thread.is_alive():
             self._capture_thread.join(timeout=2.0)
+            if self._capture_thread.is_alive():
+                errors.append((
+                    "capture_thread",
+                    RuntimeError("capture thread did not stop within 2 seconds"),
+                ))
+            else:
+                self._capture_thread = None
+        elif self._capture_thread is not None:
+            self._capture_thread = None
+        if errors:
+            details = ", ".join(
+                f"{step}:{type(error).__name__}" for step, error in errors
+            )
+            raise RuntimeError(f"AudioCapture stop incomplete ({details})")
         logger.info("AudioCapture stopped")
 
     def _start_sounddevice(self):
@@ -317,8 +396,67 @@ class AudioCapture:
                 callback=self._audio_callback,
             )
             self._stream.start()
+            stream_device = getattr(self._stream, "device", device)
+            if isinstance(stream_device, (tuple, list)) and stream_device:
+                stream_device = stream_device[0]
+            if isinstance(stream_device, int) and not isinstance(stream_device, bool):
+                self._resolved_device_index = int(stream_device)
+            elif isinstance(device, int) and not isinstance(device, bool):
+                self._resolved_device_index = int(device)
+            try:
+                device_info = sd.query_devices(
+                    self._resolved_device_index
+                    if self._resolved_device_index is not None
+                    else device,
+                    "input",
+                )
+            except TypeError:
+                device_info = sd.query_devices(
+                    self._resolved_device_index
+                    if self._resolved_device_index is not None
+                    else device
+                )
+            if isinstance(device_info, dict):
+                resolved_name = str(device_info.get("name") or "").strip()
+                if resolved_name:
+                    self._resolved_device_name = resolved_name
         except Exception as e:
             logger.error(f"Failed to start sounddevice stream: {e}")
+            stream = self._stream
+            cleanup_errors = []
+            if stream is not None:
+                try:
+                    stream.stop()
+                except Exception as stop_error:
+                    logger.error(
+                        "Failed to stop sounddevice stream after startup error: %s",
+                        stop_error,
+                    )
+                    cleanup_errors.append(("stream_stop", stop_error))
+                try:
+                    stream.close()
+                except Exception as close_error:
+                    logger.error(
+                        "Failed to close sounddevice stream after startup error: %s",
+                        close_error,
+                    )
+                    cleanup_errors.append(("stream_close", close_error))
+                if not cleanup_errors:
+                    self._stream = None
+            if cleanup_errors:
+                self._running = False
+                detail = ", ".join(
+                    f"{step}:{type(error).__name__}"
+                    for step, error in cleanup_errors
+                )
+                raise RuntimeError(
+                    f"real audio input startup cleanup incomplete ({detail})"
+                ) from e
+            if not self.allow_silence_fallback:
+                self._running = False
+                raise RuntimeError(
+                    "real audio input failed; refusing synthetic silence fallback"
+                ) from e
             self.source_type = AudioSourceType.SILENCE
             self._start_test_generator()
 
@@ -327,10 +465,13 @@ class AudioCapture:
         if status:
             logger.debug(f"Audio callback status: {status}")
         num_ch = min(indata.shape[1], self.num_channels)
-        for ch_idx in range(num_ch):
-            ch = ch_idx + 1
-            if ch in self._buffers:
-                self._buffers[ch].write(indata[:, ch_idx])
+        with self._data_lock:
+            for ch_idx in range(num_ch):
+                ch = ch_idx + 1
+                if ch in self._buffers:
+                    self._buffers[ch].write(indata[:, ch_idx])
+            self._captured_sample_count += max(0, int(frames))
+            self._last_callback_monotonic = time.monotonic()
         self._notify_subscribers()
 
     def _start_test_generator(self):
@@ -346,30 +487,31 @@ class AudioCapture:
         t = np.arange(self.block_size, dtype=np.float32) / self.sample_rate
 
         while self._running:
-            for ch in range(1, self.num_channels + 1):
-                if ch not in self._buffers:
-                    continue
+            with self._data_lock:
+                for ch in range(1, self.num_channels + 1):
+                    if ch not in self._buffers:
+                        continue
 
-                if self.source_type == AudioSourceType.TEST_SINE:
-                    freq = 200.0 + ch * 50.0  # Different freq per channel
-                    phase = self._test_phase[ch]
-                    samples = 0.5 * np.sin(
-                        2.0 * np.pi * freq * t + phase
-                    ).astype(np.float32)
-                    self._test_phase[ch] = phase + 2.0 * np.pi * freq * interval
-                elif self.source_type == AudioSourceType.TEST_PINK_NOISE:
-                    white = np.random.randn(self.block_size).astype(np.float32)
-                    # Simple pink noise approximation (1/f)
-                    fft = np.fft.rfft(white)
-                    freqs = np.fft.rfftfreq(self.block_size, 1.0 / self.sample_rate)
-                    freqs[0] = 1.0  # Avoid division by zero
-                    fft /= np.sqrt(freqs)
-                    samples = np.fft.irfft(fft, n=self.block_size).astype(np.float32)
-                    samples *= 0.3 / (np.max(np.abs(samples)) + 1e-10)
-                else:  # SILENCE
-                    samples = np.zeros(self.block_size, dtype=np.float32)
+                    if self.source_type == AudioSourceType.TEST_SINE:
+                        freq = 200.0 + ch * 50.0  # Different freq per channel
+                        phase = self._test_phase[ch]
+                        samples = 0.5 * np.sin(
+                            2.0 * np.pi * freq * t + phase
+                        ).astype(np.float32)
+                        self._test_phase[ch] = phase + 2.0 * np.pi * freq * interval
+                    elif self.source_type == AudioSourceType.TEST_PINK_NOISE:
+                        white = np.random.randn(self.block_size).astype(np.float32)
+                        # Simple pink noise approximation (1/f)
+                        fft = np.fft.rfft(white)
+                        freqs = np.fft.rfftfreq(self.block_size, 1.0 / self.sample_rate)
+                        freqs[0] = 1.0  # Avoid division by zero
+                        fft /= np.sqrt(freqs)
+                        samples = np.fft.irfft(fft, n=self.block_size).astype(np.float32)
+                        samples *= 0.3 / (np.max(np.abs(samples)) + 1e-10)
+                    else:  # SILENCE
+                        samples = np.zeros(self.block_size, dtype=np.float32)
 
-                self._buffers[ch].write(samples)
+                    self._buffers[ch].write(samples)
 
             self._notify_subscribers()
             time.sleep(interval)
@@ -397,8 +539,8 @@ class AudioCapture:
             except Exception as e:
                 logger.debug(f"Subscriber callback error: {e}")
         if global_subs:
-            for ch, buf in self._buffers.items():
-                data = buf.read(self.block_size)
+            for ch in self._buffers:
+                data = self.get_buffer(ch, self.block_size)
                 for cb in global_subs:
                     try:
                         cb(ch, data)
@@ -413,10 +555,55 @@ class AudioCapture:
             channel = 1
         if channel == 0:
             channel = 1
-        buf = self._buffers.get(channel)
-        if buf is None:
-            return np.array([], dtype=np.float32)
-        return buf.read(num_samples)
+        with self._data_lock:
+            buf = self._buffers.get(channel)
+            if buf is None:
+                return np.array([], dtype=np.float32)
+            return buf.read(num_samples)
+
+    def get_synchronized_buffers(
+        self,
+        channels: List[int],
+        num_samples: int,
+    ) -> Dict[str, Any]:
+        """Atomically snapshot aligned channels from one completed generation."""
+
+        requested = [int(channel) for channel in channels]
+        if not requested or len(set(requested)) != len(requested):
+            raise ValueError("Synchronized audio snapshot requires distinct channels")
+        if int(num_samples) <= 0:
+            raise ValueError("Synchronized audio snapshot requires positive samples")
+        with self._data_lock:
+            buffers = {}
+            available_samples = {}
+            for channel in requested:
+                buf = self._buffers.get(channel)
+                if buf is None:
+                    buffers[channel] = np.array([], dtype=np.float32)
+                    available_samples[channel] = 0
+                else:
+                    buffers[channel] = buf.read(int(num_samples))
+                    available_samples[channel] = int(buf.available_samples)
+            return {
+                "buffers": buffers,
+                "available_samples": available_samples,
+                "captured_sample_count": int(self._captured_sample_count),
+                "last_callback_monotonic": self._last_callback_monotonic,
+            }
+
+    def get_available_samples(self, channel: int) -> int:
+        """Return buffered samples for one channel without exposing buffers."""
+
+        with self._data_lock:
+            buf = self._buffers.get(int(channel))
+            return int(buf.available_samples) if buf is not None else 0
+
+    @property
+    def captured_sample_count(self) -> int:
+        """Monotonic number of real callback frames captured by this instance."""
+
+        with self._data_lock:
+            return int(self._captured_sample_count)
 
     def get_lufs(self, channel: int, window_seconds: float = 0.4) -> float:
         """Compute momentary LUFS for a channel."""
@@ -465,13 +652,38 @@ class AudioCapture:
 
     def get_status(self) -> Dict:
         """Get capture service status."""
+        with self._data_lock:
+            last_callback_monotonic = self._last_callback_monotonic
+            captured_sample_count = int(self._captured_sample_count)
+        callback_age_sec = (
+            max(0.0, time.monotonic() - last_callback_monotonic)
+            if last_callback_monotonic is not None
+            else None
+        )
         return {
             "running": self._running,
             "source_type": self.source_type.value,
+            "device_name": self._resolved_device_name
+            or (str(self.device_name) if self.device_name is not None else ""),
+            "device_index": self._resolved_device_index,
             "num_channels": self.num_channels,
             "sample_rate": self.sample_rate,
             "buffer_seconds": self.buffer_seconds,
             "subscribers": len(self._subscribers),
+            "callback_age_sec": round(callback_age_sec, 3) if callback_age_sec is not None else None,
+            "captured_sample_count": captured_sample_count,
+            "real_input": bool(
+                self._running
+                and self.source_type
+                in {
+                    AudioSourceType.SOUNDDEVICE,
+                    AudioSourceType.DANTE,
+                    AudioSourceType.SOUNDGRID,
+                }
+                and self._stream is not None
+                and callback_age_sec is not None
+                and callback_age_sec <= 1.0
+            ),
         }
 
     def subscribe_all(self, callback: Callable):

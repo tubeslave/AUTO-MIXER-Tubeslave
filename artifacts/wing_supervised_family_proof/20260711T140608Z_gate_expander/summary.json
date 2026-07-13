@@ -1,0 +1,281 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:gate_expander:gate_threshold_down",
+      "peak_dbfs": [
+        -13.9,
+        -13.9
+      ],
+      "timestamp_utc": "2026-07-11T14:06:07Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "gate_expander",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:gate_expander:gate_threshold_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:gate_expander:gate_threshold_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:gate_expander:gate_threshold_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/gate/thr",
+                "sent": true,
+                "value": -47.0
+              },
+              {
+                "address": "/ch/3/gate/range",
+                "sent": true,
+                "value": 20.0
+              },
+              {
+                "address": "/ch/3/gate/att",
+                "sent": true,
+                "value": 0.0
+              },
+              {
+                "address": "/ch/3/gate/hld",
+                "sent": true,
+                "value": 180.0
+              },
+              {
+                "address": "/ch/3/gate/rel",
+                "sent": true,
+                "value": 179.1525115966797
+              },
+              {
+                "address": "/ch/3/gate/on",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:gate_expander:gate_threshold_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/gate/att": {
+                "address": "/ch/3/gate/att",
+                "args": [
+                  "0",
+                  0.0,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/ch/3/gate/hld": {
+                "address": "/ch/3/gate/hld",
+                "args": [
+                  "180",
+                  0.8994975090026855,
+                  180.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 180.0
+              },
+              "/ch/3/gate/on": {
+                "address": "/ch/3/gate/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/gate/range": {
+                "address": "/ch/3/gate/range",
+                "args": [
+                  "20.0",
+                  0.2982456088066101,
+                  20.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 20.0
+              },
+              "/ch/3/gate/rel": {
+                "address": "/ch/3/gate/rel",
+                "args": [
+                  "179",
+                  0.5503876209259033,
+                  179.1525115966797
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 179.1525115966797
+              },
+              "/ch/3/gate/thr": {
+                "address": "/ch/3/gate/thr",
+                "args": [
+                  "-47.0",
+                  0.4124999940395355,
+                  -47.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -47.0
+              }
+            },
+            "values": {
+              "/ch/3/gate/att": 0.0,
+              "/ch/3/gate/hld": 180.0,
+              "/ch/3/gate/on": 1,
+              "/ch/3/gate/range": 20.0,
+              "/ch/3/gate/rel": 179.1525115966797,
+              "/ch/3/gate/thr": -47.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:gate_expander:gate_threshold_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:gate_expander:gate_threshold_down",
+            "peak_dbfs": [
+              -13.9,
+              -13.9
+            ],
+            "timestamp_utc": "2026-07-11T14:06:07Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:gate_expander:gate_threshold_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/gate/att": {
+                "address": "/ch/3/gate/att",
+                "args": [
+                  "0",
+                  0.0,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/ch/3/gate/hld": {
+                "address": "/ch/3/gate/hld",
+                "args": [
+                  "180",
+                  0.8994975090026855,
+                  180.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 180.0
+              },
+              "/ch/3/gate/on": {
+                "address": "/ch/3/gate/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/gate/range": {
+                "address": "/ch/3/gate/range",
+                "args": [
+                  "20.0",
+                  0.2982456088066101,
+                  20.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 20.0
+              },
+              "/ch/3/gate/rel": {
+                "address": "/ch/3/gate/rel",
+                "args": [
+                  "179",
+                  0.5503876209259033,
+                  179.1525115966797
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 179.1525115966797
+              },
+              "/ch/3/gate/thr": {
+                "address": "/ch/3/gate/thr",
+                "args": [
+                  "-46.0",
+                  0.42500001192092896,
+                  -46.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -46.0
+              }
+            },
+            "restored": {
+              "/ch/3/gate/att": 0.0,
+              "/ch/3/gate/hld": 180.0,
+              "/ch/3/gate/on": 1,
+              "/ch/3/gate/range": 20.0,
+              "/ch/3/gate/rel": 179.1525115966797,
+              "/ch/3/gate/thr": -46.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:gate_expander:gate_threshold_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:gate_expander:2026-07-11T14:06:07Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:06:08Z",
+  "wing_ip": "192.168.1.102"
+}

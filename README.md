@@ -111,10 +111,16 @@ npm install
 
 ```bash
 cd backend
-python server.py
+AUTOMIXER_OPERATOR_MODE=analyze \
+AUTOMIXER_WING_OBSERVATION_MODE=true \
+PYTHONPATH=.:.. python3 server.py
 ```
 
-Сервер запустится на `ws://localhost:8765`
+Сервер запустится на `ws://localhost:8765`. Без launch-токена этот способ
+намеренно работает только для чтения: управляющие режимы, proposals и любые
+console writes блокируются до dispatch. Для защищённой operator-сессии запускайте
+Electron через `npm run electron:dev`; он создаёт одноразовый токен и передаёт его
+backend через закрываемый pipe, а не через process environment.
 
 ### 2. Запуск Frontend
 
@@ -123,7 +129,7 @@ cd frontend
 npm start
 ```
 
-Приложение откроется в браузере на `http://localhost:3000`
+Приложение доступно только локально на `http://127.0.0.1:3000`.
 
 ## Подключение к Wing Rack
 

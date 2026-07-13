@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -56,6 +57,30 @@ def test_validate_args_blocks_unsafe_invocations(tmp_path: Path, argv: list[str]
 
 @pytest.mark.asyncio
 async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Path) -> None:
+    process_artifacts_dir = Path(os.environ["AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR"])
+    process_artifacts_dir.mkdir(parents=True, exist_ok=True)
+    process_artifacts = {
+        filename: process_artifacts_dir / filename
+        for filename in (
+            "manual_write_events.jsonl",
+            "decision_traces.jsonl",
+            "decision_memory.jsonl",
+        )
+    }
+    for filename, artifact_path in process_artifacts.items():
+        artifact_path.write_text(
+            json.dumps({"sentinel": filename}) + "\n",
+            encoding="utf-8",
+        )
+    process_artifacts_before = {
+        filename: artifact_path.read_bytes()
+        for filename, artifact_path in process_artifacts.items()
+    }
+    process_runtime_dir = Path(os.environ["AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR"])
+    process_runtime_dir.mkdir(parents=True, exist_ok=True)
+    process_wal = process_runtime_dir / "manual_write_wal.jsonl"
+    process_wal.write_text('{"sentinel":"must-remain-unchanged"}\n', encoding="utf-8")
+    process_wal_before = process_wal.read_bytes()
     args = parse_args(
         tmp_path,
         "--channel",
@@ -77,6 +102,26 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert summary["proof_runner"] == "gain_proof_dry_run_runner"
     assert summary["proof_mode"] == "dry_run"
     assert summary["physical_wing"] is False
+    assert summary["console_runtime_isolated"] is True
+    assert summary["evidence_stores_isolated"] is True
+    assert Path(summary["console_runtime_dir"]) == (
+        Path(summary["summary_path"]).parent / "console_runtime"
+    )
+    assert Path(summary["console_wal_path"]).is_file()
+    assert Path(summary["console_wal_path"]).parent == Path(summary["console_runtime_dir"])
+    assert process_wal.read_bytes() == process_wal_before
+    for filename, artifact_path in process_artifacts.items():
+        assert artifact_path.read_bytes() == process_artifacts_before[filename]
+    run_manual_dir = Path(summary["manual_write_artifacts_dir"])
+    assert run_manual_dir == Path(summary["summary_path"]).parent / "manual_write_gate"
+    assert Path(summary["decision_trace_path"]) == run_manual_dir / "decision_traces.jsonl"
+    assert Path(summary["decision_memory_path"]) == run_manual_dir / "decision_memory.jsonl"
+    for filename in (
+        "manual_write_events.jsonl",
+        "decision_traces.jsonl",
+        "decision_memory.jsonl",
+    ):
+        assert (run_manual_dir / filename).is_file()
     assert summary["write_policy"] == "fake_mixer_apply_operator_proposal_only"
     assert summary["pre_read_source"] == "fake_mixer"
     assert summary["readback_source"] == "fake_mixer"
@@ -137,3 +182,20 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
         "start_auto_compressor_live",
     }
     assert not forbidden_direct_writes & set(sent_types)
+
+
+@pytest.mark.asyncio
+async def test_same_second_dry_runs_use_exclusive_uuid_directories(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(runner, "utc_stamp", lambda: "20260712T000000Z")
+    args = parse_args(tmp_path, "--cooldown-sec", "1")
+
+    assert await runner.run(args) == 0
+    assert await runner.run(args) == 0
+
+    run_dirs = sorted(path for path in tmp_path.iterdir() if path.is_dir())
+    assert len(run_dirs) == 2
+    assert run_dirs[0].name != run_dirs[1].name
+    assert all((run_dir / "summary.json").is_file() for run_dir in run_dirs)

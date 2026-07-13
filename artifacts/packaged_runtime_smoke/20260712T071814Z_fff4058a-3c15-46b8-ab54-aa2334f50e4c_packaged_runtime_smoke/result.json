@@ -1,0 +1,746 @@
+{
+  "schema": "automixer.packaged_runtime_smoke.v1",
+  "generatedAt": "2026-07-12T07:18:14.021Z",
+  "runId": "20260712T071814Z_fff4058a-3c15-46b8-ab54-aa2334f50e4c_packaged_runtime_smoke",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveWrites": false,
+  "liveAuthorityGranted": false,
+  "pass": true,
+  "appPath": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app",
+  "buildProfile": {
+    "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/build-profile.json",
+    "size": 1589,
+    "sha256": "3f63d67e0783a1a95d6b0977927bff6dd82a8bd2b46f7d67e772aa799f896cf1",
+    "schema": "automixer.macos_build_profile.v1",
+    "profile": "local",
+    "releaseEligible": false,
+    "reason": "Local validation artifact; Developer ID, notarization and Gatekeeper acceptance are not asserted.",
+    "source": {
+      "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+      "tree": "b345a48951385404e0adac6fdaf285ffe4bdcf62",
+      "worktreeDirty": true,
+      "statusSha256": "ccb93e29d95655b91119c98473aba63d5579528b287e31a321b12582836e4303",
+      "sourceContentSha256": "080c98aca22f5f371786fe85ed9299633097f96b312fce0b504b51bbfd9eb238"
+    },
+    "declaredApp": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app",
+      "treeSha256": "5f612cda8770f73e13431af822849268b288d9a6a0d43f7a3211ef05f0b4bcc7"
+    },
+    "embeddedAttestationPath": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/local-build-attestation.json",
+    "embeddedAttestation": {
+      "schema": "automixer.macos_local_build_attestation.v1",
+      "generatedAt": "2026-07-12T07:16:49.376Z",
+      "profile": "local",
+      "releaseEligible": false,
+      "reason": "LOCAL NOT FOR DISTRIBUTION; Developer ID, notarization and Gatekeeper acceptance are not asserted.",
+      "source": {
+        "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+        "tree": "b345a48951385404e0adac6fdaf285ffe4bdcf62",
+        "worktreeDirty": true,
+        "statusSha256": "ccb93e29d95655b91119c98473aba63d5579528b287e31a321b12582836e4303",
+        "sourceContentSha256": "080c98aca22f5f371786fe85ed9299633097f96b312fce0b504b51bbfd9eb238"
+      }
+    },
+    "bindingValid": true,
+    "appTreeMatches": true
+  },
+  "before": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "canonicalDecisionTrace": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/decision_traces.jsonl",
+      "size": 246109600,
+      "sha256": "2392e248399f7c789b76f75af34bdb781df395a3924513c288567bc703d70556"
+    },
+    "canonicalDecisionMemory": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/decision_memory.jsonl",
+      "size": 20845559,
+      "sha256": "47a38efe999e037ea3b8b3226498680135f9ea3e76447e6e98f6bf5d791eb724"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 11329,
+      "sha256": "58d548ecd28593d1791ff7784b72c394ae644fa7b101331528eec2454dfe7bca"
+    },
+    "appTree": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app",
+      "sha256": "5f612cda8770f73e13431af822849268b288d9a6a0d43f7a3211ef05f0b4bcc7"
+    },
+    "backendBundle": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend",
+      "sha256": "41031193816bda541eb9cf13771f4e7d07bce959edf791c97e332d6122513938"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 51920,
+        "sha256": "2dd7a2997765c1a89ff78450af1320213cf78806caca495a7841b8de5f3398d4"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 82520400,
+        "sha256": "55bdb134026bc9d5f68c6b435ae8ecd00ff57a83ca78ea96ea8941de88b4f5af"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5585266,
+        "sha256": "0e98f9f13305098f1d59bf45931a00dac083104782107d26081f2e4fd57257a5"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 3441,
+        "sha256": "de0a93227f3475d870a6736ef1f90778323b078dbb7566aa22448bf32fad268d"
+      },
+      "runtimeSourceManifest": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/_internal/automixer-runtime-source-manifest.json",
+        "size": 3191,
+        "sha256": "25adf8d94b82278b2572e6ecbc1b769e214838112de0182fd044de7a72f8046a"
+      }
+    }
+  },
+  "provenance": {
+    "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+    "tree": "b345a48951385404e0adac6fdaf285ffe4bdcf62",
+    "worktreeDirty": true,
+    "statusSha256": "c70120ed547905b7829c11f352001be839a934f322b56f1b1ff911a4c42d6fb4",
+    "trackedDiffSha256": "7a769ba358291631fa1de8f3eb769d00a4abb9420da5edea5be892012dcca0ee",
+    "sourceBindingStrength": "dirty_tree_non_clean_checkout"
+  },
+  "networkEnforcement": {
+    "schema": "automixer.packaged_runtime_network_enforcement.v1",
+    "mechanism": "macos_sandbox_exec",
+    "scope": "packaged_backend_process_tree",
+    "profileSha256": "c96d6669fcc26c2762c7698ab6fe15e76908b62a77add1057e2ba2be86a4e7d7",
+    "probeResults": {
+      "externalUdp4Denied": true,
+      "externalTcp4Denied": true,
+      "externalUdp6Denied": true,
+      "externalTcp6Denied": true,
+      "loopbackUdp4Allowed": true,
+      "loopbackTcp4Allowed": true,
+      "loopbackUdp6Allowed": true,
+      "loopbackTcp6Allowed": true,
+      "descendantUdp4Denied": true
+    },
+    "nonLoopbackOutboundDenied": true,
+    "loopbackOutboundAllowed": true,
+    "preflightPassed": true,
+    "backendBoundaryReported": true,
+    "profileMatchesBackend": true,
+    "probeMatrixMatchesBackend": true
+  },
+  "launchCopy": {
+    "path": "/var/folders/yl/sxrfxjm551jblm0hlt3srfj80000gn/T/automixer-packaged-runtime-mbYFDa/AUTO MIXER Tubeslave.app",
+    "signatureVerifiedBefore": true,
+    "treeSha256Before": "5f612cda8770f73e13431af822849268b288d9a6a0d43f7a3211ef05f0b4bcc7",
+    "matchesSourceApp": true,
+    "signatureVerifiedAfter": true,
+    "treeSha256After": "5f612cda8770f73e13431af822849268b288d9a6a0d43f7a3211ef05f0b4bcc7",
+    "unchanged": true,
+    "stillMatchesSourceApp": true
+  },
+  "runtime": {
+    "cdpReady": true,
+    "cdpReadyMs": 3989,
+    "browser": "Chrome/150.0.7871.47",
+    "protocolVersion": "1.3",
+    "pageUrls": [
+      "http://127.0.0.1:62816/"
+    ],
+    "backendReadyMs": 5027,
+    "backendWaitAfterUiMs": 502,
+    "backendReadyBudgetMs": 20000,
+    "backendReadyWithinBudget": true
+  },
+  "bootstrap": {
+    "validShape": true,
+    "tokenLength": 43,
+    "tokenSha256": "424cdf12a2e1e85f9b6e8524a2e90fa3f2afe04ca61ab366aa3c8f940303efbe",
+    "clientId": "automixer-ui",
+    "websocketUrl": "ws://127.0.0.1:8765",
+    "packagedOfflineLock": true,
+    "backendNetworkSandboxed": true,
+    "backendNetworkSandboxProfileSha256": "c96d6669fcc26c2762c7698ab6fe15e76908b62a77add1057e2ba2be86a4e7d7",
+    "backendNetworkSandboxProbeResults": {
+      "externalUdp4Denied": true,
+      "externalTcp4Denied": true,
+      "externalUdp6Denied": true,
+      "externalTcp6Denied": true,
+      "loopbackUdp4Allowed": true,
+      "loopbackTcp4Allowed": true,
+      "loopbackUdp6Allowed": true,
+      "loopbackTcp6Allowed": true,
+      "descendantUdp4Denied": true
+    }
+  },
+  "invalidToken": {
+    "rejected": true,
+    "code": 1008,
+    "reason": "authentication_failed"
+  },
+  "runtimeProbe": {
+    "authenticated": true,
+    "mode": {
+      "mode": "analyze",
+      "packagedOfflineLock": true,
+      "mixerTransportLocked": true
+    },
+    "runtimeIdentity": {
+      "type": "runtime_identity",
+      "schema": "automixer.backend_runtime_identity.v2",
+      "runtime_kind": "packaged",
+      "instance_nonce": "6463f7f4d42f42f28b5875c49d997098",
+      "started_at_utc": "2026-07-12T07:18:25Z",
+      "process": {
+        "pid": 63499,
+        "instance_nonce": "6463f7f4d42f42f28b5875c49d997098",
+        "started_at_utc": "2026-07-12T07:18:25Z"
+      },
+      "source": {
+        "content_scope": "automixer.production_source_inputs.v2",
+        "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+        "observation": "packaged_build_manifest",
+        "schema": "automixer.backend_runtime_source.v1",
+        "source_content_sha256": "d8bd36ebe5a5aec47ced35348c665b0bc4e02223429e2c57cb4a8bb496d72754",
+        "status_sha256": "c70120ed547905b7829c11f352001be839a934f322b56f1b1ff911a4c42d6fb4",
+        "tracked_diff_sha256": "7a769ba358291631fa1de8f3eb769d00a4abb9420da5edea5be892012dcca0ee",
+        "tree": "b345a48951385404e0adac6fdaf285ffe4bdcf62",
+        "worktree_dirty": true
+      },
+      "code": {
+        "files": [
+          {
+            "exists": true,
+            "mode": 436,
+            "path": "backend/auth.py",
+            "sha256": "a86ba057aa5adb9f2bf10a92a1681a7ece477e426e1cec602284b4cca0d1301f",
+            "size": 6467
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/__init__.py",
+            "sha256": "db3a5b475fd785e8d224fb63baab85ccc53c9f5befa6f037845bec2ad243e1df",
+            "size": 2106
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/automation_handlers.py",
+            "sha256": "d6d093de919b43543e9af80afed952e18f03fc68a80b1d389393ff7b56709c44",
+            "size": 4645
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/connection_handlers.py",
+            "sha256": "8b7e130606a95c0d06e8fa455f0b793b2b7c040a51d1eb3fd9ca57bb45289419",
+            "size": 5667
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/mixer_handlers.py",
+            "sha256": "cb1b0780bc5908eb6e23bc1508103024b0cf5b40b461851dee67dc9336b59226",
+            "size": 22806
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/product_state_handlers.py",
+            "sha256": "8c95a82c3d1be87cbd60951a3106a6454dc6abd826ea9a280de96153bdc90b95",
+            "size": 304396
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/mixer_client_base.py",
+            "sha256": "2b06be82c367b05a4705ce4d88f5046bb22d8324083c3ede4e9e871789f3f2f2",
+            "size": 5465
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/operator_mode_policy.py",
+            "sha256": "10f8ae0c5305f57add93b898fe5f8361eb125234cee1984fed535f41b4e4df17",
+            "size": 11727
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/runtime_identity.py",
+            "sha256": "89aad3139ecf9407157e815470addced94f2d61b3167cded36811db278dc788e",
+            "size": 11299
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/server.py",
+            "sha256": "7a849259211df3eade5fcdb8a4af8896f3e523920133bddcb28b1030d6a99de3",
+            "size": 457608
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/supervised_console_parameter_registry.py",
+            "sha256": "2d4853ba1e6ac8d07a7e6781005665221f0d8a3d6731938623c78e89f733e23c",
+            "size": 11760
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/supervised_console_transaction.py",
+            "sha256": "6709a5699c8abcf3d917aaf376782f66f08012ba9fca6fa39fa5b51b70b79ea0",
+            "size": 24522
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/wing_client.py",
+            "sha256": "5ecec47edaebac1f22be6fce016140d2a6d5a18680ca6fbaa15b00089495d336",
+            "size": 97267
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/wing_supervised_console_adapters.py",
+            "sha256": "948eba37a48f8a291573f36ec1927858025e3ec2768b72cddabc0ad6e7133614",
+            "size": 33109
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/ws_transport.py",
+            "sha256": "2338ad6403697af480b7afec7b6d1a2b168967c897fac4e605536af4fb621944",
+            "size": 2588
+          }
+        ],
+        "files_sha256": "d8bd36ebe5a5aec47ced35348c665b0bc4e02223429e2c57cb4a8bb496d72754",
+        "scope": "automixer.live_safety_critical.v1"
+      },
+      "backend": {
+        "path": "backend/server",
+        "exists": true,
+        "size": 82520400,
+        "sha256": "55bdb134026bc9d5f68c6b435ae8ecd00ff57a83ca78ea96ea8941de88b4f5af"
+      },
+      "launch_binding": {
+        "mode": "packaged_build_manifest",
+        "packaged_manifest_schema": "automixer.packaged_runtime_source_manifest.v1",
+        "packaged_manifest_name": "automixer-runtime-source-manifest.json",
+        "packaged_manifest_size": 3191,
+        "packaged_manifest_file_sha256": "25adf8d94b82278b2572e6ecbc1b769e214838112de0182fd044de7a72f8046a",
+        "packaged_manifest_sha256": "a75118796886d76d2f75c024afc268f7813d53cc3fa9427b8d1176e3f6d9ddda",
+        "bound_before_process_start": true,
+        "proof_eligible": false,
+        "authenticated_launcher_bound": true,
+        "launch_token_sha256": "424cdf12a2e1e85f9b6e8524a2e90fa3f2afe04ca61ab366aa3c8f940303efbe"
+      },
+      "websocket": {
+        "host": "127.0.0.1",
+        "port": 8765,
+        "loopback_only": true
+      },
+      "read_only_identity": true,
+      "live_authority_granted": false,
+      "manifest_sha256": "50fd92ec09e29eb1fdd53778c31af9f418c9cc40cf67658255bcb308c11d2ec0",
+      "request_challenge_nonce": "9eb053673c50415b213077eb82399f0b"
+    },
+    "runtimeIdentityChallengeNonce": "9eb053673c50415b213077eb82399f0b",
+    "blockedOperations": [
+      "auto_connect",
+      "connect_wing",
+      "scan_mixers"
+    ]
+  },
+  "runtimeIdentityValidation": {
+    "valid": true,
+    "checks": {
+      "schema": true,
+      "runtimeKind": true,
+      "challenge": true,
+      "manifest": true,
+      "sourceSchema": true,
+      "sourceObservation": true,
+      "sourceBuildProfile": true,
+      "criticalPaths": true,
+      "criticalFiles": true,
+      "sourceCodeDigest": true,
+      "embeddedManifestSchema": true,
+      "embeddedManifestDigest": true,
+      "embeddedComponents": true,
+      "packagedLaunchBinding": true,
+      "backendBinary": true,
+      "endpoint": true,
+      "authorityDenied": true,
+      "processPid": true
+    },
+    "identity": {
+      "type": "runtime_identity",
+      "schema": "automixer.backend_runtime_identity.v2",
+      "runtime_kind": "packaged",
+      "instance_nonce": "6463f7f4d42f42f28b5875c49d997098",
+      "started_at_utc": "2026-07-12T07:18:25Z",
+      "process": {
+        "pid": 63499,
+        "instance_nonce": "6463f7f4d42f42f28b5875c49d997098",
+        "started_at_utc": "2026-07-12T07:18:25Z"
+      },
+      "source": {
+        "content_scope": "automixer.production_source_inputs.v2",
+        "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+        "observation": "packaged_build_manifest",
+        "schema": "automixer.backend_runtime_source.v1",
+        "source_content_sha256": "d8bd36ebe5a5aec47ced35348c665b0bc4e02223429e2c57cb4a8bb496d72754",
+        "status_sha256": "c70120ed547905b7829c11f352001be839a934f322b56f1b1ff911a4c42d6fb4",
+        "tracked_diff_sha256": "7a769ba358291631fa1de8f3eb769d00a4abb9420da5edea5be892012dcca0ee",
+        "tree": "b345a48951385404e0adac6fdaf285ffe4bdcf62",
+        "worktree_dirty": true
+      },
+      "code": {
+        "files": [
+          {
+            "exists": true,
+            "mode": 436,
+            "path": "backend/auth.py",
+            "sha256": "a86ba057aa5adb9f2bf10a92a1681a7ece477e426e1cec602284b4cca0d1301f",
+            "size": 6467
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/__init__.py",
+            "sha256": "db3a5b475fd785e8d224fb63baab85ccc53c9f5befa6f037845bec2ad243e1df",
+            "size": 2106
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/automation_handlers.py",
+            "sha256": "d6d093de919b43543e9af80afed952e18f03fc68a80b1d389393ff7b56709c44",
+            "size": 4645
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/connection_handlers.py",
+            "sha256": "8b7e130606a95c0d06e8fa455f0b793b2b7c040a51d1eb3fd9ca57bb45289419",
+            "size": 5667
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/mixer_handlers.py",
+            "sha256": "cb1b0780bc5908eb6e23bc1508103024b0cf5b40b461851dee67dc9336b59226",
+            "size": 22806
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/handlers/product_state_handlers.py",
+            "sha256": "8c95a82c3d1be87cbd60951a3106a6454dc6abd826ea9a280de96153bdc90b95",
+            "size": 304396
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/mixer_client_base.py",
+            "sha256": "2b06be82c367b05a4705ce4d88f5046bb22d8324083c3ede4e9e871789f3f2f2",
+            "size": 5465
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/operator_mode_policy.py",
+            "sha256": "10f8ae0c5305f57add93b898fe5f8361eb125234cee1984fed535f41b4e4df17",
+            "size": 11727
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/runtime_identity.py",
+            "sha256": "89aad3139ecf9407157e815470addced94f2d61b3167cded36811db278dc788e",
+            "size": 11299
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/server.py",
+            "sha256": "7a849259211df3eade5fcdb8a4af8896f3e523920133bddcb28b1030d6a99de3",
+            "size": 457608
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/supervised_console_parameter_registry.py",
+            "sha256": "2d4853ba1e6ac8d07a7e6781005665221f0d8a3d6731938623c78e89f733e23c",
+            "size": 11760
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/supervised_console_transaction.py",
+            "sha256": "6709a5699c8abcf3d917aaf376782f66f08012ba9fca6fa39fa5b51b70b79ea0",
+            "size": 24522
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/wing_client.py",
+            "sha256": "5ecec47edaebac1f22be6fce016140d2a6d5a18680ca6fbaa15b00089495d336",
+            "size": 97267
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/wing_supervised_console_adapters.py",
+            "sha256": "948eba37a48f8a291573f36ec1927858025e3ec2768b72cddabc0ad6e7133614",
+            "size": 33109
+          },
+          {
+            "exists": true,
+            "mode": 420,
+            "path": "backend/ws_transport.py",
+            "sha256": "2338ad6403697af480b7afec7b6d1a2b168967c897fac4e605536af4fb621944",
+            "size": 2588
+          }
+        ],
+        "files_sha256": "d8bd36ebe5a5aec47ced35348c665b0bc4e02223429e2c57cb4a8bb496d72754",
+        "scope": "automixer.live_safety_critical.v1"
+      },
+      "backend": {
+        "path": "backend/server",
+        "exists": true,
+        "size": 82520400,
+        "sha256": "55bdb134026bc9d5f68c6b435ae8ecd00ff57a83ca78ea96ea8941de88b4f5af"
+      },
+      "launch_binding": {
+        "mode": "packaged_build_manifest",
+        "packaged_manifest_schema": "automixer.packaged_runtime_source_manifest.v1",
+        "packaged_manifest_name": "automixer-runtime-source-manifest.json",
+        "packaged_manifest_size": 3191,
+        "packaged_manifest_file_sha256": "25adf8d94b82278b2572e6ecbc1b769e214838112de0182fd044de7a72f8046a",
+        "packaged_manifest_sha256": "a75118796886d76d2f75c024afc268f7813d53cc3fa9427b8d1176e3f6d9ddda",
+        "bound_before_process_start": true,
+        "proof_eligible": false,
+        "authenticated_launcher_bound": true,
+        "launch_token_sha256": "424cdf12a2e1e85f9b6e8524a2e90fa3f2afe04ca61ab366aa3c8f940303efbe"
+      },
+      "websocket": {
+        "host": "127.0.0.1",
+        "port": 8765,
+        "loopback_only": true
+      },
+      "read_only_identity": true,
+      "live_authority_granted": false,
+      "manifest_sha256": "50fd92ec09e29eb1fdd53778c31af9f418c9cc40cf67658255bcb308c11d2ec0",
+      "request_challenge_nonce": "9eb053673c50415b213077eb82399f0b"
+    },
+    "embeddedManifest": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/_internal/automixer-runtime-source-manifest.json",
+      "size": 3191,
+      "sha256": "25adf8d94b82278b2572e6ecbc1b769e214838112de0182fd044de7a72f8046a",
+      "schema": "automixer.packaged_runtime_source_manifest.v1",
+      "manifestSha256": "a75118796886d76d2f75c024afc268f7813d53cc3fa9427b8d1176e3f6d9ddda"
+    }
+  },
+  "blockedOperationsPass": true,
+  "reloadRecovery": {
+    "staleSessionTokenRemoved": true,
+    "secureBootstrapFailureShown": false,
+    "offlineLockShown": true,
+    "connectWingControlCount": 0,
+    "startAudioControlCount": 0,
+    "hardwareControlsHidden": true
+  },
+  "processGroup": [
+    {
+      "pid": 63420,
+      "role": "electron_main"
+    },
+    {
+      "pid": 63462,
+      "role": "electron_helper"
+    },
+    {
+      "pid": 63463,
+      "role": "electron_helper"
+    },
+    {
+      "pid": 63499,
+      "role": "backend"
+    },
+    {
+      "pid": 63503,
+      "role": "electron_helper"
+    }
+  ],
+  "consoleErrors": [],
+  "network": {
+    "continuous": true,
+    "intervalMs": 250,
+    "durationMs": 5409,
+    "sampleCount": 22,
+    "sockets": [
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   31u  IPv4 0x87876cbd5c3b1e91      0t0  TCP 127.0.0.1:62799 (LISTEN)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   33u  IPv4 0xd36445cb01ce5a25      0t0  TCP 127.0.0.1:62816 (LISTEN)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   40u  IPv4 0x626a27593b863072      0t0  TCP 127.0.0.1:62799->127.0.0.1:62817 (ESTABLISHED)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   59u  IPv4 0x216ec1a072543763      0t0  TCP 127.0.0.1:62799->127.0.0.1:62823 (ESTABLISHED)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   60u  IPv4 0xf47583d51db80183      0t0  TCP 127.0.0.1:62816->127.0.0.1:62825 (ESTABLISHED)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   64u  IPv4 0x98b07822620302cc      0t0  TCP 127.0.0.1:62816->127.0.0.1:62827 (ESTABLISHED)"
+      },
+      {
+        "pid": 63420,
+        "line": "AUTO\\x20M 63420 dmitrijvolkov   65u  IPv4 0x2525edd96b047b80      0t0  TCP 127.0.0.1:62816->127.0.0.1:62826 (ESTABLISHED)"
+      },
+      {
+        "pid": 63463,
+        "line": "AUTO\\x20M 63463 dmitrijvolkov   25u  IPv4 0xc503f1fbcefbd2a6      0t0  TCP 127.0.0.1:62825->127.0.0.1:62816 (ESTABLISHED)"
+      },
+      {
+        "pid": 63463,
+        "line": "AUTO\\x20M 63463 dmitrijvolkov   28u  IPv4 0xc0ac216dc0d8648d      0t0  TCP 127.0.0.1:62826->127.0.0.1:62816 (ESTABLISHED)"
+      },
+      {
+        "pid": 63463,
+        "line": "AUTO\\x20M 63463 dmitrijvolkov   29u  IPv4  0xf8b937f7731dfb3      0t0  TCP 127.0.0.1:62827->127.0.0.1:62816 (ESTABLISHED)"
+      },
+      {
+        "pid": 63499,
+        "line": "server  63499 dmitrijvolkov    7u  IPv4 0x134813b3246b4543      0t0  TCP 127.0.0.1:8765 (LISTEN)"
+      },
+      {
+        "pid": 63463,
+        "line": "AUTO\\x20M 63463 dmitrijvolkov   19u  IPv4 0x1da31c58fffd88c4      0t0  TCP 127.0.0.1:62834->127.0.0.1:8765 (ESTABLISHED)"
+      },
+      {
+        "pid": 63499,
+        "line": "server  63499 dmitrijvolkov    8u  IPv4 0xe7a229c19bdde2de      0t0  TCP 127.0.0.1:8765->127.0.0.1:62834 (ESTABLISHED)"
+      }
+    ],
+    "externalConnections": [],
+    "wingPortSockets": [],
+    "monitorErrors": []
+  },
+  "browserCloseCompleted": true,
+  "after": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "canonicalDecisionTrace": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/decision_traces.jsonl",
+      "size": 246109600,
+      "sha256": "2392e248399f7c789b76f75af34bdb781df395a3924513c288567bc703d70556"
+    },
+    "canonicalDecisionMemory": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/decision_memory.jsonl",
+      "size": 20845559,
+      "sha256": "47a38efe999e037ea3b8b3226498680135f9ea3e76447e6e98f6bf5d791eb724"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 11329,
+      "sha256": "58d548ecd28593d1791ff7784b72c394ae644fa7b101331528eec2454dfe7bca"
+    },
+    "appTree": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app",
+      "sha256": "5f612cda8770f73e13431af822849268b288d9a6a0d43f7a3211ef05f0b4bcc7"
+    },
+    "backendBundle": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend",
+      "sha256": "41031193816bda541eb9cf13771f4e7d07bce959edf791c97e332d6122513938"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 51920,
+        "sha256": "2dd7a2997765c1a89ff78450af1320213cf78806caca495a7841b8de5f3398d4"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 82520400,
+        "sha256": "55bdb134026bc9d5f68c6b435ae8ecd00ff57a83ca78ea96ea8941de88b4f5af"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5585266,
+        "sha256": "0e98f9f13305098f1d59bf45931a00dac083104782107d26081f2e4fd57257a5"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 3441,
+        "sha256": "de0a93227f3475d870a6736ef1f90778323b078dbb7566aa22448bf32fad268d"
+      },
+      "runtimeSourceManifest": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T071450Z_8ca5a038-1643-4053-b5a4-86b6d21bdce4_local/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/_internal/automixer-runtime-source-manifest.json",
+        "size": 3191,
+        "sha256": "25adf8d94b82278b2572e6ecbc1b769e214838112de0182fd044de7a72f8046a"
+      }
+    }
+  },
+  "canonicalLogUnchanged": true,
+  "canonicalDecisionTraceUnchanged": true,
+  "canonicalDecisionMemoryUnchanged": true,
+  "consoleWalUnchanged": true,
+  "packageFilesUnchanged": true,
+  "appTreeUnchanged": true,
+  "backendBundleUnchanged": true,
+  "temporaryArtifactFiles": [],
+  "temporaryConsoleRuntimeFiles": [],
+  "tempWriteArtifactsAbsent": true,
+  "stderrTail": [
+    "Backend Error: INFO:__main__:Received message: {\"type\":\"get_dashboard_snapshot\"}...",
+    "INFO:__main__:Full message: {\"type\":\"get_dashboard_snapshot\"}",
+    "INFO:__main__:Message type: get_dashboard_snapshot",
+    "INFO:__main__:Message data: {'type': 'get_dashboard_snapshot'}",
+    "INFO:__main__:Received message: {\"type\":\"get_channel_inventory\",\"total_channels\":48}...",
+    "INFO:__main__:Full message: {\"type\":\"get_channel_inventory\",\"total_channels\":48}",
+    "INFO:__main__:Message type: get_channel_inventory",
+    "INFO:__main__:Message data: {'type': 'get_channel_inventory', 'total_channels': 48}",
+    "INFO:__main__:Received message: {\"type\":\"get_connection_topology\"}...",
+    "INFO:__main__:Full message: {\"type\":\"get_connection_topology\"}",
+    "INFO:__main__:Message type: get_connection_topology",
+    "INFO:__main__:Message data: {'type': 'get_connection_topology'}",
+    "[63420:0712/101825.713069:ERROR:content/browser/gpu/gpu_process_host.cc:1089] GPU process exited unexpectedly: exit_code=15",
+    "[63420:0712/101825.714251:ERROR:content/browser/network_service_instance_impl.cc:721] Network service crashed or was terminated, restarting service.",
+    "Backend Error: INFO:__main__:Received signal SIGTERM, shutting down...",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Closing 1 client connections...",
+    "INFO:__main__:Client connection closed",
+    "INFO:__main__:Client disconnected. Total clients: 0",
+    "INFO:__main__:Graceful shutdown complete",
+    "INFO:websockets.server:server closing",
+    "INFO:websockets.server:server closed",
+    "INFO:__main__:Server stopped",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Server shutdown complete",
+    "INFO:__main__:Atexit cleanup triggered",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up"
+  ]
+}

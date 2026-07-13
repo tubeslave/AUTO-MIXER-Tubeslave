@@ -452,6 +452,13 @@ class WebSocketService extends BaseWebSocketTransport {
     this.send({ type: 'stop_agent' });
   }
 
+  emergencyStop() {
+    return this.send({
+      type: 'emergency_stop',
+      reason: 'frontend_operator_emergency_stop'
+    });
+  }
+
   emergencyStopAgent() {
     this.send({ type: 'emergency_stop_agent' });
   }
@@ -973,6 +980,32 @@ class WebSocketService extends BaseWebSocketTransport {
   getAutoSoundcheckStatus() {
     this.send({
       type: 'get_auto_soundcheck_status'
+    });
+  }
+
+  acceptSoundcheckReplan(runId, draftId, approvalId) {
+    return this.send({
+      type: 'accept_soundcheck_replan',
+      run_id: runId,
+      draft_id: draftId,
+      approved: true,
+      approval_id: approvalId
+    });
+  }
+
+  reanalyzeSoundcheckStage(runId, approvalId) {
+    return this.send({
+      type: 'reanalyze_soundcheck_stage',
+      run_id: runId,
+      approved: true,
+      approval_id: approvalId
+    });
+  }
+
+  finalizeSoundcheckReadiness(runId) {
+    return this.send({
+      type: 'finalize_soundcheck_readiness',
+      run_id: runId
     });
   }
 

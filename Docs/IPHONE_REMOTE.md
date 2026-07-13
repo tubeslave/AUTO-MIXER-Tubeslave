@@ -1,96 +1,92 @@
-# iPhone Remote Setup
+# iPhone / Remote Browser Access
 
-This project now includes a touch-first remote control surface for iPhone/iPad. It is
-served by the MacBook frontend and installed on iPhone as a Safari Home Screen web app.
+> Code-side remote session authentication exists, but remote operation is not
+> release-ready. The backend remains loopback-only. The only supported target
+> topology is a trusted same-origin HTTPS/WSS reverse proxy to
+> `127.0.0.1:8765`. Token provisioning/rotation, production proxy configuration
+> and physical iPhone validation are still unproven. Authentication never grants
+> mixer write authority.
 
-## What You Need
+## Current truth
 
-- MacBook and iPhone/iPad on the same Wi-Fi network.
-- Backend running on the MacBook and reachable on port `8765`.
-- Frontend running on the MacBook and reachable on port `3000`.
-- Mixer reachable from the MacBook network.
+- The active Vite entrypoint mounts the main Automixer cockpit. The historical
+  `IPhoneControlSurface` component is not an active product route.
+- Remote pages served over plain HTTP are rejected before a WebSocket is
+  constructed.
+- Backend startup also rejects every configured non-loopback `http://` Origin;
+  only loopback development Origins may use HTTP.
+- The backend refuses non-loopback binds even when a token is configured.
+- Direct LAN access to port `8765`, `ws://<macbook-ip>:8765`, and the old
+  `http://<macbook-ip>:3000` preview are unsupported.
+- The browser auth gate accepts a session token in memory only. The repository
+  does not yet contain a production pairing, secure delivery, rotation, or
+  recovery workflow.
+- Bulk `bypass_mixer`, trim reset, EQ reset and phase reset commands are
+  fail-closed because they have not been migrated to the supervised
+  readback/rollback executor.
 
-## Start on MacBook
+This file is therefore an architecture and acceptance contract, not an
+operator runbook.
 
-From the repository root:
+## Supported target topology
 
-```bash
-cd backend
-python server.py
+```text
+iPhone Safari / Home Screen app
+        HTTPS + same-origin WSS /ws
+                    |
+          trusted TLS reverse proxy
+                    |
+        ws://127.0.0.1:8765 on MacBook
+                    |
+       authenticated read-only/proposal runtime
 ```
 
-In another terminal:
+The reverse proxy must:
 
-```bash
-cd frontend
-npm install
-npm start
-```
+- serve the frontend and `/ws` from one trusted HTTPS origin;
+- preserve the exact browser `Origin` header;
+- terminate TLS with a certificate trusted by the physical iPhone;
+- forward `/ws` only to `127.0.0.1:8765`;
+- never publish backend port `8765` to the LAN;
+- avoid putting the bearer token in URLs, cookies, proxy logs, or static files.
 
-The backend binds to `0.0.0.0:8765` when started with `python server.py`, so iPhone can
-reach it over the local network. The frontend Vite server already listens on
-`0.0.0.0:3000`.
+No production reverse-proxy configuration is currently accepted in this
+repository, so this topology is not yet deployable from project instructions.
 
-Find the MacBook Wi-Fi IP:
+## Session authentication contract
 
-```bash
-ipconfig getifaddr en0
-```
+- Token: exactly 43 base64url characters, representing 32 random bytes.
+- Client ID: `automixer-ui`.
+- Lifetime: from one minute through 24 hours; non-finite, zero, negative and
+  longer values are rejected.
+- Transport: token is sent only in the first WebSocket authentication frame.
+- Storage: no token or endpoint persistence in local storage, session storage,
+  URL parameters, fragments, or application logs.
+- Origin: a remote browser may use only `wss://<current-https-origin>/ws`.
+  Cross-origin, userinfo, query, fragment, plain WS, and remote-page-to-loopback
+  targets are rejected before socket construction.
+- Expiry: an active session is closed with code `1008` and returns to the auth
+  gate. A replacement startup token currently requires a controlled backend
+  restart; runtime token rotation is not implemented.
 
-Example result: `192.168.1.20`.
+Authentication establishes a transport session only. It does not enable WING
+writes, autonomous mode, bulk maintenance actions, or release readiness.
 
-## Open and Install on iPhone
+## Evidence required before this becomes a runbook
 
-1. Connect iPhone to the same Wi-Fi as the MacBook.
-2. Open Safari on iPhone.
-3. Go to `http://<MACBOOK_IP>:3000`, for example:
-   `http://192.168.1.20:3000`.
-4. Safari opens the mobile `Remote` screen automatically.
-5. Tap Share, then Add to Home Screen.
-6. Name it `AUTO MIXER` and tap Add.
+1. A reviewed production static-hosting and reverse-proxy configuration.
+2. A trusted certificate chain verified on the exact physical iPhone.
+3. An operator-accessible, non-disclosing token issuance and controlled restart
+   or rotation procedure.
+4. Proof that plain HTTP, direct port access, wrong Origin, wrong token, expired
+   token, cross-origin WSS and remote-to-loopback token forwarding all fail
+   before application commands can run.
+5. Proof that the token is absent from browser storage, URLs, frontend/backend
+   logs and proxy access logs.
+6. Physical iPhone recovery proof for invalid token, expiry, reload, Home Screen
+   relaunch and network loss.
+7. Current-tree packaged-runtime proof under the immutable offline lock, with no
+   WING contact and no live authority.
 
-After that, launch AUTO MIXER from the iPhone Home Screen.
-
-## Configure Connection in the Remote
-
-Open the `Setup` tab in the bottom navigation.
-
-1. Backend on MacBook:
-   - The app automatically uses `ws://<MACBOOK_IP>:8765` when opened from
-     `http://<MACBOOK_IP>:3000`.
-   - If needed, edit the Backend field manually and tap OK.
-2. Mixer:
-   - Choose `Behringer WING`, `Allen & Heath dLive`, or `Mixing Station`.
-   - Enter mixer IP/host and port.
-   - Tap Connect.
-3. Audio interface:
-   - Choose Dante Virtual Soundcard, SoundGrid, WING USB, or another available input.
-   - Tap Scan audio if the list needs refresh.
-4. Channels:
-   - Use Channels to enable the sources AUTO-MIXER may process.
-   - Use channel-name scan after the mixer is connected.
-5. Safety:
-   - Tap Backup before applying corrections.
-   - Use Apply for pending AI actions.
-   - Use Otkat to restore the last channel backup.
-   - Use STOP for AI emergency stop.
-   - Use Bypass only intentionally: on WING it disables processing and resets channel
-     faders to `0 dB`.
-
-## Network Troubleshooting
-
-- If iPhone opens the page but shows `Offline`, check that `python server.py` is still
-  running and that macOS Firewall allows Python on port `8765`.
-- If the page does not open, check that `npm start` is running and macOS Firewall allows
-  Node/Vite on port `3000`.
-- If the mixer does not connect, test the same mixer IP from the MacBook first.
-- If the MacBook IP changes after reconnecting Wi-Fi, reopen Safari with the new IP and
-  update the Home Screen shortcut if needed.
-
-## Optional Environment Overrides
-
-```bash
-AUTOMIXER_WS_HOST=0.0.0.0 AUTOMIXER_WS_PORT=8765 python backend/server.py
-```
-
-Use a narrower host only when you intentionally do not want iPhone/iPad access.
+Until all seven exist, use only local Electron or local development access and
+do not expose the backend to the LAN.

@@ -107,16 +107,38 @@ def register_handlers(server):
     async def handle_emergency_stop_agent(websocket, data):
         system_stop = getattr(server, "activate_system_emergency_stop", None)
         if callable(system_stop):
-            await system_stop("websocket:emergency_stop_agent")
+            result = await system_stop("websocket:emergency_stop_agent")
         else:
             agent = _agent()
             if agent:
                 agent.emergency_stop()
             await server.stop_mixing_agent()
+            result = {
+                "status": "stopped",
+                "success": True,
+                "teardown_complete": True,
+                "teardown_errors": [],
+            }
+        stopped = bool(
+            result.get("success") is True
+            and result.get("status") == "stopped"
+            and result.get("teardown_complete") is True
+        )
+        current_agent = _agent()
+        agent_running = bool(
+            getattr(getattr(current_agent, "state", None), "is_running", False)
+        )
         await server.send_to_client(websocket, {
             "type": "agent_emergency_stopped",
-            "is_running": False,
-            "emergency_stop": True,
+            "is_running": False if stopped else agent_running,
+            "emergency_stop": bool(
+                getattr(server, "_manual_write_emergency_stopped", stopped)
+            ),
+            "status": result.get("status", "stop_incomplete"),
+            "success": stopped,
+            "teardown_complete": bool(result.get("teardown_complete") is True),
+            "teardown_errors": list(result.get("teardown_errors") or []),
+            "generation": result.get("generation"),
         })
 
     async def handle_set_agent_mode(websocket, data):

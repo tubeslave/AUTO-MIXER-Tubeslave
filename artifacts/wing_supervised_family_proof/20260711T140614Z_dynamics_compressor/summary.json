@@ -1,0 +1,281 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+      "peak_dbfs": [
+        -17.0,
+        -17.0
+      ],
+      "timestamp_utc": "2026-07-11T14:06:14Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "dynamics_compressor",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:dynamics_compressor:compressor_threshold_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:dynamics_compressor:compressor_threshold_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/dyn/thr",
+                "sent": true,
+                "value": -11.5
+              },
+              {
+                "address": "/ch/3/dyn/ratio",
+                "sent": true,
+                "value": "5.0"
+              },
+              {
+                "address": "/ch/3/dyn/att",
+                "sent": true,
+                "value": 7.0
+              },
+              {
+                "address": "/ch/3/dyn/rel",
+                "sent": true,
+                "value": 89.30941772460938
+              },
+              {
+                "address": "/ch/3/dyn/gain",
+                "sent": true,
+                "value": 0.0
+              },
+              {
+                "address": "/ch/3/dyn/on",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/dyn/att": {
+                "address": "/ch/3/dyn/att",
+                "args": [
+                  "7",
+                  0.05833333358168602,
+                  7.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 7.0
+              },
+              "/ch/3/dyn/gain": {
+                "address": "/ch/3/dyn/gain",
+                "args": [
+                  "0.0",
+                  0.3333333432674408,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/ch/3/dyn/on": {
+                "address": "/ch/3/dyn/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/dyn/ratio": {
+                "address": "/ch/3/dyn/ratio",
+                "args": [
+                  "5.0",
+                  0.625,
+                  5.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 5.0
+              },
+              "/ch/3/dyn/rel": {
+                "address": "/ch/3/dyn/rel",
+                "args": [
+                  "89",
+                  0.44961240887641907,
+                  89.30941772460938
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 89.30941772460938
+              },
+              "/ch/3/dyn/thr": {
+                "address": "/ch/3/dyn/thr",
+                "args": [
+                  "-11.5",
+                  0.8083333373069763,
+                  -11.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -11.5
+              }
+            },
+            "values": {
+              "/ch/3/dyn/att": 7.0,
+              "/ch/3/dyn/gain": 0.0,
+              "/ch/3/dyn/on": 1,
+              "/ch/3/dyn/ratio": 5.0,
+              "/ch/3/dyn/rel": 89.30941772460938,
+              "/ch/3/dyn/thr": -11.5
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+            "peak_dbfs": [
+              -17.0,
+              -17.0
+            ],
+            "timestamp_utc": "2026-07-11T14:06:14Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:dynamics_compressor:compressor_threshold_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/dyn/att": {
+                "address": "/ch/3/dyn/att",
+                "args": [
+                  "7",
+                  0.05833333358168602,
+                  7.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 7.0
+              },
+              "/ch/3/dyn/gain": {
+                "address": "/ch/3/dyn/gain",
+                "args": [
+                  "0.0",
+                  0.3333333432674408,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/ch/3/dyn/on": {
+                "address": "/ch/3/dyn/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/dyn/ratio": {
+                "address": "/ch/3/dyn/ratio",
+                "args": [
+                  "5.0",
+                  0.625,
+                  5.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 5.0
+              },
+              "/ch/3/dyn/rel": {
+                "address": "/ch/3/dyn/rel",
+                "args": [
+                  "89",
+                  0.44961240887641907,
+                  89.30941772460938
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 89.30941772460938
+              },
+              "/ch/3/dyn/thr": {
+                "address": "/ch/3/dyn/thr",
+                "args": [
+                  "-11.0",
+                  0.8166666626930237,
+                  -11.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -11.0
+              }
+            },
+            "restored": {
+              "/ch/3/dyn/att": 7.0,
+              "/ch/3/dyn/gain": 0.0,
+              "/ch/3/dyn/on": 1,
+              "/ch/3/dyn/ratio": 5.0,
+              "/ch/3/dyn/rel": 89.30941772460938,
+              "/ch/3/dyn/thr": -11.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:dynamics_compressor:compressor_threshold_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:dynamics_compressor:2026-07-11T14:06:14Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:06:14Z",
+  "wing_ip": "192.168.1.102"
+}

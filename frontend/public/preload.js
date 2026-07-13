@@ -1,5 +1,7 @@
+'use strict';
+
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electron', {
-  quitApp: () => ipcRenderer.send('quit-app')
+  getWebSocketAuthBootstrap: () => ipcRenderer.invoke('get-websocket-auth-bootstrap')
 });

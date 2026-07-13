@@ -1,0 +1,17 @@
+{
+ "status": "ISSUES",
+ "lufs_integrated": -26.68,
+ "true_peak_dbtp": -11.17,
+ "crest_db": 15.39,
+ "lr_balance_db": 0.01,
+ "correlation": 0.996,
+ "mono_fold_ratio": 0.998,
+ "tilt_deviation_db": 6.31,
+ "vocal_presence_db": 12.33,
+ "issues": [
+  "громкость микса -26.7 LUFS вне -20.0±6.0",
+  "спектр отклоняется от 'pink' на 6.3 дБ (медиана)"
+ ],
+ "method": "master_mix_eval",
+ "source": "main_postfader"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "automixer.packaged_runtime_smoke_manifest.v1",
+  "generatedAt": "2026-07-12T00:59:57.920Z",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveAuthorityGranted": false,
+  "files": {
+    "result.json": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/packaged_runtime_smoke/20260712T005853Z_packaged_runtime_smoke/result.json",
+      "size": 14792,
+      "sha256": "4a422f13c4582ecac97be314ca61c3c45d1e6dc5cee8eb8656027c7d49ea2a5e"
+    },
+    "result.md": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/packaged_runtime_smoke/20260712T005853Z_packaged_runtime_smoke/result.md",
+      "size": 641,
+      "sha256": "0d694ecf5882b285890f3ec3b0efd363853a3dfa1563db408d39bf02ed7f760d"
+    }
+  }
+}

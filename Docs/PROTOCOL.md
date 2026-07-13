@@ -4,13 +4,18 @@
 grep по `"type": "..."` (исходящие). Обновлять при изменении handlers.
 
 Транспорт: WebSocket, JSON-сообщения вида `{"type": "<имя>", ...поля}`.
-Аутентификация (опционально, AUTOMIXER_AUTH_ENABLED): `?token=<...>` в URL
-или заголовок `Authorization: Bearer`. Отказ — close code 4401.
+Backend слушает только loopback. Packaged Electron и удалённый HTTPS/WSS
+клиент передают 43-символьный base64url token и
+`client_id="automixer-ui"` первым WebSocket frame. Token в URL, заголовках
+страницы или browser storage не поддерживается. Ошибка/истечение
+аутентификации закрывает socket кодом `1008`. Удалённый браузер допускается
+только через trusted same-origin `wss://<host>/ws` reverse proxy к
+`127.0.0.1:8765`; это ещё не release-ready deployment.
 
 Heartbeat: клиент шлёт `{"type": "ping", "ts": ...}`, сервер отвечает
 `{"type": "pong", "ts": ..., "mixer_connected": bool}`.
 
-## Входящие сообщения (132 типов)
+## Входящие сообщения (137 типов)
 
 ### agent (10)
 - `approve_action`
@@ -46,6 +51,16 @@ Heartbeat: клиент шлёт `{"type": "ping", "ts": ...}`, сервер о�
 - `set_manual_write_supervision`
 - `set_operator_mode`
 - `start_manual_write_session`
+
+### arrangement_automation (5; fail-closed)
+- `get_arrangement_automation_status`
+- `run_arrangement_automation_tick`
+- `set_arrangement_automation_live_apply`
+- `start_arrangement_automation`
+- `stop_arrangement_automation`
+
+Все пять возвращают `reason=arrangement_automation_not_promoted`;
+`live_apply_enabled=false` и `live_authority_granted=false`.
 
 ### channel_scan (5)
 - `bypass_mixer`

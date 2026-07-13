@@ -9,12 +9,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+TOOLS_ROOT = PROJECT_ROOT / "tools"
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
+
+from verify_m006_owner_readiness_packet import verify_packet_paths  # noqa: E402
 DEFAULT_DECISION_SUMMARY = (
     "artifacts/wing_owner_readiness_review/"
     "20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json"
@@ -372,11 +378,31 @@ def _record_packet_verifier_checks(
         "packet_verifier_owner_review_input_ready",
         packet_verifier.get("owner_review_input_ready") is True,
     )
+    for field_name in (
+        "m005_behavioral_proof_complete",
+        "m005_owner_review_shape_ready",
+        "m005_provenance_ready",
+        "m005_current_release_accepted",
+    ):
+        _record(
+            checks,
+            f"packet_verifier_{field_name}",
+            packet_verifier.get(field_name) is True,
+        )
     packet_verifier_checks = _get_mapping(packet_verifier, "checks")
     _record(
         checks,
         "packet_verifier_checks_present",
         isinstance(packet_verifier.get("checks"), Mapping),
+    )
+    provenance_check_names = [
+        name for name in packet_verifier_checks if name.startswith("m005_provenance_")
+    ]
+    _record(
+        checks,
+        "packet_verifier_m005_provenance_checks_present_and_true",
+        bool(provenance_check_names)
+        and all(packet_verifier_checks.get(name) is True for name in provenance_check_names),
     )
     for check_name in sorted(
         EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS
@@ -586,18 +612,48 @@ def verify_decision_paths(
     packet_verifier_path = _resolve(packet_verifier_summary) if packet_verifier_summary is not None else None
     decision = _load_json(decision_path)
     packet = _load_json(packet_path)
-    packet_verifier = _load_json(packet_verifier_path) if packet_verifier_path is not None else None
-    return verify_decision(
+    saved_packet_verifier = (
+        _load_json(packet_verifier_path) if packet_verifier_path is not None else None
+    )
+    effective_m005_path = (
+        _resolve(m005_summary)
+        if m005_summary is not None
+        else _resolve(decision.get("m005_summary"))
+        if isinstance(decision.get("m005_summary"), str)
+        else None
+    )
+    recomputed_packet_verifier = (
+        verify_packet_paths(
+            Path(_display_path(packet_path)),
+            Path(_display_path(effective_m005_path)),
+        )
+        if packet_verifier_path is not None and effective_m005_path is not None
+        else None
+    )
+    result = verify_decision(
         decision,
         packet=packet,
-        packet_verifier=packet_verifier,
+        packet_verifier=recomputed_packet_verifier,
         decision_summary_path=_display_path(decision_path),
         packet_summary_path=_display_path(packet_path),
         packet_verifier_summary_path=_display_path(packet_verifier_path)
         if packet_verifier_path is not None
         else None,
-        m005_summary_path=_display_path(m005_summary) if m005_summary is not None else decision.get("m005_summary"),
+        m005_summary_path=(
+            _display_path(effective_m005_path)
+            if effective_m005_path is not None
+            else decision.get("m005_summary")
+        ),
     )
+    result["packet_verifier_recomputed_from_current_artifacts"] = bool(
+        recomputed_packet_verifier is not None
+    )
+    result["saved_packet_verifier_status"] = (
+        saved_packet_verifier.get("status")
+        if isinstance(saved_packet_verifier, Mapping)
+        else None
+    )
+    return result
 
 
 def write_verifier_artifact(

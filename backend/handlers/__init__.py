@@ -25,12 +25,13 @@ from .agent_handlers import register_handlers as _agent
 from .measurement_handlers import register_handlers as _measurement
 from .product_state_handlers import register_handlers as _product_state
 from .meter_stream_handlers import register_handlers as _meter_stream
+from .arrangement_automation_handlers import register_handlers as _arrangement_automation
 
 _ALL_REGISTRARS = [
     _audio, _connection, _mixer, _routing, _snapshot, _voice,
     _gain_staging, _channel_scan, _eq, _phase, _fader, _fx, _training,
     _automation, _soundcheck, _compressor, _agent, _measurement,
-    _product_state, _meter_stream,
+    _product_state, _meter_stream, _arrangement_automation,
 ]
 
 

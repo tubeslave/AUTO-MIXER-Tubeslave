@@ -206,7 +206,8 @@ autofoh:
     demote_on_first_failure: true
     readback_tolerance_db: 0.25
     readback_tolerance_ms: 0.05
-    artifact_path: artifacts/show_assist_auto_v1/gated_correction_events.jsonl
+    # Relative runtime paths resolve below ~/.automixer/runtime, never cwd.
+    artifact_path: show_assist_auto_v1/gated_correction_events.jsonl
     # These flags select typed actions for full recommendation envelopes
     # (pre-read/absolute target/rollback preview). They do not grant live-write
     # authority and are never copied into the SafetyController allowlist.

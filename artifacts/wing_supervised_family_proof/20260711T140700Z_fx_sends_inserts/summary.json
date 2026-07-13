@@ -1,0 +1,136 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:fx_sends_inserts:send_down",
+      "peak_dbfs": [
+        -15.9,
+        -16.9
+      ],
+      "timestamp_utc": "2026-07-11T14:07:00Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "fx_sends_inserts",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:fx_sends_inserts:send_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:fx_sends_inserts:send_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:fx_sends_inserts:send_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/send/13/lvl",
+                "sent": true,
+                "value": -60.0
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:fx_sends_inserts:send_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/send/13/lvl": {
+                "address": "/ch/3/send/13/lvl",
+                "args": [
+                  "-60.0",
+                  0.0625,
+                  -60.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -60.0
+              }
+            },
+            "values": {
+              "/ch/3/send/13/lvl": -60.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:fx_sends_inserts:send_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:fx_sends_inserts:send_down",
+            "peak_dbfs": [
+              -15.9,
+              -16.9
+            ],
+            "timestamp_utc": "2026-07-11T14:07:00Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:fx_sends_inserts:send_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/send/13/lvl": {
+                "address": "/ch/3/send/13/lvl",
+                "args": [
+                  "-oo",
+                  0.0,
+                  -144.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -144.0
+              }
+            },
+            "restored": {
+              "/ch/3/send/13/lvl": -144.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:fx_sends_inserts:send_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:fx_sends_inserts:2026-07-11T14:07:00Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:07:00Z",
+  "wing_ip": "192.168.1.102"
+}

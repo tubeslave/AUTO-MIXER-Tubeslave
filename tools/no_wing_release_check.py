@@ -15,6 +15,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import pwd
 import re
 import socket
 import subprocess
@@ -2432,6 +2433,120 @@ class _PreservedPathSnapshot:
     path: Path
     existed: bool
     content: bytes | None
+
+
+@dataclass(frozen=True)
+class ProtectedRuntimeFileSnapshot:
+    path: Path
+    existed: bool
+    size: int | None
+    sha256: str | None
+
+
+def snapshot_protected_runtime_file(path: Path) -> ProtectedRuntimeFileSnapshot:
+    try:
+        handle = path.open("rb")
+    except FileNotFoundError:
+        return ProtectedRuntimeFileSnapshot(
+            path=path,
+            existed=False,
+            size=None,
+            sha256=None,
+        )
+    digest = hashlib.sha256()
+    size = 0
+    with handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+            size += len(chunk)
+    return ProtectedRuntimeFileSnapshot(
+        path=path,
+        existed=True,
+        size=size,
+        sha256=digest.hexdigest(),
+    )
+
+
+def validate_protected_runtime_file_unchanged(
+    name: str,
+    before: ProtectedRuntimeFileSnapshot,
+) -> CheckResult:
+    started_at = utc_now()
+    after = snapshot_protected_runtime_file(before.path)
+    unchanged = before == after
+    return CheckResult(
+        name=f"{name}_unchanged",
+        status="passed" if unchanged else "failed",
+        started_at=started_at,
+        finished_at=utc_now(),
+        duration_sec=0.0,
+        detail={
+            "path": str(before.path),
+            "before": {
+                "existed": before.existed,
+                "size": before.size,
+                "sha256": before.sha256,
+            },
+            "after": {
+                "existed": after.existed,
+                "size": after.size,
+                "sha256": after.sha256,
+            },
+            "unchanged": unchanged,
+            "contacts_wing": False,
+            "live_write": False,
+            "live_authority_granted": False,
+        },
+    )
+
+
+def protected_runtime_file_snapshots(
+    repo_root: Path = REPO_ROOT,
+) -> tuple[tuple[str, ProtectedRuntimeFileSnapshot], ...]:
+    console_runtime = Path(pwd.getpwuid(os.getuid()).pw_dir) / ".automixer" / "runtime"
+    paths = (
+        (
+            "canonical_manual_write_log",
+            repo_root
+            / "artifacts"
+            / "wing_telemetry"
+            / "manual_write_gate"
+            / "manual_write_events.jsonl",
+        ),
+        (
+            "canonical_decision_trace_log",
+            repo_root
+            / "artifacts"
+            / "wing_telemetry"
+            / "manual_write_gate"
+            / "decision_traces.jsonl",
+        ),
+        (
+            "canonical_decision_memory_log",
+            repo_root
+            / "artifacts"
+            / "wing_telemetry"
+            / "manual_write_gate"
+            / "decision_memory.jsonl",
+        ),
+        ("console_runtime_wal", console_runtime / "manual_write_wal.jsonl"),
+        (
+            "soundcheck_parent_journal",
+            console_runtime / "soundcheck_parent_journal.jsonl",
+        ),
+    )
+    return tuple(
+        (name, snapshot_protected_runtime_file(path)) for name, path in paths
+    )
+
+
+def validate_protected_runtime_files_unchanged(
+    snapshots: Iterable[tuple[str, ProtectedRuntimeFileSnapshot]],
+) -> list[CheckResult]:
+    return [
+        validate_protected_runtime_file_unchanged(name, snapshot)
+        for name, snapshot in snapshots
+    ]
 
 
 @dataclass
@@ -30299,6 +30414,7 @@ def run_release_checks(
     run_dir = artifact_root / f"{compact_stamp()}_no_wing_release_check"
     log_dir = run_dir / "logs"
     proof_report_path = proof_report_path_for_run(run_dir)
+    protected_runtime_snapshots = protected_runtime_file_snapshots()
 
     checks = build_checks(
         run_dir=run_dir,
@@ -30322,6 +30438,9 @@ def run_release_checks(
         generated_at=generated_at,
     )
     if results[-1].status != "passed" and not continue_on_failure:
+        results.extend(
+            validate_protected_runtime_files_unchanged(protected_runtime_snapshots)
+        )
         summary = write_summary(run_dir, results, generated_at=generated_at)
         summary["run_dir"] = str(run_dir)
         return summary
@@ -30683,6 +30802,9 @@ def run_release_checks(
             if artifact_result.status != "passed" and not continue_on_failure:
                 break
 
+    results.extend(
+        validate_protected_runtime_files_unchanged(protected_runtime_snapshots)
+    )
     summary = write_summary(run_dir, results, generated_at=generated_at)
     summary["run_dir"] = str(run_dir)
     return summary

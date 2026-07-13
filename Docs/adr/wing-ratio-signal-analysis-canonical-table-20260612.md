@@ -1,5 +1,10 @@
 # wing-ratio-signal-analysis-canonical-table-20260612
 
+Status: superseded for live OSC encoding on 2026-07-12. The table below remains
+a legacy signal-analysis display quantizer; live writes use the fw3.0.5 string
+enum documented in `Docs/TOOLS.md` and implemented by
+`backend/compressor_adaptation.py`.
+
 ## Context
 
 `signal_analysis.ratio_float_to_wing()` is a helper used around compressor signal

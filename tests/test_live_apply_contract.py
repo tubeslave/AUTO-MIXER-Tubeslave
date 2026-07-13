@@ -684,7 +684,9 @@ class FakeServer:
     def __init__(self, mixer, live_apply_service):
         self.mixer_client = mixer
         self.live_apply_service = live_apply_service
-        self.connection_mode = "wing"
+        # These tests exercise the generic LiveApplyService contract. Direct
+        # WING handlers are proposal-only and have separate quarantine tests.
+        self.connection_mode = "offline"
         self.sent_messages = []
 
     async def send_to_client(self, websocket, message):
@@ -799,6 +801,29 @@ async def test_mixer_handler_set_gain_blocks_without_confirm():
     assert payload["readback_status"] == "not_requested"
     assert payload["message_for_user"] == "Live apply blocked: confirmation required."
     assert payload["target_type"] == "channel_gain"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("confirmation", [1, "true", "false", {}, []])
+async def test_mixer_handler_rejects_non_literal_live_confirmation(confirmation):
+    events = []
+    mixer = FakeMixer()
+    service = LiveApplyService(audit_sink=events.append)
+    server = FakeServer(mixer, service)
+    handlers = mixer_handlers.register_handlers(server)
+
+    await handlers["set_gain"](
+        "ws",
+        {
+            "channel": 3,
+            "value": 2.5,
+            "dry_run": False,
+            "confirm_live_apply": confirmation,
+        },
+    )
+
+    assert mixer.calls == []
+    assert events[-1]["blocked_reason"] == "confirm_live_apply_required"
 
 
 @pytest.mark.asyncio

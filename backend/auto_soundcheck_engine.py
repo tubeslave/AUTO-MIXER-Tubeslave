@@ -9,6 +9,8 @@ the server's supervised operator proposal gate.
 """
 
 import asyncio
+import copy
+from contextlib import contextmanager
 import hashlib
 import json
 import logging
@@ -19,6 +21,7 @@ import numpy as np
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
+from uuid import uuid4
 
 from audio_capture import (
     AudioCapture, AudioSourceType, AudioDeviceType,
@@ -104,6 +107,16 @@ from live_shared_mix import (
     normalize_live_role,
 )
 from soundcheck_recommendation_workflow import NoWriteSoundcheckRecommendationWorkflow
+from soundcheck_transaction_plan import (
+    STAGE_ORDER,
+    bind_soundcheck_manifest_content_sha256,
+    build_soundcheck_transaction_plans,
+    soundcheck_manifest_content_sha256,
+)
+from soundcheck_mix_readiness import build_proposal_only_readiness
+from supervised_console_parameter_registry import (
+    supervised_console_family_registry,
+)
 from channel_recognizer import (
     classification_from_legacy_preset,
     recognize_instrument, recognize_instrument_spectral_fallback,
@@ -163,6 +176,7 @@ class EngineState(Enum):
     DERIVING = "deriving_recommendations"
     APPLYING = "applying"
     RUNNING = "running"
+    STOPPING = "stopping"
     ERROR = "error"
     STOPPED = "stopped"
 
@@ -577,6 +591,27 @@ class AutoSoundcheckEngine:
         resolved_config_path = str(default_config_path) if default_config_path.exists() else config_path
         self.config_manager = ConfigManager(config_path=resolved_config_path)
         autofoh_config = self.config_manager.get_section("autofoh")
+        raw_source_map = (autofoh_config.get("measurement_taps", {}) or {}).get(
+            "raw_channels",
+            {},
+        ) or {}
+        try:
+            raw_source_count = int(raw_source_map.get("channels", 16))
+        except (TypeError, ValueError):
+            raw_source_count = 16
+        self._soundcheck_source_channel_ids = list(
+            range(1, max(1, min(raw_source_count, 48)) + 1)
+        )
+        invalid_selected_sources = sorted(
+            set(self.selected_channels) - set(self._soundcheck_source_channel_ids)
+        )
+        if invalid_selected_sources:
+            raise ValueError(
+                "Selected soundcheck channels are measurement taps, not configured "
+                f"console sources: {invalid_selected_sources}"
+            )
+        if not self.selected_channels:
+            self.selected_channels = list(self._soundcheck_source_channel_ids)
         self.classifier_config = autofoh_config.get("classifier", {})
         autofoh_safety = autofoh_config.get("safety", {})
         autofoh_evaluation = autofoh_config.get("evaluation", {})
@@ -762,6 +797,21 @@ class AutoSoundcheckEngine:
         self._owns_mixer_client = mixer_client is None
         self._owns_audio_capture = audio_capture is None
         self._derivation_complete = False
+        self._derivation_in_progress = False
+        self._derivation_lock = threading.RLock()
+        self._monitor_iteration_lock = threading.RLock()
+        self._derivation_channel_stage_coverage: Dict[int, Dict[str, str]] = {}
+        self._derivation_readiness_residuals: List[Dict[str, Any]] = []
+        self._derivation_captured_at_epoch: Optional[float] = None
+        self._soundcheck_run_id = f"soundcheck-{uuid4().hex}"
+        self._soundcheck_plan_revision = 1
+        self._soundcheck_revision_candidates: Dict[str, Dict[str, Any]] = {}
+        self._soundcheck_revision_prepare_in_progress = False
+        self._soundcheck_revision_stable_bundle: Optional[Dict[str, Any]] = None
+        self._soundcheck_publication_candidate_id = ""
+        self._committed_soundcheck_recommendation_bundle: Optional[
+            Dict[str, Any]
+        ] = None
         self.feedback_detector: Optional[FeedbackDetector] = None
         self._last_feedback_event_at: Dict[Tuple[int, str, int], float] = {}
         self._last_feedback_channel_action_at: Dict[int, float] = {}
@@ -785,6 +835,7 @@ class AutoSoundcheckEngine:
             }
         )
         self._soundcheck_action_proposals: List[Dict[str, Any]] = []
+        self._soundcheck_transaction_actions: List[Any] = []
         self.blocked_console_write_history: List[Dict[str, Any]] = []
         self.mixing_station_adapter: Optional[Any] = None
         self.perceptual_config = perceptual_config
@@ -826,6 +877,8 @@ class AutoSoundcheckEngine:
         self._stop_event = threading.Event()
         self._engine_thread: Optional[threading.Thread] = None
         self._monitor_thread: Optional[threading.Thread] = None
+        self._stop_cleanup_lock = threading.Lock()
+        self._stop_cleanup_complete = False
 
         self.on_state_change = on_state_change
         self.on_channel_update = on_channel_update
@@ -945,10 +998,17 @@ class AutoSoundcheckEngine:
     def _iter_channels(self) -> List[int]:
         if self.selected_channels:
             return [ch for ch in self.selected_channels if ch <= self.num_channels]
-        return list(range(1, self.num_channels + 1))
+        return [
+            ch
+            for ch in getattr(self, "_soundcheck_source_channel_ids", [])
+            if ch <= self.num_channels
+        ]
 
     def _emit_observation(self, operation: Dict[str, Any] = None, message: str = "", summary: Dict[str, Any] = None):
-        if not self.on_observation:
+        if (
+            not self.on_observation
+            or self._soundcheck_revision_prepare_in_progress
+        ):
             return
         payload = {}
         if message:
@@ -1172,6 +1232,14 @@ class AutoSoundcheckEngine:
         if gated_result is None:
             return
         action = gated_result.action
+        action_key = tuple(getattr(action, "target_key", (action.action_type,)))
+        self._soundcheck_transaction_actions = [
+            existing
+            for existing in self._soundcheck_transaction_actions
+            if tuple(getattr(existing, "target_key", (existing.action_type,)))
+            != action_key
+        ]
+        self._soundcheck_transaction_actions.append(action)
         pre_read = dict(gated_result.pre_read or {})
         target_value = pre_read.get("target_value")
         current_value = pre_read.get("value")
@@ -1271,6 +1339,34 @@ class AutoSoundcheckEngine:
         self._soundcheck_action_proposals.append(proposal)
 
     def get_soundcheck_recommendation_bundle(self) -> Dict[str, Any]:
+        if self._soundcheck_revision_prepare_in_progress:
+            committed = self._soundcheck_revision_stable_bundle
+            if isinstance(committed, dict):
+                return copy.deepcopy(committed)
+            raise RuntimeError(
+                "Soundcheck recommendation publication is temporarily unavailable"
+            )
+        with self._derivation_lock:
+            return self._get_soundcheck_recommendation_bundle_locked()
+
+    def _get_soundcheck_recommendation_bundle_locked(self) -> Dict[str, Any]:
+        committed = getattr(
+            self,
+            "_committed_soundcheck_recommendation_bundle",
+            None,
+        )
+        committed_manifest = (
+            committed.get("supervised_transaction_plans")
+            if isinstance(committed, dict)
+            else None
+        )
+        if (
+            isinstance(committed_manifest, dict)
+            and committed_manifest.get("run_id") == self._soundcheck_run_id
+            and committed_manifest.get("plan_revision")
+            == self._soundcheck_plan_revision
+        ):
+            return copy.deepcopy(committed)
         bundle = self._soundcheck_recommendation_workflow.build_bundle()
         generic_proposals = list(self._soundcheck_action_proposals)
         proposals = list(bundle.get("recommendations", [])) + generic_proposals
@@ -1286,7 +1382,352 @@ class AutoSoundcheckEngine:
         }
         bundle["live_mixer_writes"] = False
         bundle["transport_policy"] = "dry_run_only"
+        transaction_bundle = build_soundcheck_transaction_plans(
+            self._soundcheck_transaction_actions,
+            reason="AutoSoundcheck reviewed correction plan",
+            run_id=self._soundcheck_run_id,
+            plan_revision=self._soundcheck_plan_revision,
+        ).to_dict()
+        transaction_bundle = self._attach_soundcheck_readiness_inputs(
+            transaction_bundle
+        )
+        bundle["supervised_transaction_plans"] = transaction_bundle
+        bundle["supervised_transaction_plan_count"] = transaction_bundle["plan_count"]
+        bundle["supervised_transaction_operation_count"] = transaction_bundle[
+            "operation_count"
+        ]
+        bundle["soundcheck_readiness"] = build_proposal_only_readiness(
+            transaction_bundle
+        )
+        if not self._soundcheck_revision_prepare_in_progress:
+            self._committed_soundcheck_recommendation_bundle = copy.deepcopy(
+                bundle
+            )
         return bundle
+
+    def _attach_soundcheck_readiness_inputs(
+        self,
+        transaction_bundle: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Bind checklist/source coverage to the immutable parent manifest."""
+        payload = dict(transaction_bundle)
+        pending_items = self.soundcheck_pending_items()
+        residuals = [
+            dict(item)
+            for item in getattr(self, "_derivation_readiness_residuals", [])
+            if isinstance(item, dict)
+        ]
+        for key, item in sorted(pending_items.items()):
+            digest = hashlib.sha256(str(key).encode("utf-8")).hexdigest()[:16]
+            if str(key).startswith("dca."):
+                checklist_stage = "group_balance"
+                checklist_required_for = "show_mix"
+            elif str(key).startswith("drum_image."):
+                checklist_stage = "spatial_fx"
+                checklist_required_for = "show_mix"
+            else:
+                checklist_stage = "foundation_level"
+                checklist_required_for = "safe_core"
+            residuals.append(
+                {
+                    "logical_correction_id": f"soundcheck:checklist:{digest}",
+                    "reason": str(item.get("reason") or "soundcheck_checklist_pending"),
+                    "checklist_key": str(key),
+                    "status": "pending",
+                    "scope": "operation",
+                    "disposition": "operator_review",
+                    "stage": checklist_stage,
+                    "required_for": checklist_required_for,
+                    "musically_required": True,
+                }
+            )
+        master_verdict = dict(self.last_master_mix_verdict or {})
+        master_status = str(master_verdict.get("status") or "").upper()
+        if self.master_mix_enabled and master_status in {"", "NO_SIGNAL", "FAIL", "ERROR"}:
+            residuals.append(
+                {
+                    "logical_correction_id": "soundcheck:master_mix_verdict",
+                    "reason": (
+                        "master_mix_verdict_unavailable"
+                        if not master_status
+                        else f"master_mix_verdict_{master_status.lower()}"
+                    ),
+                    "status": "pending",
+                    "scope": "operation",
+                    "disposition": "operator_review",
+                    "stage": "tonal_dynamics",
+                    "required_for": "show_mix",
+                    "musically_required": True,
+                }
+            )
+        selected = list(self._iter_channels())
+        signalled = [
+            channel
+            for channel in selected
+            if channel in self.channels and self.channels[channel].has_signal
+        ]
+        coverage_by_channel = getattr(
+            self,
+            "_derivation_channel_stage_coverage",
+            {},
+        )
+        per_source_stage_coverage: Dict[str, Dict[str, str]] = {}
+        for channel in selected:
+            info = self.channels.get(channel)
+            channel_coverage = dict(coverage_by_channel.get(channel) or {})
+            if info is None or not info.has_signal:
+                channel_coverage = {
+                    stage: "blocked_no_signal" for stage in STAGE_ORDER
+                }
+            per_source_stage_coverage[str(channel)] = {
+                stage: str(channel_coverage.get(stage) or "not_analyzed")
+                for stage in STAGE_ORDER
+            }
+        stage_coverage = {
+            stage: bool(
+                selected
+                and all(
+                    per_source_stage_coverage[str(channel)].get(stage)
+                    in {"analyzed", "explicitly_not_required"}
+                    for channel in selected
+                )
+            )
+            for stage in STAGE_ORDER
+        }
+        fader_targets_by_channel: Dict[int, float] = {}
+        for plan in transaction_bundle.get("plans") or []:
+            if not isinstance(plan, dict):
+                continue
+            for operation in plan.get("operations") or []:
+                if not isinstance(operation, dict):
+                    continue
+                if (
+                    operation.get("family_id") == "fader"
+                    and operation.get("write_kind") == "fader"
+                    and isinstance(operation.get("channel"), int)
+                    and not isinstance(operation.get("channel"), bool)
+                ):
+                    try:
+                        target = float(operation.get("target_value"))
+                    except (TypeError, ValueError):
+                        continue
+                    if np.isfinite(target):
+                        fader_targets_by_channel[int(operation["channel"])] = target
+        per_source_fader_intent: Dict[str, Dict[str, Any]] = {}
+        for channel in selected:
+            info = self.channels.get(channel)
+            snapshot = info.original_snapshot if info is not None else None
+            baseline = (
+                snapshot.fader_db
+                if snapshot is not None
+                else None
+            )
+            baseline_valid = bool(
+                isinstance(baseline, (int, float))
+                and not isinstance(baseline, bool)
+                and np.isfinite(float(baseline))
+                and -144.0 <= float(baseline) <= 0.0
+            )
+            raw_settings = (
+                snapshot.raw_settings
+                if snapshot is not None
+                and isinstance(snapshot.raw_settings, dict)
+                else {}
+            )
+            main_send = (
+                raw_settings.get("main_send")
+                if isinstance(raw_settings.get("main_send"), dict)
+                else {}
+            )
+            main_send_on = self._as_bool(main_send.get("on"), False)
+            main_send_level = self._as_float(
+                main_send.get("level_db"),
+                -144.0,
+            )
+            main_send_pre = self._as_bool(main_send.get("pre"), True)
+            input_routing = (
+                dict(raw_settings.get("input_routing") or {})
+                if isinstance(raw_settings.get("input_routing"), dict)
+                else {}
+            )
+            readback_presence = (
+                dict(raw_settings.get("readback_presence") or {})
+                if isinstance(raw_settings.get("readback_presence"), dict)
+                else {}
+            )
+            local_path_readback_complete = all(
+                readback_presence.get(key) is True
+                for key in (
+                    "fader",
+                    "mute",
+                    "main_send_on",
+                    "main_send_level",
+                    "main_send_pre",
+                    "input_main_group",
+                    "input_main_channel",
+                    "input_alt_group",
+                    "input_alt_channel",
+                    "tags",
+                )
+            )
+            channel_main_path_locally_enabled = bool(
+                local_path_readback_complete
+                and
+                baseline_valid
+                and snapshot is not None
+                and snapshot.muted is False
+                and float(baseline) > -90.0
+                and main_send_on
+                and main_send_level > -90.0
+                and main_send_pre is False
+            )
+            assigned_dca_ids = self._extract_dca_ids_from_settings(raw_settings)
+            assigned_dca_states: Dict[str, Dict[str, Any]] = {}
+            downstream_dca_path_verified = True
+            for dca_id in assigned_dca_ids:
+                dca_snapshot = self.dca_snapshots.get(dca_id)
+                dca_fader = (
+                    float(dca_snapshot.fader_db)
+                    if dca_snapshot is not None
+                    and isinstance(dca_snapshot.fader_db, (int, float))
+                    and not isinstance(dca_snapshot.fader_db, bool)
+                    and np.isfinite(float(dca_snapshot.fader_db))
+                    else None
+                )
+                dca_enabled = bool(
+                    dca_snapshot is not None
+                    and dca_snapshot.muted is False
+                    and dca_fader is not None
+                    and dca_fader > -90.0
+                )
+                assigned_dca_states[str(dca_id)] = {
+                    "muted": (
+                        bool(dca_snapshot.muted)
+                        if dca_snapshot is not None
+                        else None
+                    ),
+                    "fader_db": dca_fader,
+                    "locally_enabled": dca_enabled,
+                }
+                downstream_dca_path_verified = bool(
+                    downstream_dca_path_verified and dca_enabled
+                )
+            analyzed_source_path_enabled = bool(
+                channel_main_path_locally_enabled
+                and downstream_dca_path_verified
+            )
+            planned_fader_target = fader_targets_by_channel.get(channel)
+            planned_fader_target_audible = bool(
+                isinstance(planned_fader_target, (int, float))
+                and not isinstance(planned_fader_target, bool)
+                and np.isfinite(float(planned_fader_target))
+                and -90.0 < float(planned_fader_target) <= 0.0
+            )
+            foundation_analyzed = (
+                per_source_stage_coverage[str(channel)].get(
+                    "foundation_level"
+                )
+                in {"analyzed", "explicitly_not_required"}
+            )
+            if planned_fader_target_audible and analyzed_source_path_enabled:
+                mode = "absolute_target"
+            elif (
+                channel not in fader_targets_by_channel
+                and
+                info is not None
+                and info.has_signal
+                and foundation_analyzed
+                and analyzed_source_path_enabled
+            ):
+                mode = "hold_current"
+            else:
+                mode = "unresolved"
+                if (
+                    channel in fader_targets_by_channel
+                    and not planned_fader_target_audible
+                ):
+                    unresolved_reason = (
+                        "selected_source_final_fader_below_audible_floor"
+                    )
+                elif snapshot is not None and (
+                        snapshot.muted is True
+                        or not baseline_valid
+                        or (
+                            baseline_valid
+                            and float(baseline) <= -90.0
+                        )
+                ):
+                    unresolved_reason = (
+                        "selected_source_muted_or_inactive_fader_requires_operator"
+                    )
+                elif (
+                    snapshot is not None
+                    and not channel_main_path_locally_enabled
+                ):
+                    unresolved_reason = "selected_source_main_path_not_audible"
+                elif (
+                    snapshot is not None
+                    and not downstream_dca_path_verified
+                ):
+                    unresolved_reason = "selected_source_dca_path_not_audible"
+                else:
+                    unresolved_reason = "per_source_fader_intent_unresolved"
+                residuals.append(
+                    {
+                        "logical_correction_id": (
+                            f"soundcheck:fader_intent:{channel}"
+                        ),
+                        "reason": unresolved_reason,
+                        "channel": channel,
+                        "status": "pending",
+                        "scope": "operation",
+                        "disposition": "operator_review",
+                        "stage": "foundation_level",
+                        "required_for": "safe_core",
+                        "musically_required": True,
+                    }
+                )
+            per_source_fader_intent[str(channel)] = {
+                "mode": mode,
+                "analysis_baseline_db": (
+                    float(baseline) if baseline_valid else None
+                ),
+                "absolute_target_db": planned_fader_target,
+                "analysis_run_id": self._soundcheck_run_id,
+                "analysis_captured_at_epoch": self._derivation_captured_at_epoch,
+                "source_name": info.name if info is not None else "",
+                "source_role": info.source_role if info is not None else "unknown",
+                "signal_verified": bool(info is not None and info.has_signal),
+                "foundation_analyzed": foundation_analyzed,
+                "main_send_on": main_send_on,
+                "main_send_level_db": main_send_level,
+                "main_send_pre": main_send_pre,
+                "input_routing": input_routing,
+                "channel_main_path_locally_enabled": (
+                    channel_main_path_locally_enabled
+                ),
+                "local_path_readback_complete": local_path_readback_complete,
+                "assigned_dca_ids": assigned_dca_ids,
+                "assigned_dca_states": assigned_dca_states,
+                "downstream_dca_path_verified": downstream_dca_path_verified,
+                "analyzed_source_path_enabled": analyzed_source_path_enabled,
+            }
+        payload["source_coverage"] = {
+            "verified": bool(selected and len(signalled) == len(selected)),
+            "captured_at_epoch": self._derivation_captured_at_epoch,
+            "max_age_sec": 300.0,
+            "selected_channel_ids": selected,
+            "signalled_channel_ids": signalled,
+            "pending_checklist_count": len(pending_items),
+            "stage_coverage": stage_coverage,
+            "per_source_stage_coverage": per_source_stage_coverage,
+            "per_source_fader_intent": per_source_fader_intent,
+            "derivation_complete": bool(self._derivation_complete),
+            "coverage_basis": "per_selected_source_stage_evidence",
+        }
+        payload["readiness_residuals"] = residuals
+        payload["last_master_mix_verdict"] = master_verdict
+        return bind_soundcheck_manifest_content_sha256(payload)
 
     def get_gain_recommendations(self) -> Dict[int, Dict[str, Any]]:
         """Return read-only AutoGain recommendations from the latest soundcheck metrics."""
@@ -2119,23 +2560,170 @@ class AutoSoundcheckEngine:
             EngineState.DERIVING: RuntimeState.SNAPSHOT_LOCK,
             EngineState.APPLYING: RuntimeState.SNAPSHOT_LOCK,
             EngineState.RUNNING: RuntimeState.PRE_SHOW_CHECK,
+            EngineState.STOPPING: RuntimeState.MANUAL_LOCK,
             EngineState.ERROR: RuntimeState.MANUAL_LOCK,
             EngineState.STOPPED: RuntimeState.IDLE,
         }
         self.runtime_state = runtime_mapping.get(new_state, self.runtime_state)
         logger.info(f"Engine state: {old.value} -> {new_state.value} {message}")
-        self._log_autofoh_event(
-            "state_transition",
-            previous_engine_state=old.value,
-            new_engine_state=new_state.value,
-            runtime_state=self.runtime_state.value,
-            message=message,
-        )
-        if self.on_state_change:
+        if not self._soundcheck_revision_prepare_in_progress:
+            self._log_autofoh_event(
+                "state_transition",
+                previous_engine_state=old.value,
+                new_engine_state=new_state.value,
+                runtime_state=self.runtime_state.value,
+                message=message,
+            )
+        if self.on_state_change and not self._soundcheck_revision_prepare_in_progress:
             try:
                 self.on_state_change(new_state.value, message)
             except Exception:
                 pass
+
+    @staticmethod
+    def _readiness_scope_for_action(action: Any) -> Tuple[str, str]:
+        """Map a requested musical action to its readiness stage."""
+
+        action_type = str(
+            getattr(action, "action_type", "")
+            or getattr(getattr(action, "__class__", None), "__name__", "")
+        ).lower()
+        if any(token in action_type for token in ("polarity", "phase", "delay")):
+            return "phase_alignment_review", "safe_core"
+        if any(token in action_type for token in ("hpf", "gate", "expander")):
+            return "source_control", "safe_core"
+        if any(token in action_type for token in ("eq", "compressor", "dynamic")):
+            return "tonal_dynamics", "show_mix"
+        if any(token in action_type for token in ("bus", "dca", "group", "matrix")):
+            return "group_balance", "show_mix"
+        if any(token in action_type for token in ("pan", "send", "fx", "reverb")):
+            return "spatial_fx", "show_mix"
+        return "foundation_level", "safe_core"
+
+    def _record_derivation_readiness_residual(
+        self,
+        action: Any,
+        *,
+        reason: str,
+        gate: str,
+        stage: Optional[str] = None,
+        required_for: Optional[str] = None,
+        channel: Optional[int] = None,
+    ) -> None:
+        """Keep every derivation rejection visible to run-level readiness."""
+
+        if not getattr(self, "_derivation_in_progress", False):
+            return
+        inferred_stage, inferred_required_for = self._readiness_scope_for_action(action)
+        stage = str(stage or inferred_stage)
+        required_for = str(required_for or inferred_required_for)
+        raw_channel = channel
+        if raw_channel is None:
+            raw_channel = getattr(action, "channel_id", None)
+        try:
+            normalized_channel = int(raw_channel) if raw_channel is not None else None
+        except (TypeError, ValueError):
+            normalized_channel = None
+        action_type = str(
+            getattr(action, "action_type", "")
+            or getattr(getattr(action, "__class__", None), "__name__", "")
+            or "derivation_stage"
+        )
+        residuals = getattr(self, "_derivation_readiness_residuals", None)
+        if not isinstance(residuals, list):
+            self._derivation_readiness_residuals = []
+            residuals = self._derivation_readiness_residuals
+        identity = {
+            "run_id": self._soundcheck_run_id,
+            "ordinal": len(residuals),
+            "channel": normalized_channel,
+            "action_type": action_type,
+            "gate": str(gate),
+            "reason": str(reason),
+            "stage": stage,
+        }
+        digest = hashlib.sha256(
+            json.dumps(identity, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()[:20]
+        residuals.append(
+            {
+                "logical_correction_id": f"soundcheck:derivation:{digest}",
+                "reason": str(reason or "derivation_correction_blocked"),
+                "gate": str(gate),
+                "action_type": action_type,
+                "channel": normalized_channel,
+                "status": "pending",
+                "scope": "operation",
+                "disposition": "operator_review",
+                "stage": stage,
+                "required_for": required_for,
+                "musically_required": True,
+            }
+        )
+        if normalized_channel is not None:
+            coverage = self._derivation_channel_stage_coverage.setdefault(
+                normalized_channel,
+                {},
+            )
+            coverage[stage] = f"blocked:{gate}"
+
+    def _fail_derivation_helper(
+        self,
+        *,
+        channel: int,
+        stage: str,
+        helper: str,
+        error: Exception,
+    ) -> None:
+        """Turn swallowed helper failures into explicit readiness residuals."""
+
+        if not getattr(self, "_derivation_in_progress", False):
+            return
+        self._record_derivation_readiness_residual(
+            None,
+            reason=f"{helper}_analysis_failed:{type(error).__name__}",
+            gate=f"{helper}_analysis",
+            stage=stage,
+            required_for=(
+                "safe_core"
+                if stage
+                in {
+                    "foundation_level",
+                    "source_control",
+                    "phase_alignment_review",
+                }
+                else "show_mix"
+            ),
+            channel=channel,
+        )
+        raise RuntimeError(f"{helper}_analysis_failed") from error
+
+    def _mark_derivation_stage_complete(self, channel: int, stage: str) -> None:
+        if not getattr(self, "_derivation_in_progress", False):
+            return
+        coverage = self._derivation_channel_stage_coverage.setdefault(channel, {})
+        if not str(coverage.get(stage) or "").startswith("blocked:"):
+            coverage[stage] = "analyzed"
+
+    def _record_derivation_control_block(
+        self,
+        channel: int,
+        *,
+        control: str,
+        stage: str,
+    ) -> None:
+        self._record_derivation_readiness_residual(
+            None,
+            reason=f"{control}_control_not_available_for_selected_source",
+            gate=f"{control}_control",
+            stage=stage,
+            required_for=("safe_core" if stage in {
+                "foundation_level",
+                "source_control",
+                "phase_alignment_review",
+            } else "show_mix"),
+            channel=channel,
+        )
 
     def _execute_action(
         self,
@@ -2146,6 +2734,11 @@ class AutoSoundcheckEngine:
         phase_guard_context: Optional[Dict[str, Any]] = None,
     ):
         if self.safety_controller is None:
+            self._record_derivation_readiness_residual(
+                action,
+                reason="safety_controller_unavailable",
+                gate="safety_controller",
+            )
             return None
         effective_state = runtime_state or self.runtime_state
         if self._phase_target_guard_enabled_for_action(action, effective_state):
@@ -2233,6 +2826,11 @@ class AutoSoundcheckEngine:
                             "metadata": guard_metadata,
                         },
                     )
+                    self._record_derivation_readiness_residual(
+                        action,
+                        reason=str(guard_message or "phase_target_guard_blocked"),
+                        gate="phase_target_guard",
+                    )
                     return decision
         snapshot = self._capture_action_snapshot(
             action,
@@ -2270,6 +2868,14 @@ class AutoSoundcheckEngine:
                 },
             )
             self._mirror_mixing_station_decision(decision, snapshot=snapshot)
+            self._record_derivation_readiness_residual(
+                action,
+                reason=str(
+                    getattr(muq_gate, "rejection_reason", "")
+                    or "muq_quality_gate_blocked"
+                ),
+                gate="muq_quality_gate",
+            )
             return decision
         gated_result = None
         if self.correction_executor is not None:
@@ -2754,6 +3360,7 @@ class AutoSoundcheckEngine:
             source_type=source_type,
             device_name=device_index,
         )
+        self.audio_capture.allow_silence_fallback = False
 
         try:
             self.audio_capture.start()
@@ -2765,6 +3372,11 @@ class AutoSoundcheckEngine:
             return True
         except Exception as e:
             logger.error(f"Failed to start audio capture: {e}")
+            try:
+                self.audio_capture.stop()
+            except Exception:
+                pass
+            self.audio_capture = None
             return False
 
     # ── 3. Scan channel names ────────────────────────────────────
@@ -4504,9 +5116,25 @@ class AutoSoundcheckEngine:
             if not info.has_signal:
                 continue
             if ch in self._applied_channels:
+                self._record_derivation_readiness_residual(
+                    None,
+                    reason="channel_already_marked_applied_before_derivation",
+                    gate="derivation_channel_state",
+                    channel=ch,
+                )
                 continue
             if not info.auto_corrections_enabled:
                 self._log_processing_skip(ch, info, "auto-processing")
+                self._record_derivation_readiness_residual(
+                    None,
+                    reason="signalled_source_auto_corrections_disabled",
+                    gate="source_identity_or_operator_policy",
+                    channel=ch,
+                )
+                for stage in STAGE_ORDER:
+                    self._derivation_channel_stage_coverage.setdefault(ch, {})[
+                        stage
+                    ] = "blocked:auto_corrections_disabled"
                 continue
 
             preset = info.preset or "custom"
@@ -4526,6 +5154,16 @@ class AutoSoundcheckEngine:
                     phase_guard_context=phase_guard_context,
                 )
                 self._applied_channels.add(ch)
+                self._record_derivation_readiness_residual(
+                    None,
+                    reason="bleed_dominated_source_requires_own_source_pass",
+                    gate="bleed_identity_guard",
+                    channel=ch,
+                )
+                for stage in STAGE_ORDER:
+                    self._derivation_channel_stage_coverage.setdefault(ch, {})[
+                        stage
+                    ] = "blocked:bleed_identity_guard"
                 continue
             had_proc = ""
             if info.original_snapshot and info.original_snapshot.had_processing:
@@ -4544,12 +5182,24 @@ class AutoSoundcheckEngine:
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="gain",
+                        stage="foundation_level",
+                    )
                 # 2. HPF
                 if self._control_allowed(info, "hpf"):
                     self._apply_hpf(
                         ch,
                         preset,
                         phase_guard_context=phase_guard_context,
+                    )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="hpf",
+                        stage="foundation_level",
                     )
                 # 2b. Gate/expander for close drum mics so bleed is not what drives EQ/trim.
                 self._apply_gate(
@@ -4558,12 +5208,19 @@ class AutoSoundcheckEngine:
                     preset,
                     phase_guard_context=phase_guard_context,
                 )
+                self._mark_derivation_stage_complete(ch, "source_control")
                 # 3. Parametric EQ (4-band)
                 if self._control_allowed(info, "eq"):
                     self._apply_eq(
                         ch,
                         preset,
                         phase_guard_context=phase_guard_context,
+                    )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="eq",
+                        stage="tonal_dynamics",
                     )
                 # 4. Compressor
                 if self._control_allowed(info, "compressor"):
@@ -4573,6 +5230,13 @@ class AutoSoundcheckEngine:
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="compressor",
+                        stage="tonal_dynamics",
+                    )
+                self._mark_derivation_stage_complete(ch, "tonal_dynamics")
                 # 5. Pan
                 if self._control_allowed(info, "pan"):
                     self._apply_pan(
@@ -4581,9 +5245,21 @@ class AutoSoundcheckEngine:
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="pan",
+                        stage="spatial_fx",
+                    )
                 # 6. Gain correction (output-side, LUFS-based)
                 if self._control_allowed(info, "fader"):
                     self._apply_gain_correction(ch, info, preset)
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="fader",
+                        stage="foundation_level",
+                    )
                 # 7. Fader
                 if self._control_allowed(info, "fader"):
                     self._apply_fader(
@@ -4592,14 +5268,31 @@ class AutoSoundcheckEngine:
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                self._mark_derivation_stage_complete(ch, "foundation_level")
                 # 8. FX sends (reverb/delay)
                 if self._control_allowed(info, "fx_send"):
+                    if not self.auto_fx_sends_enabled:
+                        self._record_derivation_readiness_residual(
+                            None,
+                            reason="automatic_fx_sends_disabled_requires_operator_review",
+                            gate="fx_send_operator_review",
+                            stage="spatial_fx",
+                            required_for="show_mix",
+                            channel=ch,
+                        )
                     self._apply_fx_sends(
                         ch,
                         info,
                         preset,
                         phase_guard_context=phase_guard_context,
                     )
+                else:
+                    self._record_derivation_control_block(
+                        ch,
+                        control="fx_send",
+                        stage="spatial_fx",
+                    )
+                self._mark_derivation_stage_complete(ch, "spatial_fx")
 
                 self._applied_channels.add(ch)
 
@@ -4622,15 +5315,48 @@ class AutoSoundcheckEngine:
 
             except Exception as e:
                 logger.error(f"Ch {ch}: error applying corrections: {e}")
+                self._record_derivation_readiness_residual(
+                    None,
+                    reason=f"channel_correction_chain_failed:{type(e).__name__}",
+                    gate="channel_correction_chain",
+                    channel=ch,
+                )
+                for stage in STAGE_ORDER:
+                    self._derivation_channel_stage_coverage.setdefault(ch, {}).setdefault(
+                        stage,
+                        "blocked:channel_correction_chain",
+                    )
 
         # 9. Full-band shared-chat mix pass over the current live console state.
         self._apply_live_shared_mix_pass(phase_guard_context=phase_guard_context)
 
         # 10. Group bus balance/headroom pass; BUS 13-16 monitor buses are excluded by policy.
-        self._apply_group_bus_corrections(phase_guard_context=phase_guard_context)
+        if (
+            self.group_bus_correction_enabled
+            and self.safety_controller is not None
+            and self.mixer_client is not None
+        ):
+            self._apply_group_bus_corrections(
+                phase_guard_context=phase_guard_context
+            )
+        else:
+            for channel in self._iter_channels():
+                self._record_derivation_readiness_residual(
+                    None,
+                    reason="group_balance_analysis_unavailable",
+                    gate="group_balance_analysis",
+                    stage="group_balance",
+                    required_for="show_mix",
+                    channel=channel,
+                )
 
         # 11. Phase / polarity check across correlated channel pairs
         self._detect_and_fix_phase()
+        for channel in self._iter_channels():
+            self._mark_derivation_stage_complete(
+                channel,
+                "phase_alignment_review",
+            )
 
         # 11b. Операторская схема панорамы и фазового порядка ударных
         # (2026-07-06): OH — мастер-картинка, всё выравнивается в неё
@@ -4661,6 +5387,8 @@ class AutoSoundcheckEngine:
         # поканальный баланс задаёт бленд внутри групп, DCA прибирает
         # группы к Ayaic-плоскостям (только вниз, потолок 0)
         self._apply_dca_group_balance(phase_guard_context=phase_guard_context)
+        for channel in self._iter_channels():
+            self._mark_derivation_stage_complete(channel, "group_balance")
 
         # 13. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
         # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
@@ -4678,17 +5406,454 @@ class AutoSoundcheckEngine:
         else:
             logger.info("Чек-лист саундчека: все пункты закрыты")
 
-    def _derive_corrections(self) -> None:
+    def _derive_corrections(self, *, continue_run: bool = False) -> None:
+        with self._derivation_lock:
+            self._derive_corrections_locked(continue_run=continue_run)
+
+    def _derive_corrections_locked(self, *, continue_run: bool = False) -> None:
         """Build a fresh review bundle through the intercepted no-write path."""
         if not self.observe_only or not isinstance(self.mixer_client, ObservationMixerClient):
             raise RuntimeError("Recommendation derivation requires the observation mixer boundary")
+        if continue_run:
+            if not str(self._soundcheck_run_id or "").strip():
+                raise RuntimeError("Soundcheck run identity is unavailable")
+            self._soundcheck_plan_revision += 1
+        else:
+            self._soundcheck_run_id = f"soundcheck-{uuid4().hex}"
+            self._soundcheck_plan_revision = 1
+        self._committed_soundcheck_recommendation_bundle = None
         self._soundcheck_recommendation_workflow.clear()
         self._soundcheck_action_proposals = []
+        self._soundcheck_transaction_actions = []
+        self._derivation_channel_stage_coverage = {}
+        self._derivation_readiness_residuals = []
+        self._derivation_captured_at_epoch = None
+        self._derivation_complete = False
+        self._derivation_in_progress = True
         applied_before = set(self._applied_channels)
-        self._apply_corrections(derivation_only=True)
-        # Derivation visits active channels, but no change was physically sent.
-        self._applied_channels = applied_before
-        self._derivation_complete = True
+        try:
+            self._apply_corrections(derivation_only=True)
+        except Exception as exc:
+            self._record_derivation_readiness_residual(
+                None,
+                reason=f"derivation_pipeline_failed:{type(exc).__name__}",
+                gate="derivation_pipeline",
+            )
+            raise
+        finally:
+            # Derivation visits active channels, but no change was physically sent.
+            self._applied_channels = applied_before
+            selected = list(self._iter_channels())
+            all_sources_covered = bool(selected)
+            for channel in selected:
+                info = self.channels.get(channel)
+                coverage = self._derivation_channel_stage_coverage.get(channel, {})
+                if (
+                    info is None
+                    or not info.has_signal
+                    or any(
+                        coverage.get(stage)
+                        not in {"analyzed", "explicitly_not_required"}
+                        for stage in STAGE_ORDER
+                        if stage != "destructive_high_risk"
+                    )
+                ):
+                    all_sources_covered = False
+                    break
+            self._derivation_complete = bool(
+                all_sources_covered and not self._derivation_readiness_residuals
+            )
+            self._derivation_captured_at_epoch = time.time()
+            self._derivation_in_progress = False
+
+    _SOUNDCHECK_REVISION_STATE_FIELDS = (
+        "channels",
+        "bus_snapshots",
+        "dca_snapshots",
+        "channel_group_routes",
+        "_analyzers",
+        "_phase_learning_snapshots",
+        "current_target_corridor",
+        "last_master_mix_verdict",
+        "soundcheck_checklist",
+        "_eq_v3_proposals",
+        "_comp_v3_proposals",
+        "_balance_v3_solution",
+        "_pan_v3_solution",
+        "_bleed_dominated_channels",
+        "_fx_bus_insert_cache",
+        "_soundcheck_plan_revision",
+        "_committed_soundcheck_recommendation_bundle",
+        "_soundcheck_recommendation_workflow",
+        "_soundcheck_action_proposals",
+        "_soundcheck_transaction_actions",
+        "_derivation_channel_stage_coverage",
+        "_derivation_readiness_residuals",
+        "_derivation_captured_at_epoch",
+        "_derivation_complete",
+        "_derivation_in_progress",
+        "_applied_channels",
+    )
+    _SOUNDCHECK_STATE_MISSING = object()
+
+    def _capture_soundcheck_revision_state(self) -> Dict[str, Any]:
+        """Copy every mutable field that can influence a derived manifest."""
+
+        snapshot: Dict[str, Any] = {}
+        for field_name in self._SOUNDCHECK_REVISION_STATE_FIELDS:
+            if hasattr(self, field_name):
+                snapshot[field_name] = copy.deepcopy(getattr(self, field_name))
+            else:
+                snapshot[field_name] = self._SOUNDCHECK_STATE_MISSING
+        demoted = getattr(
+            getattr(self, "correction_executor", None),
+            "_demoted_action_types",
+            self._SOUNDCHECK_STATE_MISSING,
+        )
+        snapshot["_correction_executor_demoted_action_types"] = (
+            copy.deepcopy(demoted)
+            if demoted is not self._SOUNDCHECK_STATE_MISSING
+            else self._SOUNDCHECK_STATE_MISSING
+        )
+        observation_client = (
+            self.mixer_client
+            if isinstance(self.mixer_client, ObservationMixerClient)
+            else None
+        )
+        snapshot["_observation_derivation_state"] = (
+            observation_client.snapshot_derivation_state()
+            if observation_client is not None
+            else self._SOUNDCHECK_STATE_MISSING
+        )
+        return snapshot
+
+    def _restore_soundcheck_revision_state(
+        self,
+        snapshot: Dict[str, Any],
+    ) -> None:
+        for field_name in self._SOUNDCHECK_REVISION_STATE_FIELDS:
+            value = snapshot.get(field_name, self._SOUNDCHECK_STATE_MISSING)
+            if value is self._SOUNDCHECK_STATE_MISSING:
+                if hasattr(self, field_name):
+                    delattr(self, field_name)
+                continue
+            setattr(self, field_name, copy.deepcopy(value))
+        demoted = snapshot.get(
+            "_correction_executor_demoted_action_types",
+            self._SOUNDCHECK_STATE_MISSING,
+        )
+        executor = getattr(self, "correction_executor", None)
+        if (
+            demoted is not self._SOUNDCHECK_STATE_MISSING
+            and executor is not None
+        ):
+            executor._demoted_action_types = copy.deepcopy(demoted)
+        observation_state = snapshot.get(
+            "_observation_derivation_state",
+            self._SOUNDCHECK_STATE_MISSING,
+        )
+        if (
+            observation_state is not self._SOUNDCHECK_STATE_MISSING
+            and isinstance(self.mixer_client, ObservationMixerClient)
+        ):
+            self.mixer_client.restore_derivation_state(observation_state)
+
+    def _validate_soundcheck_reanalysis_runtime(
+        self,
+        expected_run_id: str,
+        *,
+        allow_pending_stop: bool = False,
+    ) -> str:
+        expected_run_id = str(expected_run_id or "").strip()
+        if not expected_run_id or expected_run_id != self._soundcheck_run_id:
+            raise RuntimeError("Soundcheck reanalysis run identity mismatch")
+        if not self.observe_only or not isinstance(
+            self.mixer_client,
+            ObservationMixerClient,
+        ):
+            raise RuntimeError("Soundcheck reanalysis requires observation mode")
+        if self._stop_event.is_set() and not allow_pending_stop:
+            raise RuntimeError("Soundcheck engine is stopping")
+        if self.state != EngineState.RUNNING:
+            raise RuntimeError("Soundcheck engine is not in monitoring state")
+        if self.audio_capture is None or not getattr(
+            self.audio_capture,
+            "running",
+            False,
+        ):
+            raise RuntimeError("Soundcheck audio capture is not running")
+        return expected_run_id
+
+    def prepare_soundcheck_revision_candidate(
+        self,
+        expected_run_id: str,
+        *,
+        expected_plan_revision: Optional[int] = None,
+        expected_manifest_content_sha256: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Build the next revision without publishing it into engine state.
+
+        Read-only console/audio observations may be collected, but all mutable
+        derivation inputs and outputs are restored before this method releases
+        the monitor lock. The returned candidate can then be committed only
+        after the server has durably accepted the same revision.
+        """
+
+        expected_run_id = self._validate_soundcheck_reanalysis_runtime(
+            expected_run_id
+        )
+        with self._derivation_lock, self._monitor_iteration_lock:
+            self._validate_soundcheck_reanalysis_runtime(expected_run_id)
+            base_revision = int(self._soundcheck_plan_revision)
+            if (
+                expected_plan_revision is not None
+                and int(expected_plan_revision) != base_revision
+            ):
+                raise RuntimeError("Soundcheck reanalysis base revision mismatch")
+            if self._derivation_in_progress:
+                raise RuntimeError("Soundcheck derivation already in progress")
+            if self._soundcheck_revision_candidates:
+                raise RuntimeError("Soundcheck reanalysis candidate already pending")
+            committed = getattr(
+                self,
+                "_committed_soundcheck_recommendation_bundle",
+                None,
+            )
+            committed_manifest = (
+                committed.get("supervised_transaction_plans")
+                if isinstance(committed, dict)
+                else None
+            )
+            committed_digest = str(
+                committed_manifest.get("manifest_content_sha256") or ""
+            ) if isinstance(committed_manifest, dict) else ""
+            if expected_manifest_content_sha256 and not committed_digest:
+                frozen_base = self._get_soundcheck_recommendation_bundle_locked()
+                frozen_manifest = frozen_base.get("supervised_transaction_plans")
+                committed_digest = str(
+                    frozen_manifest.get("manifest_content_sha256") or ""
+                ) if isinstance(frozen_manifest, dict) else ""
+            if (
+                expected_manifest_content_sha256
+                and committed_digest
+                and str(expected_manifest_content_sha256) != committed_digest
+            ):
+                raise RuntimeError("Soundcheck reanalysis base digest mismatch")
+
+            previous_engine_state = self.state
+            previous_runtime_state = self.runtime_state
+            previous_state: Optional[Dict[str, Any]] = None
+            candidate_state: Optional[Dict[str, Any]] = None
+            bundle: Optional[Dict[str, Any]] = None
+            self._soundcheck_revision_stable_bundle = copy.deepcopy(
+                self._committed_soundcheck_recommendation_bundle
+            )
+            self._soundcheck_revision_prepare_in_progress = True
+            self.mixer_client.suppress_derivation_events(True)
+            try:
+                previous_state = self._capture_soundcheck_revision_state()
+                self.mixer_client.reset_derivation_state()
+                self._read_channel_state()
+                self._wait_and_analyze()
+                self._derive_corrections_locked(continue_run=True)
+                self._set_state(
+                    EngineState.RUNNING,
+                    "Stage-local recommendation reanalysis prepared",
+                )
+                bundle = copy.deepcopy(
+                    self._get_soundcheck_recommendation_bundle_locked()
+                )
+                self._committed_soundcheck_recommendation_bundle = copy.deepcopy(
+                    bundle
+                )
+                candidate_state = self._capture_soundcheck_revision_state()
+            finally:
+                if previous_state is not None:
+                    self._restore_soundcheck_revision_state(previous_state)
+                self.state = previous_engine_state
+                self.runtime_state = previous_runtime_state
+                self.mixer_client.suppress_derivation_events(False)
+                self._soundcheck_revision_prepare_in_progress = False
+                self._soundcheck_revision_stable_bundle = None
+
+            if bundle is None or candidate_state is None:
+                raise RuntimeError("Soundcheck reanalysis candidate unavailable")
+            candidate_id = f"soundcheck-reanalysis-{uuid4().hex}"
+            self._soundcheck_revision_candidates[candidate_id] = {
+                "candidate_id": candidate_id,
+                "run_id": expected_run_id,
+                "base_plan_revision": base_revision,
+                "target_plan_revision": base_revision + 1,
+                "base_manifest_content_sha256": str(
+                    expected_manifest_content_sha256 or ""
+                ),
+                "created_at_epoch": time.time(),
+                "state": candidate_state,
+                "bundle": bundle,
+            }
+            return {
+                "candidate_id": candidate_id,
+                "run_id": expected_run_id,
+                "base_plan_revision": base_revision,
+                "target_plan_revision": base_revision + 1,
+                "base_manifest_content_sha256": str(
+                    expected_manifest_content_sha256 or ""
+                ),
+                "bundle": copy.deepcopy(bundle),
+            }
+
+    def commit_soundcheck_revision_candidate(
+        self,
+        candidate_id: str,
+        *,
+        accepted_manifest_content_sha256: Optional[str] = None,
+        accepted_bundle: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Atomically publish a previously prepared engine revision."""
+
+        candidate_id = str(candidate_id or "").strip()
+        with self._derivation_lock, self._monitor_iteration_lock:
+            self._validate_soundcheck_reanalysis_runtime(
+                self._soundcheck_run_id,
+                allow_pending_stop=(
+                    self._soundcheck_publication_candidate_id == candidate_id
+                ),
+            )
+            candidate = self._soundcheck_revision_candidates.get(candidate_id)
+            if not isinstance(candidate, dict):
+                raise RuntimeError("Soundcheck reanalysis candidate missing")
+            if (
+                candidate.get("run_id") != self._soundcheck_run_id
+                or candidate.get("base_plan_revision")
+                != self._soundcheck_plan_revision
+            ):
+                raise RuntimeError("Soundcheck reanalysis candidate is stale")
+            candidate_manifest = candidate["bundle"].get(
+                "supervised_transaction_plans"
+            )
+            candidate_digest = str(
+                candidate_manifest.get("manifest_content_sha256") or ""
+            ) if isinstance(candidate_manifest, dict) else ""
+            if (
+                accepted_manifest_content_sha256
+                and candidate_digest
+                != str(accepted_manifest_content_sha256)
+            ):
+                raise RuntimeError("Soundcheck reanalysis accepted digest mismatch")
+            committed_bundle = (
+                copy.deepcopy(accepted_bundle)
+                if isinstance(accepted_bundle, dict)
+                else copy.deepcopy(candidate["bundle"])
+            )
+            accepted_manifest = committed_bundle.get(
+                "supervised_transaction_plans"
+            )
+            if not (
+                isinstance(accepted_manifest, dict)
+                and accepted_manifest.get("run_id") == candidate.get("run_id")
+                and accepted_manifest.get("plan_revision")
+                == candidate.get("target_plan_revision")
+                and str(accepted_manifest.get("manifest_content_sha256") or "")
+                == candidate_digest
+            ):
+                raise RuntimeError("Soundcheck reanalysis accepted bundle mismatch")
+            self._restore_soundcheck_revision_state(candidate["state"])
+            self._committed_soundcheck_recommendation_bundle = committed_bundle
+            self._soundcheck_revision_candidates.pop(candidate_id, None)
+            return copy.deepcopy(committed_bundle)
+
+    def discard_soundcheck_revision_candidate(self, candidate_id: str) -> bool:
+        """Forget an unpublished revision without changing visible state."""
+
+        candidate_id = str(candidate_id or "").strip()
+        with self._derivation_lock, self._monitor_iteration_lock:
+            return self._soundcheck_revision_candidates.pop(candidate_id, None) is not None
+
+    def discard_soundcheck_revision_candidates_for_run(
+        self,
+        expected_run_id: str,
+    ) -> int:
+        """Cancel every unpublished candidate for one run during teardown."""
+
+        expected_run_id = str(expected_run_id or "").strip()
+        with self._derivation_lock, self._monitor_iteration_lock:
+            candidate_ids = [
+                candidate_id
+                for candidate_id, candidate in self._soundcheck_revision_candidates.items()
+                if candidate.get("run_id") == expected_run_id
+            ]
+            for candidate_id in candidate_ids:
+                self._soundcheck_revision_candidates.pop(candidate_id, None)
+            return len(candidate_ids)
+
+    def acknowledge_published_soundcheck_bundle(
+        self,
+        bundle: Dict[str, Any],
+    ) -> bool:
+        """Freeze the exact server-accepted bundle for the current revision."""
+
+        manifest = (
+            bundle.get("supervised_transaction_plans")
+            if isinstance(bundle, dict)
+            else None
+        )
+        with self._derivation_lock, self._monitor_iteration_lock:
+            if not (
+                isinstance(manifest, dict)
+                and manifest.get("run_id") == self._soundcheck_run_id
+                and manifest.get("plan_revision")
+                == self._soundcheck_plan_revision
+                and str(manifest.get("manifest_content_sha256") or "")
+                == soundcheck_manifest_content_sha256(manifest)
+            ):
+                return False
+            self._committed_soundcheck_recommendation_bundle = copy.deepcopy(
+                bundle
+            )
+            return True
+
+    def validate_soundcheck_revision_candidate(self, candidate_id: str) -> bool:
+        """Recheck lifecycle and identity immediately before publication."""
+
+        candidate_id = str(candidate_id or "").strip()
+        with self._derivation_lock, self._monitor_iteration_lock:
+            self._validate_soundcheck_reanalysis_runtime(self._soundcheck_run_id)
+            candidate = self._soundcheck_revision_candidates.get(candidate_id)
+            if not isinstance(candidate, dict):
+                raise RuntimeError("Soundcheck reanalysis candidate missing")
+            if (
+                candidate.get("run_id") != self._soundcheck_run_id
+                or candidate.get("base_plan_revision")
+                != self._soundcheck_plan_revision
+            ):
+                raise RuntimeError("Soundcheck reanalysis candidate is stale")
+            return True
+
+    @contextmanager
+    def soundcheck_revision_publication_scope(self, candidate_id: str):
+        """Fence stop/teardown across durable server publish plus commit."""
+
+        candidate_id = str(candidate_id or "").strip()
+        with self._derivation_lock, self._monitor_iteration_lock:
+            self.validate_soundcheck_revision_candidate(candidate_id)
+            if self._soundcheck_publication_candidate_id:
+                raise RuntimeError("Soundcheck revision publication already active")
+            self._soundcheck_publication_candidate_id = candidate_id
+            try:
+                yield
+            finally:
+                self._soundcheck_publication_candidate_id = ""
+
+    def rederive_soundcheck_revision(self, expected_run_id: str) -> Dict[str, Any]:
+        """Compatibility helper: prepare and immediately commit one revision."""
+
+        candidate = self.prepare_soundcheck_revision_candidate(expected_run_id)
+        candidate_id = candidate["candidate_id"]
+        try:
+            return self.commit_soundcheck_revision_candidate(candidate_id)
+        except BaseException:
+            self.discard_soundcheck_revision_candidate(candidate_id)
+            raise
 
     def _measurement_taps(self) -> Dict[str, Any]:
         """Карта измерительных USB-тапов (config autofoh.measurement_taps)."""
@@ -4753,6 +5918,7 @@ class AutoSoundcheckEngine:
             return
         groups = cfg.get("groups", {}) or {}
         for dca_id, spec in sorted(groups.items()):
+            members: List[int] = []
             try:
                 members = [int(ch) for ch in (spec.get("channels") or [])]
                 plane = float(spec.get("plane_lufs", -25.0))
@@ -4803,8 +5969,23 @@ class AutoSoundcheckEngine:
                         "fdr %.1f",
                         int(dca_id), spec.get("name", ""), stem_sum, stem_src,
                         plane, target)
-            except Exception:
+            except Exception as exc:
                 logger.exception("DCA balance failed for group %s", dca_id)
+                if getattr(self, "_derivation_in_progress", False):
+                    affected = [
+                        channel
+                        for channel in members
+                        if channel in self._iter_channels()
+                    ] or list(self._iter_channels())
+                    for channel in affected:
+                        self._record_derivation_readiness_residual(
+                            None,
+                            reason=f"dca_balance_failed:{type(exc).__name__}",
+                            gate="dca_balance_analysis",
+                            stage="group_balance",
+                            required_for="show_mix",
+                            channel=channel,
+                        )
 
     def _evaluate_master_mix(self) -> Optional[Dict[str, Any]]:
         """Захват мастер-петли и оценка микса; вердикт в лог и reports/."""
@@ -4958,6 +6139,12 @@ class AutoSoundcheckEngine:
                     logger.debug(f"Ch {ch}: HPF={requested_freq:.0f}Hz")
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="foundation_level",
+                helper="hpf",
+                error=e,
+            )
 
     def _collect_v3_channel_audio(self) -> Dict[int, Dict[str, Any]]:
         """Буферы активных каналов для мультиканальных v3-прогонов (EQ/comp)."""
@@ -5500,6 +6687,12 @@ class AutoSoundcheckEngine:
                 logger.debug(f"Ch {ch}: EQ preset '{preset}' (no adaptation)")
         except Exception as e:
             logger.warning(f"Ch {ch}: EQ failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="tonal_dynamics",
+                helper="eq",
+                error=e,
+            )
 
     def _apply_gain_correction(self, ch: int, info: ChannelInfo, preset: str):
         """Compute LUFS-based gain correction and fold it into fader offset.
@@ -5641,6 +6834,12 @@ class AutoSoundcheckEngine:
                     info.fader_db = previous_fader_db
             except Exception as e:
                 logger.warning(f"Ch {ch}: balance_v3 fader set failed: {e}")
+                self._fail_derivation_helper(
+                    channel=ch,
+                    stage="foundation_level",
+                    helper="fader",
+                    error=e,
+                )
             return
 
         # Start with the operator's current fader and apply only a correction.
@@ -5713,6 +6912,12 @@ class AutoSoundcheckEngine:
                 logger.info(f"Ch {ch} '{info.name}': fader={fader_db:.1f}dB")
         except Exception as e:
             logger.warning(f"Ch {ch}: fader set failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="foundation_level",
+                helper="fader",
+                error=e,
+            )
 
     # ── 5d. Input gain staging ───────────────────────────────────
 
@@ -5846,6 +7051,12 @@ class AutoSoundcheckEngine:
                     self._shift_comp_threshold_with_trim(ch, applied_delta)
         except Exception as e:
             logger.warning(f"Ch {ch}: input gain failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="foundation_level",
+                helper="input_gain",
+                error=e,
+            )
 
     def _shift_comp_threshold_with_trim(self, ch: int, delta_db: float) -> None:
         """Сдвинуть порог включённого компрессора вслед за тримом."""
@@ -6050,6 +7261,23 @@ class AutoSoundcheckEngine:
 
             except Exception as e:
                 logger.warning(f"Phase check error for pair ({ch_a}, {ch_b}): {e}")
+                if getattr(self, "_derivation_in_progress", False):
+                    self._record_derivation_readiness_residual(
+                        None,
+                        reason=f"phase_analysis_failed:{type(e).__name__}",
+                        gate="phase_analysis",
+                        stage="phase_alignment_review",
+                        required_for="safe_core",
+                        channel=ch_a,
+                    )
+                    self._record_derivation_readiness_residual(
+                        None,
+                        reason=f"phase_analysis_failed:{type(e).__name__}",
+                        gate="phase_analysis",
+                        stage="phase_alignment_review",
+                        required_for="safe_core",
+                        channel=ch_b,
+                    )
 
     # пресеты пар «один источник — несколько близких микрофонов»
     SAME_SOURCE_CLOSE_PAIR_PRESETS = frozenset({"kick", "snare"})
@@ -6294,9 +7522,22 @@ class AutoSoundcheckEngine:
                          if trim_target is not None else ""),
                         (f", фейдер -> {fader_target:.1f}"
                          if fader_target is not None else ""))
-            except Exception:
+            except Exception as exc:
                 logger.exception(
                     "stereo identity failed for pair ch%d/ch%d", l_ch, r_ch)
+                if getattr(self, "_derivation_in_progress", False):
+                    for channel in (l_ch, r_ch):
+                        self._record_derivation_readiness_residual(
+                            None,
+                            reason=(
+                                "stereo_identity_analysis_failed:"
+                                f"{type(exc).__name__}"
+                            ),
+                            gate="stereo_identity_analysis",
+                            stage="foundation_level",
+                            required_for="safe_core",
+                            channel=channel,
+                        )
 
     def _apply_drum_image_scheme(
         self,
@@ -6306,6 +7547,7 @@ class AutoSoundcheckEngine:
         """Схема оператора 2026-07-06: панорама + фазовый порядок ударных."""
         if not self._drum_image_enabled():
             return
+        drum_chs: set[int] = set()
         try:
             from heuristics.drum_image_v3 import plan_drum_image
             roles = self._drum_image_roles(restrict_to_applied=True)
@@ -6387,8 +7629,19 @@ class AutoSoundcheckEngine:
                     PanAdjust(channel_id=ch, pan=round(float(pan), 1),
                               reason="drum_image: панорама по схеме оператора"),
                     phase_guard_context=phase_guard_context)
-        except Exception:
+        except Exception as exc:
             logger.exception("drum_image scheme failed (informational only)")
+            if getattr(self, "_derivation_in_progress", False):
+                affected = sorted(drum_chs) or list(self._iter_channels())
+                for channel in affected:
+                    self._record_derivation_readiness_residual(
+                        None,
+                        reason=f"drum_image_analysis_failed:{type(exc).__name__}",
+                        gate="drum_image_analysis",
+                        stage="phase_alignment_review",
+                        required_for="safe_core",
+                        channel=channel,
+                    )
 
     def _same_source_delay_plausible(self, pair_type: str,
                                      delay_ms: float) -> bool:
@@ -6494,6 +7747,12 @@ class AutoSoundcheckEngine:
                     logger.info(f"Ch {ch} '{info.name}': pan_v3 -> {pan:+.0f}")
             except Exception as e:
                 logger.warning(f"Ch {ch}: pan_v3 set failed: {e}")
+                self._fail_derivation_helper(
+                    channel=ch,
+                    stage="spatial_fx",
+                    helper="pan",
+                    error=e,
+                )
             return
 
         pan = INSTRUMENT_PAN.get(preset, 0.0)
@@ -6546,6 +7805,12 @@ class AutoSoundcheckEngine:
                 logger.info(f"Ch {ch} '{info.name}': pan = {pan:+.0f}")
         except Exception as e:
             logger.warning(f"Ch {ch}: pan set failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="spatial_fx",
+                helper="pan",
+                error=e,
+            )
 
     # ── 5g. Gate / Expander ──────────────────────────────────────
 
@@ -6613,6 +7878,12 @@ class AutoSoundcheckEngine:
                 )
         except Exception as e:
             logger.warning(f"Ch {ch}: gate failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="source_control",
+                helper="gate",
+                error=e,
+            )
 
     # ── 5h. Compressor ───────────────────────────────────────────
 
@@ -7123,6 +8394,12 @@ class AutoSoundcheckEngine:
                 )
         except Exception as e:
             logger.warning(f"Ch {ch}: compressor failed: {e}")
+            self._fail_derivation_helper(
+                channel=ch,
+                stage="tonal_dynamics",
+                helper="compressor",
+                error=e,
+            )
 
     # ── 5h. FX Sends (reverb / delay) ────────────────────────────
 
@@ -7237,6 +8514,12 @@ class AutoSoundcheckEngine:
                     sent_buses.append((send_bus, level_db))
             except Exception as e:
                 logger.warning(f"Ch {ch}: send bus {send_bus} failed: {e}")
+                self._fail_derivation_helper(
+                    channel=ch,
+                    stage="spatial_fx",
+                    helper="fx_send",
+                    error=e,
+                )
 
         if sent_buses:
             bus_desc = ", ".join(f"bus{b}={l:.0f}dB" for b, l in sent_buses)
@@ -7304,28 +8587,29 @@ class AutoSoundcheckEngine:
 
         while not self._stop_event.is_set():
             try:
-                for ch, info in self.channels.items():
-                    if not info.has_signal:
-                        peak = self.audio_capture.get_peak(ch, self.block_size * 4)
-                        if peak > SIGNAL_THRESHOLD_DB:
-                            info.has_signal = True
-                            info.peak_db = peak
-                            info.rms_db = self.audio_capture.get_rms(ch, self.block_size * 4)
-                            info.lufs = self.audio_capture.get_lufs(ch, 0.4)
-                            if not info.recognized:
-                                self._classify_by_spectrum(ch, info)
-                            logger.info(f"Monitor: new signal on Ch {ch} '{info.name}'")
-                            self._apply_corrections_single(ch)
-                        continue
+                with self._monitor_iteration_lock:
+                    for ch, info in self.channels.items():
+                        if not info.has_signal:
+                            peak = self.audio_capture.get_peak(ch, self.block_size * 4)
+                            if peak > SIGNAL_THRESHOLD_DB:
+                                info.has_signal = True
+                                info.peak_db = peak
+                                info.rms_db = self.audio_capture.get_rms(ch, self.block_size * 4)
+                                info.lufs = self.audio_capture.get_lufs(ch, 0.4)
+                                if not info.recognized:
+                                    self._classify_by_spectrum(ch, info)
+                                logger.info(f"Monitor: new signal on Ch {ch} '{info.name}'")
+                                self._apply_corrections_single(ch)
+                            continue
 
-                    samples = self.audio_capture.get_buffer(ch, 2048)
-                    if len(samples) >= 2048:
-                        events = self.feedback_detector.process(ch, samples)
-                        for evt in events:
-                            self._handle_feedback_event(ch, evt)
+                        samples = self.audio_capture.get_buffer(ch, 2048)
+                        if len(samples) >= 2048:
+                            events = self.feedback_detector.process(ch, samples)
+                            for evt in events:
+                                self._handle_feedback_event(ch, evt)
 
-                self._evaluate_pending_actions()
-                self._run_autofoh_monitor_analysis()
+                    self._evaluate_pending_actions()
+                    self._run_autofoh_monitor_analysis()
 
             except Exception as e:
                 logger.debug(f"Monitor loop error: {e}")
@@ -7655,74 +8939,108 @@ class AutoSoundcheckEngine:
         10. Apply bounded corrections relative to the snapshot
         11. Enter monitoring mode (feedback detection, new channels)
         """
-        self._stop_event.clear()
-        self._phase_learning_snapshots = {}
-        self._last_feedback_event_at = {}
-        self._last_feedback_channel_action_at = {}
-        self._last_feedback_global_action_at = 0.0
-        self._feedback_actions_sent_by_channel = {}
-        self._feedback_actions_sent_total = 0
-
-        # Steps 1-2: Discover and connect mixer
-        if not self._connect_mixer():
-            self._set_state(EngineState.ERROR, "Mixer connection failed")
-            return False
-
-        # Steps 3-4: Scan and start audio
-        if not self._start_audio():
-            self._set_state(EngineState.ERROR, "Audio capture failed")
-            return False
-
-        if self.soundcheck_profile_enabled and self.soundcheck_profile_auto_load:
-            self._load_soundcheck_profile()
-
-        # Step 5: Scan channel names and recognize instruments
-        self._scan_channels()
-
-        # Step 6: Read existing settings from mixer
-        self._read_channel_state()
-
-        # Step 7: Preserve channel processing before analysis, unless explicitly opted into reset
-        self._reset_channels()
-
-        # Steps 8-9: Wait for audio signals and analyze
-        self._wait_and_analyze()
-
-        # Step 10: derive reviewable proposals in the canonical no-write mode.
-        # Legacy apply remains an internal-only runtime path and is not exposed
-        # by the web handler or CLI.
-        if self.auto_apply:
-            self._apply_corrections()
-        elif self.observe_only:
-            self._derive_corrections()
-        elif self.soundcheck_profile_capture_multiphase_learning:
-            self._capture_learning_phase(
-                "SNAPSHOT_LOCK",
-                RuntimeState.SNAPSHOT_LOCK,
-                metadata={
-                    "applied_channel_ids": [],
-                    "auto_apply": False,
-                },
-                notes="Snapshot lock captured without auto-apply",
-            )
-
-        self._auto_save_soundcheck_profile_if_allowed()
-
-        self._set_state(EngineState.RUNNING, "Auto-soundcheck complete, monitoring...")
-
-        self._monitor_thread = threading.Thread(
-            target=self._monitor_loop, daemon=True
-        )
-        self._monitor_thread.start()
+        success = False
+        if self._stop_event.is_set():
+            logger.info("AutoSoundcheck start cancelled before engine thread entered run")
+        else:
+            self._phase_learning_snapshots = {}
+            self._last_feedback_event_at = {}
+            self._last_feedback_channel_action_at = {}
+            self._last_feedback_global_action_at = 0.0
+            self._feedback_actions_sent_by_channel = {}
+            self._feedback_actions_sent_total = 0
 
         try:
-            while not self._stop_event.is_set():
-                time.sleep(1.0)
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt, stopping...")
+            if self._stop_event.is_set():
+                return False
 
-        self.stop()
-        return True
+            if not self._connect_mixer():
+                self._set_state(EngineState.ERROR, "Mixer connection failed")
+                return False
+
+            if not self._start_audio():
+                self._set_state(EngineState.ERROR, "Audio capture failed")
+                return False
+
+            if self.soundcheck_profile_enabled and self.soundcheck_profile_auto_load:
+                self._load_soundcheck_profile()
+
+            self._scan_channels()
+            self._read_channel_state()
+            self._reset_channels()
+            self._wait_and_analyze()
+
+            if self.auto_apply:
+                self._apply_corrections()
+            elif self.observe_only:
+                self._derive_corrections()
+            elif self.soundcheck_profile_capture_multiphase_learning:
+                self._capture_learning_phase(
+                    "SNAPSHOT_LOCK",
+                    RuntimeState.SNAPSHOT_LOCK,
+                    metadata={
+                        "applied_channel_ids": [],
+                        "auto_apply": False,
+                    },
+                    notes="Snapshot lock captured without auto-apply",
+                )
+
+            self._auto_save_soundcheck_profile_if_allowed()
+
+            if self._stop_event.is_set():
+                return False
+
+            self._set_state(
+                EngineState.RUNNING,
+                (
+                    "Recommendation derivation finished; operator review required. "
+                    "Monitoring..."
+                    if self.observe_only
+                    else "Correction pass finished; mix readiness not yet verified. Monitoring..."
+                ),
+            )
+            self._monitor_thread = threading.Thread(
+                target=self._monitor_loop,
+                daemon=True,
+            )
+            self._monitor_thread.start()
+
+            try:
+                while not self._stop_event.is_set():
+                    time.sleep(1.0)
+            except KeyboardInterrupt:
+                logger.info("Keyboard interrupt, stopping...")
+                self._stop_event.set()
+            success = True
+        except Exception as exc:
+            logger.error("AutoSoundcheck engine failed: %s", exc, exc_info=True)
+            self._set_state(EngineState.ERROR, f"Engine failed: {type(exc).__name__}")
+            success = False
+        finally:
+            cleanup_error = None
+            self._stop_event.set()
+            with self._stop_cleanup_lock:
+                if not self._stop_cleanup_complete:
+                    try:
+                        self._finalize_stop_resources()
+                    except Exception as exc:
+                        cleanup_error = exc
+                    else:
+                        self._stop_cleanup_complete = True
+            if cleanup_error is not None:
+                logger.error(
+                    "AutoSoundcheck cleanup failed: %s",
+                    cleanup_error,
+                    exc_info=True,
+                )
+                self._set_state(
+                    EngineState.ERROR,
+                    f"Engine cleanup incomplete: {type(cleanup_error).__name__}",
+                )
+                success = False
+            elif self.state != EngineState.ERROR:
+                self._set_state(EngineState.STOPPED, "Engine stopped")
+        return success
 
     def _auto_save_soundcheck_profile_if_allowed(self):
         """Persist learned profiles only for an explicitly mutable session."""
@@ -7738,6 +9056,11 @@ class AutoSoundcheckEngine:
 
     def start_async(self):
         """Start engine in background thread."""
+        if self._engine_thread is not None and self._engine_thread.is_alive():
+            raise RuntimeError("AutoSoundcheck engine thread is already running")
+        with self._stop_cleanup_lock:
+            self._stop_cleanup_complete = False
+        self._stop_event.clear()
         self._engine_thread = threading.Thread(target=self.run, daemon=True)
         self._engine_thread.start()
 
@@ -7788,51 +9111,116 @@ class AutoSoundcheckEngine:
 
     def stop(self):
         """Stop the engine, joining threads before releasing resources."""
+        prior_state = self.state
         self._stop_event.set()
-        self._set_state(EngineState.STOPPED, "Engine stopped")
+        self.discard_soundcheck_revision_candidates_for_run(
+            self._soundcheck_run_id
+        )
+        if prior_state != EngineState.ERROR:
+            self._set_state(EngineState.STOPPING, "Engine stop in progress")
+
+        engine_thread = self._engine_thread
+        if (
+            engine_thread is not None
+            and engine_thread is not threading.current_thread()
+            and engine_thread.is_alive()
+        ):
+            engine_thread.join(timeout=5.0)
+            if engine_thread.is_alive():
+                self._set_state(
+                    EngineState.ERROR,
+                    "Engine stop incomplete: worker thread still running",
+                )
+                raise RuntimeError("AutoSoundcheck engine thread did not stop within 5 seconds")
+
+        with self._stop_cleanup_lock:
+            if self._stop_cleanup_complete:
+                if prior_state != EngineState.ERROR:
+                    self._set_state(EngineState.STOPPED, "Engine stopped")
+                return
+            self._finalize_stop_resources()
+            self._stop_cleanup_complete = True
+        if prior_state != EngineState.ERROR:
+            self._set_state(EngineState.STOPPED, "Engine stopped")
+
+    def _finalize_stop_resources(self):
+        """Release resources once the engine thread can no longer create new work."""
+
+        errors = []
 
         if self._observation_mixer_client is not None:
-            summary = self._observation_mixer_client.get_summary()
-            self._emit_observation(
-                message=(
-                    f"[OBSERVE] Engine complete. Intercepted "
-                    f"{summary['total_operations']} mixer write operation(s)."
-                ),
-                summary=summary,
-            )
+            try:
+                summary = self._observation_mixer_client.get_summary()
+                self._emit_observation(
+                    message=(
+                        f"[OBSERVE] Engine complete. Intercepted "
+                        f"{summary['total_operations']} mixer write operation(s)."
+                    ),
+                    summary=summary,
+                )
+            except Exception as exc:
+                errors.append(("observation_summary", exc))
 
         # Join monitor thread first so it stops accessing audio/mixer
+        monitor_still_running = False
         if self._monitor_thread and self._monitor_thread.is_alive():
             self._monitor_thread.join(timeout=3.0)
+            monitor_still_running = self._monitor_thread.is_alive()
 
-        self._evaluate_pending_actions(force=True)
+        try:
+            self._evaluate_pending_actions(force=True)
+        except Exception as exc:
+            errors.append(("pending_actions", exc))
 
         if self.audio_capture and self._owns_audio_capture:
             try:
                 self.audio_capture.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                errors.append(("audio_capture", exc))
 
         if self.perceptual_evaluator is not None:
             try:
                 self.perceptual_evaluator.stop()
-            except Exception:
-                pass
+            except Exception as exc:
+                errors.append(("perceptual_evaluator", exc))
 
+        mixer_disconnected = True
         if self.mixer_client and self._owns_mixer_client:
             try:
                 self.mixer_client.disconnect()
-            except Exception:
-                pass
-        if self._real_mixer_client is not None:
-            self.mixer_client = self._real_mixer_client
-        self._observation_mixer_client = None
-        self._real_mixer_client = None
+            except Exception as exc:
+                mixer_disconnected = False
+                errors.append(("mixer_disconnect", exc))
+        if mixer_disconnected:
+            if self._real_mixer_client is not None:
+                self.mixer_client = self._real_mixer_client
+            self._observation_mixer_client = None
+            self._real_mixer_client = None
         if self.autofoh_logger is not None:
-            self.autofoh_logger.stop()
-        self._generate_autofoh_session_report()
+            try:
+                self.autofoh_logger.stop()
+            except Exception as exc:
+                errors.append(("autofoh_logger", exc))
+        try:
+            self._generate_autofoh_session_report()
+        except Exception as exc:
+            errors.append(("session_report", exc))
+        if monitor_still_running:
+            errors.append((
+                "monitor_thread",
+                RuntimeError("monitor thread did not stop within 3 seconds"),
+            ))
+        if errors:
+            detail = ", ".join(
+                f"{step}:{type(error).__name__}" for step, error in errors
+            )
+            raise RuntimeError(f"AutoSoundcheck cleanup incomplete ({detail})")
 
     def get_status(self) -> Dict:
+        with self._derivation_lock:
+            return self._get_status_locked()
+
+    def _get_status_locked(self) -> Dict:
         """Get engine status."""
         channels_info = {}
         for ch, info in self.channels.items():
@@ -7891,6 +9279,16 @@ class AutoSoundcheckEngine:
             }
             for d in self.audio_devices
         ]
+        published_bundle = self._get_soundcheck_recommendation_bundle_locked()
+        transaction_bundle = copy.deepcopy(
+            published_bundle["supervised_transaction_plans"]
+        )
+        soundcheck_readiness = copy.deepcopy(
+            published_bundle.get("soundcheck_readiness")
+            or build_proposal_only_readiness(transaction_bundle)
+        )
+        pending_soundcheck_items = self.soundcheck_pending_items()
+        family_registry = supervised_console_family_registry()
 
         return {
             "state": self.state.value,
@@ -7929,6 +9327,12 @@ class AutoSoundcheckEngine:
             "dry_run": bool((not self.auto_apply) or self.observe_only),
             "pipeline_mode": "proposal_only" if self.observe_only else "legacy_runtime",
             "recommendation_derivation_complete": bool(self._derivation_complete),
+            "soundcheck_readiness": soundcheck_readiness,
+            "soundcheck_pending_items": pending_soundcheck_items,
+            "soundcheck_unsupported_action_count": len(
+                transaction_bundle.get("unsupported_actions") or []
+            ),
+            "last_master_mix_verdict": dict(self.last_master_mix_verdict or {}),
             "shared_mixer_runtime": not self._owns_mixer_client,
             "shared_audio_runtime": not self._owns_audio_capture,
             "observe_only": self.observe_only,
@@ -7950,8 +9354,17 @@ class AutoSoundcheckEngine:
                 if promoted
             ],
             "soundcheck_recommendation_count": (
-                len(self._soundcheck_recommendation_workflow.list_recommendations())
-                + len(self._soundcheck_action_proposals)
+                int(published_bundle.get("recommendation_count") or 0)
+            ),
+            "supervised_transaction_plan_count": transaction_bundle["plan_count"],
+            "supervised_transaction_operation_count": transaction_bundle[
+                "operation_count"
+            ],
+            "supervised_console_family_registry": family_registry,
+            "supervised_console_live_allowed_families": sorted(
+                family_id
+                for family_id, contract in family_registry.items()
+                if contract.get("normal_supervised_apply_allowed") is True
             ),
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,

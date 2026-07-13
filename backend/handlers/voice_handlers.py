@@ -7,10 +7,7 @@ logger = logging.getLogger(__name__)
 
 def register_handlers(server):
     async def handle_start_voice_control(websocket, data):
-        logger.info("=" * 60)
-        logger.info("RECEIVED start_voice_control MESSAGE")
-        logger.info(f"Data: {data}")
-        logger.info("=" * 60)
+        logger.info("Received start_voice_control")
         language_param = data.get("language", "ru")
         if language_param == "":
             language_param = None

@@ -1,0 +1,136 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:master_output:master_fader_down",
+      "peak_dbfs": [
+        -18.2,
+        -18.3
+      ],
+      "timestamp_utc": "2026-07-11T14:11:31Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "master_output",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:master_output:master_fader_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:master_output:master_fader_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:master_output:master_fader_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/main/1/fdr",
+                "sent": true,
+                "value": -0.5
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:master_output:master_fader_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/main/1/fdr": {
+                "address": "/main/1/fdr",
+                "args": [
+                  "-0.5",
+                  0.737500011920929,
+                  -0.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -0.5
+              }
+            },
+            "values": {
+              "/main/1/fdr": -0.5
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:master_output:master_fader_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:master_output:master_fader_down",
+            "peak_dbfs": [
+              -18.2,
+              -18.3
+            ],
+            "timestamp_utc": "2026-07-11T14:11:31Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:master_output:master_fader_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/main/1/fdr": {
+                "address": "/main/1/fdr",
+                "args": [
+                  "0.0",
+                  0.75,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              }
+            },
+            "restored": {
+              "/main/1/fdr": 0.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:master_output:master_fader_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:master_output:2026-07-11T14:11:31Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:11:31Z",
+  "wing_ip": "192.168.1.102"
+}

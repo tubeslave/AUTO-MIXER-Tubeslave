@@ -725,6 +725,15 @@ def external_validation_handoff_lines(
         bool(score_gate.get("public_release_ready", False))
     ).lower()
     score_reason = score_gate.get("score_ceiling_reason")
+    local_gate = state.get("local_engineering_readiness")
+    if not isinstance(local_gate, dict):
+        local_gate = {}
+    local_score = local_gate.get("score")
+    local_threshold = local_gate.get("threshold")
+    local_achieved = bool(local_gate.get("achieved", False))
+    full_release_requirements = score_gate.get("required_before_95")
+    if not isinstance(full_release_requirements, list):
+        full_release_requirements = []
 
     lines = [
         "## Current External Validation Handoff",
@@ -732,13 +741,25 @@ def external_validation_handoff_lines(
         "- Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`",
         f"- Strict pre-release review score: `{score}/100`",
         f"- Pre-release score threshold: `{release_threshold}/100`",
-        f"- Public release ready from score gate: `{public_release_ready}`",
         (
-            f"- Score gate: do not report `{release_threshold}/100` or "
-            "public-release readiness while these external WING requirements "
-            "remain open."
+            f"- Local engineering readiness: `{local_score}/100` against "
+            f"`{local_threshold}/100`; achieved: `{str(local_achieved).lower()}` "
+            "(excludes public signing/notarization and standing live autonomy)"
+        ),
+        (
+            f"- Public release ready from score gate: `{public_release_ready}` "
+            "(no standing supervised transaction authority)"
+        ),
+        (
+            f"- Score gate: do not report public-release `{release_threshold}/100` "
+            "or public-release readiness while the current-source and public "
+            "release requirements remain open."
         ),
         "- Canonical read-only decision marker: `accepted_decision_ready`",
+        (
+            "- Closed historical marker: `rollback_not_applied` is retained "
+            "as audit history and closed by the passed CH3 fader rerun."
+        ),
         f"- Current blocker from `STATE.json`: {state.get('current_blocker', '')}",
         (
             "- Next operator action from `STATE.json`: "
@@ -749,6 +770,14 @@ def external_validation_handoff_lines(
         lines.append(f"- Score ceiling reason: {score_reason}")
     lines.append("- External validation requirements:")
     for requirement in requirements:
+        lines.append(f"  - {requirement}")
+    lines.append(
+        "- Scope note: the two items above are current-source promotion/public "
+        "handoff items, not unfinished local engineering work and not the complete "
+        "full-release checklist."
+    )
+    lines.append("- Full-release requirements before 95/100:")
+    for requirement in full_release_requirements:
         lines.append(f"  - {requirement}")
     if latest_ledger:
         lines.append(
@@ -813,12 +842,20 @@ def build_progress_report(
         "",
         f"Generated: `{generated}`",
         "",
+        (
+            "> Full-project release truth comes from "
+            "`ops/autopilot/STATE.json.strict_pre_release_review`. The blocker "
+            "inventory below is a frozen legacy M001 packet contract, not a "
+            "current count of unfinished full-project work."
+        ),
+        "",
         "## Current MVP",
         "",
         "Supervised WING Rack proof.",
         "",
         "## Summary",
         "",
+        "- Inventory scope: legacy M001 packet-contract rows",
         f"- Total blockers: {total}",
         f"- Closed blockers: {closed}",
         f"- Current first open blocker: {first_name}",
@@ -837,6 +874,11 @@ def build_progress_report(
     lines.extend(
         [
             "## Blockers",
+            "",
+            (
+                "The following rows are retained as the legacy M001 packet-contract "
+                "inventory. Current full-release requirements are listed above."
+            ),
             "",
             "| Blocker | Status | Next action |",
             "| --- | --- | --- |",

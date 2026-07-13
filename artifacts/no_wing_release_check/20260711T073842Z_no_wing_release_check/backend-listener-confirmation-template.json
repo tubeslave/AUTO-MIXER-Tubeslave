@@ -1,0 +1,37 @@
+{
+  "accepted_by_template": false,
+  "confirms_intended_backend": false,
+  "execution_allowed_by_template": false,
+  "host": "127.0.0.1",
+  "listener_candidates": [
+    {
+      "command": "Python",
+      "command_line": "/Library/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python server.py",
+      "name": "127.0.0.1:8765",
+      "pid": 34310
+    }
+  ],
+  "live_authority_granted": false,
+  "operator_name": "REPLACE_WITH_OPERATOR_NAME",
+  "operator_next_step": "Edit this pending template only after confirming the listener is the intended Automixer backend, then rerun the no-WING gate with --backend-listener-confirmation. Do not stop or reconfigure the listener from this template.",
+  "operator_reviewed_at": "REPLACE_WITH_OPERATOR_REVIEW_UTC",
+  "port": 8765,
+  "readiness_closure_allowed_by_template": false,
+  "required_operator_edits": [
+    "confirm the listener is the intended Automixer backend for this WING preflight",
+    "set status to operator_confirmed_intended_backend only after operator review",
+    "set confirms_intended_backend to true only after matching the PID and command line",
+    "replace operator_reviewed_at with the UTC review timestamp",
+    "replace operator_name with the reviewing operator name",
+    "set template_status to operator_reviewed_and_edited if using the generated template",
+    "set accepted_by_template to true if using the generated template",
+    "rerun the no-WING gate with --backend-listener-confirmation pointing to the edited JSON"
+  ],
+  "reviewed_listener_command_line": "/Library/Frameworks/Python.framework/Versions/3.14/Resources/Python.app/Contents/MacOS/Python server.py",
+  "reviewed_listener_pid": 34310,
+  "safe_to_stop_listener_by_gate": false,
+  "status": "operator_review_required",
+  "template_generated_at": "2026-07-11T07:38:42Z",
+  "template_status": "pending_operator_edit",
+  "type": "wing_backend_port_listener_confirmation.v1"
+}

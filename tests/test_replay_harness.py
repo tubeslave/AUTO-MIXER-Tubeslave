@@ -222,7 +222,9 @@ class _ReplayServer:
     def __init__(self, mixer, live_apply_service):
         self.mixer_client = mixer
         self.live_apply_service = live_apply_service
-        self.connection_mode = "wing"
+        # Replay harnesses exercise generic LiveApply incident payloads. Direct
+        # WING handlers are proposal-only and covered by separate rail tests.
+        self.connection_mode = "offline"
         self.sent_messages = []
 
     async def send_to_client(self, websocket, message):

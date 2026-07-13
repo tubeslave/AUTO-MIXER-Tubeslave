@@ -169,4 +169,39 @@ async def test_emergency_stop_agent_stops_running_agent():
     assert payload["type"] == "agent_emergency_stopped"
     assert payload["is_running"] is False
     assert payload["emergency_stop"] is True
+    assert payload["success"] is True
+    assert payload["status"] == "stopped"
+    assert payload["teardown_complete"] is True
     assert server.mixing_agent.emergency_stopped is True
+
+
+@pytest.mark.asyncio
+async def test_emergency_stop_agent_propagates_incomplete_system_teardown():
+    server = DummyServer()
+    server.mixing_agent = FakeAgent()
+    server.mixing_agent.state.is_running = True
+    server._manual_write_emergency_stopped = True
+
+    async def incomplete(_reason):
+        return {
+            "status": "stop_incomplete",
+            "success": False,
+            "teardown_complete": False,
+            "teardown_errors": [{"step": "engine", "error": "RuntimeError"}],
+            "generation": 2,
+        }
+
+    server.activate_system_emergency_stop = incomplete
+    handlers = register_handlers(server)
+
+    await handlers["emergency_stop_agent"]("ws", {})
+
+    _, payload = server.sent_messages[-1]
+    assert payload["status"] == "stop_incomplete"
+    assert payload["success"] is False
+    assert payload["teardown_complete"] is False
+    assert payload["emergency_stop"] is True
+    assert payload["is_running"] is True
+    assert payload["teardown_errors"] == [
+        {"step": "engine", "error": "RuntimeError"}
+    ]

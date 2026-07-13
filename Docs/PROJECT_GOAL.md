@@ -61,8 +61,9 @@ soundcheck-автоматизации отдельными hardware-backed ре�
 AutoSoundcheck теперь измеряет реальные WING/USB сигналы и формирует evidence в
 `proposal-only` режиме; физическая запись остается только за узким ручным gate.
 
-- WebSocket слушает loopback по умолчанию; remote bind без bearer token не
-  запускается.
+- WebSocket всегда слушает только loopback; bearer token не разрешает
+  non-loopback bind. Remote browser возможен только через отдельно проверенный
+  same-origin HTTPS/WSS reverse proxy к `127.0.0.1:8765`.
 - `force_auto_apply` удален из frontend и отвергается backend.
 - AutoSoundcheck принудительно использует `observe_only=true` и
   `auto_apply=false`; observe-only цикл не сохраняет tracked learning profile.

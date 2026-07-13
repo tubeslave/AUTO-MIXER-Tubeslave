@@ -27,6 +27,7 @@ export interface BackendUiState {
   applyPath: string;
   writeScope: string[];
   mixerConnected: boolean;
+  mixerTransportLocked: boolean;
   observationOnly: boolean;
   audioCaptureRunning: boolean;
   audioCaptureChannels: number;
@@ -50,9 +51,90 @@ export interface SoundcheckRuntime {
   channelsWithSignal: number;
   totalChannels: number;
   recommendationCount: number;
+  transactionPlanCount: number;
+  transactionOperationCount: number;
+  liveAllowedFamilies: string[];
+  familyLifecycle: Record<string, string>;
+  familyLiveWriteKinds: Record<string, string[]>;
+  familyWriteKinds: Record<string, string[]>;
+  familyContracts: Record<string, SoundcheckFamilyContract>;
   derivationComplete: boolean;
+  readiness: SoundcheckReadiness;
+  replan: SoundcheckReplan;
   interceptedWriteCount: number;
   lastUpdated: string;
+}
+
+export interface SoundcheckReplan {
+  status: string;
+  draftAvailable: boolean;
+  draftId: string;
+  runId: string;
+  fromPlanRevision: number;
+  toPlanRevision: number;
+  splitOperationCount: number;
+  safeAlternativeOperationCount: number;
+  deferredTargetCount: number;
+  operatorRequests: Array<{
+    operationId: string;
+    reason: string;
+    safeAutomaticReplacementAvailable: boolean;
+    selectedSafeStrategy: string;
+  }>;
+  safeAlternatives: Array<{
+    strategy: string;
+    translationDb?: number;
+    finalTargetVectorPreserved?: boolean;
+    relativeBalancePreserved?: boolean;
+    currentStepTransitional?: boolean;
+    constructiveLaneUsed?: boolean;
+  }>;
+}
+
+export interface SoundcheckReadinessStage {
+  required: number;
+  resolved: number;
+  applied: number;
+  alreadySatisfied: number;
+  replaced: number;
+  operatorReview: number;
+  forbidden: number;
+  pending: number;
+  ready: boolean;
+}
+
+export interface SoundcheckReadiness {
+  schemaVersion: string;
+  runId: string;
+  planRevision: number;
+  planFingerprint: string;
+  mixReadiness: 'soundcheck_incomplete' | 'safe_core_ready' | 'show_mix_ready';
+  safetyState: string;
+  executionStatus: string;
+  logicalTotal: number;
+  logicalApplied: number;
+  logicalAlreadySatisfied: number;
+  logicalReplaced: number;
+  logicalOperatorReview: number;
+  logicalForbidden: number;
+  logicalPending: number;
+  unresolvedRequiredIds: string[];
+  unresolvedReasons: Record<string, string>;
+  globalBlockers: string[];
+  evidenceComplete: boolean;
+  stages: Record<string, SoundcheckReadinessStage>;
+}
+
+export interface SoundcheckFamilyContract {
+  label: string;
+  lifecycle: string;
+  riskClass: string;
+  blockers: string[];
+  separateApproval: boolean;
+  hardwareProof: string;
+  proofRunAllowed: boolean;
+  writeKinds: string[];
+  liveAllowedWriteKinds: string[];
 }
 
 export interface ProposalApplyResult {
@@ -63,6 +145,8 @@ export interface ProposalApplyResult {
   readbackStatus: string;
   rollbackStatus: string;
   rollbackAvailable: boolean;
+  readbackTone: Tone;
+  rollbackTone: Tone;
   tone: Tone;
   updatedAt: string;
 }
@@ -219,6 +303,15 @@ export interface TelemetryAlertsSnapshot {
 export interface ToastState {
   message: string;
   tone: Tone;
+}
+
+export type EmergencyStopStatus = 'ready' | 'pending' | 'acknowledged' | 'error';
+
+export interface EmergencyStopUiState {
+  status: EmergencyStopStatus;
+  message: string;
+  updatedAt: string;
+  reconciliationRequired?: boolean;
 }
 
 export interface ActionFocus {
@@ -578,6 +671,7 @@ export interface UiState {
   mode: AutomixerMode;
   backend: BackendUiState;
   soundcheck: SoundcheckRuntime;
+  emergencyStop: EmergencyStopUiState;
   selectedAgentId: string;
   selectedCommunicationKey: string;
   selectedPerformanceAgent: string;
@@ -634,6 +728,10 @@ export interface UiActions {
   startReplayRun: () => void;
   startSoundcheck: () => void;
   stopSoundcheck: () => void;
+  acceptSoundcheckReplan: () => void;
+  reanalyzeSoundcheckStage: () => void;
+  finalizeSoundcheckReadiness: () => void;
+  triggerEmergencyStop: () => boolean;
   pushToast: (message: string, tone?: Tone) => void;
   dismissToast: () => void;
 }

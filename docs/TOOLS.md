@@ -25,44 +25,48 @@ dB → OSC float:
 ### Основные OSC-адреса
 ```
 Channels (1-40):
-  /ch/{N}/mix/fader     float [0.0-1.0]    Fader level
-  /ch/{N}/mix/on        int [0,1]          Mute on/off
-  /ch/{N}/mix/pan       float [0.0-1.0]    Pan (0.5 = center)
-  /ch/{N}/preamp/trim   float              Trim/Gain
-  /ch/{N}/eq/{B}/f      float              EQ band frequency (B=1-4)
-  /ch/{N}/eq/{B}/g      float              EQ band gain
-  /ch/{N}/eq/{B}/q      float              EQ band Q
-  /ch/{N}/eq/{B}/type   int                EQ band type (0=peaking, etc.)
+  /ch/{N}/fdr           float [-144,10]     Fader level in dB
+  /ch/{N}/mute          int [0,1]           1 = muted
+  /ch/{N}/pan           float [-100,100]    Pan (0 = center)
+  /ch/{N}/in/set/trim   float [-18,18]      Input trim in dB
+  /ch/{N}/eq/{B}f       float               EQ band frequency (B=1-4)
+  /ch/{N}/eq/{B}g       float               EQ band gain
+  /ch/{N}/eq/{B}q       float               EQ band Q
   /ch/{N}/eq/on         int [0,1]          EQ on/off
   /ch/{N}/gate/on       int [0,1]          Gate on/off
   /ch/{N}/gate/thr      float              Gate threshold
   /ch/{N}/dyn/on        int [0,1]          Compressor on/off
-  /ch/{N}/dyn/thr26     float              Compressor threshold
-  /ch/{N}/dyn/ratio     int                Ratio (index в WING_RATIO_VALUES)
-  /ch/{N}/dyn/attack    float              Attack time
-  /ch/{N}/dyn/release   float              Release time
+  /ch/{N}/dyn/thr       float              COMP threshold (some models use thr26)
+  /ch/{N}/dyn/ratio     string             Ratio enum from the table below
+  /ch/{N}/dyn/att       float [0,120]       Attack time in ms
+  /ch/{N}/dyn/rel       float [4,4000]      Release time in ms
   /ch/{N}/dyn/knee      float              Knee
-  /ch/{N}/config/name   string             Channel name
-  /ch/{N}/config/icon   int                Channel icon
-  /ch/{N}/config/color  int                Channel color
+  /ch/{N}/name          string             Channel name
+  /ch/{N}/icon          int                Channel icon
+  /ch/{N}/col           int                Channel color
 
-Main:
-  /main/mix/fader       float              Main fader
-  /main/mix/on          int                Main mute
+Main outputs (1-4):
+  /main/{N}/fdr         float [-144,10]     Main fader in dB
+  /main/{N}/mute        int [0,1]           Main mute
 
 Buses (1-16):
-  /bus/{N}/mix/fader    float              Bus fader
-  /bus/{N}/mix/on       int                Bus mute
+  /bus/{N}/fdr          float [-144,10]     Bus fader in dB
+  /bus/{N}/mute         int [0,1]           Bus mute
 
 Snapshots:
-  /‐snap/load/{N}       —                  Load snapshot N
-  /‐snap/name/{N}       string             Snapshot name (read-only cache!)
+  /$ctl/lib/$actionidx  int                Select library cursor
+  /$ctl/lib/$name       string             Read selected name without loading
+  /$ctl/lib/$action     string "GO"        Load selected snapshot (destructive)
 ```
 
-### WING Ratio Values (индекс → ratio)
+Snapshot loading is never a discovery/read operation and remains behind an
+explicit operator workflow. Always verify the exact model-specific dynamics
+threshold address by physical readback before any supervised write.
+
+### WING Ratio Values (live OSC string enum)
 ```python
-WING_RATIO_VALUES = [1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.0, 10.0, 20.0]
-WING_RATIO_STRINGS = ["1:1", "1.5:1", "2:1", "2.5:1", "3:1", "4:1", "5:1", "7:1", "10:1", "20:1"]
+WING_RATIO_VALUES = [1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0, 3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0, 50.0, 100.0]
+WING_RATIO_STRINGS = ["1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0", "3.5", "4.0", "5.0", "6.0", "8.0", "10", "20", "50", "100"]
 ```
 
 ### Полная документация

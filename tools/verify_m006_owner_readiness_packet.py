@@ -8,13 +8,27 @@ backend/WING transport, and cannot grant readiness or live authority.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+BACKEND_ROOT = PROJECT_ROOT / "backend"
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
+
+from runtime_identity import (  # noqa: E402
+    RUNTIME_IDENTITY_SCHEMA,
+    canonical_json_bytes,
+    capture_source_runtime_components,
+    runtime_identity_manifest_sha256,
+    valid_lower_hex,
+)
 DEFAULT_PACKET_SUMMARY = (
     "artifacts/wing_owner_readiness_review/"
     "20260704T191101Z_m006_owner_readiness_review_packet/summary.json"
@@ -101,6 +115,16 @@ EXPECTED_PROOF_ROWS = {
 }
 PHYSICAL_READBACK_STATUS = "verified_from_physical_readback"
 PHYSICAL_READBACK_SOURCE = "physical_readback"
+EXPECTED_M005_PROVENANCE_SCHEMA = "automixer.m005_current_release_provenance.v1"
+EXPECTED_M005_RUNNER_PATH = "tools/wing_timeout_disconnect_proof_runner.py"
+EXPECTED_SOURCE_BACKEND_PATH = "backend/server.py"
+EXPECTED_M005_CANONICAL_URL = "ws://127.0.0.1:8765"
+EXPECTED_M005_RUNTIME_IDENTITY_SCHEMA = RUNTIME_IDENTITY_SCHEMA
+EXPECTED_M005_CONSOLE_IDENTITY_SCHEMA = "automixer.wing_console_identity_owner_challenge.v1"
+EXPECTED_M005_CONSOLE_IDENTITY_ROOT = "artifacts/wing_console_identity_owner_challenge"
+EXPECTED_M005_CONSOLE_MODEL = "WING Rack"
+EXPECTED_M005_CONSOLE_FIRMWARE = "3.0.5"
+MAX_M005_BOUND_BACKEND_START_DELAY_SECONDS = 600
 
 
 def _resolve(path_text: str | Path) -> Path:
@@ -110,6 +134,91 @@ def _resolve(path_text: str | Path) -> Path:
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _sha256_bytes(value: bytes) -> str:
+    return hashlib.sha256(value).hexdigest()
+
+
+def _canonical_json_sha256(value: Any) -> str:
+    return _sha256_bytes(
+        json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
+            "utf-8"
+        )
+    )
+
+
+def _file_identity(path: Path) -> dict[str, Any]:
+    resolved = path.resolve()
+    try:
+        display_path = str(resolved.relative_to(PROJECT_ROOT))
+    except ValueError:
+        display_path = str(resolved)
+    if not resolved.is_file():
+        return {"path": display_path, "exists": False, "size": None, "sha256": None}
+    value = resolved.read_bytes()
+    return {
+        "path": display_path,
+        "exists": True,
+        "size": len(value),
+        "sha256": _sha256_bytes(value),
+    }
+
+
+def _git_bytes(*args: str) -> bytes:
+    completed = subprocess.run(
+        ["/usr/bin/git", *args],
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"git {' '.join(args)} failed ({completed.returncode}): "
+            f"{completed.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+    return completed.stdout
+
+
+def _status_excluding_m005_run(m005_summary_path: str | Path | None) -> bytes:
+    raw = _git_bytes("status", "--porcelain=v1", "-z", "-uall")
+    if m005_summary_path is None:
+        return raw
+    summary_path = _resolve(m005_summary_path).resolve()
+    try:
+        run_dir = summary_path.parent.relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return raw
+    retained: list[bytes] = []
+    for entry in raw.split(b"\0"):
+        if not entry:
+            continue
+        text = entry.decode("utf-8", errors="surrogateescape")
+        candidate = text[3:] if len(text) >= 4 else ""
+        if candidate == run_dir or candidate.startswith(f"{run_dir}/"):
+            continue
+        retained.append(entry)
+    return b"\0".join(retained) + (b"\0" if retained else b"")
+
+
+def current_release_provenance_expectations(
+    m005_summary_path: str | Path | None = None,
+) -> dict[str, Any]:
+    status = _status_excluding_m005_run(m005_summary_path)
+    tracked_diff = _git_bytes("diff", "HEAD", "--binary")
+    return {
+        "source": {
+            "head": _git_bytes("rev-parse", "HEAD").decode().strip(),
+            "tree": _git_bytes("rev-parse", "HEAD^{tree}").decode().strip(),
+            "worktree_dirty": bool(status.strip()),
+            "status_sha256": _sha256_bytes(status),
+            "tracked_diff_sha256": _sha256_bytes(tracked_diff),
+        },
+        "runner": _file_identity(PROJECT_ROOT / EXPECTED_M005_RUNNER_PATH),
+        "source_backend": _file_identity(PROJECT_ROOT / EXPECTED_SOURCE_BACKEND_PATH),
+        "runtime_source": capture_source_runtime_components(PROJECT_ROOT),
+    }
 
 
 def _display_path(path: Path | None) -> str | None:
@@ -145,6 +254,35 @@ def _resolve_m005_events_path(
     if resolved_events.parent != summary_path.parent:
         return None
     return resolved_events
+
+
+def load_m005_console_identity_challenge(
+    m005_summary: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if not isinstance(m005_summary, Mapping):
+        return None
+    provenance = _get_mapping(m005_summary, "provenance")
+    declared = _get_mapping(provenance, "console_identity_challenge")
+    path_text = declared.get("path")
+    if not isinstance(path_text, str) or not path_text or path_text.strip() != path_text:
+        return None
+    candidate = Path(path_text)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        return None
+    expected_root = Path(EXPECTED_M005_CONSOLE_IDENTITY_ROOT)
+    if candidate.name != "summary.json" or not candidate.is_relative_to(expected_root):
+        return None
+    resolved = (PROJECT_ROOT / candidate).resolve()
+    if not resolved.is_file():
+        return None
+    identity = _file_identity(resolved)
+    if dict(declared) != identity:
+        return None
+    try:
+        content = _load_json(resolved)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return {"identity": identity, "content": content}
 
 
 def load_m005_event_request_types(
@@ -202,8 +340,21 @@ def load_m005_event_audit(
         return None, display_events_path
     return {
         "request_types": request_types,
+        "initial_connection": _m005_event_initial_connection_payload(rows),
         "stale_readback": _m005_event_stale_readback_payload(rows),
         "reconnect_readback": _m005_event_reconnect_readback_payload(rows),
+        "first_event": dict(rows[0]) if rows else None,
+        "runtime_identity": next(
+            (
+                dict(row.get("payload"))
+                for row in rows
+                if row.get("event_type") == "recv"
+                and isinstance(row.get("payload"), Mapping)
+                and row.get("payload", {}).get("type") == "runtime_identity"
+            ),
+            None,
+        ),
+        "sha256": _sha256_bytes(events_path.read_bytes()),
     }, display_events_path
 
 
@@ -397,7 +548,13 @@ def _m005_disconnect_flow_indexes(request_types: Any) -> dict[str, int] | None:
         except ValueError:
             return None
 
-    baseline_query = find_after("query_mixer_parameter", 0)
+    runtime_identity = find_after("get_runtime_identity", 0)
+    if runtime_identity != 0:
+        return None
+    initial_connect = find_after("connect_wing", runtime_identity + 1)
+    if initial_connect != 1:
+        return None
+    baseline_query = find_after("query_mixer_parameter", initial_connect + 1)
     if baseline_query is None:
         return None
     supervised_mode = find_after("set_operator_mode", baseline_query + 1)
@@ -421,10 +578,18 @@ def _m005_disconnect_flow_indexes(request_types: Any) -> dict[str, int] | None:
 
     if find_after("apply_operator_proposal", 0) != blocked_apply:
         return None
-    if find_after("connect_wing", 0) != reconnect:
+    if find_after("query_mixer_parameter", 0) != baseline_query:
+        return None
+    if find_after("connect_wing", 0) != initial_connect:
+        return None
+    if find_after("connect_wing", initial_connect + 1) != reconnect:
+        return None
+    if find_after("connect_wing", reconnect + 1) is not None:
         return None
 
     return {
+        "runtime_identity": runtime_identity,
+        "initial_connect": initial_connect,
         "baseline_query": baseline_query,
         "supervised_mode": supervised_mode,
         "proposal": proposal,
@@ -491,6 +656,18 @@ def _m005_event_stale_readback_payload(rows: list[Mapping[str, Any]]) -> dict[st
         before_request="blocked_apply",
         expected_event_types=EXPECTED_M005_STALE_EVENT_TYPES,
         expected_payload_types=EXPECTED_M005_STALE_EVENT_PAYLOAD_TYPES,
+    )
+
+
+def _m005_event_initial_connection_payload(
+    rows: list[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    return _m005_event_payload_between_requests(
+        rows,
+        after_request="initial_connect",
+        before_request="baseline_query",
+        expected_event_types={"recv"},
+        expected_payload_types={"connection_status"},
     )
 
 
@@ -831,11 +1008,15 @@ def _record_m005_checks(
     *,
     m005_summary: Mapping[str, Any] | None,
     m005_event_request_types: list[str] | None = None,
+    m005_event_initial_connection: Mapping[str, Any] | None = None,
     m005_event_stale_readback: Mapping[str, Any] | None = None,
     m005_event_reconnect_readback: Mapping[str, Any] | None = None,
     m005_event_stale_readback_required: bool = False,
     m005_summary_path: str | None = None,
     m005_events_path: str | None = None,
+    m005_events_sha256: str | None = None,
+    m005_event_audit: Mapping[str, Any] | None = None,
+    m005_console_identity_challenge: Mapping[str, Any] | None = None,
 ) -> None:
     _record(checks, "m005_summary_supplied", m005_summary is not None)
     if m005_summary is None:
@@ -900,6 +1081,11 @@ def _record_m005_checks(
         checks,
         "m005_summary_physical_cable_loss_mode",
         m005_summary.get("disconnect_mode") == "physical-cable-loss",
+    )
+    _record(
+        checks,
+        "m005_summary_url_is_canonical_loopback",
+        m005_summary.get("url") == EXPECTED_M005_CANONICAL_URL,
     )
     for field_name, expected in AUTHORITY_DENIAL_FLAGS.items():
         _record(checks, f"m005_summary_{field_name}_denied", m005_summary.get(field_name) is expected)
@@ -1017,16 +1203,21 @@ def _record_m005_checks(
     )
 
     phases = _get_mapping(m005_summary, "phases")
+    initial_connection = _get_mapping(phases, "initial_connection")
     baseline = _get_mapping(phases, "baseline")
     disconnect = _get_mapping(phases, "disconnect")
     stale = _get_mapping(phases, "stale_readback")
     blocked_write = _get_mapping(phases, "blocked_write_while_disconnected")
     reconnect = _get_mapping(phases, "reconnect_recovery")
+    initial_connection_status = _get_mapping(initial_connection, "connection_status")
     baseline_readback = _get_mapping(baseline, "readback")
     stale_readback = _get_mapping(stale, "readback")
     blocked_apply_result = _get_mapping(blocked_write, "apply_result")
     reconnect_status = _get_mapping(reconnect, "connection_status")
     reconnect_readback = _get_mapping(reconnect, "readback")
+    initial_connection_event_present = isinstance(
+        m005_event_initial_connection, Mapping
+    ) and bool(m005_event_initial_connection)
     stale_event_present = isinstance(m005_event_stale_readback, Mapping) and bool(
         m005_event_stale_readback
     )
@@ -1034,6 +1225,27 @@ def _record_m005_checks(
         m005_event_reconnect_readback
     )
     if m005_event_stale_readback_required:
+        _record(
+            checks,
+            "m005_events_initial_connection_payload_present",
+            initial_connection_event_present,
+        )
+        _record(
+            checks,
+            "m005_events_initial_connection_matches_summary",
+            initial_connection_event_present
+            and dict(m005_event_initial_connection) == dict(initial_connection_status),
+        )
+        _record(
+            checks,
+            "m005_events_initial_connection_write_capable",
+            initial_connection_event_present
+            and m005_event_initial_connection.get("connected") is True
+            and m005_event_initial_connection.get("mode") == "wing"
+            and m005_event_initial_connection.get("ip") == m005_summary.get("wing_ip")
+            and m005_event_initial_connection.get("observation_only") is False
+            and m005_event_initial_connection.get("record_telemetry") is False,
+        )
         _record(
             checks,
             "m005_events_stale_readback_payload_present",
@@ -1070,6 +1282,17 @@ def _record_m005_checks(
         "m005_summary_target_fields_present",
         _m005_summary_target(m005_summary) is not None,
     )
+    _record(
+        checks,
+        "m005_initial_connection_phase_passed",
+        m005_summary.get("initial_connection_verified") is True
+        and initial_connection.get("status") == "passed"
+        and initial_connection_status.get("connected") is True
+        and initial_connection_status.get("mode") == "wing"
+        and initial_connection_status.get("ip") == m005_summary.get("wing_ip")
+        and initial_connection_status.get("observation_only") is False
+        and initial_connection_status.get("record_telemetry") is False,
+    )
     _record(checks, "m005_baseline_phase_passed", baseline.get("status") == "passed")
     _record(
         checks,
@@ -1087,6 +1310,11 @@ def _record_m005_checks(
         "m005_disconnect_phase_operator_confirmed_physical_loss",
         disconnect.get("status") == "operator_confirmed_physical_cable_loss"
         and disconnect.get("confirmation") == EXPECTED_M005_PHYSICAL_CABLE_CONFIRMATION,
+    )
+    _record(
+        checks,
+        "m005_disconnect_phase_operator_gate_required",
+        disconnect.get("operator_gate") is True,
     )
     _record(checks, "m005_stale_readback_phase_passed", stale.get("status") == "passed")
     _record(
@@ -1149,12 +1377,271 @@ def _record_m005_checks(
             and _m005_readback_matches_target(m005_event_reconnect_readback, m005_summary),
         )
 
+    _record_m005_provenance_checks(
+        checks,
+        m005_summary=m005_summary,
+        m005_events_path=m005_events_path,
+        m005_events_sha256=m005_events_sha256,
+        m005_event_audit=m005_event_audit,
+        m005_console_identity_challenge=m005_console_identity_challenge,
+        m005_summary_path=m005_summary_path,
+    )
+
+
+def _record_m005_provenance_checks(
+    checks: dict[str, bool],
+    *,
+    m005_summary: Mapping[str, Any],
+    m005_events_path: str | None,
+    m005_events_sha256: str | None,
+    m005_event_audit: Mapping[str, Any] | None,
+    m005_console_identity_challenge: Mapping[str, Any] | None,
+    m005_summary_path: str | None,
+) -> None:
+    provenance = _get_mapping(m005_summary, "provenance")
+    source = _get_mapping(provenance, "source")
+    declared_runtime_source = _get_mapping(provenance, "runtime_source")
+    runner = _get_mapping(provenance, "runner")
+    backend = _get_mapping(provenance, "backend")
+    console = _get_mapping(provenance, "console")
+    events = _get_mapping(provenance, "events")
+    expected = current_release_provenance_expectations(m005_summary_path)
+
+    _record(
+        checks,
+        "m005_provenance_schema_matches",
+        provenance.get("schema") == EXPECTED_M005_PROVENANCE_SCHEMA,
+    )
+    for field_name, expected_value in expected["source"].items():
+        _record(
+            checks,
+            f"m005_provenance_source_{field_name}_matches_current",
+            source.get(field_name) == expected_value,
+        )
+    _record(
+        checks,
+        "m005_provenance_source_clean_before_run",
+        source.get("worktree_dirty") is False
+        and source.get("status_sha256") == _sha256_bytes(b"")
+        and source.get("tracked_diff_sha256") == _sha256_bytes(b""),
+    )
+    _record(
+        checks,
+        "m005_provenance_current_checkout_clean_excluding_run_artifact",
+        expected["source"]["worktree_dirty"] is False
+        and expected["source"]["status_sha256"] == _sha256_bytes(b"")
+        and expected["source"]["tracked_diff_sha256"] == _sha256_bytes(b""),
+    )
+    expected_runtime_source = expected["runtime_source"]
+    runtime_source_code = _get_mapping(declared_runtime_source, "code")
+    runtime_source_source = _get_mapping(declared_runtime_source, "source")
+    runtime_source_files = runtime_source_code.get("files")
+    _record(
+        checks,
+        "m005_provenance_runtime_source_matches_current",
+        dict(declared_runtime_source) == expected_runtime_source,
+    )
+    _record(
+        checks,
+        "m005_provenance_runtime_source_hash_is_self_consistent",
+        isinstance(runtime_source_files, list)
+        and runtime_source_code.get("files_sha256")
+        == _canonical_json_sha256(runtime_source_files)
+        and runtime_source_source.get("source_content_sha256")
+        == runtime_source_code.get("files_sha256"),
+    )
+    _record(
+        checks,
+        "m005_provenance_runtime_launch_fields_present",
+        valid_lower_hex(provenance.get("runtime_launch_nonce"), 32)
+        and isinstance(provenance.get("captured_at_utc"), str)
+        and bool(str(provenance.get("captured_at_utc")).strip()),
+    )
+    _record(
+        checks,
+        "m005_provenance_runner_matches_current",
+        dict(runner) == expected["runner"],
+    )
+    runtime_kind = backend.get("runtime_kind")
+    _record(
+        checks,
+        "m005_provenance_backend_runtime_kind_supported",
+        runtime_kind == "source",
+    )
+    expected_backend = {"runtime_kind": "source", **expected["source_backend"]}
+    backend_matches = dict(backend) == expected_backend
+    package_matches = provenance.get("package") is None
+    _record(checks, "m005_provenance_backend_matches_current", backend_matches)
+    _record(checks, "m005_provenance_package_contract_matches_runtime_kind", package_matches)
+    _record(
+        checks,
+        "m005_provenance_console_identity_source_is_operator_challenge",
+        console.get("identity_source") == "operator_attested_owner_challenge"
+        and console.get("console_identity_query_available") is False,
+    )
+    _record(
+        checks,
+        "m005_provenance_console_model_matches",
+        console.get("model") == EXPECTED_M005_CONSOLE_MODEL,
+    )
+    _record(checks, "m005_provenance_console_firmware_matches", console.get("firmware") == EXPECTED_M005_CONSOLE_FIRMWARE)
+
+    challenge = (
+        _get_mapping(m005_console_identity_challenge, "content")
+        if isinstance(m005_console_identity_challenge, Mapping)
+        else {}
+    )
+    challenge_identity = (
+        _get_mapping(m005_console_identity_challenge, "identity")
+        if isinstance(m005_console_identity_challenge, Mapping)
+        else {}
+    )
+    declared_challenge = _get_mapping(provenance, "console_identity_challenge")
+    preflight_gate = _get_mapping(m005_summary, "preflight_decision_gate")
+    _record(checks, "m005_provenance_console_challenge_loaded", bool(challenge))
+    _record(
+        checks,
+        "m005_provenance_console_challenge_identity_matches",
+        bool(challenge_identity) and dict(declared_challenge) == dict(challenge_identity),
+    )
+    _record(
+        checks,
+        "m005_provenance_console_challenge_contract_matches",
+        challenge.get("schema") == EXPECTED_M005_CONSOLE_IDENTITY_SCHEMA
+        and challenge.get("operator_confirmed") is True
+        and challenge.get("console_model") == EXPECTED_M005_CONSOLE_MODEL
+        and challenge.get("firmware") == EXPECTED_M005_CONSOLE_FIRMWARE
+        and isinstance(challenge.get("serial"), str)
+        and bool(str(challenge.get("serial")).strip())
+        and challenge.get("accepted_readonly_source_id")
+        == preflight_gate.get("expected_accepted_readonly_source_id"),
+    )
+    _record(
+        checks,
+        "m005_provenance_console_matches_owner_challenge",
+        bool(challenge)
+        and console.get("serial") == challenge.get("serial")
+        and console.get("firmware") == challenge.get("firmware")
+        and console.get("model") == challenge.get("console_model"),
+    )
+    events_hash = events.get("sha256")
+    _record(
+        checks,
+        "m005_provenance_events_path_matches_loaded",
+        isinstance(m005_events_path, str)
+        and bool(m005_events_path)
+        and events.get("path") == m005_events_path,
+    )
+    _record(
+        checks,
+        "m005_provenance_events_hash_present",
+        events.get("exists") is True
+        and isinstance(events_hash, str)
+        and len(events_hash) == 64
+        and all(character in "0123456789abcdef" for character in events_hash),
+    )
+    _record(
+        checks,
+        "m005_provenance_events_hash_matches_loaded",
+        isinstance(m005_events_sha256, str) and events_hash == m005_events_sha256,
+    )
+
+    event_audit = m005_event_audit if isinstance(m005_event_audit, Mapping) else {}
+    first_event = _get_mapping(event_audit, "first_event")
+    first_payload = _get_mapping(first_event, "payload")
+    prestart_provenance = dict(provenance)
+    prestart_provenance["events"] = None
+    prestart_sha256 = _canonical_json_sha256(prestart_provenance)
+    _record(
+        checks,
+        "m005_provenance_first_event_is_prestart_capture",
+        first_event.get("seq") == 1
+        and first_event.get("event_type") == "provenance_capture"
+        and first_payload.get("captured_before_backend_contact") is True,
+    )
+    _record(
+        checks,
+        "m005_provenance_first_event_matches_summary",
+        dict(_get_mapping(first_payload, "provenance")) == prestart_provenance
+        and first_payload.get("provenance_sha256") == prestart_sha256
+        and m005_summary.get("provenance_prestart_sha256") == prestart_sha256
+        and first_payload.get("url") == EXPECTED_M005_CANONICAL_URL,
+    )
+
+    runtime_identity = _get_mapping(m005_summary, "runtime_identity")
+    event_runtime_identity = _get_mapping(event_audit, "runtime_identity")
+    runtime_backend = _get_mapping(runtime_identity, "backend")
+    runtime_websocket = _get_mapping(runtime_identity, "websocket")
+    runtime_process = _get_mapping(runtime_identity, "process")
+    runtime_launch_binding = _get_mapping(runtime_identity, "launch_binding")
+    runtime_source = {
+        "source": dict(_get_mapping(runtime_identity, "source")),
+        "code": dict(_get_mapping(runtime_identity, "code")),
+    }
+    expected_runtime_source = dict(_get_mapping(provenance, "runtime_source"))
+    expected_runtime_backend = {
+        key: backend.get(key) for key in ("path", "exists", "size", "sha256")
+    }
+    nonce = str(runtime_identity.get("instance_nonce") or "")
+    challenge_nonce = str(m005_summary.get("runtime_identity_challenge_nonce") or "")
+    launch_nonce = str(provenance.get("runtime_launch_nonce") or "")
+    try:
+        captured_at = datetime.fromisoformat(
+            str(provenance.get("captured_at_utc") or "").replace("Z", "+00:00")
+        )
+        started_at = datetime.fromisoformat(
+            str(runtime_identity.get("started_at_utc") or "").replace("Z", "+00:00")
+        )
+        start_delay = (started_at - captured_at).total_seconds()
+    except (TypeError, ValueError):
+        start_delay = -1
+    _record(
+        checks,
+        "m005_provenance_backend_runtime_identity_matches",
+        runtime_identity.get("type") == "runtime_identity"
+        and runtime_identity.get("schema") == EXPECTED_M005_RUNTIME_IDENTITY_SCHEMA
+        and runtime_identity.get("runtime_kind") == "source"
+        and valid_lower_hex(nonce, 32)
+        and runtime_process.get("instance_nonce") == nonce
+        and runtime_process.get("started_at_utc")
+        == runtime_identity.get("started_at_utc")
+        and runtime_process.get("pid") == m005_summary.get("launched_backend_pid")
+        and 0 <= start_delay <= MAX_M005_BOUND_BACKEND_START_DELAY_SECONDS
+        and runtime_identity.get("read_only_identity") is True
+        and runtime_identity.get("live_authority_granted") is False
+        and runtime_identity.get("request_challenge_nonce") == challenge_nonce
+        and valid_lower_hex(challenge_nonce, 32)
+        and runtime_launch_binding.get("mode") == "proof_runner"
+        and runtime_launch_binding.get("launch_nonce") == launch_nonce
+        and valid_lower_hex(launch_nonce, 32)
+        and runtime_launch_binding.get("prestart_provenance_schema")
+        == EXPECTED_M005_PROVENANCE_SCHEMA
+        and runtime_launch_binding.get("prestart_provenance_sha256") == prestart_sha256
+        and runtime_launch_binding.get("prestart_provenance_size")
+        == len(canonical_json_bytes(prestart_provenance))
+        and runtime_launch_binding.get("bound_before_process_start") is True
+        and runtime_launch_binding.get("proof_eligible") is True
+        and runtime_source == expected_runtime_source
+        and runtime_websocket.get("loopback_only") is True
+        and runtime_websocket.get("host") == "127.0.0.1"
+        and runtime_websocket.get("port") == 8765
+        and dict(runtime_backend) == expected_runtime_backend
+        and runtime_identity.get("manifest_sha256")
+        == runtime_identity_manifest_sha256(dict(runtime_identity)),
+    )
+    _record(
+        checks,
+        "m005_provenance_backend_runtime_identity_event_matches_summary",
+        bool(event_runtime_identity) and dict(event_runtime_identity) == dict(runtime_identity),
+    )
+
 
 def verify_packet(
     packet: Mapping[str, Any],
     *,
     m005_summary: Mapping[str, Any] | None = None,
     m005_event_request_types: list[str] | None = None,
+    m005_event_initial_connection: Mapping[str, Any] | None = None,
     m005_event_stale_readback: Mapping[str, Any] | None = None,
     m005_event_reconnect_readback: Mapping[str, Any] | None = None,
     m005_event_stale_readback_required: bool = False,
@@ -1162,6 +1649,9 @@ def verify_packet(
     packet_summary_path: str | None = None,
     m005_summary_path: str | None = None,
     m005_events_path: str | None = None,
+    m005_events_sha256: str | None = None,
+    m005_event_audit: Mapping[str, Any] | None = None,
+    m005_console_identity_challenge: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     checks: dict[str, bool] = {}
     _record_packet_checks(checks, packet)
@@ -1174,19 +1664,51 @@ def verify_packet(
         checks,
         m005_summary=m005_summary,
         m005_event_request_types=m005_event_request_types,
+        m005_event_initial_connection=m005_event_initial_connection,
         m005_event_stale_readback=m005_event_stale_readback,
         m005_event_reconnect_readback=m005_event_reconnect_readback,
         m005_event_stale_readback_required=m005_event_stale_readback_required,
         m005_summary_path=m005_summary_path,
         m005_events_path=m005_events_path,
+        m005_events_sha256=m005_events_sha256,
+        m005_event_audit=m005_event_audit,
+        m005_console_identity_challenge=m005_console_identity_challenge,
+    )
+    m005_preflight_gate = (
+        _get_mapping(m005_summary, "preflight_decision_gate")
+        if isinstance(m005_summary, Mapping)
+        else {}
+    )
+    _record(
+        checks,
+        "packet_accepted_readonly_source_matches_m005_gate",
+        bool(m005_preflight_gate)
+        and isinstance(packet.get("accepted_readonly_source_id"), str)
+        and packet.get("accepted_readonly_source_id")
+        == m005_preflight_gate.get("expected_accepted_readonly_source_id"),
     )
 
     failed_checks = sorted(name for name, passed in checks.items() if not passed)
+    provenance_checks = sorted(
+        name for name in checks if name.startswith("m005_provenance_")
+    )
+    provenance_ready = bool(provenance_checks) and all(checks[name] for name in provenance_checks)
+    owner_review_shape_ready = all(
+        passed for name, passed in checks.items() if name not in provenance_checks
+    )
+    behavioral_complete = bool(
+        m005_summary
+        and m005_summary.get("status") == "passed"
+        and m005_summary.get("m005_complete") is True
+        and m005_summary.get("missing_m005_evidence") == []
+    )
     ready = not failed_checks
     if ready:
         reason = "m006_owner_review_inputs_verified"
     elif m005_summary is None:
         reason = "m005_summary_required_for_owner_review"
+    elif behavioral_complete and owner_review_shape_ready and not provenance_ready:
+        reason = "m005_current_release_provenance_missing_or_mismatch"
     else:
         reason = "m006_owner_review_inputs_failed"
 
@@ -1200,6 +1722,10 @@ def verify_packet(
         "m005_events": m005_events_path,
         "proof_artifact_summaries": sorted((proof_summaries_by_artifact or {}).keys()),
         "owner_review_input_ready": ready,
+        "m005_behavioral_proof_complete": behavioral_complete,
+        "m005_owner_review_shape_ready": owner_review_shape_ready,
+        "m005_provenance_ready": provenance_ready,
+        "m005_current_release_accepted": ready,
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
@@ -1216,28 +1742,38 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
     m005_path = _resolve(m005_summary) if m005_summary is not None else None
     packet = _load_json(packet_path)
     m005 = _load_json(m005_path) if m005_path is not None else None
+    m005_console_identity_challenge = load_m005_console_identity_challenge(m005)
     m005_event_audit, m005_events_path = load_m005_event_audit(
         m005_summary_path=m005_path,
         m005_summary=m005,
     )
     m005_event_request_types = None
+    m005_event_initial_connection = None
     m005_event_stale_readback = None
     m005_event_reconnect_readback = None
+    m005_events_sha256 = None
     if isinstance(m005_event_audit, Mapping):
         request_types = m005_event_audit.get("request_types")
         if isinstance(request_types, list):
             m005_event_request_types = [str(item) for item in request_types]
+        initial_connection = m005_event_audit.get("initial_connection")
+        if isinstance(initial_connection, Mapping):
+            m005_event_initial_connection = initial_connection
         stale_readback = m005_event_audit.get("stale_readback")
         if isinstance(stale_readback, Mapping):
             m005_event_stale_readback = stale_readback
         reconnect_readback = m005_event_audit.get("reconnect_readback")
         if isinstance(reconnect_readback, Mapping):
             m005_event_reconnect_readback = reconnect_readback
+        event_hash = m005_event_audit.get("sha256")
+        if isinstance(event_hash, str):
+            m005_events_sha256 = event_hash
     proof_summaries = load_packet_proof_summaries(packet)
     return verify_packet(
         packet,
         m005_summary=m005,
         m005_event_request_types=m005_event_request_types,
+        m005_event_initial_connection=m005_event_initial_connection,
         m005_event_stale_readback=m005_event_stale_readback,
         m005_event_reconnect_readback=m005_event_reconnect_readback,
         m005_event_stale_readback_required=True,
@@ -1245,6 +1781,9 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
         packet_summary_path=str(packet_summary),
         m005_summary_path=_display_path(m005_path) if m005_path is not None else None,
         m005_events_path=m005_events_path,
+        m005_events_sha256=m005_events_sha256,
+        m005_event_audit=m005_event_audit,
+        m005_console_identity_challenge=m005_console_identity_challenge,
     )
 
 

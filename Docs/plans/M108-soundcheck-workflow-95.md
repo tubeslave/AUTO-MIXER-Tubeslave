@@ -1,5 +1,10 @@
 # M108 — Soundcheck Workflow 95
 
+> Superseded scope note (2026-07-12): `98/100` measured proposal derivation and
+> cockpit quality, not executable formation of a mix from a poor scene. The
+> monolithic 0/51 defect and its staged replacement are documented in
+> `Docs/reports/SOUNDCHECK_PLAN_DECOMPOSITION_20260712.md`.
+
 Status: `COMPLETE` — `98/100` (operator-requested local product hardening; does not
 replace active external-validation milestone M001)
 

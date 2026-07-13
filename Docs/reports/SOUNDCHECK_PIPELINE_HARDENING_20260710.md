@@ -1,5 +1,9 @@
 # Soundcheck pipeline hardening — 2026-07-10
 
+> Historical snapshot. Its `92/100` predates discovery of the monolithic
+> transaction failure and must not be used as current readiness. See
+> `Docs/reports/SOUNDCHECK_PLAN_DECOMPOSITION_20260712.md`.
+
 ## Итог
 
 Рабочий supervised soundcheck pipeline доведен до состояния **92/100** на

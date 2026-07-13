@@ -3,6 +3,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
 from autofoh_models import RuntimeState
@@ -123,6 +125,59 @@ def test_dry_run_never_writes_but_returns_operator_recommendation_data():
     assert result.message == "dry_run_only"
     assert mixer.calls == []
     assert decision.payload["gated_executor"]["pre_read"]["value"] == 0.0
+
+
+def test_relative_artifact_path_is_cwd_independent_and_test_isolated(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_root = tmp_path / "correction-runtime"
+    working_directory = tmp_path / "checkout" / "backend"
+    working_directory.mkdir(parents=True)
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR",
+        str(runtime_root),
+    )
+    monkeypatch.chdir(working_directory)
+
+    executor = _executor(
+        ProofMixer(),
+        artifact_path="show_assist_auto_v1/gated_correction_events.jsonl",
+    )
+    executor.execute(
+        ChannelGainMove(channel_id=1, target_db=1.5, reason="artifact isolation"),
+        RuntimeState.SOURCE_LEARNING,
+        dry_run=True,
+    )
+
+    expected = runtime_root / "show_assist_auto_v1" / "gated_correction_events.jsonl"
+    assert expected.is_file()
+    assert "gated_action_dry_run" in expected.read_text(encoding="utf-8")
+    assert not (working_directory / "show_assist_auto_v1").exists()
+    assert not (working_directory / "artifacts").exists()
+
+
+def test_artifact_path_rejects_absolute_and_parent_traversal(tmp_path):
+    for invalid in (str(tmp_path / "events.jsonl"), "../source-tree/events.jsonl"):
+        with pytest.raises(ValueError, match="relative runtime path"):
+            _executor(ProofMixer(), artifact_path=invalid)
+
+
+def test_artifact_test_runtime_override_is_rejected_outside_pytest(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR",
+        str(tmp_path / "runtime"),
+    )
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    with pytest.raises(RuntimeError, match="allowed only under pytest"):
+        _executor(
+            ProofMixer(),
+            artifact_path="show_assist_auto_v1/events.jsonl",
+        )
 
 
 def test_disabled_gated_executor_fails_closed_without_calling_legacy_writer():

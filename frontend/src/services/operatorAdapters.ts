@@ -122,6 +122,7 @@ export const mockBackendState: BackendUiState = {
   applyPath: 'none',
   writeScope: [],
   mixerConnected: false,
+  mixerTransportLocked: false,
   observationOnly: true,
   audioCaptureRunning: false,
   audioCaptureChannels: 0,
@@ -733,9 +734,17 @@ export function adaptBackendState(
   const safety = asRecord(data.safety);
   const manual = asRecord(safety.manual_write_supervision);
   const connected = Boolean(connection.connected);
+  const mixerTransportLocked = Boolean(
+    mode.mixer_transport_locked
+    ?? mode.packaged_offline_lock
+    ?? manual.mixer_transport_locked
+    ?? manual.packaged_offline_lock
+  );
   const emergencyStopped = Boolean(manual.emergency_stopped ?? manual.reset_required);
   const liveWritePolicy = str(mode.live_write_policy, connected ? 'connected_read_only' : 'backend_read_only');
-  const canApplyToConsole = Boolean(capabilities.can_apply_to_console) && !emergencyStopped;
+  const canApplyToConsole = Boolean(capabilities.can_apply_to_console)
+    && !emergencyStopped
+    && !mixerTransportLocked;
   const canCreateProposals = Boolean(capabilities.can_create_proposals);
   const requiresApproval = capabilities.requires_approval !== false;
   const writeScope = Array.isArray(capabilities.allowed_live_write_kinds)
@@ -762,8 +771,8 @@ export function adaptBackendState(
     connectionLabel: connected
       ? `${str(connection.connection_mode, 'mixer')} ${str(connection.ip, '')}`.trim()
       : connectionState === 'connected' ? 'Backend online' : mockBackendState.connectionLabel,
-    statusLabel: emergencyStopped ? 'Emergency reset required' : connectionState === 'connected' ? 'Live data' : connectionState === 'connecting' ? 'Connecting' : 'Offline',
-    statusTone: emergencyStopped ? 'red' : connectionState === 'connected' ? 'green' : connectionState === 'connecting' ? 'yellow' : 'blue',
+    statusLabel: mixerTransportLocked ? 'Offline smoke lock' : emergencyStopped ? 'Emergency reset required' : connectionState === 'connected' ? 'Live data' : connectionState === 'connecting' ? 'Connecting' : 'Offline',
+    statusTone: emergencyStopped ? 'red' : mixerTransportLocked ? 'blue' : connectionState === 'connected' ? 'green' : connectionState === 'connecting' ? 'yellow' : 'blue',
     canCreateProposals,
     canApplyToConsole,
     requiresApproval,
@@ -771,13 +780,16 @@ export function adaptBackendState(
     applyPath: str(mode.apply_path, 'none'),
     writeScope,
     mixerConnected: connected,
+    mixerTransportLocked,
     observationOnly: manual.wing_observation_only !== false,
     audioCaptureRunning: Boolean(audioCapture.running),
     audioCaptureChannels: Math.trunc(metricNum(audioCapture.num_channels, 0)),
     audioSampleRate: Math.trunc(metricNum(audioCapture.sample_rate, 0)),
     availableModes: normalizedAvailableModes,
     lastUpdated: str(data.generated_at, new Date().toISOString()),
-    message: emergencyStopped
+    message: mixerTransportLocked
+      ? 'Packaged offline lock is active. Mixer discovery, connection and console writes are disabled.'
+      : emergencyStopped
       ? 'Emergency stop is active. Supervised apply is blocked until explicit operator reset.'
       : message || str(data.reason, connectionState === 'connected' ? 'Product Layer connected.' : mockBackendState.message)
   };
@@ -4333,11 +4345,39 @@ export function adaptRoutingSegments(payload: unknown): RoutingSegment[] {
   });
 }
 
+function isOfflineDecisionTrace(row: UnknownRecord): boolean {
+  const metadata = asRecord(row.metadata);
+  const evidenceText = [
+    row.source,
+    row.mode,
+    row.status,
+    row.proof_status,
+    row.proof_mode,
+    metadata.proof_mode
+  ].map(value => str(value).toLowerCase()).join(' ');
+  return ['offline', 'replay', 'dry_run', 'dry-run', 'fake', 'legacy_unbound', 'applied_unverified'].some(marker => evidenceText.includes(marker))
+    || metadata.physical_wing === false
+    || row.physical_wing === false;
+}
+
+function traceStatusForDisplay(row: UnknownRecord): string {
+  const status = str(row.status, 'observed');
+  if (isOfflineDecisionTrace(row) && ['applied', 'passed', 'success', 'verified'].includes(status.toLowerCase())) {
+    return 'offline_simulated';
+  }
+  return status;
+}
+
+function traceProofForDisplay(row: UnknownRecord): string {
+  return isOfflineDecisionTrace(row) ? 'offline' : str(row.proof_status, 'unverified');
+}
+
 function toneForTrace(row: UnknownRecord): Tone {
   const status = str(row.status).toLowerCase();
   const blocked = str(row.blocked_reason);
   const proof = str(row.proof_status).toLowerCase();
   if (blocked || status.includes('blocked') || status.includes('error')) return 'red';
+  if (isOfflineDecisionTrace(row)) return 'yellow';
   if (proof === 'verified' || status === 'applied') return 'green';
   if (status.includes('created') || status.includes('pending')) return 'blue';
   return 'yellow';
@@ -4351,9 +4391,9 @@ export function adaptDecisionTraces(payload: unknown): DecisionTraceRecord[] {
     mode: str(row.mode) || undefined,
     target: str(row.target) || undefined,
     actionType: str(row.action_type, 'proposal'),
-    status: str(row.status, 'observed'),
+    status: traceStatusForDisplay(row),
     delta: row.delta === null || row.delta === undefined ? undefined : String(row.delta),
-    proofStatus: str(row.proof_status, 'unverified'),
+    proofStatus: traceProofForDisplay(row),
     blockedReason: str(row.blocked_reason) || undefined,
     createdAt: timeLabel(row.created_at, 'now'),
     tone: toneForTrace(row)

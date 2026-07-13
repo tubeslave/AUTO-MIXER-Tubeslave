@@ -23,10 +23,21 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',
+    host: '127.0.0.1',
     port: 3000,
+    strictPort: true,
   },
   build: {
-    outDir: 'build',
+    outDir: process.env.AUTOMIXER_FRONTEND_BUILD_DIR || 'build',
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('/node_modules/react') || id.includes('/node_modules/scheduler')) {
+            return 'react-vendor';
+          }
+        },
+      },
+    },
   },
 });

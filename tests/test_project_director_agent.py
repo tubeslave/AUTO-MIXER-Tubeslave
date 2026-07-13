@@ -1465,15 +1465,23 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
     if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
         assert directive["selected_action_source"] == "WING Read-Only Decision Review"
         assert directive["wing_readonly_preflight_decision_status"] == "blocked"
-        assert (
-            directive["wing_readonly_preflight_decision_ledger_status"]
-            == "operator_review_required"
-        )
+        ledger_status = directive["wing_readonly_preflight_decision_ledger_status"]
+        assert ledger_status in {
+            "operator_review_required",
+            "operator_review_decision_replacement_required",
+        }
         assert directive["wing_readonly_preflight_unreviewed_candidate_count"] >= 1
+        expected_blocker = (
+            "operator_must_replace_invalid_readonly_preflight_review_decisions"
+            if ledger_status == "operator_review_decision_replacement_required"
+            else "operator_must_record_readonly_preflight_review_decision"
+        )
         assert directive["wing_readonly_preflight_decision_blocked_by"] == [
-            "operator_must_record_readonly_preflight_review_decision"
+            expected_blocker
         ]
         assert "records an accepted or rejected decision" in directive["selected_action"]
+        if ledger_status == "operator_review_decision_replacement_required":
+            assert "refresh the template" in directive["selected_action"]
         assert "does not contact WING/backend" in directive["selected_action"]
         assert "grant live authority" in directive["selected_action"]
     else:

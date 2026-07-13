@@ -7,6 +7,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TOOL_PATH = PROJECT_ROOT / "tools" / "verify_m006_owner_readiness_decision.py"
@@ -65,6 +67,10 @@ def ready_packet_verifier_report() -> dict:
         "m005_events": M005_EVENTS_REL,
         "proof_artifact_summaries": list(packet["input_proof_artifacts"]),
         "owner_review_input_ready": True,
+        "m005_behavioral_proof_complete": True,
+        "m005_owner_review_shape_ready": True,
+        "m005_provenance_ready": True,
+        "m005_current_release_accepted": True,
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
@@ -73,6 +79,7 @@ def ready_packet_verifier_report() -> dict:
         "live_write": False,
         "checks": {
             "unit_ready": True,
+            "m005_provenance_unit_binding": True,
             "m005_events_stale_readback_payload_present": True,
             "m005_events_stale_readback_matches_summary": True,
             "m005_events_stale_readback_target_matches": True,
@@ -198,6 +205,55 @@ def test_packet_verifier_must_be_ready_and_clean() -> None:
     assert "packet_verifier_status_ready" in result["failed_checks"]
     assert "packet_verifier_failed_checks_empty" in result["failed_checks"]
     assert "packet_verifier_owner_review_input_ready" in result["failed_checks"]
+
+
+def test_path_verifier_recomputes_packet_evidence_instead_of_trusting_saved_ready_report(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    decision_path = PACKET_SUMMARY.parent / "unit_owner_decision_recompute.json"
+    packet_verifier_path = (
+        PROJECT_ROOT
+        / "artifacts"
+        / "wing_owner_readiness_review_verifier"
+        / "unit_m006_owner_readiness_packet_verifier"
+        / "summary.json"
+    )
+    packet_verifier_path.parent.mkdir(parents=True, exist_ok=True)
+    decision_path.write_text(json.dumps(accepted_decision()), encoding="utf-8")
+    packet_verifier_path.write_text(
+        json.dumps(ready_packet_verifier_report()),
+        encoding="utf-8",
+    )
+    recomputed = ready_packet_verifier_report()
+    recomputed.update({
+        "status": "blocked",
+        "reason": "m005_current_release_provenance_missing_or_mismatch",
+        "owner_review_input_ready": False,
+        "m005_provenance_ready": False,
+        "m005_current_release_accepted": False,
+        "failed_checks": ["m005_provenance_source_clean_before_run"],
+    })
+    monkeypatch.setattr(verifier, "verify_packet_paths", lambda *_args, **_kwargs: recomputed)
+    try:
+        result = verifier.verify_decision_paths(
+            decision_path,
+            PACKET_SUMMARY,
+            packet_verifier_path,
+            Path(M005_SUMMARY_REL),
+        )
+    finally:
+        decision_path.unlink(missing_ok=True)
+        packet_verifier_path.unlink(missing_ok=True)
+        try:
+            packet_verifier_path.parent.rmdir()
+        except OSError:
+            pass
+
+    assert result["status"] == "blocked"
+    assert result["packet_verifier_recomputed_from_current_artifacts"] is True
+    assert result["saved_packet_verifier_status"] == "ready_for_owner_review"
+    assert "packet_verifier_status_ready" in result["failed_checks"]
+    assert "packet_verifier_m005_provenance_ready" in result["failed_checks"]
     assert result["owner_decision_accepted"] is False
     assert result["readiness_matrix_update_allowed"] is False
 

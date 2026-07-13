@@ -7,7 +7,17 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
 
-from ws_transport import broadcast_json, is_connection_closed_error, send_json, serialize_message
+from ws_transport import (
+    EMERGENCY_FAST_LANE_TYPES,
+    RejectionWindow,
+    TokenBucket,
+    broadcast_json,
+    consume_token_buckets,
+    is_connection_closed_error,
+    send_json,
+    serialize_message,
+    websocket_message_type,
+)
 
 
 class FakeClosedError(Exception):
@@ -25,6 +35,69 @@ class FakeWebSocket:
         if self.fail_with is not None:
             raise self.fail_with
         self.sent.append(payload)
+
+
+class FakeClock:
+    def __init__(self):
+        self.now = 0.0
+
+    def __call__(self):
+        return self.now
+
+    def advance(self, seconds):
+        self.now += seconds
+
+
+def test_token_bucket_enforces_burst_and_refills_at_configured_rate():
+    clock = FakeClock()
+    bucket = TokenBucket(10, 30, clock=clock)
+
+    assert all(bucket.consume() for _ in range(30))
+    assert bucket.consume() is False
+
+    clock.advance(0.1)
+    assert bucket.consume() is True
+    assert bucket.consume() is False
+
+
+def test_multi_bucket_consume_is_atomic_when_global_bucket_is_empty():
+    clock = FakeClock()
+    connection = TokenBucket(10, 30, clock=clock)
+    global_bucket = TokenBucket(50, 100, clock=clock)
+    for _ in range(100):
+        assert global_bucket.consume()
+
+    before = connection.tokens
+    assert consume_token_buckets(
+        (connection, global_bucket),
+        now=clock.now,
+    ) is False
+    assert connection.tokens == before
+
+
+def test_rejection_window_closes_on_twentieth_reject_within_five_seconds():
+    clock = FakeClock()
+    window = RejectionWindow(20, 5.0, clock=clock)
+
+    assert all(window.record() is False for _ in range(19))
+    assert window.record() is True
+
+    clock.advance(5.1)
+    assert window.record() is False
+    assert window.count == 1
+
+
+@pytest.mark.parametrize("message_type", sorted(EMERGENCY_FAST_LANE_TYPES))
+def test_only_exact_emergency_message_types_enter_fast_lane(message_type):
+    assert websocket_message_type(f'{{"type":"{message_type}"}}') == message_type
+    assert message_type in EMERGENCY_FAST_LANE_TYPES
+    assert websocket_message_type(f'{{"type":"{message_type}_later"}}') not in EMERGENCY_FAST_LANE_TYPES
+
+
+def test_malformed_or_non_object_frames_have_no_fast_lane_type():
+    assert websocket_message_type("not-json") is None
+    assert websocket_message_type("[]") is None
+    assert websocket_message_type('{"type": 123}') is None
 
 
 def test_is_connection_closed_error_detects_normal_close():

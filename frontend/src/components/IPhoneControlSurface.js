@@ -66,9 +66,20 @@ function IPhoneControlSurface({
       setAgentStatus(prev => ({ ...prev, is_running: false }));
       setMessage('AI Agent остановлен');
     };
-    const onEmergencyStopped = () => {
-      setAgentStatus(prev => ({ ...prev, is_running: false, emergency_stop: true }));
-      setMessage('Аварийный стоп выполнен');
+    const onEmergencyStopped = (data) => {
+      const stopped = data?.success === true
+        && data?.status === 'stopped'
+        && data?.teardown_complete === true
+        && data?.emergency_stop === true;
+      setAgentStatus(prev => ({
+        ...prev,
+        is_running: stopped ? false : prev.is_running,
+        emergency_stop: data?.emergency_stop === true,
+        emergency_stop_status: stopped ? 'stopped' : 'unknown',
+      }));
+      setMessage(stopped
+        ? 'Аварийный стоп выполнен'
+        : 'Стоп зафиксирован, но завершение остановки не подтверждено');
     };
     const onPending = (data) => setPendingActions(data.actions || []);
     const onHistory = (data) => setHistory(data.history || []);

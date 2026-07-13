@@ -3,6 +3,7 @@
 import asyncio
 import logging
 
+from audio_capture import validate_live_capture_dimensions
 from audio_devices import get_audio_devices
 from dante_routing_config import get_routing_as_dict, get_module_signal_info
 from audio_device_scanner import (
@@ -106,6 +107,11 @@ def register_handlers(server):
             num_channels = int(data.get("num_channels", data.get("channels", 48)))
             sample_rate = int(data.get("sample_rate", 48000))
             buffer_seconds = float(data.get("buffer_seconds", 8.0))
+            num_channels, sample_rate, buffer_seconds = validate_live_capture_dimensions(
+                num_channels,
+                sample_rate,
+                buffer_seconds,
+            )
         except (TypeError, ValueError) as exc:
             await server.send_to_client(websocket, {
                 "type": "audio_capture_status",
@@ -115,17 +121,56 @@ def register_handlers(server):
             return
 
         try:
-            capture = server._ensure_audio_capture(
-                device_id,
-                num_channels=num_channels,
-                sample_rate=sample_rate,
-                buffer_seconds=buffer_seconds,
-            )
+            measurement_task = getattr(server, "_system_measurement_task", None)
+            if measurement_task is not None and not measurement_task.done():
+                await server.send_to_client(websocket, {
+                    "type": "audio_capture_status",
+                    "running": False,
+                    "preview": True,
+                    "device_id": device_id,
+                    "error": "audio_capture_in_use_by_system_measurement",
+                })
+                return
+            async with server._audio_capture_lock:
+                current_capture = getattr(server, "audio_capture", None)
+                current_owner = getattr(server, "_audio_capture_preview_owner", None)
+                engine = getattr(server, "auto_soundcheck_engine", None)
+                engine_state = getattr(getattr(engine, "state", None), "value", None)
+                if getattr(server, "auto_soundcheck_running", False) or (
+                    engine is not None and engine_state not in ("stopped", "error")
+                ):
+                    payload = {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": False,
+                        "error": "audio_capture_in_use_by_auto_soundcheck",
+                    }
+                elif current_capture is not None and current_owner is not websocket:
+                    payload = {
+                        "type": "audio_capture_status",
+                        "running": bool(getattr(current_capture, "running", False)),
+                        "preview": True,
+                        "owned_by_requester": False,
+                        "error": "audio_capture_in_use_by_another_runtime_owner",
+                    }
+                else:
+                    capture = await server._ensure_audio_capture_async(
+                        device_id,
+                        num_channels=num_channels,
+                        sample_rate=sample_rate,
+                        buffer_seconds=buffer_seconds,
+                    )
+                    server._audio_capture_preview_owner = websocket
+                    payload = {
+                        "type": "audio_capture_status",
+                        "preview": True,
+                        "device_id": device_id,
+                        "owned_by_requester": True,
+                        **capture.get_status(),
+                    }
             await server.send_to_client(websocket, {
-                "type": "audio_capture_status",
-                "preview": True,
-                "device_id": device_id,
-                **capture.get_status(),
+                **payload,
             })
         except Exception as exc:
             logger.exception("Failed to start audio capture preview")
@@ -138,16 +183,35 @@ def register_handlers(server):
             })
 
     async def handle_stop_audio_capture_preview(websocket, data):
-        """Stop read-only audio capture if it is running."""
-        if server.audio_capture:
-            try:
-                server.audio_capture.stop()
-            finally:
-                server.audio_capture = None
+        """Stop only the read-only preview owned by this WebSocket."""
+        stop_owned = getattr(server, "_stop_owned_audio_capture_preview", None)
+        if callable(stop_owned):
+            stopped = bool(await stop_owned(websocket))
+        else:
+            owner = getattr(server, "_audio_capture_preview_owner", None)
+            stopped = owner is websocket
+            if stopped and server.audio_capture:
+                try:
+                    server.audio_capture.stop()
+                finally:
+                    server.audio_capture = None
+                    server._audio_capture_preview_owner = None
+        if not stopped:
+            await server.send_to_client(websocket, {
+                "type": "audio_capture_status",
+                "running": bool(
+                    server.audio_capture and getattr(server.audio_capture, "running", False)
+                ),
+                "preview": True,
+                "owned_by_requester": False,
+                "error": "audio_capture_preview_not_owned_by_requester",
+            })
+            return
         await server.send_to_client(websocket, {
             "type": "audio_capture_status",
             "running": False,
             "preview": True,
+            "owned_by_requester": True,
         })
 
     return {

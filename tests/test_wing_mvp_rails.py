@@ -845,7 +845,7 @@ def test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed():
 
     decision_ledger = summary["wing_readonly_preflight_review_decision_ledger"]
     assert decision_ledger["accepted_record_count"] == 1
-    assert decision_ledger["rejected_record_count"] == 2
+    assert decision_ledger["rejected_record_count"] == 3
     assert decision_ledger["invalid_record_count"] == 0
     assert decision_ledger["unreviewed_candidate_count"] == 0
     assert decision_ledger["live_authority_granted"] is False
@@ -1282,12 +1282,17 @@ def test_mvp_progress_report_records_external_validation_handoff():
     normalized_progress = re.sub(r"\s+", " ", progress_report)
     assert "## Current External Validation Handoff" in progress_report
     assert "Program status from `STATE.json`: `WAITING_FOR_EXTERNAL_VALIDATION`" in progress_report
-    assert "Strict pre-release review score: `95/100`" in progress_report
+    score_gate = state["strict_pre_release_review"]
     assert (
-        "score `95/100` is evidence-backed by the passed supervised CH3 fader "
-        "and gain-down proof artifacts" in progress_report
+        f"Strict pre-release review score: `{score_gate['score']}/100`"
+        in progress_report
     )
+    assert score_gate["score"] < score_gate["release_threshold"]
+    assert score_gate["score_ceiling_reason"] in normalized_progress
+    assert "frozen legacy M001 packet contract" in progress_report
     for requirement in state["external_validation_requirements"]:
+        assert f"  - {requirement}" in progress_report
+    for requirement in score_gate["required_before_95"]:
         assert f"  - {requirement}" in progress_report
     assert (
         re.sub(r"\s+", " ", state["current_blocker"])
@@ -1346,7 +1351,7 @@ def test_m006_owner_decision_handoff_surfaces_track_latest_verifier_commit():
         assert "matching reconnect-recovery physical readback event checks" in normalized_surface
         assert "accepted M005 summary sibling `events.jsonl`" in normalized_surface
         assert "packet-verifier" in normalized_surface
-        assert "reason=m006_owner_decision_pending" in normalized_surface
+        assert "reason=m006_owner_decision_failed_closed" in normalized_surface
         assert "readiness-matrix update" in normalized_surface
 
 
@@ -1358,21 +1363,42 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
     score_gate = state["strict_pre_release_review"]
 
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
-    assert score_gate["score"] == 95
+    assert score_gate["score"] == 88
     assert score_gate["release_threshold"] == 95
-    assert score_gate["score"] >= score_gate["release_threshold"]
-    assert score_gate["public_release_ready"] is True
-    assert "supervised narrow" in score_gate["public_release_scope"]
-    assert "no autonomous mixing" in score_gate["public_release_scope"]
-    assert score_gate["required_before_95"] == []
-    assert score_gate["evidence"] == [
-        "artifacts/wing_operator_proposal_validation/"
-        "20260704T045741Z_wing_operator_proposal_ch3_fader/summary.json",
-        "artifacts/wing_operator_proposal_validation/"
-        "20260704T045820Z_wing_operator_proposal_ch3_gain/summary.json",
-    ]
+    assert score_gate["score"] < score_gate["release_threshold"]
+    assert score_gate["public_release_ready"] is False
+    assert "not public-release ready" in score_gate["public_release_scope"]
+    assert "normal supervised transaction live kinds are empty" in score_gate["public_release_scope"]
+    assert score_gate["required_before_95"]
+    assert any(
+        "operator-present canonical backend transaction proof on the exact WING Rack"
+        in requirement
+        for requirement in score_gate["required_before_95"]
+    )
+    assert any(
+        "real current-tree arm64 packaged-app launch smoke"
+        in requirement
+        for requirement in score_gate["required_before_95"]
+    )
+    assert any(
+        "M006 technical narrow promotion for the already recorded owner decision"
+        in requirement
+        for requirement in score_gate["required_before_95"]
+    )
+    assert score_gate["evidence"][0] == (
+        "Docs/reports/FULL_PROJECT_READINESS_AUDIT_20260711.md"
+    )
+    assert any(
+        path.startswith("artifacts/no_wing_release_check/")
+        for path in score_gate["evidence"]
+    )
+    assert any("wing_operator_proposal_ch3_fader" in path for path in score_gate["evidence"])
+    assert any("wing_operator_proposal_ch3_gain" in path for path in score_gate["evidence"])
     for artifact in score_gate["evidence"]:
         assert (PROJECT_ROOT / artifact).is_file()
+    for artifact in score_gate["evidence"]:
+        if "wing_operator_proposal_validation" not in artifact:
+            continue
         artifact_summary = json.loads(
             (PROJECT_ROOT / artifact).read_text(encoding="utf-8")
         )
@@ -1384,13 +1410,17 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         )
 
     for marker in (
-        "fader and gain-down proofs passed",
-        "physical readback",
-        "rollback",
-        "emergency-stop/block",
-        "M006",
-        "M005",
-        "no autonomy",
+        "canonical proposal-only WING WebSocket surfaces",
+        "strict address-bound physical readback and rollback CAS",
+        "one per-user writer lock and recovery WAL",
+        "atomic proposal claims",
+        "exact browser Origin and memory-only Electron token bootstrap",
+        "nested unbound physical claims",
+        "runtime identity v2",
+        "initial non-observation connection before baseline plus observation-only reconnect",
+        "self-hashed embedded source manifest",
+        "authenticated launcher-token and observed backend PID binding",
+        "all four canonical stores unchanged",
     ):
         assert marker in score_gate["score_ceiling_reason"]
 
@@ -1406,17 +1436,33 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         in progress_report
     )
     assert (
-        "Public release ready from score gate: `true` "
-        "(supervised narrow WING fader/gain-down MVP scope only)"
+        "Public release ready from score gate: `false` "
+        "(no standing supervised transaction authority)"
         in progress_report
     )
     assert score_gate["score_ceiling_reason"] in normalized_progress
     for surface in (normalized_current, normalized_report):
         assert f"strict pre-release score is `{score_gate['score']}/100`" in surface
         assert f"threshold remains `{score_gate['release_threshold']}/100`" in surface
-        assert "public release ready: `true`" in surface
-        assert "supervised narrow WING fader/gain-down MVP" in surface
+        assert "public release ready: `false`" in surface
+        assert "no standing supervised transaction authority" in surface
         assert score_gate["score_ceiling_reason"] in surface
+
+    assert state["truth_revision"] == (
+        "soundcheck_staged_execution_kernel_96_strict_live_88_zero_authority_20260712"
+    )
+    assert state["full_release_truth_source"] == "strict_pre_release_review"
+    assert state["full_release_requirements_source"] == (
+        "strict_pre_release_review.required_before_95"
+    )
+    scoped_run = state["latest_m006_scoped_live_soundcheck"]
+    assert scoped_run["evidence_class"] == "historical_operator_approved_execution"
+    assert scoped_run["accepted_for_current_release_readiness"] is False
+    assert scoped_run["standing_live_authority_granted"] is False
+    assert scoped_run["superseded_by"] == "strict_pre_release_review"
+    assert "live_allowed_write_kinds" not in scoped_run
+    assert scoped_run["historical_bounded_write_kinds"]
+    assert "Historical checkpoints — superseded" in report
 
 
 def test_autopilot_operator_reports_match_latest_full_suite_evidence():
@@ -1910,12 +1956,14 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
         )
     assert state["external_validation_requirements"] == [
         (
-            "Supervised WING disconnect/timeout/stale-state protection proof "
-            "(M005) with operator present"
+            "Current-release provenance rebind for the closed M005 "
+            "disconnect/timeout/stale-state proof without repeating the physical "
+            "cable pull unless the owner explicitly requests it"
         ),
         (
-            "Owner readiness review that updates the MVP readiness matrix from "
-            "the accepted CH3 fader and gain-down proof artifacts (M006)"
+            "Technical M006 readiness review promotion after the current verifier "
+            "accepts that provenance; the narrow owner decision is already "
+            "recorded and grants no live authority"
         ),
     ]
 
@@ -7203,8 +7251,12 @@ def test_m050_supervised_apply_backend_result_is_hidden_by_integration_bundle_bl
     assert "const backendResultTone = visibleBackendResultMatches ? backendResult?.tone ?? approvalTone : approvalTone" in (
         task_queue
     )
-    assert "visibleBackendResultMatches && readbackLabel.includes('verified')" in task_queue
-    assert "visibleBackendResultMatches && rollbackLabel.includes('available')" in task_queue
+    assert "const readbackTone = modalGateBlockerStatus" in task_queue
+    assert "backendResult?.readbackTone ?? 'yellow' as Tone" in task_queue
+    assert "const rollbackTone = modalGateBlockerStatus" in task_queue
+    assert "backendResult?.rollbackTone ?? 'yellow' as Tone" in task_queue
+    assert "{ label: 'Readback status', value: readbackLabel, tone: readbackTone }" in task_queue
+    assert "{ label: 'Rollback status', value: rollbackLabel, tone: rollbackTone }" in task_queue
     assert "{visibleBackendResultMatches && (" in task_queue
     assert "supervised apply backend result is hidden" in adapter_test
     assert "Supervised Apply backend result panels must fail closed" in completion

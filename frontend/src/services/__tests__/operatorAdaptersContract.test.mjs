@@ -27,6 +27,78 @@ async function importTypeScript(relativePath) {
   return import(`data:text/javascript;base64,${encoded}`);
 }
 
+test('adaptDecisionTraces never presents retained dry-run proof as a green live apply', async () => {
+  const { adaptDecisionTraces } = await importTypeScript('services/operatorAdapters.ts');
+
+  const [trace] = adaptDecisionTraces({
+    traces: [{
+      decision_id: 'decision-retained-dry-run',
+      source: 'gain_proof_dry_run_runner',
+      mode: 'supervised',
+      status: 'applied',
+      proof_status: 'verified',
+      metadata: { proof_mode: 'dry_run', physical_wing: false },
+    }],
+  });
+
+  assert.equal(trace.status, 'offline_simulated');
+  assert.equal(trace.proofStatus, 'offline');
+  assert.equal(trace.tone, 'yellow');
+});
+
+test('adaptDecisionTraces keeps legacy-unbound and applied-unverified rows yellow', async () => {
+  const { adaptDecisionTraces } = await importTypeScript('services/operatorAdapters.ts');
+
+  const traces = adaptDecisionTraces({
+    traces: [
+      {
+        decision_id: 'legacy-unbound',
+        source: 'operator_proposal_queue',
+        status: 'legacy_unbound_apply',
+        proof_status: 'legacy_unbound',
+      },
+      {
+        decision_id: 'bound-unverified',
+        source: 'operator_proposal_queue',
+        status: 'applied_unverified',
+        proof_status: 'unverified',
+      },
+    ],
+  });
+
+  assert.deepEqual(traces.map(trace => trace.tone), ['yellow', 'yellow']);
+  assert.notEqual(traces[0].status, 'applied');
+  assert.notEqual(traces[1].proofStatus, 'verified');
+});
+
+test('adaptBackendState exposes packaged offline lock and removes console authority', async () => {
+  const { adaptBackendState } = await importTypeScript('services/operatorAdapters.ts');
+
+  const state = adaptBackendState({
+    operator_mode: {
+      mode: 'analyze',
+      mixer_transport_locked: true,
+      capabilities: {
+        can_apply_to_console: true,
+        can_create_proposals: true,
+        allowed_live_write_kinds: ['fader', 'gain'],
+      },
+    },
+    connection: { connected: false },
+    safety: {
+      manual_write_supervision: {
+        packaged_offline_lock: true,
+        wing_observation_only: true,
+      },
+    },
+  }, 'connected');
+
+  assert.equal(state.mixerTransportLocked, true);
+  assert.equal(state.canApplyToConsole, false);
+  assert.equal(state.statusLabel, 'Offline smoke lock');
+  assert.match(state.message, /Mixer discovery, connection and console writes are disabled/);
+});
+
 test('adaptTasks preserves SafeGain ensemble evidence for read-only cockpit display', async () => {
   const { adaptTasks } = await importTypeScript('services/operatorAdapters.ts');
 
@@ -4883,8 +4955,10 @@ test('supervised apply backend result is hidden when integration bundle is block
   assert.match(source, /: visibleBackendResultMatches \? backendResult\?\.readbackStatus \?\? 'Required after backend apply' : 'Required after backend apply'/);
   assert.match(source, /: visibleBackendResultMatches \? backendResult\?\.rollbackStatus \?\? 'Snapshot required' : 'Snapshot required'/);
   assert.match(source, /const backendResultTone = visibleBackendResultMatches \? backendResult\?\.tone \?\? approvalTone : approvalTone/);
-  assert.match(source, /visibleBackendResultMatches && readbackLabel\.includes\('verified'\)/);
-  assert.match(source, /visibleBackendResultMatches && rollbackLabel\.includes\('available'\)/);
+  assert.match(source, /backendResult\?\.readbackTone \?\? 'yellow'/);
+  assert.match(source, /backendResult\?\.rollbackTone \?\? 'yellow'/);
+  assert.doesNotMatch(source, /readbackLabel\.includes\('verified'\)/);
+  assert.doesNotMatch(source, /rollbackLabel\.includes\('available'\)/);
   assert.match(source, /\{visibleBackendResultMatches && \(/);
   assert.equal(source.includes('queueMutation'), false);
 });

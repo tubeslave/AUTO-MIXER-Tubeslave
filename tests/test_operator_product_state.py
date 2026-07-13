@@ -1,3 +1,4 @@
+import asyncio
 import importlib
 import json
 import os
@@ -9,9 +10,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import backend.automation_trace as automation_trace
 import backend.operator_product_state as operator_product_state
-from backend.automation_trace import AutomationTraceStore
-from backend.decision_memory import DecisionMemoryStore, decision_memory_entry_from_trace
+from backend.automation_trace import TRACE_PROVENANCE_SCHEMA, AutomationTraceStore
+from backend.decision_memory import (
+    DecisionMemoryStore,
+    decision_memory_entry_from_trace,
+    normalize_decision_memory_entry,
+)
 from backend.operator_analysis import build_operator_analysis_report
 from backend.shadow_gain_rides import build_shadow_gain_ride_candidates, shadow_gain_ride_trace
 from backend.operator_product_state import (
@@ -538,7 +544,7 @@ def test_bus_main_dca_snapshot_publishes_cached_console_surfaces_without_queries
         "/bus/1/eq/on": 1,
         "/bus/1/dyn/on": 1,
         "/bus/1/dyn/mdl": "BUSCOMP",
-        "/bus/1/dyn/thr37": -20.0,
+        "/bus/1/dyn/thr": -20.0,
         "/bus/1/dyn/ratio": "2.0",
         "/bus/1/dyn/knee": 3.0,
         "/bus/1/dyn/det": "RMS",
@@ -1702,12 +1708,286 @@ def test_decision_memory_accepts_verified_and_offline_evidence_only():
         "status": "shadow_proposed",
         "proof_status": "shadow_only",
     })
+    fake_dry_run = decision_memory_entry_from_trace({
+        "decision_id": "trace-fake-dry-run",
+        "source": "gain_proof_dry_run_runner",
+        "mode": "supervised",
+        "target": 2,
+        "action_type": "gain",
+        "status": "applied",
+        "proof_status": "verified",
+    })
 
     assert verified is not None
     assert verified["evidence_quality"] == "verified"
     assert offline is not None
     assert offline["evidence_quality"] == "offline"
+    assert fake_dry_run is not None
+    assert fake_dry_run["evidence_quality"] == "offline"
+    assert fake_dry_run["confidence"] == 0.82
+    assert fake_dry_run["metadata"]["trace_source"] == "gain_proof_dry_run_runner"
+    assert fake_dry_run["metadata"]["proof_mode"] == "dry_run"
+    assert fake_dry_run["metadata"]["physical_wing"] is False
     assert shadow is None
+
+
+def test_legacy_dry_run_trace_is_quarantined_without_rewriting_store(tmp_path):
+    store = AutomationTraceStore(tmp_path)
+    store.root_dir.mkdir(parents=True, exist_ok=True)
+    legacy = {
+        "decision_id": "decision-legacy-fake-readback",
+        "source": "gain_proof_dry_run_runner",
+        "mode": "supervised",
+        "status": "applied",
+        "proof_status": "verified",
+        "readback": {"status": "verified_from_physical_readback", "value": 3.0},
+    }
+    original = json.dumps(legacy, sort_keys=True) + "\n"
+    store.path.write_text(original, encoding="utf-8")
+
+    rows = store.read_recent()
+
+    assert store.path.read_text(encoding="utf-8") == original
+    assert rows[0]["status"] == "offline_simulated"
+    assert rows[0]["proof_status"] == "offline"
+    assert rows[0]["physical_wing"] is False
+    assert rows[0]["metadata"]["original_proof_status"] == "verified"
+    assert rows[0]["metadata"]["trust_status"] == "offline_non_physical"
+    assert rows[0]["readback"]["status"] == "offline_unverified"
+    assert rows[0]["readback"]["original_status"] == "verified_from_physical_readback"
+
+
+def test_decision_trace_summary_does_not_count_dry_run_as_verified(server, tmp_path):
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.automation_trace_store.append({
+        "decision_id": "decision-dry-run-summary",
+        "source": "gain_proof_dry_run_runner",
+        "mode": "supervised",
+        "status": "applied",
+        "proof_status": "verified",
+    })
+
+    snapshot = build_decision_traces(server)
+
+    assert snapshot["summary"]["verified_count"] == 0
+    assert snapshot["summary"]["applied_count"] == 0
+    assert snapshot["traces"][0]["proof_status"] == "offline"
+    assert snapshot["traces"][0]["status"] == "offline_simulated"
+
+
+def test_legacy_unbound_verified_apply_is_quarantined_without_rewrite(tmp_path):
+    store = AutomationTraceStore(tmp_path)
+    store.root_dir.mkdir(parents=True, exist_ok=True)
+    legacy = {
+        "decision_id": "decision-generic-synthetic",
+        "source": "operator_proposal_queue",
+        "mode": "supervised",
+        "status": "applied",
+        "proof_status": "verified",
+        "pre_read": {"status": "verified_from_physical_readback", "value": -2.5},
+        "readback": {"status": "verified_from_physical_readback", "value": -3.0},
+    }
+    original = json.dumps(legacy, sort_keys=True) + "\n"
+    store.path.write_text(original, encoding="utf-8")
+
+    rows = store.read_recent()
+
+    assert store.path.read_text(encoding="utf-8") == original
+    assert rows[0]["status"] == "legacy_unbound_apply"
+    assert rows[0]["proof_status"] == "legacy_unbound"
+    assert rows[0]["metadata"]["trust_status"] == "legacy_unbound"
+    assert rows[0]["pre_read"]["status"] == "legacy_unbound"
+    assert rows[0]["readback"]["status"] == "legacy_unbound"
+
+
+def test_legacy_unbound_blocked_trace_quarantines_nested_physical_claim(tmp_path):
+    store = AutomationTraceStore(tmp_path)
+    store.append(
+        {
+            "decision_id": "legacy-blocked-physical-pre-read",
+            "source": "wing_operator_proposal_validation_runner",
+            "status": "blocked",
+            "proof_status": "unverified",
+            "pre_read": {
+                "status": "verified_from_physical_readback",
+                "source": "physical_readback",
+                "value": -3.0,
+            },
+            "metadata": {},
+        }
+    )
+    raw_before = store.path.read_bytes()
+
+    rows = store.read_recent(limit=10)
+
+    assert store.path.read_bytes() == raw_before
+    assert rows[0]["status"] == "blocked"
+    assert rows[0]["proof_status"] == "legacy_unbound"
+    assert rows[0]["metadata"]["trust_status"] == "legacy_unbound"
+    assert rows[0]["pre_read"]["original_status"] == (
+        "verified_from_physical_readback"
+    )
+    assert rows[0]["pre_read"]["status"] == "legacy_unbound"
+    assert rows[0]["pre_read"]["physical_wing"] is False
+
+
+def test_bound_runtime_verified_apply_remains_verified(tmp_path):
+    store = AutomationTraceStore(tmp_path)
+    store.append({
+        "decision_id": "decision-bound-runtime",
+        "source": "operator_proposal_queue",
+        "status": "applied",
+        "proof_status": "verified",
+        "metadata": {
+            "trace_provenance": {
+                "schema": TRACE_PROVENANCE_SCHEMA,
+                "origin": "server_runtime",
+                "runtime_instance_nonce": "a" * 32,
+                "runtime_kind": "source",
+            }
+        },
+    })
+
+    [row] = store.read_recent()
+
+    assert row["status"] == "applied"
+    assert row["proof_status"] == "verified"
+
+
+def test_bound_runtime_applied_without_verified_proof_is_not_counted(server, tmp_path):
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.automation_trace_store.append({
+        "decision_id": "decision-bound-unverified",
+        "source": "operator_proposal_queue",
+        "status": "applied",
+        "proof_status": "unverified",
+        "metadata": {
+            "trace_provenance": {
+                "schema": TRACE_PROVENANCE_SCHEMA,
+                "origin": "server_runtime",
+                "runtime_instance_nonce": "b" * 32,
+                "runtime_kind": "source",
+            }
+        },
+    })
+
+    snapshot = build_decision_traces(server)
+
+    assert snapshot["summary"]["applied_count"] == 0
+    assert snapshot["summary"]["verified_count"] == 0
+    assert snapshot["traces"][0]["status"] == "applied_unverified"
+
+
+def test_server_overwrites_caller_supplied_trace_provenance(server, tmp_path):
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.decision_memory_store = DecisionMemoryStore(tmp_path)
+    recorded = server.record_automation_decision_trace(
+        source="unit",
+        status="applied",
+        proof_status="verified",
+        metadata={
+            "trace_provenance": {
+                "schema": TRACE_PROVENANCE_SCHEMA,
+                "origin": "server_runtime",
+                "runtime_instance_nonce": "f" * 32,
+                "runtime_kind": "packaged",
+            }
+        },
+    )
+
+    provenance = recorded["metadata"]["trace_provenance"]
+    assert provenance == {
+        "schema": TRACE_PROVENANCE_SCHEMA,
+        "origin": "server_runtime",
+        "runtime_instance_nonce": server._runtime_identity["instance_nonce"],
+        "runtime_kind": server._runtime_identity["runtime_kind"],
+    }
+
+
+def test_decision_trace_summary_does_not_count_generic_legacy_synthetic_rows(server, tmp_path):
+    server.automation_trace_store = AutomationTraceStore(tmp_path)
+    server.automation_trace_store.append({
+        "decision_id": "decision-generic-legacy",
+        "source": "operator_proposal_queue",
+        "status": "applied",
+        "proof_status": "verified",
+        "readback": {"status": "verified_from_physical_readback", "value": -3.0},
+    })
+
+    snapshot = build_decision_traces(server)
+
+    assert snapshot["summary"]["applied_count"] == 0
+    assert snapshot["summary"]["verified_count"] == 0
+    assert snapshot["traces"][0]["status"] == "legacy_unbound_apply"
+
+
+def test_read_recent_parses_only_bounded_tail(tmp_path, monkeypatch):
+    store = AutomationTraceStore(tmp_path)
+    store.root_dir.mkdir(parents=True, exist_ok=True)
+    with store.path.open("w", encoding="utf-8") as handle:
+        for index in range(10_000):
+            handle.write(json.dumps({"decision_id": f"prefix-{index}"}) + "\n")
+        handle.write(json.dumps({"decision_id": "tail-1"}) + "\n")
+        handle.write(json.dumps({"decision_id": "tail-2"}) + "\n")
+    calls = 0
+    original_loads = automation_trace.json.loads
+
+    def counting_loads(value):
+        nonlocal calls
+        calls += 1
+        return original_loads(value)
+
+    monkeypatch.setattr(automation_trace.json, "loads", counting_loads)
+
+    rows = store.read_recent(2)
+
+    assert [row["decision_id"] for row in rows] == ["tail-1", "tail-2"]
+    assert calls <= 3
+
+
+def test_read_recent_handles_invalid_tail_and_lines_larger_than_chunk(tmp_path, monkeypatch):
+    store = AutomationTraceStore(tmp_path)
+    store.root_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(automation_trace, "TRACE_TAIL_CHUNK_BYTES", 32)
+    payload = "x" * 1024
+    original = (
+        json.dumps({"decision_id": "large-1", "payload": payload})
+        + "\nnot-json\n\n"
+        + json.dumps({"decision_id": "large-2", "payload": payload})
+    )
+    store.path.write_text(original, encoding="utf-8")
+
+    rows = store.read_recent(2)
+
+    assert [row["decision_id"] for row in rows] == ["large-1", "large-2"]
+    assert store.path.read_text(encoding="utf-8") == original
+
+
+def test_legacy_verified_decision_memory_is_downgraded_without_rewriting_store(tmp_path):
+    store = DecisionMemoryStore(tmp_path)
+    store.root_dir.mkdir(parents=True, exist_ok=True)
+    legacy = {
+        "memory_id": "decision-memory-legacy-dry-run",
+        "source_decision_id": "decision-legacy-dry-run",
+        "source": "automation_decision_trace",
+        "evidence_quality": "verified",
+        "confidence": 0.95,
+        "metadata": {"mode": "supervised"},
+    }
+    original = json.dumps(legacy, sort_keys=True) + "\n"
+    store.path.write_text(original, encoding="utf-8")
+
+    rows = store.read_recent()
+
+    assert store.path.read_text(encoding="utf-8") == original
+    assert rows[0]["evidence_quality"] == "legacy_unbound"
+    assert rows[0]["confidence"] == 0.5
+    assert rows[0]["metadata"]["original_evidence_quality"] == "verified"
+    assert rows[0]["metadata"]["trust_status"] == "downgraded_missing_trace_provenance"
+    assert normalize_decision_memory_entry({
+        **legacy,
+        "metadata": {"trace_source": "operator"},
+    })["evidence_quality"] == "verified"
 
 
 def test_verified_traces_feed_decision_memory_snapshot(server, tmp_path):
@@ -9013,6 +9293,8 @@ async def test_supervised_linked_proposal_apply_routes_each_change_through_manua
     )
 
     assert server._apply_manual_console_write.await_count == 2
+    for call in server._apply_manual_console_write.await_args_list:
+        assert call.kwargs["expected_current_value"] == 0.0
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_result"
     assert payload["status"] == "applied"
@@ -9065,7 +9347,7 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
     server.mixer_client.is_connected = True
     server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
     server.mixer_client.state_timestamps = {address: time.time() for address in server.mixer_client.state}
-    server._apply_manual_console_write = AsyncMock(side_effect=[
+    apply_results = [
         {
             "status": "applied",
             "channel": 9,
@@ -9099,7 +9381,27 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
             "approval_id": "rollback:linked-unit:1",
             "source": "operator_proposal_linked_rollback:proposal",
         },
-    ])
+    ]
+
+    async def physical_read(*, address, **_kwargs):
+        return {
+            "value": server.mixer_client.state.get(address),
+            "status": "verified_from_physical_readback",
+            "source": "physical_readback",
+            "cache_freshness": {"status": "fresh"},
+        }
+
+    async def apply_with_state_update(*_args, **kwargs):
+        result = apply_results.pop(0)
+        if result.get("status") == "applied":
+            address = f"/ch/{kwargs['channel']}/fdr"
+            server.mixer_client.state[address] = result["effective_value"]
+        return result
+
+    server._manual_write_read_value = AsyncMock(side_effect=physical_read)
+    server._apply_manual_console_write = AsyncMock(
+        side_effect=apply_with_state_update
+    )
     server.send_to_client = AsyncMock()
 
     await server._dispatch["create_operator_proposal"](
@@ -9131,6 +9433,9 @@ async def test_supervised_linked_apply_rolls_back_first_channel_when_second_fail
     assert payload["status"] == "apply_blocked"
     assert payload["apply_result"]["reason"] == "linked_apply_failed_rolled_back"
     assert payload["apply_result"]["rollback_results"][0]["rollback"] is True
+    assert payload["proposal"]["result"]["physical_state_restored"] is True
+    assert payload["proposal"]["result"]["fresh_analysis_required"] is True
+    assert server.operator_proposal_queue.summary()["pending_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -9161,10 +9466,16 @@ async def test_supervised_operator_proposal_apply_routes_through_manual_gate(ser
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "reason": "operator approved", "idempotency_key": "unit-supervised-apply"},
+        {"proposal_id": proposal_id, "approved": True, "approval_id": "operator-unit-supervised-apply", "reason": "operator approved", "idempotency_key": "unit-supervised-apply"},
     )
 
     server._apply_manual_console_write.assert_awaited_once()
+    assert (
+        server._apply_manual_console_write.await_args.kwargs[
+            "expected_current_value"
+        ]
+        == -2.5
+    )
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_result"
     assert payload["status"] == "applied"
@@ -9196,7 +9507,12 @@ async def test_supervised_operator_proposal_apply_blocks_stale_cache_pre_read(se
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal["id"], "approved": True, "idempotency_key": "stale-pre-read"},
+        {
+            "proposal_id": proposal["id"],
+            "approved": True,
+            "approval_id": "stale-pre-read-approval",
+            "idempotency_key": "stale-pre-read",
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -10154,6 +10470,7 @@ async def test_gate_operator_proposal_apply_sequence_execution_reports_ready_wit
         {
             "dry_run_payload": dry_run_payload,
             "operator_ack": True,
+            "approval_id": "gate-ready-operator",
         },
     )
 
@@ -10211,6 +10528,7 @@ async def test_gate_operator_proposal_apply_sequence_execution_reports_ready_wit
         "type": "apply_operator_proposal",
         "proposal_id": "gate-ready",
         "approved": True,
+        "approval_id": "gate-ready-operator",
         "idempotency_key": "gate-ready:gate-ready",
     }
     assert candidate["current_proposal"]["status"] == "pending"
@@ -10268,6 +10586,7 @@ async def test_gate_operator_proposal_apply_sequence_execution_blocks_stale_dry_
         {
             "dry_run_payload": dry_run_payload,
             "operator_ack": True,
+            "approval_id": "gate-stale-operator",
         },
     )
 
@@ -10312,6 +10631,7 @@ async def _build_gate_ready_apply_sequence(server, *, idempotency_prefix):
         {
             "dry_run_payload": dry_run_payload,
             "operator_ack": True,
+            "approval_id": f"{idempotency_prefix}-operator",
         },
     )
     return server.send_to_client.await_args.args[1]
@@ -10361,6 +10681,7 @@ async def test_execute_operator_proposal_apply_sequence_applies_gate_ready_row_v
             "execute": True,
             "operator_ack": True,
             "approved": True,
+            "approval_id": "execute-ready-operator",
         },
     )
 
@@ -11591,17 +11912,467 @@ async def test_supervised_apply_blocks_duplicate_idempotency_key(server):
 
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": "dup-1", "approved": True, "idempotency_key": "same-key"},
+        {
+            "proposal_id": "dup-1",
+            "approved": True,
+            "approval_id": "dup-1-approval",
+            "idempotency_key": "same-key",
+        },
     )
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": "dup-2", "approved": True, "idempotency_key": "same-key"},
+        {
+            "proposal_id": "dup-2",
+            "approved": True,
+            "approval_id": "dup-2-approval",
+            "idempotency_key": "same-key",
+        },
     )
 
     assert server._apply_manual_console_write.await_count == 1
     payload = server.send_to_client.await_args.args[1]
     assert payload["type"] == "operator_proposal_apply_blocked"
     assert payload["reason"] == "duplicate_idempotency_key"
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_claim_blocks_double_click_and_history_replay(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {
+        address: time.time() for address in server.mixer_client.state
+    }
+    write_started = asyncio.Event()
+    release_write = asyncio.Event()
+
+    async def delayed_apply(*_args, **_kwargs):
+        write_started.set()
+        await release_write.wait()
+        return {
+            "status": "applied",
+            "channel": 2,
+            "value_type": "fader",
+            "effective_value": -3.0,
+            "old_value": -2.5,
+            "readback_value": -3.0,
+            "readback_status": "verified_from_cache",
+            "rollback_available": True,
+            "rollback_value": -2.5,
+        }
+
+    server._apply_manual_console_write = AsyncMock(side_effect=delayed_apply)
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "double-click",
+            "title": "double-click: supervised fader",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+
+    first = asyncio.create_task(
+        server._dispatch["apply_operator_proposal"](
+            object(),
+            {
+                "proposal_id": "double-click",
+                "approved": True,
+                "approval_id": "double-click-1",
+                "idempotency_key": "double-click-key-1",
+            },
+        )
+    )
+    await write_started.wait()
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "double-click",
+            "approved": True,
+            "approval_id": "double-click-2",
+            "idempotency_key": "double-click-key-2",
+        },
+    )
+
+    blocked = server.send_to_client.await_args.args[1]
+    assert blocked["type"] == "operator_proposal_apply_blocked"
+    assert blocked["reason"] == "proposal_not_pending"
+    assert "double-click-key-2" not in server._operator_apply_idempotency_keys
+
+    release_write.set()
+    await first
+    assert server._apply_manual_console_write.await_count == 1
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "double-click",
+            "approved": True,
+            "approval_id": "double-click-replay",
+            "idempotency_key": "double-click-replay-key",
+        },
+    )
+    replay = server.send_to_client.await_args.args[1]
+    assert replay["type"] == "operator_proposal_apply_blocked"
+    assert replay["reason"] == "proposal_not_pending"
+    assert replay["proposal"]["status"] == "applied"
+    assert "double-click-replay-key" not in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_claims_before_async_pre_read(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {
+        "/ch/2/fdr": time.time()
+    }
+    pre_read_started = asyncio.Event()
+    release_pre_read = asyncio.Event()
+
+    async def delayed_pre_read(**_kwargs):
+        pre_read_started.set()
+        await release_pre_read.wait()
+        return {
+            "value": -2.5,
+            "status": "verified_from_physical_readback",
+            "source": "physical_readback",
+            "cache_freshness": {"status": "fresh"},
+        }
+
+    server._manual_write_read_value = AsyncMock(side_effect=delayed_pre_read)
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 2,
+        "value_type": "fader",
+        "effective_value": -3.0,
+        "old_value": -2.5,
+        "readback_value": -3.0,
+        "readback_status": "verified_from_physical_readback",
+        "rollback_available": True,
+        "rollback_value": -2.5,
+    })
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "pre-read-race",
+            "title": "pre-read race",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+
+    first = asyncio.create_task(
+        server._dispatch["apply_operator_proposal"](
+            object(),
+            {
+                "proposal_id": "pre-read-race",
+                "approved": True,
+                "approval_id": "pre-read-race-1",
+                "idempotency_key": "pre-read-race-key-1",
+            },
+        )
+    )
+    await pre_read_started.wait()
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "pre-read-race",
+            "approved": True,
+            "approval_id": "pre-read-race-2",
+            "idempotency_key": "pre-read-race-key-2",
+        },
+    )
+    blocked = server.send_to_client.await_args.args[1]
+    assert blocked["reason"] == "proposal_not_pending"
+    assert "pre-read-race-key-2" not in server._operator_apply_idempotency_keys
+
+    release_pre_read.set()
+    await first
+    assert server._apply_manual_console_write.await_count == 1
+    assert build_decision_queue(server)["summary"]["applied_count"] == 1
+
+
+@pytest.mark.asyncio
+async def test_supervised_apply_exception_is_terminal_and_latches_emergency(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/2/fdr": -2.5}
+    server.mixer_client.state_timestamps = {
+        "/ch/2/fdr": time.time()
+    }
+    server._apply_manual_console_write = AsyncMock(
+        side_effect=RuntimeError("synthetic post-claim failure")
+    )
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "post-claim-exception",
+            "title": "post-claim exception",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "post-claim-exception",
+            "approved": True,
+            "approval_id": "post-claim-exception-approval",
+            "idempotency_key": "post-claim-exception-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["status"] == "apply_error"
+    assert payload["apply_result"]["manual_review_required"] is True
+    assert payload["proposal"]["status"] == "apply_error"
+    assert payload["proposal"]["can_apply"] is False
+    assert server._manual_write_emergency_stopped is True
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("no_send_value", [False, "missing"])
+async def test_possible_transaction_send_is_terminal_and_keeps_outer_idempotency(
+    server,
+    no_send_value,
+):
+    operator_mode = {
+        "mode": "supervised",
+        "capabilities": {
+            "can_create_proposals": True,
+            "can_apply_to_console": True,
+            "allowed_live_write_kinds": ["fader"],
+        },
+    }
+    server.get_operator_mode_status = lambda: operator_mode
+    server.refresh_soundcheck_child_preflight = AsyncMock(
+        return_value={"refreshed": True}
+    )
+    server.validate_soundcheck_child_for_apply = lambda _proposal: {
+        "allowed": True
+    }
+    apply_result = {
+        "status": "blocked",
+        "reason": "write_authority_revoked",
+    }
+    if no_send_value != "missing":
+        apply_result["no_console_send_proven"] = no_send_value
+    server.apply_supervised_soundcheck_transaction = AsyncMock(
+        return_value=apply_result
+    )
+    server.send_to_client = AsyncMock()
+    plan = {
+        "transaction_id": "possible-send-handler",
+        "run_id": "possible-send-run",
+        "plan_revision": 1,
+        "plan_fingerprint": "possible-send-fingerprint",
+        "operations": [
+            {
+                "operation_id": "possible-send-fader",
+                "family_id": "fader",
+                "write_kind": "fader",
+                "target_value": -12.0,
+                "channel": 2,
+                "parameter": "channel_fader_db",
+                "metadata": {"absolute_target": True},
+            }
+        ],
+        "preflight_assessment": {
+            "disposition": "apply",
+            "reason": "transition_preflight_passed",
+        },
+    }
+    with patch(
+        "operator_proposal_queue._apply_blockers_for_transaction_plan",
+        return_value=[],
+    ):
+        created = server.operator_proposal_queue.create(
+            {
+                "id": "possible-send-proposal",
+                "title": "Possible console send",
+                "kind": "supervised_soundcheck_transaction",
+                "supervised_transaction_plan": plan,
+            },
+            operator_mode,
+        )
+        assert created["status"] == "created"
+        await server._dispatch["apply_operator_proposal"](
+            object(),
+            {
+                "proposal_id": "possible-send-proposal",
+                "approved": True,
+                "approval_id": "possible-send-approval",
+                "idempotency_key": "possible-send-idempotency",
+            },
+        )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["status"] == "apply_error"
+    assert payload["proposal"]["status"] == "apply_error"
+    assert payload["proposal"]["can_apply"] is False
+    assert "possible-send-idempotency" in server._operator_apply_idempotency_keys
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("approved", [False, None, 0, 1, "false", "true"])
+async def test_supervised_apply_requires_literal_true_approval(server, approved):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+    proposal_id = f"strict-approval-{approved!r}"
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": proposal_id,
+            "title": "strict approval",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+            "reason": "unit",
+        },
+    )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": proposal_id,
+            "approved": approved,
+            "approval_id": f"approval-{approved!r}",
+            "idempotency_key": f"strict-approval-key-{approved!r}",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["reason"] == "approval_required"
+    server._apply_manual_console_write.assert_not_called()
+    assert f"strict-approval-key-{approved!r}" not in server._operator_apply_idempotency_keys
+
+
+@pytest.mark.asyncio
+async def test_live_apply_rejects_mutable_queue_index(server):
+    server.operator_mode = "supervised"
+    server._apply_manual_console_write = AsyncMock()
+    server.send_to_client = AsyncMock()
+    for proposal_id in ("index-first", "index-second"):
+        await server._dispatch["create_operator_proposal"](
+            object(),
+            {
+                "id": proposal_id,
+                "title": proposal_id,
+                "channel": 2,
+                "value_type": "fader",
+                "value": -3.0,
+            },
+        )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "index": 0,
+            "approved": True,
+            "approval_id": "index-approval",
+            "idempotency_key": "index-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["reason"] == "proposal_id_required_for_apply"
+    server._apply_manual_console_write.assert_not_called()
+    assert build_decision_queue(server)["summary"]["pending_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_durable_consumed_proposal_id_cannot_be_reimported(server):
+    server._durable_operator_proposal_ids.add("durably-consumed")
+    server.send_to_client = AsyncMock()
+
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "durably-consumed",
+            "title": "stale replay after restart",
+            "channel": 2,
+            "value_type": "fader",
+            "value": -3.0,
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == "proposal_id_already_consumed"
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_linked_apply_without_recoverable_preimage_is_terminal(server):
+    server.operator_mode = "supervised"
+    server.mixer_client = MagicMock()
+    server.mixer_client.is_connected = True
+    server.mixer_client.state = {"/ch/9/fdr": 0.0, "/ch/10/fdr": 0.0}
+    server.mixer_client.state_timestamps = {
+        address: time.time() for address in server.mixer_client.state
+    }
+    server._apply_manual_console_write = AsyncMock(return_value={
+        "status": "applied",
+        "channel": 9,
+        "value_type": "fader",
+        "effective_value": -0.5,
+        "old_value": 0.0,
+        "readback_value": -0.5,
+        "readback_status": "verified_from_physical_readback",
+        "proof_status": "verified",
+        "rollback_available": False,
+    })
+    server.send_to_client = AsyncMock()
+    await server._dispatch["create_operator_proposal"](
+        object(),
+        {
+            "id": "linked-no-preimage",
+            "title": "linked no preimage",
+            "kind": "linked_fader",
+            "requested_changes": [
+                {"value_type": "fader", "channel": 9, "value": -0.5},
+                {"value_type": "fader", "channel": 10, "value": -0.5},
+            ],
+        },
+    )
+
+    await server._dispatch["apply_operator_proposal"](
+        object(),
+        {
+            "proposal_id": "linked-no-preimage",
+            "approved": True,
+            "approval_id": "linked-no-preimage-approval",
+            "idempotency_key": "linked-no-preimage-key",
+        },
+    )
+
+    payload = server.send_to_client.await_args.args[1]
+    assert payload["status"] == "apply_error"
+    assert payload["apply_result"]["reason"] == (
+        "linked_apply_failed_manual_review_required"
+    )
+    assert payload["apply_result"]["manual_review_required"] is True
+    assert server._manual_write_emergency_stopped is True
+    assert build_decision_queue(server)["summary"]["pending_count"] == 0
 
 
 @pytest.mark.asyncio
@@ -11667,7 +12438,12 @@ async def test_supervised_apply_blocks_cumulative_delta_before_manual_gate(serve
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "cumulative-limit"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": "cumulative-limit-approval",
+            "idempotency_key": "cumulative-limit",
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -11700,7 +12476,12 @@ async def test_supervised_apply_blocks_large_delta_before_manual_gate(server):
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "large-delta"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": "large-delta-approval",
+            "idempotency_key": "large-delta",
+        },
     )
 
     server._apply_manual_console_write.assert_not_called()
@@ -11738,7 +12519,12 @@ async def test_supervised_apply_uses_normalized_clamped_value_after_validation(s
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "clamped-gain"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": "clamped-gain-approval",
+            "idempotency_key": "clamped-gain",
+        },
     )
 
     server._apply_manual_console_write.assert_awaited_once()
@@ -11786,7 +12572,12 @@ async def test_decision_trace_and_safety_monitor_expose_apply_evidence(server, t
     proposal_id = build_decision_queue(server)["pending_actions"][0]["id"]
     await server._dispatch["apply_operator_proposal"](
         object(),
-        {"proposal_id": proposal_id, "approved": True, "idempotency_key": "trace-key"},
+        {
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": "trace-key-approval",
+            "idempotency_key": "trace-key",
+        },
     )
 
     traces = build_decision_traces(server)
@@ -13659,6 +14450,7 @@ async def test_sequence_policy_queue_import_dry_run_result_consumer_feeds_execut
 
     gate_request = dict(dry_run_consumer_payload["execution_gate_request"])
     gate_request["operator_ack"] = True
+    gate_request["approval_id"] = "seq-import-gate-operator"
     await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
         object(),
         gate_request,
@@ -13856,6 +14648,7 @@ async def test_sequence_policy_queue_import_execution_result_consumer_feeds_audi
     dry_run_consumer_payload = server.send_to_client.await_args.args[1]
     gate_request = dict(dry_run_consumer_payload["execution_gate_request"])
     gate_request["operator_ack"] = True
+    gate_request["approval_id"] = "seq-import-audit-operator"
     await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
         object(),
         gate_request,
@@ -16806,6 +17599,7 @@ async def test_sequence_policy_queue_import_promotion_queue_importer_result_cons
     assert gate_request["execution_gate_created"] is False
     assert gate_request["idempotency_reserved"] is False
     gate_request["operator_ack"] = True
+    gate_request["approval_id"] = "promotion-import-operator"
 
     await server._dispatch["gate_operator_proposal_apply_sequence_execution"](
         object(),

@@ -36,6 +36,28 @@ class TestOSCThrottle:
             assert client._osc_throttle_enabled is True
             assert client._osc_throttle_hz == 10.0
 
+    def test_first_observed_value_advances_console_state_generation(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+
+            before = client.get_observed_state_revision(["/ch/1/fdr"])
+            client._set_state_value("/ch/1/fdr", -12.0)
+            after = client.get_observed_state_revision(["/ch/1/fdr"])
+
+            assert after["generation"] == before["generation"] + 1
+            assert after["addresses"]["/ch/1/fdr"]["generation"] == (
+                after["generation"]
+            )
+            assert after["addresses"]["/ch/1/fdr"]["value"] == -12.0
+
     def test_osc_throttle_set(self):
         """set_osc_throttle should update throttle settings."""
         with patch.dict("sys.modules", {
@@ -191,6 +213,63 @@ class TestStateManagement:
             client._handle_message("/ch/1/$name", "Vocals")
             assert client.state["/ch/1/$name"] == "Vocals"
 
+    def test_query_parameter_rejects_one_queued_packet_without_confirmed_round_trip(self):
+        """One delayed packet must not make a disconnected console look reachable."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            send_count = 0
+
+            def send(address, *values):
+                nonlocal send_count
+                send_count += 1
+                if send_count == 1:
+                    client._handle_message(address, "-12.1", 0.47, -12.1)
+                return True
+
+            client.send = send
+
+            result = client.query_parameter("/ch/3/fdr", timeout=0.01)
+
+            assert result["status"] == "timeout"
+            assert result["value"] is None
+            assert send_count == 2
+
+    def test_query_parameter_returns_second_confirmed_reply(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            replies = iter((-12.1, -12.0))
+
+            def send(address, *values):
+                value = next(replies)
+                client._handle_message(address, str(value), 0.47, value)
+                return True
+
+            client.send = send
+
+            result = client.query_parameter("/ch/3/fdr", timeout=0.01)
+
+            assert result["status"] == "received"
+            assert result["value"] == -12.0
+            assert result["confirmed_round_trips"] == 2
+
 
 class TestChannelNameScanning:
     """Tests for read-only WING channel name discovery."""
@@ -326,7 +405,7 @@ class TestRoutingState:
                 "/bus/4/mute": 0,
                 "/bus/4/eq/on": 1,
                 "/bus/4/dyn/on": 1,
-                "/bus/4/dyn/thr37": -18.0,
+                "/bus/4/dyn/thr": -18.0,
                 "/bus/4/tags": "#D6",
                 "/dca/6/name": "Vocals",
                 "/dca/6/fdr": -2.0,
@@ -337,7 +416,7 @@ class TestRoutingState:
                 bus_settings = client.get_bus_settings(4)
                 dca_settings = client.get_dca_settings(6)
 
-            assert "/bus/4/dyn/thr37" in sent
+            assert "/bus/4/dyn/thr" in sent
             assert "/dca/6/fdr" in sent
             assert bus_settings["name"] == "VOC BUS"
             assert bus_settings["compressor_enabled"] == 1
@@ -706,7 +785,7 @@ class TestConnectionLifecycle:
             assert client.commanded_state["/ch/1/dyn/thr"] == -20.0
             assert client.commanded_state["/ch/1/dyn/thr26"] == -20.0
             assert client.commanded_state["/ch/1/gate/thr"] == -55.0
-            assert client.commanded_state["/bus/2/dyn/thr37"] == -12.0
+            assert client.commanded_state["/bus/2/dyn/thr"] == -12.0
             assert client.commanded_state["/main/1/eq/1g"] == -1.0
             assert client.commanded_state["/mtx/1/eq/1g"] == -1.0
             assert "/fx/1/on" not in client.state

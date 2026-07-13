@@ -7,6 +7,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 TOOL_PATH = PROJECT_ROOT / "tools" / "verify_m006_owner_readiness_packet.py"
@@ -45,8 +47,37 @@ assert SPEC.loader is not None
 SPEC.loader.exec_module(verifier)
 
 
+@pytest.fixture(autouse=True)
+def clean_current_release_expectations(monkeypatch: pytest.MonkeyPatch):
+    actual = verifier.current_release_provenance_expectations()
+    expected = copy.deepcopy(actual)
+    expected["source"].update({
+        "worktree_dirty": False,
+        "status_sha256": verifier._sha256_bytes(b""),
+        "tracked_diff_sha256": verifier._sha256_bytes(b""),
+    })
+    expected["runtime_source"]["source"].update({
+        "worktree_dirty": False,
+        "status_sha256": verifier._sha256_bytes(b""),
+        "tracked_diff_sha256": verifier._sha256_bytes(b""),
+    })
+    monkeypatch.setattr(
+        verifier,
+        "current_release_provenance_expectations",
+        lambda _m005_summary_path=None: copy.deepcopy(expected),
+    )
+
+
 def load_packet() -> dict:
     return json.loads(PACKET_SUMMARY.read_text(encoding="utf-8"))
+
+
+def test_generated_m006_verifier_and_decision_outputs_are_gitignored() -> None:
+    gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "artifacts/wing_owner_readiness_review_verifier/" in gitignore
+    assert "artifacts/wing_owner_readiness_decision_verifier/" in gitignore
+    assert "artifacts/wing_owner_readiness_review/*/owner_decision.json" in gitignore
 
 
 def load_packet_proofs(packet: dict | None = None) -> dict:
@@ -58,10 +89,26 @@ def with_m005_target(payload: dict) -> dict:
 
 
 def complete_m005_summary() -> dict:
-    return {
+    expected_provenance = verifier.current_release_provenance_expectations()
+    challenge_identity = {
+        "path": (
+            "artifacts/wing_console_identity_owner_challenge/"
+            "unit-owner-challenge/summary.json"
+        ),
+        "exists": True,
+        "size": 512,
+        "sha256": "b" * 64,
+    }
+    captured_at = "2026-07-12T00:00:00Z"
+    runtime_launch_nonce = "d" * 32
+    runtime_challenge_nonce = "e" * 32
+    runtime_pid = 4242
+    summary = {
         "proof_artifact_schema": "wing_timeout_disconnect_proof.v1",
         "status": "passed",
         "disconnect_mode": "physical-cable-loss",
+        "url": verifier.EXPECTED_M005_CANONICAL_URL,
+        "wing_ip": "192.0.2.10",
         **M005_TARGET,
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
@@ -72,6 +119,8 @@ def complete_m005_summary() -> dict:
         "rollback_request_sent": False,
         "forbidden_request_types_sent": [],
         "sent_request_types": [
+            "get_runtime_identity",
+            "connect_wing",
             "get_operator_mode",
             "get_state",
             "query_mixer_parameter",
@@ -86,7 +135,60 @@ def complete_m005_summary() -> dict:
         "completed_m005_evidence": list(verifier.EXPECTED_M005_EVIDENCE),
         "missing_m005_evidence": [],
         "remaining_m005_evidence": [],
+        "m005_complete": True,
+        "initial_connection_verified": True,
+        "preflight_decision_gate": {
+            "status": "accepted_decision_ready",
+            "accepted": True,
+            "expected_accepted_readonly_source_id": load_packet()[
+                "accepted_readonly_source_id"
+            ],
+            "live_authority_granted": False,
+        },
+        "backend_launch_mode": "proof_runner_bound",
+        "launched_backend_pid": runtime_pid,
+        "runtime_identity_challenge_nonce": runtime_challenge_nonce,
+        "runtime_identity": None,
+        "m005_backend_runtime_identity_captured": True,
+        "provenance": {
+            "schema": verifier.EXPECTED_M005_PROVENANCE_SCHEMA,
+            "captured_at_utc": captured_at,
+            "runtime_launch_nonce": runtime_launch_nonce,
+            "source": expected_provenance["source"],
+            "runtime_source": expected_provenance["runtime_source"],
+            "runner": expected_provenance["runner"],
+            "backend": {
+                "runtime_kind": "source",
+                **expected_provenance["source_backend"],
+            },
+            "package": None,
+            "console": {
+                "model": verifier.EXPECTED_M005_CONSOLE_MODEL,
+                "serial": "TEST-WING-RACK-SERIAL",
+                "firmware": verifier.EXPECTED_M005_CONSOLE_FIRMWARE,
+                "identity_source": "operator_attested_owner_challenge",
+                "console_identity_query_available": False,
+            },
+            "console_identity_challenge": challenge_identity,
+            "events": {
+                "path": COMPLETE_M005_EVENTS_PATH,
+                "exists": True,
+                "size": 1,
+                "sha256": "a" * 64,
+            },
+        },
         "phases": {
+            "initial_connection": {
+                "status": "passed",
+                "connection_status": {
+                    "type": "connection_status",
+                    "connected": True,
+                    "mode": "wing",
+                    "ip": "192.0.2.10",
+                    "observation_only": False,
+                    "record_telemetry": False,
+                },
+            },
             "baseline": {
                 "status": "passed",
                 "readback": with_m005_target(
@@ -101,6 +203,7 @@ def complete_m005_summary() -> dict:
             "disconnect": {
                 "status": "operator_confirmed_physical_cable_loss",
                 "confirmation": "WING_CABLE_PULLED_BY_OPERATOR",
+                "operator_gate": True,
             },
             "stale_readback": {
                 "status": "passed",
@@ -137,6 +240,98 @@ def complete_m005_summary() -> dict:
             },
         },
     }
+    prestart = copy.deepcopy(summary["provenance"])
+    prestart["events"] = None
+    summary["provenance_prestart_sha256"] = verifier._canonical_json_sha256(prestart)
+    runtime_identity = {
+        "type": "runtime_identity",
+        "schema": verifier.EXPECTED_M005_RUNTIME_IDENTITY_SCHEMA,
+        "runtime_kind": "source",
+        "instance_nonce": "c" * 32,
+        "started_at_utc": captured_at,
+        "process": {
+            "pid": runtime_pid,
+            "instance_nonce": "c" * 32,
+            "started_at_utc": captured_at,
+        },
+        "source": copy.deepcopy(expected_provenance["runtime_source"]["source"]),
+        "code": copy.deepcopy(expected_provenance["runtime_source"]["code"]),
+        "backend": expected_provenance["source_backend"],
+        "launch_binding": {
+            "mode": "proof_runner",
+            "launch_nonce": runtime_launch_nonce,
+            "prestart_provenance_schema": verifier.EXPECTED_M005_PROVENANCE_SCHEMA,
+            "prestart_provenance_size": len(verifier.canonical_json_bytes(prestart)),
+            "prestart_provenance_sha256": summary["provenance_prestart_sha256"],
+            "bound_before_process_start": True,
+            "proof_eligible": True,
+        },
+        "websocket": {"host": "127.0.0.1", "port": 8765, "loopback_only": True},
+        "read_only_identity": True,
+        "live_authority_granted": False,
+        "request_challenge_nonce": runtime_challenge_nonce,
+    }
+    runtime_identity["manifest_sha256"] = verifier.runtime_identity_manifest_sha256(
+        runtime_identity
+    )
+    summary["runtime_identity"] = runtime_identity
+    return summary
+
+
+def complete_console_identity_challenge(m005: dict) -> dict:
+    return {
+        "identity": copy.deepcopy(m005["provenance"]["console_identity_challenge"]),
+        "content": {
+            "schema": verifier.EXPECTED_M005_CONSOLE_IDENTITY_SCHEMA,
+            "operator_confirmed": True,
+            "console_model": verifier.EXPECTED_M005_CONSOLE_MODEL,
+            "serial": m005["provenance"]["console"]["serial"],
+            "firmware": verifier.EXPECTED_M005_CONSOLE_FIRMWARE,
+            "accepted_readonly_source_id": m005["preflight_decision_gate"][
+                "expected_accepted_readonly_source_id"
+            ],
+        },
+    }
+
+
+def complete_event_audit(m005: dict) -> dict:
+    prestart = copy.deepcopy(m005["provenance"])
+    prestart["events"] = None
+    return {
+        "request_types": list(m005["sent_request_types"]),
+        "initial_connection": m005["phases"]["initial_connection"][
+            "connection_status"
+        ],
+        "stale_readback": m005["phases"]["stale_readback"]["readback"],
+        "reconnect_readback": m005["phases"]["reconnect_recovery"]["readback"],
+        "first_event": {
+            "seq": 1,
+            "event_type": "provenance_capture",
+            "payload": {
+                "schema": verifier.EXPECTED_M005_PROVENANCE_SCHEMA,
+                "provenance": prestart,
+                "provenance_sha256": m005["provenance_prestart_sha256"],
+                "url": verifier.EXPECTED_M005_CANONICAL_URL,
+                "captured_before_backend_contact": True,
+            },
+        },
+        "runtime_identity": copy.deepcopy(m005["runtime_identity"]),
+        "sha256": m005["provenance"]["events"]["sha256"],
+    }
+
+
+def complete_m005_verify_kwargs(m005: dict) -> dict:
+    audit = complete_event_audit(m005)
+    return {
+        "m005_event_request_types": list(audit["request_types"]),
+        "m005_event_initial_connection": audit["initial_connection"],
+        "m005_event_stale_readback": audit["stale_readback"],
+        "m005_event_reconnect_readback": audit["reconnect_readback"],
+        "m005_event_stale_readback_required": True,
+        "m005_events_sha256": audit["sha256"],
+        "m005_event_audit": audit,
+        "m005_console_identity_challenge": complete_console_identity_challenge(m005),
+    }
 
 
 def complete_m005_event_request_types(m005: dict) -> list[str]:
@@ -167,6 +362,7 @@ def write_m005_event_log(
     rows = []
     seq = 1
     query_count = 0
+    connect_count = 0
     stale_inserted = False
     reconnect_inserted = False
     if stale_readback is None:
@@ -183,6 +379,24 @@ def write_m005_event_log(
     for request_type in request_types:
         rows.append({"seq": seq, "event_type": "send", "payload": {"type": request_type}})
         seq += 1
+        if request_type == "connect_wing":
+            connect_count += 1
+            if connect_count == 1:
+                rows.append(
+                    {
+                        "seq": seq,
+                        "event_type": "recv",
+                        "payload": {
+                            "type": "connection_status",
+                            "connected": True,
+                            "mode": "wing",
+                            "ip": "192.0.2.10",
+                            "observation_only": False,
+                            "record_telemetry": False,
+                        },
+                    }
+                )
+                seq += 1
         if request_type == "query_mixer_parameter":
             query_count += 1
         if (
@@ -332,10 +546,10 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     result = verifier.verify_packet(
         packet,
         m005_summary=m005,
-        m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
         m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **complete_m005_verify_kwargs(m005),
     )
 
     assert result["status"] == "ready_for_owner_review"
@@ -350,6 +564,184 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["contacts_wing"] is False
     assert result["contacts_backend"] is False
     assert result["live_write"] is False
+    assert result["checks"]["m005_initial_connection_phase_passed"] is True
+    assert result["checks"]["m005_events_initial_connection_write_capable"] is True
+
+
+def test_packet_readonly_source_must_match_m005_preflight_gate() -> None:
+    m005 = complete_m005_summary()
+    packet = load_packet()
+    packet["accepted_readonly_source_id"] = (
+        "artifacts/wing_readonly_preflight/other-run/summary.json"
+    )
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **complete_m005_verify_kwargs(m005),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["owner_review_input_ready"] is False
+    assert (
+        "packet_accepted_readonly_source_matches_m005_gate"
+        in result["failed_checks"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failed_check"),
+    [
+        (
+            lambda m005: m005.update({"url": "ws://127.0.0.1:9999"}),
+            "m005_summary_url_is_canonical_loopback",
+        ),
+        (
+            lambda m005: m005["phases"]["disconnect"].update({"operator_gate": False}),
+            "m005_disconnect_phase_operator_gate_required",
+        ),
+        (
+            lambda m005: m005["provenance"]["source"].update({"worktree_dirty": True}),
+            "m005_provenance_source_clean_before_run",
+        ),
+        (
+            lambda m005: m005["provenance"]["backend"].update({
+                "runtime_kind": "packaged",
+                "path": "/etc/hosts",
+            }),
+            "m005_provenance_backend_runtime_kind_supported",
+        ),
+    ],
+)
+def test_current_release_m005_binding_mutations_fail_closed(mutation, failed_check) -> None:
+    m005 = complete_m005_summary()
+    kwargs = complete_m005_verify_kwargs(m005)
+    mutation(m005)
+
+    result = verifier.verify_packet(
+        load_packet(),
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["owner_review_input_ready"] is False
+    assert failed_check in result["failed_checks"]
+
+
+def test_m005_event_hash_is_required_for_direct_verifier_calls() -> None:
+    m005 = complete_m005_summary()
+    kwargs = complete_m005_verify_kwargs(m005)
+    kwargs["m005_events_sha256"] = None
+
+    result = verifier.verify_packet(
+        load_packet(),
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert "m005_provenance_events_hash_matches_loaded" in result["failed_checks"]
+
+
+def test_m005_prestart_and_runtime_identity_events_are_required() -> None:
+    m005 = complete_m005_summary()
+    kwargs = complete_m005_verify_kwargs(m005)
+    kwargs["m005_event_audit"] = {
+        **kwargs["m005_event_audit"],
+        "first_event": None,
+        "runtime_identity": None,
+    }
+
+    result = verifier.verify_packet(
+        load_packet(),
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert "m005_provenance_first_event_is_prestart_capture" in result["failed_checks"]
+    assert (
+        "m005_provenance_backend_runtime_identity_event_matches_summary"
+        in result["failed_checks"]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda identity: identity.update(
+            {"schema": "automixer.backend_runtime_identity.v1"}
+        ),
+        lambda identity: (
+            identity.update({"started_at_utc": "1999-01-01T00:00:00Z"}),
+            identity["process"].update({"started_at_utc": "1999-01-01T00:00:00Z"}),
+        ),
+        lambda identity: identity["code"]["files"][0].update(
+            {"sha256": "f" * 64}
+        ),
+        lambda identity: identity["launch_binding"].update(
+            {"bound_before_process_start": False, "proof_eligible": False}
+        ),
+    ],
+)
+def test_m005_runtime_identity_v2_rejects_stale_unbound_or_changed_code(mutation) -> None:
+    m005 = complete_m005_summary()
+    mutation(m005["runtime_identity"])
+    m005["runtime_identity"]["manifest_sha256"] = (
+        verifier.runtime_identity_manifest_sha256(m005["runtime_identity"])
+    )
+    kwargs = complete_m005_verify_kwargs(m005)
+
+    result = verifier.verify_packet(
+        load_packet(),
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["owner_review_input_ready"] is False
+    assert "m005_provenance_backend_runtime_identity_matches" in result["failed_checks"]
+
+
+def test_complete_behavioral_m005_without_current_provenance_fails_closed() -> None:
+    m005 = complete_m005_summary()
+    verification_kwargs = complete_m005_verify_kwargs(m005)
+    m005.pop("provenance")
+    packet = load_packet()
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **verification_kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m005_current_release_provenance_missing_or_mismatch"
+    assert result["m005_behavioral_proof_complete"] is True
+    assert result["m005_owner_review_shape_ready"] is True
+    assert result["m005_provenance_ready"] is False
+    assert result["m005_current_release_accepted"] is False
+    assert result["owner_review_input_ready"] is False
+    assert "m005_provenance_schema_matches" in result["failed_checks"]
 
 
 def test_complete_m005_timeout_readback_allows_owner_review_input_only() -> None:
@@ -361,10 +753,10 @@ def test_complete_m005_timeout_readback_allows_owner_review_input_only() -> None
     result = verifier.verify_packet(
         packet,
         m005_summary=m005,
-        m005_event_request_types=complete_m005_event_request_types(m005),
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
         m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **complete_m005_verify_kwargs(m005),
     )
 
     assert result["status"] == "ready_for_owner_review"
@@ -385,13 +777,10 @@ def test_complete_m005_event_stale_readback_allows_owner_review_input_only() -> 
     result = verifier.verify_packet(
         packet,
         m005_summary=m005,
-        m005_event_request_types=complete_m005_event_request_types(m005),
-        m005_event_stale_readback=stale_readback,
-        m005_event_reconnect_readback=m005["phases"]["reconnect_recovery"]["readback"],
-        m005_event_stale_readback_required=True,
         proof_summaries_by_artifact=load_packet_proofs(packet),
         m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
         m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **complete_m005_verify_kwargs(m005),
     )
 
     assert result["status"] == "ready_for_owner_review"
@@ -1022,6 +1411,65 @@ def test_m005_apply_before_stale_query_blocks_owner_review_even_if_flags_claim_c
     assert result["readiness_closure_allowed"] is False
 
 
+@pytest.mark.parametrize("mutation", ["missing", "after_baseline", "extra"])
+def test_m005_requires_exact_initial_connect_and_reconnect_sequence(mutation: str) -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    sequence = list(m005["sent_request_types"])
+    if mutation == "missing":
+        sequence.pop(sequence.index("connect_wing"))
+    elif mutation == "after_baseline":
+        initial = sequence.pop(sequence.index("connect_wing"))
+        baseline = sequence.index("query_mixer_parameter")
+        sequence.insert(baseline + 1, initial)
+    else:
+        sequence.insert(sequence.index("set_operator_mode"), "connect_wing")
+    m005["sent_request_types"] = sequence
+    kwargs = complete_m005_verify_kwargs(m005)
+    kwargs["m005_event_request_types"] = list(sequence)
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert "m005_summary_request_sequence_proves_disconnect_flow" in result[
+        "failed_checks"
+    ]
+    assert "m005_events_request_sequence_proves_disconnect_flow" in result[
+        "failed_checks"
+    ]
+    assert result["live_authority_granted"] is False
+
+
+def test_m005_initial_connection_must_be_write_capable_and_event_bound() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["phases"]["initial_connection"]["connection_status"][
+        "observation_only"
+    ] = True
+    kwargs = complete_m005_verify_kwargs(m005)
+
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        **kwargs,
+    )
+
+    assert result["status"] == "blocked"
+    assert "m005_initial_connection_phase_passed" in result["failed_checks"]
+    assert "m005_events_initial_connection_write_capable" in result["failed_checks"]
+    assert result["live_authority_granted"] is False
+
+
 def test_m005_event_log_forbidden_request_type_blocks_owner_review_even_if_summary_claims_clean() -> None:
     packet = load_packet()
     m005 = complete_m005_summary()
@@ -1071,11 +1519,12 @@ def test_m005_event_audit_extracts_stale_timeout_before_apply(tmp_path: Path) ->
     )
 
     assert display_events_path == str(events_path)
-    assert audit == {
-        "request_types": complete_m005_event_request_types(m005),
-        "stale_readback": stale_readback,
-        "reconnect_readback": reconnect_readback,
-    }
+    assert audit["request_types"] == complete_m005_event_request_types(m005)
+    assert audit["stale_readback"] == stale_readback
+    assert audit["reconnect_readback"] == reconnect_readback
+    assert audit["sha256"] == verifier._sha256_bytes(events_path.read_bytes())
+    assert audit["first_event"]["seq"] == 1
+    assert audit["runtime_identity"] is None
 
 
 def test_verify_packet_paths_rejects_m005_artifact_outside_canonical_root(tmp_path: Path) -> None:

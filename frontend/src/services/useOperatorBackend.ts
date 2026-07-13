@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import websocketService from './websocket';
 import {
   adaptAgents,
@@ -34,6 +34,11 @@ import {
   toUiMode
 } from './operatorAdapters';
 import {
+  classifyApplyToneValue,
+  classifyReadbackToneValue,
+  classifyRollbackToneValue
+} from './operatorStatusTone.mjs';
+import {
   agents as mockAgents,
   buses as mockBuses,
   channels as mockChannels,
@@ -58,6 +63,7 @@ import type {
   DecisionTraceRecord,
   DeviceRecord,
   DirectorRuntime,
+  EmergencyStopUiState,
   ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
@@ -72,6 +78,7 @@ import type {
   SoundcheckRuntime,
   Task,
   TelemetryAlertsSnapshot,
+  Tone,
   TrainingSessionSnapshotRow,
   TopologyLink,
   TopologyNode
@@ -90,10 +97,60 @@ const idleSoundcheckRuntime: SoundcheckRuntime = {
   channelsWithSignal: 0,
   totalChannels: 0,
   recommendationCount: 0,
+  transactionPlanCount: 0,
+  transactionOperationCount: 0,
+  liveAllowedFamilies: [],
+  familyLifecycle: {},
+  familyLiveWriteKinds: {},
+  familyWriteKinds: {},
+  familyContracts: {},
   derivationComplete: false,
+  readiness: {
+    schemaVersion: 'soundcheck_readiness/v1',
+    runId: 'idle',
+    planRevision: 1,
+    planFingerprint: '',
+    mixReadiness: 'soundcheck_incomplete',
+    safetyState: 'clear',
+    executionStatus: 'awaiting_operator_review',
+    logicalTotal: 0,
+    logicalApplied: 0,
+    logicalAlreadySatisfied: 0,
+    logicalReplaced: 0,
+    logicalOperatorReview: 0,
+    logicalForbidden: 0,
+    logicalPending: 0,
+    unresolvedRequiredIds: [],
+    unresolvedReasons: {},
+    globalBlockers: [],
+    evidenceComplete: false,
+    stages: {}
+  },
+  replan: {
+    status: 'not_required',
+    draftAvailable: false,
+    draftId: '',
+    runId: '',
+    fromPlanRevision: 0,
+    toPlanRevision: 0,
+    splitOperationCount: 0,
+    safeAlternativeOperationCount: 0,
+    deferredTargetCount: 0,
+    operatorRequests: [],
+    safeAlternatives: []
+  },
   interceptedWriteCount: 0,
   lastUpdated: ''
 };
+
+const idleEmergencyStop: EmergencyStopUiState = {
+  status: 'ready',
+  message: 'Emergency stop ready. Arm, then confirm immediately.',
+  updatedAt: '',
+  reconciliationRequired: false
+};
+
+const EMERGENCY_STOP_ACK_TIMEOUT_MS = 5000;
 
 function soundcheckRuntimeFromPayload(
   current: SoundcheckRuntime,
@@ -104,6 +161,181 @@ function soundcheckRuntimeFromPayload(
     ? data.selected_channels.map(Number).filter(Number.isFinite)
     : current.selectedChannels;
   const summary = recordValue(data.summary);
+  const readinessPayload = recordValue(data.soundcheck_readiness);
+  const readinessCounts = recordValue(readinessPayload.logical_counts);
+  const readinessStages = Object.fromEntries(
+    Object.entries(recordValue(readinessPayload.stages)).map(([stageId, rawStage]) => {
+      const stage = recordValue(rawStage);
+      return [stageId, {
+        required: numberValue(stage.required),
+        resolved: numberValue(stage.resolved),
+        applied: numberValue(stage.applied),
+        alreadySatisfied: numberValue(stage.already_satisfied),
+        replaced: numberValue(stage.replaced),
+        operatorReview: numberValue(stage.operator_review),
+        forbidden: numberValue(stage.forbidden),
+        pending: numberValue(stage.pending),
+        ready: Boolean(stage.ready)
+      }];
+    })
+  );
+  const hasReadiness = Object.prototype.hasOwnProperty.call(data, 'soundcheck_readiness');
+  const lifecycleWithoutReadiness = !hasReadiness && [
+    'running',
+    'is_running',
+    'state',
+    'current_step'
+  ].some(key => Object.prototype.hasOwnProperty.call(data, key));
+  const mixReadinessValue = stringValue(readinessPayload.mix_readiness ?? readinessPayload.status);
+  const mixReadiness = (
+    ['soundcheck_incomplete', 'safe_core_ready', 'show_mix_ready'].includes(mixReadinessValue)
+      ? mixReadinessValue
+      : 'soundcheck_incomplete'
+  ) as SoundcheckRuntime['readiness']['mixReadiness'];
+  const readiness = hasReadiness ? {
+    schemaVersion: stringValue(readinessPayload.schema_version, 'soundcheck_readiness/v1'),
+    runId: stringValue(readinessPayload.run_id, 'unknown'),
+    planRevision: numberValue(readinessPayload.plan_revision, 1),
+    planFingerprint: stringValue(readinessPayload.plan_fingerprint),
+    mixReadiness,
+    safetyState: stringValue(readinessPayload.safety_state, 'manual_review_required'),
+    executionStatus: stringValue(readinessPayload.execution_status, 'awaiting_operator_review'),
+    logicalTotal: numberValue(readinessCounts.total),
+    logicalApplied: numberValue(readinessCounts.applied),
+    logicalAlreadySatisfied: numberValue(readinessCounts.already_satisfied),
+    logicalReplaced: numberValue(readinessCounts.replaced),
+    logicalOperatorReview: numberValue(readinessCounts.operator_review),
+    logicalForbidden: numberValue(readinessCounts.forbidden),
+    logicalPending: numberValue(readinessCounts.pending),
+    unresolvedRequiredIds: Array.isArray(readinessPayload.unresolved_required_operation_ids)
+      ? readinessPayload.unresolved_required_operation_ids.map(String)
+      : [],
+    unresolvedReasons: Object.fromEntries(
+      Object.entries(recordValue(readinessPayload.unresolved_reasons)).map(
+        ([operationId, reason]) => [operationId, String(reason)]
+      )
+    ),
+    globalBlockers: Array.isArray(readinessPayload.global_blockers)
+      ? readinessPayload.global_blockers.map(String)
+      : [],
+    evidenceComplete: Boolean(readinessPayload.readiness_evidence_complete),
+    stages: readinessStages
+  } : lifecycleWithoutReadiness ? {
+    ...current.readiness,
+    mixReadiness: 'soundcheck_incomplete' as const,
+    safetyState: 'manual_review_required',
+    executionStatus: 'readiness_contract_missing_from_lifecycle_event',
+    evidenceComplete: false
+  } : current.readiness;
+  const hasReplan = Object.prototype.hasOwnProperty.call(data, 'soundcheck_replan');
+  const replanPayload = recordValue(data.soundcheck_replan);
+  const replan = hasReplan ? {
+    status: stringValue(replanPayload.status, 'not_required'),
+    draftAvailable: Boolean(replanPayload.draft_available),
+    draftId: stringValue(replanPayload.draft_id),
+    runId: stringValue(replanPayload.run_id),
+    fromPlanRevision: numberValue(replanPayload.from_plan_revision),
+    toPlanRevision: numberValue(replanPayload.to_plan_revision),
+    splitOperationCount: numberValue(replanPayload.split_operation_count),
+    safeAlternativeOperationCount: numberValue(
+      replanPayload.safe_alternative_operation_count
+    ),
+    deferredTargetCount: numberValue(replanPayload.deferred_target_count),
+    operatorRequests: Array.isArray(replanPayload.operator_requests)
+      ? replanPayload.operator_requests.map(raw => {
+        const request = recordValue(raw);
+        return {
+          operationId: stringValue(request.operation_id),
+          reason: stringValue(request.reason),
+          safeAutomaticReplacementAvailable: Boolean(
+            request.safe_automatic_replacement_available
+          ),
+          selectedSafeStrategy: stringValue(request.selected_safe_strategy)
+        };
+      })
+      : [],
+    safeAlternatives: Array.isArray(replanPayload.safe_alternatives)
+      ? replanPayload.safe_alternatives.map(raw => {
+        const alternative = recordValue(raw);
+        return {
+          strategy: stringValue(alternative.strategy),
+          translationDb: Number.isFinite(Number(alternative.translation_db))
+            ? Number(alternative.translation_db)
+            : undefined,
+          relativeBalancePreserved: Boolean(
+            alternative.relative_balance_preserved
+          ),
+          finalTargetVectorPreserved: Boolean(
+            alternative.final_target_vector_preserved
+          ),
+          currentStepTransitional: Boolean(
+            alternative.current_step_transitional
+          ),
+          constructiveLaneUsed: Boolean(alternative.constructive_lane_used)
+        };
+      })
+      : []
+  } : current.replan;
+  const hasFamilyRegistry = Object.prototype.hasOwnProperty.call(
+    data,
+    'supervised_console_family_registry'
+  );
+  const familyRegistry = recordValue(data.supervised_console_family_registry);
+  const familyContracts = Object.fromEntries(
+    Object.entries(familyRegistry).map(([familyId, rawContract]) => {
+      const contract = recordValue(rawContract);
+      const writeKinds = Array.isArray(contract.write_kinds)
+        ? contract.write_kinds.map(String)
+        : [];
+      const liveAllowedWriteKinds = Array.isArray(contract.live_allowed_write_kinds)
+        ? contract.live_allowed_write_kinds.map(String)
+        : [];
+      return [familyId, {
+        label: stringValue(contract.label, familyId.replace(/_/g, ' ')),
+        lifecycle: stringValue(contract.lifecycle, 'unknown'),
+        riskClass: stringValue(contract.risk_class, 'unknown'),
+        blockers: Array.isArray(contract.blockers) ? contract.blockers.map(String) : [],
+        separateApproval: Boolean(contract.separate_approval),
+        hardwareProof: stringValue(contract.hardware_proof, 'missing'),
+        proofRunAllowed: Boolean(contract.proof_run_allowed),
+        writeKinds,
+        liveAllowedWriteKinds
+      }];
+    })
+  );
+  const familyLifecycle = Object.fromEntries(
+    Object.entries(familyRegistry).map(([familyId, rawContract]) => {
+      const contract = recordValue(rawContract);
+      return [familyId, stringValue(contract.lifecycle, 'unknown')];
+    })
+  );
+  const familyLiveWriteKinds = Object.fromEntries(
+    Object.entries(familyRegistry).map(([familyId, rawContract]) => {
+      const values = recordValue(rawContract).live_allowed_write_kinds;
+      return [familyId, Array.isArray(values) ? values.map(String) : []];
+    })
+  );
+  const familyWriteKinds = Object.fromEntries(
+    Object.entries(familyRegistry).map(([familyId, rawContract]) => {
+      const values = recordValue(rawContract).write_kinds;
+      return [familyId, Array.isArray(values) ? values.map(String) : []];
+    })
+  );
+  const hasLiveAllowedFamilies = Object.prototype.hasOwnProperty.call(
+    data,
+    'supervised_console_live_allowed_families'
+  );
+  const liveAllowedFamilies = Array.isArray(data.supervised_console_live_allowed_families)
+    ? data.supervised_console_live_allowed_families
+      .map(value => String(value).trim())
+      .filter(Boolean)
+    : hasLiveAllowedFamilies
+      ? []
+      : hasFamilyRegistry
+        ? Object.entries(familyContracts)
+          .filter(([, contract]) => contract.lifecycle === 'live_allowed' && contract.liveAllowedWriteKinds.length > 0)
+          .map(([familyId]) => familyId)
+        : current.liveAllowedFamilies;
   return {
     ...current,
     running: Boolean(data.running ?? data.is_running ?? current.running),
@@ -121,9 +353,26 @@ function soundcheckRuntimeFromPayload(
       data.soundcheck_recommendation_count ?? data.recommendation_count,
       current.recommendationCount
     ),
+    transactionPlanCount: numberValue(
+      data.supervised_transaction_plan_count,
+      current.transactionPlanCount
+    ),
+    transactionOperationCount: numberValue(
+      data.supervised_transaction_operation_count,
+      current.transactionOperationCount
+    ),
+    liveAllowedFamilies,
+    familyLifecycle: hasFamilyRegistry ? familyLifecycle : current.familyLifecycle,
+    familyLiveWriteKinds: hasFamilyRegistry
+      ? familyLiveWriteKinds
+      : current.familyLiveWriteKinds,
+    familyWriteKinds: hasFamilyRegistry ? familyWriteKinds : current.familyWriteKinds,
+    familyContracts: hasFamilyRegistry ? familyContracts : current.familyContracts,
     derivationComplete: Boolean(
       data.recommendation_derivation_complete ?? current.derivationComplete
     ),
+    readiness,
+    replan,
     interceptedWriteCount: numberValue(
       summary.total_operations ?? data.intercepted_write_count,
       current.interceptedWriteCount
@@ -228,9 +477,7 @@ function connectionMessage(state: BackendConnectionState) {
 }
 
 function socketIsOpen() {
-  const socket = (websocketService as { ws?: { readyState?: number } }).ws;
-  const openState = globalThis.WebSocket?.OPEN ?? 1;
-  return socket?.readyState === openState;
+  return (websocketService as { isReady?: () => boolean }).isReady?.() === true;
 }
 
 function payloadKeys(payloads: ProductLayerPayloads) {
@@ -358,6 +605,30 @@ function replayRunsPayloadFromStarted(current: unknown, payload: unknown): unkno
   };
 }
 
+export function classifyReadbackTone(status: unknown): Tone {
+  return classifyReadbackToneValue(status) as Tone;
+}
+
+export function classifyRollbackTone(status: unknown): Tone {
+  return classifyRollbackToneValue(status) as Tone;
+}
+
+function activeSoundcheckChannels(payload: unknown): number[] {
+  const rows = recordValue(payload).channels;
+  if (!Array.isArray(rows)) return [];
+  return [...new Set(rows.flatMap(row => {
+    const channel = recordValue(row);
+    const id = Number(channel.id ?? channel.number ?? channel.channel);
+    const status = stringValue(channel.status).toUpperCase();
+    // Canonical WING capture map: USB 1..16 are raw console sources;
+    // 17..48 are post-fader/stem/Main measurement taps and must never become
+    // physical console channel correction targets.
+    return Number.isInteger(id) && id >= 1 && id <= 16 && status === 'ACTIVE'
+      ? [id]
+      : [];
+  }))].sort((a, b) => a - b);
+}
+
 function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): ProposalApplyResult {
   const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
   const rawResult = data.apply_result && typeof data.apply_result === 'object'
@@ -365,21 +636,25 @@ function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): P
     : data;
   const status = String(data.status ?? rawResult.status ?? fallbackStatus);
   const reason = String(rawResult.reason ?? data.reason ?? '');
-  const readbackStatus = String(rawResult.readback_status ?? (status === 'applied' ? 'readback verified' : 'not verified'));
+  const readbackStatus = String(rawResult.readback_status ?? 'not verified');
   const rollbackAvailable = Boolean(rawResult.rollback_available);
   const rollbackResults = Array.isArray(rawResult.rollback_results) ? rawResult.rollback_results : [];
   const rollbackFailed = rollbackResults.some(item => {
     const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
-    return row.status && row.status !== 'applied';
+    return row.status !== 'applied' || row.rollback_verified === false;
   });
-  const rollbackStatus = rollbackFailed
+  const explicitRollbackStatus = String(
+    rawResult.rollback_status ?? rawResult.rollback_reason ?? ''
+  ).trim();
+  const rollbackStatus = explicitRollbackStatus || (rollbackFailed
     ? 'rollback failed/unavailable'
     : rollbackResults.length
       ? 'rollback executed'
       : rollbackAvailable
         ? 'rollback available'
-        : 'rollback unavailable';
-  const blocked = status.includes('blocked') || reason.includes('blocked') || reason.includes('failed');
+        : 'rollback unavailable');
+  const tone = classifyApplyToneValue(status, reason, rollbackFailed) as Tone;
+  const blocked = tone === 'red';
   return {
     proposalId: proposalIdFromPayload(payload),
     status,
@@ -388,7 +663,9 @@ function applyResultFromPayload(payload: unknown, fallbackStatus = 'updated'): P
     readbackStatus,
     rollbackStatus,
     rollbackAvailable,
-    tone: blocked || rollbackFailed ? 'red' : status === 'applied' ? 'green' : 'yellow',
+    readbackTone: classifyReadbackTone(readbackStatus),
+    rollbackTone: classifyRollbackTone(rollbackStatus),
+    tone,
     updatedAt: new Date().toLocaleTimeString()
   };
 }
@@ -408,17 +685,29 @@ function mergeMeterFrameIntoPayloads(current: ProductLayerPayloads, frame: Recor
   const inventory = current.channels && typeof current.channels === 'object'
     ? current.channels as Record<string, unknown>
     : null;
-  if (inventory && Array.isArray(inventory.channels) && meterByChannel.size) {
+  if (inventory && Array.isArray(inventory.channels)) {
     next.channels = {
       ...inventory,
       channels: (inventory.channels as unknown[]).map(row => {
         if (!row || typeof row !== 'object') return row;
         const record = row as Record<string, unknown>;
         const meter = meterByChannel.get(Number(record.id ?? record.number));
-        if (!meter) return record;
         const previousMeter = record.meter && typeof record.meter === 'object'
           ? record.meter as Record<string, unknown>
           : {};
+        if (!meter) {
+          return {
+            ...record,
+            level_db: null,
+            meter: {
+              ...previousMeter,
+              available: false,
+              rms_db: null,
+              peak_db: null,
+              lufs: null
+            }
+          };
+        }
         return {
           ...record,
           level_db: meter.rms_db ?? record.level_db,
@@ -566,12 +855,23 @@ function mergeMixerUpdateIntoPayloads(
 }
 
 export function useOperatorBackend() {
-  const [connectionState, setConnectionState] = useState<BackendConnectionState>(() => shouldAutoConnect() ? 'connecting' : 'mock');
+  const [connectionState, setConnectionState] = useState<BackendConnectionState>(() => (
+    socketIsOpen() ? 'connected' : shouldAutoConnect() ? 'connecting' : 'mock'
+  ));
   const [payloads, setPayloads] = useState<ProductLayerPayloads>({});
   const [modeFromBackend, setModeFromBackend] = useState<AutomixerMode | null>(null);
   const [logs, setLogs] = useState<LogRecord[]>(mockLogs);
   const [proposalApplyResult, setProposalApplyResult] = useState<ProposalApplyResult | null>(null);
   const [soundcheck, setSoundcheck] = useState<SoundcheckRuntime>(idleSoundcheckRuntime);
+  const [emergencyStop, setEmergencyStop] = useState<EmergencyStopUiState>(idleEmergencyStop);
+  const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearEmergencyStopAckTimer = useCallback(() => {
+    if (emergencyStopAckTimer.current !== null) {
+      globalThis.clearTimeout(emergencyStopAckTimer.current);
+      emergencyStopAckTimer.current = null;
+    }
+  }, []);
 
   const requestSnapshot = useCallback(() => {
     websocketService.getOperatorMode();
@@ -695,6 +995,8 @@ export function useOperatorBackend() {
       readbackStatus: 'waiting for backend readback',
       rollbackStatus: 'waiting for rollback proof',
       rollbackAvailable: false,
+      readbackTone: 'yellow',
+      rollbackTone: 'yellow',
       tone: 'yellow',
       updatedAt: new Date().toLocaleTimeString()
     });
@@ -707,7 +1009,17 @@ export function useOperatorBackend() {
       setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Connect backend before starting soundcheck.', 'WARN'));
       return;
     }
-    websocketService.startAutoSoundcheck(null, 48, {}, {}, {}, true);
+    const selectedChannels = activeSoundcheckChannels(payloads.channels);
+    if (!selectedChannels.length) {
+      setLogs(current => appendBackendLog(
+        current,
+        'auto_soundcheck',
+        'No active backend channels are available; soundcheck was not started.',
+        'WARN'
+      ));
+      return;
+    }
+    websocketService.startAutoSoundcheck(null, selectedChannels, {}, {}, {}, true);
     setSoundcheck(current => ({
       ...current,
       running: true,
@@ -717,17 +1029,135 @@ export function useOperatorBackend() {
       observeOnly: true,
       proposalOnly: true,
       derivationComplete: false,
+      readiness: {
+        ...idleSoundcheckRuntime.readiness,
+        runId: 'starting',
+        executionStatus: 'pending'
+      },
+      replan: { ...idleSoundcheckRuntime.replan },
       recommendationCount: 0,
+      transactionPlanCount: 0,
+      transactionOperationCount: 0,
+      liveAllowedFamilies: [],
+      familyLifecycle: {},
+      familyLiveWriteKinds: {},
+      familyWriteKinds: {},
+      familyContracts: {},
+      selectedChannels,
+      totalChannels: selectedChannels.length,
+      channelsWithSignal: 0,
+      interceptedWriteCount: 0,
       lastUpdated: new Date().toLocaleTimeString()
     }));
     setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Proposal-only soundcheck requested. Mixer writes remain blocked.', 'INFO'));
-  }, [refreshBackend]);
+  }, [payloads.channels, refreshBackend]);
 
   const stopSoundcheck = useCallback(() => {
     if (!socketIsOpen()) return;
     websocketService.stopAutoSoundcheck();
     setLogs(current => appendBackendLog(current, 'auto_soundcheck', 'Soundcheck stop requested.', 'INFO'));
   }, []);
+
+  const acceptSoundcheckReplan = useCallback(() => {
+    if (
+      !socketIsOpen()
+      || !soundcheck.replan.draftAvailable
+      || !soundcheck.replan.runId
+      || !soundcheck.replan.draftId
+    ) return;
+    const queued = websocketService.acceptSoundcheckReplan(
+      soundcheck.replan.runId,
+      soundcheck.replan.draftId,
+      `frontend-soundcheck-replan-${Date.now()}`
+    );
+    setLogs(current => appendBackendLog(
+      current,
+      'soundcheck_replan',
+      queued
+        ? 'Safe next-revision request queued; waiting for backend acknowledgement.'
+        : 'Safe next-revision request was not sent.',
+      queued ? 'INFO' : 'WARN'
+    ));
+  }, [soundcheck.replan]);
+
+  const reanalyzeSoundcheckStage = useCallback(() => {
+    const runId = soundcheck.readiness.runId;
+    if (!socketIsOpen() || !runId || ['idle', 'starting', 'unknown'].includes(runId)) return;
+    const queued = websocketService.reanalyzeSoundcheckStage(
+      runId,
+      `frontend-soundcheck-reanalysis-${Date.now()}`
+    );
+    setLogs(current => appendBackendLog(
+      current,
+      'soundcheck_reanalysis',
+      queued
+        ? 'Fresh read-only stage analysis queued; a new immutable revision will require review.'
+        : 'Stage reanalysis request was not sent.',
+      queued ? 'INFO' : 'WARN'
+    ));
+  }, [soundcheck.readiness.runId]);
+
+  const finalizeSoundcheckReadiness = useCallback(() => {
+    const runId = soundcheck.readiness.runId;
+    if (!socketIsOpen() || !runId || ['idle', 'starting', 'unknown'].includes(runId)) return;
+    const queued = websocketService.finalizeSoundcheckReadiness(runId);
+    setLogs(current => appendBackendLog(
+      current,
+      'soundcheck_finalize',
+      queued
+        ? 'Fresh read-only target/Main reconciliation request queued.'
+        : 'Read-only reconciliation request was not sent.',
+      queued ? 'INFO' : 'WARN'
+    ));
+  }, [soundcheck.readiness.runId]);
+
+  const triggerEmergencyStop = useCallback(() => {
+    clearEmergencyStopAckTimer();
+    if (!socketIsOpen()) {
+      setEmergencyStop({
+        status: 'error',
+        message: 'STOP NOT SENT: backend is offline. Reconnect and retry.',
+        updatedAt: new Date().toLocaleTimeString(),
+        reconciliationRequired: true
+      });
+      setLogs(current => appendBackendLog(current, 'emergency_stop', 'Emergency stop was not sent because the backend is offline.', 'ERROR'));
+      return false;
+    }
+
+    const sent = websocketService.emergencyStop();
+    if (!sent) {
+      setEmergencyStop({
+        status: 'error',
+        message: 'STOP NOT SENT: WebSocket send failed. Retry now.',
+        updatedAt: new Date().toLocaleTimeString(),
+        reconciliationRequired: true
+      });
+      setLogs(current => appendBackendLog(current, 'emergency_stop', 'Emergency stop WebSocket send failed.', 'ERROR'));
+      return false;
+    }
+
+    setEmergencyStop({
+      status: 'pending',
+      message: 'Emergency stop sent. Waiting for backend acknowledgement.',
+      updatedAt: new Date().toLocaleTimeString(),
+      reconciliationRequired: true
+    });
+    setLogs(current => appendBackendLog(current, 'emergency_stop', 'System emergency stop requested.', 'WARN'));
+    emergencyStopAckTimer.current = globalThis.setTimeout(() => {
+      emergencyStopAckTimer.current = null;
+      setEmergencyStop(current => current.status === 'pending' ? {
+        status: 'error',
+        message: 'STOP ACK MISSING: backend did not confirm within 5 seconds.',
+        updatedAt: new Date().toLocaleTimeString(),
+        reconciliationRequired: true
+      } : current);
+      setLogs(current => appendBackendLog(current, 'emergency_stop', 'Emergency stop acknowledgement timed out.', 'ERROR'));
+      websocketService.getManualWriteSupervision();
+    }, EMERGENCY_STOP_ACK_TIMEOUT_MS);
+    return true;
+  }, [clearEmergencyStopAckTimer]);
+
+  useEffect(() => () => clearEmergencyStopAckTimer(), [clearEmergencyStopAckTimer]);
 
   useEffect(() => {
     const handleDashboard = (payload: unknown) => {
@@ -736,6 +1166,12 @@ export function useOperatorBackend() {
     };
     const handleChannels = (payload: unknown) => {
       setPayloads(current => ({ ...current, channels: payload }));
+      const candidates = activeSoundcheckChannels(payload);
+      setSoundcheck(current => current.running ? current : {
+        ...current,
+        selectedChannels: candidates,
+        totalChannels: candidates.length
+      });
       setLogs(current => appendBackendLog(current, 'channel_inventory', 'Channel inventory received.', 'SUCCESS'));
     };
     const handleDecisions = (payload: unknown) => {
@@ -810,7 +1246,28 @@ export function useOperatorBackend() {
     };
     const handleManualWriteSupervision = (payload: unknown) => {
       const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
-      const emergencyStopped = Boolean(data.emergency_stopped ?? data.reset_required);
+      const emergencyStopped = data.emergency_stopped === true || data.reset_required === true;
+      if (emergencyStopped) clearEmergencyStopAckTimer();
+      setEmergencyStop(current => {
+        if (emergencyStopped) {
+          return {
+            status: 'acknowledged',
+            message: 'STOP ACTIVE: backend supervision confirms the emergency latch is engaged.',
+            updatedAt: new Date().toLocaleTimeString(),
+            reconciliationRequired: false
+          };
+        }
+        if (current.status === 'pending') return current;
+        if (current.status === 'acknowledged' || current.reconciliationRequired) {
+          return {
+            status: 'ready',
+            message: 'Backend reports the emergency stop is reset. Stop control is ready.',
+            updatedAt: new Date().toLocaleTimeString(),
+            reconciliationRequired: false
+          };
+        }
+        return current;
+      });
       setLogs(current => appendBackendLog(
         current,
         'manual_write_supervision',
@@ -823,7 +1280,41 @@ export function useOperatorBackend() {
       const status = String(data.status ?? 'updated');
       const level: LogRecord['level'] = status === 'blocked' ? 'WARN' : 'SUCCESS';
       setLogs(current => appendBackendLog(current, 'manual_write_emergency_reset', `Emergency reset ${status}.`, level));
+      if (data.success === true && ['reset', 'not_required'].includes(status)) {
+        clearEmergencyStopAckTimer();
+        setEmergencyStop({
+          status: 'ready',
+          message: 'Emergency stop reset acknowledged. Stop control is ready.',
+          updatedAt: new Date().toLocaleTimeString(),
+          reconciliationRequired: false
+        });
+      }
       refreshBackend();
+    };
+    const handleEmergencyStopApplied = (payload: unknown) => {
+      const data = recordValue(payload);
+      const status = stringValue(data.status).toLowerCase();
+      const supervision = recordValue(data.manual_write_supervision);
+      const acknowledged = data.success === true
+        && status === 'stopped'
+        && (supervision.emergency_stopped === true || supervision.reset_required === true);
+      clearEmergencyStopAckTimer();
+      setEmergencyStop({
+        status: acknowledged ? 'acknowledged' : 'error',
+        message: acknowledged
+          ? 'STOP ACTIVE: backend confirmed the emergency latch is engaged.'
+          : `STOP ERROR: backend response was not an acknowledgement${status ? ` (${status})` : ''}.`,
+        updatedAt: new Date().toLocaleTimeString(),
+        reconciliationRequired: !acknowledged
+      });
+      setLogs(current => appendBackendLog(
+        current,
+        'emergency_stop',
+        acknowledged ? 'Backend acknowledged the system emergency stop.' : 'Backend rejected or failed the system emergency stop.',
+        acknowledged ? 'SUCCESS' : 'ERROR'
+      ));
+      websocketService.getManualWriteSupervision();
+      websocketService.getSafetyMonitor();
     };
     const handleAnalysis = (payload: unknown) => {
       setLogs(current => appendBackendLog(current, 'operator_analysis_report', 'Operator analysis completed.', 'SUCCESS'));
@@ -846,7 +1337,7 @@ export function useOperatorBackend() {
     };
     const handleMeterFrame = (payload: unknown) => {
       const frame = payload && typeof payload === 'object' ? payload as Record<string, unknown> : null;
-      if (!frame || frame.available !== true) return;
+      if (!frame) return;
       setPayloads(current => mergeMeterFrameIntoPayloads(current, frame));
     };
     const handleAudioCaptureStatus = (payload: unknown) => {
@@ -863,6 +1354,7 @@ export function useOperatorBackend() {
       websocketService.getDashboardSnapshot();
       websocketService.getChannelInventory(48);
       websocketService.getConnectionTopology();
+      websocketService.getAutoSoundcheckStatus();
     };
     const handleAutoSoundcheckStatus = (payload: unknown) => {
       setSoundcheck(current => soundcheckRuntimeFromPayload(current, payload));
@@ -884,12 +1376,39 @@ export function useOperatorBackend() {
     const handleSoundcheckProposalImport = (payload: unknown) => {
       const data = recordValue(payload);
       if (stringValue(data.source) !== 'soundcheck_recommendation_bundle') return;
-      setSoundcheck(current => ({
-        ...current,
-        recommendationCount: numberValue(data.imported_count ?? data.created_count, current.recommendationCount),
-        derivationComplete: true,
-        lastUpdated: new Date().toLocaleTimeString()
-      }));
+      setSoundcheck(current => {
+        const parsed = soundcheckRuntimeFromPayload(current, payload);
+        return {
+          ...parsed,
+          recommendationCount: numberValue(
+            data.imported_count ?? data.created_count,
+            current.recommendationCount
+          ),
+          derivationComplete: Boolean(data.recommendation_derivation_complete),
+          readiness: Object.prototype.hasOwnProperty.call(data, 'soundcheck_readiness')
+            ? parsed.readiness
+            : {
+              ...idleSoundcheckRuntime.readiness,
+              runId: 'missing-readiness-contract',
+              safetyState: 'manual_review_required'
+            },
+          lastUpdated: new Date().toLocaleTimeString()
+        };
+      });
+    };
+    const handleSoundcheckControlResult = (payload: unknown) => {
+      const data = recordValue(payload);
+      setSoundcheck(current => soundcheckRuntimeFromPayload(current, payload));
+      const success = data.success === true;
+      setLogs(current => appendBackendLog(
+        current,
+        stringValue(data.type, 'soundcheck_control'),
+        success
+          ? 'Soundcheck read-only finalize/replan request completed.'
+          : `Soundcheck control blocked: ${stringValue(data.reason, 'unknown reason')}.`,
+        success ? 'SUCCESS' : 'WARN'
+      ));
+      websocketService.getAutoSoundcheckStatus();
     };
     const handleConnectionStatus = (payload: unknown) => {
       const data = recordValue(payload);
@@ -908,7 +1427,43 @@ export function useOperatorBackend() {
     };
     const handleDisconnected = () => {
       setConnectionState(previous => previous === 'mock' ? 'mock' : 'offline');
+      setProposalApplyResult(null);
+      setSoundcheck(current => ({
+        ...current,
+        running: false,
+        state: 'disconnected',
+        message: 'Backend disconnected; soundcheck readiness is no longer valid.',
+        readiness: {
+          ...current.readiness,
+          mixReadiness: 'soundcheck_incomplete',
+          safetyState: 'manual_review_required',
+          evidenceComplete: false,
+          globalBlockers: [
+            ...new Set([...current.readiness.globalBlockers, 'backend_disconnected'])
+          ]
+        }
+      }));
+      clearEmergencyStopAckTimer();
+      setEmergencyStop(current => ['pending', 'acknowledged'].includes(current.status) ? {
+        status: 'error',
+        message: 'STOP STATE UNKNOWN: backend disconnected; reconnect to verify the emergency latch.',
+        updatedAt: new Date().toLocaleTimeString(),
+        reconciliationRequired: true
+      } : current);
       setLogs(current => appendBackendLog(current, 'backend', 'Product Layer disconnected; using mock fallback.', 'WARN'));
+    };
+    const handleConnected = () => {
+      setPayloads({});
+      setModeFromBackend(null);
+      setProposalApplyResult(null);
+      setConnectionState('connected');
+      setLogs(current => appendBackendLog(
+        current,
+        'backend',
+        'Product Layer websocket connected.',
+        'SUCCESS'
+      ));
+      requestSnapshot();
     };
 
     websocketService.on('dashboard_snapshot', handleDashboard);
@@ -932,6 +1487,7 @@ export function useOperatorBackend() {
     websocketService.on('operator_mode_status', handleMode);
     websocketService.on('manual_write_supervision_status', handleManualWriteSupervision);
     websocketService.on('manual_write_emergency_reset_result', handleEmergencyResetResult);
+    websocketService.on('emergency_stop_applied', handleEmergencyStopApplied);
     websocketService.on('operator_analysis_report', handleAnalysis);
     websocketService.on('operator_proposal_created', handleProposalMutation);
     websocketService.on('operator_proposal_accepted', handleProposalMutation);
@@ -945,18 +1501,20 @@ export function useOperatorBackend() {
     websocketService.on('auto_soundcheck_observation', handleAutoSoundcheckObservation);
     websocketService.on('auto_soundcheck_channel_update', handleAutoSoundcheckChannel);
     websocketService.on('operator_proposals_imported', handleSoundcheckProposalImport);
+    websocketService.on('soundcheck_replan_result', handleSoundcheckControlResult);
+    websocketService.on('soundcheck_stage_reanalysis_result', handleSoundcheckControlResult);
+    websocketService.on('soundcheck_finalize_result', handleSoundcheckControlResult);
     websocketService.on('connection_status', handleConnectionStatus);
     websocketService.on('mixer_update', handleMixerUpdate);
     websocketService.on('disconnected', handleDisconnected);
+    websocketService.on('connected', handleConnected);
 
-    if (shouldAutoConnect()) {
+    if (socketIsOpen()) {
+      handleConnected();
+    } else if (shouldAutoConnect()) {
       setConnectionState('connecting');
       websocketService.connect()
-        .then(() => {
-          setConnectionState('connected');
-          setLogs(current => appendBackendLog(current, 'backend', 'Product Layer websocket connected.', 'SUCCESS'));
-          requestSnapshot();
-        })
+        .then(() => undefined)
         .catch(() => {
           setConnectionState('error');
           setLogs(current => appendBackendLog(current, 'backend', 'Product Layer unavailable; mock fallback remains active.', 'WARN'));
@@ -985,6 +1543,7 @@ export function useOperatorBackend() {
       websocketService.off('operator_mode_status', handleMode);
       websocketService.off('manual_write_supervision_status', handleManualWriteSupervision);
       websocketService.off('manual_write_emergency_reset_result', handleEmergencyResetResult);
+      websocketService.off('emergency_stop_applied', handleEmergencyStopApplied);
       websocketService.off('operator_analysis_report', handleAnalysis);
       websocketService.off('operator_proposal_created', handleProposalMutation);
       websocketService.off('operator_proposal_accepted', handleProposalMutation);
@@ -998,17 +1557,34 @@ export function useOperatorBackend() {
       websocketService.off('auto_soundcheck_observation', handleAutoSoundcheckObservation);
       websocketService.off('auto_soundcheck_channel_update', handleAutoSoundcheckChannel);
       websocketService.off('operator_proposals_imported', handleSoundcheckProposalImport);
+      websocketService.off('soundcheck_replan_result', handleSoundcheckControlResult);
+      websocketService.off('soundcheck_stage_reanalysis_result', handleSoundcheckControlResult);
+      websocketService.off('soundcheck_finalize_result', handleSoundcheckControlResult);
       websocketService.off('connection_status', handleConnectionStatus);
       websocketService.off('mixer_update', handleMixerUpdate);
       websocketService.off('disconnected', handleDisconnected);
+      websocketService.off('connected', handleConnected);
       if (socketIsOpen()) {
         websocketService.unsubscribeMeters();
       }
     };
-  }, [refreshBackend, requestSnapshot]);
+  }, [clearEmergencyStopAckTimer, refreshBackend, requestSnapshot]);
 
   const backend: BackendUiState = useMemo(() => {
-    const sourcePayload = payloads.dashboard ?? payloads.mode ?? {};
+    const rawSourcePayload = payloads.dashboard ?? payloads.mode ?? {};
+    const packagedOfflineLock = window.automixerRuntimeSafety?.packagedOfflineLock === true;
+    const rawSourceRecord = recordValue(rawSourcePayload);
+    const sourcePayload = packagedOfflineLock
+      ? {
+          ...rawSourceRecord,
+          operator_mode: {
+            ...recordValue(rawSourceRecord.operator_mode ?? rawSourceRecord),
+            packaged_offline_lock: true,
+            mixer_transport_locked: true,
+            mode: 'analyze'
+          }
+        }
+      : rawSourcePayload;
     const base = adaptBackendState(sourcePayload, connectionState, connectionMessage(connectionState));
     const receivedPayloads = payloadKeys(payloads);
     const dataState = resolveDataState(connectionState, payloads);
@@ -1106,12 +1682,17 @@ export function useOperatorBackend() {
     dismissProposal,
     applyProposal,
     startSoundcheck,
-    stopSoundcheck
-  }), [acceptProposal, applyProposal, connectWingReadOnly, dismissProposal, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview]);
+    stopSoundcheck,
+    acceptSoundcheckReplan,
+    reanalyzeSoundcheckStage,
+    finalizeSoundcheckReadiness,
+    triggerEmergencyStop
+  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, reanalyzeSoundcheckStage, refreshBackend, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, triggerEmergencyStop]);
 
   return {
     backend,
     soundcheck,
+    emergencyStop,
     modeFromBackend,
     viewData,
     backendActions,

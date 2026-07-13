@@ -45,10 +45,22 @@ function AIAgentTab({ selectedChannels, availableChannels }) {
       setStatus(prev => ({ ...prev, is_running: false }));
       setMessage('AI Agent stopped');
     };
-    const handleEmergencyStopped = () => {
-      setStatus(prev => ({ ...prev, is_running: false, emergency_stop: true, mode: 'manual' }));
-      setMode('manual');
-      setMessage('Emergency stop: agent is in manual mode');
+    const handleEmergencyStopped = (data) => {
+      const stopped = data?.success === true
+        && data?.status === 'stopped'
+        && data?.teardown_complete === true
+        && data?.emergency_stop === true;
+      setStatus(prev => ({
+        ...prev,
+        is_running: stopped ? false : prev.is_running,
+        emergency_stop: data?.emergency_stop === true,
+        emergency_stop_status: stopped ? 'stopped' : 'unknown',
+        ...(stopped ? { mode: 'manual' } : {}),
+      }));
+      if (stopped) setMode('manual');
+      setMessage(stopped
+        ? 'Emergency stop: agent is in manual mode'
+        : 'Emergency latch active; controller teardown is not confirmed');
       websocketService.getActionHistory(20);
     };
     const handlePending = (data) => setPending(data.actions || []);

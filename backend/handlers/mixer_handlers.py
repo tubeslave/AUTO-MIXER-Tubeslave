@@ -11,7 +11,11 @@ except ImportError:  # pragma: no cover - package import fallback
 
 def _wing_boundary_active(server) -> bool:
     checker = getattr(server, "_is_wing_deployment_write_boundary_active", None)
-    return bool(checker()) if callable(checker) else False
+    policy_boundary = bool(checker()) if callable(checker) else False
+    # Direct WebSocket writes are never a supported WING path, even when a
+    # legacy deployment-boundary feature flag is disabled. The canonical
+    # operator-proposal path owns WING authorization and transaction proof.
+    return policy_boundary or str(getattr(server, "connection_mode", "")).lower() == "wing"
 
 
 def _target_type(operation: str) -> str:
@@ -162,7 +166,7 @@ async def _send_live_apply_result(
             channel=channel_int,
             value=value_float,
             dry_run=data.get("dry_run"),
-            confirm_live_apply=bool(data.get("confirm_live_apply", False)),
+            confirm_live_apply=data.get("confirm_live_apply") is True,
             current_value=data.get("current_value"),
             min_value=data.get("min_value"),
             max_value=data.get("max_value"),
@@ -288,22 +292,18 @@ def register_handlers(server):
         channel = data.get("channel")
         value = data.get("value")
         if _wing_boundary_active(server):
-            result = await server._apply_manual_console_write(
-                websocket,
+            result = server._manual_write_blocked_result(
+                reason="direct_wing_write_requires_operator_proposal",
                 channel=channel,
                 value=value,
                 value_type="fader",
                 source="websocket:set_fader",
-                reason=data.get("reason") or "websocket_set_fader",
-                approved=bool(data.get("approved", False)),
                 approval_id=data.get("approval_id"),
             )
-            result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
-            if result.get("status") == "sent_unverified":
-                result_type = "manual_write_unverified"
-            if result.get("status") == "error":
-                result_type = "manual_write_error"
-            await server.send_to_client(websocket, {"type": result_type, **result})
+            await server.send_to_client(
+                websocket,
+                {"type": "manual_write_blocked", **result},
+            )
             return
         await _send_live_apply_result(
             server,
@@ -318,22 +318,18 @@ def register_handlers(server):
         channel = data.get("channel")
         value = data.get("value")
         if _wing_boundary_active(server):
-            result = await server._apply_manual_console_write(
-                websocket,
+            result = server._manual_write_blocked_result(
+                reason="direct_wing_write_requires_operator_proposal",
                 channel=channel,
                 value=value,
                 value_type="gain",
                 source="websocket:set_gain",
-                reason=data.get("reason") or "websocket_set_gain",
-                approved=bool(data.get("approved", False)),
                 approval_id=data.get("approval_id"),
             )
-            result_type = "manual_write_applied" if result.get("status") == "applied" else "manual_write_blocked"
-            if result.get("status") == "sent_unverified":
-                result_type = "manual_write_unverified"
-            if result.get("status") == "error":
-                result_type = "manual_write_error"
-            await server.send_to_client(websocket, {"type": result_type, **result})
+            await server.send_to_client(
+                websocket,
+                {"type": "manual_write_blocked", **result},
+            )
             return
         await _send_live_apply_result(
             server,
@@ -554,7 +550,7 @@ def register_handlers(server):
             websocket,
             source="websocket:rollback_last_manual_write",
             reason=data.get("reason") or "websocket_rollback_last_manual_write",
-            approved=bool(data.get("approved", False)),
+            approved=data.get("approved") is True,
             approval_id=data.get("approval_id"),
             transaction_id=data.get("transaction_id"),
         )
@@ -602,6 +598,7 @@ def register_handlers(server):
             value_type=value_type,
             address=address,
             prefer_physical=True,
+            allow_cache_fallback=False,
         )
         await server.send_to_client(websocket, {
             "type": "mixer_parameter_value",

@@ -697,6 +697,10 @@ function SupervisedApplyModal({
 }) {
   const proposal = task.proposal;
   const canRequestBackendGate = ui.mode === 'Supervised'
+    && ui.backend.connectionState === 'connected'
+    && ui.backend.dataState === 'connected'
+    && !ui.backend.staleSnapshot
+    && ui.backend.mixerConnected
     && ui.backend.canApplyToConsole
     && Boolean(task.canApply ?? true)
     && !task.reviewOnly
@@ -741,10 +745,10 @@ function SupervisedApplyModal({
   const backendResultTone = visibleBackendResultMatches ? backendResult?.tone ?? approvalTone : approvalTone;
   const readbackTone = modalGateBlockerStatus
     ? modalGateBlockerStatus.readbackTone
-    : visibleBackendResultMatches && readbackLabel.includes('verified') ? 'green' as Tone : 'yellow' as Tone;
+    : visibleBackendResultMatches ? backendResult?.readbackTone ?? 'yellow' as Tone : 'yellow' as Tone;
   const rollbackTone = modalGateBlockerStatus
     ? modalGateBlockerStatus.rollbackTone
-    : visibleBackendResultMatches && rollbackLabel.includes('available') ? 'green' as Tone : visibleBackendResultMatches && rollbackLabel.includes('failed') ? 'red' as Tone : 'yellow' as Tone;
+    : visibleBackendResultMatches ? backendResult?.rollbackTone ?? 'yellow' as Tone : 'yellow' as Tone;
   const finalReadinessStatus = integrationBundleApplyBlocked
     ? { value: 'Blocked by integration bundle', tone: 'red' as Tone }
     : { value: ui.backend.statusLabel, tone: ui.backend.statusTone };

@@ -33,6 +33,9 @@ class WingClient(MixerClientBase):
         
         self.state = {}
         self.state_timestamps = {}
+        self._state_observation_lock = threading.Lock()
+        self._state_change_generation = 0
+        self._state_value_generations: Dict[str, int] = {}
         self.commanded_state = {}
         self.command_timestamps = {}
         self.callbacks = {}
@@ -128,8 +131,43 @@ class WingClient(MixerClientBase):
 
     def _set_state_value(self, address: str, value: Any) -> None:
         """Record only state received from the physical console."""
-        self.state[address] = value
-        self.state_timestamps[address] = time.time()
+        with self._state_observation_lock:
+            previous_present = address in self.state
+            previous = self.state.get(address)
+            self.state[address] = value
+            self.state_timestamps[address] = time.time()
+            if not previous_present or previous != value:
+                self._state_change_generation += 1
+                self._state_value_generations[address] = (
+                    self._state_change_generation
+                )
+
+    def get_observed_state_revision(
+        self,
+        addresses: Any = None,
+    ) -> Dict[str, Any]:
+        """Atomically expose value-change generations for readiness fences."""
+
+        requested = [
+            str(address)
+            for address in (addresses or self.state.keys())
+            if str(address).strip()
+        ]
+        with self._state_observation_lock:
+            return {
+                "generation": int(self._state_change_generation),
+                "addresses": {
+                    address: {
+                        "generation": int(
+                            self._state_value_generations.get(address, 0)
+                        ),
+                        "value": self.state.get(address),
+                        "observed_at_epoch": self.state_timestamps.get(address),
+                    }
+                    for address in requested
+                },
+                "captured_at_epoch": time.time(),
+            }
 
     def _set_commanded_value(self, address: str, value: Any) -> None:
         """Record transport intent separately from observed console state."""
@@ -381,8 +419,10 @@ class WingClient(MixerClientBase):
         """Query one OSC address and wait briefly for physical readback.
 
         The caller decides whether a timeout can fall back to the state cache.
-        This helper itself performs only a query message: ``send(address)`` with
-        no values.
+        OSC replies have no request identifier, so one queued update cannot prove
+        that the console answered the current query. The first request drains any
+        delayed matching packet; a second request must receive another reply before
+        the readback is reported as fresh.
         """
 
         event = threading.Event()
@@ -400,15 +440,30 @@ class WingClient(MixerClientBase):
 
         self.subscribe(address, callback)
         try:
-            if not self.send(address):
-                return {"status": "send_failed", "address": address, "value": None}
-            if not event.wait(max(0.0, float(timeout))):
-                return {"status": "timeout", "address": address, "value": None}
+            for phase in ("drain", "confirm"):
+                event.clear()
+                captured["value"] = None
+                captured["args"] = None
+                if not self.send(address):
+                    return {
+                        "status": "send_failed",
+                        "address": address,
+                        "value": None,
+                        "phase": phase,
+                    }
+                if not event.wait(max(0.0, float(timeout))):
+                    return {
+                        "status": "timeout",
+                        "address": address,
+                        "value": None,
+                        "phase": phase,
+                    }
             return {
                 "status": "received",
                 "address": address,
                 "value": captured["value"],
                 "args": captured["args"],
+                "confirmed_round_trips": 2,
             }
         finally:
             callbacks = self.callbacks.get(address)
@@ -1236,7 +1291,10 @@ class WingClient(MixerClientBase):
             results.append(self.send(f"{base}/on", 1 if enabled else 0))
             time.sleep(0.01)
         if threshold_db is not None:
-            results.append(self.send(f"{base}/thr37", threshold_db))
+            # WING Rack fw3.0.5 standard bus compressor exposes /dyn/thr.
+            # /dyn/thr37 is model-specific and times out on the verified COMP
+            # model, so it cannot serve as the canonical write/readback path.
+            results.append(self.send(f"{base}/thr", threshold_db))
             time.sleep(0.01)
         if ratio is not None:
             ratio_value = f"{float(ratio):.1f}" if isinstance(ratio, (int, float)) else str(ratio)
@@ -2105,7 +2163,7 @@ class WingClient(MixerClientBase):
             f"/bus/{bus}/eq/on",
             f"/bus/{bus}/dyn/on",
             f"/bus/{bus}/dyn/mdl",
-            f"/bus/{bus}/dyn/thr37",
+            f"/bus/{bus}/dyn/thr",
             f"/bus/{bus}/dyn/ratio",
             f"/bus/{bus}/dyn/knee",
             f"/bus/{bus}/dyn/det",
@@ -2154,7 +2212,11 @@ class WingClient(MixerClientBase):
             "eq_bands": eq_bands,
             "compressor_enabled": self.state.get(f"/bus/{bus}/dyn/on"),
             "compressor_model": self.state.get(f"/bus/{bus}/dyn/mdl"),
-            "compressor_threshold_db": self.state.get(f"/bus/{bus}/dyn/thr37"),
+            "compressor_threshold_db": (
+                self.state.get(f"/bus/{bus}/dyn/thr")
+                if self.state.get(f"/bus/{bus}/dyn/thr") is not None
+                else self.state.get(f"/bus/{bus}/dyn/thr37")
+            ),
             "compressor_ratio": self.state.get(f"/bus/{bus}/dyn/ratio"),
             "compressor_knee": self.state.get(f"/bus/{bus}/dyn/knee"),
             "compressor_detector": self.state.get(f"/bus/{bus}/dyn/det"),
@@ -2292,12 +2354,24 @@ class WingClient(MixerClientBase):
                 active_bus_sends.append(send_state)
 
         tags = self.state.get(f"/ch/{channel}/tags")
+        readback_presence = {
+            "fader": self.state.get(f"/ch/{channel}/fdr") is not None,
+            "mute": self.state.get(f"/ch/{channel}/mute") is not None,
+            "main_send_on": self.state.get(f"/ch/{channel}/main/1/on") is not None,
+            "main_send_level": self.state.get(f"/ch/{channel}/main/1/lvl") is not None,
+            "main_send_pre": self.state.get(f"/ch/{channel}/main/1/pre") is not None,
+            "input_main_group": self.state.get(f"/ch/{channel}/in/conn/grp") is not None,
+            "input_main_channel": self.state.get(f"/ch/{channel}/in/conn/in") is not None,
+            "input_alt_group": self.state.get(f"/ch/{channel}/in/conn/altgrp") is not None,
+            "input_alt_channel": self.state.get(f"/ch/{channel}/in/conn/altin") is not None,
+            "tags": self.state.get(f"/ch/{channel}/tags") is not None,
+        }
 
         return {
             "channel": channel,
             "name": self.get_channel_name(channel),
             "fader_db": self.get_fader(channel),
-            "muted": self.get_mute(channel),
+            "muted": self.state.get(f"/ch/{channel}/mute"),
             "gain_db": self.get_channel_gain(channel) or 0.0,
             "pan": self.get_channel_pan(channel),
             "polarity_inverted": self.state.get(f"/ch/{channel}/in/set/inv"),
@@ -2318,6 +2392,7 @@ class WingClient(MixerClientBase):
             "active_bus_sends": active_bus_sends,
             "tags": tags,
             "dca_assignments": self._parse_dca_assignments(tags),
+            "readback_presence": readback_presence,
             "hpf_enabled": self.state.get(f"/ch/{channel}/flt/lc"),
             "hpf_freq": self.state.get(f"/ch/{channel}/flt/lcf"),
             "eq_on": self.get_eq_on(channel),

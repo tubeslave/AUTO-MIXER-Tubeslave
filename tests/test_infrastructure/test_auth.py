@@ -3,6 +3,7 @@ import pytest
 import os
 import sys
 import time
+import math
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
@@ -41,6 +42,38 @@ class TestAuthManager:
         assert am._token_digest(token) in am._tokens
         assert am.authenticate(token=token, client_id='automixer-ui') is True
         assert am.authenticate(token=token, client_id='other-client') is False
+
+    @pytest.mark.parametrize("expires_hours", [math.nan, math.inf, -1, "invalid"])
+    def test_register_token_rejects_invalid_expiry(self, expires_hours):
+        am = AuthManager(enabled=True)
+        with pytest.raises(ValueError, match="finite non-negative"):
+            am.register_token(
+                "operator-supplied-token",
+                client_id="automixer-ui",
+                expires_hours=expires_hours,
+            )
+
+    def test_token_expiry_returns_absolute_expiry_without_plaintext_storage(self):
+        am = AuthManager(enabled=True)
+        token = "operator-supplied-token"
+        before = time.time()
+        am.register_token(token, client_id="automixer-ui", expires_hours=1)
+
+        expires_at = am.token_expiry(token)
+
+        assert expires_at is not None
+        assert expires_at >= before + 3599
+        assert token not in repr(am._tokens)
+
+    def test_process_lifetime_token_remains_valid_without_absolute_expiry(self):
+        am = AuthManager(enabled=True)
+        token = "process-lifetime-token"
+        am.register_token(token, client_id="automixer-ui", expires_hours=None)
+
+        assert am.authenticate(token=token, client_id="automixer-ui") is True
+        assert am.token_expiry(token) is None
+        am.cleanup_expired()
+        assert am.validate_token(token) is True
 
     def test_validate_token_when_disabled(self):
         """Token validation always returns True when auth is disabled."""

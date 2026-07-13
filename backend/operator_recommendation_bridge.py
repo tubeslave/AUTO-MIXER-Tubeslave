@@ -7,6 +7,7 @@ handlers decide what is allowed by the current operator mode.
 
 from __future__ import annotations
 
+import copy
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -739,11 +740,43 @@ def build_soundcheck_operator_proposals(
     if not isinstance(items, list):
         return []
 
+    transaction_bundle = bundle.get("supervised_transaction_plans")
+    transaction_plans = (
+        transaction_bundle.get("plans")
+        if isinstance(transaction_bundle, dict)
+        else None
+    )
+    transaction_change_keys = set()
+    if isinstance(transaction_plans, list):
+        for plan in transaction_plans:
+            if not isinstance(plan, dict):
+                continue
+            for operation in plan.get("operations") or []:
+                if not isinstance(operation, dict):
+                    continue
+                write_kind = str(operation.get("write_kind") or "").strip()
+                channel = _coerce_int(operation.get("channel"))
+                target = _coerce_float(operation.get("target_value"))
+                if write_kind in {"gain", "fader"} and channel is not None and target is not None:
+                    transaction_change_keys.add((write_kind, channel, round(target, 4)))
+
     proposals: List[Dict[str, Any]] = []
     for index, item in enumerate(items):
         if not isinstance(item, dict):
             continue
         kind, requested_change = _soundcheck_kind_and_change(item)
+        if requested_change:
+            change_key = (
+                str(requested_change.get("value_type") or ""),
+                _coerce_int(requested_change.get("channel")),
+                round(float(requested_change.get("value")), 4),
+            )
+            if change_key in transaction_change_keys:
+                # The supervised child is the sole apply surface. Retaining a
+                # second generic gain/fader row makes one logical correction
+                # appear independently successful while the manifest remains
+                # incomplete.
+                continue
         target_dict = item.get("target") if isinstance(item.get("target"), dict) else {}
         item_id = item.get("proposal_id") or item.get("recommendation_id") or item.get("id") or f"{index + 1}"
         mode = str(item.get("mode") or _source_payload(item).get("mode") or "")
@@ -771,6 +804,70 @@ def build_soundcheck_operator_proposals(
         }
         gated = _gate_proposal_cache_freshness(proposal, mixer_client)
         proposals.append(_attach_operator_correction(gated, method_id="auto_soundcheck_engine"))
+
+    if isinstance(transaction_plans, list):
+        for index, plan in enumerate(transaction_plans):
+            if not isinstance(plan, dict):
+                continue
+            transaction_id = str(
+                plan.get("transaction_id") or f"soundcheck-plan-{index + 1}"
+            )
+            operations = plan.get("operations")
+            if not isinstance(operations, list) or not operations:
+                continue
+            family_ids = sorted(
+                {
+                    str(operation.get("family_id") or "")
+                    for operation in operations
+                    if isinstance(operation, dict)
+                    and str(operation.get("family_id") or "")
+                }
+            )
+            separate = bool(plan.get("separate_approval_required"))
+            proposals.append(
+                {
+                    "id": transaction_id,
+                    "title": (
+                        f"Soundcheck {plan.get('stage') or 'review'}: {', '.join(family_ids)} "
+                        f"({len(operations)} operations)"
+                    ),
+                    "target": family_ids,
+                    "kind": "supervised_soundcheck_transaction",
+                    "severity": "high" if separate else "medium",
+                    "ttl_seconds": 300,
+                    "confidence": None,
+                    "source": source,
+                    "reason": str(
+                        plan.get("reason")
+                        or "Review the absolute soundcheck correction plan."
+                    ),
+                    "supervised_transaction_plan": copy.deepcopy(plan),
+                    "soundcheck_run_id": (
+                        transaction_bundle.get("run_id")
+                        if isinstance(transaction_bundle, dict)
+                        else None
+                    ),
+                    "soundcheck_plan_revision": (
+                        transaction_bundle.get("plan_revision")
+                        if isinstance(transaction_bundle, dict)
+                        else None
+                    ),
+                    "soundcheck_plan_fingerprint": (
+                        transaction_bundle.get("plan_fingerprint")
+                        if isinstance(transaction_bundle, dict)
+                        else None
+                    ),
+                    "soundcheck_stage": plan.get("stage"),
+                    "soundcheck_required_for": plan.get("required_for"),
+                    "logical_correction_ids": list(
+                        plan.get("logical_correction_ids") or []
+                    ),
+                    "transaction_family_ids": family_ids,
+                    "separate_approval_required": separate,
+                    "live_mixer_writes": False,
+                    "transport_policy": "proposal_only",
+                }
+            )
     return proposals
 
 
@@ -813,10 +910,17 @@ def import_operator_proposals(
         elif result.get("status") == "blocked":
             blocked_count += 1
 
+    if blocked_count == 0:
+        import_status = "ok"
+    elif blocked_count == len(proposals):
+        import_status = "blocked"
+    else:
+        import_status = "partial"
     return {
         "type": "operator_proposals_imported",
-        "status": "ok",
-        "success": blocked_count < len(proposals) if proposals else True,
+        "status": import_status,
+        "success": blocked_count == 0,
+        "complete": blocked_count == 0,
         "source": source,
         "operator_mode": operator_mode,
         "imported_count": len(proposals),

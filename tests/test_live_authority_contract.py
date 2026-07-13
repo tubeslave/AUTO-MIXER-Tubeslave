@@ -41,8 +41,9 @@ def test_remote_websocket_bind_is_fail_closed_and_local_default_is_loopback():
     source = _source("backend/server.py")
 
     assert 'os.environ.get("AUTOMIXER_WS_HOST", "127.0.0.1")' in source
-    assert "Remote WebSocket bind requires AUTOMIXER_WS_AUTH_TOKEN" in source
-    assert "if not await self._authenticate_websocket(websocket)" in source
+    assert "Non-loopback WebSocket binds are disabled" in source
+    assert "authenticated = await self._authenticate_websocket(websocket)" in source
+    assert "if not authenticated:\n            return" in source
 
 
 def test_only_physical_readback_can_close_manual_write_proof():

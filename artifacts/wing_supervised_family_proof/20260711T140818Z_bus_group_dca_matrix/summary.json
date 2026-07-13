@@ -1,0 +1,695 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+      "peak_dbfs": [
+        -17.6,
+        -17.7
+      ],
+      "timestamp_utc": "2026-07-11T14:08:18Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+      "peak_dbfs": [
+        -17.6,
+        -17.7
+      ],
+      "timestamp_utc": "2026-07-11T14:08:18Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+      "peak_dbfs": [
+        -17.6,
+        -17.7
+      ],
+      "timestamp_utc": "2026-07-11T14:08:18Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+      "peak_dbfs": [
+        -15.4,
+        -15.4
+      ],
+      "timestamp_utc": "2026-07-11T14:08:18Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "bus_group_dca_matrix",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:bus_group_dca_matrix:bus_fader_down",
+    "proof:bus_group_dca_matrix:dca_fader_down",
+    "proof:bus_group_dca_matrix:bus_eq_cut",
+    "proof:bus_group_dca_matrix:bus_compressor_threshold_down"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:bus_group_dca_matrix:bus_fader_down",
+      "proof:bus_group_dca_matrix:dca_fader_down",
+      "proof:bus_group_dca_matrix:bus_eq_cut",
+      "proof:bus_group_dca_matrix:bus_compressor_threshold_down"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/bus/1/fdr",
+                "sent": true,
+                "value": -8.69999885559082
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/fdr": {
+                "address": "/bus/1/fdr",
+                "args": [
+                  "-8.7",
+                  0.5325000286102295,
+                  -8.69999885559082
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -8.69999885559082
+              }
+            },
+            "values": {
+              "/bus/1/fdr": -8.69999885559082
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+            "peak_dbfs": [
+              -17.6,
+              -17.7
+            ],
+            "timestamp_utc": "2026-07-11T14:08:18Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/dca/1/fdr",
+                "sent": true,
+                "value": -144.0
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/dca/1/fdr": {
+                "address": "/dca/1/fdr",
+                "args": [
+                  "-oo",
+                  0.0,
+                  -144.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -144.0
+              }
+            },
+            "values": {
+              "/dca/1/fdr": -144.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+            "peak_dbfs": [
+              -17.6,
+              -17.7
+            ],
+            "timestamp_utc": "2026-07-11T14:08:18Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/bus/1/eq/4f",
+                "sent": true,
+                "value": 1499.788330078125
+              },
+              {
+                "address": "/bus/1/eq/4g",
+                "sent": true,
+                "value": -0.5
+              },
+              {
+                "address": "/bus/1/eq/4q",
+                "sent": true,
+                "value": 0.9979702234268188
+              },
+              {
+                "address": "/bus/1/eq/on",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/eq/4f": {
+                "address": "/bus/1/eq/4f",
+                "args": [
+                  "1k50",
+                  0.625,
+                  1499.788330078125
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1499.788330078125
+              },
+              "/bus/1/eq/4g": {
+                "address": "/bus/1/eq/4g",
+                "args": [
+                  "-0.5",
+                  0.44466668367385864,
+                  -0.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -0.5
+              },
+              "/bus/1/eq/4q": {
+                "address": "/bus/1/eq/4q",
+                "args": [
+                  "1.00",
+                  0.2611111104488373,
+                  0.9979702234268188
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.9979702234268188
+              },
+              "/bus/1/eq/on": {
+                "address": "/bus/1/eq/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "values": {
+              "/bus/1/eq/4f": 1499.788330078125,
+              "/bus/1/eq/4g": -0.5,
+              "/bus/1/eq/4q": 0.9979702234268188,
+              "/bus/1/eq/on": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+            "peak_dbfs": [
+              -17.6,
+              -17.7
+            ],
+            "timestamp_utc": "2026-07-11T14:08:18Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/bus/1/dyn/thr",
+                "sent": true,
+                "value": -31.0
+              },
+              {
+                "address": "/bus/1/dyn/ratio",
+                "sent": true,
+                "value": "2.0"
+              },
+              {
+                "address": "/bus/1/dyn/att",
+                "sent": true,
+                "value": 30.0
+              },
+              {
+                "address": "/bus/1/dyn/rel",
+                "sent": true,
+                "value": 152.565185546875
+              },
+              {
+                "address": "/bus/1/dyn/gain",
+                "sent": true,
+                "value": 3.0
+              },
+              {
+                "address": "/bus/1/dyn/on",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/dyn/att": {
+                "address": "/bus/1/dyn/att",
+                "args": [
+                  "30",
+                  0.25,
+                  30.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 30.0
+              },
+              "/bus/1/dyn/gain": {
+                "address": "/bus/1/dyn/gain",
+                "args": [
+                  "3.0",
+                  0.5,
+                  3.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 3.0
+              },
+              "/bus/1/dyn/on": {
+                "address": "/bus/1/dyn/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/bus/1/dyn/ratio": {
+                "address": "/bus/1/dyn/ratio",
+                "args": [
+                  "2.0",
+                  0.3125,
+                  2.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 2.0
+              },
+              "/bus/1/dyn/rel": {
+                "address": "/bus/1/dyn/rel",
+                "args": [
+                  "153",
+                  0.5271317958831787,
+                  152.565185546875
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 152.565185546875
+              },
+              "/bus/1/dyn/thr": {
+                "address": "/bus/1/dyn/thr",
+                "args": [
+                  "-31.0",
+                  0.4833333194255829,
+                  -31.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -31.0
+              }
+            },
+            "values": {
+              "/bus/1/dyn/att": 30.0,
+              "/bus/1/dyn/gain": 3.0,
+              "/bus/1/dyn/on": 1,
+              "/bus/1/dyn/ratio": 2.0,
+              "/bus/1/dyn/rel": 152.565185546875,
+              "/bus/1/dyn/thr": -31.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+            "peak_dbfs": [
+              -15.4,
+              -15.4
+            ],
+            "timestamp_utc": "2026-07-11T14:08:18Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/dyn/att": {
+                "address": "/bus/1/dyn/att",
+                "args": [
+                  "30",
+                  0.25,
+                  30.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 30.0
+              },
+              "/bus/1/dyn/gain": {
+                "address": "/bus/1/dyn/gain",
+                "args": [
+                  "3.0",
+                  0.5,
+                  3.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 3.0
+              },
+              "/bus/1/dyn/on": {
+                "address": "/bus/1/dyn/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/bus/1/dyn/ratio": {
+                "address": "/bus/1/dyn/ratio",
+                "args": [
+                  "2.0",
+                  0.3125,
+                  2.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 2.0
+              },
+              "/bus/1/dyn/rel": {
+                "address": "/bus/1/dyn/rel",
+                "args": [
+                  "153",
+                  0.5271317958831787,
+                  152.565185546875
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 152.565185546875
+              },
+              "/bus/1/dyn/thr": {
+                "address": "/bus/1/dyn/thr",
+                "args": [
+                  "-30.5",
+                  0.49166667461395264,
+                  -30.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -30.5
+              }
+            },
+            "restored": {
+              "/bus/1/dyn/att": 30.0,
+              "/bus/1/dyn/gain": 3.0,
+              "/bus/1/dyn/on": 1,
+              "/bus/1/dyn/ratio": 2.0,
+              "/bus/1/dyn/rel": 152.565185546875,
+              "/bus/1/dyn/thr": -30.5
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_eq_cut",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/eq/4f": {
+                "address": "/bus/1/eq/4f",
+                "args": [
+                  "1k50",
+                  0.625,
+                  1499.788330078125
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1499.788330078125
+              },
+              "/bus/1/eq/4g": {
+                "address": "/bus/1/eq/4g",
+                "args": [
+                  "0.0",
+                  0.5,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/bus/1/eq/4q": {
+                "address": "/bus/1/eq/4q",
+                "args": [
+                  "1.00",
+                  0.2611111104488373,
+                  0.9979702234268188
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.9979702234268188
+              },
+              "/bus/1/eq/on": {
+                "address": "/bus/1/eq/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "restored": {
+              "/bus/1/eq/4f": 1499.788330078125,
+              "/bus/1/eq/4g": 0.0,
+              "/bus/1/eq/4q": 0.9979702234268188,
+              "/bus/1/eq/on": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:dca_fader_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/dca/1/fdr": {
+                "address": "/dca/1/fdr",
+                "args": [
+                  "-oo",
+                  0.0,
+                  -144.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -144.0
+              }
+            },
+            "restored": {
+              "/dca/1/fdr": -144.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:bus_group_dca_matrix:bus_fader_down",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/bus/1/fdr": {
+                "address": "/bus/1/fdr",
+                "args": [
+                  "-8.2",
+                  0.5450000166893005,
+                  -8.19999885559082
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -8.19999885559082
+              }
+            },
+            "restored": {
+              "/bus/1/fdr": -8.19999885559082
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:bus_group_dca_matrix:bus_compressor_threshold_down",
+      "proof:bus_group_dca_matrix:bus_eq_cut",
+      "proof:bus_group_dca_matrix:dca_fader_down",
+      "proof:bus_group_dca_matrix:bus_fader_down"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:bus_group_dca_matrix:2026-07-11T14:08:18Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:08:18Z",
+  "wing_ip": "192.168.1.102"
+}

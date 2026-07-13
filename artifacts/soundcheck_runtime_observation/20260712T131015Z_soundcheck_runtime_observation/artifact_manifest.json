@@ -1,0 +1,19 @@
+{
+  "events": {
+    "path": "artifacts/soundcheck_runtime_observation/20260712T131015Z_soundcheck_runtime_observation/events.jsonl",
+    "sha256": "ae673d4d55f65d9fb16e2b240ff22825f46a1a4b7ba6900e8e383c30e79d996a",
+    "size": 7630946
+  },
+  "live_authority_granted": false,
+  "live_write": false,
+  "mutates_console_state": false,
+  "read_only": true,
+  "readiness_closure_allowed": false,
+  "run_id": "20260712T131015Z_soundcheck_runtime_observation",
+  "schema": "soundcheck_runtime_observation_artifact_manifest.v1",
+  "summary": {
+    "path": "artifacts/soundcheck_runtime_observation/20260712T131015Z_soundcheck_runtime_observation/summary.json",
+    "sha256": "f8df605f7133f8f542f51eb035a0b5bffe26a799d0b3531141c514b15d96683c",
+    "size": 16401
+  }
+}

@@ -11,7 +11,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, is_dataclass
 from enum import Enum
 import json
+import os
 from pathlib import Path
+import pwd
 import time
 from typing import Any, Callable, Dict, Optional, Set, Tuple
 
@@ -61,6 +63,40 @@ DEFAULT_PROMOTED_ACTION_TYPES = {
     "PolarityAdjust": False,
     "SendLevelAdjust": False,
 }
+
+
+def resolve_correction_artifact_path(value: Any) -> Optional[Path]:
+    """Resolve runtime events outside the checkout, independent of cwd."""
+
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+    relative_path = Path(raw_value)
+    if relative_path.is_absolute() or ".." in relative_path.parts:
+        raise ValueError(
+            "Correction action artifact_path must be a relative runtime path"
+        )
+
+    test_override = os.environ.get(
+        "AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR"
+    ) or os.environ.get("AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR")
+    if test_override:
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
+            raise RuntimeError(
+                "AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR is allowed only under pytest"
+            )
+        runtime_root = Path(test_override).expanduser().resolve()
+    else:
+        runtime_root = (
+            Path(pwd.getpwuid(os.getuid()).pw_dir)
+            / ".automixer"
+            / "runtime"
+        ).resolve()
+
+    resolved = (runtime_root / relative_path).resolve()
+    if resolved == runtime_root or not resolved.is_relative_to(runtime_root):
+        raise ValueError("Correction action artifact_path escapes the runtime directory")
+    return resolved
 
 
 def _normalize(value: Any) -> Any:
@@ -250,6 +286,9 @@ class GatedCorrectionActionExecutor:
     ) -> None:
         self.safety_controller = safety_controller
         self.config = config or CorrectionActionExecutorConfig()
+        self._artifact_path = resolve_correction_artifact_path(
+            self.config.artifact_path
+        )
         self.event_logger = event_logger
         self.time_provider = time_provider or time.time
         self._demoted_action_types: Set[str] = set()
@@ -916,11 +955,11 @@ class GatedCorrectionActionExecutor:
             except Exception:
                 pass
 
-        if not self.config.artifact_path:
+        if self._artifact_path is None:
             return
-        path = Path(self.config.artifact_path)
+        path = self._artifact_path
         try:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             event = {
                 "timestamp": self.time_provider(),
                 "event_type": event_type,

@@ -1,24 +1,100 @@
 """Auto soundcheck message handlers."""
 
 import asyncio
+import copy
 import logging
 
+from audio_capture import LIVE_CAPTURE_MAX_CHANNELS
 from auto_soundcheck_engine import AutoSoundcheckEngine
+from soundcheck_mix_readiness import (
+    build_proposal_only_readiness,
+    plan_preflight_assessment,
+)
+from supervised_console_parameter_registry import (
+    supervised_console_family_registry,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def register_handlers(server):
+    def _engine_cleanup_incomplete():
+        engine = server.auto_soundcheck_engine
+        state = getattr(getattr(engine, "state", None), "value", None)
+        return bool(
+            engine is not None
+            and state in ("error", "stopped")
+            and getattr(engine, "_stop_cleanup_complete", False) is not True
+        )
+
     def _engine_is_active():
         engine = server.auto_soundcheck_engine
         state = getattr(getattr(engine, "state", None), "value", None)
-        return bool(engine and state not in ("stopped", "error"))
+        engine_thread = getattr(engine, "_engine_thread", None)
+        monitor_thread = getattr(engine, "_monitor_thread", None)
+        cleanup_complete = getattr(engine, "_stop_cleanup_complete", False) is True
+        thread_alive = any(
+            thread is not None
+            and callable(getattr(thread, "is_alive", None))
+            and thread.is_alive() is True
+            for thread in (engine_thread, monitor_thread)
+        )
+        return bool(
+            engine
+            and (
+                not cleanup_complete
+                or thread_alive
+                or state not in ("stopped", "error")
+            )
+        )
 
     def _channel_selection(data):
+        autofoh = server.config.get("autofoh", {}) if isinstance(server.config, dict) else {}
+        measurement_taps = autofoh.get("measurement_taps", {}) or {}
+        raw_map = measurement_taps.get("raw_channels", {}) or {}
+        try:
+            source_channel_count = int(raw_map.get("channels", 16))
+        except (TypeError, ValueError):
+            source_channel_count = 16
+        source_channel_count = max(1, min(source_channel_count, 48))
+
+        capture_indices = [48]
+        for key in ("raw_channels", "postfader_channels"):
+            mapping = measurement_taps.get(key, {}) or {}
+            try:
+                first = int(mapping.get("first_usb", 1))
+                count = int(mapping.get("channels", 0))
+            except (TypeError, ValueError):
+                continue
+            if first > 0 and count > 0:
+                capture_indices.append(first + count - 1)
+        for mapping in (measurement_taps.get("stem_buses", {}) or {}).values():
+            if isinstance(mapping, dict):
+                capture_indices.extend(
+                    int(value)
+                    for value in mapping.get("usb", [])
+                    if isinstance(value, int) and not isinstance(value, bool)
+                )
+        capture_indices.extend(
+            int(value)
+            for value in measurement_taps.get("main_prefader", []) or []
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        master_mix = autofoh.get("master_mix", {}) or {}
+        capture_indices.extend(
+            int(value)
+            for value in master_mix.get("capture_channels", [47, 48]) or []
+            if isinstance(value, int) and not isinstance(value, bool)
+        )
+        num_channels = max(capture_indices)
+
         raw_channels = data.get("channels", [])
         if isinstance(raw_channels, int):
-            selected_channels = []
-            num_channels = max(raw_channels, 1)
+            if isinstance(raw_channels, bool) or raw_channels < 1:
+                raise ValueError("AutoSoundcheck source channel count must be positive")
+            selected_channels = list(
+                range(1, min(raw_channels, source_channel_count) + 1)
+            )
         else:
             selected_channels = []
             for ch in raw_channels:
@@ -29,7 +105,22 @@ def register_handlers(server):
                 if channel > 0:
                     selected_channels.append(channel)
             selected_channels = sorted(set(selected_channels))
-            num_channels = max(selected_channels) if selected_channels else 48
+            if not selected_channels:
+                selected_channels = list(range(1, source_channel_count + 1))
+        invalid_sources = [
+            channel
+            for channel in selected_channels
+            if channel > source_channel_count
+        ]
+        if invalid_sources:
+            raise ValueError(
+                "AutoSoundcheck selected channels are outside the configured "
+                f"raw source map 1..{source_channel_count}: {invalid_sources}"
+            )
+        if num_channels > LIVE_CAPTURE_MAX_CHANNELS:
+            raise ValueError(
+                f"AutoSoundcheck channels must be within 1..{LIVE_CAPTURE_MAX_CHANNELS}"
+            )
         return selected_channels, num_channels
 
     def _schedule(loop, coro, label):
@@ -55,6 +146,29 @@ def register_handlers(server):
 
     async def _start_engine(websocket, data, *, soundcheck_events: bool):
         """Start the new AutoSoundcheckEngine as the canonical soundcheck path."""
+        if getattr(server, "_packaged_offline_lock", False):
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": False,
+                "running": False,
+                "observe_only": True,
+                "proposal_only": True,
+                "reason": "packaged_offline_lock_active",
+                "packaged_offline_lock": True,
+            })
+            return
+        if _engine_cleanup_incomplete():
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": False,
+                "running": False,
+                "cleanup_complete": False,
+                "error": "Auto soundcheck cleanup is incomplete",
+                "reason": "auto_soundcheck_cleanup_incomplete",
+            })
+            return
         if _engine_is_active():
             await server.send_to_client(websocket, {
                 "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
@@ -66,7 +180,20 @@ def register_handlers(server):
 
         mixer_config = server.config.get("mixer", {})
         audio_config = server.config.get("audio", {})
-        selected_channels, num_channels = _channel_selection(data)
+        try:
+            selected_channels, num_channels = _channel_selection(data)
+        except (TypeError, ValueError) as exc:
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": False,
+                "running": False,
+                "observe_only": True,
+                "proposal_only": True,
+                "error": str(exc),
+                "reason": "invalid_audio_capture_dimensions",
+            })
+            return
 
         mixer_type = data.get("mixer_type", mixer_config.get("type", "dlive"))
         mixer_ip = data.get("mixer_ip", mixer_config.get("ip", "192.168.3.70"))
@@ -135,42 +262,146 @@ def register_handlers(server):
             recommendation_import["done"] = True
             if not hasattr(server, "import_soundcheck_recommendations_to_operator_queue"):
                 return
+            if getattr(server, "auto_soundcheck_engine", None) is not engine:
+                await server.broadcast({
+                    "type": "operator_proposals_imported",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "soundcheck_engine_superseded",
+                    "trigger": "auto_soundcheck_state",
+                    "trigger_state": trigger_state,
+                })
+                return
             bundle = None
             if hasattr(engine, "get_soundcheck_recommendation_bundle"):
                 bundle = engine.get_soundcheck_recommendation_bundle()
-            summary = server.import_soundcheck_recommendations_to_operator_queue(bundle)
+            manifest = (
+                bundle.get("supervised_transaction_plans")
+                if isinstance(bundle, dict)
+                else None
+            )
+            preflight_manifest = getattr(
+                server,
+                "preflight_soundcheck_manifest",
+                None,
+            )
+            if isinstance(manifest, dict) and callable(preflight_manifest):
+                assessment = await preflight_manifest(manifest)
+                if getattr(server, "auto_soundcheck_engine", None) is not engine:
+                    await server.broadcast({
+                        "type": "operator_proposals_imported",
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "soundcheck_engine_superseded",
+                        "trigger": "auto_soundcheck_state",
+                        "trigger_state": trigger_state,
+                    })
+                    return
+                assessments_by_operation = {
+                    str(item.get("operation_id") or ""): dict(item)
+                    for item in assessment.get("assessments") or []
+                    if isinstance(item, dict)
+                }
+                manifest = copy.deepcopy(manifest)
+                manifest["plans"] = [
+                    {
+                        **dict(plan),
+                        "preflight_assessment": plan_preflight_assessment(
+                            plan,
+                            assessments_by_operation,
+                        ),
+                    }
+                    for plan in manifest.get("plans") or []
+                    if isinstance(plan, dict)
+                ]
+                bundle = {
+                    **dict(bundle),
+                    "supervised_transaction_plans": manifest,
+                    "soundcheck_preflight": assessment,
+                }
+            summary = server.import_soundcheck_recommendations_to_operator_queue(
+                bundle,
+                trusted_engine_bundle=True,
+            )
+            finalized = None
+            finalize_without_apply = getattr(
+                server,
+                "finalize_soundcheck_readiness_if_no_apply",
+                None,
+            )
+            if isinstance(manifest, dict) and callable(finalize_without_apply):
+                finalized = await finalize_without_apply(
+                    str(manifest.get("run_id") or "")
+                )
+            if isinstance(finalized, dict):
+                summary["soundcheck_readiness"] = dict(finalized)
+            summary["recommendation_derivation_complete"] = bool(
+                getattr(engine, "_derivation_complete", False)
+            )
             summary.update({
                 "trigger": "auto_soundcheck_state",
                 "trigger_state": trigger_state,
             })
             await server.broadcast(summary)
 
-        engine = AutoSoundcheckEngine(
-            mixer_type=mixer_type,
-            mixer_ip=mixer_ip,
-            mixer_port=mixer_port,
-            audio_device_name=audio_device,
-            num_channels=num_channels,
-            selected_channels=selected_channels,
-            observe_only=observe_only,
-            auto_apply=False,
-            on_state_change=on_state,
-            on_channel_update=on_channel,
-            on_observation=on_observation,
-            mixer_client=(
-                server.mixer_client
-                if getattr(getattr(server, "mixer_client", None), "is_connected", False)
-                else None
-            ),
-            audio_capture=(
-                server.audio_capture
-                if getattr(getattr(server, "audio_capture", None), "running", False)
-                else None
-            ),
-        )
-        server.auto_soundcheck_engine = engine
-        server.auto_soundcheck_running = True
-        server.auto_soundcheck_observe_only = observe_only
+        conflict = None
+        async with server._audio_capture_lock:
+            measurement_task = getattr(server, "_system_measurement_task", None)
+            if measurement_task is not None and not measurement_task.done():
+                conflict = "audio_capture_in_use_by_system_measurement"
+            elif getattr(server, "audio_capture", None) is not None:
+                conflict = "audio_capture_in_use_by_preview"
+            elif _engine_is_active():
+                conflict = "auto_soundcheck_already_running"
+            else:
+                # Reserve the capture authority before releasing the lock. The
+                # engine owns its private capture; server preview/measurement
+                # capture is never borrowed across lifecycle boundaries.
+                server.auto_soundcheck_running = True
+                server.auto_soundcheck_observe_only = observe_only
+
+        if conflict is not None:
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": bool(server.auto_soundcheck_running),
+                "running": bool(server.auto_soundcheck_running),
+                "observe_only": True,
+                "proposal_only": True,
+                "error": conflict,
+                "reason": conflict,
+            })
+            return
+
+        engine = None
+        try:
+            engine = AutoSoundcheckEngine(
+                mixer_type=mixer_type,
+                mixer_ip=mixer_ip,
+                mixer_port=mixer_port,
+                audio_device_name=audio_device,
+                num_channels=num_channels,
+                selected_channels=selected_channels,
+                observe_only=observe_only,
+                auto_apply=False,
+                on_state_change=on_state,
+                on_channel_update=on_channel,
+                on_observation=on_observation,
+                mixer_client=(
+                    server.mixer_client
+                    if getattr(getattr(server, "mixer_client", None), "is_connected", False)
+                    else None
+                ),
+                audio_capture=None,
+            )
+            server.auto_soundcheck_engine = engine
+        except BaseException:
+            async with server._audio_capture_lock:
+                if server.auto_soundcheck_engine is engine:
+                    server.auto_soundcheck_engine = None
+                server.auto_soundcheck_running = False
+                server.auto_soundcheck_observe_only = False
+            raise
 
         original_on_state = on_state
 
@@ -184,7 +415,15 @@ def register_handlers(server):
                 )
 
         engine.on_state_change = on_state_with_recommendation_import
-        engine.start_async()
+        try:
+            engine.start_async()
+        except BaseException:
+            async with server._audio_capture_lock:
+                if server.auto_soundcheck_engine is engine:
+                    server.auto_soundcheck_engine = None
+                server.auto_soundcheck_running = False
+                server.auto_soundcheck_observe_only = False
+            raise
 
         live_action_config = getattr(engine, "correction_executor_config", None)
         await server.send_to_client(websocket, {
@@ -209,11 +448,7 @@ def register_handlers(server):
         await _start_engine(websocket, data, soundcheck_events=True)
 
     async def handle_stop_auto_soundcheck(websocket, data):
-        if server.auto_soundcheck_engine:
-            server.auto_soundcheck_engine.stop()
-            server.auto_soundcheck_engine = None
-        server.auto_soundcheck_running = False
-        server.auto_soundcheck_observe_only = False
+        await server._stop_auto_soundcheck_engine_async(observe_only=False)
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status",
             "is_running": False,
@@ -223,7 +458,87 @@ def register_handlers(server):
         })
 
     async def handle_get_auto_soundcheck_status(websocket, data):
-        engine_status = server.auto_soundcheck_engine.get_status() if server.auto_soundcheck_engine else {}
+        refresh_readiness = getattr(
+            server,
+            "refresh_soundcheck_readiness_truth",
+            None,
+        )
+        if callable(refresh_readiness):
+            refresh_readiness()
+        engine = server.auto_soundcheck_engine
+        engine_status = (
+            await asyncio.to_thread(engine.get_status)
+            if engine is not None
+            else {}
+        )
+        if isinstance(engine_status, dict) and isinstance(
+            engine_status.get("soundcheck_readiness"),
+            dict,
+        ):
+            engine_readiness = dict(engine_status["soundcheck_readiness"])
+            retained_readiness = getattr(server, "last_soundcheck_readiness", {})
+            retained_is_aggregate = bool(
+                isinstance(retained_readiness, dict)
+                and retained_readiness.get("run_id") == engine_readiness.get("run_id")
+                and retained_readiness.get("plan_revision")
+                == engine_readiness.get("plan_revision")
+                and retained_readiness.get("plan_fingerprint")
+                == engine_readiness.get("plan_fingerprint")
+                and retained_readiness.get("proposal_only") is False
+            )
+            if retained_is_aggregate:
+                engine_status = dict(engine_status)
+                engine_status["soundcheck_readiness"] = dict(retained_readiness)
+            else:
+                server.last_soundcheck_readiness = engine_readiness
+        # The full AutoFOH session report can contain analyzer evidence measured
+        # in hundreds of megabytes. Status polling is a bounded control-plane
+        # surface; the report remains available through its dedicated artifact.
+        if isinstance(engine_status, dict) and engine_status.get("autofoh_session_report"):
+            engine_status = dict(engine_status)
+            engine_status["autofoh_session_report_available"] = True
+            engine_status.pop("autofoh_session_report", None)
+        if not engine_status:
+            family_registry = supervised_console_family_registry()
+            retained_readiness = getattr(server, "last_soundcheck_readiness", None)
+            if not isinstance(retained_readiness, dict) or not retained_readiness:
+                retained_readiness = build_proposal_only_readiness(
+                    {
+                        "run_id": "idle",
+                        "plan_revision": 1,
+                        "plan_fingerprint": "",
+                        "plans": [],
+                        "unsupported_actions": [],
+                    }
+                )
+            engine_status = {
+                "state": "idle",
+                "mixer_connected": bool(
+                    getattr(server, "mixer_client", None)
+                    and getattr(server.mixer_client, "is_connected", False)
+                ),
+                "audio_running": bool(
+                    getattr(server, "audio_capture", None)
+                    and getattr(server.audio_capture, "running", False)
+                ),
+                "supervised_transaction_plan_count": 0,
+                "supervised_transaction_operation_count": 0,
+                "soundcheck_readiness": retained_readiness,
+                "supervised_console_family_registry": family_registry,
+                "supervised_console_live_allowed_families": sorted(
+                    family_id
+                    for family_id, contract in family_registry.items()
+                    if contract.get("normal_supervised_apply_allowed") is True
+                ),
+            }
+        readiness_for_replan = engine_status.get("soundcheck_readiness") or {}
+        replan_run_id = str(readiness_for_replan.get("run_id") or "")
+        public_replan = getattr(server, "_public_soundcheck_replan", None)
+        if callable(public_replan):
+            engine_status = dict(engine_status)
+            engine_status["soundcheck_replan"] = public_replan(
+                getattr(server, "_soundcheck_replan_drafts", {}).get(replan_run_id)
+            )
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status",
             "is_running": server.auto_soundcheck_running,
@@ -237,17 +552,93 @@ def register_handlers(server):
             **engine_status,
         })
 
+    async def handle_accept_soundcheck_replan(websocket, data):
+        accept_replan = getattr(server, "accept_soundcheck_replan_draft", None)
+        if not callable(accept_replan):
+            result = {
+                "type": "soundcheck_replan_result",
+                "status": "blocked",
+                "success": False,
+                "reason": "soundcheck_replan_path_unavailable",
+            }
+        else:
+            result = await accept_replan(
+                run_id=data.get("run_id"),
+                draft_id=data.get("draft_id"),
+                approved=data.get("approved") is True,
+                approval_id=data.get("approval_id"),
+            )
+        await server.send_to_client(websocket, result)
+
+    async def handle_reanalyze_soundcheck_stage(websocket, data):
+        reanalyze = getattr(server, "reanalyze_soundcheck_stage", None)
+        if not callable(reanalyze):
+            result = {
+                "type": "soundcheck_stage_reanalysis_result",
+                "status": "blocked",
+                "success": False,
+                "reason": "soundcheck_reanalysis_path_unavailable",
+                "live_authority_changed": False,
+            }
+        else:
+            result = await reanalyze(
+                run_id=data.get("run_id"),
+                approved=data.get("approved") is True,
+                approval_id=data.get("approval_id"),
+            )
+        await server.send_to_client(websocket, result)
+
+    async def handle_finalize_soundcheck_readiness(websocket, data):
+        run_id = str(data.get("run_id") or "").strip()
+        reconcile = getattr(server, "reconcile_soundcheck_readiness", None)
+        if not run_id or not callable(reconcile):
+            await server.send_to_client(
+                websocket,
+                {
+                    "type": "soundcheck_finalize_result",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": (
+                        "soundcheck_run_id_required"
+                        if not run_id
+                        else "soundcheck_reconciliation_path_unavailable"
+                    ),
+                    "run_id": run_id or None,
+                },
+            )
+            return
+        readiness = await reconcile(run_id)
+        if not isinstance(readiness, dict):
+            await server.send_to_client(
+                websocket,
+                {
+                    "type": "soundcheck_finalize_result",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "soundcheck_run_not_found",
+                    "run_id": run_id,
+                },
+            )
+            return
+        await server.send_to_client(
+            websocket,
+            {
+                "type": "soundcheck_finalize_result",
+                "status": "ok",
+                "success": True,
+                "run_id": run_id,
+                "live_write": False,
+                "soundcheck_readiness": readiness,
+            },
+        )
+
     async def handle_start_auto_engine(websocket, data):
         """Start the headless auto-soundcheck engine."""
         await _start_engine(websocket, data, soundcheck_events=False)
 
     async def handle_stop_auto_engine(websocket, data):
         """Stop the headless auto-soundcheck engine."""
-        if server.auto_soundcheck_engine:
-            server.auto_soundcheck_engine.stop()
-            server.auto_soundcheck_engine = None
-        server.auto_soundcheck_running = False
-        server.auto_soundcheck_observe_only = False
+        await server._stop_auto_soundcheck_engine_async(observe_only=False)
         await server.send_to_client(websocket, {
             "type": "auto_engine_status",
             "status": "stopped",
@@ -258,7 +649,9 @@ def register_handlers(server):
     async def handle_get_auto_engine_status(websocket, data):
         """Get auto-soundcheck engine status."""
         if server.auto_soundcheck_engine:
-            status = server.auto_soundcheck_engine.get_status()
+            status = await asyncio.to_thread(
+                server.auto_soundcheck_engine.get_status
+            )
         else:
             status = {"state": "idle", "mixer_connected": False, "audio_running": False}
         await server.send_to_client(websocket, {
@@ -315,6 +708,9 @@ def register_handlers(server):
         "start_auto_soundcheck": handle_start_auto_soundcheck,
         "stop_auto_soundcheck": handle_stop_auto_soundcheck,
         "get_auto_soundcheck_status": handle_get_auto_soundcheck_status,
+        "accept_soundcheck_replan": handle_accept_soundcheck_replan,
+        "reanalyze_soundcheck_stage": handle_reanalyze_soundcheck_stage,
+        "finalize_soundcheck_readiness": handle_finalize_soundcheck_readiness,
         "start_auto_engine": handle_start_auto_engine,
         "stop_auto_engine": handle_stop_auto_engine,
         "get_auto_engine_status": handle_get_auto_engine_status,

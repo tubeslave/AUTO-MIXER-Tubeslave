@@ -6,19 +6,26 @@
   "main": "public/electron.js",
   "homepage": "./",
   "private": true,
+  "packageManager": "npm@10.9.8",
+  "engines": {
+    "node": "22.22.3",
+    "npm": "10.9.8"
+  },
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@electron/asar": "3.4.1",
+    "@electron/osx-sign": "1.0.5",
     "@playwright/test": "^1.60.0",
     "@types/react": "^18.3.28",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.5.0",
     "concurrently": "^8.2.2",
-    "electron": "^28.0.0",
-    "electron-builder": "^24.9.1",
+    "electron": "43.1.0",
+    "electron-builder": "24.13.3",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.17",
     "typescript": "^6.0.3",
@@ -26,17 +33,21 @@
     "wait-on": "^7.2.0"
   },
   "scripts": {
-    "start": "vite --host 0.0.0.0",
+    "start": "vite --host 127.0.0.1",
     "build": "vite build",
-    "test": "node --test src/services/__tests__/websocketCore.test.mjs src/components/__tests__/autoSoundcheckSummary.test.mjs src/components/__tests__/dashboardReadOnlyContract.test.mjs src/components/__tests__/frontendTruthContract.regression-1.test.mjs src/components/__tests__/soundcheckCockpitContract.test.mjs src/services/__tests__/operatorAdaptersContract.test.mjs",
+    "test": "node --test src/services/__tests__/websocketCore.test.mjs src/services/__tests__/remoteAuthPolicy.test.mjs src/services/__tests__/electronSecurityContract.test.mjs src/services/__tests__/macosSigningContract.test.mjs src/services/__tests__/macosBuildProfilesContract.test.mjs src/services/__tests__/macosReleaseVerifier.test.mjs src/services/__tests__/packagingArchitecture.test.mjs src/services/__tests__/operatorStatusTone.test.mjs src/components/__tests__/autoSoundcheckSummary.test.mjs src/components/__tests__/dashboardReadOnlyContract.test.mjs src/components/__tests__/frontendTruthContract.regression-1.test.mjs src/components/__tests__/soundcheckCockpitContract.test.mjs src/services/__tests__/operatorAdaptersContract.test.mjs",
     "test:e2e": "playwright test",
+    "test:packaged-runtime": "node scripts/smoke-packaged-runtime.mjs",
+    "mac:local": "node scripts/build-macos.mjs --profile local",
+    "mac:release": "node scripts/build-macos.mjs --profile release",
+    "mac:verify-release": "node scripts/verify-macos-release.mjs",
     "electron": "electron .",
-    "electron:dev": "concurrently \"npm start\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run build:backend && npm run build && electron-builder",
-    "electron:build:mac": "npm run build:backend && npm run build && electron-builder --mac",
-    "dist:frontend": "npm run build && electron-builder --mac zip --dir --publish never",
-    "dist": "npm run build:backend && npm run dist:frontend",
-    "build:backend": "cd .. && ./build_backend.sh"
+    "electron:dev": "electron .",
+    "electron:build": "npm run mac:local",
+    "electron:build:mac": "npm run mac:local",
+    "dist:frontend": "npm run mac:local",
+    "dist": "npm run mac:local",
+    "build:backend": "cd .. && AUTOMIXER_TARGET_ARCH=arm64 ./build_backend.sh"
   },
   "eslintConfig": {
     "extends": [
@@ -58,16 +69,18 @@
   "build": {
     "appId": "com.automixer.wing",
     "productName": "AUTO MIXER Tubeslave",
+    "afterPack": "scripts/after-pack-macos.cjs",
     "files": [
       "build/**/*",
       "public/electron.js",
+      "public/electronSecurity.js",
       "public/preload.js",
       "public/icon.png"
     ],
     "extraResources": [
       {
         "from": "../backend/dist/server",
-        "to": "backend/server",
+        "to": "backend",
         "filter": [
           "**/*"
         ]
@@ -99,14 +112,12 @@
         {
           "target": "dmg",
           "arch": [
-            "x64",
             "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "x64",
             "arm64"
           ]
         }
@@ -116,7 +127,15 @@
       "gatekeeperAssess": false,
       "timestamp": null,
       "entitlements": "public/entitlements.mac.plist",
-      "entitlementsInherit": "public/entitlements.mac.plist"
+      "entitlementsInherit": "public/entitlements.mac.inherit.plist",
+      "sign": "scripts/sign-macos.cjs",
+      "strictVerify": true,
+      "extendInfo": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSAllowsLocalNetworking": true
+        }
+      }
     },
     "dmg": {
       "contents": [

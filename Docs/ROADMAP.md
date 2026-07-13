@@ -5,6 +5,50 @@ Status: active dependency-ordered roadmap
 Roadmap выбирается от текущего evidence state. Milestone считается валидным
 только если он finite, independently verifiable и имеет rollback.
 
+## Current full-project gate — 2026-07-12
+
+Local P1 overlay completed: the soundcheck parent is decomposed into semantic
+children; local blockers no longer poison siblings; bounded replans and the
+only currently trusted constructive substitute (complete down-only fader
+translation) are content-bound and approval-gated; final readiness is
+`safe_core_ready`, `show_mix_ready` or `soundcheck_incomplete` from fresh
+physical/audio evidence. Kernel score is `96/100`; strict real-live soundcheck
+is `88/100` because standing authority is zero and the current staged flow has
+not yet completed on the real console.
+
+The local reanalysis control plane is complete: candidate/commit/discard,
+default-deny observation shadow, immutable accepted-bundle identity and
+derivation+monitor+console-writer fencing are adversarially verified. This
+closes a local architectural blocker but grants no physical authority.
+
+Strict readiness is `88/100`, not `95/100`; public release ready is false and
+standing supervised live authority is empty. Local arm64 packaging and
+source-bound no-WING runtime smoke are verified, but the package is ad-hoc
+signed, dirty-tree-bound and `releaseEligible=false`.
+
+The next finite external sequence is intentionally narrow:
+
+1. rebind the already closed M005 behavioral artifact to current-source
+   provenance without another cable pull unless the owner explicitly asks;
+2. rerun the M006 technical verifier against that provenance and the already
+   recorded narrow owner decision, without widening any unproven family;
+3. perform an operator-present current-tree staged-child proof on the exact
+   WING, including source-path query latency, rollback and terminal
+   `safe_core_ready`/`show_mix_ready` evidence;
+4. separately complete clean-checkout reproduction, Developer ID/notary/
+   Gatekeeper, production remote-auth recovery and room/PA validation.
+
+Current blocker from `STATE.json`: The monolithic soundcheck defect is closed locally: staged execution kernel readiness is 96/100 and full-project local engineering remains 95/100. Strict real-live soundcheck readiness is 88/100 because the normal live allowlist is 0, the current-tree staged child flow has no physical WING completion proof, real safe_core_ready/show_mix_ready are unproven, source-path query latency is unproven, and EQ boost/compressor makeup/gain-up/send-up substitutions remain operator-review-only. M005 behavior is closed and narrow M006 owner intent is recorded, but current-source provenance and technical promotion remain fail-closed. Strict public-release readiness stays 88/100 and standing live authority remains denied.
+
+Next operator action from `STATE.json`: Do not widen live authority. Rebind the closed M005 disconnect/timeout/stale-state behavior to current-source provenance without another cable pull unless explicitly requested, rerun the M006 technical readiness review verifier against the recorded narrow owner decision, then perform an operator-present current-tree staged-child proof on the exact WING with source-path latency, rollback, safe_core_ready/show_mix_ready and room/PA evidence. Complete clean-checkout reproduction, Developer ID signing/notarization/Gatekeeper and production remote-auth recovery separately.
+
+Latest ledger handoff row: `soundcheck_atomic_reanalysis_final_validation` at `2026-07-12T22:48:19Z`.
+
+The detailed table below is a frozen dependency taxonomy, not the operational
+task selector; its old M002-M006 status labels are historical. Current release
+truth and the complete requirements before `95/100` are owned by
+`ops/autopilot/STATE.json.strict_pre_release_review`.
+
 ## Selection Rules
 
 Следующий milestone выбирается по порядку:
@@ -142,19 +186,20 @@ Current M001 waiting reason: the canonical WING read-only decision is
 `accepted_decision_ready`, and the supervised CH3 fader/gain-down proofs have
 passed with apply, physical readback, rollback and emergency-stop/block
 evidence. The earlier `rollback_not_applied` artifact remains closed audit
-history. No roadmap row advances to readiness or standing live authority until
-M005 disconnect/timeout/stale-state proof and M006 owner readiness review pass.
+history. M005 disconnect/timeout/stale-state behavior is closed and the narrow
+M006 owner decision is recorded; no roadmap row advances to standing live
+authority until current-source provenance and technical promotion pass.
 
 ## Current external validation requirements
 
-- Supervised WING disconnect/timeout/stale-state protection proof (M005) with operator present
-- Owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts (M006)
+- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
+- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
 
-Next operator action from `STATE.json`: Do not widen live authority beyond the proven narrow supervised fader/gain-down scope. Next: run the M005 supervised disconnect/timeout/stale-state protection proof with the operator present, then complete the M006 owner readiness review that updates the MVP readiness matrix from the accepted CH3 fader and gain-down proof artifacts; only after that reassess wider release scope.
+Next operator action from `STATE.json`: Do not widen live authority. Treat M005 disconnect/timeout/stale-state behavior as closed and the narrow M006 readiness review owner decision as recorded; do not repeat the physical cable pull unless the owner explicitly requests it. For public release, rebind or migrate the closed M005 evidence to a clean current-source provenance packet, rerun the M006 technical verifier, reproduce the package from a clean checkout, complete Developer ID signing/notarization/Gatekeeper checks, and perform operator-present room/PA audible rollback validation.
 
 Latest ledger handoff row:
-`m005_readback_target_binding_required` at
-`2026-07-05T02:51:16Z`. No live authority changed; release-ready live
+`local_engineering_95_final_tree_full_suite_no_wing_validation` at
+`2026-07-12T13:56:06Z`. No live authority changed; release-ready live
 correction families remain `0`, live-allowed safety rows remain `0`, and
 current supervised live-write kinds remain `0`.
 
@@ -170,7 +215,7 @@ checks and matching reconnect-recovery physical readback event checks from
 Latest M006 owner decision verifier: `5eda78126`; it requires a ready
 packet-verifier report with the current M005 stale-readback event-evidence
 checks, matching reconnect-recovery physical readback event checks and the
-accepted M005 summary sibling `events.jsonl` path. The current pending template
-blocks with
-`reason=m006_owner_decision_pending` and does not grant a readiness-matrix
-update.
+accepted M005 summary sibling `events.jsonl` path. The owner decision is
+recorded, but technical promotion blocks with
+`reason=m006_owner_decision_failed_closed` because current-source M005
+provenance is not accepted; it does not grant a readiness-matrix update.

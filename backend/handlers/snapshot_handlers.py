@@ -20,7 +20,7 @@ def register_handlers(server):
                     source="manual_ui",
                     operation=operation,
                     dry_run=data.get("dry_run"),
-                    confirm_maintenance=bool(data.get("confirm_maintenance", False)),
+                    confirm_maintenance=data.get("confirm_maintenance") is True,
                     rollback_snapshot_path=data.get("rollback_snapshot_path"),
                     target={"snap_name": snap_name},
                     metadata={"handler": f"snapshot:{method_name}"},
@@ -126,7 +126,7 @@ def register_handlers(server):
             websocket,
             data.get("snapshot_path"),
             dry_run=data.get("dry_run"),
-            confirm_maintenance=bool(data.get("confirm_maintenance", False)),
+            confirm_maintenance=data.get("confirm_maintenance") is True,
             rollback_snapshot_path=data.get("rollback_snapshot_path"),
             source=data.get("source") or "manual_ui",
         )

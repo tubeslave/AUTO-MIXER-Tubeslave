@@ -1,0 +1,8 @@
+{
+  "schema": "automixer.wing_console_identity_owner_challenge.v1",
+  "operator_confirmed": false,
+  "console_model": "WING Rack",
+  "serial": "REPLACE_WITH_PHYSICALLY_VERIFIED_SERIAL",
+  "firmware": "3.0.5",
+  "accepted_readonly_source_id": "artifacts/wing_readonly_preflight/REPLACE_WITH_ACCEPTED_RUN_ID/summary.json"
+}

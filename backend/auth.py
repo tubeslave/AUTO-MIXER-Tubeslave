@@ -4,6 +4,7 @@ Supports token-based auth and IP allowlisting.
 """
 import hashlib
 import hmac
+import math
 import secrets
 import time
 import logging
@@ -30,16 +31,29 @@ class AuthManager:
         logger.info(f"Token generated for client: {client_id}")
         return token
 
-    def register_token(self, token: str, client_id: str, expires_hours: float = 24.0) -> None:
+    def register_token(
+        self,
+        token: str,
+        client_id: str,
+        expires_hours: Optional[float] = 24.0,
+    ) -> None:
         """Register an externally supplied bearer token without retaining plaintext."""
         if not isinstance(token, str) or not token:
             raise ValueError("token must be a non-empty string")
         if not isinstance(client_id, str) or not client_id:
             raise ValueError("client_id must be a non-empty string")
+        if expires_hours is not None:
+            try:
+                expires_hours = float(expires_hours)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("expires_hours must be a finite non-negative number") from exc
+            if not math.isfinite(expires_hours) or expires_hours < 0:
+                raise ValueError("expires_hours must be a finite non-negative number")
+        now = time.time()
         self._tokens[self._token_digest(token)] = {
             'client_id': client_id,
-            'created': time.time(),
-            'expires': time.time() + expires_hours * 3600,
+            'created': now,
+            'expires': None if expires_hours is None else now + expires_hours * 3600,
         }
         logger.info("Bearer token registered for client: %s", client_id)
 
@@ -56,7 +70,7 @@ class AuthManager:
         info = self._tokens.get(token_digest)
         if info is None:
             return None
-        if time.time() > info['expires']:
+        if info['expires'] is not None and time.time() > info['expires']:
             del self._tokens[token_digest]
             return None
         return info
@@ -66,6 +80,15 @@ class AuthManager:
         if not self.enabled:
             return True
         return self._token_info(token) is not None
+
+    def token_expiry(self, token: str) -> Optional[float]:
+        """Return an authenticated token's absolute expiry without exposing storage keys."""
+        info = self._token_info(token)
+        return (
+            float(info['expires'])
+            if info is not None and info['expires'] is not None
+            else None
+        )
 
     def revoke_token(self, token: str):
         """Revoke a token."""
@@ -146,7 +169,11 @@ class AuthManager:
     def cleanup_expired(self):
         """Remove expired tokens."""
         now = time.time()
-        expired = [t for t, info in self._tokens.items() if now > info['expires']]
+        expired = [
+            token_digest
+            for token_digest, info in self._tokens.items()
+            if info['expires'] is not None and now > info['expires']
+        ]
         for token in expired:
             del self._tokens[token]
         if expired:

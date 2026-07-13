@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { Agent, AutomixerMode, Channel, DirectorRuntime, LogRecord, Metric, NavItem, RouteId, Tone, UiActions, UiState, ViewModel } from '../../types';
 import { getModeDisplayLabel } from '../../utils/prototypeTone';
@@ -77,6 +77,91 @@ export function IconButton({ label, children, onClick }: { label: string; childr
     >
       {children}
     </button>
+  );
+}
+
+export function EmergencyStopControl({ ui, actions, compact = false }: { ui: UiState; actions: UiActions; compact?: boolean }) {
+  const [armed, setArmed] = useState(false);
+  const stopState = ui.emergencyStop;
+  const requestLocked = stopState.status === 'pending';
+
+  useEffect(() => {
+    if (!armed) return undefined;
+    const timer = globalThis.setTimeout(() => setArmed(false), 5000);
+    return () => globalThis.clearTimeout(timer);
+  }, [armed]);
+
+  useEffect(() => {
+    if (requestLocked) setArmed(false);
+  }, [requestLocked]);
+
+  const buttonLabel = stopState.status === 'acknowledged'
+    ? 'STOP ACTIVE · REASSERT'
+    : stopState.status === 'pending'
+      ? 'STOPPING…'
+      : stopState.status === 'error'
+        ? 'STOP ERROR · RETRY'
+        : armed
+          ? 'STOP ARMED'
+          : 'EMERGENCY STOP';
+  const buttonAriaLabel = stopState.status === 'acknowledged'
+    ? 'Reassert emergency stop'
+    : stopState.status === 'pending'
+      ? 'Emergency stop pending'
+      : armed
+        ? 'Emergency stop armed'
+        : 'Arm emergency stop';
+  const statusTone = stopState.status === 'acknowledged'
+    ? 'text-online'
+    : stopState.status === 'pending'
+      ? 'text-warn'
+      : stopState.status === 'error'
+        ? 'text-danger'
+        : 'text-dim';
+
+  return (
+    <div
+      className={`relative shrink-0 ${compact ? 'mt-2 w-full' : 'w-[142px]'}`}
+      onKeyDown={event => {
+        if (event.key === 'Escape') setArmed(false);
+      }}
+    >
+      <button
+        aria-label={buttonAriaLabel}
+        className="h-8 w-full rounded-[5px] border border-danger bg-danger/20 px-2 text-[9px] font-black uppercase tracking-[0.04em] text-danger shadow-[0_0_16px_rgba(248,81,73,.12)] transition hover:bg-danger/30 disabled:cursor-default disabled:opacity-80"
+        disabled={requestLocked}
+        onClick={() => setArmed(true)}
+        type="button"
+      >
+        {buttonLabel}
+      </button>
+      <div aria-live="assertive" className={`mt-0.5 truncate text-[7.5px] font-semibold ${statusTone}`} role="status">
+        {armed ? 'Confirmation open — no timer delay.' : stopState.message}
+      </div>
+      {armed && !requestLocked && (
+        <div
+          aria-label="Confirm system emergency stop"
+          className={`absolute top-[calc(100%+6px)] z-[70] w-[286px] rounded-[7px] border border-danger bg-[#180b0d] p-3 shadow-panel ${compact ? 'left-0 max-w-[calc(100vw-32px)]' : 'right-0'}`}
+          role="dialog"
+        >
+          <div className="text-[10px] font-black uppercase tracking-[0.08em] text-danger">Stop all automation now?</div>
+          <p className="mt-1 text-[9px] leading-4 text-muted">This sends the system safety command immediately. No mixer level is increased.</p>
+          <div className="mt-2 grid grid-cols-[0.8fr_1.2fr] gap-2">
+            <button autoFocus className="am-button px-2 py-1.5" onClick={() => setArmed(false)} type="button">Cancel</button>
+            <button
+              className="rounded-[4px] border border-danger bg-danger px-2 py-1.5 text-[10px] font-black uppercase text-white"
+              onClick={() => {
+                setArmed(false);
+                actions.triggerEmergencyStop();
+              }}
+              type="button"
+            >
+              Confirm STOP
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -580,14 +665,14 @@ export function TopStatusBar({
   const statusItems: { label: string; value: string; tone: Tone; interactive?: boolean }[] = [
     { label: 'Backend', value: statusLabel, tone: mockDataOnly ? 'green' : ui.backend.statusTone },
     { label: 'Data', value: mockDataOnly ? 'Mock fallback' : ui.backend.dataStateLabel, tone: mockDataOnly ? 'blue' : ui.backend.dataStateTone },
-    { label: 'Mode', value: getModeDisplayLabel(mode), tone: policyForMode(mode).tone, interactive: true },
-    { label: 'Authority', value: safeValue, tone: mockDataOnly ? 'green' : (ui.backend.canApplyToConsole ? 'yellow' : 'green') },
+    { label: 'Mode', value: getModeDisplayLabel(mode), tone: policyForMode(mode).tone, interactive: !ui.backend.mixerTransportLocked },
+    { label: 'Authority', value: ui.backend.mixerTransportLocked ? 'Offline lock' : safeValue, tone: mockDataOnly ? 'green' : (ui.backend.canApplyToConsole ? 'yellow' : 'green') },
     { label: 'Console', value: connectionLabel, tone: mockDataOnly ? 'green' : (ui.backend.mixerConnected ? 'green' : 'red') },
     { label: 'Audio', value: ui.backend.audioCaptureRunning ? `${ui.backend.audioCaptureChannels}ch · ${Math.round(ui.backend.audioSampleRate / 1000)}k` : 'Stopped', tone: ui.backend.audioCaptureRunning ? 'green' : 'yellow' }
   ];
 
   return (
-    <header className="col-span-2 flex items-center justify-between border-b border-line bg-[#060a10] px-3">
+    <header className="relative z-40 col-span-2 flex items-center justify-between border-b border-line bg-[#060a10] px-3">
       <div className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden">
         <div>
           <div className="text-[13px] font-black uppercase tracking-[0.08em] text-text">{title}</div>
@@ -618,8 +703,9 @@ export function TopStatusBar({
         </div>
       </div>
       <div className="flex items-center gap-2 text-[10px] text-muted">
-        {!ui.backend.mixerConnected && <IconButton label="Connect WING read-only" onClick={actions.connectWingReadOnly}>W</IconButton>}
-        <IconButton label={ui.backend.audioCaptureRunning ? 'Stop read-only audio meters' : 'Start read-only audio meters'} onClick={actions.toggleAudioPreview}>~</IconButton>
+        <EmergencyStopControl actions={actions} ui={ui} />
+        {!ui.backend.mixerTransportLocked && !ui.backend.mixerConnected && <IconButton label="Connect WING read-only" onClick={actions.connectWingReadOnly}>W</IconButton>}
+        {!ui.backend.mixerTransportLocked && <IconButton label={ui.backend.audioCaptureRunning ? 'Stop read-only audio meters' : 'Start read-only audio meters'} onClick={actions.toggleAudioPreview}>~</IconButton>}
         <IconButton label="Refresh backend" onClick={actions.refreshBackend}>↻</IconButton>
         <IconButton label="Run backend analysis" onClick={actions.runBackendAnalysis}>◇</IconButton>
         <div className="ml-2 text-right">
@@ -769,14 +855,14 @@ function CompactOperatorView({
   actions: UiActions;
   runtime: DirectorRuntime;
 }) {
-  const compactRoutes = items.filter(item => ['dashboard', 'task-queue', 'channels', 'agents', 'settings'].includes(item.id));
+  const compactRoutes = items.filter(item => ['dashboard', 'soundcheck', 'task-queue', 'channels', 'agents', 'settings'].includes(item.id));
   const offlineDemo = ui.backend.connectionState === 'mock';
   const compactDataLabel = ui.backend.dataState === 'connected' ? 'PL live' : ui.backend.dataStateLabel;
   const compactReadyLabel = runtime.readyLabel === 'Ready for live' ? 'Ready' : runtime.readyLabel;
   const compactAudioLabel = runtime.audioLabel === 'Audio capture running' ? 'Audio running' : runtime.audioLabel;
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg font-ui text-text">
-      <header className="border-b border-line bg-[#060a10] px-4 py-3">
+      <header className="relative z-40 border-b border-line bg-[#060a10] px-4 py-3">
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[13px] font-black uppercase tracking-[0.12em] text-text">Automixer</div>
@@ -795,8 +881,84 @@ function CompactOperatorView({
           <option disabled={!offlineDemo && !ui.backend.availableModes.includes('Supervised')} value="Supervised">Supervised AutoMix {!offlineDemo && !ui.backend.availableModes.includes('Supervised') ? '(blocked)' : ''}</option>
           <option disabled={!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto'))} value="Auto">Full Autonomous Mixing {!offlineDemo && (!ui.backend.canApplyToConsole || !ui.backend.availableModes.includes('Auto')) ? '(blocked)' : ''}</option>
         </select>
+        <EmergencyStopControl actions={actions} compact ui={ui} />
       </header>
       <main className="am-scrollbar flex-1 space-y-2 overflow-auto p-3">
+        {active === 'soundcheck' ? (
+          <>
+            <Panel title="Soundcheck status">
+              <div className="grid grid-cols-2 gap-2 text-[10px]">
+                <StatusBadge tone={ui.backend.mixerConnected ? 'green' : 'red'}>
+                  {ui.backend.mixerConnected ? 'WING online' : 'Console required'}
+                </StatusBadge>
+                <StatusBadge tone={ui.backend.audioCaptureRunning ? 'green' : 'red'}>
+                  {ui.backend.audioCaptureRunning ? 'Audio running' : 'Audio required'}
+                </StatusBadge>
+                <StatusBadge tone={ui.soundcheck.derivationComplete ? 'blue' : 'yellow'}>
+                  {ui.soundcheck.derivationComplete ? 'Derived only' : ui.soundcheck.state.replace(/_/g, ' ')}
+                </StatusBadge>
+                <StatusBadge tone={ui.soundcheck.liveAllowedFamilies.length ? 'yellow' : 'red'}>
+                  {ui.soundcheck.liveAllowedFamilies.length} live families
+                </StatusBadge>
+                <StatusBadge tone={ui.soundcheck.readiness.mixReadiness === 'show_mix_ready' ? 'green' : ui.soundcheck.readiness.mixReadiness === 'safe_core_ready' ? 'blue' : 'yellow'}>
+                  {ui.soundcheck.readiness.mixReadiness.replace(/_/g, ' ')}
+                </StatusBadge>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div className="rounded border border-line bg-row p-2"><b className="block text-[16px] text-text">{ui.soundcheck.recommendationCount}</b><span className="text-muted">Proposals</span></div>
+                <div className="rounded border border-line bg-row p-2"><b className="block text-[16px] text-text">{ui.soundcheck.transactionPlanCount}</b><span className="text-muted">Plans</span></div>
+                <div className="rounded border border-line bg-row p-2"><b className="block text-[16px] text-text">{ui.soundcheck.transactionOperationCount}</b><span className="text-muted">Operations</span></div>
+              </div>
+              <p className="mt-3 text-[10px] leading-5 text-muted">{ui.soundcheck.error || ui.soundcheck.message}</p>
+              {Object.keys(ui.soundcheck.readiness.unresolvedReasons).length > 0 && (
+                <p className="mt-2 rounded border border-warn/30 bg-warn/5 p-2 text-[10px] text-warn">
+                  Incomplete: {Object.values(ui.soundcheck.readiness.unresolvedReasons).slice(0, 3).map((reason) => reason.replace(/_/g, ' ')).join('; ')}
+                </p>
+              )}
+            </Panel>
+            <Panel title="Soundcheck transport">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  className="am-button"
+                  disabled={ui.soundcheck.running
+                    || ui.backend.connectionState !== 'connected'
+                    || ui.backend.dataState === 'stale'
+                    || ui.backend.staleSnapshot
+                    || !ui.backend.mixerConnected
+                    || !ui.backend.audioCaptureRunning
+                    || ui.soundcheck.selectedChannels.length === 0}
+                  onClick={actions.startSoundcheck}
+                  type="button"
+                >
+                  Start proposal soundcheck
+                </button>
+                <button
+                  className="am-button"
+                  disabled={!ui.soundcheck.running}
+                  onClick={actions.stopSoundcheck}
+                  type="button"
+                >
+                  Stop
+                </button>
+              </div>
+              <button className="am-button mt-2 w-full" onClick={actions.refreshBackend} type="button">Refresh status</button>
+              <p className="mt-3 text-[10px] leading-5 text-muted">No module writes directly. Approved plans use physical readback, audio recheck and compare-and-swap rollback.</p>
+            </Panel>
+            <Panel title="Console module authority">
+              <div className="space-y-2 text-[10px]">
+                {Object.entries(ui.soundcheck.familyLifecycle).length ? Object.entries(ui.soundcheck.familyLifecycle).map(([familyId, lifecycle]) => (
+                  <div className="flex items-center justify-between gap-2 border-b border-line pb-2" key={familyId}>
+                    <span className="truncate text-muted">{familyId.replace(/_/g, ' ')}</span>
+                    <StatusBadge tone={lifecycle === 'hardware_proven' ? 'yellow' : 'red'}>
+                      {lifecycle === 'hardware_proven' ? 'proof · owner pending' : 'proposal only'}
+                    </StatusBadge>
+                  </div>
+                )) : <span className="text-muted">Waiting for backend registry.</span>}
+              </div>
+            </Panel>
+          </>
+        ) : (
+          <>
         <Panel title="Status">
           <div className="grid grid-cols-2 gap-2 text-[10px]">
             <StatusBadge tone={runtime.readyTone}>{compactReadyLabel}</StatusBadge>
@@ -831,8 +993,10 @@ function CompactOperatorView({
           </div>
           <p className="mt-3 text-[10px] leading-5 text-muted">Compact view remains read-only unless the supervised backend gate explicitly allows an approved apply.</p>
         </Panel>
+          </>
+        )}
       </main>
-      <nav className="grid grid-cols-5 border-t border-line bg-[#0b121b]">
+      <nav className="grid grid-cols-6 border-t border-line bg-[#0b121b]">
         {compactRoutes.map(item => (
           <button
             className={`px-1 py-2 text-[9px] font-semibold ${active === item.id ? 'bg-audio/10 text-audio' : 'text-muted'}`}

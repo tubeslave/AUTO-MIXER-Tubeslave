@@ -19,7 +19,11 @@ def register_handlers(server):
         await server.stop_phase_alignment(websocket)
 
     async def handle_apply_phase_corrections(websocket, data):
-        logger.info(f"Received apply_phase_corrections command. Measurements: {data.get('measurements')}")
+        measurements = data.get("measurements")
+        logger.info(
+            "Received apply_phase_corrections measurement_count=%s",
+            len(measurements) if isinstance(measurements, (list, dict)) else 0,
+        )
         await server.apply_phase_corrections(websocket, data.get("measurements"))
 
     async def handle_reset_phase_delay(websocket, data):

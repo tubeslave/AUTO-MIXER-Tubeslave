@@ -58,6 +58,14 @@ frontend/dist/
 ops/autopilot/WRITER_LEASE/
 artifacts/tub345_supervised_live/
 artifacts/wing_telemetry*/
+artifacts/wing_console_identity_owner_challenge/
+artifacts/wing_timeout_disconnect_proof/
+artifacts/wing_owner_readiness_review_verifier/
+artifacts/wing_owner_readiness_decision_verifier/
+artifacts/wing_owner_readiness_review/*/owner_decision.json
+artifacts/wing_owner_readiness_review/*/owner_decision-*.json
+artifacts/show_assist_auto_v1/
+backend/artifacts/show_assist_auto_v1/
 artifacts/soundcheck_runtime_observation/*/events.jsonl
 artifacts/soundcheck_long_run_drift_audit/20260704T183538Z_soundcheck_long_run_drift_audit/
 artifacts/soundcheck_long_run_drift_audit/20260704T183627Z_soundcheck_long_run_drift_audit/
@@ -102,3 +110,4 @@ backend/venv/
 .claude/
 GitHub/
 sessions/*.json
+.gstack/

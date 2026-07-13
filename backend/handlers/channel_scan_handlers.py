@@ -10,10 +10,7 @@ def register_handlers(server):
         await server.scan_and_recognize_channels(websocket, data.get("channels", []))
 
     async def handle_scan_mixer_channel_names(websocket, data):
-        logger.info("=" * 60)
-        logger.info("RECEIVED scan_mixer_channel_names MESSAGE")
-        logger.info(f"Data: {data}")
-        logger.info("=" * 60)
+        logger.info("Received scan_mixer_channel_names")
         await server.scan_mixer_channel_names(websocket)
 
     async def handle_reset_trim(websocket, data):

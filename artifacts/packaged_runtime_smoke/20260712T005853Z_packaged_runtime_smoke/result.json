@@ -1,0 +1,301 @@
+{
+  "schema": "automixer.packaged_runtime_smoke.v1",
+  "generatedAt": "2026-07-12T00:58:53.337Z",
+  "runId": "20260712T005853Z_packaged_runtime_smoke",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveWrites": false,
+  "liveAuthorityGranted": false,
+  "pass": true,
+  "appPath": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app",
+  "before": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 8497,
+      "sha256": "86a361a7411f3e9d20a7e2d60cb26b0a65977f2cfa45acd5fc8ef468f10cf566"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 69312,
+        "sha256": "f858060f97931c7379cc45cb3ff8c7d487b21a0c2176828bcd4de2662bd8afc7"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 267649344,
+        "sha256": "cd91be0c6ed5f0f38ee982971a7c40038dab8f2ba6ed31a0ac6312b9befb1158"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5567968,
+        "sha256": "1b0af64937809272cd2b9c15a51d0804906ec7dd4a91080567685567c35ad189"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 2974,
+        "sha256": "a0468e3025e3bbc15beee3ab340bb4e1e4cb3b9843986869bbec6bf4b31686eb"
+      }
+    }
+  },
+  "provenance": {
+    "head": "e21778f0be8e7d88a552927fcd8a375351e0c07e",
+    "worktreeDirty": true,
+    "statusSha256": "730d4ecb26c382036c8789c6576d1071be94b1447d0e0d106384a1476da4dd98",
+    "trackedDiffSha256": "5ecf61327d49dec28190c6e6d6c0df04aefc5f1d97f8737d95b969c95ccc3cca",
+    "sourceBindingStrength": "dirty_tree_non_clean_checkout"
+  },
+  "runtime": {
+    "cdpReady": true,
+    "cdpReadyMs": 2539,
+    "browser": "Chrome/120.0.6099.291",
+    "protocolVersion": "1.3",
+    "pageUrls": [
+      "http://127.0.0.1:49711/"
+    ],
+    "backendReadyMs": 59974,
+    "backendWaitAfterUiMs": 57157
+  },
+  "bootstrap": {
+    "validShape": true,
+    "tokenLength": 43,
+    "tokenSha256": "6059b0de3ed36edb1dd0a1e39c11b3e0bb7d3349ed843b70ab01988496626e7b",
+    "clientId": "automixer-ui",
+    "websocketUrl": "ws://127.0.0.1:8765",
+    "packagedOfflineLock": true
+  },
+  "invalidToken": {
+    "rejected": true,
+    "code": 1008,
+    "reason": "authentication_failed"
+  },
+  "runtimeProbe": {
+    "authenticated": true,
+    "mode": {
+      "mode": "analyze",
+      "packagedOfflineLock": true,
+      "mixerTransportLocked": true
+    },
+    "blockedOperations": [
+      "auto_connect",
+      "connect_wing",
+      "scan_mixers"
+    ]
+  },
+  "blockedOperationsPass": true,
+  "reloadRecovery": {
+    "staleSessionTokenRemoved": true,
+    "secureBootstrapFailureShown": false,
+    "offlineLockShown": true,
+    "connectWingControlCount": 0,
+    "startAudioControlCount": 0,
+    "hardwareControlsHidden": true
+  },
+  "processGroup": [
+    {
+      "pid": 47440,
+      "role": "electron_main"
+    },
+    {
+      "pid": 47563,
+      "role": "electron_helper"
+    },
+    {
+      "pid": 47564,
+      "role": "electron_helper"
+    },
+    {
+      "pid": 47589,
+      "role": "backend"
+    },
+    {
+      "pid": 47614,
+      "role": "electron_helper"
+    },
+    {
+      "pid": 47646,
+      "role": "backend"
+    }
+  ],
+  "network": {
+    "sockets": [
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   39u  IPv4 0x673e18e8e3bd6c4f      0t0  TCP 127.0.0.1:49711->127.0.0.1:50038 (ESTABLISHED)"
+      },
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   41u  IPv4 0xaf238c2f436db0ff      0t0  TCP 127.0.0.1:49696 (LISTEN)"
+      },
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   43u  IPv4 0x31a2bfaff7c730b5      0t0  TCP 127.0.0.1:49711 (LISTEN)"
+      },
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   61u  IPv4 0xa48af5729eac79f9      0t0  TCP 127.0.0.1:49711->127.0.0.1:50040 (ESTABLISHED)"
+      },
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   63u  IPv4 0x8bac3102378669bf      0t0  TCP 127.0.0.1:49696->127.0.0.1:49713 (ESTABLISHED)"
+      },
+      {
+        "pid": 47440,
+        "line": "AUTO\\x20M 47440 dmitrijvolkov   66u  IPv4 0x6ffee40aab0832ab      0t0  TCP 127.0.0.1:49711->127.0.0.1:50041 (ESTABLISHED)"
+      },
+      {
+        "pid": 47564,
+        "line": "AUTO\\x20M 47564 dmitrijvolkov   21u  IPv4 0x5c59e46d455f8c0b      0t0  TCP 127.0.0.1:50042->127.0.0.1:8765 (ESTABLISHED)"
+      },
+      {
+        "pid": 47564,
+        "line": "AUTO\\x20M 47564 dmitrijvolkov   23u  IPv4 0xab7f95d96d6dd9ad      0t0  TCP 127.0.0.1:50038->127.0.0.1:49711 (ESTABLISHED)"
+      },
+      {
+        "pid": 47564,
+        "line": "AUTO\\x20M 47564 dmitrijvolkov   26u  IPv4 0x4cf4c05047bff803      0t0  TCP 127.0.0.1:50040->127.0.0.1:49711 (ESTABLISHED)"
+      },
+      {
+        "pid": 47564,
+        "line": "AUTO\\x20M 47564 dmitrijvolkov   28u  IPv4 0x626a27593b863072      0t0  TCP 127.0.0.1:50041->127.0.0.1:49711 (ESTABLISHED)"
+      },
+      {
+        "pid": 47646,
+        "line": "server  47646 dmitrijvolkov    7u  IPv4 0x9ac5ef8c9b059bd4      0t0  TCP 127.0.0.1:8765 (LISTEN)"
+      },
+      {
+        "pid": 47646,
+        "line": "server  47646 dmitrijvolkov    8u  IPv4 0xf16d83c4095604d5      0t0  TCP 127.0.0.1:8765->127.0.0.1:50031 (ESTABLISHED)"
+      },
+      {
+        "pid": 47646,
+        "line": "server  47646 dmitrijvolkov    9u  IPv4 0x4f452b8bb4af14c8      0t0  TCP 127.0.0.1:8765->127.0.0.1:50042 (ESTABLISHED)"
+      }
+    ],
+    "externalConnections": []
+  },
+  "consoleErrors": [
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)",
+    "WebSocket connection to 'ws://127.0.0.1:8765/' failed: ",
+    "WebSocket transport error.",
+    "Reconnect failed: Error: WebSocket connection failed\n    at u (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:55394)\n    at m.onerror (http://127.0.0.1:49711/assets/index-ewgazgB9.js:1:56849)"
+  ],
+  "browserCloseCompleted": true,
+  "after": {
+    "canonicalLog": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+      "size": 115380009,
+      "sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4"
+    },
+    "consoleWal": {
+      "path": "/Users/dmitrijvolkov/.automixer/runtime/manual_write_wal.jsonl",
+      "size": 8497,
+      "sha256": "86a361a7411f3e9d20a7e2d60cb26b0a65977f2cfa45acd5fc8ef468f10cf566"
+    },
+    "packageFiles": {
+      "electron": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/MacOS/AUTO MIXER Tubeslave",
+        "size": 69312,
+        "sha256": "f858060f97931c7379cc45cb3ff8c7d487b21a0c2176828bcd4de2662bd8afc7"
+      },
+      "backend": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/backend/server",
+        "size": 267649344,
+        "sha256": "cd91be0c6ed5f0f38ee982971a7c40038dab8f2ba6ed31a0ac6312b9befb1158"
+      },
+      "asar": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/app.asar",
+        "size": 5567968,
+        "sha256": "1b0af64937809272cd2b9c15a51d0804906ec7dd4a91080567685567c35ad189"
+      },
+      "infoPlist": {
+        "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/mac-arm64/AUTO MIXER Tubeslave.app/Contents/Info.plist",
+        "size": 2974,
+        "sha256": "a0468e3025e3bbc15beee3ab340bb4e1e4cb3b9843986869bbec6bf4b31686eb"
+      }
+    }
+  },
+  "canonicalLogUnchanged": true,
+  "consoleWalUnchanged": true,
+  "packageFilesUnchanged": true,
+  "stderrTail": [
+    "INFO:__main__:Full message: {\"type\":\"get_connection_topology\"}",
+    "INFO:__main__:Message type: get_connection_topology",
+    "INFO:__main__:Message data: {'type': 'get_connection_topology'}",
+    "[47440:0712/035956.267649:ERROR:network_service_instance_impl.cc(601)] Network service crashed, restarting service.",
+    "Backend Error: INFO:__main__:Received signal SIGTERM, shutting down...",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Closing 1 client connections...",
+    "INFO:__main__:Client connection closed",
+    "INFO:__main__:Client disconnected. Total clients: 0",
+    "INFO:__main__:Graceful shutdown complete",
+    "INFO:websockets.server:server closing",
+    "ERROR:websockets.server:connection handler failed",
+    "Traceback (most recent call last):",
+    "File \"websockets/asyncio/server.py\", line 376, in conn_handler",
+    "File \"server.py\", line 9790, in handler",
+    "File \"server.py\", line 615, in _authenticate_websocket",
+    "File \"asyncio/tasks.py\", line 488, in wait_for",
+    "File \"websockets/asyncio/connection.py\", line 324, in recv",
+    "websockets.exceptions.ConnectionClosedOK: sent 1001 (going away); then received 1001 (going away)",
+    "INFO:websockets.server:server closed",
+    "INFO:__main__:Server stopped",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "INFO:__main__:Server shutdown complete",
+    "INFO:__main__:Atexit cleanup triggered",
+    "INFO:__main__:Cleaning up all controllers...",
+    "INFO:__main__:All controllers cleaned up",
+    "[47440:0712/035956.269040:ERROR:gpu_process_host.cc(993)] GPU process exited unexpectedly: exit_code=15",
+    "[47440:0712/035956.270164:ERROR:command_buffer_proxy_impl.cc(319)] GPU state invalid after WaitForGetOffsetInRange."
+  ]
+}

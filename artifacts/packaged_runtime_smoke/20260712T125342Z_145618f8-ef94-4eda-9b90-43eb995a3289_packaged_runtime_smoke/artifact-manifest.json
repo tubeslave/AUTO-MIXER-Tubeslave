@@ -1,0 +1,29 @@
+{
+  "schema": "automixer.packaged_runtime_smoke_manifest.v1",
+  "pathPolicy": "manifest_directory_relative_v1",
+  "generatedAt": "2026-07-12T12:53:58.843Z",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveAuthorityGranted": false,
+  "buildProfile": {
+    "profile": "local",
+    "releaseEligible": false,
+    "path": "build-profile.json",
+    "pathBase": "packaged_build_artifact_root",
+    "sha256": "f14ce6c944a9a23373aa931a68e2a4ce80f677d760baa2d83a9623b77721e363",
+    "bindingValid": true,
+    "appTreeMatches": true
+  },
+  "files": {
+    "result.json": {
+      "path": "result.json",
+      "size": 30749,
+      "sha256": "02354b8c994d8a8162fa23ef5a76ab4f2ab3a194f919ae354a32eeb238e00b2c"
+    },
+    "result.md": {
+      "path": "result.md",
+      "size": 1211,
+      "sha256": "b885077bb9a1863a4cc0e9e01d001443f09f25602b5e50a40bf58e0622d2296a"
+    }
+  }
+}

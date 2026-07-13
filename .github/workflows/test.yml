@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   test:
@@ -64,9 +64,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22.22.3"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin npm
+        run: npm install --global npm@10.9.8
 
       - name: Install frontend dependencies
         working-directory: frontend
@@ -87,3 +90,177 @@ jobs:
       - name: Run frontend end-to-end tests
         working-directory: frontend
         run: npm run test:e2e
+
+  macos-arm64-package-contract:
+    runs-on: macos-15
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.3"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Pin npm
+        run: npm install --global npm@10.9.8
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14.3"
+          architecture: arm64
+
+      - name: Confirm native release toolchain
+        shell: bash
+        run: |
+          test "$(uname -m)" = "arm64"
+          test "$(node -p process.arch)" = "arm64"
+          test "$(npm --version)" = "10.9.8"
+          test "$(python3 -c 'import platform; print(platform.python_version())')" = "3.14.3"
+          echo "AUTOMIXER_PYTHON_BIN=$(command -v python3)" >> "$GITHUB_ENV"
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Run macOS release lifecycle contracts
+        working-directory: frontend
+        run: |
+          node --test \
+            src/services/__tests__/electronSecurityContract.test.mjs \
+            src/services/__tests__/macosBuildProfilesContract.test.mjs \
+            src/services/__tests__/macosReleaseVerifier.test.mjs \
+            src/services/__tests__/macosSigningContract.test.mjs \
+            src/services/__tests__/packagingArchitecture.test.mjs
+
+      - name: Build non-release arm64 package
+        working-directory: frontend
+        env:
+          AUTOMIXER_BACKEND_VENV_DIR: ${{ runner.temp }}/automixer-backend-venv
+          AUTOMIXER_BACKEND_REQUIREMENTS_FILE: ${{ github.workspace }}/backend/requirements-macos-arm64.lock.txt
+          AUTOMIXER_BACKEND_BUILD_REQUIREMENTS_FILE: ${{ github.workspace }}/backend/requirements-macos-arm64-build.lock.txt
+          AUTOMIXER_PIP_VERSION: "25.3"
+          AUTOMIXER_PYINSTALLER_VERSION: "6.20.0"
+          AUTOMIXER_REQUIRED_PYTHON_VERSION: "3.14.3"
+          AUTOMIXER_VERIFY_LOCKED_ENV: "true"
+        run: npm run mac:local
+
+      - name: Resolve package evidence paths
+        working-directory: frontend
+        shell: bash
+        run: |
+          PROFILE_COUNT="$(find dist/local -mindepth 2 -maxdepth 2 -name build-profile.json -type f | wc -l | tr -d ' ')"
+          test "$PROFILE_COUNT" = "1"
+          PROFILE="$(find dist/local -mindepth 2 -maxdepth 2 -name build-profile.json -type f -print -quit)"
+          APP="$(node scripts/resolve-build-profile-app.mjs "$PROFILE")"
+          test -d "$APP"
+          echo "AUTOMIXER_CI_BUILD_PROFILE=$PWD/$PROFILE" >> "$GITHUB_ENV"
+          echo "AUTOMIXER_CI_APP_PATH=$APP" >> "$GITHUB_ENV"
+
+      - name: Launch and smoke the packaged runtime under the offline lock
+        working-directory: frontend
+        run: |
+          node scripts/smoke-packaged-runtime.mjs \
+            --app "$AUTOMIXER_CI_APP_PATH" \
+            --build-profile "$AUTOMIXER_CI_BUILD_PROFILE" \
+            --artifact-root "$RUNNER_TEMP/automixer-packaged-runtime-smoke"
+
+      - name: Run full suite in the exact locked macOS package environment
+        env:
+          AUTOMIXER_BACKEND_VENV_DIR: ${{ runner.temp }}/automixer-backend-venv
+        run: |
+          test -x "$AUTOMIXER_BACKEND_VENV_DIR/bin/python"
+          PYTHONPATH=backend "$AUTOMIXER_BACKEND_VENV_DIR/bin/python" \
+            -m pytest tests/ -x --tb=short -q
+          "$AUTOMIXER_BACKEND_VENV_DIR/bin/python" -m pip freeze --all \
+            > "$RUNNER_TEMP/automixer-locked-macos-pip-freeze.txt"
+
+      - name: Run and detach-verify the no-WING release gate
+        shell: bash
+        run: |
+          PYTHONPATH=backend "$AUTOMIXER_BACKEND_VENV_DIR/bin/python" \
+            tools/no_wing_release_check.py \
+            --quick \
+            --artifact-root "$RUNNER_TEMP/automixer-no-wing"
+          RUN_COUNT="$(find "$RUNNER_TEMP/automixer-no-wing" -mindepth 1 -maxdepth 1 -type d -name '*_no_wing_release_check' | wc -l | tr -d ' ')"
+          test "$RUN_COUNT" = "1"
+          RUN_DIR="$(find "$RUNNER_TEMP/automixer-no-wing" -mindepth 1 -maxdepth 1 -type d -name '*_no_wing_release_check' -print -quit)"
+          PYTHONPATH=backend "$AUTOMIXER_BACKEND_VENV_DIR/bin/python" \
+            tools/verify_no_wing_artifact_manifest.py "$RUN_DIR" \
+            > "$RUN_DIR/artifact-manifest-verifier.json"
+
+      - name: Assert local package cannot claim release eligibility
+        working-directory: frontend
+        run: |
+          APP="$(find dist/local -type d -name 'AUTO MIXER Tubeslave.app' -print -quit)"
+          test -n "$APP"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsArbitraryLoads' "$APP/Contents/Info.plist")" = "false"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSAppTransportSecurity:NSAllowsLocalNetworking' "$APP/Contents/Info.plist")" = "true"
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {
+            resolveArtifactPath,
+            resolveBuildProfileAppPath
+          } from './scripts/release-evidence.mjs';
+
+          const root = path.resolve('dist/local');
+          const runs = fs.readdirSync(root, { withFileTypes: true })
+            .filter(entry => entry.isDirectory());
+          assert.equal(runs.length, 1);
+          const output = path.join(root, runs[0].name);
+          const profilePath = path.join(output, 'build-profile.json');
+          const { appPath, profile: manifest } = resolveBuildProfileAppPath(profilePath);
+          const zipPath = resolveArtifactPath(
+            output,
+            manifest.artifacts.zip.path,
+            'Local package ZIP'
+          );
+          const embeddedPath = resolveArtifactPath(
+            output,
+            manifest.embeddedAttestation.path,
+            'Embedded local build attestation'
+          );
+          assert.equal(manifest.profile, 'local');
+          assert.equal(manifest.releaseEligible, false);
+          assert.equal(manifest.source.worktreeDirty, false);
+          assert.ok(fs.existsSync(appPath));
+          assert.ok(fs.existsSync(zipPath));
+          assert.match(path.basename(zipPath), /LOCAL-NOT-FOR-DISTRIBUTION/);
+          const embedded = JSON.parse(fs.readFileSync(
+            embeddedPath,
+            'utf8'
+          ));
+          assert.equal(embedded.profile, 'local');
+          assert.equal(embedded.releaseEligible, false);
+          assert.deepEqual(embedded.source, manifest.source);
+          assert.equal(manifest.embeddedAttestation.path.endsWith(
+            '/Contents/Resources/local-build-attestation.json'
+          ), true);
+          assert.equal(fs.existsSync(path.join(output, '.build')), false);
+          assert.equal(fs.existsSync(path.join(output, 'release-manifest.json')), false);
+          assert.equal(
+            fs.existsSync(path.join(output, 'release-verification-initial.json')),
+            false
+          );
+          NODE
+
+      - name: Retain clean macOS package evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: automixer-macos-arm64-local-evidence-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            frontend/dist/local/*/build-profile.json
+            ${{ runner.temp }}/automixer-packaged-runtime-smoke/*/result.json
+            ${{ runner.temp }}/automixer-no-wing/*/summary.json
+            ${{ runner.temp }}/automixer-no-wing/*/summary.md
+            ${{ runner.temp }}/automixer-no-wing/*/artifact-manifest.json
+            ${{ runner.temp }}/automixer-no-wing/*/artifact-manifest-verifier.json
+            ${{ runner.temp }}/automixer-locked-macos-pip-freeze.txt

@@ -11,7 +11,10 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
+import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -71,6 +74,9 @@ class FakeProofMixer:
         self.is_connected = True
         self.physical = {self.gain_address(channel): float(initial_gain_db)}
         self.state = dict(self.physical)
+        self.state_timestamps = {
+            self.gain_address(channel): time.time(),
+        }
         self.write_calls: list[Dict[str, Any]] = []
 
     @staticmethod
@@ -78,13 +84,19 @@ class FakeProofMixer:
         return f"/ch/{channel}/in/set/trim"
 
     def query_parameter(self, address: str) -> Dict[str, Any]:
-        return {"status": "received", "address": address, "value": self.physical.get(address)}
+        return {
+            "status": "received",
+            "address": address,
+            "value": self.physical.get(address),
+            "confirmed_round_trips": 2,
+        }
 
     def set_channel_gain(self, channel: int, value: float) -> bool:
         address = self.gain_address(channel)
         value = max(-18.0, min(18.0, float(value)))
         self.physical[address] = value
         self.state[address] = value
+        self.state_timestamps[address] = time.time()
         self.write_calls.append({"method": "set_channel_gain", "channel": channel, "value": value})
         return True
 
@@ -181,9 +193,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 async def run(args: argparse.Namespace) -> int:
     validation_error = validate_args(args)
-    run_id = f"{utc_stamp()}_gain_proof_dry_run_ch{args.channel}"
+    run_id = f"{utc_stamp()}_{uuid.uuid4()}_gain_proof_dry_run_ch{args.channel}"
     run_dir = Path(args.artifact_root) / run_id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    run_dir.parent.mkdir(parents=True, exist_ok=True)
+    run_dir.mkdir()
+    console_runtime_dir = (run_dir / "console_runtime").resolve()
+    console_wal_path = console_runtime_dir / "manual_write_wal.jsonl"
+    manual_write_artifacts_dir = (run_dir / "manual_write_gate").resolve()
+    decision_trace_path = manual_write_artifacts_dir / "decision_traces.jsonl"
+    decision_memory_path = manual_write_artifacts_dir / "decision_memory.jsonl"
     recorder = EventRecorder(run_dir)
 
     summary: Dict[str, Any] = {
@@ -198,6 +216,13 @@ async def run(args: argparse.Namespace) -> int:
         "cooldown_sec": args.cooldown_sec,
         "write_policy": "fake_mixer_apply_operator_proposal_only",
         "physical_wing": False,
+        "console_runtime_dir": str(console_runtime_dir),
+        "console_wal_path": str(console_wal_path),
+        "console_runtime_isolated": False,
+        "manual_write_artifacts_dir": str(manual_write_artifacts_dir),
+        "decision_trace_path": str(decision_trace_path),
+        "decision_memory_path": str(decision_memory_path),
+        "evidence_stores_isolated": False,
         "forbidden_messages": ["set_gain", "set_fader", "set_eq", "set_compressor", "route_output", "load_snap", "save_snap"],
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
     }
@@ -210,13 +235,42 @@ async def run(args: argparse.Namespace) -> int:
     try:
         from server import AutoMixerServer
 
-        with patch("server.BleedService"), patch.object(AutoMixerServer, "_load_config", return_value={}):
+        with (
+            patch("server.BleedService"),
+            patch.object(AutoMixerServer, "_load_config", return_value={}),
+            patch.dict(
+                os.environ,
+                {"AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR": str(manual_write_artifacts_dir)},
+            ),
+            patch.object(
+                AutoMixerServer,
+                "_resolve_console_runtime_dir",
+                return_value=console_runtime_dir,
+            ),
+        ):
             server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+        if server._manual_write_wal_path() != console_wal_path.resolve():
+            raise RuntimeError("dry-run console WAL escaped the run artifact directory")
+        if server._manual_write_artifacts_dir.resolve() != manual_write_artifacts_dir:
+            raise RuntimeError("dry-run manual-write evidence escaped the run artifact directory")
+        if server.automation_trace_store.path.resolve() != decision_trace_path:
+            raise RuntimeError("dry-run decision trace store escaped the run artifact directory")
+        if server.decision_memory_store.path.resolve() != decision_memory_path:
+            raise RuntimeError("dry-run decision memory store escaped the run artifact directory")
+        isolated_paths = (
+            console_wal_path,
+            server._manual_write_artifacts_dir,
+            server.automation_trace_store.path,
+            server.decision_memory_store.path,
+        )
+        if not all(path.resolve().is_relative_to(run_dir.resolve()) for path in isolated_paths):
+            raise RuntimeError("dry-run evidence path escaped the run artifact directory")
+        summary["console_runtime_isolated"] = True
+        summary["evidence_stores_isolated"] = True
         fake_mixer = FakeProofMixer(args.channel, args.initial_gain_db)
         server.connection_mode = "wing"
         server.mixer_client = fake_mixer
         server._manual_write_cooldown_sec = args.cooldown_sec
-        server._manual_write_artifacts_dir = run_dir / "manual_write_gate"
 
         await dispatch(server, recorder, "set_operator_mode", {"mode": "supervised", "reason": args.reason})
 

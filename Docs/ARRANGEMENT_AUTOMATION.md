@@ -150,7 +150,10 @@ still making questionable decisions visible in the report.
 
 ## WebSocket API
 
-Messages:
+Current product status: **fail-closed / not promoted**. The handler names below
+are registered so clients receive an explicit blocked status instead of an
+unknown-message or missing-method crash, but no controller is started and no
+fader write can occur:
 
 - `start_arrangement_automation`
 - `stop_arrangement_automation`
@@ -158,7 +161,11 @@ Messages:
 - `run_arrangement_automation_tick`
 - `set_arrangement_automation_live_apply`
 
-State is returned under `arrangement_automation_state` and includes:
+`arrangement_automation_state` currently returns
+`reason=arrangement_automation_not_promoted`, `active=false`,
+`analysis_only_mode=true`, `live_apply_enabled=false`, and
+`live_authority_granted=false`. The richer state fields below describe the
+offline/prototype controller and are not current product-runtime evidence:
 
 - current section and confidence
 - ADI and density label
@@ -172,6 +179,11 @@ State is returned under `arrangement_automation_state` and includes:
 - decision reasons
 
 ## Enabling Live Apply
+
+Live apply cannot currently be enabled through the product WebSocket API. Even
+an explicit `set_arrangement_automation_live_apply` request returns a blocked
+status. The configuration example below documents the prototype's intended
+defaults only; changing it does not promote the runtime surface.
 
 Default config is analysis-only:
 

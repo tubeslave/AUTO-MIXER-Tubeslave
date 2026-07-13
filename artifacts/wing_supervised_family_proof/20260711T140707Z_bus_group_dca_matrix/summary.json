@@ -1,0 +1,8 @@
+{
+  "accepted": false,
+  "error": "RuntimeError:physical_read_failed:/bus/1/dyn/thr37:timeout",
+  "family_id": "bus_group_dca_matrix",
+  "live_authority_granted": false,
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:07:07Z"
+}

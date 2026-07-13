@@ -23,19 +23,25 @@ def _text(value: Any) -> str:
 
 
 def _is_offline_evidence(trace: Dict[str, Any]) -> bool:
+    metadata = trace.get("metadata") if isinstance(trace.get("metadata"), dict) else {}
     haystack = " ".join(
-        _text(trace.get(key)).lower()
-        for key in ("source", "mode", "status", "proof_status")
+        [
+            *(
+                _text(trace.get(key)).lower()
+                for key in ("source", "mode", "status", "proof_status", "proof_mode")
+            ),
+            _text(metadata.get("proof_mode")).lower(),
+        ]
     )
-    return "offline" in haystack or "replay" in haystack
+    return any(marker in haystack for marker in ("offline", "replay", "dry_run", "dry-run", "fake"))
 
 
 def evidence_quality_for_trace(trace: Dict[str, Any]) -> Optional[str]:
     proof_status = _text(trace.get("proof_status")).lower()
-    if proof_status in VERIFIED_PROOF_STATUSES:
-        return "verified"
     if _is_offline_evidence(trace):
         return "offline"
+    if proof_status in VERIFIED_PROOF_STATUSES:
+        return "verified"
     return None
 
 
@@ -53,6 +59,20 @@ def decision_memory_entry_from_trace(trace: Dict[str, Any]) -> Optional[Dict[str
         summary = f"{summary} blocked: {blocked_reason}"
 
     confidence = 0.95 if quality == "verified" else 0.82
+    trace_metadata = trace.get("metadata") if isinstance(trace.get("metadata"), dict) else {}
+    trace_source = trace.get("source")
+    proof_mode = trace.get("proof_mode") or trace_metadata.get("proof_mode")
+    physical_wing = trace.get("physical_wing")
+    if physical_wing is None:
+        physical_wing = trace_metadata.get("physical_wing")
+    if _is_offline_evidence(trace):
+        if not proof_mode and any(
+            marker in _text(trace_source).lower()
+            for marker in ("dry_run", "dry-run", "fake")
+        ):
+            proof_mode = "dry_run"
+        if physical_wing is None:
+            physical_wing = False
     return {
         "memory_id": f"decision-memory-{uuid4().hex[:12]}",
         "source_decision_id": trace.get("decision_id"),
@@ -69,11 +89,41 @@ def decision_memory_entry_from_trace(trace: Dict[str, Any]) -> Optional[Dict[str
         "trace_created_at": trace.get("created_at"),
         "metadata": {
             "mode": trace.get("mode"),
+            "trace_source": trace_source,
+            "proof_mode": proof_mode,
+            "physical_wing": physical_wing,
             "delta": trace.get("delta"),
             "readback": trace.get("readback"),
             "rollback": trace.get("rollback"),
         },
     }
+
+
+def normalize_decision_memory_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
+    """Fail closed when legacy verified rows have no trace provenance.
+
+    The append-only store is never rewritten. Older rows predate preservation of
+    ``metadata.trace_source`` and can include synthetic dry-run evidence that was
+    labelled ``verified``. Readers therefore downgrade those rows in memory until
+    an explicit provenance-aware replacement is recorded.
+    """
+
+    payload = dict(entry)
+    metadata = payload.get("metadata")
+    metadata = dict(metadata) if isinstance(metadata, dict) else {}
+    if (
+        payload.get("evidence_quality") == "verified"
+        and not _text(metadata.get("trace_source"))
+    ):
+        payload["evidence_quality"] = "legacy_unbound"
+        try:
+            payload["confidence"] = min(float(payload.get("confidence", 0.5)), 0.5)
+        except (TypeError, ValueError):
+            payload["confidence"] = 0.5
+        metadata["trust_status"] = "downgraded_missing_trace_provenance"
+        metadata.setdefault("original_evidence_quality", "verified")
+        payload["metadata"] = metadata
+    return payload
 
 
 class DecisionMemoryStore:
@@ -110,5 +160,5 @@ class DecisionMemoryStore:
                 except json.JSONDecodeError:
                     continue
                 if isinstance(value, dict):
-                    rows.append(value)
+                    rows.append(normalize_decision_memory_entry(value))
         return rows[-limit:]

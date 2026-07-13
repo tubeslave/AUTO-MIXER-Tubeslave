@@ -10,7 +10,11 @@ const CYCLE_STEPS = [
   { id: 'eq', label: 'EQ' },
   { id: 'comp', label: 'Compressor' },
   { id: 'gate', label: 'Gate' },
+  { id: 'pan', label: 'Pan' },
   { id: 'fader', label: 'Fader' },
+  { id: 'fx', label: 'FX Sends' },
+  { id: 'groups', label: 'Bus / DCA' },
+  { id: 'master', label: 'Master' },
 ];
 
 function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
@@ -94,6 +98,9 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
   const sessionSummary = buildAutofohSessionSummary(sessionStatus);
   const driftStems = Object.entries(stemDrift?.stems || {})
     .filter(([, data]) => data.state && data.state !== 'NORMAL');
+  const familyRegistry = sessionStatus.supervised_console_family_registry || {};
+  const transactionPlanCount = Number(sessionStatus.supervised_transaction_plan_count || 0);
+  const transactionOperationCount = Number(sessionStatus.supervised_transaction_operation_count || 0);
   if (!channels.length) return (<div><SignalHint moduleKey="auto_soundcheck" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
 
   return (
@@ -120,6 +127,22 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
           <div className="module-status">Режим наблюдения: пульт не изменяется, все команды только логируются.</div>
         )}
         {statusMessage && <div className="module-status">{statusMessage}</div>}
+        <div className="module-status">
+          Транзакционный план: {transactionPlanCount} · операций: {transactionOperationCount}. Коррекции отправляются только через очередь подтверждения с физическим readback и откатом.
+        </div>
+        {Object.keys(familyRegistry).length > 0 && (
+          <div className="step-indicators">
+            {Object.entries(familyRegistry).map(([familyId, contract]) => (
+              <span
+                key={familyId}
+                className={`step-chip ${contract.lifecycle === 'live_allowed' ? 'active' : ''}`}
+                title={(contract.blockers || []).join(', ') || 'Аппаратное доказательство принято'}
+              >
+                {familyId.replaceAll('_', ' ')} · {(contract.live_allowed_write_kinds || []).length}/{(contract.write_kinds || []).length} live
+              </span>
+            ))}
+          </div>
+        )}
         {driftStems.length > 0 && (
           <div className="muq-drift-strip">
             {driftStems.map(([stem, data]) => {

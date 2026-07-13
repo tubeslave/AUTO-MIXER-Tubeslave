@@ -19,19 +19,34 @@ for _key, _value in _OFFLINE_MODEL_ENV_DEFAULTS.items():
 
 
 @pytest.fixture(autouse=True)
-def isolate_automixer_env():
-    """Keep AUTOMIXER_* overrides from leaking between tests."""
+def isolate_automixer_env(tmp_path):
+    """Keep AUTOMIXER_* overrides and audit writes isolated per test."""
     automixer_keys = [
         'AUTOMIXER_MIXER_IP',
         'AUTOMIXER_MIXER_PORT',
         'AUTOMIXER_WS_PORT',
         'AUTOMIXER_MODEL_FALLBACKS',
+        'AUTOMIXER_PACKAGED_OFFLINE_LOCK',
+        'AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR',
+        'AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR',
+        'AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR',
+        'AUTOMIXER_MASTER_CAPTURE_ROUTE_VERIFIED',
+        'AUTOMIXER_MASTER_CAPTURE_ROUTE_PROOF_ID',
     ]
     env_keys = [*automixer_keys, *_OFFLINE_MODEL_ENV_DEFAULTS.keys()]
     original = {key: os.environ.get(key) for key in env_keys}
 
     for key in automixer_keys:
         os.environ.pop(key, None)
+    os.environ['AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR'] = str(
+        tmp_path / 'manual_write_gate'
+    )
+    os.environ['AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR'] = str(
+        tmp_path / 'console_runtime'
+    )
+    os.environ['AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR'] = str(
+        tmp_path / 'correction_runtime'
+    )
     for key, value in _OFFLINE_MODEL_ENV_DEFAULTS.items():
         os.environ[key] = value
 

@@ -1,5 +1,7 @@
 """Read-only operator cockpit state handlers."""
 
+import asyncio
+import math
 import time
 from pathlib import Path
 
@@ -261,21 +263,48 @@ def register_handlers(server):
         return set(allowed_live_write_kinds_for_safety_surface(operator_mode))
 
     def coerce_float(value):
+        if isinstance(value, bool):
+            return None
         try:
             if value is None:
                 return None
-            return float(value)
+            parsed = float(value)
         except (TypeError, ValueError):
             return None
+        return parsed if math.isfinite(parsed) else None
+
+    def coerce_channel(value):
+        if isinstance(value, bool):
+            return None
+        if isinstance(value, int):
+            parsed = value
+        elif isinstance(value, float):
+            if not math.isfinite(value) or not value.is_integer():
+                return None
+            parsed = int(value)
+        elif isinstance(value, str):
+            raw = value.strip()
+            if not raw or not raw.lstrip("+-").isdigit():
+                return None
+            parsed = int(raw)
+        else:
+            return None
+        return parsed if 1 <= parsed <= 48 else None
 
     def is_operator_authored(proposal, data):
-        raw = getattr(proposal, "raw", {}) if proposal is not None else {}
-        return bool(
-            data.get("operator_authored")
-            or raw.get("operator_authored")
-            or raw.get("authored_by") == "operator"
-            or raw.get("source") == "operator_authored"
-        )
+        validator = getattr(server, "validate_operator_approval_token", None)
+        if not callable(validator):
+            return False
+        try:
+            return validator(
+                token=data.get("approval_token"),
+                proposal_id=getattr(proposal, "id", None),
+                requested_change=(
+                    getattr(proposal, "requested_change", None) or {}
+                ),
+            ) is True
+        except Exception:
+            return False
 
     def expected_wing_surface_contract(normalized_change):
         value_type = str(normalized_change.get("value_type") or "").strip().lower()
@@ -942,8 +971,8 @@ def register_handlers(server):
             )
             proposal_payloads = pipeline_preview.get("proposals", [])
 
-        apply_requested = bool(data.get("apply", False))
-        operator_ack = bool(data.get("operator_ack", False))
+        apply_requested = data.get("apply") is True
+        operator_ack = data.get("operator_ack") is True
         result = build_source_identity_proposal_queue_importer(
             queue_ordering_plan=queue_ordering_plan,
             proposal_payloads=proposal_payloads,
@@ -978,8 +1007,8 @@ def register_handlers(server):
             )
             proposal_payloads = pipeline_preview.get("proposals", [])
 
-        apply_requested = bool(data.get("apply", False))
-        operator_ack = bool(data.get("operator_ack", False))
+        apply_requested = data.get("apply") is True
+        operator_ack = data.get("operator_ack") is True
         result = (
             build_operator_proposal_apply_sequence_policy_memory_trust_promotion_queue_importer(
                 queue_ordering_plan=queue_ordering_plan,
@@ -2046,7 +2075,25 @@ def register_handlers(server):
     async def handle_create_operator_proposal(websocket, data):
         payload = dict(data.get("proposal") or data)
         payload.pop("type", None)
-        result = server.operator_proposal_queue.create(payload, server.get_operator_mode_status())
+        explicit_proposal_id = str(
+            payload.get("id") or payload.get("proposal_id") or ""
+        ).strip()
+        durable_ids = getattr(server, "_durable_operator_proposal_ids", set())
+        if explicit_proposal_id and explicit_proposal_id in durable_ids:
+            result = {
+                "type": "operator_proposal_created",
+                "status": "blocked",
+                "success": False,
+                "reason": "proposal_id_already_consumed",
+                "proposal_id": explicit_proposal_id,
+                "proposal": None,
+                "operator_mode": server.get_operator_mode_status(),
+            }
+        else:
+            result = server.operator_proposal_queue.create(
+                payload,
+                server.get_operator_mode_status(),
+            )
         proposal = result.get("proposal") if isinstance(result, dict) else None
         if isinstance(proposal, dict):
             requested_change = proposal.get("requested_change") or {}
@@ -2091,19 +2138,76 @@ def register_handlers(server):
             {
                 "status": "blocked",
                 "reason": reason,
+                "no_console_send_proven": True,
                 **extra,
+            },
+        )
+
+    def claim_and_reserve_operator_apply(
+        proposal,
+        *,
+        idempotency_key,
+        approval_id,
+    ):
+        claim = server.operator_proposal_queue.claim_for_apply(proposal)
+        if not claim.get("claimed"):
+            return {
+                "ready": False,
+                "reason": claim.get("reason") or "proposal_not_pending",
+                "claim": claim,
+            }
+        reservation = server.reserve_operator_apply_idempotency_key(
+            idempotency_key,
+            proposal_id=getattr(proposal, "id", None),
+            approval_id=approval_id,
+        )
+        if not reservation.get("reserved"):
+            server.operator_proposal_queue.mark_apply_result(
+                proposal,
+                {
+                    "status": "blocked",
+                    "reason": reservation.get("reason"),
+                    "idempotency": reservation,
+                    "no_console_send_proven": True,
+                },
+            )
+            return {
+                "ready": False,
+                "reason": reservation.get("reason"),
+                "claim": claim,
+                "idempotency": reservation,
+            }
+        return {
+            "ready": True,
+            "claim": claim,
+            "idempotency": reservation,
+        }
+
+    async def finalize_unknown_apply_failure(proposal, *, reason, error=None):
+        emergency_stop = getattr(server, "activate_system_emergency_stop", None)
+        if callable(emergency_stop):
+            await emergency_stop(
+                f"operator_proposal_unknown_write_state:{proposal.id}:{reason}"
+            )
+        return server.operator_proposal_queue.mark_apply_result(
+            proposal,
+            {
+                "status": "error",
+                "success": False,
+                "reason": reason,
+                "error": str(error) if error is not None else None,
+                "manual_review_required": True,
+                "emergency_stop_activated": callable(emergency_stop),
             },
         )
 
     def normalize_linked_change(change):
         value_type = server._normalize_manual_write_kind(change.get("value_type"))
-        try:
-            channel = int(change.get("channel"))
-        except (TypeError, ValueError):
+        channel = coerce_channel(change.get("channel"))
+        if channel is None:
             return None, "invalid_channel"
-        try:
-            value = float(change.get("value"))
-        except (TypeError, ValueError):
+        value = coerce_float(change.get("value"))
+        if value is None:
             return None, "invalid_value"
         address = server._manual_write_address(channel, value_type)
         if not address:
@@ -2119,19 +2223,85 @@ def register_handlers(server):
     async def rollback_linked_results(websocket, proposal, applied_results, approval_id, reason):
         rollback_results = []
         for index, applied in reversed(list(enumerate(applied_results))):
+            value_type = str(applied.get("value_type") or "")
+            channel = coerce_channel(applied.get("channel"))
+            expected_current_value = applied.get("effective_value")
+            rollback_value = applied.get("rollback_value")
+            address = str(
+                applied.get("rollback_address")
+                or (
+                    server._manual_write_address(channel, value_type)
+                    if channel is not None
+                    else ""
+                )
+            )
+            if (
+                channel is None
+                or rollback_value is None
+                or expected_current_value is None
+                or not address
+            ):
+                rollback_results.append(
+                    {
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "rollback_preimage_unavailable",
+                        "rollback": True,
+                        "rollback_verified": False,
+                        "channel": applied.get("channel"),
+                        "value_type": value_type,
+                    }
+                )
+                continue
+            current_read = await server._manual_write_read_value(
+                channel=channel,
+                value_type=value_type,
+                address=address,
+                prefer_physical=True,
+            )
+            current_status = server._manual_write_readback_status(
+                old_value=expected_current_value,
+                readback_value=current_read.get("value"),
+                effective_value=expected_current_value,
+                value_type=value_type,
+                readback_source=str(current_read.get("source") or "unavailable"),
+                readback_cache_freshness=current_read.get("cache_freshness"),
+            )
+            if current_status != "verified_from_physical_readback":
+                rollback_results.append(
+                    {
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "rollback_cas_target_changed_or_unverified",
+                        "rollback": True,
+                        "rollback_verified": False,
+                        "channel": channel,
+                        "value_type": value_type,
+                        "expected_current_value": expected_current_value,
+                        "current_readback_value": current_read.get("value"),
+                        "current_readback_status": current_status,
+                    }
+                )
+                continue
             rollback_result = await server._apply_manual_console_write(
                 websocket,
-                channel=applied.get("channel"),
-                value=applied.get("rollback_value"),
-                value_type=applied.get("value_type"),
+                channel=channel,
+                value=rollback_value,
+                value_type=value_type,
                 source=f"operator_proposal_linked_rollback:{proposal.id}",
                 reason=reason,
                 approved=True,
                 approval_id=f"rollback:{approval_id}:{index + 1}",
+                expected_current_value=expected_current_value,
                 bypass_cooldown=True,
+                emergency_recovery=True,
             )
             rollback_result.update({
                 "rollback": True,
+                "rollback_verified": (
+                    rollback_result.get("status") == "applied"
+                    and manual_write_result_verified(rollback_result)
+                ),
                 "rollback_of": applied.get("approval_id"),
                 "rollback_source": applied.get("source"),
             })
@@ -2159,7 +2329,7 @@ def register_handlers(server):
             await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
             return
 
-        if not bool(data.get("approved", False)):
+        if data.get("approved") is not True:
             record_apply_trace(
                 proposal=proposal,
                 operator_mode=operator_mode,
@@ -2207,6 +2377,14 @@ def register_handlers(server):
             await server.send_to_client(websocket, {"type": "operator_proposal_apply_blocked", **result})
             return
 
+        approval_id = str(data.get("approval_id") or "").strip()
+        if not approval_id:
+            result = linked_change_blocked_result(proposal, "approval_id_required")
+            await server.send_to_client(
+                websocket,
+                {"type": "operator_proposal_apply_blocked", **result},
+            )
+            return
         normalized_changes = []
         for raw_change in requested_changes:
             normalized, error = await validate_change_before_apply(
@@ -2257,7 +2435,6 @@ def register_handlers(server):
                 return
             normalized_changes.append(normalized)
 
-        approval_id = data.get("approval_id") or proposal.id
         applied_results = []
         for index, change in enumerate(normalized_changes):
             apply_result = await apply_manual_console_write(
@@ -2269,6 +2446,9 @@ def register_handlers(server):
                 reason=data.get("reason") or proposal.reason or proposal.title,
                 approved=True,
                 approval_id=f"{approval_id}:{index + 1}",
+                idempotency_key=idempotency_key,
+                proposal_id=proposal.id,
+                expected_current_value=change["old_value"],
             )
             applied_results.append(apply_result)
             record_apply_trace(
@@ -2284,9 +2464,17 @@ def register_handlers(server):
             verified = manual_write_result_verified(apply_result)
             rollback_ready = bool(apply_result.get("rollback_available"))
             if apply_result.get("status") != "applied" or not verified or not rollback_ready:
+                possible_mutations = [
+                    result
+                    for result in applied_results
+                    if result.get("status") in {"applied", "sent_unverified"}
+                    or result.get("manual_review_required")
+                    or result.get("emergency_stop_activated")
+                ]
                 rollback_candidates = [
-                    result for result in applied_results
-                    if result.get("status") == "applied" and result.get("rollback_available")
+                    result
+                    for result in possible_mutations
+                    if result.get("rollback_available")
                 ]
                 rollback_results = await rollback_linked_results(
                     websocket,
@@ -2295,14 +2483,51 @@ def register_handlers(server):
                     approval_id,
                     "rollback:linked_operator_proposal_failed",
                 )
-                result = linked_change_blocked_result(
-                    proposal,
-                    "linked_apply_failed_rolled_back",
-                    failed_result=apply_result,
-                    apply_results=applied_results,
-                    rollback_results=rollback_results,
-                    requested_changes=requested_changes,
+                recovered_count = sum(
+                    1 for item in rollback_results if item.get("rollback_verified")
                 )
+                recovery_complete = (
+                    len(possible_mutations) == len(rollback_candidates)
+                    and len(rollback_candidates) == len(rollback_results)
+                    and recovered_count == len(possible_mutations)
+                )
+                if recovery_complete:
+                    result = linked_change_blocked_result(
+                        proposal,
+                        "linked_apply_failed_rolled_back",
+                        no_console_send_proven=False,
+                        physical_state_restored=True,
+                        terminal_after_console_send=True,
+                        fresh_analysis_required=True,
+                        failed_result=apply_result,
+                        apply_results=applied_results,
+                        rollback_results=rollback_results,
+                        requested_changes=requested_changes,
+                    )
+                else:
+                    emergency_stop = getattr(
+                        server,
+                        "activate_system_emergency_stop",
+                        None,
+                    )
+                    if callable(emergency_stop):
+                        await emergency_stop(
+                            f"linked_apply_recovery_incomplete:{proposal.id}"
+                        )
+                    result = server.operator_proposal_queue.mark_apply_result(
+                        proposal,
+                        {
+                            "status": "error",
+                            "success": False,
+                            "reason": "linked_apply_failed_manual_review_required",
+                            "manual_review_required": True,
+                            "emergency_stop_activated": callable(emergency_stop),
+                            "failed_result": apply_result,
+                            "apply_results": applied_results,
+                            "rollback_results": rollback_results,
+                            "requested_changes": requested_changes,
+                        },
+                    )
                 for rollback_result in rollback_results:
                     record_apply_trace(
                         proposal=proposal,
@@ -2428,6 +2653,17 @@ def register_handlers(server):
             )
             return
 
+        if proposal.status != "pending":
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": "proposal_not_pending",
+                "proposal_status": proposal.status,
+                "proposal": proposal.to_dict(),
+            })
+            return
+
         await server.send_to_client(
             websocket,
             await build_operator_proposal_apply_preflight_result(proposal, data),
@@ -2504,7 +2740,7 @@ def register_handlers(server):
                     requested_changes=requested_changes,
                     extra=preflight_extra,
                 )
-            if not bool(data.get("approved", False)):
+            if data.get("approved") is not True:
                 return operator_apply_preflight_payload(
                     proposal=proposal,
                     operator_mode=operator_mode,
@@ -2632,7 +2868,7 @@ def register_handlers(server):
                 },
             )
 
-        if not bool(data.get("approved", False)):
+        if data.get("approved") is not True:
             return operator_apply_preflight_payload(
                 proposal=proposal,
                 operator_mode=operator_mode,
@@ -3359,6 +3595,7 @@ def register_handlers(server):
                 "type": "apply_operator_proposal",
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": str(apply_request.get("approval_id")).strip(),
                 "idempotency_key": idempotency_key,
             },
             "current_proposal": current_proposal,
@@ -3367,7 +3604,8 @@ def register_handlers(server):
 
     async def handle_gate_operator_proposal_apply_sequence_execution(websocket, data):
         raw_results = dry_run_results_from_data(data)
-        operator_ack = bool(data.get("operator_ack", False))
+        operator_ack = data.get("operator_ack") is True
+        approval_id = str(data.get("approval_id") or "").strip()
         if raw_results is None:
             await server.send_to_client(
                 websocket,
@@ -3416,6 +3654,27 @@ def register_handlers(server):
                 ),
             )
             return
+        if not approval_id:
+            await server.send_to_client(
+                websocket,
+                execution_gate_payload(
+                    status="blocked",
+                    reason="approval_id_required",
+                    dry_run_results=dry_run_results,
+                    operator_ack=operator_ack,
+                    blocked=[
+                        *blocked,
+                        {
+                            "planned_apply_index": None,
+                            "proposal_id": None,
+                            "dry_run_result_index": None,
+                            "status": "blocked",
+                            "reason": "approval_id_required",
+                        },
+                    ],
+                ),
+            )
+            return
 
         operator_mode = server.get_operator_mode_status()
         if not operator_mode.get("capabilities", {}).get("can_apply_to_console"):
@@ -3451,6 +3710,10 @@ def register_handlers(server):
             if blocker:
                 blocked.append(blocker)
             else:
+                candidate["apply_request"] = {
+                    **dict(candidate["apply_request"]),
+                    "approval_id": approval_id,
+                }
                 candidates.append(candidate)
 
         await server.send_to_client(
@@ -3754,7 +4017,7 @@ def register_handlers(server):
                     "blocked_proposal_ids": blocked_ids,
                     "skipped_analysis_only_ids": skipped_analysis_only_ids,
                     "not_found_ids": not_found_ids,
-                    "approved": bool(data.get("approved", False)),
+                    "approved": data.get("approved") is True,
                     "idempotency_key_prefix": (
                         str(data.get("idempotency_key_prefix") or "").strip() or None
                     ),
@@ -3778,8 +4041,19 @@ def register_handlers(server):
         )
 
     async def handle_apply_operator_proposal(websocket, data):
-        proposal_id, index = proposal_id_or_index(data)
-        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id, index=index)
+        proposal_id = str(data.get("proposal_id") or "").strip()
+        if not proposal_id:
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": "proposal_id_required_for_apply",
+                "proposal_id": None,
+            })
+            return
+
+        index = None
+        proposal = server.operator_proposal_queue.find(proposal_id=proposal_id)
         operator_mode = server.get_operator_mode_status()
         if proposal is None:
             recorder = getattr(server, "record_automation_decision_trace", None)
@@ -3807,16 +4081,24 @@ def register_handlers(server):
             })
             return
 
+        if proposal.status != "pending":
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": "proposal_not_pending",
+                "proposal": proposal.to_dict(),
+            })
+            return
+
         if proposal.is_expired():
-            result = server.operator_proposal_queue.mark_apply_result(
-                proposal,
-                {
-                    "status": "blocked",
-                    "reason": "proposal_expired",
-                    "expires_at": proposal.expires_at,
-                    "ttl_seconds": proposal.ttl_seconds,
-                },
-            )
+            result = server.operator_proposal_queue.expire_pending(proposal)
+            result["apply_result"] = {
+                "status": "blocked",
+                "reason": "proposal_expired",
+                "expires_at": proposal.expires_at,
+                "ttl_seconds": proposal.ttl_seconds,
+            }
             record_apply_trace(
                 proposal=proposal,
                 operator_mode=operator_mode,
@@ -3833,12 +4115,16 @@ def register_handlers(server):
             return
 
         idempotency_key = str(data.get("idempotency_key") or "").strip()
-        reservation = server.reserve_operator_apply_idempotency_key(
-            idempotency_key,
-            proposal_id=getattr(proposal, "id", None),
-            approval_id=data.get("approval_id"),
-        )
-        if not reservation.get("reserved"):
+        idempotency_store = getattr(server, "_operator_apply_idempotency_keys", {})
+        if not idempotency_key or (
+            isinstance(idempotency_store, dict)
+            and idempotency_key in idempotency_store
+        ):
+            reservation = server.reserve_operator_apply_idempotency_key(
+                idempotency_key,
+                proposal_id=getattr(proposal, "id", None),
+                approval_id=data.get("approval_id"),
+            )
             reason = reservation.get("reason")
             record_apply_trace(
                 proposal=proposal,
@@ -3860,9 +4146,246 @@ def register_handlers(server):
             })
             return
 
+        transaction_plan = (
+            proposal.raw.get("supervised_transaction_plan")
+            if isinstance(getattr(proposal, "raw", None), dict)
+            else None
+        )
+        if isinstance(transaction_plan, dict):
+            proposal_view = proposal.to_dict()
+            apply_blockers = list(proposal_view.get("apply_blockers") or [])
+            if apply_blockers:
+                blocked_reason = str(apply_blockers[0]).split(":", 1)[0]
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "apply_blocked",
+                    "success": False,
+                    "reason": blocked_reason,
+                    "apply_blockers": apply_blockers,
+                    "proposal": proposal_view,
+                    "apply_result": {
+                        "status": "blocked",
+                        "reason": blocked_reason,
+                        "apply_blockers": apply_blockers,
+                    },
+                })
+                return
+            approval_id = str(data.get("approval_id") or "").strip()
+            if not approval_id:
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "approval_id_required",
+                    "proposal": proposal.to_dict(),
+                })
+                return
+            if data.get("approved") is not True:
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "approval_required",
+                    "proposal": proposal.to_dict(),
+                })
+                return
+            claim_result = claim_and_reserve_operator_apply(
+                proposal,
+                idempotency_key=idempotency_key,
+                approval_id=approval_id,
+            )
+            if not claim_result.get("ready"):
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": claim_result.get("reason"),
+                    "proposal": proposal.to_dict(),
+                    **{
+                        key: value
+                        for key, value in claim_result.items()
+                        if key != "ready"
+                    },
+                })
+                return
+            apply_transaction = getattr(
+                server,
+                "apply_supervised_soundcheck_transaction",
+                None,
+            )
+            if not callable(apply_transaction):
+                apply_result = {
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "supervised_transaction_path_unavailable",
+                }
+            else:
+                try:
+                    apply_result = await apply_transaction(
+                        transaction_plan,
+                        approved=True,
+                        approval_id=approval_id,
+                        idempotency_key=idempotency_key,
+                        proof_run=False,
+                        approval_expires_at_epoch=proposal.expiration_epoch(),
+                    )
+                except asyncio.CancelledError:
+                    await finalize_unknown_apply_failure(
+                        proposal,
+                        reason="supervised_transaction_cancelled",
+                    )
+                    raise
+                except Exception as exc:
+                    result = await finalize_unknown_apply_failure(
+                        proposal,
+                        reason="supervised_transaction_exception",
+                        error=exc,
+                    )
+                    await server.send_to_client(
+                        websocket,
+                        {"type": "operator_proposal_apply_result", **result},
+                    )
+                    return
+            # Retry/release authority requires an explicit server proof.  The
+            # absence of events or WAL fields is not evidence that a legacy or
+            # partial result never reached the console.
+            no_console_send_proven = bool(
+                apply_result.get("no_console_send_proven") is True
+            )
+            result = server.operator_proposal_queue.mark_apply_result(
+                proposal,
+                apply_result,
+            )
+            if no_console_send_proven:
+                release_idempotency = getattr(
+                    server,
+                    "release_operator_apply_idempotency_key_if_no_send",
+                    None,
+                )
+                if callable(release_idempotency):
+                    result["operator_idempotency_released"] = bool(
+                        release_idempotency(
+                            idempotency_key,
+                            proposal_id=proposal.id,
+                        )
+                    )
+            record_child_result = getattr(
+                server,
+                "record_soundcheck_child_result",
+                None,
+            )
+            if callable(record_child_result) and not isinstance(
+                apply_result.get("soundcheck_readiness"),
+                dict,
+            ):
+                readiness = record_child_result(proposal, apply_result)
+                if isinstance(readiness, dict):
+                    result["soundcheck_readiness"] = readiness
+            elif isinstance(apply_result.get("soundcheck_readiness"), dict):
+                result["soundcheck_readiness"] = dict(
+                    apply_result["soundcheck_readiness"]
+                )
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change={
+                    "value_type": "supervised_transaction",
+                    "transaction_id": transaction_plan.get("transaction_id"),
+                    "operation_count": len(transaction_plan.get("operations") or []),
+                },
+                idempotency_key=idempotency_key,
+                status=apply_result.get("status", "unknown"),
+                blocked_reason=(
+                    apply_result.get("reason")
+                    if apply_result.get("status") != "applied"
+                    else None
+                ),
+                metadata={"supervised_transaction": True},
+            )
+            await server.send_to_client(
+                websocket,
+                {"type": "operator_proposal_apply_result", **result},
+            )
+            return
+
         requested_changes = getattr(proposal, "requested_changes", []) or []
         if requested_changes:
-            await apply_linked_operator_proposal(websocket, data, proposal, operator_mode, requested_changes, idempotency_key)
+            approval_id = str(data.get("approval_id") or "").strip()
+            if not approval_id:
+                result = linked_change_blocked_result(
+                    proposal,
+                    "approval_id_required",
+                )
+                await server.send_to_client(
+                    websocket,
+                    {"type": "operator_proposal_apply_blocked", **result},
+                )
+                return
+            if data.get("approved") is not True:
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "approval_required",
+                    "proposal": proposal.to_dict(),
+                })
+                return
+            claim_result = claim_and_reserve_operator_apply(
+                proposal,
+                idempotency_key=idempotency_key,
+                approval_id=approval_id,
+            )
+            if not claim_result.get("ready"):
+                await server.send_to_client(websocket, {
+                    "type": "operator_proposal_apply_blocked",
+                    "status": "blocked",
+                    "success": False,
+                    "reason": claim_result.get("reason"),
+                    "proposal": proposal.to_dict(),
+                    **{
+                        key: value
+                        for key, value in claim_result.items()
+                        if key != "ready"
+                    },
+                })
+                return
+            write_scope = getattr(server, "_console_write_scope", None)
+            try:
+                if callable(write_scope):
+                    async with write_scope():
+                        await apply_linked_operator_proposal(
+                            websocket,
+                            data,
+                            proposal,
+                            operator_mode,
+                            requested_changes,
+                            idempotency_key,
+                        )
+                else:
+                    await apply_linked_operator_proposal(
+                        websocket,
+                        data,
+                        proposal,
+                        operator_mode,
+                        requested_changes,
+                        idempotency_key,
+                    )
+            except asyncio.CancelledError:
+                await finalize_unknown_apply_failure(
+                    proposal,
+                    reason="linked_operator_proposal_cancelled",
+                )
+                raise
+            except Exception as exc:
+                result = await finalize_unknown_apply_failure(
+                    proposal,
+                    reason="linked_operator_proposal_exception",
+                    error=exc,
+                )
+                await server.send_to_client(
+                    websocket,
+                    {"type": "operator_proposal_apply_result", **result},
+                )
             return
 
         requested_change = proposal.requested_change or {}
@@ -3942,7 +4465,7 @@ def register_handlers(server):
             })
             return
 
-        if not bool(data.get("approved", False)):
+        if data.get("approved") is not True:
             record_apply_trace(
                 proposal=proposal,
                 operator_mode=operator_mode,
@@ -3957,6 +4480,18 @@ def register_handlers(server):
                 "success": False,
                 "reason": "approval_required",
                 "proposal": proposal.to_dict(),
+            })
+            return
+
+        approval_id = str(data.get("approval_id") or "").strip()
+        if not approval_id:
+            result = server.operator_proposal_queue.mark_apply_result(
+                proposal,
+                {"status": "blocked", "reason": "approval_id_required"},
+            )
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                **result,
             })
             return
 
@@ -3999,6 +4534,26 @@ def register_handlers(server):
             })
             return
 
+        claim_result = claim_and_reserve_operator_apply(
+            proposal,
+            idempotency_key=idempotency_key,
+            approval_id=approval_id,
+        )
+        if not claim_result.get("ready"):
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": claim_result.get("reason"),
+                "proposal": proposal.to_dict(),
+                **{
+                    key: value
+                    for key, value in claim_result.items()
+                    if key != "ready"
+                },
+            })
+            return
+
         normalized_change, safety_error = await validate_change_before_apply(
             requested_change,
             proposal=proposal,
@@ -4013,6 +4568,7 @@ def register_handlers(server):
                     "status": "blocked",
                     "reason": safety_error["reason"],
                     "requested_change": requested_change,
+                    "no_console_send_proven": True,
                     **{key: value for key, value in safety_error.items() if key not in {"reason", "requested_change"}},
                 },
             )
@@ -4032,16 +4588,37 @@ def register_handlers(server):
             })
             return
 
-        apply_result = await apply_manual_console_write(
-            websocket,
-            channel=normalized_change["channel"],
-            value=normalized_change["effective_value"],
-            value_type=normalized_change["value_type"],
-            source=f"operator_proposal:{proposal.id}",
-            reason=data.get("reason") or proposal.reason or proposal.title,
-            approved=True,
-            approval_id=data.get("approval_id") or proposal.id,
-        )
+        try:
+            apply_result = await apply_manual_console_write(
+                websocket,
+                channel=normalized_change["channel"],
+                value=normalized_change["effective_value"],
+                value_type=normalized_change["value_type"],
+                source=f"operator_proposal:{proposal.id}",
+                reason=data.get("reason") or proposal.reason or proposal.title,
+                approved=True,
+                approval_id=approval_id,
+                idempotency_key=idempotency_key,
+                proposal_id=proposal.id,
+                expected_current_value=normalized_change["old_value"],
+            )
+        except asyncio.CancelledError:
+            await finalize_unknown_apply_failure(
+                proposal,
+                reason="operator_proposal_apply_cancelled",
+            )
+            raise
+        except Exception as exc:
+            result = await finalize_unknown_apply_failure(
+                proposal,
+                reason="operator_proposal_apply_exception",
+                error=exc,
+            )
+            await server.send_to_client(
+                websocket,
+                {"type": "operator_proposal_apply_result", **result},
+            )
+            return
         result = server.operator_proposal_queue.mark_apply_result(proposal, apply_result)
         record_apply_trace(
             proposal=proposal,
@@ -4153,6 +4730,14 @@ def register_handlers(server):
                 "status": "blocked",
                 "reason": "apply_request_approval_required",
             }
+        if not str(apply_request.get("approval_id") or "").strip():
+            return None, {
+                "planned_apply_index": planned_apply_index,
+                "proposal_id": proposal_id,
+                "candidate_index": candidate_index,
+                "status": "blocked",
+                "reason": "apply_request_approval_id_required",
+            }
 
         idempotency_key = str(apply_request.get("idempotency_key") or "").strip()
         if not idempotency_key:
@@ -4213,6 +4798,7 @@ def register_handlers(server):
                 "type": "apply_operator_proposal",
                 "proposal_id": proposal_id,
                 "approved": True,
+                "approval_id": str(apply_request.get("approval_id")).strip(),
                 "idempotency_key": idempotency_key,
             },
             "current_proposal": current_proposal,
@@ -4327,9 +4913,10 @@ def register_handlers(server):
 
     async def handle_execute_operator_proposal_apply_sequence(websocket, data):
         raw_candidates = executor_ready_rows_from_data(data)
-        operator_ack = bool(data.get("operator_ack", False))
-        execute = bool(data.get("execute", False))
-        approved = bool(data.get("approved", False))
+        operator_ack = data.get("operator_ack") is True
+        execute = data.get("execute") is True
+        approved = data.get("approved") is True
+        approval_id = str(data.get("approval_id") or "").strip()
         if raw_candidates is None:
             await server.send_to_client(
                 websocket,
@@ -4383,7 +4970,6 @@ def register_handlers(server):
                 "status": "blocked",
                 "reason": "approved_true_required",
             })
-
         operator_mode = server.get_operator_mode_status()
         if not operator_mode.get("capabilities", {}).get("can_apply_to_console"):
             blocked.append({
@@ -4406,6 +4992,20 @@ def register_handlers(server):
                 blocked.append(blocker)
             else:
                 ready_rows.append(ready_row)
+
+        if not blocked and ready_rows and approval_id:
+            for ready_row in ready_rows:
+                bound_approval_id = str(
+                    ready_row["apply_request"].get("approval_id") or ""
+                ).strip()
+                if bound_approval_id != approval_id:
+                    blocked.append({
+                        "planned_apply_index": ready_row["planned_apply_index"],
+                        "proposal_id": ready_row["proposal_id"],
+                        "candidate_index": ready_row["candidate_index"],
+                        "status": "blocked",
+                        "reason": "approval_id_binding_mismatch",
+                    })
 
         if blocked or not ready_rows:
             await server.send_to_client(
@@ -4431,6 +5031,7 @@ def register_handlers(server):
         results = []
         for ready_row in ready_rows:
             apply_request = dict(ready_row["apply_request"])
+            apply_request["approval_id"] = approval_id or apply_request["approval_id"]
             await handle_apply_operator_proposal(websocket, apply_request)
             proposal = server.operator_proposal_queue.find(
                 proposal_id=ready_row["proposal_id"],
@@ -5722,8 +6323,8 @@ def register_handlers(server):
 
     async def handle_write_operator_proposal_apply_sequence_policy_memory(websocket, data):
         source_payload = sequence_policy_memory_draft_payload_from_data(data)
-        apply_requested = bool(data.get("apply", False))
-        operator_ack = bool(data.get("operator_ack", False))
+        apply_requested = data.get("apply") is True
+        operator_ack = data.get("operator_ack") is True
         if not isinstance(source_payload, dict):
             await server.send_to_client(
                 websocket,
@@ -5921,8 +6522,8 @@ def register_handlers(server):
                 or data.get("execution_plan")
                 or data.get("plan")
             ),
-            apply=bool(data.get("apply", False)),
-            operator_ack=bool(data.get("operator_ack", False)),
+            apply=data.get("apply") is True,
+            operator_ack=data.get("operator_ack") is True,
         )
         result["handler"] = (
             "dry_run_operator_proposal_apply_sequence_policy_memory_trust_promotion_executor"
@@ -5947,8 +6548,8 @@ def register_handlers(server):
                 or data.get("dry_run")
             ),
             target_store=target_store,
-            apply=bool(data.get("apply", False)),
-            operator_ack=bool(data.get("operator_ack", False)),
+            apply=data.get("apply") is True,
+            operator_ack=data.get("operator_ack") is True,
         )
         result["handler"] = (
             "execute_operator_proposal_apply_sequence_policy_memory_trust_promotion"

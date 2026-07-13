@@ -1,0 +1,1075 @@
+{
+  "operation_count": 51,
+  "operations": [
+    {
+      "channel": 1,
+      "family_id": "gain_trim",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelgainmove:5f211b1cf1be839a",
+      "parameter": "input_gain_db",
+      "snapshot_values": {
+        "/ch/1/in/set/trim": 4.600000381469727
+      },
+      "target_value": -2.1728959600644924,
+      "write_kind": "gain"
+    },
+    {
+      "channel": 1,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:b1ed6dde23b9bf1c",
+      "parameter": "eq_band_4",
+      "snapshot_values": {
+        "/ch/1/eq/4f": 3505.7421875,
+        "/ch/1/eq/4g": 3.0,
+        "/ch/1/eq/4q": 1.5126134157180786,
+        "/ch/1/eq/on": 1
+      },
+      "target_value": {
+        "band": 4,
+        "freq_hz": 8000.0,
+        "gain_db": 0.0,
+        "q": 1.5
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 1,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:70e65ed7e1bc4b54",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/1/flt/lc": 1,
+        "/ch/1/flt/lcf": 29.924715042114258
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 42.0
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 2,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:e8d11255e36c3769",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/2/flt/lc": 1,
+        "/ch/2/flt/lcf": 89.98185729980469
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 112.47732162475586
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 3,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:84713f1370466258",
+      "parameter": "eq_band_1",
+      "snapshot_values": {
+        "/ch/3/eq/1f": 176.97216796875,
+        "/ch/3/eq/1g": -6.0,
+        "/ch/3/eq/1q": 3.4749510288238525,
+        "/ch/3/eq/on": 1
+      },
+      "target_value": {
+        "band": 1,
+        "freq_hz": 120.0,
+        "gain_db": -7.0,
+        "q": 4.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 3,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:79ab20cba912750c",
+      "parameter": "eq_band_2",
+      "snapshot_values": {
+        "/ch/3/eq/2f": 366.0412292480469,
+        "/ch/3/eq/2g": -6.0,
+        "/ch/3/eq/2q": 3.4749510288238525,
+        "/ch/3/eq/on": 1
+      },
+      "target_value": {
+        "band": 2,
+        "freq_hz": 375.0,
+        "gain_db": -5.0,
+        "q": 2.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 3,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:d352e9c026b232fc",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/3/flt/lc": 1,
+        "/ch/3/flt/lcf": 89.98185729980469
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 112.47732162475586
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 4,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:386a6655430c7856",
+      "parameter": "eq_band_1",
+      "snapshot_values": {
+        "/ch/4/eq/1f": 179.53741455078125,
+        "/ch/4/eq/1g": -6.0,
+        "/ch/4/eq/1q": 3.4749510288238525,
+        "/ch/4/eq/on": 1
+      },
+      "target_value": {
+        "band": 1,
+        "freq_hz": 120.0,
+        "gain_db": -7.0,
+        "q": 4.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 4,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:1d6a3c7135e2f57f",
+      "parameter": "eq_band_3",
+      "snapshot_values": {
+        "/ch/4/eq/3f": 399.05242919921875,
+        "/ch/4/eq/3g": -4.0,
+        "/ch/4/eq/3q": 1.9958817958831787,
+        "/ch/4/eq/on": 1
+      },
+      "target_value": {
+        "band": 3,
+        "freq_hz": 3000.0,
+        "gain_db": -5.0,
+        "q": 4.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 6,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:d30dda2b92921105",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/6/flt/lc": 1,
+        "/ch/6/flt/lcf": 119.99275207519531
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 120.0
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 7,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:046e6562fb02829a",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/7/flt/lc": 1,
+        "/ch/7/flt/lcf": 119.99275207519531
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 149.99094009399414
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 8,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:6b2e16dd0e9950bc",
+      "parameter": "eq_band_1",
+      "snapshot_values": {
+        "/ch/8/eq/1f": 173.19287109375,
+        "/ch/8/eq/1g": -6.0,
+        "/ch/8/eq/1q": 3.4749510288238525,
+        "/ch/8/eq/on": 1
+      },
+      "target_value": {
+        "band": 1,
+        "freq_hz": 120.0,
+        "gain_db": -7.0,
+        "q": 2.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 8,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:450a457f9d6069cc",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/8/flt/lc": 1,
+        "/ch/8/flt/lcf": 29.924715042114258
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 30.0
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 9,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:2da5289349c6e2b7",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/9/flt/lc": 1,
+        "/ch/9/flt/lcf": 80.19641876220703
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 100.24552345275879
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 10,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:152c0146ff4b95f4",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/10/flt/lc": 1,
+        "/ch/10/flt/lcf": 80.19641876220703
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 100.24552345275879
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 11,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [
+          "eq_enabled_physical_readback"
+        ],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:channeleqmove:b8de5c4f51142bb2",
+      "parameter": "eq_band_1",
+      "snapshot_values": {
+        "/ch/11/eq/1f": 292.8565673828125,
+        "/ch/11/eq/1g": -6.0,
+        "/ch/11/eq/1q": 3.4749510288238525,
+        "/ch/11/eq/on": 1
+      },
+      "target_value": {
+        "band": 1,
+        "freq_hz": 10702.693130402105,
+        "gain_db": -6.0,
+        "q": 4.0
+      },
+      "write_kind": "eq"
+    },
+    {
+      "channel": 13,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:fd8eb56d1623e7c1",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/13/flt/lc": 1,
+        "/ch/13/flt/lcf": 80.19641876220703
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 100.24552345275879
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 16,
+      "family_id": "eq_hpf",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:highpassadjust:7e18727b0015a994",
+      "parameter": "high_pass_filter",
+      "snapshot_values": {
+        "/ch/16/flt/lc": 1,
+        "/ch/16/flt/lcf": 89.98185729980469
+      },
+      "target_value": {
+        "enabled": true,
+        "freq_hz": 112.47732162475586
+      },
+      "write_kind": "hpf"
+    },
+    {
+      "channel": 1,
+      "family_id": "gate_expander",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "source_control"
+      },
+      "operation_id": "soundcheck:gateadjust:3836bb611f9eb7a2",
+      "parameter": "gate",
+      "snapshot_values": {
+        "/ch/1/gate/att": 0.0,
+        "/ch/1/gate/hld": 200.0,
+        "/ch/1/gate/on": 1,
+        "/ch/1/gate/range": 18.0,
+        "/ch/1/gate/rel": 199.40428161621094,
+        "/ch/1/gate/thr": -51.0
+      },
+      "target_value": {
+        "attack_ms": 1.0,
+        "enabled": true,
+        "hold_ms": 90.0,
+        "range_db": 24.0,
+        "release_ms": 140.0,
+        "threshold_db": -47.0
+      },
+      "write_kind": "gate"
+    },
+    {
+      "channel": 2,
+      "family_id": "gate_expander",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "source_control"
+      },
+      "operation_id": "soundcheck:gateadjust:95d23a6e19b3bf92",
+      "parameter": "gate",
+      "snapshot_values": {
+        "/ch/2/gate/att": 0.0,
+        "/ch/2/gate/hld": 180.0,
+        "/ch/2/gate/on": 1,
+        "/ch/2/gate/range": 20.0,
+        "/ch/2/gate/rel": 179.1525115966797,
+        "/ch/2/gate/thr": -47.0
+      },
+      "target_value": {
+        "attack_ms": 1.5,
+        "enabled": true,
+        "hold_ms": 90.0,
+        "range_db": 26.0,
+        "release_ms": 180.0,
+        "threshold_db": -50.0
+      },
+      "write_kind": "gate"
+    },
+    {
+      "channel": 3,
+      "family_id": "gate_expander",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "source_control"
+      },
+      "operation_id": "soundcheck:gateadjust:3f0efdec68c4dcf5",
+      "parameter": "gate",
+      "snapshot_values": {
+        "/ch/3/gate/att": 0.0,
+        "/ch/3/gate/hld": 180.0,
+        "/ch/3/gate/on": 1,
+        "/ch/3/gate/range": 20.0,
+        "/ch/3/gate/rel": 179.1525115966797,
+        "/ch/3/gate/thr": -46.0
+      },
+      "target_value": {
+        "attack_ms": 1.5,
+        "enabled": true,
+        "hold_ms": 90.0,
+        "range_db": 26.0,
+        "release_ms": 180.0,
+        "threshold_db": -46.6
+      },
+      "write_kind": "gate"
+    },
+    {
+      "channel": 4,
+      "family_id": "gate_expander",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "source_control"
+      },
+      "operation_id": "soundcheck:gateadjust:52aec3d9a5fea5ed",
+      "parameter": "gate",
+      "snapshot_values": {
+        "/ch/4/gate/att": 0.0,
+        "/ch/4/gate/hld": 180.0,
+        "/ch/4/gate/on": 1,
+        "/ch/4/gate/range": 20.0,
+        "/ch/4/gate/rel": 179.1525115966797,
+        "/ch/4/gate/thr": -52.5
+      },
+      "target_value": {
+        "attack_ms": 1.5,
+        "enabled": true,
+        "hold_ms": 120.0,
+        "range_db": 26.0,
+        "release_ms": 260.0,
+        "threshold_db": -50.7
+      },
+      "write_kind": "gate"
+    },
+    {
+      "channel": 5,
+      "family_id": "gate_expander",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "source_control"
+      },
+      "operation_id": "soundcheck:gateadjust:2ca68f4afdbd2dca",
+      "parameter": "gate",
+      "snapshot_values": {
+        "/ch/5/gate/att": 0.0,
+        "/ch/5/gate/hld": 180.0,
+        "/ch/5/gate/on": 1,
+        "/ch/5/gate/range": 20.0,
+        "/ch/5/gate/rel": 179.1525115966797,
+        "/ch/5/gate/thr": -48.0
+      },
+      "target_value": {
+        "attack_ms": 1.5,
+        "enabled": true,
+        "hold_ms": 120.0,
+        "range_db": 26.0,
+        "release_ms": 260.0,
+        "threshold_db": -45.1
+      },
+      "write_kind": "gate"
+    },
+    {
+      "channel": 6,
+      "family_id": "dynamics_compressor",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:compressoradjust:3a00f64a1aeebc33",
+      "parameter": "compressor",
+      "snapshot_values": {
+        "/ch/6/dyn/att": 7.0,
+        "/ch/6/dyn/gain": 0.0,
+        "/ch/6/dyn/on": 1,
+        "/ch/6/dyn/ratio": 4.0,
+        "/ch/6/dyn/rel": 89.30941772460938,
+        "/ch/6/dyn/thr": -31.0
+      },
+      "target_value": {
+        "attack_ms": 10.0,
+        "enabled": true,
+        "makeup_db": 4.0,
+        "ratio": 3.0,
+        "release_ms": 164.3,
+        "threshold_db": -34.0
+      },
+      "write_kind": "compressor"
+    },
+    {
+      "channel": 11,
+      "family_id": "dynamics_compressor",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "tonal_dynamics"
+      },
+      "operation_id": "soundcheck:compressoradjust:b188bf2aae64b780",
+      "parameter": "compressor",
+      "snapshot_values": {
+        "/ch/11/dyn/att": 14.0,
+        "/ch/11/dyn/gain": 0.0,
+        "/ch/11/dyn/on": 1,
+        "/ch/11/dyn/ratio": 4.0,
+        "/ch/11/dyn/rel": 123.14935302734375,
+        "/ch/11/dyn/thr": -19.5
+      },
+      "target_value": {
+        "attack_ms": 20.0,
+        "enabled": true,
+        "makeup_db": 4.0,
+        "ratio": 3.0,
+        "release_ms": 198.1,
+        "threshold_db": -22.5
+      },
+      "write_kind": "compressor"
+    },
+    {
+      "channel": 1,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:9e8fd0c4a304417f",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/1/pan": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 2,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:b97b67692181a1c4",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/2/pan": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 3,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:3ae483f0ff2931e7",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/3/pan": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 4,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:cab4cc0ae2e14304",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/4/pan": 20.0
+      },
+      "target_value": -17.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 5,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:b7741f5d0bff7b36",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/5/pan": -25.0
+      },
+      "target_value": -10.8,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 6,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:6861fb86b45bfd98",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/6/pan": -100.0
+      },
+      "target_value": -100.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 7,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:5e478c44757d0cdf",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/7/pan": 100.0
+      },
+      "target_value": 54.1,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 8,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:259fac1c6c8a9616",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/8/pan": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 9,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:19c0d03eb842dfe3",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/9/pan": -70.0
+      },
+      "target_value": -100.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 10,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:3302dfebdcf3d583",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/10/pan": 70.0
+      },
+      "target_value": 100.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 11,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:b5331206cbd827d3",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/11/pan": -100.0
+      },
+      "target_value": -100.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 12,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:89679d849198225c",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/12/pan": 100.0
+      },
+      "target_value": 100.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 13,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:0af37acad173bff3",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/13/pan": 0.0
+      },
+      "target_value": -30.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 16,
+      "family_id": "pan_phase_delay",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "show_mix",
+        "stage": "spatial_fx"
+      },
+      "operation_id": "soundcheck:panadjust:1147c2260ebc44db",
+      "parameter": "pan",
+      "snapshot_values": {
+        "/ch/16/pan": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "pan"
+    },
+    {
+      "channel": 1,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:abbe05c39f8db41f",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/1/fdr": -3.0999984741210938
+      },
+      "target_value": -3.8945411541898274,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 2,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:a84a384b4341d1ad",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/2/fdr": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 3,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:c325c2f9ce4c673b",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/3/fdr": -12.099998474121094
+      },
+      "target_value": -8.210443064512038,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 6,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:2323b3d142e9893b",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/6/fdr": -6.200000762939453
+      },
+      "target_value": -0.20000076293945312,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 7,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:43682e206d81d8b3",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/7/fdr": -6.200000762939453
+      },
+      "target_value": -3.2634904955267636,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 8,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:04cb022c1723e1d9",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/8/fdr": -4.799997329711914
+      },
+      "target_value": -5.3,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 9,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:884befc7e0c4aac3",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/9/fdr": -4.899999618530273
+      },
+      "target_value": -5.9,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 10,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:02f1f5f6274d92a7",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/10/fdr": -6.899997711181641
+      },
+      "target_value": -5.9,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 11,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:dd1879bbc73f19f1",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/11/fdr": -2.0
+      },
+      "target_value": -6.748451614042239,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 12,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:8161e0ce3a1dfe8f",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/12/fdr": -2.0
+      },
+      "target_value": -5.037168229417034,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 13,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:7c2309cfafb7682f",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/13/fdr": -2.799999237060547
+      },
+      "target_value": -3.9670284980139563,
+      "write_kind": "fader"
+    },
+    {
+      "channel": 16,
+      "family_id": "fader",
+      "metadata": {
+        "audible_state_requirements": [],
+        "musically_required": true,
+        "required_for": "safe_core",
+        "stage": "foundation_level"
+      },
+      "operation_id": "soundcheck:channelfadermove:07926d1cf7e88117",
+      "parameter": "channel_fader_db",
+      "snapshot_values": {
+        "/ch/16/fdr": 0.0
+      },
+      "target_value": 0.0,
+      "write_kind": "fader"
+    }
+  ],
+  "schema": "m006_exact_transaction_fixture/v1",
+  "source": {
+    "event_line_sha256": "0ce7efb80f19e38f0a5e926467f77845b05ebee9820c78e7ec362b2443128d51",
+    "file_sha256": "aaaba5d3b0dd7e9fb9f54b12affdf54ff444a16bba31c1d92297afda39941fc4",
+    "line_number_1_based": 85419,
+    "relative_path": "artifacts/wing_telemetry/manual_write_gate/manual_write_events.jsonl",
+    "timestamp": "2026-07-11T14:37:51Z",
+    "transaction_id": "soundcheck:normal:13c43cc98a3c487c"
+  }
+}

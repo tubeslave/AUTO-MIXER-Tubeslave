@@ -1438,7 +1438,7 @@ def _bus_surface_row(client: Any, bus: int) -> Dict[str, Any]:
     dynamics_fields = {
         "enabled": _state_has_address(client, f"{prefix}/dyn/on"),
         "model": _state_has_address(client, f"{prefix}/dyn/mdl"),
-        "threshold_db": _state_has_address(client, f"{prefix}/dyn/thr37"),
+        "threshold_db": _state_has_address(client, f"{prefix}/dyn/thr"),
         "ratio": _state_has_address(client, f"{prefix}/dyn/ratio"),
         "knee": _state_has_address(client, f"{prefix}/dyn/knee"),
         "detector": _state_has_address(client, f"{prefix}/dyn/det"),
@@ -1476,7 +1476,7 @@ def _bus_surface_row(client: Any, bus: int) -> Dict[str, Any]:
         "dynamics": {
             "enabled": _cached_int(client, f"{prefix}/dyn/on"),
             "model": _cached_raw(client, f"{prefix}/dyn/mdl"),
-            "threshold_db": _cached_numeric(client, f"{prefix}/dyn/thr37"),
+            "threshold_db": _cached_numeric(client, f"{prefix}/dyn/thr"),
             "ratio": _cached_raw(client, f"{prefix}/dyn/ratio"),
             "knee": _cached_numeric(client, f"{prefix}/dyn/knee"),
             "detector": _cached_raw(client, f"{prefix}/dyn/det"),
@@ -1622,7 +1622,7 @@ def _bus_main_dca_cache_addresses(
         addresses.extend([
             f"{prefix}/dyn/on",
             f"{prefix}/dyn/mdl",
-            f"{prefix}/dyn/thr37",
+            f"{prefix}/dyn/thr",
             f"{prefix}/dyn/ratio",
             f"{prefix}/dyn/knee",
             f"{prefix}/dyn/det",
@@ -3785,7 +3785,10 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     queue_history: List[Dict[str, Any]] = []
     queue_summary: Dict[str, Any] = {}
     if proposal_queue:
-        queue_pending = proposal_queue.pending_actions()
+        # The product endpoint promises a bounded snapshot. Soundcheck can
+        # generate dozens of evidence-rich proposals; returning the entire
+        # queue made a small ``limit`` request exceed WebSocket frame limits.
+        queue_pending = proposal_queue.pending_actions()[-limit:]
         queue_history = proposal_queue.history(limit)
         queue_summary = proposal_queue.summary()
 
@@ -3985,24 +3988,74 @@ def build_decision_queue(server: Any, limit: int = 50) -> Dict[str, Any]:
     }
 
 
-def _master_bus_metrics(server: Any) -> Dict[str, Any]:
-    capture = getattr(server, "audio_capture", None)
-    if not capture or not getattr(capture, "running", False):
+PROJECT_MASTER_CAPTURE_CHANNELS = (47, 48)
+METER_SIGNAL_FLOOR_DB = -90.0
+
+
+def _capture_status(capture: Any) -> Dict[str, Any]:
+    if capture is None or not hasattr(capture, "get_status"):
+        return {}
+    status = _safe_call(capture.get_status, default={})
+    return status if isinstance(status, dict) else {}
+
+
+def _capture_status_is_fresh(
+    capture: Any,
+    capture_status: Optional[Dict[str, Any]] = None,
+) -> bool:
+    status = capture_status if isinstance(capture_status, dict) else _capture_status(capture)
+    callback_age = status.get("callback_age_sec")
+    return bool(
+        capture is not None
+        and getattr(capture, "running", False)
+        and status.get("real_input") is True
+        and isinstance(callback_age, (int, float))
+        and not isinstance(callback_age, bool)
+        and 0.0 <= float(callback_age) <= 1.0
+    )
+
+
+def _active_meter_capture(server: Any) -> tuple[Any, Dict[str, Any]]:
+    candidates = [
+        getattr(server, "audio_capture", None),
+        getattr(getattr(server, "auto_soundcheck_engine", None), "audio_capture", None),
+    ]
+    unique_candidates = []
+    for candidate in candidates:
+        if candidate is not None and all(candidate is not item for item in unique_candidates):
+            unique_candidates.append(candidate)
+    fallback = (None, {})
+    for capture in unique_candidates:
+        if not getattr(capture, "running", False):
+            continue
+        status = _capture_status(capture)
+        if fallback[0] is None:
+            fallback = (capture, status)
+        if _capture_status_is_fresh(capture, status):
+            return capture, status
+    return fallback
+
+
+def _master_bus_metrics(
+    server: Any,
+    *,
+    capture: Any = None,
+    capture_status: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    if capture is None:
+        capture, capture_status = _active_meter_capture(server)
+    if not _capture_status_is_fresh(capture, capture_status):
         return {
             "available": False,
+            "source_channels": [],
+            "signal_present": False,
             "integrated_lufs": None,
             "short_term_lufs": None,
             "momentary_lufs": None,
             "true_peak_db": None,
             "lra_lu": None,
         }
-    master_channels = [
-        channel
-        for channel in (49, 50)
-        if channel <= int(getattr(capture, "num_channels", 0) or 0)
-    ]
-    if not master_channels:
-        master_channels = [1]
+    master_channels = _capture_master_channels(capture)
     lufs_values = [_meter_for_channel(capture, ch).get("lufs") for ch in master_channels]
     peak_values = [_meter_for_channel(capture, ch).get("peak_db") for ch in master_channels]
     lufs_values = [value for value in lufs_values if value is not None]
@@ -4010,6 +4063,8 @@ def _master_bus_metrics(server: Any) -> Dict[str, Any]:
     short_lufs = round(sum(lufs_values) / len(lufs_values), 1) if lufs_values else None
     return {
         "available": bool(lufs_values or peak_values),
+        "source_channels": master_channels,
+        "signal_present": any(value > METER_SIGNAL_FLOOR_DB for value in peak_values),
         "integrated_lufs": short_lufs,
         "short_term_lufs": short_lufs,
         "momentary_lufs": short_lufs,
@@ -4027,21 +4082,33 @@ METER_FRAME_MAX_CHANNELS = 48
 
 def _capture_master_channels(capture: Any) -> List[int]:
     num_channels = int(getattr(capture, "num_channels", 0) or 0)
-    master_channels = [channel for channel in (49, 50) if channel <= num_channels]
-    if not master_channels and num_channels >= 1:
-        master_channels = [1]
-    return master_channels
+    if num_channels >= max(PROJECT_MASTER_CAPTURE_CHANNELS):
+        return list(PROJECT_MASTER_CAPTURE_CHANNELS)
+    if num_channels >= 2:
+        return [1, 2]
+    return [1] if num_channels == 1 else []
 
 
-def _analyzer_metrics(server: Any) -> Dict[str, Any]:
+def _analyzer_metrics(
+    server: Any,
+    *,
+    capture: Any = None,
+    capture_status: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """Read-only master spectrum bins for the dashboard analyzer trace.
 
     Bins are log-spaced 20 Hz..20 kHz and normalized to a 0..100 display
     scale from a -60 dB floor, matching the frontend trace contract.
     """
-    unavailable = {"available": False, "spectrum_bins": [], "read_only": True}
-    capture = getattr(server, "audio_capture", None)
-    if not capture or not getattr(capture, "running", False):
+    unavailable = {
+        "available": False,
+        "spectrum_bins": [],
+        "source_channels": [],
+        "read_only": True,
+    }
+    if capture is None:
+        capture, capture_status = _active_meter_capture(server)
+    if not _capture_status_is_fresh(capture, capture_status):
         return unavailable
     master_channels = _capture_master_channels(capture)
     if not master_channels:
@@ -4049,18 +4116,48 @@ def _analyzer_metrics(server: Any) -> Dict[str, Any]:
     get_spectrum = getattr(capture, "get_spectrum", None)
     if not callable(get_spectrum):
         return unavailable
-    spectrum = _safe_call(get_spectrum, master_channels[0], default=None)
-    if not spectrum:
-        return unavailable
-    try:
-        freqs = [float(value) for value in spectrum.get("frequencies", [])]
-        mags = [float(value) for value in spectrum.get("magnitude_db", [])]
-    except (TypeError, ValueError):
-        return unavailable
-    if len(freqs) != len(mags) or len(freqs) < 8:
+    import math
+
+    spectra = []
+    for channel in master_channels:
+        spectrum = _safe_call(get_spectrum, channel, default=None)
+        if not spectrum:
+            continue
+        try:
+            channel_freqs = [float(value) for value in spectrum.get("frequencies", [])]
+            channel_mags = [float(value) for value in spectrum.get("magnitude_db", [])]
+        except (TypeError, ValueError):
+            continue
+        if len(channel_freqs) != len(channel_mags) or len(channel_freqs) < 8:
+            continue
+        spectra.append((channel, channel_freqs, channel_mags))
+    if not spectra:
         return unavailable
 
-    import math
+    source_channels = [row[0] for row in spectra]
+    freqs = spectra[0][1]
+    compatible_magnitudes = [
+        magnitudes
+        for _channel, candidate_freqs, magnitudes in spectra
+        if len(candidate_freqs) == len(freqs)
+        and all(abs(left - right) <= 1e-6 for left, right in zip(candidate_freqs, freqs))
+    ]
+    if not compatible_magnitudes:
+        return unavailable
+    mags = [
+        10.0
+        * math.log10(
+            max(
+                1e-30,
+                sum(
+                    10.0 ** (max(-300.0, channel_mags[index]) / 10.0)
+                    for channel_mags in compatible_magnitudes
+                )
+                / len(compatible_magnitudes),
+            )
+        )
+        for index in range(len(freqs))
+    ]
 
     log_min = math.log10(SPECTRUM_MIN_HZ)
     log_max = math.log10(SPECTRUM_MAX_HZ)
@@ -4085,7 +4182,8 @@ def _analyzer_metrics(server: Any) -> Dict[str, Any]:
         "available": True,
         "spectrum_bins": bins,
         "bin_count": SPECTRUM_BIN_COUNT,
-        "source_channel": master_channels[0],
+        "source_channel": source_channels[0],
+        "source_channels": source_channels,
         "scale": "display_0_100_from_-60db_floor",
         "read_only": True,
     }
@@ -4098,10 +4196,11 @@ def build_meter_frame(server: Any, max_channels: int = METER_FRAME_MAX_CHANNELS)
     telemetry only: no console contact beyond the existing capture buffers,
     no authority fields, no write surface.
     """
-    capture = getattr(server, "audio_capture", None)
+    capture, capture_status = _active_meter_capture(server)
     running = bool(capture and getattr(capture, "running", False))
+    capture_fresh = _capture_status_is_fresh(capture, capture_status)
     channels: List[Dict[str, Any]] = []
-    if running:
+    if capture_fresh:
         num_channels = min(int(getattr(capture, "num_channels", 0) or 0), max_channels)
         for channel in range(1, num_channels + 1):
             meter = _meter_for_channel(capture, channel)
@@ -4115,15 +4214,42 @@ def build_meter_frame(server: Any, max_channels: int = METER_FRAME_MAX_CHANNELS)
                     "lufs": meter.get("lufs"),
                 }
             )
+    active_channels = [
+        row
+        for row in channels
+        if row.get("peak_db") is not None
+        and float(row["peak_db"]) > METER_SIGNAL_FLOOR_DB
+    ]
     return {
         "type": "meter_frame",
         "generated_at": _utc_now(),
-        "available": running and bool(channels),
+        "available": capture_fresh and bool(channels),
         "read_only": True,
         "live_write": False,
+        "signal_present": bool(active_channels),
+        "active_channel_count": len(active_channels),
+        "signal_floor_db": METER_SIGNAL_FLOOR_DB,
+        "capture": {
+            "running": running,
+            "source_type": capture_status.get("source_type"),
+            "device_name": capture_status.get("device_name"),
+            "num_channels": capture_status.get("num_channels"),
+            "sample_rate": capture_status.get("sample_rate"),
+            "callback_age_sec": capture_status.get("callback_age_sec"),
+            "real_input": capture_status.get("real_input") is True,
+            "fresh": capture_fresh,
+        },
         "channels": channels,
-        "master_bus": _master_bus_metrics(server),
-        "analyzer": _analyzer_metrics(server),
+        "master_bus": _master_bus_metrics(
+            server,
+            capture=capture,
+            capture_status=capture_status,
+        ),
+        "analyzer": _analyzer_metrics(
+            server,
+            capture=capture,
+            capture_status=capture_status,
+        ),
     }
 
 

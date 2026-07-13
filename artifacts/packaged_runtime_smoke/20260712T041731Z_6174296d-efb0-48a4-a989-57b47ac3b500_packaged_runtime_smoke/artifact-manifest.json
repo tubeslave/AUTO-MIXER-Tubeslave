@@ -1,0 +1,27 @@
+{
+  "schema": "automixer.packaged_runtime_smoke_manifest.v1",
+  "generatedAt": "2026-07-12T04:17:48.434Z",
+  "readOnly": true,
+  "contactsWing": false,
+  "liveAuthorityGranted": false,
+  "buildProfile": {
+    "profile": "local",
+    "releaseEligible": false,
+    "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/frontend/dist/local/20260712T041131Z_28debb6b-97ef-4e22-8497-1513b4c5e735_local/build-profile.json",
+    "sha256": "9af907e7a55afb60ebbbc4de8f0c7e963e69685b61c23d7183e4eee355c96e2b",
+    "bindingValid": true,
+    "appTreeMatches": true
+  },
+  "files": {
+    "result.json": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/packaged_runtime_smoke/20260712T041731Z_6174296d-efb0-48a4-a989-57b47ac3b500_packaged_runtime_smoke/result.json",
+      "size": 17313,
+      "sha256": "1d827ac1de0dd311a8b150ad27e2739ba37f48ef770bb33b6bf4109c4280d89c"
+    },
+    "result.md": {
+      "path": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/artifacts/packaged_runtime_smoke/20260712T041731Z_6174296d-efb0-48a4-a989-57b47ac3b500_packaged_runtime_smoke/result.md",
+      "size": 1159,
+      "sha256": "0eb9b0529ea95465af8e296e4998ce467fddd1c60d7096acf669460777204d0c"
+    }
+  }
+}

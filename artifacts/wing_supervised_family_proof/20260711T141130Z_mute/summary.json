@@ -1,0 +1,136 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:mute:mute_toggle",
+      "peak_dbfs": [
+        -19.0,
+        -19.0
+      ],
+      "timestamp_utc": "2026-07-11T14:11:30Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "mute",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:mute:mute_toggle"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:mute:mute_toggle"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:mute:mute_toggle",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/mute",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:mute:mute_toggle",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/mute": {
+                "address": "/ch/3/mute",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "values": {
+              "/ch/3/mute": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:mute:mute_toggle",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:mute:mute_toggle",
+            "peak_dbfs": [
+              -19.0,
+              -19.0
+            ],
+            "timestamp_utc": "2026-07-11T14:11:30Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:mute:mute_toggle",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/mute": {
+                "address": "/ch/3/mute",
+                "args": [
+                  "0",
+                  0.0,
+                  0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0
+              }
+            },
+            "restored": {
+              "/ch/3/mute": 0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:mute:mute_toggle"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:mute:2026-07-11T14:11:30Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:11:30Z",
+  "wing_ip": "192.168.1.102"
+}

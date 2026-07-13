@@ -1,0 +1,408 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:pan_phase_delay:pan_toward_center",
+      "peak_dbfs": [
+        -15.6,
+        -15.6
+      ],
+      "timestamp_utc": "2026-07-11T14:06:19Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:pan_phase_delay:polarity_toggle",
+      "peak_dbfs": [
+        -20.6,
+        -20.5
+      ],
+      "timestamp_utc": "2026-07-11T14:06:19Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+      "peak_dbfs": [
+        -20.6,
+        -20.5
+      ],
+      "timestamp_utc": "2026-07-11T14:06:19Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "pan_phase_delay",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:pan_phase_delay:pan_toward_center",
+    "proof:pan_phase_delay:polarity_toggle",
+    "proof:pan_phase_delay:delay_0_1ms"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:pan_phase_delay:pan_toward_center",
+      "proof:pan_phase_delay:polarity_toggle",
+      "proof:pan_phase_delay:delay_0_1ms"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:pan_phase_delay:pan_toward_center",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/pan",
+                "sent": true,
+                "value": 1.0
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:pan_toward_center",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/pan": {
+                "address": "/ch/3/pan",
+                "args": [
+                  "+1",
+                  0.5446000099182129,
+                  1.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1.0
+              }
+            },
+            "values": {
+              "/ch/3/pan": 1.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:pan_toward_center",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:pan_phase_delay:pan_toward_center",
+            "peak_dbfs": [
+              -15.6,
+              -15.6
+            ],
+            "timestamp_utc": "2026-07-11T14:06:19Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:polarity_toggle",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/in/set/inv",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:polarity_toggle",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/inv": {
+                "address": "/ch/3/in/set/inv",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "values": {
+              "/ch/3/in/set/inv": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:polarity_toggle",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:pan_phase_delay:polarity_toggle",
+            "peak_dbfs": [
+              -20.6,
+              -20.5
+            ],
+            "timestamp_utc": "2026-07-11T14:06:19Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/in/set/dlymode",
+                "sent": true,
+                "value": "MS"
+              },
+              {
+                "address": "/ch/3/in/set/dly",
+                "sent": true,
+                "value": 0.6
+              },
+              {
+                "address": "/ch/3/in/set/dlyon",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/dly": {
+                "address": "/ch/3/in/set/dly",
+                "args": [
+                  "0.6",
+                  0.0002002002001972869,
+                  0.6000000238418579
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.6000000238418579
+              },
+              "/ch/3/in/set/dlymode": {
+                "address": "/ch/3/in/set/dlymode",
+                "args": [
+                  "MS"
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": "MS"
+              },
+              "/ch/3/in/set/dlyon": {
+                "address": "/ch/3/in/set/dlyon",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "values": {
+              "/ch/3/in/set/dly": 0.6000000238418579,
+              "/ch/3/in/set/dlymode": "MS",
+              "/ch/3/in/set/dlyon": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+            "peak_dbfs": [
+              -20.6,
+              -20.5
+            ],
+            "timestamp_utc": "2026-07-11T14:06:19Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:delay_0_1ms",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/dly": {
+                "address": "/ch/3/in/set/dly",
+                "args": [
+                  "0.5",
+                  0.0,
+                  0.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.5
+              },
+              "/ch/3/in/set/dlymode": {
+                "address": "/ch/3/in/set/dlymode",
+                "args": [
+                  "MS"
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": "MS"
+              },
+              "/ch/3/in/set/dlyon": {
+                "address": "/ch/3/in/set/dlyon",
+                "args": [
+                  "0",
+                  0.0,
+                  0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0
+              }
+            },
+            "restored": {
+              "/ch/3/in/set/dly": 0.5,
+              "/ch/3/in/set/dlymode": "MS",
+              "/ch/3/in/set/dlyon": 0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:polarity_toggle",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/in/set/inv": {
+                "address": "/ch/3/in/set/inv",
+                "args": [
+                  "0",
+                  0.0,
+                  0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0
+              }
+            },
+            "restored": {
+              "/ch/3/in/set/inv": 0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:pan_phase_delay:pan_toward_center",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/pan": {
+                "address": "/ch/3/pan",
+                "args": [
+                  "0",
+                  0.5,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              }
+            },
+            "restored": {
+              "/ch/3/pan": 0.0
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:pan_phase_delay:delay_0_1ms",
+      "proof:pan_phase_delay:polarity_toggle",
+      "proof:pan_phase_delay:pan_toward_center"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:pan_phase_delay:2026-07-11T14:06:19Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:06:19Z",
+  "wing_ip": "192.168.1.102"
+}

@@ -1,0 +1,361 @@
+{
+  "accepted": true,
+  "audio_evidence": [
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:eq_hpf:hpf_frequency",
+      "peak_dbfs": [
+        -21.8,
+        -22.0
+      ],
+      "timestamp_utc": "2026-07-11T14:06:02Z"
+    },
+    {
+      "master_channels": [
+        47,
+        48
+      ],
+      "operation_id": "proof:eq_hpf:eq_cut",
+      "peak_dbfs": [
+        -21.8,
+        -22.0
+      ],
+      "timestamp_utc": "2026-07-11T14:06:02Z"
+    }
+  ],
+  "emergency_reasons": [],
+  "family_id": "eq_hpf",
+  "firmware": "3.0.5-observed",
+  "live_authority_granted": false,
+  "operation_ids": [
+    "proof:eq_hpf:hpf_frequency",
+    "proof:eq_hpf:eq_cut"
+  ],
+  "result": {
+    "applied_operation_ids": [
+      "proof:eq_hpf:hpf_frequency",
+      "proof:eq_hpf:eq_cut"
+    ],
+    "emergency_stop_activated": false,
+    "events": [
+      {
+        "operation_id": "proof:eq_hpf:hpf_frequency",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/flt/lcf",
+                "sent": true,
+                "value": 94.98185729980469
+              },
+              {
+                "address": "/ch/3/flt/lc",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:hpf_frequency",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/flt/lc": {
+                "address": "/ch/3/flt/lc",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/flt/lcf": {
+                "address": "/ch/3/flt/lcf",
+                "args": [
+                  "95.3",
+                  0.33906251192092896,
+                  95.31362915039062
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 95.31362915039062
+              }
+            },
+            "values": {
+              "/ch/3/flt/lc": 1,
+              "/ch/3/flt/lcf": 95.31362915039062
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:hpf_frequency",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:eq_hpf:hpf_frequency",
+            "peak_dbfs": [
+              -21.8,
+              -22.0
+            ],
+            "timestamp_utc": "2026-07-11T14:06:02Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:eq_cut",
+        "phase": "apply",
+        "result": {
+          "evidence": {
+            "writes": [
+              {
+                "address": "/ch/3/eq/4f",
+                "sent": true,
+                "value": 498.77532958984375
+              },
+              {
+                "address": "/ch/3/eq/4g",
+                "sent": true,
+                "value": -0.5
+              },
+              {
+                "address": "/ch/3/eq/4q",
+                "sent": true,
+                "value": 1.9958817958831787
+              },
+              {
+                "address": "/ch/3/eq/on",
+                "sent": true,
+                "value": 1
+              }
+            ]
+          },
+          "physical_verified": false,
+          "reason": "wing_write_sent",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:eq_cut",
+        "phase": "verify",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/eq/4f": {
+                "address": "/ch/3/eq/4f",
+                "args": [
+                  "498.8",
+                  0.46562498807907104,
+                  498.77532958984375
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 498.77532958984375
+              },
+              "/ch/3/eq/4g": {
+                "address": "/ch/3/eq/4g",
+                "args": [
+                  "-0.5",
+                  0.44466668367385864,
+                  -0.5
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": -0.5
+              },
+              "/ch/3/eq/4q": {
+                "address": "/ch/3/eq/4q",
+                "args": [
+                  "2.00",
+                  0.4833333194255829,
+                  1.9958817958831787
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1.9958817958831787
+              },
+              "/ch/3/eq/on": {
+                "address": "/ch/3/eq/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "values": {
+              "/ch/3/eq/4f": 498.77532958984375,
+              "/ch/3/eq/4g": -0.5,
+              "/ch/3/eq/4q": 1.9958817958831787,
+              "/ch/3/eq/on": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "physical_readback_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:eq_cut",
+        "phase": "audio_recheck",
+        "result": {
+          "evidence": {
+            "master_channels": [
+              47,
+              48
+            ],
+            "operation_id": "proof:eq_hpf:eq_cut",
+            "peak_dbfs": [
+              -21.8,
+              -22.0
+            ],
+            "timestamp_utc": "2026-07-11T14:06:02Z"
+          },
+          "reason": "master_audio_present_and_safe",
+          "status": "passed"
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:eq_cut",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/eq/4f": {
+                "address": "/ch/3/eq/4f",
+                "args": [
+                  "498.8",
+                  0.46562498807907104,
+                  498.77532958984375
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 498.77532958984375
+              },
+              "/ch/3/eq/4g": {
+                "address": "/ch/3/eq/4g",
+                "args": [
+                  "0.0",
+                  0.5,
+                  0.0
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 0.0
+              },
+              "/ch/3/eq/4q": {
+                "address": "/ch/3/eq/4q",
+                "args": [
+                  "2.00",
+                  0.4833333194255829,
+                  1.9958817958831787
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1.9958817958831787
+              },
+              "/ch/3/eq/on": {
+                "address": "/ch/3/eq/on",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              }
+            },
+            "restored": {
+              "/ch/3/eq/4f": 498.77532958984375,
+              "/ch/3/eq/4g": 0.0,
+              "/ch/3/eq/4q": 1.9958817958831787,
+              "/ch/3/eq/on": 1
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      },
+      {
+        "operation_id": "proof:eq_hpf:hpf_frequency",
+        "phase": "rollback",
+        "result": {
+          "evidence": {
+            "mismatches": [],
+            "queries": {
+              "/ch/3/flt/lc": {
+                "address": "/ch/3/flt/lc",
+                "args": [
+                  "1",
+                  1.0,
+                  1
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 1
+              },
+              "/ch/3/flt/lcf": {
+                "address": "/ch/3/flt/lcf",
+                "args": [
+                  "90.0",
+                  0.3265624940395355,
+                  89.98185729980469
+                ],
+                "confirmed_round_trips": 2,
+                "status": "received",
+                "value": 89.98185729980469
+              }
+            },
+            "restored": {
+              "/ch/3/flt/lc": 1,
+              "/ch/3/flt/lcf": 89.98185729980469
+            }
+          },
+          "physical_verified": true,
+          "reason": "rollback_physical_verified",
+          "success": true
+        }
+      }
+    ],
+    "live_authority_granted": false,
+    "reason": "proof_apply_readback_audio_and_rollback_verified",
+    "rollback_operation_ids": [
+      "proof:eq_hpf:eq_cut",
+      "proof:eq_hpf:hpf_frequency"
+    ],
+    "status": "proof_passed",
+    "transaction_id": "hardware-proof:eq_hpf:2026-07-11T14:06:02Z"
+  },
+  "schema": "wing-supervised-family-proof/v1",
+  "timestamp_utc": "2026-07-11T14:06:02Z",
+  "wing_ip": "192.168.1.102"
+}

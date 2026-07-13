@@ -24,7 +24,9 @@ test('default operator route autoconnects and subscribes to real readback events
   assert.match(hook, /websocketService\.on\('audio_capture_status', handleAudioCaptureStatus\)/);
   assert.match(hook, /websocketService\.on\('connection_status', handleConnectionStatus\)/);
   assert.match(hook, /websocketService\.getAudioCaptureStatus\(\)/);
-  assert.match(core, /data\.type !== 'meter_frame'/);
+  assert.match(hook, /isReady\?: \(\) => boolean/);
+  assert.match(core, /data\.type !== 'authentication_status'/);
+  assert.match(core, /this\.notifyListeners\(data\.type, data\)/);
 });
 
 test('WING connect and audio meter controls remain read-only by default', async () => {
@@ -41,6 +43,24 @@ test('WING connect and audio meter controls remain read-only by default', async 
   assert.doesNotMatch(shell, />Rollback UI</);
   assert.match(hook, /_frontend_authoritative_status/);
   assert.match(hook, /mergeDashboardSnapshotIntoPayloads/);
+});
+
+test('packaged offline lock hides hardware controls as well as blocking them server-side', async () => {
+  const adapter = await source('services/operatorAdapters.ts');
+  const hook = await source('services/useOperatorBackend.ts');
+  const main = await source('main.tsx');
+  const shell = await source('components/prototype/AutomixerComponents.tsx');
+
+  assert.match(adapter, /mixerTransportLocked/);
+  assert.match(adapter, /Packaged offline lock is active/);
+  assert.match(main, /automixerRuntimeSafety/);
+  assert.match(main, /packagedOfflineLock: bootstrap\.packagedOfflineLock/);
+  assert.match(hook, /window\.automixerRuntimeSafety\?\.packagedOfflineLock === true/);
+  assert.match(hook, /packaged_offline_lock: true/);
+  assert.match(hook, /mixer_transport_locked: true/);
+  assert.match(shell, /!ui\.backend\.mixerTransportLocked && !ui\.backend\.mixerConnected/);
+  assert.match(shell, /!ui\.backend\.mixerTransportLocked && <IconButton/);
+  assert.match(shell, /Offline lock/);
 });
 
 test('live dashboard renders unavailable and no-signal states instead of mock measurements', async () => {

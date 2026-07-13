@@ -2,7 +2,10 @@
 
 import os
 import sys
+import copy
 import json
+import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -10,7 +13,13 @@ import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from auto_soundcheck_engine import AutoSoundcheckEngine, ChannelInfo, ChannelSnapshot
+import auto_soundcheck_engine as auto_soundcheck_module
+from auto_soundcheck_engine import (
+    AutoSoundcheckEngine,
+    ChannelInfo,
+    ChannelSnapshot,
+    DCASnapshot,
+)
 from autofoh_analysis import extract_analysis_features
 from autofoh_detectors import LeadMaskingAnalyzer, aggregate_stem_features
 from autofoh_models import RuntimeState
@@ -99,6 +108,152 @@ def test_observation_mode_wraps_mixer_and_intercepts_writes():
     assert any("operation" in item for item in observed)
 
 
+def test_observation_proxy_default_denies_unknown_callable_and_unknown_read():
+    class Base:
+        is_connected = True
+        state = {}
+        callbacks = {}
+
+        def __init__(self):
+            self.calls = []
+
+        def apply_scene(self, scene):
+            self.calls.append(("apply_scene", scene))
+            return "physical-write"
+
+        def get_vendor_state(self):
+            self.calls.append(("get_vendor_state",))
+            return "physical-read"
+
+    base = Base()
+    proxy = ObservationMixerClient(base)
+
+    assert proxy.apply_scene("A") is True
+    assert proxy.get_vendor_state() is None
+    assert base.calls == []
+    assert [item["method"] for item in proxy.get_operations()] == [
+        "apply_scene",
+        "get_vendor_state",
+    ]
+
+
+@pytest.mark.parametrize(
+    "method,args",
+    [
+        ("get_channel_mute", (1,)),
+        ("get_channel_pan", (1,)),
+        ("get_pan", (1,)),
+        ("get_send_level", (1, 9)),
+        ("get_compressor_threshold", (1,)),
+        ("get_gate_threshold", (1,)),
+        ("get_hpf", (1,)),
+        ("get_dca_fader", (2,)),
+        ("get_bus_eq_band_gain", (3, 1)),
+        ("get_observed_state_revision", ()),
+    ],
+)
+def test_observation_proxy_delegates_only_allowlisted_reads(method, args):
+    sentinel = object()
+
+    class Base:
+        is_connected = True
+        state = {}
+        callbacks = {}
+
+        def __getattr__(self, name):
+            if name != method:
+                raise AttributeError(name)
+
+            def read(*actual):
+                assert actual == args
+                return sentinel
+
+            return read
+
+    proxy = ObservationMixerClient(Base())
+
+    assert getattr(proxy, method)(*args) is sentinel
+    assert proxy.get_operations() == []
+
+
+def test_observation_proxy_state_is_fresh_dict_and_shadow_wins():
+    base = type(
+        "Base",
+        (),
+        {
+            "is_connected": True,
+            "state": {"/base": 1, "/ch/1/fdr": -20.0},
+            "callbacks": {},
+        },
+    )()
+    proxy = ObservationMixerClient(base)
+
+    assert isinstance(proxy.state, dict)
+    proxy.set_channel_fader(1, -10.0)
+    base.state["/base"] = 2
+
+    assert proxy.state["/base"] == 2
+    assert proxy.state["/ch/1/fdr"] == -10.0
+
+
+def test_observation_proxy_hypothetical_reads_are_revision_consistent():
+    base = type(
+        "Base",
+        (),
+        {"is_connected": True, "state": {}, "callbacks": {}},
+    )()
+    proxy = ObservationMixerClient(base)
+
+    proxy.set_channel_pan(1, 25.0)
+    proxy.set_channel_mute(1, 1)
+    proxy.set_hpf(1, 100.0, True)
+    proxy.set_compressor_threshold(1, -18.0)
+    proxy.set_gate(1, threshold_db=-42.0)
+    proxy.set_delay(1, 2.5)
+    proxy.set_polarity(1, True)
+    proxy.set_send_level(1, 9, -12.0)
+    proxy.set_bus_fader(3, -8.0)
+    proxy.set_dca_fader(2, -6.0)
+    proxy.set_main_fader(1, -3.0)
+    proxy.set_bus_eq_band(3, 1, gain=-2.0)
+
+    assert proxy.get_channel_pan(1) == 25.0
+    assert proxy.get_pan(1) == 25.0
+    assert proxy.get_channel_mute(1) is True
+    assert proxy.get_hpf(1) == {"enabled": True, "freq_hz": 100.0}
+    assert proxy.get_compressor_threshold(1) == -18.0
+    assert proxy.get_gate_threshold(1) == -42.0
+    assert proxy.get_delay(1) == 2.5
+    assert proxy.get_polarity(1) is True
+    assert proxy.get_send_level(1, 9) == -12.0
+    assert proxy.get_bus_fader(3) == -8.0
+    assert proxy.get_dca_fader(2) == -6.0
+    assert proxy.get_main_fader(1) == -3.0
+    assert proxy.get_bus_eq_band_gain(3, 1) == -2.0
+
+
+def test_observation_proxy_zero_arg_send_is_query_and_value_send_is_intercepted():
+    class Base:
+        is_connected = True
+        state = {}
+        callbacks = {}
+
+        def __init__(self):
+            self.sent = []
+
+        def send(self, address):
+            self.sent.append(address)
+            return "query-sent"
+
+    base = Base()
+    proxy = ObservationMixerClient(base)
+
+    assert proxy.send("/ch/1/fdr") == "query-sent"
+    assert proxy.send("/ch/1/fdr", -9.0) is True
+    assert base.sent == ["/ch/1/fdr"]
+    assert proxy.get_operations()[0]["method"] == "send"
+
+
 class GatedEngineMixer:
     is_connected = True
     state = {}
@@ -148,6 +303,11 @@ def test_engine_routes_actions_through_gated_executor_and_exports_bundle():
     assert mixer.calls == []
     assert bundle["recommendation_count"] == 1
     assert bundle["proposals"][0]["action_type"] == "set_fader_db"
+    assert bundle["supervised_transaction_plan_count"] == 1
+    assert bundle["supervised_transaction_operation_count"] == 1
+    transaction = bundle["supervised_transaction_plans"]["plans"][0]
+    assert transaction["operations"][0]["family_id"] == "fader"
+    assert transaction["execution_allowed"] is False
 
 
 def test_recommendation_bundle_ids_are_stable_and_upserted():
@@ -200,7 +360,858 @@ def test_derivation_phase_builds_proposal_without_mixer_write(monkeypatch):
     assert bundle["recommendation_count"] == 1
     assert mixer.calls == []
     assert engine._applied_channels == set()
-    assert engine.get_status()["recommendation_derivation_complete"] is True
+    # A synthetic proposal alone no longer claims full musical coverage: the
+    # test did not provide per-source signal/stage analysis evidence.
+    assert engine.get_status()["recommendation_derivation_complete"] is False
+
+
+def test_stage_reanalysis_preserves_run_and_creates_fresh_revision(monkeypatch):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.audio_capture = type(
+        "Capture",
+        (),
+        {
+            "running": True,
+            "get_buffer": lambda _self, _channel, size: np.zeros(
+                size,
+                dtype=np.float32,
+            ),
+        },
+    )()
+    engine._stop_event.clear()
+    run_id = engine._soundcheck_run_id
+    engine._soundcheck_plan_revision = 1
+    calls = []
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: calls.append("state"))
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: calls.append("audio"))
+
+    def derive_one(*, derivation_only=False):
+        assert derivation_only is True
+        engine._execute_action(
+            ChannelFaderMove(
+                channel_id=1,
+                target_db=-10.0,
+                reason="fresh stage-local target",
+            ),
+            runtime_state=RuntimeState.SOURCE_LEARNING,
+        )
+
+    monkeypatch.setattr(engine, "_apply_corrections", derive_one)
+
+    bundle = engine.rederive_soundcheck_revision(run_id)
+    manifest = bundle["supervised_transaction_plans"]
+
+    assert calls == ["state", "audio"]
+    assert manifest["run_id"] == run_id
+    assert manifest["plan_revision"] == 2
+    assert engine._soundcheck_plan_revision == 2
+    assert manifest["source_coverage"]["captured_at_epoch"] is not None
+    assert mixer.calls == []
+
+
+def test_stage_reanalysis_candidate_is_invisible_until_commit_and_retry_is_n_plus_one(
+    monkeypatch,
+):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
+    engine.audio_capture = type(
+        "Capture",
+        (),
+        {
+            "running": True,
+            "get_buffer": lambda _self, _channel, size: np.zeros(
+                size,
+                dtype=np.float32,
+            ),
+        },
+    )()
+    engine._stop_event.clear()
+    run_id = engine._soundcheck_run_id
+    engine._soundcheck_plan_revision = 1
+    engine.mixer_client.set_channel_fader(1, -5.0)
+    previous_observation_state = engine.mixer_client.snapshot_derivation_state()
+    base_digest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]["manifest_content_sha256"]
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: None)
+
+    def derive_one(*, derivation_only=False):
+        assert derivation_only is True
+        engine._execute_action(
+            ChannelFaderMove(
+                channel_id=1,
+                target_db=-11.0,
+                reason="candidate target",
+            ),
+            runtime_state=RuntimeState.SOURCE_LEARNING,
+        )
+        engine.mixer_client.set_channel_fader(1, -11.0)
+
+    monkeypatch.setattr(engine, "_apply_corrections", derive_one)
+
+    first = engine.prepare_soundcheck_revision_candidate(
+        run_id,
+        expected_plan_revision=1,
+        expected_manifest_content_sha256=base_digest,
+    )
+    assert first["bundle"]["supervised_transaction_plans"]["plan_revision"] == 2
+    assert engine._soundcheck_plan_revision == 1
+    assert engine.mixer_client.snapshot_derivation_state() == (
+        previous_observation_state
+    )
+    assert engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]["plan_revision"] == 1
+
+    assert engine.discard_soundcheck_revision_candidate(
+        first["candidate_id"]
+    ) is True
+    assert engine.mixer_client.snapshot_derivation_state() == (
+        previous_observation_state
+    )
+    retry = engine.prepare_soundcheck_revision_candidate(
+        run_id,
+        expected_plan_revision=1,
+        expected_manifest_content_sha256=base_digest,
+    )
+    retry_manifest = retry["bundle"]["supervised_transaction_plans"]
+    assert retry_manifest["plan_revision"] == 2
+
+    accepted_bundle = copy.deepcopy(retry["bundle"])
+    accepted_manifest = accepted_bundle["supervised_transaction_plans"]
+    accepted_manifest["plans"][0]["preflight_assessment"] = {
+        "disposition": "apply_now"
+    }
+    committed = engine.commit_soundcheck_revision_candidate(
+        retry["candidate_id"],
+        accepted_manifest_content_sha256=retry_manifest[
+            "manifest_content_sha256"
+        ],
+        accepted_bundle=accepted_bundle,
+    )
+    assert engine._soundcheck_plan_revision == 2
+    assert engine.mixer_client.get_channel_fader(1) == -11.0
+    assert engine.mixer_client.snapshot_derivation_state() != (
+        previous_observation_state
+    )
+    assert committed["supervised_transaction_plans"][
+        "manifest_content_sha256"
+    ] == retry_manifest["manifest_content_sha256"]
+    assert engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]["manifest_content_sha256"] == retry_manifest[
+        "manifest_content_sha256"
+    ]
+    assert engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]["plans"][0]["preflight_assessment"] == {"disposition": "apply_now"}
+    assert mixer.calls == []
+
+
+def test_stage_reanalysis_candidate_restores_revision_after_derivation_failure(
+    monkeypatch,
+):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
+    engine.audio_capture = type("Capture", (), {"running": True})()
+    engine._stop_event.clear()
+    run_id = engine._soundcheck_run_id
+    engine._soundcheck_plan_revision = 1
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: None)
+
+    def fail(*, derivation_only=False):
+        assert derivation_only is True
+        raise RuntimeError("derive failed")
+
+    monkeypatch.setattr(engine, "_apply_corrections", fail)
+
+    with pytest.raises(RuntimeError, match="derive failed"):
+        engine.prepare_soundcheck_revision_candidate(
+            run_id,
+            expected_plan_revision=1,
+        )
+
+    assert engine._soundcheck_plan_revision == 1
+    assert engine.state == engine.state.__class__.RUNNING
+    assert engine.runtime_state == RuntimeState.PRE_SHOW_CHECK
+    assert engine._soundcheck_revision_candidates == {}
+    assert mixer.calls == []
+
+
+def test_stage_reanalysis_candidate_cannot_resurrect_stopped_engine(monkeypatch):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
+    engine.audio_capture = type("Capture", (), {"running": True})()
+    engine._stop_event.clear()
+    run_id = engine._soundcheck_run_id
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: None)
+    monkeypatch.setattr(engine, "_apply_corrections", lambda **_kwargs: None)
+
+    candidate = engine.prepare_soundcheck_revision_candidate(
+        run_id,
+        expected_plan_revision=1,
+    )
+    engine._stop_event.set()
+    engine.state = engine.state.__class__.STOPPED
+    engine.runtime_state = RuntimeState.IDLE
+    engine.audio_capture.running = False
+
+    with pytest.raises(RuntimeError, match="stopping"):
+        engine.commit_soundcheck_revision_candidate(candidate["candidate_id"])
+
+    assert engine.state == engine.state.__class__.STOPPED
+    assert engine.runtime_state == RuntimeState.IDLE
+    assert engine._soundcheck_plan_revision == 1
+    assert engine.discard_soundcheck_revision_candidate(
+        candidate["candidate_id"]
+    ) is True
+
+
+def test_stage_reanalysis_publication_scope_fences_concurrent_stop_request(
+    monkeypatch,
+):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
+    engine.audio_capture = type("Capture", (), {"running": True})()
+    engine._stop_event.clear()
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: None)
+    monkeypatch.setattr(engine, "_apply_corrections", lambda **_kwargs: None)
+    candidate = engine.prepare_soundcheck_revision_candidate(
+        engine._soundcheck_run_id,
+        expected_plan_revision=1,
+    )
+    stop_completed = threading.Event()
+
+    def request_stop():
+        engine._stop_event.set()
+        engine.discard_soundcheck_revision_candidates_for_run(
+            engine._soundcheck_run_id
+        )
+        stop_completed.set()
+
+    with engine.soundcheck_revision_publication_scope(
+        candidate["candidate_id"]
+    ):
+        stop_thread = threading.Thread(target=request_stop)
+        stop_thread.start()
+        assert engine._stop_event.wait(timeout=1.0)
+        time.sleep(0.02)
+        assert stop_completed.is_set() is False
+        engine.commit_soundcheck_revision_candidate(candidate["candidate_id"])
+
+    stop_thread.join(timeout=1.0)
+    assert stop_completed.is_set() is True
+    assert engine._soundcheck_plan_revision == 2
+    engine._stop_event.clear()
+
+
+def test_stage_reanalysis_status_waits_until_candidate_is_restored(monkeypatch):
+    mixer = GatedEngineMixer()
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=mixer,
+    )
+    assert engine._connect_mixer() is True
+    engine.state = engine.state.__class__.RUNNING
+    engine.runtime_state = RuntimeState.PRE_SHOW_CHECK
+    engine.audio_capture = type("Capture", (), {"running": True})()
+    engine._stop_event.clear()
+    started = threading.Event()
+    release = threading.Event()
+    candidate_result = {}
+    status_result = {}
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+
+    def wait_for_release():
+        started.set()
+        assert release.wait(timeout=2.0)
+
+    monkeypatch.setattr(engine, "_wait_and_analyze", wait_for_release)
+    monkeypatch.setattr(engine, "_apply_corrections", lambda **_kwargs: None)
+
+    candidate_thread = threading.Thread(
+        target=lambda: candidate_result.update(
+            engine.prepare_soundcheck_revision_candidate(
+                engine._soundcheck_run_id,
+                expected_plan_revision=1,
+            )
+        )
+    )
+    candidate_thread.start()
+    assert started.wait(timeout=1.0)
+    status_thread = threading.Thread(
+        target=lambda: status_result.update(engine.get_status())
+    )
+    status_thread.start()
+    time.sleep(0.05)
+    assert status_thread.is_alive()
+
+    release.set()
+    candidate_thread.join(timeout=2.0)
+    status_thread.join(timeout=2.0)
+
+    assert status_result["soundcheck_readiness"]["plan_revision"] == 1
+    assert engine._soundcheck_plan_revision == 1
+    assert engine.discard_soundcheck_revision_candidate(
+        candidate_result["candidate_id"]
+    ) is True
+
+
+def test_status_identity_uses_committed_bundle_not_live_monitor_draft():
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        selected_channels=[1],
+        auto_discover=False,
+        observe_only=True,
+        mixer_client=GatedEngineMixer(),
+    )
+    engine._soundcheck_transaction_actions = [
+        ChannelFaderMove(
+            channel_id=1,
+            target_db=-12.0,
+            reason="committed target",
+        )
+    ]
+    committed = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+    engine._soundcheck_transaction_actions = [
+        ChannelFaderMove(
+            channel_id=1,
+            target_db=-4.0,
+            reason="unpublished monitor draft",
+        )
+    ]
+
+    status = engine.get_status()
+
+    assert status["soundcheck_readiness"]["plan_fingerprint"] == committed[
+        "plan_fingerprint"
+    ]
+    assert status["soundcheck_readiness"]["plan_revision"] == committed[
+        "plan_revision"
+    ]
+
+
+def test_derivation_channel_helper_failure_is_visible_and_next_source_continues(
+    monkeypatch,
+):
+    base_mixer = type(
+        "BaseMixer",
+        (),
+        {"is_connected": True, "state": {}, "callbacks": {}},
+    )()
+    engine = AutoSoundcheckEngine(
+        selected_channels=[1, 2],
+        num_channels=2,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.mixer_client = ObservationMixerClient(base_mixer)
+    engine.safety_controller = type("Safety", (), {"history": []})()
+    engine.channels = {
+        channel: ChannelInfo(
+            channel=channel,
+            name=f"Source {channel}",
+            preset="custom",
+            allowed_controls=[
+                "gain",
+                "hpf",
+                "eq",
+                "compressor",
+                "pan",
+                "fader",
+                "fx_send",
+            ],
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+        )
+        for channel in (1, 2)
+    }
+    engine.group_bus_correction_enabled = True
+    engine.auto_fx_sends_enabled = True
+    monkeypatch.setattr(engine, "_build_phase_target_guard_context", lambda **_: None)
+    monkeypatch.setattr(engine, "_close_mic_bleed_dominated", lambda *_: False)
+    for helper in (
+        "_compute_eq_v3_proposals",
+        "_compute_comp_v3_proposals",
+        "_compute_balance_v3_solution",
+        "_compute_pan_v3_solution",
+    ):
+        monkeypatch.setattr(engine, helper, lambda: {})
+    monkeypatch.setattr(engine, "_apply_input_gain", lambda *_args, **_kwargs: None)
+
+    def hpf(channel, *_args, **_kwargs):
+        if channel == 1:
+            raise RuntimeError("injected hpf analysis failure")
+
+    monkeypatch.setattr(engine, "_apply_hpf", hpf)
+    for helper in (
+        "_apply_gate",
+        "_apply_eq",
+        "_apply_compressor",
+        "_apply_pan",
+        "_apply_gain_correction",
+        "_apply_fader",
+        "_apply_fx_sends",
+        "_apply_live_shared_mix_pass",
+        "_apply_group_bus_corrections",
+        "_detect_and_fix_phase",
+        "_apply_drum_image_scheme",
+        "_enforce_stereo_pair_identity",
+        "_apply_dca_group_balance",
+        "_evaluate_master_mix",
+        "_checklist_channels_signal",
+    ):
+        monkeypatch.setattr(engine, helper, lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        engine,
+        "_build_soundcheck_profile_from_live_buffers",
+        lambda: None,
+    )
+    monkeypatch.setattr(engine, "soundcheck_pending_items", lambda: {})
+
+    engine._derive_corrections()
+
+    assert engine._derivation_complete is False
+    assert engine._applied_channels == set()
+    residuals = engine._derivation_readiness_residuals
+    assert any(
+        row["channel"] == 1
+        and row["reason"].startswith("channel_correction_chain_failed:")
+        for row in residuals
+    )
+    assert not any(row["channel"] == 2 for row in residuals)
+    assert engine._derivation_channel_stage_coverage[1][
+        "foundation_level"
+    ].startswith("blocked:")
+    assert all(
+        engine._derivation_channel_stage_coverage[2].get(stage) == "analyzed"
+        for stage in auto_soundcheck_module.STAGE_ORDER
+        if stage != "destructive_high_risk"
+    )
+
+
+def test_signalled_but_auto_disabled_source_cannot_claim_stage_coverage():
+    engine = AutoSoundcheckEngine(
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="unknown live source",
+            has_signal=True,
+            auto_corrections_enabled=False,
+        )
+    }
+    engine._derivation_complete = True
+    engine._derivation_channel_stage_coverage = {
+        1: {
+            stage: "blocked:auto_corrections_disabled"
+            for stage in auto_soundcheck_module.STAGE_ORDER
+        }
+    }
+    engine._derivation_readiness_residuals = [
+        {
+            "logical_correction_id": "soundcheck:derivation:auto-disabled-1",
+            "reason": "signalled_source_auto_corrections_disabled",
+            "status": "pending",
+            "scope": "operation",
+            "disposition": "operator_review",
+            "stage": "foundation_level",
+            "required_for": "safe_core",
+            "musically_required": True,
+        }
+    ]
+
+    bundle = engine.get_soundcheck_recommendation_bundle()
+    manifest = bundle["supervised_transaction_plans"]
+
+    assert manifest["source_coverage"]["verified"] is True
+    assert not any(manifest["source_coverage"]["stage_coverage"].values())
+    assert manifest["source_coverage"]["per_source_stage_coverage"]["1"][
+        "foundation_level"
+    ].startswith("blocked:")
+    assert bundle["soundcheck_readiness"]["mix_readiness"] == (
+        "soundcheck_incomplete"
+    )
+    assert manifest["readiness_residuals"][0]["reason"] == (
+        "signalled_source_auto_corrections_disabled"
+    )
+
+
+def test_analyzed_source_without_fader_move_exports_explicit_hold_intent():
+    engine = AutoSoundcheckEngine(
+        selected_channels=[1],
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Stable source",
+            source_role="instrument",
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                fader_db=-10.0,
+                raw_settings={
+                    "main_send": {"on": True, "level_db": 0.0, "pre": False},
+                    "input_routing": {
+                        "main_group": "LOCAL",
+                        "main_channel": 1,
+                        "alt_group": "OFF",
+                        "alt_channel": 0,
+                    },
+                    "tags": "",
+                    "readback_presence": {
+                        "fader": True,
+                        "mute": True,
+                        "main_send_on": True,
+                        "main_send_level": True,
+                        "main_send_pre": True,
+                        "input_main_group": True,
+                        "input_main_channel": True,
+                        "input_alt_group": True,
+                        "input_alt_channel": True,
+                        "tags": True,
+                    },
+                },
+            ),
+        )
+    }
+    engine._derivation_complete = True
+    engine._derivation_captured_at_epoch = time.time()
+    engine._derivation_channel_stage_coverage = {
+        1: {
+            stage: "analyzed"
+            for stage in auto_soundcheck_module.STAGE_ORDER
+            if stage != "destructive_high_risk"
+        }
+    }
+
+    bundle = engine.get_soundcheck_recommendation_bundle()
+    source_coverage = bundle["supervised_transaction_plans"][
+        "source_coverage"
+    ]
+    intent = source_coverage["per_source_fader_intent"]["1"]
+
+    assert intent["mode"] == "hold_current"
+    assert intent["analysis_baseline_db"] == -10.0
+    assert intent["analysis_run_id"] == engine._soundcheck_run_id
+    assert intent["signal_verified"] is True
+
+
+def _engine_with_verified_analyzed_source(*, main_pre=False, mute_read=True):
+    engine = AutoSoundcheckEngine(
+        selected_channels=[1],
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Source",
+            source_role="instrument",
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                fader_db=-10.0,
+                muted=False,
+                raw_settings={
+                    "main_send": {
+                        "on": True,
+                        "level_db": 0.0,
+                        "pre": main_pre,
+                    },
+                    "input_routing": {
+                        "main_group": "LOCAL",
+                        "main_channel": 1,
+                        "alt_group": "OFF",
+                        "alt_channel": 0,
+                    },
+                    "tags": "",
+                    "dca_assignments": [],
+                    "readback_presence": {
+                        "fader": True,
+                        "mute": mute_read,
+                        "main_send_on": True,
+                        "main_send_level": True,
+                        "main_send_pre": True,
+                        "input_main_group": True,
+                        "input_main_channel": True,
+                        "input_alt_group": True,
+                        "input_alt_channel": True,
+                        "tags": True,
+                    },
+                },
+            ),
+        )
+    }
+    engine._derivation_complete = True
+    engine._derivation_captured_at_epoch = time.time()
+    engine._derivation_channel_stage_coverage = {
+        1: {
+            stage: "analyzed"
+            for stage in auto_soundcheck_module.STAGE_ORDER
+            if stage != "destructive_high_risk"
+        }
+    }
+    return engine
+
+
+@pytest.mark.parametrize(
+    ("main_pre", "mute_read", "reason"),
+    [
+        (True, True, "selected_source_main_path_not_audible"),
+        (False, False, "selected_source_main_path_not_audible"),
+    ],
+)
+def test_pre_fader_or_incomplete_local_path_cannot_be_hold_current(
+    main_pre,
+    mute_read,
+    reason,
+):
+    engine = _engine_with_verified_analyzed_source(
+        main_pre=main_pre,
+        mute_read=mute_read,
+    )
+
+    manifest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+    intent = manifest["source_coverage"]["per_source_fader_intent"]["1"]
+
+    assert intent["mode"] == "unresolved"
+    assert intent["channel_main_path_locally_enabled"] is False
+    assert any(
+        residual["reason"] == reason
+        for residual in manifest["readiness_residuals"]
+    )
+
+
+def test_muted_assigned_dca_cannot_prove_selected_source_path():
+    engine = _engine_with_verified_analyzed_source()
+    snapshot = engine.channels[1].original_snapshot
+    snapshot.raw_settings["tags"] = "#D2"
+    snapshot.raw_settings["dca_assignments"] = [2]
+    engine.dca_snapshots[2] = DCASnapshot(
+        dca=2,
+        fader_db=0.0,
+        muted=True,
+        source_channels=[1],
+    )
+
+    manifest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+    intent = manifest["source_coverage"]["per_source_fader_intent"]["1"]
+
+    assert intent["mode"] == "unresolved"
+    assert intent["downstream_dca_path_verified"] is False
+    assert any(
+        residual["reason"] == "selected_source_dca_path_not_audible"
+        for residual in manifest["readiness_residuals"]
+    )
+
+
+def test_planned_fader_below_audible_floor_stays_unresolved_not_hold_current():
+    engine = _engine_with_verified_analyzed_source()
+    mixer = GatedEngineMixer()
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=engine.action_safety_config,
+    )
+    engine.correction_executor = GatedCorrectionActionExecutor(
+        engine.safety_controller,
+        config=CorrectionActionExecutorConfig.from_config(
+            {"promoted_action_types": {"ChannelFaderMove": True}}
+        ),
+    )
+    engine._execute_action(
+        ChannelFaderMove(
+            channel_id=1,
+            target_db=-100.0,
+            reason="inaudible target proof",
+        ),
+        runtime_state=RuntimeState.SOURCE_LEARNING,
+    )
+
+    manifest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+    intent = manifest["source_coverage"]["per_source_fader_intent"]["1"]
+
+    assert intent["mode"] == "unresolved"
+    assert any(
+        residual["reason"] == "selected_source_final_fader_below_audible_floor"
+        for residual in manifest["readiness_residuals"]
+    )
+
+
+@pytest.mark.parametrize(
+    ("muted", "fader_db"),
+    [(True, -10.0), (False, -100.0)],
+)
+def test_muted_or_inactive_selected_source_cannot_be_hold_current(
+    muted,
+    fader_db,
+):
+    engine = AutoSoundcheckEngine(
+        selected_channels=[1],
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="Inactive source",
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                fader_db=fader_db,
+                muted=muted,
+                raw_settings={
+                    "main_send": {"on": True, "level_db": 0.0}
+                },
+            ),
+        )
+    }
+    engine._derivation_complete = True
+    engine._derivation_captured_at_epoch = time.time()
+    engine._derivation_channel_stage_coverage = {
+        1: {
+            stage: "analyzed"
+            for stage in auto_soundcheck_module.STAGE_ORDER
+            if stage != "destructive_high_risk"
+        }
+    }
+
+    manifest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+
+    assert manifest["source_coverage"]["per_source_fader_intent"]["1"][
+        "mode"
+    ] == "unresolved"
+    assert any(
+        residual["reason"]
+        == "selected_source_muted_or_inactive_fader_requires_operator"
+        for residual in manifest["readiness_residuals"]
+    )
+
+
+def test_selected_source_without_audible_main_path_is_not_mix_ready():
+    engine = AutoSoundcheckEngine(
+        selected_channels=[1],
+        num_channels=1,
+        auto_discover=False,
+        observe_only=True,
+    )
+    engine.channels = {
+        1: ChannelInfo(
+            channel=1,
+            name="No main path",
+            has_signal=True,
+            recognized=True,
+            auto_corrections_enabled=True,
+            original_snapshot=ChannelSnapshot(
+                channel=1,
+                fader_db=-10.0,
+                muted=False,
+                raw_settings={
+                    "main_send": {"on": False, "level_db": 0.0}
+                },
+            ),
+        )
+    }
+    engine._derivation_complete = True
+    engine._derivation_captured_at_epoch = time.time()
+    engine._derivation_channel_stage_coverage = {
+        1: {
+            stage: "analyzed"
+            for stage in auto_soundcheck_module.STAGE_ORDER
+            if stage != "destructive_high_risk"
+        }
+    }
+
+    manifest = engine.get_soundcheck_recommendation_bundle()[
+        "supervised_transaction_plans"
+    ]
+
+    intent = manifest["source_coverage"]["per_source_fader_intent"]["1"]
+    assert intent["mode"] == "unresolved"
+    assert intent["channel_main_path_locally_enabled"] is False
+    assert intent["analyzed_source_path_enabled"] is False
+    assert any(
+        residual["reason"] == "selected_source_main_path_not_audible"
+        for residual in manifest["readiness_residuals"]
+    )
 
 
 class SharedAudioCapture:
@@ -242,6 +1253,126 @@ def test_shared_runtime_is_not_stopped_or_disconnected_by_engine():
     status = engine.get_status()
     assert status["shared_mixer_runtime"] is True
     assert status["shared_audio_runtime"] is True
+
+
+def test_run_does_not_clear_a_preexisting_stop_request(monkeypatch):
+    engine = AutoSoundcheckEngine(auto_discover=False)
+    engine._stop_event.set()
+    monkeypatch.setattr(
+        engine,
+        "_connect_mixer",
+        lambda: pytest.fail("stopped engine must not connect"),
+    )
+
+    assert engine.run() is False
+    assert engine._stop_event.is_set()
+
+
+def test_stop_joins_engine_thread_before_reporting_cleanup_complete():
+    engine = AutoSoundcheckEngine(auto_discover=False)
+    worker_finished = threading.Event()
+
+    def worker():
+        assert engine._stop_event.wait(1.0)
+        time.sleep(0.03)
+        worker_finished.set()
+
+    thread = threading.Thread(target=worker)
+    engine._engine_thread = thread
+    thread.start()
+
+    engine.stop()
+
+    assert worker_finished.is_set()
+    assert thread.is_alive() is False
+    assert engine._stop_cleanup_complete is True
+
+
+def test_private_audio_capture_refuses_synthetic_silence_fallback(monkeypatch):
+    engine = AutoSoundcheckEngine(auto_discover=False, num_channels=2)
+    stopped = {"value": False}
+
+    class FailingCapture:
+        def __init__(self, **_kwargs):
+            self.allow_silence_fallback = True
+
+        def start(self):
+            assert self.allow_silence_fallback is False
+            raise RuntimeError("real device unavailable")
+
+        def stop(self):
+            stopped["value"] = True
+
+    monkeypatch.setattr(auto_soundcheck_module, "scan_audio_devices", lambda: [])
+    monkeypatch.setattr(auto_soundcheck_module, "AudioCapture", FailingCapture)
+
+    assert engine._start_audio() is False
+    assert stopped["value"] is True
+    assert engine.audio_capture is None
+
+
+def test_run_releases_owned_mixer_when_audio_start_fails(monkeypatch):
+    engine = AutoSoundcheckEngine(auto_discover=False)
+    mixer = type(
+        "OwnedMixer",
+        (),
+        {"disconnect": lambda self: setattr(self, "disconnected", True)},
+    )()
+    mixer.disconnected = False
+
+    def connect():
+        engine.mixer_client = mixer
+        return True
+
+    monkeypatch.setattr(engine, "_connect_mixer", connect)
+    monkeypatch.setattr(engine, "_start_audio", lambda: False)
+    monkeypatch.setattr(engine, "_evaluate_pending_actions", lambda **_kwargs: None)
+    monkeypatch.setattr(engine, "_generate_autofoh_session_report", lambda: None)
+
+    assert engine.run() is False
+    assert mixer.disconnected is True
+    assert engine.state.value == "error"
+    assert engine._stop_cleanup_complete is True
+
+
+def test_run_releases_owned_audio_and_mixer_after_pipeline_exception(monkeypatch):
+    engine = AutoSoundcheckEngine(auto_discover=False)
+    mixer = type(
+        "OwnedMixer",
+        (),
+        {"disconnect": lambda self: setattr(self, "disconnected", True)},
+    )()
+    mixer.disconnected = False
+    capture = type(
+        "OwnedCapture",
+        (),
+        {"stop": lambda self: setattr(self, "stopped", True)},
+    )()
+    capture.stopped = False
+
+    def connect():
+        engine.mixer_client = mixer
+        return True
+
+    def start_audio():
+        engine.audio_capture = capture
+        return True
+
+    monkeypatch.setattr(engine, "_connect_mixer", connect)
+    monkeypatch.setattr(engine, "_start_audio", start_audio)
+    monkeypatch.setattr(
+        engine,
+        "_scan_channels",
+        lambda: (_ for _ in ()).throw(RuntimeError("scan failed")),
+    )
+    monkeypatch.setattr(engine, "_evaluate_pending_actions", lambda **_kwargs: None)
+    monkeypatch.setattr(engine, "_generate_autofoh_session_report", lambda: None)
+
+    assert engine.run() is False
+    assert capture.stopped is True
+    assert mixer.disconnected is True
+    assert engine.state.value == "error"
+    assert engine._stop_cleanup_complete is True
 
 
 class ResetTrackingMixer:

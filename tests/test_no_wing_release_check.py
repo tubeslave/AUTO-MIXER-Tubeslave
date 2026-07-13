@@ -102,6 +102,7 @@ from tools.no_wing_release_check import (
     policy_supervised_live_write_kinds,
     policy_supervised_live_write_surfaces,
     proof_report_path_for_run,
+    protected_runtime_file_snapshots,
     raw_mixer_readback_artifact_intake_summary,
     raw_mixer_readback_contract_summary,
     read_surface_physical_readback_acceptance_template_path_for_run,
@@ -128,11 +129,13 @@ from tools.no_wing_release_check import (
     routing_sends_readback_artifact_intake_summary,
     run_command_check,
     run_release_checks,
+    snapshot_protected_runtime_file,
     snapshots_scenes_readback_artifact_intake_summary,
     supervised_gain_dry_run_summary,
     user_presets_readback_contract_summary,
     user_presets_readback_artifact_intake_summary,
     validate_repo_local_commands,
+    validate_protected_runtime_file_unchanged,
     validate_no_live_commands,
     validate_bus_group_main_dca_physical_readback_artifact_intake_snapshot,
     validate_bus_group_main_dca_physical_readback_contract_snapshot,
@@ -202,6 +205,43 @@ def bind_local_test_server_or_skip() -> socket.socket:
         server.close()
         pytest.skip(f"local socket bind unavailable in this environment: {exc}")
     return server
+
+
+def test_protected_runtime_file_guard_detects_offline_wal_mutation(tmp_path):
+    wal = tmp_path / "manual_write_wal.jsonl"
+    wal.write_text('{"phase":"existing"}\n', encoding="utf-8")
+    before = snapshot_protected_runtime_file(wal)
+
+    unchanged = validate_protected_runtime_file_unchanged("console_runtime_wal", before)
+    assert unchanged.status == "passed"
+    assert unchanged.detail["unchanged"] is True
+
+    with wal.open("a", encoding="utf-8") as handle:
+        handle.write('{"phase":"synthetic_dry_run"}\n')
+    changed = validate_protected_runtime_file_unchanged("console_runtime_wal", before)
+    assert changed.status == "failed"
+    assert changed.detail["unchanged"] is False
+    assert changed.detail["before"]["sha256"] != changed.detail["after"]["sha256"]
+    assert changed.detail["live_authority_granted"] is False
+
+
+def test_protected_runtime_snapshots_cover_all_canonical_append_only_stores(tmp_path):
+    snapshots = dict(protected_runtime_file_snapshots(repo_root=tmp_path))
+
+    assert set(snapshots) == {
+        "canonical_manual_write_log",
+        "canonical_decision_trace_log",
+        "canonical_decision_memory_log",
+        "console_runtime_wal",
+        "soundcheck_parent_journal",
+    }
+    canonical_root = tmp_path / "artifacts" / "wing_telemetry" / "manual_write_gate"
+    assert snapshots["canonical_manual_write_log"].path == canonical_root / "manual_write_events.jsonl"
+    assert snapshots["canonical_decision_trace_log"].path == canonical_root / "decision_traces.jsonl"
+    assert snapshots["canonical_decision_memory_log"].path == canonical_root / "decision_memory.jsonl"
+    assert snapshots["soundcheck_parent_journal"].path.name == (
+        "soundcheck_parent_journal.jsonl"
+    )
 
 GAIN_REQUIRED_EVIDENCE_COMPONENTS = [
     "physical_pre_read",
@@ -13714,6 +13754,9 @@ def test_no_wing_release_check_rejects_misleading_proof_report_gap_rollup_claims
 
 
 def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, monkeypatch):
+    accepted_source_id = (
+        "artifacts/wing_readonly_preflight/run/summary.json"
+    )
     def fake_free_port(
         port: int,
         host: str = "127.0.0.1",
@@ -13810,6 +13853,13 @@ def test_no_wing_release_check_runs_gap_rollup_schema_after_report(tmp_path, mon
 
     monkeypatch.setattr(release_check, "check_port_free", fake_free_port)
     monkeypatch.setattr(release_check, "run_command_check", fake_command_check)
+    monkeypatch.setattr(
+        release_check,
+        "build_wing_readonly_preflight_review_decision_ledger",
+        lambda: _fake_review_decision_ledger_with_accepted_candidate(
+            accepted_source_id
+        ),
+    )
 
     summary = run_release_checks(
         artifact_root=tmp_path,
