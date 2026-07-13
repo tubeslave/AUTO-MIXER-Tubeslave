@@ -287,7 +287,7 @@ def classify_trusted_apply_reason_code(
 ) -> Optional[str]:
     """Classify a reason only inside the private producer that created it."""
 
-    if final_status == "applied":
+    if final_status in {"applied", "proof_passed"}:
         return None
     allowed = _TRUSTED_REASON_CODES_BY_SOURCE.get(source, frozenset())
     if type(value) is str and value in allowed:
@@ -320,6 +320,54 @@ def terminal_result_proves_verified_apply(result: Any) -> bool:
         and dict.get(result, "emergency_stop_activated") is not True
         and dict.get(result, "emergency_stop_required") is not True
         and audio_recheck_satisfied
+    )
+
+
+def terminal_result_proves_verified_restored_proof(result: Any) -> bool:
+    """Recognize only a complete, durable, restore-only proof terminal."""
+
+    if type(result) is not dict:
+        return False
+    applied = dict.get(result, "applied_operation_ids")
+    rolled_back = dict.get(result, "rollback_operation_ids")
+    identifiers_are_exact = bool(
+        type(applied) is list
+        and type(rolled_back) is list
+        and applied
+        and rolled_back
+        and all(type(value) is str and value for value in (*applied, *rolled_back))
+        and len(applied) == len(set(applied))
+        and len(rolled_back) == len(set(rolled_back))
+        and set(applied) == set(rolled_back)
+    )
+    return bool(
+        identifiers_are_exact
+        and dict.get(result, "status") == "proof_passed"
+        and dict.get(result, "proof_run") is True
+        and dict.get(result, "restore_after_verify") is True
+        and dict.get(result, "capability_kind") == "restore_only_proof"
+        and is_sha256_digest(dict.get(result, "operation_digest"))
+        and is_sha256_digest(dict.get(result, "review_content_digest"))
+        and type(dict.get(result, "proposal_id")) is str
+        and bool(dict.get(result, "proposal_id"))
+        and dict.get(result, "accepted") is False
+        and dict.get(result, "owner_review_required") is True
+        and dict.get(result, "live_authority_granted") is False
+        and dict.get(result, "readiness_closure_allowed") is False
+        and dict.get(result, "no_console_send_proven") is False
+        and dict.get(result, "physical_verified") is True
+        and dict.get(result, "proof_target_verified") is True
+        and dict.get(result, "physical_state_restored") is True
+        and dict.get(result, "terminal_after_console_send") is True
+        and dict.get(result, "rollback_attempted") is True
+        and dict.get(result, "rollback_succeeded") is True
+        and dict.get(result, "wal_terminal") == "proof_restored"
+        and dict.get(result, "audio_recheck_passed") is True
+        and dict.get(result, "write_state_unknown") is False
+        and dict.get(result, "rollback_state_unknown") is False
+        and dict.get(result, "manual_review_required") is False
+        and dict.get(result, "emergency_stop_activated") is False
+        and dict.get(result, "emergency_stop_required") is False
     )
 
 
@@ -493,6 +541,15 @@ class TrustedApplyReceipt:
     operator_idempotency_released: Optional[bool]
     channel: Optional[int]
     value_type: Optional[str]
+    accepted: Optional[bool]
+    owner_review_required: Optional[bool]
+    live_authority_granted: Optional[bool]
+    readiness_closure_allowed: Optional[bool]
+    proof_run: Optional[bool]
+    restore_after_verify: Optional[bool]
+    capability_kind: Optional[str]
+    operation_digest: Optional[str]
+    proof_target_verified: Optional[bool]
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         raise TypeError(
@@ -664,7 +721,12 @@ def _freeze_trusted_apply_receipt(
         or not identity._is_authentic()
     ):
         raise ApplyResponseProjectionError("trusted_apply_identity_invalid")
-    if final_status not in {"applied", "apply_blocked", "apply_error"}:
+    if final_status not in {
+        "applied",
+        "proof_passed",
+        "apply_blocked",
+        "apply_error",
+    }:
         raise ApplyResponseProjectionError("finalized_apply_status_invalid")
     if type(terminal_result) is not dict:
         raise ApplyResponseProjectionError("finalized_apply_result_invalid")
@@ -674,6 +736,9 @@ def _freeze_trusted_apply_receipt(
     normalized_result_digest = result_digest if detail_available else None
     evidence_pinned = result_evidence_pinned is True
     result = terminal_result
+    restored_proof = terminal_result_proves_verified_restored_proof(result)
+    if final_status == "proof_passed" and not restored_proof:
+        raise ApplyResponseProjectionError("restored_proof_terminal_invalid")
     apply_status = _exact_string(dict.get(result, "status")) or "unknown"
     no_send = _exact_optional_bool(dict.get(result, "no_console_send_proven"))
     physical_verified = _exact_optional_bool(dict.get(result, "physical_verified"))
@@ -774,14 +839,24 @@ def _freeze_trusted_apply_receipt(
         "apply_status": apply_status,
         "success": bool(
             final_success is True
-            and final_status == "applied"
-            and apply_status == "applied"
-            and terminal_result_proves_verified_apply(result)
+            and (
+                (
+                    final_status == "applied"
+                    and apply_status == "applied"
+                    and terminal_result_proves_verified_apply(result)
+                )
+                or (
+                    final_status == "proof_passed"
+                    and apply_status == "proof_passed"
+                    and restored_proof
+                )
+            )
         ),
         "reason_code": (
             reason_code
             if (
-                reason_code is None and final_status == "applied"
+                reason_code is None
+                and final_status in {"applied", "proof_passed"}
             )
             or (
                 type(reason_code) is str
@@ -830,6 +905,29 @@ def _freeze_trusted_apply_receipt(
         ),
         "channel": channel,
         "value_type": _exact_string(dict.get(result, "value_type")),
+        "accepted": _exact_optional_bool(dict.get(result, "accepted")),
+        "owner_review_required": _exact_optional_bool(
+            dict.get(result, "owner_review_required")
+        ),
+        "live_authority_granted": _exact_optional_bool(
+            dict.get(result, "live_authority_granted")
+        ),
+        "readiness_closure_allowed": _exact_optional_bool(
+            dict.get(result, "readiness_closure_allowed")
+        ),
+        "proof_run": _exact_optional_bool(dict.get(result, "proof_run")),
+        "restore_after_verify": _exact_optional_bool(
+            dict.get(result, "restore_after_verify")
+        ),
+        "capability_kind": _exact_string(dict.get(result, "capability_kind")),
+        "operation_digest": (
+            dict.get(result, "operation_digest")
+            if is_sha256_digest(dict.get(result, "operation_digest"))
+            else None
+        ),
+        "proof_target_verified": _exact_optional_bool(
+            dict.get(result, "proof_target_verified")
+        ),
     }
     receipt = object.__new__(TrustedApplyReceipt)
     object.__setattr__(
@@ -3655,7 +3753,7 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
     proposal_id = utf8_preview(receipt.proposal_id, 256)
     proposal_status = utf8_preview(receipt.proposal_status, 64)
     apply_status = utf8_preview(receipt.apply_status, 64)
-    return {
+    payload = {
         "type": receipt.response_type,
         "contract_version": 2,
         "status": receipt.final_status,
@@ -3726,6 +3824,27 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
         "response_degraded": False,
         "wire": {},
     }
+    if receipt.final_status == "proof_passed":
+        payload.update(
+            {
+                "accepted": receipt.accepted,
+                "owner_review_required": receipt.owner_review_required,
+                "live_authority_granted": receipt.live_authority_granted,
+                "readiness_closure_allowed": (
+                    receipt.readiness_closure_allowed
+                ),
+                "proof_run": receipt.proof_run,
+                "restore_after_verify": receipt.restore_after_verify,
+                "capability_kind": (
+                    utf8_preview(receipt.capability_kind, 64)
+                    if receipt.capability_kind is not None
+                    else None
+                ),
+                "operation_digest": receipt.operation_digest,
+                "proof_target_verified": receipt.proof_target_verified,
+            }
+        )
+    return payload
 
 
 def _prewrite_no_send_projection(

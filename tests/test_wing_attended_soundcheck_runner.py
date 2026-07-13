@@ -23,7 +23,11 @@ from master_capture_route_proof import (
 from m110_cp05_hardware_gate import compute_m110_cp05_source_binding
 from tools import wing_attended_soundcheck_runner as runner
 from runtime_identity import RUNTIME_IDENTITY_SCHEMA, runtime_identity_manifest_sha256
-from supervised_proof_capability import M110_RUNTIME_CRITICAL_PATHS
+from supervised_proof_capability import (
+    M110_RUNTIME_CRITICAL_PATHS,
+    validate_m110_arm_request,
+    validate_m110_capability_issue_request,
+)
 
 
 def _git(root: Path, *args: str) -> None:
@@ -411,6 +415,60 @@ def _route_result(
     }
 
 
+def _valid_restore_only_terminal(
+    *,
+    proposal_id="proposal-1",
+    review_digest="sha256:" + "b" * 64,
+    operation_digest="sha256:" + "c" * 64,
+):
+    result_digest = "sha256:" + "f" * 64
+    return {
+        "type": "operator_proposal_apply_result",
+        "contract_version": 2,
+        "status": "proof_passed",
+        "success": True,
+        "reason": None,
+        "proposal_id": proposal_id,
+        "proposal_status": "proof_passed",
+        "proposal": {
+            "id": proposal_id,
+            "review_contract_version": 2,
+            "review_content_digest": review_digest,
+            "status": "proof_passed",
+            "result_digest": result_digest,
+            "result_detail_available": True,
+            "result_evidence_pinned": False,
+        },
+        "apply_status": "proof_passed",
+        "accepted": False,
+        "owner_review_required": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "proof_run": True,
+        "restore_after_verify": True,
+        "capability_kind": "restore_only_proof",
+        "operation_digest": operation_digest,
+        "proof_target_verified": True,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "physical_state_restored": True,
+        "terminal_after_console_send": True,
+        "write_state_unknown": False,
+        "rollback_attempted": True,
+        "rollback_succeeded": True,
+        "rollback_status": "verified",
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "wal_terminal": "proof_restored",
+        "audio_recheck_passed": True,
+        "result_digest": result_digest,
+        "result_detail_available": True,
+        "result_evidence_pinned": False,
+    }
+
+
 def test_authority_packet_is_length_prefixed_manifest_plus_secret():
     secret = secrets.token_bytes(32)
     manifest = {
@@ -440,6 +498,85 @@ def test_runner_builds_exact_hmac_route_request():
 
     assert validate_master_capture_route_request(request) == ()
     assert request["authority_proof"].startswith("hmac-sha256:")
+
+
+def test_runner_builds_exact_hmac_control_and_capability_requests():
+    secret = secrets.token_bytes(32)
+    arm = runner.build_m110_attended_control_request(
+        approval_id="operator-approved",
+        request_nonce="a" * 32,
+        secret=secret,
+    )
+    issue = runner.build_m110_restore_only_capability_request(
+        proposal_id="proposal-1",
+        review_contract_version=2,
+        review_content_digest="sha256:" + "b" * 64,
+        operation_digest="sha256:" + "c" * 64,
+        approval_id="operator-approved",
+        request_nonce="d" * 32,
+        secret=secret,
+    )
+
+    assert validate_m110_arm_request(arm)[0] is True
+    assert validate_m110_capability_issue_request(issue)[0] is True
+    with pytest.raises(ValueError, match="review_version"):
+        runner.build_m110_restore_only_capability_request(
+            proposal_id="proposal-1",
+            review_contract_version=True,
+            review_content_digest="sha256:" + "b" * 64,
+            operation_digest="sha256:" + "c" * 64,
+            approval_id="operator-approved",
+            request_nonce="d" * 32,
+            secret=secret,
+        )
+
+
+def test_restore_only_terminal_validator_rejects_unsafe_or_unbound_truth():
+    proposal_id = "proposal-1"
+    review_digest = "sha256:" + "b" * 64
+    operation_digest = "sha256:" + "c" * 64
+    valid = _valid_restore_only_terminal(
+        proposal_id=proposal_id,
+        review_digest=review_digest,
+        operation_digest=operation_digest,
+    )
+    runner.ProofOwnedBackendSession._validate_restore_only_proof_terminal(
+        valid,
+        proposal_id=proposal_id,
+        review_digest=review_digest,
+        operation_digest=operation_digest,
+    )
+
+    malformed = []
+    for field_name, unsafe_value in (
+        ("no_console_send_proven", True),
+        ("emergency_stop_activated", True),
+        ("emergency_stop_required", True),
+        ("result_digest", None),
+    ):
+        candidate = deepcopy(valid)
+        if unsafe_value is None:
+            candidate.pop(field_name)
+        else:
+            candidate[field_name] = unsafe_value
+        malformed.append(candidate)
+    nested_digest_mismatch = deepcopy(valid)
+    nested_digest_mismatch["proposal"]["result_digest"] = (
+        "sha256:" + "0" * 64
+    )
+    malformed.append(nested_digest_mismatch)
+    nested_identity_mismatch = deepcopy(valid)
+    nested_identity_mismatch["proposal"]["id"] = "proposal-other"
+    malformed.append(nested_identity_mismatch)
+
+    for candidate in malformed:
+        with pytest.raises(RuntimeError, match="proof_terminal|result_digest"):
+            runner.ProofOwnedBackendSession._validate_restore_only_proof_terminal(
+                candidate,
+                proposal_id=proposal_id,
+                review_digest=review_digest,
+                operation_digest=operation_digest,
+            )
 
 
 def test_plan_only_runner_contacts_neither_backend_nor_wing(tmp_path):
@@ -852,6 +989,236 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
             "stop_audio_capture_preview",
             "disconnect_wing",
         ]
+
+    asyncio.run(scenario())
+
+
+def test_same_session_arm_prepare_issue_apply_restores_and_erases_token(
+    tmp_path,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        artifact_root = tmp_path / "route-artifacts"
+        identity = _identity_result()
+        proposal_id = "m110-proof-proposal-1"
+        approval_id = "operator-approved"
+        review_digest = "sha256:" + "b" * 64
+        operation_digest = "sha256:" + "c" * 64
+        capability_token = "m110cap_v1_" + "d" * 64
+        idempotency_key = "m110-proof:" + "e" * 32
+        route_proof = {}
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": True,
+                        "preview": True,
+                        "owned_by_requester": True,
+                        "source_type": "sounddevice",
+                        "real_input": True,
+                        "device_name": "WING",
+                        "device_index": 7,
+                        "num_channels": 48,
+                        "sample_rate": 48_000,
+                    }
+                ]
+            if payload["type"] == "capture_wing_master_route_proof":
+                result = _route_result(artifact_root, payload, identity)
+                route_proof["id"] = result["proof_id"]
+                return [result]
+            if payload["type"] == "arm_m110_attended_control":
+                assert validate_m110_arm_request(payload)[0] is True
+                return [
+                    {
+                        "type": "m110_attended_control_result",
+                        "status": "armed",
+                        "success": True,
+                        "reason": "m110_supervised_capability_only_armed",
+                        "route_proof_id": route_proof["id"],
+                        "supervised_capability_only": True,
+                        "normal_operator_mode_unchanged": True,
+                        "normal_live_allowlist_changed": False,
+                        "live_authority_granted": False,
+                        "readiness_closure_allowed": False,
+                    }
+                ]
+            if payload["type"] == "prepare_m110_restore_only_proof":
+                return [
+                    {
+                        "type": "m110_restore_proof_prepare_result",
+                        "status": "prepared",
+                        "success": True,
+                        "reason": "m110_restore_proof_bundle_current",
+                        "proposal_id": proposal_id,
+                        "review_contract_version": 2,
+                        "review_content_digest": review_digest,
+                        "operation_digest": operation_digest,
+                        "operation_count": 1,
+                        "scope_addresses": ["/ch/1/eq/on"],
+                        "token_issued": False,
+                        "live_authority_granted": False,
+                    }
+                ]
+            if payload["type"] == "issue_supervised_capability":
+                assert validate_m110_capability_issue_request(payload)[0] is True
+                return [
+                    {
+                        "type": "supervised_capability_result",
+                        "status": "issued",
+                        "success": True,
+                        "reason": "m110_capability_issued",
+                        "capability_kind": "restore_only_proof",
+                        "proposal_id": proposal_id,
+                        "review_contract_version": 2,
+                        "review_content_digest": review_digest,
+                        "operation_digest": operation_digest,
+                        "approval_id": approval_id,
+                        "idempotency_key": idempotency_key,
+                        "latest_start_epoch": time.time() + 20.0,
+                        "supervised_capability_token": capability_token,
+                        "single_use": True,
+                        "stores_plaintext_token": False,
+                        "live_authority_granted": False,
+                    }
+                ]
+            if payload["type"] == "apply_operator_proposal":
+                assert payload["supervised_capability_token"] == capability_token
+                assert set(payload) == {
+                    "type",
+                    "proposal_id",
+                    "approved",
+                    "approval_id",
+                    "idempotency_key",
+                    "expected_review_contract_version",
+                    "expected_review_content_digest",
+                    "expected_operation_digest",
+                    "supervised_capability_token",
+                }
+                return [
+                    {
+                        "type": "operator_proposal_apply_result",
+                        "contract_version": 2,
+                        "status": "proof_passed",
+                        "success": True,
+                        "reason": None,
+                        "proposal_id": proposal_id,
+                        "proposal_status": "proof_passed",
+                        "proposal": {
+                            "id": proposal_id,
+                            "review_contract_version": 2,
+                            "review_content_digest": review_digest,
+                            "status": "proof_passed",
+                            "result_digest": "sha256:" + "f" * 64,
+                            "result_detail_available": True,
+                            "result_evidence_pinned": False,
+                        },
+                        "apply_status": "proof_passed",
+                        "accepted": False,
+                        "owner_review_required": True,
+                        "live_authority_granted": False,
+                        "readiness_closure_allowed": False,
+                        "proof_run": True,
+                        "restore_after_verify": True,
+                        "capability_kind": "restore_only_proof",
+                        "operation_digest": operation_digest,
+                        "proof_target_verified": True,
+                        "no_console_send_proven": False,
+                        "physical_verified": True,
+                        "physical_state_restored": True,
+                        "terminal_after_console_send": True,
+                        "write_state_unknown": False,
+                        "rollback_attempted": True,
+                        "rollback_succeeded": True,
+                        "rollback_status": "verified",
+                        "rollback_state_unknown": False,
+                        "manual_review_required": False,
+                        "emergency_stop_activated": False,
+                        "emergency_stop_required": False,
+                        "wal_terminal": "proof_restored",
+                        "audio_recheck_passed": True,
+                        "result_digest": "sha256:" + "f" * 64,
+                        "result_detail_available": True,
+                        "result_evidence_pinned": False,
+                    }
+                ]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=identity,
+        )
+        await session.establish_master_route(
+            wing_ip="192.168.1.102",
+            audio_device_index=7,
+            approval_id=approval_id,
+            request_id="m110-route-test",
+            request_nonce="1" * 32,
+            route_artifact_root=artifact_root,
+        )
+        arm = await session.arm_m110_attended_control(
+            approval_id=approval_id,
+        )
+        proof = await session.prove_pending_restore_only_proposal(
+            proposal_id=proposal_id,
+            approval_id=approval_id,
+        )
+
+        assert arm["verified"] is True
+        assert proof["verified"] is True
+        assert proof["accepted"] is False
+        assert proof["token_retained"] is False
+        assert session.closed is False
+        assert session.control_armed is True
+        durable = json.dumps(proof, sort_keys=True) + repr(session)
+        assert capability_token not in durable
+        sent_types = [item["type"] for item in websocket.sent]
+        assert sent_types == [
+            "connect_wing",
+            "start_audio_capture_preview",
+            "capture_wing_master_route_proof",
+            "arm_m110_attended_control",
+            "prepare_m110_restore_only_proof",
+            "issue_supervised_capability",
+            "apply_operator_proposal",
+        ]
+        assert sum(
+            capability_token in json.dumps(item)
+            for item in websocket.sent
+        ) == 1
+
+        teardown = await session.close()
+        assert teardown["verified"] is True
+        assert session.control_armed is False
+        assert backend.process.poll() is not None
 
     asyncio.run(scenario())
 

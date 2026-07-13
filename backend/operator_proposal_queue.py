@@ -14,7 +14,7 @@ import re
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
 try:
@@ -28,6 +28,7 @@ from decision_queue_wire_contract import (
     build_review_identity,
     is_sha256_digest,
     terminal_result_proves_verified_apply,
+    terminal_result_proves_verified_restored_proof,
 )
 from operator_proposal_result_store import (
     ResultEvidenceError,
@@ -37,7 +38,14 @@ from operator_proposal_result_store import (
 )
 
 
-FINAL_STATUSES = {"accepted", "dismissed", "applied", "apply_blocked", "apply_error"}
+FINAL_STATUSES = {
+    "accepted",
+    "dismissed",
+    "applied",
+    "proof_passed",
+    "apply_blocked",
+    "apply_error",
+}
 APPLYABLE_VALUE_TYPES = set(LIVE_ALLOWED_WRITE_KINDS)
 DEFAULT_PROPOSAL_TTL_SECONDS = 120
 MIN_PROPOSAL_TTL_SECONDS = 5
@@ -410,6 +418,7 @@ class OperatorProposalQueue:
         max_history_bytes: int = MAX_TERMINAL_RETAINED_BYTES,
         result_store: Optional[ResultEvidenceStore] = None,
         result_evidence_lifecycle_ready: bool = False,
+        terminal_callback: Optional[Callable[[str, str], None]] = None,
     ):
         self.max_history = int(max_history)
         self.max_history_bytes = int(max_history_bytes)
@@ -418,6 +427,7 @@ class OperatorProposalQueue:
         self._tombstones: Dict[str, OperatorProposal] = {}
         self._seen_proposal_ids: set[str] = set()
         self._review_claim_lock = threading.RLock()
+        self._terminal_callback = terminal_callback
         self._result_persistence_failed = False
         self._result_store = result_store
         self._result_recovery_hazards: tuple[Dict[str, Any], ...] = ()
@@ -437,6 +447,11 @@ class OperatorProposalQueue:
             and not self._result_persistence_failed
             and not self._result_recovery_hazards
         )
+
+    def _notify_terminal(self, proposal: OperatorProposal) -> None:
+        callback = self._terminal_callback
+        if callback is not None:
+            callback(proposal.id, proposal.status)
 
     @property
     def result_persistence_failed(self) -> bool:
@@ -1196,6 +1211,7 @@ class OperatorProposalQueue:
         proposal.result = copy.deepcopy(result) if result else None
         self._history.append(proposal)
         self._trim_history()
+        self._notify_terminal(proposal)
         return {
             "status": status,
             "success": True,
@@ -1295,6 +1311,19 @@ class OperatorProposalQueue:
                     "fresh_analysis_required": True,
                 }
             )
+        if (
+            result.get("status") == "proof_passed"
+            and not terminal_result_proves_verified_restored_proof(result)
+        ):
+            result.update(
+                {
+                    "status": "error",
+                    "success": False,
+                    "reason": "proof_terminal_evidence_incomplete",
+                    "manual_review_required": True,
+                    "fresh_analysis_required": True,
+                }
+            )
         pending_idx = self._find_pending_index(proposal.id)
         exact_pending = (
             pending_idx is not None and self._pending[pending_idx] is proposal
@@ -1304,9 +1333,13 @@ class OperatorProposalQueue:
             claimed
             and _result_proves_verified_rollback(result)
         )
+        pre_persist_restored_proof = bool(
+            claimed
+            and terminal_result_proves_verified_restored_proof(result)
+        )
         pre_persist_possible_send = bool(
             claimed
-            and result.get("status") != "applied"
+            and result.get("status") not in {"applied", "proof_passed"}
             and result.get("no_console_send_proven") is not True
         )
         pre_persist_safe_no_send = bool(
@@ -1330,7 +1363,11 @@ class OperatorProposalQueue:
             result.setdefault("write_state_unknown", False)
             result.setdefault("rollback_state_unknown", False)
             result.setdefault("manual_review_required", False)
-        if pre_persist_possible_send and not pre_persist_verified_rollback:
+        if (
+            pre_persist_possible_send
+            and not pre_persist_verified_rollback
+            and not pre_persist_restored_proof
+        ):
             # Freeze the exact terminal safety truth before digest-bound
             # persistence.  The artifact, in-memory row, tombstone and wire
             # receipt must never disagree about an unverified possible send.
@@ -1372,7 +1409,7 @@ class OperatorProposalQueue:
         claimed_without_no_send_proof = bool(
             exact_pending
             and proposal.status == "applying"
-            and result.get("status") != "applied"
+            and result.get("status") not in {"applied", "proof_passed"}
             and result.get("no_console_send_proven") is not True
         )
         terminal_expiry = bool(
@@ -1390,6 +1427,11 @@ class OperatorProposalQueue:
             and proposal.status == "applying"
             and _result_proves_verified_rollback(result)
         )
+        terminal_restored_proof = bool(
+            exact_pending
+            and proposal.status == "applying"
+            and terminal_result_proves_verified_restored_proof(result)
+        )
         status = "applied"
         possible_console_send = bool(
             claimed_without_no_send_proof
@@ -1399,6 +1441,8 @@ class OperatorProposalQueue:
             # Only the complete durable receipt can become green terminal
             # apply truth.  Physical readback alone is insufficient.
             status = "applied"
+        elif terminal_restored_proof:
+            status = "proof_passed"
         elif possible_console_send:
             # A retry is unsafe once a transaction may have reached the
             # console, even when the coordinator's top-level status is
@@ -1417,7 +1461,7 @@ class OperatorProposalQueue:
         elif result.get("status") != "applied":
             status = "apply_error"
 
-        if status != "applied":
+        if status not in {"applied", "proof_passed"}:
             proposal.updated_at = utc_now()
             proposal.result = copy.deepcopy(result)
             if terminal_expiry or terminal_verified_rollback:
@@ -1444,6 +1488,8 @@ class OperatorProposalQueue:
                 if proposal not in self._history:
                     self._history.append(proposal)
                 self._trim_history()
+            if proposal.status in FINAL_STATUSES:
+                self._notify_terminal(proposal)
             return {
                 "status": status,
                 "success": False,
@@ -1470,9 +1516,11 @@ class OperatorProposalQueue:
         if proposal not in self._history:
             self._history.append(proposal)
         self._trim_history()
+        self._notify_terminal(proposal)
         return {
             "status": status,
-            "success": status == "applied",
+            "success": status in {"applied", "proof_passed"},
+            "accepted": status == "applied",
             "proposal": proposal.to_dict(),
             "apply_result": result,
             "result_digest": proposal.result_digest,
@@ -1491,6 +1539,9 @@ class OperatorProposalQueue:
             "pending_count": len(self._pending),
             "history_count": len(self._history),
             "applied_count": sum(1 for item in self._history if item.status == "applied"),
+            "proof_passed_count": sum(
+                1 for item in self._history if item.status == "proof_passed"
+            ),
             "accepted_count": sum(1 for item in self._history if item.status == "accepted"),
             "dismissed_count": sum(1 for item in self._history if item.status == "dismissed"),
             "blocked_count": sum(1 for item in self._history if item.status == "apply_blocked"),

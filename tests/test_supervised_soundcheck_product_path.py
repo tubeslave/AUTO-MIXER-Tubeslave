@@ -1153,7 +1153,7 @@ async def test_remote_operator_path_cannot_enable_hardware_proof_mode(
     assert result == {
         "status": "blocked",
         "success": False,
-        "reason": "hardware_proof_requires_local_proof_runner",
+        "reason": "restore_only_proof_grant_required",
         "no_console_send_proven": True,
     }
 

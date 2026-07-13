@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict, dataclass, field
+import json
 import math
 import time
 from typing import Any, Awaitable, Callable, Dict, Mapping, Protocol, Tuple
@@ -18,6 +19,12 @@ from supervised_console_parameter_registry import (
     AUDIO_RECHECK_REQUIRED,
     SupervisedConsoleFamilyContract,
 )
+from supervised_family_proof_plan import (
+    canonical_operation_bundle_bytes,
+    canonicalize_attended_operation,
+    validate_canonical_operation_bundle,
+)
+from supervised_proof_capability import RestoreOnlyProofGrant
 
 
 @dataclass(frozen=True)
@@ -47,6 +54,7 @@ class ConsoleTransactionContext:
     proof_run: bool = False
     restore_after_verify: bool = False
     approval_deadline_epoch: float | None = None
+    capability_grant: Any = field(default=None, repr=False, compare=False)
 
 
 @dataclass(frozen=True)
@@ -188,6 +196,12 @@ class SupervisedConsoleTransactionCoordinator:
         plan: ConsoleTransactionPlan,
         context: ConsoleTransactionContext,
     ) -> str | None:
+        grant = context.capability_grant
+        if grant is not None:
+            if type(grant) is not RestoreOnlyProofGrant or not grant.is_authentic():
+                return "restore_only_proof_grant_required"
+            if not grant.begin_execution():
+                return "restore_only_proof_grant_already_used"
         if context.approved is not True:
             return "approval_required"
         if not context.approval_id:
@@ -206,9 +220,44 @@ class SupervisedConsoleTransactionCoordinator:
         if len(operation_ids) != len(set(operation_ids)):
             return "duplicate_operation_id"
 
+        proof_lane_requested = bool(
+            context.proof_run is True
+            or context.restore_after_verify is True
+            or grant is not None
+        )
+        proof_bundle: Mapping[str, Any] | None = None
+        if proof_lane_requested:
+            if type(grant) is not RestoreOnlyProofGrant or not grant.is_authentic():
+                return "restore_only_proof_grant_required"
+            if (
+                context.proof_run is not True
+                or context.restore_after_verify is not True
+            ):
+                return "restore_only_proof_flags_forced"
+            if (
+                context.approval_id != grant.binding.approval_id
+                or context.idempotency_key != grant.binding.idempotency_key
+            ):
+                return "restore_only_proof_approval_binding_mismatch"
+            try:
+                decoded = json.loads(
+                    grant.binding.canonical_bundle_bytes.decode("utf-8")
+                )
+                proof_bundle = validate_canonical_operation_bundle(decoded)
+                if (
+                    canonical_operation_bundle_bytes(proof_bundle)
+                    != grant.binding.canonical_bundle_bytes
+                ):
+                    return "restore_only_proof_bundle_bytes_not_canonical"
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                return "restore_only_proof_bundle_invalid"
+            if len(proof_bundle["operations"]) != len(plan.operations):
+                return "restore_only_proof_operation_count_mismatch"
+
         separate_families = set()
         plan_families = {operation.family_id for operation in plan.operations}
         prepared_addresses: set[str] = set()
+        proof_operation_rows: list[Mapping[str, Any]] = []
         for operation in plan.operations:
             contract = self.family_contracts.get(operation.family_id)
             if contract is None:
@@ -247,6 +296,22 @@ class SupervisedConsoleTransactionCoordinator:
                 if overlap:
                     return "transaction_address_overlap:" + ",".join(sorted(overlap))
                 prepared_addresses.update(addresses)
+                if proof_bundle is not None:
+                    try:
+                        proof_operation_rows.append(
+                            canonicalize_attended_operation(
+                                {
+                                    "operation_id": operation.operation_id,
+                                    "family_id": operation.family_id,
+                                    "write_kind": operation.write_kind,
+                                    "channel": operation.channel,
+                                    "parameter": operation.parameter,
+                                },
+                                prepared,
+                            )
+                        )
+                    except ValueError:
+                        return "restore_only_proof_operation_canonicalization_failed"
             if contract.separate_approval:
                 separate_families.add(contract.family_id)
 
@@ -254,6 +319,10 @@ class SupervisedConsoleTransactionCoordinator:
             len(separate_families) != 1 or len(plan_families) != 1
         ):
             return "high_risk_family_requires_separate_transaction"
+        if proof_bundle is not None and proof_operation_rows != list(
+            proof_bundle["operations"]
+        ):
+            return "restore_only_proof_exact_bundle_mismatch"
         return None
 
     def _generation_matches(self, context: ConsoleTransactionContext) -> bool:
@@ -473,6 +542,7 @@ class SupervisedConsoleTransactionCoordinator:
                     AdapterStepResult,
                 ]
             ] = []
+            proof_audio_passed_operation_ids: set[str] = set()
 
             snapshots: list[Mapping[str, Any]] = []
             for operation in plan.operations:
@@ -607,10 +677,18 @@ class SupervisedConsoleTransactionCoordinator:
             for operation, snapshot in zip(plan.operations, snapshots):
                 adapter = self.adapters[operation.family_id]
                 if atomic_group and processed_atomic_members:
-                    if not await self._reverify_atomic_members(
-                        result,
-                        processed_atomic_members,
-                    ):
+                    try:
+                        atomic_members_current = await self._reverify_atomic_members(
+                            result,
+                            processed_atomic_members,
+                        )
+                    except asyncio.CancelledError:
+                        await abort_before_next_apply(
+                            "atomic_group_reverify_cancelled",
+                            cancellation_safe=True,
+                        )
+                        return result
+                    if not atomic_members_current:
                         result.reason = "atomic_group_member_drift_detected"
                         if applied:
                             await self._rollback_applied(result, applied, context)
@@ -626,7 +704,11 @@ class SupervisedConsoleTransactionCoordinator:
                             )
                         )
                     except asyncio.CancelledError:
-                        raise
+                        await abort_before_next_apply(
+                            "atomic_group_preapply_snapshot_cancelled",
+                            cancellation_safe=True,
+                        )
+                        return result
                     except Exception as exc:
                         snapshot_current, current_snapshot = False, {
                             "exception_type": type(exc).__name__,
@@ -874,13 +956,23 @@ class SupervisedConsoleTransactionCoordinator:
                         "result": asdict(audio_result),
                     }
                 )
+                if audio_result.status == "passed":
+                    proof_audio_passed_operation_ids.add(
+                        operation.operation_id
+                    )
                 audio_ok = audio_result.passed
                 if contract.audio_recheck_policy == AUDIO_RECHECK_REQUIRED:
                     audio_ok = audio_result.status == "passed"
                 elif contract.audio_recheck_policy == AUDIO_RECHECK_NOT_APPLICABLE:
                     audio_ok = audio_result.status in {"passed", "not_applicable"}
+                if context.proof_run is True:
+                    audio_ok = audio_result.status == "passed"
                 if not audio_ok:
-                    result.reason = audio_result.reason or "audio_recheck_failed"
+                    result.reason = (
+                        "proof_audio_recheck_must_pass"
+                        if context.proof_run is True
+                        else audio_result.reason or "audio_recheck_failed"
+                    )
                     await self._rollback_applied(result, applied, context)
                     return result
 
@@ -899,12 +991,36 @@ class SupervisedConsoleTransactionCoordinator:
 
             if context.restore_after_verify:
                 result.reason = "proof_verified_restoring_original_state"
+                expected_operation_ids = {
+                    operation.operation_id for operation in plan.operations
+                }
+                exact_apply_and_audio_coverage = bool(
+                    expected_operation_ids
+                    and set(result.applied_operation_ids)
+                    == expected_operation_ids
+                    and len(result.applied_operation_ids)
+                    == len(expected_operation_ids)
+                    and proof_audio_passed_operation_ids
+                    == expected_operation_ids
+                )
                 await self._rollback_applied(result, applied, context)
-                if result.status == "rolled_back":
+                exact_rollback_coverage = bool(
+                    set(result.rollback_operation_ids)
+                    == expected_operation_ids
+                    and len(result.rollback_operation_ids)
+                    == len(expected_operation_ids)
+                )
+                if (
+                    result.status == "rolled_back"
+                    and exact_apply_and_audio_coverage
+                    and exact_rollback_coverage
+                ):
                     result.status = "proof_passed"
                     result.reason = (
                         "proof_apply_readback_audio_and_rollback_verified"
                     )
+                elif result.status == "rolled_back":
+                    result.reason = "proof_operation_coverage_incomplete"
                 return result
 
             if not self._generation_matches(context):
@@ -912,13 +1028,22 @@ class SupervisedConsoleTransactionCoordinator:
                 await self._rollback_applied(result, applied, context)
                 return result
 
-            if atomic_group and not await self._reverify_atomic_members(
-                result,
-                processed_atomic_members,
-            ):
-                result.reason = "atomic_group_member_drift_detected_before_commit"
-                await self._rollback_applied(result, applied, context)
-                return result
+            if atomic_group:
+                try:
+                    atomic_members_current = await self._reverify_atomic_members(
+                        result,
+                        processed_atomic_members,
+                    )
+                except asyncio.CancelledError:
+                    await abort_before_next_apply(
+                        "atomic_group_final_reverify_cancelled",
+                        cancellation_safe=True,
+                    )
+                    return result
+                if not atomic_members_current:
+                    result.reason = "atomic_group_member_drift_detected_before_commit"
+                    await self._rollback_applied(result, applied, context)
+                    return result
 
             if not self._approval_is_current(context):
                 result.reason = "operator_approval_expired_before_commit"

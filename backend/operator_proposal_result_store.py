@@ -28,6 +28,7 @@ from decision_queue_wire_contract import (
     is_sha256_digest,
     sha256_digest,
     terminal_result_proves_verified_apply,
+    terminal_result_proves_verified_restored_proof,
 )
 
 
@@ -94,6 +95,17 @@ _RESULT_SAFETY_BOOLEAN_FIELDS = frozenset(
         "audio_recheck_required",
         "terminal_after_console_send",
         "result_persistence_failed",
+        "proof_run",
+        "restore_after_verify",
+        "accepted",
+        "owner_review_required",
+        "live_authority_granted",
+        "readiness_closure_allowed",
+        "proof_target_verified",
+        "rollback_attempted",
+        "rollback_succeeded",
+        "emergency_stop_activated",
+        "emergency_stop_required",
     }
 )
 
@@ -263,7 +275,13 @@ def result_requires_pinned_evidence(result: Dict[str, Any]) -> bool:
         and result.get("status") in {"blocked", "rolled_back"}
     )
     known_verified_apply = terminal_result_proves_verified_apply(result)
-    return not (known_no_send or known_restored or known_verified_apply)
+    known_restored_proof = terminal_result_proves_verified_restored_proof(result)
+    return not (
+        known_no_send
+        or known_restored
+        or known_verified_apply
+        or known_restored_proof
+    )
 
 
 def _validate_result_shape(value: Any) -> None:

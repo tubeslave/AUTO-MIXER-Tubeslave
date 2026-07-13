@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import re
+import secrets
 import select
 import stat
 import subprocess
@@ -21,7 +22,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 
 M110_PRESTART_MANIFEST_SCHEMA = "automixer.m110_attended_prestart_manifest.v1"
@@ -30,6 +31,62 @@ M110_AUTHORITY_FD_ENV = "AUTOMIXER_M110_AUTHORITY_FD"
 M110_AUTHORITY_PIPE_TIMEOUT_SECONDS = 5.0
 M110_MAX_MANIFEST_BYTES = 64 * 1024
 M110_MAX_TOMBSTONED_NONCES = 4096
+M110_CAPABILITY_TOKEN_PREFIX = "m110cap_v1_"
+M110_CAPABILITY_TTL_SECONDS = 30.0
+M110_MAX_ACTIVE_CAPABILITIES = 8
+M110_MAX_CAPABILITY_TOMBSTONES = 4096
+M110_CAPABILITY_KINDS = (
+    "restore_only_proof",
+    "maintenance_dsp_reset_commit_once",
+    "processor_enable_commit_once",
+    "soundcheck_child_commit_once",
+)
+M110_CAPABILITY_CONFIRMATIONS = {
+    "restore_only_proof": "ISSUE_RESTORE_ONLY_PROOF_CAPABILITY",
+    "maintenance_dsp_reset_commit_once": (
+        "ISSUE_MAINTENANCE_DSP_RESET_COMMIT_ONCE"
+    ),
+    "processor_enable_commit_once": "ISSUE_PROCESSOR_ENABLE_COMMIT_ONCE",
+    "soundcheck_child_commit_once": "ISSUE_SOUNDCHECK_CHILD_COMMIT_ONCE",
+}
+M110_CAPABILITY_ISSUE_REQUEST_FIELDS = frozenset(
+    {
+        "type",
+        "contract_version",
+        "capability_kind",
+        "proposal_id",
+        "expected_review_contract_version",
+        "expected_review_content_digest",
+        "expected_operation_digest",
+        "approval_id",
+        "confirmation",
+        "request_nonce",
+        "authority_proof",
+    }
+)
+M110_ARM_REQUEST_FIELDS = frozenset(
+    {
+        "type",
+        "contract_version",
+        "approval_id",
+        "confirmation",
+        "request_nonce",
+        "authority_proof",
+    }
+)
+M110_CAPABILITY_APPLY_REQUEST_FIELDS = frozenset(
+    {
+        "type",
+        "proposal_id",
+        "approved",
+        "approval_id",
+        "idempotency_key",
+        "expected_review_contract_version",
+        "expected_review_content_digest",
+        "expected_operation_digest",
+        "supervised_capability_token",
+    }
+)
 M110_ALLOWED_UNTRACKED_REPORT = re.compile(
     r"reports/[A-Za-z0-9][A-Za-z0-9._-]*\.json"
 )
@@ -569,3 +626,910 @@ def sign_m110_request(
         hashlib.sha256,
     ).hexdigest()
     return signed
+
+
+def validate_m110_capability_issue_request(
+    request: Mapping[str, Any],
+) -> tuple[bool, str]:
+    """Validate the fixed public issuance envelope without granting authority."""
+
+    if type(request) is not dict:
+        return False, "m110_capability_issue_request_object_required"
+    if set(request) != M110_CAPABILITY_ISSUE_REQUEST_FIELDS:
+        return False, "m110_capability_issue_request_fields_mismatch"
+    kind = request.get("capability_kind")
+    if (
+        request.get("type") != "issue_supervised_capability"
+        or request.get("contract_version") != 1
+        or isinstance(request.get("contract_version"), bool)
+        or kind not in M110_CAPABILITY_KINDS
+    ):
+        return False, "m110_capability_issue_contract_invalid"
+    for field_name in ("proposal_id", "approval_id"):
+        value = request.get(field_name)
+        if not (
+            isinstance(value, str)
+            and 1 <= len(value.encode("utf-8")) <= 128
+            and all(0x21 <= ord(character) <= 0x7E for character in value)
+        ):
+            return False, f"m110_capability_issue_{field_name}_invalid"
+    if request.get("expected_review_contract_version") != 2 or isinstance(
+        request.get("expected_review_contract_version"), bool
+    ):
+        return False, "m110_capability_issue_review_version_invalid"
+    for field_name in (
+        "expected_review_content_digest",
+        "expected_operation_digest",
+    ):
+        value = request.get(field_name)
+        if not (
+            isinstance(value, str)
+            and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+        ):
+            return False, f"m110_capability_issue_{field_name}_invalid"
+    if request.get("confirmation") != M110_CAPABILITY_CONFIRMATIONS[kind]:
+        return False, "m110_capability_issue_confirmation_mismatch"
+    if not _valid_lower_hex(request.get("request_nonce"), 32):
+        return False, "m110_capability_issue_request_nonce_invalid"
+    proof = request.get("authority_proof")
+    if not (
+        isinstance(proof, str)
+        and re.fullmatch(r"hmac-sha256:[0-9a-f]{64}", proof)
+    ):
+        return False, "m110_capability_issue_authority_proof_invalid"
+    return True, "m110_capability_issue_request_valid"
+
+
+def validate_m110_arm_request(
+    request: Mapping[str, Any],
+) -> tuple[bool, str]:
+    if type(request) is not dict:
+        return False, "m110_arm_request_object_required"
+    if set(request) != M110_ARM_REQUEST_FIELDS:
+        return False, "m110_arm_request_fields_mismatch"
+    if (
+        request.get("type") != "arm_m110_attended_control"
+        or request.get("contract_version") != 1
+        or isinstance(request.get("contract_version"), bool)
+        or request.get("confirmation")
+        != "ARM_M110_ATTENDED_ONE_SHOT_CONTROL"
+    ):
+        return False, "m110_arm_contract_invalid"
+    approval_id = request.get("approval_id")
+    if not (
+        isinstance(approval_id, str)
+        and 1 <= len(approval_id.encode("utf-8")) <= 128
+        and all(0x21 <= ord(character) <= 0x7E for character in approval_id)
+    ):
+        return False, "m110_arm_approval_id_invalid"
+    if not _valid_lower_hex(request.get("request_nonce"), 32):
+        return False, "m110_arm_request_nonce_invalid"
+    if not (
+        isinstance(request.get("authority_proof"), str)
+        and re.fullmatch(
+            r"hmac-sha256:[0-9a-f]{64}",
+            request["authority_proof"],
+        )
+    ):
+        return False, "m110_arm_authority_proof_invalid"
+    return True, "m110_arm_request_valid"
+
+
+def validate_m110_capability_apply_request(
+    request: Mapping[str, Any],
+) -> tuple[bool, str]:
+    if type(request) is not dict:
+        return False, "m110_capability_apply_request_object_required"
+    if set(request) != M110_CAPABILITY_APPLY_REQUEST_FIELDS:
+        return False, "m110_capability_apply_request_fields_mismatch"
+    if request.get("type") != "apply_operator_proposal":
+        return False, "m110_capability_apply_type_invalid"
+    if request.get("approved") is not True:
+        return False, "m110_capability_apply_approval_required"
+    for field_name in ("proposal_id", "approval_id", "idempotency_key"):
+        value = request.get(field_name)
+        if not (
+            isinstance(value, str)
+            and 1 <= len(value.encode("utf-8")) <= 512
+            and "\x00" not in value
+        ):
+            return False, f"m110_capability_apply_{field_name}_invalid"
+    if request.get("expected_review_contract_version") != 2 or isinstance(
+        request.get("expected_review_contract_version"), bool
+    ):
+        return False, "m110_capability_apply_review_version_invalid"
+    for field_name in (
+        "expected_review_content_digest",
+        "expected_operation_digest",
+    ):
+        if not _valid_sha256_digest(request.get(field_name)):
+            return False, f"m110_capability_apply_{field_name}_invalid"
+    if SupervisedCapabilityStore._token_digest(
+        request.get("supervised_capability_token")
+    ) is None:
+        return False, "m110_capability_apply_token_invalid"
+    return True, "m110_capability_apply_request_valid"
+
+
+_M110_CONTROL_FACTORY_MARKER = object()
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class M110AttendedControlAuthority:
+    runtime_instance_nonce: str
+    runtime_manifest_sha256: str
+    launch_manifest_sha256: str
+    source_head: str
+    source_tree: str
+    route_proof_id: str
+    route_artifact_sha256: str
+    connection_generation: int
+    transport_generation: int
+    emergency_generation: int
+    owner_connection_id: int
+    approval_id: str
+    armed_at_epoch: float
+    _owner_ref: Any = field(repr=False, compare=False)
+    _route_ref: Any = field(repr=False, compare=False)
+    _transport_ref: Any = field(repr=False, compare=False)
+    _capture_ref: Any = field(repr=False, compare=False)
+    _factory_marker: object = field(repr=False, compare=False)
+
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("M110AttendedControlAuthority is backend-factory-only")
+
+    def is_authentic(self) -> bool:
+        return self._factory_marker is _M110_CONTROL_FACTORY_MARKER
+
+
+def new_m110_attended_control_authority(
+    **values: Any,
+) -> M110AttendedControlAuthority:
+    required = {
+        "runtime_instance_nonce",
+        "runtime_manifest_sha256",
+        "launch_manifest_sha256",
+        "source_head",
+        "source_tree",
+        "route_proof_id",
+        "route_artifact_sha256",
+        "connection_generation",
+        "transport_generation",
+        "emergency_generation",
+        "owner_connection_id",
+        "approval_id",
+        "armed_at_epoch",
+        "_owner_ref",
+        "_route_ref",
+        "_transport_ref",
+        "_capture_ref",
+    }
+    if set(values) != required:
+        raise ValueError("m110_control_authority_fields_mismatch")
+    authority = object.__new__(M110AttendedControlAuthority)
+    for name, value in values.items():
+        object.__setattr__(authority, name, value)
+    object.__setattr__(
+        authority,
+        "_factory_marker",
+        _M110_CONTROL_FACTORY_MARKER,
+    )
+    if not authority.is_authentic():
+        raise RuntimeError("m110_control_authority_factory_failed")
+    return authority
+
+
+def _valid_sha256_digest(value: Any) -> bool:
+    return bool(
+        isinstance(value, str)
+        and re.fullmatch(r"sha256:[0-9a-f]{64}", value)
+    )
+
+
+def _valid_binding_text(value: Any, *, maximum_bytes: int = 512) -> bool:
+    return bool(
+        isinstance(value, str)
+        and value
+        and len(value.encode("utf-8")) <= maximum_bytes
+        and "\x00" not in value
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class M110CapabilityBinding:
+    """Exact immutable authority facts re-derived at issue and consume."""
+
+    capability_kind: str
+    runtime_instance_nonce: str
+    runtime_manifest_sha256: str
+    launch_manifest_sha256: str
+    source_head: str
+    source_tree: str
+    connection_generation: int
+    transport_generation: int
+    console_serial: str
+    firmware_version: str
+    route_proof_id: str
+    route_artifact_sha256: str
+    capture_hardware_uid: str
+    emergency_generation: int
+    owner_connection_id: int
+    proposal_id: str
+    review_contract_version: int
+    review_content_digest: str
+    operation_digest: str
+    canonical_bundle_bytes: bytes = field(repr=False)
+    approval_id: str = ""
+    idempotency_key: str = ""
+    scope_addresses: tuple[str, ...] = ()
+    target_fingerprints: tuple[tuple[str, str], ...] = ()
+    _owner_ref: Any = field(default=None, repr=False, compare=False)
+    _route_ref: Any = field(default=None, repr=False, compare=False)
+    _transport_ref: Any = field(default=None, repr=False, compare=False)
+    _capture_ref: Any = field(default=None, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.capability_kind not in M110_CAPABILITY_KINDS:
+            raise ValueError("m110_capability_binding_kind_invalid")
+        for value, length, reason in (
+            (self.runtime_instance_nonce, 32, "runtime_nonce"),
+            (self.source_head, 40, "source_head"),
+            (self.source_tree, 40, "source_tree"),
+        ):
+            if not _valid_lower_hex(value, length):
+                raise ValueError(f"m110_capability_binding_{reason}_invalid")
+        for value, reason in (
+            (self.runtime_manifest_sha256, "runtime_manifest"),
+            (self.launch_manifest_sha256, "launch_manifest"),
+            (self.route_artifact_sha256, "route_artifact"),
+            (self.review_content_digest, "review_content"),
+            (self.operation_digest, "operation"),
+        ):
+            normalized = (
+                value if str(value).startswith("sha256:") else f"sha256:{value}"
+            )
+            if not _valid_sha256_digest(normalized):
+                raise ValueError(f"m110_capability_binding_{reason}_digest_invalid")
+        for value, reason in (
+            (self.console_serial, "console_serial"),
+            (self.firmware_version, "firmware_version"),
+            (self.route_proof_id, "route_proof_id"),
+            (self.capture_hardware_uid, "capture_hardware_uid"),
+            (self.proposal_id, "proposal_id"),
+            (self.approval_id, "approval_id"),
+            (self.idempotency_key, "idempotency_key"),
+        ):
+            if not _valid_binding_text(value):
+                raise ValueError(f"m110_capability_binding_{reason}_invalid")
+        for value, reason in (
+            (self.connection_generation, "connection_generation"),
+            (self.transport_generation, "transport_generation"),
+            (self.emergency_generation, "emergency_generation"),
+            (self.owner_connection_id, "owner_connection_id"),
+        ):
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError(f"m110_capability_binding_{reason}_invalid")
+        if self.review_contract_version != 2 or isinstance(
+            self.review_contract_version, bool
+        ):
+            raise ValueError("m110_capability_binding_review_version_invalid")
+        if not isinstance(self.canonical_bundle_bytes, bytes) or not (
+            self.canonical_bundle_bytes
+        ):
+            raise ValueError("m110_capability_binding_bundle_bytes_invalid")
+        actual_operation_digest = "sha256:" + hashlib.sha256(
+            self.canonical_bundle_bytes
+        ).hexdigest()
+        if not hmac.compare_digest(actual_operation_digest, self.operation_digest):
+            raise ValueError("m110_capability_binding_operation_digest_mismatch")
+        if (
+            not self.scope_addresses
+            or len(self.scope_addresses) > 64
+            or len(self.scope_addresses) != len(set(self.scope_addresses))
+            or any(
+                not isinstance(address, str)
+                or not re.fullmatch(r"/[A-Za-z0-9_$.-]+(?:/[A-Za-z0-9_$.-]+)+", address)
+                for address in self.scope_addresses
+            )
+        ):
+            raise ValueError("m110_capability_binding_scope_invalid")
+        if len(self.target_fingerprints) != len(self.scope_addresses):
+            raise ValueError("m110_capability_binding_targets_incomplete")
+        target_addresses = tuple(address for address, _ in self.target_fingerprints)
+        if target_addresses != self.scope_addresses or any(
+            not _valid_binding_text(target, maximum_bytes=256)
+            for _address, target in self.target_fingerprints
+        ):
+            raise ValueError("m110_capability_binding_targets_invalid")
+        if (
+            self._owner_ref is None
+            or self._route_ref is None
+            or self._transport_ref is None
+            or self._capture_ref is None
+        ):
+            raise ValueError("m110_capability_binding_object_identity_required")
+
+    def matches_exactly(self, other: Any) -> bool:
+        if type(other) is not M110CapabilityBinding:
+            return False
+        scalar_fields = (
+            "capability_kind",
+            "runtime_instance_nonce",
+            "runtime_manifest_sha256",
+            "launch_manifest_sha256",
+            "source_head",
+            "source_tree",
+            "connection_generation",
+            "transport_generation",
+            "console_serial",
+            "firmware_version",
+            "route_proof_id",
+            "route_artifact_sha256",
+            "capture_hardware_uid",
+            "emergency_generation",
+            "owner_connection_id",
+            "proposal_id",
+            "review_contract_version",
+            "review_content_digest",
+            "operation_digest",
+            "canonical_bundle_bytes",
+            "approval_id",
+            "idempotency_key",
+            "scope_addresses",
+            "target_fingerprints",
+        )
+        return bool(
+            all(getattr(self, name) == getattr(other, name) for name in scalar_fields)
+            and self._owner_ref is other._owner_ref
+            and self._route_ref is other._route_ref
+            and self._transport_ref is other._transport_ref
+            and self._capture_ref is other._capture_ref
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class M110IssuedCapability:
+    """Plaintext token handoff. The store never retains this object or token."""
+
+    capability_kind: str
+    token: str = field(repr=False)
+    issued_at_epoch: float
+    latest_start_epoch: float
+    idempotency_key: str
+    operation_digest: str
+
+
+_M110_GRANT_FACTORY_MARKER = object()
+_M110_GRANT_EXECUTION_STATE_FACTORY_MARKER = object()
+
+
+class _M110GrantExecutionState:
+    __slots__ = ("_phase", "_terminal", "_lock", "_factory_marker")
+
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("m110_grant_execution_state_is_factory_only")
+
+    def __setattr__(self, _name: str, _value: Any) -> None:
+        raise AttributeError("m110_grant_execution_state_is_immutable")
+
+    def begin(self) -> bool:
+        if self._factory_marker is not _M110_GRANT_EXECUTION_STATE_FACTORY_MARKER:
+            return False
+        with self._lock:
+            if self._phase != "issued":
+                return False
+            object.__setattr__(self, "_phase", "executing")
+            return True
+
+    def mark_terminal(self, terminal: str) -> bool:
+        with self._lock:
+            if self._phase not in {"issued", "executing"}:
+                return False
+            object.__setattr__(self, "_phase", "terminal")
+            object.__setattr__(self, "_terminal", str(terminal))
+            return True
+
+    def status(self) -> str:
+        with self._lock:
+            return str(self._phase)
+
+    def __copy__(self):
+        raise TypeError("m110_grant_execution_state_copy_forbidden")
+
+    def __deepcopy__(self, _memo):
+        raise TypeError("m110_grant_execution_state_copy_forbidden")
+
+    def __reduce__(self):
+        raise TypeError("m110_grant_execution_state_pickle_forbidden")
+
+
+def _new_m110_grant_execution_state() -> _M110GrantExecutionState:
+    state = object.__new__(_M110GrantExecutionState)
+    object.__setattr__(state, "_phase", "issued")
+    object.__setattr__(state, "_terminal", None)
+    object.__setattr__(state, "_lock", threading.Lock())
+    object.__setattr__(
+        state,
+        "_factory_marker",
+        _M110_GRANT_EXECUTION_STATE_FACTORY_MARKER,
+    )
+    return state
+
+
+class _M110CapabilityGrantBase:
+    __slots__ = (
+        "binding",
+        "consumed_at_epoch",
+        "consumed_at_monotonic",
+        "_factory_marker",
+        "_execution_state",
+        "_execution_lock",
+    )
+    CAPABILITY_KIND = ""
+
+    def __setattr__(self, _name: str, _value: Any) -> None:
+        raise AttributeError("m110_capability_grant_is_immutable")
+
+    def __repr__(self) -> str:
+        return (
+            f"<{type(self).__name__} proposal_id="
+            f"{self.binding.proposal_id!r} operation_digest="
+            f"{self.binding.operation_digest!r}>"
+        )
+
+    def is_authentic(self) -> bool:
+        return bool(
+            self._factory_marker is _M110_GRANT_FACTORY_MARKER
+            and self.binding.capability_kind == self.CAPABILITY_KIND
+        )
+
+    def begin_execution(self) -> bool:
+        if not self.is_authentic():
+            return False
+        if type(self._execution_state) is not _M110GrantExecutionState:
+            return False
+        return self._execution_state.begin()
+
+    def mark_terminal(self, terminal: str) -> bool:
+        if type(self._execution_state) is not _M110GrantExecutionState:
+            return False
+        return self._execution_state.mark_terminal(terminal)
+
+    def execution_status(self) -> str:
+        if type(self._execution_state) is not _M110GrantExecutionState:
+            return "invalid"
+        return self._execution_state.status()
+
+    def __copy__(self):
+        raise TypeError("m110_capability_grant_copy_forbidden")
+
+    def __deepcopy__(self, _memo):
+        raise TypeError("m110_capability_grant_copy_forbidden")
+
+    def __reduce__(self):
+        raise TypeError("m110_capability_grant_pickle_forbidden")
+
+
+class RestoreOnlyProofGrant(_M110CapabilityGrantBase):
+    CAPABILITY_KIND = "restore_only_proof"
+
+
+class MaintenanceDspResetCommitOnceGrant(_M110CapabilityGrantBase):
+    CAPABILITY_KIND = "maintenance_dsp_reset_commit_once"
+
+
+class ProcessorEnableCommitOnceGrant(_M110CapabilityGrantBase):
+    CAPABILITY_KIND = "processor_enable_commit_once"
+
+
+class SoundcheckChildCommitOnceGrant(_M110CapabilityGrantBase):
+    CAPABILITY_KIND = "soundcheck_child_commit_once"
+
+
+_M110_GRANT_TYPES = {
+    grant_type.CAPABILITY_KIND: grant_type
+    for grant_type in (
+        RestoreOnlyProofGrant,
+        MaintenanceDspResetCommitOnceGrant,
+        ProcessorEnableCommitOnceGrant,
+        SoundcheckChildCommitOnceGrant,
+    )
+}
+
+
+_M110_RESTORED_PROOF_RECEIPT_FACTORY_MARKER = object()
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class M110RestoredProofReceipt:
+    """Process-private proof truth minted only after both durable terminals."""
+
+    receipt_id: str
+    proposal_id: str
+    review_contract_version: int
+    review_content_digest: str
+    operation_digest: str
+    result_digest: str
+    transaction_id: str
+    runtime_instance_nonce: str
+    source_head: str
+    source_tree: str
+    route_proof_id: str
+    route_artifact_sha256: str
+    owner_connection_id: int
+    created_at_epoch: float
+    created_at_monotonic: float
+    _owner_ref: Any = field(repr=False, compare=False)
+    _control_ref: Any = field(repr=False, compare=False)
+    _route_ref: Any = field(repr=False, compare=False)
+    _factory_marker: object = field(repr=False, compare=False)
+
+    def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+        raise TypeError("M110RestoredProofReceipt is backend-factory-only")
+
+    def is_authentic(self) -> bool:
+        return bool(
+            self._factory_marker
+            is _M110_RESTORED_PROOF_RECEIPT_FACTORY_MARKER
+        )
+
+    def __copy__(self):
+        raise TypeError("m110_restored_proof_receipt_copy_forbidden")
+
+    def __deepcopy__(self, _memo):
+        raise TypeError("m110_restored_proof_receipt_copy_forbidden")
+
+    def __reduce__(self):
+        raise TypeError("m110_restored_proof_receipt_pickle_forbidden")
+
+
+def new_m110_restored_proof_receipt(**values: Any) -> M110RestoredProofReceipt:
+    required = {
+        "proposal_id",
+        "review_contract_version",
+        "review_content_digest",
+        "operation_digest",
+        "result_digest",
+        "transaction_id",
+        "runtime_instance_nonce",
+        "source_head",
+        "source_tree",
+        "route_proof_id",
+        "route_artifact_sha256",
+        "owner_connection_id",
+        "created_at_epoch",
+        "created_at_monotonic",
+        "_owner_ref",
+        "_control_ref",
+        "_route_ref",
+    }
+    if set(values) != required:
+        raise ValueError("m110_restored_proof_receipt_fields_mismatch")
+    for field_name in (
+        "proposal_id",
+        "transaction_id",
+        "route_proof_id",
+    ):
+        if not _valid_binding_text(values[field_name]):
+            raise ValueError(
+                f"m110_restored_proof_receipt_{field_name}_invalid"
+            )
+    for field_name in (
+        "review_content_digest",
+        "operation_digest",
+        "result_digest",
+        "route_artifact_sha256",
+    ):
+        if not _valid_sha256_digest(values[field_name]):
+            raise ValueError(
+                f"m110_restored_proof_receipt_{field_name}_invalid"
+            )
+    for field_name, length in (
+        ("runtime_instance_nonce", 32),
+        ("source_head", 40),
+        ("source_tree", 40),
+    ):
+        if not _valid_lower_hex(values[field_name], length):
+            raise ValueError(
+                f"m110_restored_proof_receipt_{field_name}_invalid"
+            )
+    if values["review_contract_version"] != 2 or isinstance(
+        values["review_contract_version"], bool
+    ):
+        raise ValueError("m110_restored_proof_receipt_review_version_invalid")
+    if not (
+        isinstance(values["owner_connection_id"], int)
+        and not isinstance(values["owner_connection_id"], bool)
+        and values["owner_connection_id"] >= 0
+    ):
+        raise ValueError("m110_restored_proof_receipt_owner_invalid")
+    for field_name in ("created_at_epoch", "created_at_monotonic"):
+        value = values[field_name]
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(
+                f"m110_restored_proof_receipt_{field_name}_invalid"
+            )
+    if any(
+        values[field_name] is None
+        for field_name in ("_owner_ref", "_control_ref", "_route_ref")
+    ):
+        raise ValueError("m110_restored_proof_receipt_object_identity_required")
+    receipt = object.__new__(M110RestoredProofReceipt)
+    object.__setattr__(
+        receipt,
+        "receipt_id",
+        "m110proof_v1_" + secrets.token_hex(32),
+    )
+    for field_name, value in values.items():
+        object.__setattr__(receipt, field_name, value)
+    object.__setattr__(
+        receipt,
+        "_factory_marker",
+        _M110_RESTORED_PROOF_RECEIPT_FACTORY_MARKER,
+    )
+    return receipt
+
+
+def _new_m110_grant(
+    binding: M110CapabilityBinding,
+    *,
+    consumed_at_epoch: float,
+    consumed_at_monotonic: float,
+) -> _M110CapabilityGrantBase:
+    grant_type = _M110_GRANT_TYPES[binding.capability_kind]
+    grant = object.__new__(grant_type)
+    object.__setattr__(grant, "binding", binding)
+    object.__setattr__(grant, "consumed_at_epoch", consumed_at_epoch)
+    object.__setattr__(grant, "consumed_at_monotonic", consumed_at_monotonic)
+    object.__setattr__(grant, "_factory_marker", _M110_GRANT_FACTORY_MARKER)
+    object.__setattr__(
+        grant,
+        "_execution_state",
+        _new_m110_grant_execution_state(),
+    )
+    object.__setattr__(grant, "_execution_lock", threading.Lock())
+    return grant
+
+
+@dataclass(frozen=True, slots=True)
+class _M110CapabilityRecord:
+    token_digest: str
+    binding: M110CapabilityBinding
+    issued_at_epoch: float
+    issued_at_monotonic: float
+    latest_start_epoch: float
+    latest_start_monotonic: float
+
+
+class SupervisedCapabilityStore:
+    """Bounded digest-only store for exact one-shot attended capabilities."""
+
+    def __init__(
+        self,
+        *,
+        epoch_clock: Callable[[], float] = time.time,
+        monotonic_clock: Callable[[], float] = time.monotonic,
+        token_factory: Callable[[], str] | None = None,
+    ) -> None:
+        self._epoch_clock = epoch_clock
+        self._monotonic_clock = monotonic_clock
+        self._token_factory = token_factory or (lambda: secrets.token_hex(32))
+        self._records: dict[str, _M110CapabilityRecord] = {}
+        self._owner_active: dict[int, str] = {}
+        self._tombstones: OrderedDict[str, str] = OrderedDict()
+        self._lock = threading.Lock()
+        self._closed = False
+        self._issuance_disabled = False
+
+    @staticmethod
+    def _token_digest(token: Any) -> str | None:
+        if not (
+            isinstance(token, str)
+            and re.fullmatch(r"m110cap_v1_[0-9a-f]{64}", token)
+        ):
+            return None
+        return hashlib.sha256(token.encode("ascii")).hexdigest()
+
+    def _tombstone_locked(self, digest: str, reason: str) -> None:
+        if digest in self._tombstones:
+            return
+        if len(self._tombstones) >= M110_MAX_CAPABILITY_TOMBSTONES:
+            self._issuance_disabled = True
+            return
+        self._tombstones[digest] = reason
+
+    def _remove_record_locked(self, digest: str, *, reason: str) -> None:
+        record = self._records.pop(digest, None)
+        if record is None:
+            return
+        owner_id = record.binding.owner_connection_id
+        if self._owner_active.get(owner_id) == digest:
+            self._owner_active.pop(owner_id, None)
+        self._tombstone_locked(digest, reason)
+
+    def issue(
+        self,
+        binding: M110CapabilityBinding,
+    ) -> tuple[M110IssuedCapability | None, str]:
+        if type(binding) is not M110CapabilityBinding:
+            return None, "m110_capability_binding_required"
+        now_epoch = float(self._epoch_clock())
+        now_monotonic = float(self._monotonic_clock())
+        with self._lock:
+            if self._closed:
+                return None, "m110_capability_store_closed"
+            if self._issuance_disabled or len(self._tombstones) >= (
+                M110_MAX_CAPABILITY_TOMBSTONES
+            ):
+                return None, "m110_capability_tombstone_capacity_exhausted"
+            existing = self._owner_active.get(binding.owner_connection_id)
+            active_count_after_replacement = len(self._records) - bool(existing)
+            if active_count_after_replacement >= M110_MAX_ACTIVE_CAPABILITIES:
+                return None, "m110_capability_global_capacity_exhausted"
+            if existing:
+                self._remove_record_locked(
+                    existing,
+                    reason="replaced_by_new_owner_capability",
+                )
+                if self._issuance_disabled:
+                    return None, "m110_capability_tombstone_capacity_exhausted"
+            token = ""
+            digest = ""
+            for _attempt in range(8):
+                candidate = self._token_factory()
+                if not (
+                    isinstance(candidate, str)
+                    and re.fullmatch(r"[0-9a-f]{64}", candidate)
+                ):
+                    self._issuance_disabled = True
+                    return None, "m110_capability_token_factory_invalid"
+                token = M110_CAPABILITY_TOKEN_PREFIX + candidate
+                digest = hashlib.sha256(token.encode("ascii")).hexdigest()
+                if digest not in self._records and digest not in self._tombstones:
+                    break
+            else:
+                self._issuance_disabled = True
+                return None, "m110_capability_token_collision_exhausted"
+            record = _M110CapabilityRecord(
+                token_digest=digest,
+                binding=binding,
+                issued_at_epoch=now_epoch,
+                issued_at_monotonic=now_monotonic,
+                latest_start_epoch=now_epoch + M110_CAPABILITY_TTL_SECONDS,
+                latest_start_monotonic=(
+                    now_monotonic + M110_CAPABILITY_TTL_SECONDS
+                ),
+            )
+            self._records[digest] = record
+            self._owner_active[binding.owner_connection_id] = digest
+        return (
+            M110IssuedCapability(
+                capability_kind=binding.capability_kind,
+                token=token,
+                issued_at_epoch=record.issued_at_epoch,
+                latest_start_epoch=record.latest_start_epoch,
+                idempotency_key=binding.idempotency_key,
+                operation_digest=binding.operation_digest,
+            ),
+            "m110_capability_issued",
+        )
+
+    def _validate_record_locked(
+        self,
+        token: Any,
+        current_binding: M110CapabilityBinding,
+    ) -> tuple[_M110CapabilityRecord | None, str, str | None]:
+        digest = self._token_digest(token)
+        if digest is None:
+            return None, "m110_capability_token_invalid", None
+        if digest in self._tombstones:
+            return None, "m110_capability_token_replayed_or_revoked", digest
+        record = self._records.get(digest)
+        if record is None:
+            return None, "m110_capability_token_unknown", digest
+        if float(self._monotonic_clock()) >= record.latest_start_monotonic:
+            self._remove_record_locked(digest, reason="expired_before_start")
+            return None, "m110_capability_latest_start_expired", digest
+        if not record.binding.matches_exactly(current_binding):
+            return None, "m110_capability_binding_mismatch", digest
+        return record, "m110_capability_current", digest
+
+    def preview(
+        self,
+        token: Any,
+        current_binding: M110CapabilityBinding,
+    ) -> tuple[bool, str]:
+        if type(current_binding) is not M110CapabilityBinding:
+            return False, "m110_capability_binding_required"
+        with self._lock:
+            if self._closed:
+                return False, "m110_capability_store_closed"
+            record, reason, _digest = self._validate_record_locked(
+                token,
+                current_binding,
+            )
+            return record is not None, reason
+
+    def consume(
+        self,
+        token: Any,
+        current_binding: M110CapabilityBinding,
+    ) -> tuple[_M110CapabilityGrantBase | None, str]:
+        if type(current_binding) is not M110CapabilityBinding:
+            return None, "m110_capability_binding_required"
+        with self._lock:
+            if self._closed:
+                return None, "m110_capability_store_closed"
+            record, reason, digest = self._validate_record_locked(
+                token,
+                current_binding,
+            )
+            if record is None or digest is None:
+                return None, reason
+            consumed_at_epoch = float(self._epoch_clock())
+            consumed_at_monotonic = float(self._monotonic_clock())
+            self._remove_record_locked(digest, reason="consumed")
+            grant = _new_m110_grant(
+                record.binding,
+                consumed_at_epoch=consumed_at_epoch,
+                consumed_at_monotonic=consumed_at_monotonic,
+            )
+        return grant, "m110_capability_consumed"
+
+    def revoke_owner(self, owner_ref: Any, *, reason: str) -> int:
+        with self._lock:
+            digests = [
+                digest
+                for digest, record in self._records.items()
+                if record.binding._owner_ref is owner_ref
+            ]
+            for digest in digests:
+                self._remove_record_locked(digest, reason=reason)
+            return len(digests)
+
+    def revoke_proposal(self, proposal_id: str, *, reason: str) -> int:
+        """Revoke only unconsumed tokens bound to one exact proposal."""
+
+        if not isinstance(proposal_id, str) or not proposal_id:
+            return 0
+        with self._lock:
+            digests = [
+                digest
+                for digest, record in self._records.items()
+                if record.binding.proposal_id == proposal_id
+            ]
+            for digest in digests:
+                self._remove_record_locked(digest, reason=reason)
+            return len(digests)
+
+    def revoke_all(self, *, reason: str) -> int:
+        with self._lock:
+            digests = list(self._records)
+            for digest in digests:
+                self._remove_record_locked(digest, reason=reason)
+            return len(digests)
+
+    def active_count(self) -> int:
+        with self._lock:
+            return len(self._records)
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "active_count": len(self._records),
+                "active_limit": M110_MAX_ACTIVE_CAPABILITIES,
+                "tombstone_count": len(self._tombstones),
+                "tombstone_limit": M110_MAX_CAPABILITY_TOMBSTONES,
+                "issuance_enabled": bool(
+                    not self._closed and not self._issuance_disabled
+                ),
+                "stores_plaintext_tokens": False,
+            }
+
+    def close(self) -> None:
+        with self._lock:
+            if self._closed:
+                return
+            for digest in list(self._records):
+                self._remove_record_locked(digest, reason="store_closed")
+            self._closed = True

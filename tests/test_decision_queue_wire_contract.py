@@ -992,6 +992,89 @@ def _trusted_terminal_receipt(
     )
 
 
+def _restored_proof_terminal(**overrides):
+    return {
+        "status": "proof_passed",
+        "proof_run": True,
+        "restore_after_verify": True,
+        "capability_kind": "restore_only_proof",
+        "proposal_id": "sequence-proof-1",
+        "review_content_digest": "sha256:" + "6" * 64,
+        "operation_digest": "sha256:" + "8" * 64,
+        "accepted": False,
+        "owner_review_required": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "proof_target_verified": True,
+        "physical_state_restored": True,
+        "terminal_after_console_send": True,
+        "rollback_attempted": True,
+        "rollback_succeeded": True,
+        "wal_terminal": "proof_restored",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "applied_operation_ids": ["proof-op"],
+        "rollback_operation_ids": ["proof-op"],
+        **overrides,
+    }
+
+
+def test_restored_proof_projects_as_distinct_non_accepted_terminal():
+    identity = _freeze_verified_apply_identity(
+        SimpleNamespace(
+            proposal_id="sequence-proof-1",
+            review_contract_version=2,
+            review_content_digest="sha256:" + "6" * 64,
+        )
+    )
+    receipt = _freeze_trusted_apply_receipt(
+        identity,
+        terminal_result=_restored_proof_terminal(),
+        proposal_status="proof_passed",
+        final_status="proof_passed",
+        final_success=True,
+        result_digest="sha256:" + "7" * 64,
+        result_detail_available=True,
+        result_evidence_pinned=False,
+        reason_code=None,
+        idempotency_key="proof-key",
+        operator_idempotency_released=False,
+    )
+    parsed = json.loads(project_outbound_message({}, trusted_receipt=receipt))
+
+    assert parsed["status"] == "proof_passed"
+    assert parsed["success"] is True
+    assert parsed["accepted"] is False
+    assert parsed["proposal_status"] == "proof_passed"
+    assert parsed["apply_status"] == "proof_passed"
+    assert parsed["proof_run"] is True
+    assert parsed["restore_after_verify"] is True
+    assert parsed["capability_kind"] == "restore_only_proof"
+    assert parsed["live_authority_granted"] is False
+    assert parsed["readiness_closure_allowed"] is False
+
+    with pytest.raises(Exception, match="restored_proof_terminal_invalid"):
+        _freeze_trusted_apply_receipt(
+            identity,
+            terminal_result=_restored_proof_terminal(
+                rollback_operation_ids=[]
+            ),
+            proposal_status="proof_passed",
+            final_status="proof_passed",
+            final_success=True,
+            result_digest="sha256:" + "7" * 64,
+            result_detail_available=True,
+            result_evidence_pinned=True,
+            reason_code=None,
+        )
+
+
 def _sequence_execution_message(*, status="applied", forged_receipt=None):
     return {
         "type": "operator_proposal_apply_sequence_execution_result",

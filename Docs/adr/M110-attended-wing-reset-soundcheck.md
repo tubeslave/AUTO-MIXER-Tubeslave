@@ -97,11 +97,12 @@ attended-launch HMAC and literal `ARM_M110_ATTENDED_ONE_SHOT_CONTROL`; no
 additional fields are allowed. Inside
 the writer scope the backend repeats the fixed route/identity/headroom checks,
 requires the `m110_attended_runner` launch binding, clean source and healthy
-WAL/emergency state, then changes the same connection from observation-only to
-`supervised` capability-only mode without reconnecting. Ordinary Apply remains
-blocked in this mode unless an exact M110 capability is atomically consumed.
-Disarm, disconnect, emergency or route expiry returns to observation-only and
-revokes every unconsumed grant.
+WAL/emergency state, then creates process-private capability-only control for
+that same connection without reconnecting. Normal operator mode stays
+`analyze`, WING stays observation-only, and the standing live allowlist remains
+empty. Ordinary Apply remains blocked unless an exact M110 capability is
+atomically consumed. Disarm, disconnect, emergency or route expiry revokes
+every unconsumed grant without changing normal mode.
 
 The complete arm request is exactly:
 
@@ -127,8 +128,27 @@ serial/firmware, route proof ID/SHA, emergency generation, owner session,
 proposal ID/review digest, canonical plan digest, exact scope/addresses/targets,
 approval/idempotency and latest-start deadline.
 
-Preparation endpoints create server-owned proposals but never tokens. The only
-issuance request is exact v1:
+Preparation endpoints bind server-owned reviewed proposals but never issue
+tokens. The restore-only proof preparation request is exactly:
+
+```json
+{
+  "type": "prepare_m110_restore_only_proof",
+  "contract_version": 1,
+  "proposal_id": "<server-reviewed pending proposal>",
+  "bundle_selector": "reviewed_supervised_transaction"
+}
+```
+
+For CP02 the referenced proposal must already exist in the same backend
+process, have review contract v2 and contain exactly one supervised operation.
+The server re-parses it, prepares the physical adapter without sending, builds
+the canonical bundle, and returns only proposal/review/operation identity,
+operation count and scope. It returns no token. CP03/CP04 add fixed server-owned
+proposal constructors; the client never supplies addresses or a plan to those
+constructors.
+
+The only issuance request is exact v1:
 
 ```json
 {
@@ -155,6 +175,14 @@ eight globally and 30 seconds to start. A second issuance revokes the previous
 owner token. Disconnect, reconnect, route re-proof, emergency generation change
 or proposal terminal state revokes every affected unconsumed token. Consumed
 records are tombstoned for bounded replay detection and never reissued.
+
+The successful issue response returns the plaintext token exactly once along
+with the bound proposal/review/operation identity, server-generated
+idempotency key and latest-start epoch. The attended runner immediately removes
+the token field from the parsed response, holds the value only in a local
+`bytearray`, places it in one exact Apply frame, removes it from that frame and
+zeroes the bytearray as soon as WebSocket send completes. It is never copied to
+session state, summaries, logs or artifacts.
 
 The attended runner creates a pipe before spawning the backend. Of M110 launch
 authority material, the environment contains only
@@ -271,7 +299,9 @@ The fixed capability enum and confirmation literals are:
 
 Preparation messages are also exact v1 and accept only a server proposal and a
 server-defined bundle selector, never addresses or targets. Each preparation
-stores the owner connection and immutable bundle digest used by issuance.
+stores the owner connection and immutable bundle digest used by issuance. The
+later reset/soundcheck constructor endpoints create those proposals from fixed
+selectors; the restore-only preparation endpoint itself does not create one.
 
 The canonical proof/commit unit is
 `automixer.canonical_attended_operation_bundle.v1`. It contains a bundle kind
@@ -312,6 +342,33 @@ private non-serializable grants:
   `single_soundcheck_operation` with an identical recent restored bundle
   digest.
 
+The restore-only Apply object is exactly:
+
+```json
+{
+  "type": "apply_operator_proposal",
+  "proposal_id": "<bound proposal>",
+  "approved": true,
+  "approval_id": "<bound approval>",
+  "idempotency_key": "<server-issued key>",
+  "expected_review_contract_version": 2,
+  "expected_review_content_digest": "sha256:<64 hex>",
+  "expected_operation_digest": "sha256:<64 hex>",
+  "supervised_capability_token": "m110cap_v1_<64 lowercase hex>"
+}
+```
+
+Apply ordering is fixed. The queue first reserves durable result-evidence
+capacity without changing proposal status. The server then re-derives the
+exact binding and atomically consumes/tombstones the token. Only after that may
+the queue claim the proposal as `applying` and reserve the bound idempotency
+key. Writer acquisition, fresh CP05/route/hardware/global checks and fresh Main
+47/48 headroom recheck still occur before the first adapter snapshot or send.
+If claim or any later no-send check fails, the consumed grant becomes terminal
+and cannot be replayed. Accept, dismiss, expiry and any Apply terminal revoke
+only unconsumed authority for that proposal and clear its prepared bundle;
+verified restored-proof receipts are retained until route/session revocation.
+
 Expiry is a latest-start rule. Once a grant is consumed, rollback and recovery
 authority remains until terminal state even after caller cancellation or socket
 loss. Forward work still stops on disconnect/emergency/global hazard.
@@ -326,6 +383,16 @@ WAL `proof_restored`, identical nonempty applied/rollback operation sets,
 physical state restored, verified audio, known write/rollback state, no manual
 review/emergency, `accepted:false`, owner review still required, and no live
 authority/readiness change. It is never treated as normal `applied`.
+
+The outbound v2 terminal is projected only from the durable result receipt. It
+must report `proposal_status=apply_status=status=proof_passed`, `success:true`,
+`proof_run:true`, `restore_after_verify:true`,
+`capability_kind=restore_only_proof`, exact operation digest,
+`proof_target_verified:true`, `physical_verified:true`,
+`physical_state_restored:true`, `terminal_after_console_send:true`, verified
+rollback/audio, known states, `accepted:false`, `owner_review_required:true`,
+`live_authority_granted:false` and `readiness_closure_allowed:false`. The token
+field or any token-shaped value in a terminal is a protocol failure.
 
 ### Maintenance reset
 
@@ -392,8 +459,10 @@ Final status is honest: `safe_core_ready`,
 
 ### Runner boundary
 
-Route and family proof runners themselves are WebSocket-only and plan-only by
-default. They contain no `WingClient`, UDP, OSC or direct write call. After the
+The legacy family proof runner is permanently plan-only and contains no mixer
+or network transport. All real proof execution lives in the attended runner,
+which is WebSocket-only and contains no `WingClient`, UDP, OSC or direct write
+call. After the
 CP05 gate and exact operator confirmation, the isolated proof-owned child may
 open OSC. One persistent authenticated WebSocket, one child process, the exact
 WING transport and exact owned capture stream remain alive together from route
@@ -403,6 +472,14 @@ passes bearer tokens via separate inherited file descriptors, binds challenged
 runtime identity, launches only clean committed source and guarantees shielded
 child/capture/transport teardown even under cancellation. Secrets and tokens
 never enter argv, logs or artifacts.
+
+On the retained WebSocket the fixed order is route proof, one control arm, then
+for each already-reviewed proof proposal prepare, issue and Apply. Re-arming is
+not used between proposals because arm intentionally clears prepared bundles
+and prior process-private proof receipts. Any malformed, blocked, duplicate or
+wrong-stage terminal tears down the entire proof-owned session. CP02 exposes
+this same-session protocol but does not unblock the top-level real `--execute`
+flow until CP03/CP04 can create the required fixed proposals in that process.
 
 ## 4. Why this won
 
@@ -447,6 +524,8 @@ unformed mix.
   restart/reconnect/TTL/source drift.
 - Token replay, wrong owner, restart, reconnect, expiry, concurrency and every
   binding mismatch.
+- Durable result capacity before consume, consume before claim, claim-race
+  terminalization and proposal-scoped revocation on accept/dismiss/expiry.
 - Generic proof switches and arbitrary plans block before pre-read/send.
 - Cancellation and failure at every coordinator/WAL/readback/rollback await.
 - `proof_passed` remains distinct in queue, result store, wire and readiness.

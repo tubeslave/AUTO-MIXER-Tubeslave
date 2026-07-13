@@ -15,6 +15,7 @@ from operator_proposal_result_store import (
     ResultEvidenceError,
     ResultEvidenceReservationBinding,
     ResultEvidenceStore,
+    result_requires_pinned_evidence,
 )
 from operator_proposal_queue import OperatorProposalQueue
 
@@ -36,6 +37,70 @@ def _result(**overrides):
         "manual_review_required": False,
         **overrides,
     }
+
+
+def _restored_proof_result(**overrides):
+    return {
+        "status": "proof_passed",
+        "proof_run": True,
+        "restore_after_verify": True,
+        "capability_kind": "restore_only_proof",
+        "proposal_id": "proposal-proof-1",
+        "review_content_digest": "sha256:" + "1" * 64,
+        "operation_digest": "sha256:" + "2" * 64,
+        "accepted": False,
+        "owner_review_required": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "proof_target_verified": True,
+        "physical_state_restored": True,
+        "terminal_after_console_send": True,
+        "rollback_attempted": True,
+        "rollback_succeeded": True,
+        "wal_terminal": "proof_restored",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "applied_operation_ids": ["proof-op-1", "proof-op-2"],
+        "rollback_operation_ids": ["proof-op-2", "proof-op-1"],
+        **overrides,
+    }
+
+
+def test_exact_restored_proof_is_not_pinned_but_every_near_miss_is():
+    golden = _restored_proof_result()
+    assert result_requires_pinned_evidence(golden) is False
+
+    mutations = (
+        {"status": "rolled_back"},
+        {"proof_run": False},
+        {"restore_after_verify": False},
+        {"accepted": True},
+        {"owner_review_required": False},
+        {"live_authority_granted": True},
+        {"readiness_closure_allowed": True},
+        {"physical_verified": False},
+        {"proof_target_verified": False},
+        {"physical_state_restored": False},
+        {"audio_recheck_passed": False},
+        {"wal_terminal": "rolled_back"},
+        {"rollback_succeeded": False},
+        {"emergency_stop_activated": True},
+        {"applied_operation_ids": []},
+        {"rollback_operation_ids": ["proof-op-1"]},
+        {"rollback_operation_ids": ["proof-op-1", "proof-op-1"]},
+        {"operation_digest": "sha256:bad"},
+    )
+    assert all(
+        result_requires_pinned_evidence(_restored_proof_result(**mutation))
+        is True
+        for mutation in mutations
+    )
 
 
 def _reserve(store, marker="test"):
@@ -92,6 +157,47 @@ def _claimed(queue, proposal_id="proposal-1"):
     )
     assert claim["claimed"] is True
     return proposal
+
+
+def test_queue_records_restored_proof_as_distinct_non_apply_terminal(tmp_path):
+    root = tmp_path / "proof-results"
+    store = ResultEvidenceStore(
+        root,
+        min_free_bytes=0,
+        disk_usage=_disk_with_free(1_000_000_000),
+    )
+    queue = OperatorProposalQueue(
+        result_store=store,
+        result_evidence_lifecycle_ready=True,
+    )
+    proposal = _claimed(queue, proposal_id="proposal-proof-1")
+    reservation = queue.reserve_result_evidence(proposal)
+    assert queue.mark_result_evidence_send_may_have_occurred(
+        reservation["reservation_binding"]
+    )["transitioned"] is True
+
+    completed = queue.mark_apply_result(
+        proposal,
+        _restored_proof_result(),
+        evidence_reservation_binding=reservation["reservation_binding"],
+    )
+
+    assert completed["status"] == "proof_passed"
+    assert completed["success"] is True
+    assert completed["accepted"] is False
+    assert proposal.status == "proof_passed"
+    assert proposal.result_evidence_pinned is False
+    assert queue.pending_actions() == []
+    assert queue.summary()["applied_count"] == 0
+    assert queue.summary()["proof_passed_count"] == 1
+
+    restarted = ResultEvidenceStore(
+        root,
+        min_free_bytes=0,
+        disk_usage=_disk_with_free(1_000_000_000),
+        process_instance_id="a" * 32,
+    )
+    assert restarted.recovery_hazards() == ()
 
 
 def test_store_reserves_then_persists_digest_only_atomic_artifact(tmp_path):

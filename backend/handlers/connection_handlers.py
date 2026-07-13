@@ -34,6 +34,27 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_arm_m110_attended_control(websocket, data):
+        result = await server.arm_m110_attended_control(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_issue_supervised_capability(websocket, data):
+        result = await server.issue_m110_supervised_capability(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_prepare_m110_restore_only_proof(websocket, data):
+        result = await server.prepare_m110_restore_only_proof(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(
             ip=data.get("ip", "192.168.3.70"),
@@ -160,6 +181,11 @@ def register_handlers(server):
         "get_runtime_identity": handle_get_runtime_identity,
         "capture_wing_master_route_proof": (
             handle_capture_wing_master_route_proof
+        ),
+        "arm_m110_attended_control": handle_arm_m110_attended_control,
+        "issue_supervised_capability": handle_issue_supervised_capability,
+        "prepare_m110_restore_only_proof": (
+            handle_prepare_m110_restore_only_proof
         ),
         "connect_wing": handle_connect_wing,
         "connect_dlive": handle_connect_dlive,

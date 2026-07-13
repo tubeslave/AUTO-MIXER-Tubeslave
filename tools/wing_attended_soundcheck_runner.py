@@ -356,6 +356,7 @@ from m110_cp05_hardware_gate import (  # noqa: E402
     verify_m110_cp05_hardware_gate,
 )
 from supervised_proof_capability import (  # noqa: E402
+    M110_CAPABILITY_CONFIRMATIONS,
     M110_ALLOWED_UNTRACKED_REPORT,
     M110_IGNORED_IMPORT_ARTIFACT_SUFFIXES,
     M110_IMPORT_SCAN_EXCLUDED_DIRECTORIES,
@@ -363,6 +364,8 @@ from supervised_proof_capability import (  # noqa: E402
     M110_RUNTIME_CRITICAL_PATHS,
     M110_RUNTIME_IMPORT_ROOTS,
     sign_m110_request,
+    validate_m110_arm_request,
+    validate_m110_capability_issue_request,
 )
 from runtime_identity import (  # noqa: E402
     RUNTIME_IDENTITY_SCHEMA,
@@ -374,6 +377,7 @@ if tuple(M110_RUNTIME_CRITICAL_PATHS) != EARLY_M110_RUNTIME_CRITICAL_PATHS:
 
 
 ATTENDED_EXECUTION_CONFIRMATION = "EXECUTE_M110_ATTENDED_WING_SOUNDCHECK"
+M110_ATTENDED_CONTROL_CONFIRMATION = "ARM_M110_ATTENDED_ONE_SHOT_CONTROL"
 M110_RUNNER_CLIENT_ID = "m110-attended-runner"
 DEFAULT_ARTIFACT_ROOT = Path.home() / ".automixer" / "runtime" / "m110_attended"
 DEFAULT_ROUTE_ARTIFACT_ROOT = (
@@ -621,6 +625,70 @@ def build_route_capture_request(
         },
         secret=secret,
     )
+
+
+def build_m110_attended_control_request(
+    *,
+    approval_id: str,
+    request_nonce: str,
+    secret: bytes,
+) -> dict[str, Any]:
+    """Build the exact signed one-shot control-arm envelope."""
+
+    request = sign_m110_request(
+        {
+            "type": "arm_m110_attended_control",
+            "contract_version": 1,
+            "approval_id": approval_id,
+            "confirmation": M110_ATTENDED_CONTROL_CONFIRMATION,
+            "request_nonce": request_nonce,
+        },
+        secret=secret,
+    )
+    valid, reason = validate_m110_arm_request(request)
+    if not valid:
+        raise ValueError(f"m110_arm_request_builder_invalid:{reason}")
+    return request
+
+
+def build_m110_restore_only_capability_request(
+    *,
+    proposal_id: str,
+    review_contract_version: int,
+    review_content_digest: str,
+    operation_digest: str,
+    approval_id: str,
+    request_nonce: str,
+    secret: bytes,
+) -> dict[str, Any]:
+    """Build the exact signed capability-issue envelope for one bundle."""
+
+    if review_contract_version != 2 or isinstance(
+        review_contract_version,
+        bool,
+    ):
+        raise ValueError("m110_capability_review_version_invalid")
+    request = sign_m110_request(
+        {
+            "type": "issue_supervised_capability",
+            "contract_version": 1,
+            "capability_kind": "restore_only_proof",
+            "proposal_id": proposal_id,
+            "expected_review_contract_version": review_contract_version,
+            "expected_review_content_digest": review_content_digest,
+            "expected_operation_digest": operation_digest,
+            "approval_id": approval_id,
+            "confirmation": M110_CAPABILITY_CONFIRMATIONS[
+                "restore_only_proof"
+            ],
+            "request_nonce": request_nonce,
+        },
+        secret=secret,
+    )
+    valid, reason = validate_m110_capability_issue_request(request)
+    if not valid:
+        raise ValueError(f"m110_capability_request_builder_invalid:{reason}")
+    return request
 
 
 def _write_all(fd: int, value: bytes) -> None:
@@ -884,13 +952,18 @@ def _strict_websocket_object(raw: Any) -> dict[str, Any]:
     return value
 
 
-M110_ROUTE_TERMINAL_TYPES = frozenset(
+M110_CONTROL_TERMINAL_TYPES = frozenset(
     {
         "authentication_status",
         "runtime_identity",
         "connection_status",
         "audio_capture_status",
         "wing_master_route_proof_result",
+        "m110_attended_control_result",
+        "m110_restore_proof_prepare_result",
+        "supervised_capability_result",
+        "operator_proposal_apply_result",
+        "operator_proposal_apply_blocked",
         "control_authentication_required",
     }
 )
@@ -930,6 +1003,8 @@ class ProofOwnedBackendSession:
     capture_started: bool = False
     route_established: bool = False
     route_result: dict[str, Any] | None = None
+    control_armed: bool = False
+    control_approval_id: str | None = None
     closed: bool = False
     teardown_result: dict[str, Any] | None = None
     cp05_gate_result: dict[str, Any] | None = None
@@ -1038,9 +1113,9 @@ class ProofOwnedBackendSession:
         expected_type: str,
     ) -> None:
         message_type = payload.get("type")
-        if message_type in M110_ROUTE_TERMINAL_TYPES:
+        if message_type in M110_CONTROL_TERMINAL_TYPES:
             raise RuntimeError(
-                f"unexpected_route_terminal:{message_type}:expected:{expected_type}"
+                f"unexpected_control_terminal:{message_type}:expected:{expected_type}"
             )
         if payload.get("status") == "blocked" or payload.get("success") is False:
             raise RuntimeError(
@@ -1064,7 +1139,7 @@ class ProofOwnedBackendSession:
                 return
             if payload.get("type") == expected_type:
                 raise RuntimeError(
-                    f"duplicate_route_terminal:{expected_type}"
+                    f"duplicate_control_terminal:{expected_type}"
                 )
             self._reject_unexpected_terminal(
                 payload,
@@ -1710,6 +1785,382 @@ class ProofOwnedBackendSession:
             "readiness_closure_allowed": False,
         }
 
+    @staticmethod
+    def _require_sha256(value: Any, *, field_name: str) -> str:
+        if not (
+            isinstance(value, str)
+            and re.fullmatch(r"sha256:[0-9a-f]{64}", value) is not None
+        ):
+            raise RuntimeError(f"m110_{field_name}_invalid")
+        return value
+
+    @staticmethod
+    def _assert_no_capability_secret(payload: Any) -> None:
+        """Reject a terminal payload that contains any token-shaped material."""
+
+        nodes = 0
+
+        def visit(value: Any, depth: int) -> None:
+            nonlocal nodes
+            nodes += 1
+            if nodes > 4096 or depth > 16:
+                raise RuntimeError("m110_terminal_secret_scan_bounds_exceeded")
+            if isinstance(value, str):
+                if "m110cap_v1_" in value:
+                    raise RuntimeError("m110_capability_token_leaked_to_terminal")
+                return
+            if isinstance(value, Mapping):
+                for key, item in value.items():
+                    if key == "supervised_capability_token":
+                        raise RuntimeError(
+                            "m110_capability_token_field_leaked_to_terminal"
+                        )
+                    visit(item, depth + 1)
+                return
+            if isinstance(value, (list, tuple)):
+                for item in value:
+                    visit(item, depth + 1)
+
+        visit(payload, 0)
+
+    @classmethod
+    def _validate_restore_only_proof_terminal(
+        cls,
+        terminal: Mapping[str, Any],
+        *,
+        proposal_id: str,
+        review_digest: str,
+        operation_digest: str,
+    ) -> None:
+        cls._assert_no_capability_secret(terminal)
+        terminal_result_digest = cls._require_sha256(
+            terminal.get("result_digest"),
+            field_name="proof_result_digest",
+        )
+        terminal_proposal = terminal.get("proposal")
+        if not (
+            terminal.get("contract_version") == 2
+            and not isinstance(terminal.get("contract_version"), bool)
+            and terminal.get("status") == "proof_passed"
+            and terminal.get("success") is True
+            and terminal.get("proposal_id") == proposal_id
+            and terminal.get("proposal_status") == "proof_passed"
+            and terminal.get("apply_status") == "proof_passed"
+            and terminal.get("accepted") is False
+            and terminal.get("owner_review_required") is True
+            and terminal.get("live_authority_granted") is False
+            and terminal.get("readiness_closure_allowed") is False
+            and terminal.get("proof_run") is True
+            and terminal.get("restore_after_verify") is True
+            and terminal.get("capability_kind") == "restore_only_proof"
+            and terminal.get("operation_digest") == operation_digest
+            and terminal.get("proof_target_verified") is True
+            and terminal.get("no_console_send_proven") is False
+            and terminal.get("physical_verified") is True
+            and terminal.get("physical_state_restored") is True
+            and terminal.get("terminal_after_console_send") is True
+            and terminal.get("write_state_unknown") is False
+            and terminal.get("rollback_attempted") is True
+            and terminal.get("rollback_succeeded") is True
+            and terminal.get("rollback_status") == "verified"
+            and terminal.get("rollback_state_unknown") is False
+            and terminal.get("manual_review_required") is False
+            and terminal.get("emergency_stop_activated") is False
+            and terminal.get("emergency_stop_required") is False
+            and terminal.get("wal_terminal") == "proof_restored"
+            and terminal.get("audio_recheck_passed") is True
+            and terminal.get("result_detail_available") is True
+            and terminal.get("result_evidence_pinned") is False
+            and isinstance(terminal_proposal, Mapping)
+            and terminal_proposal.get("id") == proposal_id
+            and terminal_proposal.get("status") == "proof_passed"
+            and terminal_proposal.get("review_contract_version") == 2
+            and terminal_proposal.get("review_content_digest")
+            == review_digest
+            and terminal_proposal.get("result_digest")
+            == terminal_result_digest
+            and terminal_proposal.get("result_detail_available") is True
+            and terminal_proposal.get("result_evidence_pinned") is False
+        ):
+            raise RuntimeError(
+                "m110_restore_only_proof_terminal_invalid:"
+                + cls._bounded_terminal_failure_context(terminal)
+            )
+
+    async def prove_pending_restore_only_proposal(
+        self,
+        *,
+        proposal_id: str,
+        approval_id: str,
+        timeout_seconds: float = 45.0,
+    ) -> dict[str, Any]:
+        """Bind and consume one restore-only capability on this armed session.
+
+        The proposal must already be a server-reviewed, one-operation
+        supervised transaction created by the later reset/soundcheck stage.
+        Any protocol failure tears down the whole proof-owned authority.
+        """
+
+        try:
+            return await self._prove_pending_restore_only_proposal(
+                proposal_id=proposal_id,
+                approval_id=approval_id,
+                timeout_seconds=timeout_seconds,
+            )
+        except BaseException:
+            await self.close()
+            raise
+
+    async def arm_m110_attended_control(
+        self,
+        *,
+        approval_id: str,
+        timeout_seconds: float = 20.0,
+    ) -> dict[str, Any]:
+        """Arm the one-shot capability control without widening normal mode."""
+
+        try:
+            return await self._arm_m110_attended_control(
+                approval_id=approval_id,
+                timeout_seconds=timeout_seconds,
+            )
+        except BaseException:
+            await self.close()
+            raise
+
+    async def _arm_m110_attended_control(
+        self,
+        *,
+        approval_id: str,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        if not self.route_established or self.route_result is None:
+            raise RuntimeError("m110_master_route_must_precede_capability")
+        if self.control_armed:
+            raise RuntimeError("m110_attended_control_already_armed")
+        if not (
+            isinstance(approval_id, str)
+            and 1 <= len(approval_id.encode("utf-8")) <= 128
+            and all(0x21 <= ord(character) <= 0x7E for character in approval_id)
+        ):
+            raise ValueError("m110_approval_id_invalid")
+        if not (
+            isinstance(timeout_seconds, (int, float))
+            and not isinstance(timeout_seconds, bool)
+            and math.isfinite(float(timeout_seconds))
+            and 0.0 < float(timeout_seconds) <= 120.0
+        ):
+            raise ValueError("m110_capability_timeout_invalid")
+        arm_request = build_m110_attended_control_request(
+            approval_id=approval_id,
+            request_nonce=secrets.token_hex(16),
+            secret=bytes(self.backend.secret),
+        )
+        await self._send_json(arm_request)
+        armed = await self._receive_terminal(
+            "m110_attended_control_result",
+            timeout_seconds=float(timeout_seconds),
+        )
+        route_proof_id = self.route_result.get("proof_id")
+        if not (
+            armed.get("status") == "armed"
+            and armed.get("success") is True
+            and armed.get("reason")
+            == "m110_supervised_capability_only_armed"
+            and armed.get("route_proof_id") == route_proof_id
+            and armed.get("supervised_capability_only") is True
+            and armed.get("normal_operator_mode_unchanged") is True
+            and armed.get("normal_live_allowlist_changed") is False
+            and armed.get("live_authority_granted") is False
+            and armed.get("readiness_closure_allowed") is False
+        ):
+            raise RuntimeError(
+                "m110_attended_control_arm_failed:"
+                + self._bounded_terminal_failure_context(armed)
+            )
+        self.control_armed = True
+        self.control_approval_id = approval_id
+        return {
+            "verified": True,
+            "reason": "m110_supervised_capability_only_armed",
+            "route_proof_id": route_proof_id,
+            "normal_operator_mode_unchanged": True,
+            "normal_live_allowlist_changed": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+
+    async def _prove_pending_restore_only_proposal(
+        self,
+        *,
+        proposal_id: str,
+        approval_id: str,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        if not self.route_established or self.route_result is None:
+            raise RuntimeError("m110_master_route_must_precede_capability")
+        if self.closed:
+            raise RuntimeError("proof_owned_backend_session_closed")
+        if not self.control_armed:
+            raise RuntimeError("m110_attended_control_must_be_armed")
+        if approval_id != self.control_approval_id:
+            raise RuntimeError("m110_attended_control_approval_mismatch")
+        for field_name, value in (
+            ("proposal_id", proposal_id),
+            ("approval_id", approval_id),
+        ):
+            if not (
+                isinstance(value, str)
+                and 1 <= len(value.encode("utf-8")) <= 128
+                and all(0x21 <= ord(character) <= 0x7E for character in value)
+            ):
+                raise ValueError(f"m110_{field_name}_invalid")
+        if not (
+            isinstance(timeout_seconds, (int, float))
+            and not isinstance(timeout_seconds, bool)
+            and math.isfinite(float(timeout_seconds))
+            and 0.0 < float(timeout_seconds) <= 120.0
+        ):
+            raise ValueError("m110_capability_timeout_invalid")
+
+        await self._send_json(
+            {
+                "type": "prepare_m110_restore_only_proof",
+                "contract_version": 1,
+                "proposal_id": proposal_id,
+                "bundle_selector": "reviewed_supervised_transaction",
+            }
+        )
+        prepared = await self._receive_terminal(
+            "m110_restore_proof_prepare_result",
+            timeout_seconds=min(float(timeout_seconds), 20.0),
+        )
+        review_digest = self._require_sha256(
+            prepared.get("review_content_digest"),
+            field_name="review_content_digest",
+        )
+        operation_digest = self._require_sha256(
+            prepared.get("operation_digest"),
+            field_name="operation_digest",
+        )
+        scope_addresses = prepared.get("scope_addresses")
+        if not (
+            prepared.get("status") == "prepared"
+            and prepared.get("success") is True
+            and prepared.get("reason") == "m110_restore_proof_bundle_current"
+            and prepared.get("proposal_id") == proposal_id
+            and prepared.get("review_contract_version") == 2
+            and not isinstance(prepared.get("review_contract_version"), bool)
+            and prepared.get("operation_count") == 1
+            and not isinstance(prepared.get("operation_count"), bool)
+            and isinstance(scope_addresses, list)
+            and bool(scope_addresses)
+            and all(
+                isinstance(address, str) and address.startswith("/")
+                for address in scope_addresses
+            )
+            and prepared.get("token_issued") is False
+            and prepared.get("live_authority_granted") is False
+        ):
+            raise RuntimeError(
+                "m110_restore_proof_prepare_failed:"
+                + self._bounded_terminal_failure_context(prepared)
+            )
+
+        issue_request = build_m110_restore_only_capability_request(
+            proposal_id=proposal_id,
+            review_contract_version=2,
+            review_content_digest=review_digest,
+            operation_digest=operation_digest,
+            approval_id=approval_id,
+            request_nonce=secrets.token_hex(16),
+            secret=bytes(self.backend.secret),
+        )
+        await self._send_json(issue_request)
+        issued = await self._receive_terminal(
+            "supervised_capability_result",
+            timeout_seconds=min(float(timeout_seconds), 20.0),
+        )
+        raw_token = issued.pop("supervised_capability_token", None)
+        idempotency_key = issued.get("idempotency_key")
+        latest_start_epoch = issued.get("latest_start_epoch")
+        if not (
+            issued.get("status") == "issued"
+            and issued.get("success") is True
+            and issued.get("reason") == "m110_capability_issued"
+            and issued.get("capability_kind") == "restore_only_proof"
+            and issued.get("proposal_id") == proposal_id
+            and issued.get("review_contract_version") == 2
+            and issued.get("review_content_digest") == review_digest
+            and issued.get("operation_digest") == operation_digest
+            and issued.get("approval_id") == approval_id
+            and isinstance(idempotency_key, str)
+            and re.fullmatch(r"m110-proof:[0-9a-f]{32}", idempotency_key)
+            is not None
+            and isinstance(latest_start_epoch, (int, float))
+            and not isinstance(latest_start_epoch, bool)
+            and math.isfinite(float(latest_start_epoch))
+            and time.time() < float(latest_start_epoch) <= time.time() + 31.0
+            and isinstance(raw_token, str)
+            and re.fullmatch(r"m110cap_v1_[0-9a-f]{64}", raw_token) is not None
+            and issued.get("single_use") is True
+            and issued.get("stores_plaintext_token") is False
+            and issued.get("live_authority_granted") is False
+        ):
+            raw_token = None
+            raise RuntimeError(
+                "m110_restore_proof_capability_issue_failed:"
+                + self._bounded_terminal_failure_context(issued)
+            )
+
+        token = bytearray(raw_token.encode("ascii"))
+        raw_token = None
+        apply_request = {
+            "type": "apply_operator_proposal",
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": approval_id,
+            "idempotency_key": idempotency_key,
+            "expected_review_contract_version": 2,
+            "expected_review_content_digest": review_digest,
+            "expected_operation_digest": operation_digest,
+            "supervised_capability_token": token.decode("ascii"),
+        }
+        try:
+            await self._send_json(apply_request)
+        finally:
+            apply_request.pop("supervised_capability_token", None)
+            for index in range(len(token)):
+                token[index] = 0
+
+        terminal = await self._receive_terminal(
+            "operator_proposal_apply_result",
+            timeout_seconds=float(timeout_seconds),
+        )
+        self._validate_restore_only_proof_terminal(
+            terminal,
+            proposal_id=proposal_id,
+            review_digest=review_digest,
+            operation_digest=operation_digest,
+        )
+        return {
+            "verified": True,
+            "reason": "restore_only_proof_verified_and_restored",
+            "proposal_id": proposal_id,
+            "review_contract_version": 2,
+            "review_content_digest": review_digest,
+            "operation_digest": operation_digest,
+            "scope_addresses": list(scope_addresses),
+            "proof_terminal": terminal,
+            "same_websocket_retained": True,
+            "backend_process_retained": self.backend.process.poll() is None,
+            "token_retained": False,
+            "accepted": False,
+            "owner_review_required": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
+
     async def close(self) -> dict[str, Any]:
         if self.closed and self.teardown_result is not None:
             return dict(self.teardown_result)
@@ -1777,6 +2228,8 @@ class ProofOwnedBackendSession:
                 # No await is permitted between this flag and exact child
                 # termination: it is the cancellation-proof safety backstop.
                 self.closed = True
+                self.control_armed = False
+                self.control_approval_id = None
                 self.backend.close()
         backend_terminated = self.backend.process.poll() is not None
         if not backend_terminated:

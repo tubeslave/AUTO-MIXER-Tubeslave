@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from dataclasses import replace
 
 import pytest
@@ -19,6 +20,16 @@ from supervised_console_transaction import (
     ConsoleTransactionPlan,
     SupervisedConsoleTransactionCoordinator,
 )
+from supervised_family_proof_plan import (
+    build_canonical_operation_bundle_from_prepared,
+    canonical_bundle_scope,
+    canonical_operation_bundle_bytes,
+    canonical_operation_bundle_digest,
+)
+from supervised_proof_capability import (
+    M110CapabilityBinding,
+    SupervisedCapabilityStore,
+)
 
 
 class FakeAdapter:
@@ -31,7 +42,19 @@ class FakeAdapter:
     def prepare(self, operation):
         if operation.target_value == "invalid":
             raise ValueError("synthetic_invalid_target")
-        return {"addresses": [f"/{self.family_id}/{operation.operation_id}"]}
+        address = f"/{self.family_id}/{operation.operation_id}"
+        return {
+            "addresses": (address,),
+            "write_count": 1,
+            "writes": (
+                {
+                    "address": address,
+                    "target_value": operation.target_value,
+                    "tolerance": 0.01,
+                },
+            ),
+            "audible_state_reads": (),
+        }
 
     def validate_snapshot(self, operation, snapshot):
         return None
@@ -96,6 +119,7 @@ def context(
     proof_run: bool = False,
     restore_after_verify: bool = False,
     key: str = "txn-key",
+    capability_grant=None,
 ):
     return ConsoleTransactionContext(
         approved=True,
@@ -104,7 +128,87 @@ def context(
         emergency_generation=7,
         proof_run=proof_run,
         restore_after_verify=restore_after_verify,
+        capability_grant=capability_grant,
     )
+
+
+def restore_only_grant(plan, adapter, *, key="proof-restore"):
+    safety_binding = {
+        "adapter_revision": "unit-adapter-v1",
+        "protocol_revision": "unit-protocol-v1",
+        "runtime_instance_nonce": "1" * 32,
+        "runtime_manifest_sha256": "sha256:" + "2" * 64,
+        "source_head": "3" * 40,
+        "source_tree": "4" * 40,
+        "console_serial": "unit-console",
+        "firmware_version": "3.0.5",
+        "route_proof_id": "unit-route",
+        "route_artifact_sha256": "sha256:" + "5" * 64,
+        "capture_hardware_uid": "unit-capture",
+        "connection_generation": 1,
+        "transport_generation": 2,
+        "emergency_generation": 7,
+    }
+    operation_rows = [
+        {
+            "operation_id": item.operation_id,
+            "family_id": item.family_id,
+            "write_kind": item.write_kind,
+            "channel": item.channel,
+            "parameter": item.parameter,
+        }
+        for item in plan.operations
+    ]
+    bundle = build_canonical_operation_bundle_from_prepared(
+        bundle_kind=(
+            "single_soundcheck_operation"
+            if len(plan.operations) == 1
+            else "maintenance_dsp_reset_bundle"
+        ),
+        operations=operation_rows,
+        prepared_operations=[adapter.prepare(item) for item in plan.operations],
+        safety_binding=safety_binding,
+    )
+    bundle_bytes = canonical_operation_bundle_bytes(bundle)
+    scope, targets = canonical_bundle_scope(bundle)
+    owner = object()
+    route = object()
+    transport = object()
+    capture = object()
+    binding = M110CapabilityBinding(
+        capability_kind="restore_only_proof",
+        runtime_instance_nonce="1" * 32,
+        runtime_manifest_sha256="sha256:" + "2" * 64,
+        launch_manifest_sha256="sha256:" + "6" * 64,
+        source_head="3" * 40,
+        source_tree="4" * 40,
+        connection_generation=1,
+        transport_generation=2,
+        console_serial="unit-console",
+        firmware_version="3.0.5",
+        route_proof_id="unit-route",
+        route_artifact_sha256="sha256:" + "5" * 64,
+        capture_hardware_uid="unit-capture",
+        emergency_generation=7,
+        owner_connection_id=id(owner),
+        proposal_id="unit-proposal",
+        review_contract_version=2,
+        review_content_digest="sha256:" + "7" * 64,
+        operation_digest=canonical_operation_bundle_digest(bundle),
+        canonical_bundle_bytes=bundle_bytes,
+        approval_id="operator-approval",
+        idempotency_key=key,
+        scope_addresses=scope,
+        target_fingerprints=targets,
+        _owner_ref=owner,
+        _route_ref=route,
+        _transport_ref=transport,
+        _capture_ref=capture,
+    )
+    store = SupervisedCapabilityStore(token_factory=lambda: "8" * 64)
+    issued, _ = store.issue(binding)
+    grant, _ = store.consume(issued.token, binding)
+    return grant
 
 
 def coordinator(
@@ -589,8 +693,17 @@ async def test_proposal_only_family_is_blocked_even_in_proof_run():
     )
     service, _ = coordinator({"eq_hpf": row}, {"eq_hpf": adapter})
     plan = ConsoleTransactionPlan("txn-2", (operation("eq-1"),), "blocked")
+    grant = restore_only_grant(plan, adapter, key="proposal-only-proof")
 
-    result = await service.execute(plan, context(proof_run=True))
+    result = await service.execute(
+        plan,
+        context(
+            proof_run=True,
+            restore_after_verify=True,
+            key="proposal-only-proof",
+            capability_grant=grant,
+        ),
+    )
 
     assert result.status == "blocked"
     assert result.reason == "write_kind_not_live_or_proof_allowed"
@@ -610,10 +723,24 @@ async def test_proof_candidate_requires_explicit_proof_run():
     plan = ConsoleTransactionPlan("txn-3", (operation("eq-1"),), "proof")
 
     blocked = await service.execute(plan, context(key="normal"))
-    passed = await service.execute(plan, context(proof_run=True, key="proof"))
+    public_flag_blocked = await service.execute(
+        plan,
+        context(proof_run=True, restore_after_verify=True, key="public-proof"),
+    )
+    grant = restore_only_grant(plan, adapter, key="proof")
+    passed = await service.execute(
+        plan,
+        context(
+            proof_run=True,
+            restore_after_verify=True,
+            key="proof",
+            capability_grant=grant,
+        ),
+    )
 
     assert blocked.reason == "write_kind_not_live_or_proof_allowed"
-    assert passed.status == "applied"
+    assert public_flag_blocked.reason == "restore_only_proof_grant_required"
+    assert passed.status == "proof_passed"
 
 
 @pytest.mark.asyncio
@@ -698,6 +825,7 @@ async def test_hardware_proof_restores_original_state_after_success():
     )
     service, emergency = coordinator({"eq_hpf": row}, {"eq_hpf": adapter})
     plan = ConsoleTransactionPlan("proof-1", (operation("eq-1"),), "proof")
+    grant = restore_only_grant(plan, adapter, key="proof-restore")
 
     result = await service.execute(
         plan,
@@ -705,6 +833,7 @@ async def test_hardware_proof_restores_original_state_after_success():
             proof_run=True,
             restore_after_verify=True,
             key="proof-restore",
+            capability_grant=grant,
         ),
     )
 

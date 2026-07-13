@@ -87,6 +87,135 @@ def wal_event(transaction_id, phase, **extra):
     }
 
 
+def restored_proof_wal_payloads(transaction_id):
+    identity = {
+        "proof_run": True,
+        "restore_after_verify": True,
+        "capability_kind": "restore_only_proof",
+        "proposal_id": "m110-proof-proposal",
+        "review_content_digest": "sha256:" + "1" * 64,
+        "operation_digest": "sha256:" + "2" * 64,
+    }
+    prepared = {
+        "scope": "supervised_transaction",
+        **identity,
+        "expected_operation_ids": ["m110-proof-operation"],
+    }
+    terminal = {
+        "result_status": "proof_passed",
+        **identity,
+        "applied_operation_ids": ["m110-proof-operation"],
+        "rollback_operation_ids": ["m110-proof-operation"],
+        "physical_verified": True,
+        "proof_target_verified": True,
+        "audio_recheck_passed": True,
+        "physical_state_restored": True,
+        "terminal_after_console_send": True,
+        "rollback_attempted": True,
+        "rollback_succeeded": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "accepted": False,
+        "owner_review_required": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+    return prepared, terminal
+
+
+def test_exact_restored_proof_wal_is_terminal_across_restart(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_dir = tmp_path / "proof-restored-runtime"
+    server = build_server(
+        tmp_path / "proof-restored-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    transaction_id = "m110-proof-restored-golden"
+    prepared, terminal = restored_proof_wal_payloads(transaction_id)
+
+    assert server._append_manual_write_wal(
+        "prepared",
+        transaction_id,
+        **prepared,
+    )
+    assert server._append_manual_write_wal(
+        "proof_restored",
+        transaction_id,
+        **terminal,
+    )
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert server._wal_lifecycle_proves_restored_proof(lifecycle) is True
+    assert transaction_id not in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / "proof-restored-events-after-restart",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert restarted._manual_write_recovery_transactions == {}
+    assert restarted._manual_write_emergency_stopped is False
+
+
+@pytest.mark.parametrize(
+    ("field_name", "unsafe_value"),
+    [
+        ("audio_recheck_passed", False),
+        ("physical_state_restored", False),
+        ("rollback_succeeded", False),
+        ("manual_review_required", True),
+        ("emergency_stop_activated", True),
+        ("accepted", True),
+        ("owner_review_required", False),
+        ("live_authority_granted", True),
+        ("readiness_closure_allowed", True),
+    ],
+)
+def test_near_miss_restored_proof_wal_remains_recovery_hazard(
+    tmp_path,
+    monkeypatch,
+    field_name,
+    unsafe_value,
+):
+    runtime_dir = tmp_path / f"near-miss-{field_name}"
+    server = build_server(
+        tmp_path / f"near-miss-events-{field_name}",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    transaction_id = f"m110-proof-near-miss-{field_name}"
+    prepared, terminal = restored_proof_wal_payloads(transaction_id)
+    terminal[field_name] = unsafe_value
+
+    assert server._append_manual_write_wal(
+        "prepared",
+        transaction_id,
+        **prepared,
+    )
+    assert server._append_manual_write_wal(
+        "proof_restored",
+        transaction_id,
+        **terminal,
+    )
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert server._wal_lifecycle_proves_restored_proof(lifecycle) is False
+    assert transaction_id in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / f"near-miss-restart-{field_name}",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
 def test_startup_latches_on_unresolved_wal_and_reset_cannot_clear_it(
     tmp_path,
     monkeypatch,
