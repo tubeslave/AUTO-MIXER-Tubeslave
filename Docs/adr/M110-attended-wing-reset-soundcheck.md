@@ -1,0 +1,426 @@
+# ADR M110 — attended WING reset and staged soundcheck authority
+
+Status: accepted for implementation after Council review on 2026-07-13.
+
+## 1. Context
+
+The project can analyze the real WING and plan staged child transactions, but
+normal live authority is intentionally empty. The current route proof is
+self-declared, proof execution is disconnected from the canonical writer, no
+safe DSP reset exists, and reset processing cannot be re-enabled under a
+separate approval. These gaps prevent the requested real reset and soundcheck.
+
+## 2. Options considered
+
+1. Widen the standing family allowlist and run the staged plan.
+2. Use the legacy direct-WING family runner and reset functions.
+3. Add a dedicated generic proof/write API.
+4. Add backend-issued fixed provenance plus exact one-time capabilities behind
+   the existing canonical Apply evidence lifecycle.
+
+## 3. Decision
+
+Choose option 4.
+
+### Route provenance
+
+Add authenticated `capture_wing_master_route_proof`, contract v1. It accepts
+only bounded request identity, approval, a fresh request nonce, the fixed
+literal confirmation and the attended-launch HMAC described below. Unknown
+fields and every address/expected-value/artifact field are rejected.
+
+Its complete request object is exactly:
+
+```json
+{
+  "type": "capture_wing_master_route_proof",
+  "contract_version": 1,
+  "request_id": "<1..128 safe ASCII>",
+  "approved": true,
+  "approval_id": "<1..128 safe ASCII>",
+  "confirmation": "CAPTURE_WING_MAIN_USB_47_48_ROUTE_PROOF",
+  "request_nonce": "<32 lowercase hex>",
+  "authority_proof": "hmac-sha256:<64 lowercase hex>"
+}
+```
+
+`request_id` and `approval_id` must be strings matching
+`[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`; booleans, coercion and empty values are
+rejected. `contract_version` must be the integer `1` (not boolean), `approved`
+must be the boolean `true`, and all other values are strings with the exact
+syntax shown.
+
+Inside `_console_write_scope` and `_audio_capture_lock`, the backend performs
+two complete passes over exactly:
+
+- `/$syscfg/$serial`
+- `/$syscfg/$firmware`
+- `/io/out/USB/47/grp == MAIN`
+- `/io/out/USB/47/in == 0`
+- `/io/out/USB/48/grp == MAIN`
+- `/io/out/USB/48/in == 1`
+
+Between passes it requires fresh real WING audio, exact device/index/48
+channels/48 kHz identity, sample-count progression, signal on both 47/48 and
+conservative true peak `max(sample_peak) + 3 dB <= -1 dBTP`.
+
+The canonical audit artifact schema is
+`automixer.wing_master_capture_route_proof.v1`. Artifacts live under a fixed
+per-user 0700 root, use 0600 regular non-symlink files, atomic exclusive write,
+file and directory fsync. Artifact path/SHA and any ledger are audit evidence,
+not live authority: same-user files cannot authenticate their own issuer.
+
+Live route authority is a private non-serializable object held only by the
+issuing process and bound to its runtime nonce/source identity, console,
+capture, emergency and connection generation. Restart, reconnect, a new route
+attempt, route TTL expiry or emergency change revokes it. The attended workflow
+does not restart between route proof and later capabilities; any restart repeats
+the route proof. Legacy flat JSON and environment path/SHA are never accepted
+as M110 live authority.
+
+The same authenticated owner may then send exact v1
+`arm_m110_attended_control` with approval ID, fresh 32-hex request nonce,
+attended-launch HMAC and literal `ARM_M110_ATTENDED_ONE_SHOT_CONTROL`; no
+additional fields are allowed. Inside
+the writer scope the backend repeats the fixed route/identity/headroom checks,
+requires the `m110_attended_runner` launch binding, clean source and healthy
+WAL/emergency state, then changes the same connection from observation-only to
+`supervised` capability-only mode without reconnecting. Ordinary Apply remains
+blocked in this mode unless an exact M110 capability is atomically consumed.
+Disarm, disconnect, emergency or route expiry returns to observation-only and
+revokes every unconsumed grant.
+
+The complete arm request is exactly:
+
+```json
+{
+  "type": "arm_m110_attended_control",
+  "contract_version": 1,
+  "approval_id": "<1..128 safe ASCII>",
+  "confirmation": "ARM_M110_ATTENDED_ONE_SHOT_CONTROL",
+  "request_nonce": "<32 lowercase hex>",
+  "authority_proof": "hmac-sha256:<64 lowercase hex>"
+}
+```
+
+It uses the same non-coercing integer/string/regex rules as route capture.
+
+### One-time capabilities
+
+Add bounded server-owned token storage. Plaintext tokens are returned once and
+never logged or persisted; the server stores only SHA-256. Each frozen record
+binds runtime identity/nonce/HEAD/content, connection generation, console
+serial/firmware, route proof ID/SHA, emergency generation, owner session,
+proposal ID/review digest, canonical plan digest, exact scope/addresses/targets,
+approval/idempotency and latest-start deadline.
+
+Preparation endpoints create server-owned proposals but never tokens. The only
+issuance request is exact v1:
+
+```json
+{
+  "type": "issue_supervised_capability",
+  "contract_version": 1,
+  "capability_kind": "<fixed enum>",
+  "proposal_id": "<server proposal>",
+  "expected_review_contract_version": 2,
+  "expected_review_content_digest": "sha256:<64 hex>",
+  "expected_operation_digest": "sha256:<64 hex>",
+  "approval_id": "<bounded nonempty>",
+  "confirmation": "<kind-specific literal>",
+  "request_nonce": "<32 lowercase hex>",
+  "authority_proof": "hmac-sha256:<64 lowercase hex>"
+}
+```
+
+No additional fields are accepted. Issuance requires bearer-authenticated
+runtime launch binding `mode=m110_attended_runner`, the same connection owner
+that prepared/reviewed the proposal, current process-private route authority,
+clean committed source, zero unresolved WAL/emergency/global hazards and exact
+proposal/review/operation identity. Limits are one unconsumed token per owner,
+eight globally and 30 seconds to start. A second issuance revokes the previous
+owner token. Disconnect, reconnect, route re-proof, emergency generation change
+or proposal terminal state revokes every affected unconsumed token. Consumed
+records are tombstoned for bounded replay detection and never reissued.
+
+The attended runner creates a pipe before spawning the backend. The environment
+contains only `AUTOMIXER_M110_AUTHORITY_FD=<decimal inherited read-fd>`; launch
+nonce, manifest, digest and authority secret are forbidden in environment,
+argv and files. The parent writes exactly one packet to the pipe and closes its
+write end:
+
+1. four-byte unsigned big-endian manifest length, bounded to 64 KiB;
+2. that many canonical UTF-8 JSON bytes;
+3. exactly 32 random authority-secret bytes; and
+4. EOF, with no trailing byte.
+
+The manifest schema is exactly
+`automixer.m110_attended_prestart_manifest.v1` and has only `schema`, `mode`,
+`head`, `tree`, `launch_nonce` and `files`. `mode` is
+`m110_attended_runner`; `launch_nonce` is fresh 32-lowercase-hex; `files` is a
+path-sorted array of only `path`, `size` and `sha256`. Its paths must equal this
+server-constant `M110_RUNTIME_CRITICAL_PATHS` tuple exactly:
+
+```text
+backend/audio_capture.py
+backend/decision_queue_wire_contract.py
+backend/handlers/connection_handlers.py
+backend/handlers/product_state_handlers.py
+backend/maintenance_dsp_reset.py
+backend/master_capture_route_proof.py
+backend/operator_proposal_queue.py
+backend/operator_proposal_result_store.py
+backend/runtime_identity.py
+backend/server.py
+backend/soundcheck_transaction_plan.py
+backend/supervised_console_transaction.py
+backend/supervised_family_proof_plan.py
+backend/supervised_proof_capability.py
+backend/wing_client.py
+backend/wing_supervised_console_adapters.py
+tools/wing_attended_soundcheck_runner.py
+tools/wing_supervised_family_proof_runner.py
+```
+
+Paths are repository-relative canonical POSIX paths; size is the exact
+non-negative byte size; SHA is `sha256:<64 lowercase hex>`.
+Canonical JSON means UTF-8, keys sorted recursively, separators `,` and `:`, no
+insignificant whitespace, duplicate keys, floats, NaN or Unicode normalization.
+
+Before constructing the server or opening network/audio/console resources, the
+backend consumes and closes the FD, requires exact EOF, independently resolves
+the checkout, proves the tracked tree has no modifications, reads HEAD/tree and
+every server-constant critical path with no symlink traversal, recomputes the
+canonical manifest bytes and compares them byte-for-byte. Invalid, partial,
+inherited-more-than-once or mismatched input aborts startup. Untracked generated
+reports outside the critical path set are not source authority. The backend
+keeps the secret only in process memory and exposes only its SHA in runtime
+identity.
+
+The runner retains the other in-memory copy solely to authenticate three exact
+request kinds: route capture, arm and capability issuance. Each includes a
+unique 32-hex `request_nonce` and `authority_proof`. The proof is HMAC-SHA256
+with the 32-byte secret over
+`automixer.m110.request.v1\n` followed by the canonical JSON bytes of the whole
+request with only `authority_proof` omitted. The backend verifies it with a
+constant-time comparison and atomically tombstones the nonce before work;
+wrong/replayed nonces block before console pre-read. Bearer authentication and
+same-owner checks remain independently mandatory. The secret is zeroized on
+shutdown as far as Python permits and is never logged, persisted or returned.
+
+This binding proves possession by the parent of this exact backend launch and
+prevents a browser or unrelated client from arming it. It does not claim to
+defend against a malicious same-user process able to inspect process memory or
+write OSC to WING directly; that actor is already outside this repository's
+software authority boundary. Persistent JSON/SHA artifacts still never confer
+live authority.
+
+The fixed capability enum and confirmation literals are:
+
+- `restore_only_proof` → `ISSUE_RESTORE_ONLY_PROOF_CAPABILITY`;
+- `maintenance_dsp_reset_commit_once` →
+  `ISSUE_MAINTENANCE_DSP_RESET_COMMIT_ONCE`;
+- `processor_enable_commit_once` → `ISSUE_PROCESSOR_ENABLE_COMMIT_ONCE`;
+- `soundcheck_child_commit_once` → `ISSUE_SOUNDCHECK_CHILD_COMMIT_ONCE`.
+
+Preparation messages are also exact v1 and accept only a server proposal and a
+server-defined bundle selector, never addresses or targets. Each preparation
+stores the owner connection and immutable bundle digest used by issuance.
+
+The canonical proof/commit unit is
+`automixer.canonical_attended_operation_bundle.v1`. It contains a bundle kind
+and a server-ordered operation array, plus adapter/protocol source revision,
+exact addresses/parameter model, scope, direction/value bounds, target values,
+tolerances, audio contract and console/firmware/route/runtime identity. Proof
+receipt ID and evidence expiry are deliberately outside operation identity;
+the permanent lane checks them separately for exact same-process origin and
+freshness. The only bundle kinds are:
+
+- `single_soundcheck_operation`: exactly one logical operation after a staged
+  planner child is decomposed before review;
+- `maintenance_dsp_reset_bundle`: the fixed server-generated reset set of at
+  most 64 operations; and
+- `processor_enable_bundle`: one channel/processor complete conservative
+  parameter block plus its enable-last operation.
+
+Every finite numeric target, tolerance and bound is encoded in the bundle as a
+canonical decimal string, never a JSON float: parse with `Decimal(str(value))`,
+reject boolean/non-finite input, emit fixed-point notation with no exponent or
+leading plus, strip insignificant trailing fractional zeros and the trailing
+dot, and normalize every signed zero to `"0"`. Integral channel/bus indices
+remain JSON integers; categorical strings and booleans retain their native
+types. The SHA-256 of those canonical bytes is the `operation_digest`. Proof and
+permanent preparation independently regenerate the bytes. They may exclude
+only transaction ID, idempotency key and the proof/commit execution label;
+operation order and every safety binding remain identical.
+
+The external execution message remains `apply_operator_proposal`. Public
+`proof_run`, `restore_after_verify`, capability-kind, address, target and plan
+switches never select authority. Atomic token consumption creates one of four
+private non-serializable grants:
+
+- `restore_only_proof` — exactly one canonical attended operation bundle;
+- `maintenance_dsp_reset_commit_once` — fixed DSP bypass set;
+- `processor_enable_commit_once` — exact complete block, enable last;
+- `soundcheck_child_commit_once` — one decomposed immutable
+  `single_soundcheck_operation` with an identical recent restored bundle
+  digest.
+
+Expiry is a latest-start rule. Once a grant is consumed, rollback and recovery
+authority remains until terminal state even after caller cancellation or socket
+loss. Forward work still stops on disconnect/emergency/global hazard.
+
+No capability updates the standing registry or normal allowlist.
+
+### Proof terminal
+
+Restore-only execution forces `proof_run=True` and
+`restore_after_verify=True` internally. Success is `proof_passed` with durable
+WAL `proof_restored`, identical nonempty applied/rollback operation sets,
+physical state restored, verified audio, known write/rollback state, no manual
+review/emergency, `accepted:false`, owner review still required, and no live
+authority/readiness change. It is never treated as normal `applied`.
+
+### Maintenance reset
+
+The first M110 reset scope is channels 1–16 and at most 64 addresses:
+
+- `/ch/N/eq/on = 0`
+- `/ch/N/flt/lc = 0`
+- `/ch/N/gate/on = 0`
+- `/ch/N/dyn/on = 0`
+
+The backend creates the plan from fresh physical readback, captures a complete
+preimage, prepares WAL before a send, double-verifies all writes and rolls the
+whole transaction back in reverse on any failure.
+
+Preservation has two explicit, non-overclaiming proofs:
+
+1. A finite fresh physical manifest reads before and after, with canonical
+   sorted JSON rows and address-specific tolerances, for channels 1–16:
+   `in/set/trim` (0.05 dB), `fdr` (0.05 dB), `mute` (exact), `pan` (0.1),
+   `in/set/inv` (exact), `in/set/dly` (0.01 ms), `in/set/dlyon` (exact), and
+   input route `in/conn/{grp,in,altgrp,altin}` (exact); plus Main 1 `fdr`/`mute`
+   and the six fixed console/USB identity addresses. Every query must be
+   `received`, exact-address, at least two confirmed round trips and inside a
+   `120.0` second per-pass sweep deadline. Unreadable or missing rows block
+   reset.
+2. The maintenance adapter and send-boundary interceptor allow only the 64
+   reset addresses. A temporary wildcard physical observer records only
+   transition events actually delivered by WING; any delivered event outside
+   the reset set blocks and rolls back, but event silence never proves physical
+   equality because not every WING surface is streamed. Sends/FX,
+   buses/DCA/matrix, other Main values, scenes and names are reported only as
+   `no_mutation_attempt_proven` from the send-boundary audit, with delivered
+   observer events as supplemental evidence, not falsely as full physical
+   equality when no finite read contract exists.
+
+The before/after manifest bytes and no-mutation-attempt audit are both
+digest-bound to the proposal and receipt. Reset remains a maintenance proposal
+and cannot contribute soundcheck readiness by itself.
+
+### Processor enable and permanent soundcheck
+
+After reset, one atomic `processor_enable_commit_once` grant owns both the
+complete conservative parameter block and its enable state. It snapshots the
+whole block while bypassed, writes and physically verifies parameters, enables
+last, then audio-checks. Failure disables first, reverse-restores every
+parameter and restores the original enable state. No earlier permanent child
+may write those parameters. Unknown retained settings may never be made
+audible by toggling only the enable bit.
+
+Each permanent reset bundle, processor bundle or decomposed soundcheck operation
+uses a separate
+operator approval, idempotency key, proposal review digest and commit-once
+grant. It requires a recent same-process `proof_passed` whose canonical
+operation-bundle bytes and digest are identical under the exclusions defined
+above. A multi-operation staged child is split into independently reviewed
+single-operation bundles before proof or commit; grouping survives only in the
+local stage journal and never broadens authority. The fixed reset and atomic
+processor bundles are the only composite bundle types. A proof for a sibling
+address, a subset/superset, reordered operations or merely the same family/
+write kind grants nothing. Local
+blockers remain local and trigger bounded replan; global hazards stop the run.
+Final status is honest: `safe_core_ready`,
+`show_mix_ready`, or `soundcheck_incomplete`.
+
+### Runner boundary
+
+Route and family proof runners are WebSocket-only and plan-only by default.
+They contain no `WingClient`, UDP, OSC or direct write call, establish the
+inherited one-shot launch pipe above, pass bearer tokens via separate inherited
+file descriptors, bind challenged runtime identity, launch only clean committed
+source and guarantee child teardown. Secrets and tokens never enter argv, logs
+or artifacts.
+
+## 4. Why this won
+
+It preserves all existing global rails while giving the attended operator a
+finite content-bound path to the requested result. It reuses the hardened queue
+claim/result/WAL lifecycle, proves route origin inside one attended process,
+revokes that authority on restart, distinguishes
+validation from permanent change and prevents reset from producing a silently
+unformed mix.
+
+## 5. Rejected alternatives
+
+- Standing allowlist widening outlives the reviewed run.
+- Direct runner OSC bypasses the backend writer, WAL and emergency generation.
+- JSON+SHA or a `producer` field is self-authored evidence.
+- A generic query/write endpoint lets clients choose the safety boundary.
+- Broad reset functions mutate preserved surfaces and are not atomic.
+- Automatic promotion from one proof conflates evidence with policy authority.
+
+## 6. Implementation plan
+
+1. Implement fixed route artifact/handler/runner and same-process revocation.
+2. Implement capability store, typed grants and verified proof terminal.
+3. Implement fixed maintenance reset and preserved-surface verification.
+4. Implement enable-last processor lane and exact child commit capability.
+5. Run adversarial, frontend/no-WING and full-suite gates; independent review.
+6. Commit clean source, then run the attended route→proof→reset→soundcheck
+   hardware checkpoint and record immutable evidence.
+
+## 7. Test plan
+
+- Strict request schemas, authentication and packaged-offline blocks.
+- Exact fixed address order; two physical passes; route/identity drift.
+- Capture freshness/identity/progression/stereo signal/headroom boundaries.
+- Audit-artifact path/symlink/size/tamper/fsync tests and proof revocation on
+  restart/reconnect/TTL/source drift.
+- Token replay, wrong owner, restart, reconnect, expiry, concurrency and every
+  binding mismatch.
+- Generic proof switches and arbitrary plans block before pre-read/send.
+- Cancellation and failure at every coordinator/WAL/readback/rollback await.
+- `proof_passed` remains distinct in queue, result store, wire and readiness.
+- Reset writes only the fixed set, proves equality of every finite-manifest
+  surface, proves no outside mutation send, and reports whether WING delivered
+  any outside transition event without treating event silence as equality.
+- Processor enable order and complete-block binding.
+- Reset, processor and decomposed soundcheck commits each require byte-identical
+  canonical bundle bytes/digest from their own recent restored proof; no
+  subset, superset, reorder or sibling inference.
+- Normal allowlist and registry remain byte-for-byte unchanged.
+- Standard full suite, no-WING gate, `git diff --check` and independent review.
+
+## 8. Risks and rollback
+
+The largest risks are token confusion, expiry after send, audit corruption,
+processor enable transients and long reset rollback. Separate frozen grant
+classes, exact digest revalidation, latest-start expiry, recovery-shielded
+rollback, fixed roots/budgets and enable-last/disable-first ordering mitigate
+them.
+
+Source rollback removes M110 handlers and runners while leaving ordinary
+proposal analysis available. Never restore direct runner writes, digestless
+apply, legacy broad reset or self-authored route proof. Any ambiguous live
+state latches emergency/manual review and stops the hardware checkpoint.
+
+## Council record
+
+Codex and three independent read-only reviewers agreed on fixed route
+provenance, one-shot authority, restored-proof semantics, DSP-only reset and a
+separate processor-enable lane. The main disagreement was a new proof execute
+message versus canonical Apply. Canonical Apply won because it preserves one
+external write entrypoint; private typed grants and adversarial no-mint tests
+are mandatory conditions of that choice.
