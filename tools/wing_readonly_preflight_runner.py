@@ -84,6 +84,12 @@ EXPECTED_STATE_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE["get_state"]
 EXPECTED_PARAMETER_EVENTS = EXPECTED_RESPONSE_TYPES_BY_REQUEST_TYPE[
     "query_mixer_parameter"
 ]
+# The backend accepts ten normal WebSocket frames per second with a burst of
+# thirty. Large physical baselines must stay below that boundary because an
+# ingress reject is intentionally silent and would otherwise look like a
+# transport timeout to this request/response runner.
+LARGE_PREFLIGHT_REQUEST_THRESHOLD = 24
+LARGE_PREFLIGHT_REQUEST_INTERVAL_SECONDS = 0.11
 IGNORED_STARTUP_RESPONSE_TYPES = {"connection_status"}
 PRESTART_SUMMARY_TYPE = WING_READONLY_PREFLIGHT_PRESTART_SUMMARY_TYPE
 PRESTART_SUMMARY_CONNECTION_POLICY = (
@@ -1698,7 +1704,16 @@ async def run(args: argparse.Namespace) -> int:
 
             readbacks: list[Dict[str, Any]] = []
             blockers: list[str] = []
-            for request in build_read_requests(channels, value_types):
+            read_requests = build_read_requests(channels, value_types)
+            request_interval = (
+                LARGE_PREFLIGHT_REQUEST_INTERVAL_SECONDS
+                if len(read_requests) > LARGE_PREFLIGHT_REQUEST_THRESHOLD
+                else 0.0
+            )
+            summary["request_interval_seconds"] = request_interval
+            for request_index, request in enumerate(read_requests):
+                if request_interval and request_index:
+                    await asyncio.sleep(request_interval)
                 payload = await send_and_wait(
                     ws,
                     recorder,

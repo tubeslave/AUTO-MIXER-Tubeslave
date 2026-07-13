@@ -1,0 +1,332 @@
+# No-WING Release Check
+
+- generated_at: `2026-07-13T05:49:35Z`
+- status: `failed`
+- failed_checks: `["wing_readonly_preflight_evidence_schema"]`
+- environment_blocked_checks: `[]`
+- environment_blocked_check_details: `[]`
+- connection_policy: `no_hardware_no_network_no_live_writes`
+- live_write: `false`
+- readiness_closure_allowed_by_packet: `false`
+- live_authority_granted: `false`
+- artifact_manifest_summary_surface_required: `true`
+- artifact_manifest_summary_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_summary_json_contract_id_matches_manifest", "artifact_manifest_summary_json_contract_sha256_matches_manifest", "artifact_manifest_summary_json_contract_sha256_match_flag", "artifact_manifest_summary_md_contract_id_matches_manifest", "artifact_manifest_summary_md_contract_sha256_matches_manifest", "artifact_manifest_summary_md_contract_sha256_match_flag", "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied", "artifact_manifest_summary_json_cross_surface_readiness_closure_denied", "artifact_manifest_summary_json_cross_surface_live_authority_denied", "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied", "artifact_manifest_summary_md_cross_surface_readiness_closure_denied", "artifact_manifest_summary_md_cross_surface_live_authority_denied", "artifact_manifest_contract_cross_surface_mismatches", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_matrix_update_allowed", "readiness_closure_allowed_by_packet", "live_authority_granted", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "wing_readonly_handoff_plan_verifier_summary_surface_required", "wing_readonly_handoff_plan_verifier_summary_surface_mismatches", "wing_readonly_handoff_plan_verifier_summary_surface_match", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted", "artifact_manifest_verifier_required", "artifact_manifest_verifier_command", "artifact_manifest_verifier_target_artifact_dir", "artifact_manifest_verifier_status_required", "artifact_manifest_verifier_failed_checks_required", "artifact_manifest_verifier_report_required_fields", "artifact_manifest_verifier_read_only", "artifact_manifest_verifier_live_write", "artifact_manifest_verifier_contacts_wing", "artifact_manifest_verifier_contacts_backend", "artifact_manifest_verifier_mutates_console_state", "artifact_manifest_verifier_queries_console", "artifact_manifest_verifier_executes_tests", "artifact_manifest_verifier_readiness_matrix_update_allowed", "artifact_manifest_verifier_readiness_closure_allowed", "artifact_manifest_verifier_live_authority_granted", "artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted", "artifact_manifest_self_consistency_summary_surface_required", "artifact_manifest_self_consistency_summary_surface_required_fields", "artifact_manifest_self_consistency_summary_surface_json_mismatches", "artifact_manifest_self_consistency_summary_surface_markdown_mismatches", "artifact_manifest_self_consistency_summary_surface_mismatches", "artifact_manifest_self_consistency_summary_surface_match", "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed", "artifact_manifest_self_consistency_summary_surface_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_fields: `[]`
+- artifact_manifest_summary_surface_required_field_lines: `["artifact_manifest_summary_surface_required", "artifact_manifest_summary_surface_required_fields", "artifact_manifest_summary_surface_missing_fields", "artifact_manifest_summary_surface_required_field_lines", "artifact_manifest_summary_surface_missing_field_lines", "artifact_manifest_summary_surface_field_lines_rendered", "artifact_manifest_contract_id", "artifact_manifest_contract_required", "artifact_manifest_contract_fields", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_available", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_required", "artifact_manifest_contract_cross_surface_required_surfaces", "artifact_manifest_contract_cross_surface_required_fields", "artifact_manifest_contract_cross_surface_expected_match", "artifact_manifest_summary_json_contract_id_matches_manifest", "artifact_manifest_summary_json_contract_sha256_matches_manifest", "artifact_manifest_summary_json_contract_sha256_match_flag", "artifact_manifest_summary_md_contract_id_matches_manifest", "artifact_manifest_summary_md_contract_sha256_matches_manifest", "artifact_manifest_summary_md_contract_sha256_match_flag", "artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied", "artifact_manifest_summary_json_cross_surface_readiness_closure_denied", "artifact_manifest_summary_json_cross_surface_live_authority_denied", "artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied", "artifact_manifest_summary_md_cross_surface_readiness_closure_denied", "artifact_manifest_summary_md_cross_surface_live_authority_denied", "artifact_manifest_contract_cross_surface_mismatches", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "artifact_manifest_required", "artifact_manifest_path", "artifact_manifest_required_artifact_count", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_matrix_update_allowed", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "wing_readonly_handoff_plan_verifier_summary_surface_required", "wing_readonly_handoff_plan_verifier_summary_surface_mismatches", "wing_readonly_handoff_plan_verifier_summary_surface_match", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted", "artifact_manifest_verifier_required", "artifact_manifest_verifier_command", "artifact_manifest_verifier_target_artifact_dir", "artifact_manifest_verifier_status_required", "artifact_manifest_verifier_failed_checks_required", "artifact_manifest_verifier_report_required_fields", "artifact_manifest_verifier_read_only", "artifact_manifest_verifier_live_write", "artifact_manifest_verifier_contacts_wing", "artifact_manifest_verifier_contacts_backend", "artifact_manifest_verifier_mutates_console_state", "artifact_manifest_verifier_queries_console", "artifact_manifest_verifier_executes_tests", "artifact_manifest_verifier_readiness_matrix_update_allowed", "artifact_manifest_verifier_readiness_closure_allowed", "artifact_manifest_verifier_live_authority_granted", "artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted", "artifact_manifest_self_consistency_summary_surface_required", "artifact_manifest_self_consistency_summary_surface_required_fields", "artifact_manifest_self_consistency_summary_surface_json_mismatches", "artifact_manifest_self_consistency_summary_surface_markdown_mismatches", "artifact_manifest_self_consistency_summary_surface_mismatches", "artifact_manifest_self_consistency_summary_surface_match", "artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed", "artifact_manifest_self_consistency_summary_surface_live_authority_granted"]`
+- artifact_manifest_summary_surface_missing_field_lines: `[]`
+- artifact_manifest_summary_surface_field_lines_rendered: `true`
+- artifact_manifest_contract_id: `no_wing_release_check_artifact_manifest_contract.v1`
+- artifact_manifest_contract_required: `true`
+- artifact_manifest_contract_fields: `["artifact_manifest_path", "artifact_manifest_required_artifact_ids", "artifact_manifest_required_artifact_paths", "artifact_manifest_required_artifact_sha256_fields", "artifact_manifest_readiness_matrix_update_allowed", "artifact_manifest_readiness_closure_allowed", "artifact_manifest_live_authority_granted", "read_only", "live_write", "contacts_wing", "contacts_backend", "mutates_console_state", "queries_console", "executes_tests", "readiness_closure_allowed", "live_authority_granted", "wing_readonly_handoff_plan_verifier_summary_surface_required", "wing_readonly_handoff_plan_verifier_summary_surface_mismatches", "wing_readonly_handoff_plan_verifier_summary_surface_match", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"]`
+- artifact_manifest_contract_sha256: `245f6ed219db630156da59461c5b528c99ca2f7265f45b0b3904e6665fc88f4f`
+- artifact_manifest_contract_sha256_available: `true`
+- artifact_manifest_contract_sha256_matches_expected: `true`
+- artifact_manifest_contract_cross_surface_required: `true`
+- artifact_manifest_contract_cross_surface_required_surfaces: `["summary.json", "summary.md", "artifact-manifest.json"]`
+- artifact_manifest_contract_cross_surface_required_fields: `["artifact_manifest_contract_id", "artifact_manifest_contract_sha256", "artifact_manifest_contract_sha256_matches_expected", "artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed", "artifact_manifest_contract_cross_surface_readiness_closure_allowed", "artifact_manifest_contract_cross_surface_live_authority_granted", "wing_readonly_handoff_plan_verifier_summary_surface_required", "wing_readonly_handoff_plan_verifier_summary_surface_mismatches", "wing_readonly_handoff_plan_verifier_summary_surface_match", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"]`
+- artifact_manifest_contract_cross_surface_expected_match: `true`
+- artifact_manifest_summary_json_contract_id_matches_manifest: `true`
+- artifact_manifest_summary_json_contract_sha256_matches_manifest: `true`
+- artifact_manifest_summary_json_contract_sha256_match_flag: `true`
+- artifact_manifest_summary_md_contract_id_matches_manifest: `true`
+- artifact_manifest_summary_md_contract_sha256_matches_manifest: `true`
+- artifact_manifest_summary_md_contract_sha256_match_flag: `true`
+- artifact_manifest_summary_json_cross_surface_readiness_matrix_update_denied: `true`
+- artifact_manifest_summary_json_cross_surface_readiness_closure_denied: `true`
+- artifact_manifest_summary_json_cross_surface_live_authority_denied: `true`
+- artifact_manifest_summary_md_cross_surface_readiness_matrix_update_denied: `true`
+- artifact_manifest_summary_md_cross_surface_readiness_closure_denied: `true`
+- artifact_manifest_summary_md_cross_surface_live_authority_denied: `true`
+- artifact_manifest_contract_cross_surface_mismatches: `[]`
+- artifact_manifest_contract_cross_surface_match: `true`
+- artifact_manifest_contract_cross_surface_readiness_matrix_update_allowed: `false`
+- artifact_manifest_contract_cross_surface_readiness_closure_allowed: `false`
+- artifact_manifest_contract_cross_surface_live_authority_granted: `false`
+- artifact_manifest_required: `true`
+- artifact_manifest_path: `artifact-manifest.json`
+- artifact_manifest_required_artifact_count: `2`
+- artifact_manifest_required_artifact_ids: `["summary_json", "summary_md"]`
+- artifact_manifest_required_artifact_paths: `["summary.json", "summary.md"]`
+- artifact_manifest_required_artifact_sha256_fields: `["artifact_manifest_summary_json_sha256", "artifact_manifest_summary_md_sha256"]`
+- artifact_manifest_readiness_matrix_update_allowed: `false`
+- artifact_manifest_readiness_closure_allowed: `false`
+- artifact_manifest_live_authority_granted: `false`
+- wing_readonly_handoff_plan_verifier_summary_surface_required: `false`
+- wing_readonly_handoff_plan_verifier_summary_surface_mismatches: `[]`
+- wing_readonly_handoff_plan_verifier_summary_surface_match: `true`
+- wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed: `false`
+- wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed: `false`
+- wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted: `false`
+- artifact_manifest_verifier_required: `true`
+- artifact_manifest_verifier_command: `PYTHONPATH=backend python3 tools/verify_no_wing_artifact_manifest.py <no_wing_artifact_dir>`
+- artifact_manifest_verifier_target_artifact_dir: `<no_wing_artifact_dir>`
+- artifact_manifest_verifier_status_required: `passed`
+- artifact_manifest_verifier_failed_checks_required: `[]`
+- artifact_manifest_verifier_report_required_fields: `["status", "failed_checks", "failed_checks_missing_check_entries", "checks", "verifier_report_required_fields", "verifier_report_required_fields_missing", "verifier_report_required_fields_match_contract", "artifact_manifest_self_consistency_match", "artifact_manifest_contract_cross_surface_match", "artifact_manifest_self_consistency_summary_surface_match", "read_only", "live_write", "contacts_wing", "contacts_backend", "mutates_console_state", "queries_console", "executes_tests", "readiness_matrix_update_allowed", "readiness_closure_allowed", "live_authority_granted", "wing_readonly_handoff_plan_verifier_summary_surface_required", "wing_readonly_handoff_plan_verifier_summary_surface_mismatches", "wing_readonly_handoff_plan_verifier_summary_surface_match", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_matrix_update_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_readiness_closure_allowed", "wing_readonly_handoff_plan_verifier_summary_surface_live_authority_granted"]`
+- artifact_manifest_verifier_read_only: `true`
+- artifact_manifest_verifier_live_write: `false`
+- artifact_manifest_verifier_contacts_wing: `false`
+- artifact_manifest_verifier_contacts_backend: `false`
+- artifact_manifest_verifier_mutates_console_state: `false`
+- artifact_manifest_verifier_queries_console: `false`
+- artifact_manifest_verifier_executes_tests: `false`
+- artifact_manifest_verifier_readiness_matrix_update_allowed: `false`
+- artifact_manifest_verifier_readiness_closure_allowed: `false`
+- artifact_manifest_verifier_live_authority_granted: `false`
+- artifact_manifest_self_consistency_required: `true`
+- artifact_manifest_self_consistency_artifact_count_matches_required: `true`
+- artifact_manifest_self_consistency_required_artifact_ids_match_contract: `true`
+- artifact_manifest_self_consistency_artifact_ids_match_required: `true`
+- artifact_manifest_self_consistency_artifact_ids_unique: `true`
+- artifact_manifest_self_consistency_required_artifact_paths_match_contract: `true`
+- artifact_manifest_self_consistency_artifact_paths_match_required: `true`
+- artifact_manifest_self_consistency_artifact_paths_unique: `true`
+- artifact_manifest_self_consistency_required_sha_fields_match_contract: `true`
+- artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level: `true`
+- artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level: `true`
+- artifact_manifest_self_consistency_sha256_availability_matches_entries: `true`
+- artifact_manifest_self_consistency_read_only_required: `true`
+- artifact_manifest_self_consistency_live_write_denied: `true`
+- artifact_manifest_self_consistency_contacts_wing_denied: `true`
+- artifact_manifest_self_consistency_contacts_backend_denied: `true`
+- artifact_manifest_self_consistency_mutates_console_state_denied: `true`
+- artifact_manifest_self_consistency_queries_console_denied: `true`
+- artifact_manifest_self_consistency_executes_tests_denied: `true`
+- artifact_manifest_self_consistency_readiness_closure_denied: `true`
+- artifact_manifest_self_consistency_live_authority_denied: `true`
+- artifact_manifest_self_consistency_mismatches: `[]`
+- artifact_manifest_self_consistency_match: `true`
+- artifact_manifest_self_consistency_readiness_closure_allowed: `false`
+- artifact_manifest_self_consistency_live_authority_granted: `false`
+- artifact_manifest_self_consistency_summary_surface_required: `true`
+- artifact_manifest_self_consistency_summary_surface_required_fields: `["artifact_manifest_self_consistency_required", "artifact_manifest_self_consistency_artifact_count_matches_required", "artifact_manifest_self_consistency_required_artifact_ids_match_contract", "artifact_manifest_self_consistency_artifact_ids_match_required", "artifact_manifest_self_consistency_artifact_ids_unique", "artifact_manifest_self_consistency_required_artifact_paths_match_contract", "artifact_manifest_self_consistency_artifact_paths_match_required", "artifact_manifest_self_consistency_artifact_paths_unique", "artifact_manifest_self_consistency_required_sha_fields_match_contract", "artifact_manifest_self_consistency_summary_json_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_summary_md_entry_sha256_matches_top_level", "artifact_manifest_self_consistency_sha256_availability_matches_entries", "artifact_manifest_self_consistency_read_only_required", "artifact_manifest_self_consistency_live_write_denied", "artifact_manifest_self_consistency_contacts_wing_denied", "artifact_manifest_self_consistency_contacts_backend_denied", "artifact_manifest_self_consistency_mutates_console_state_denied", "artifact_manifest_self_consistency_queries_console_denied", "artifact_manifest_self_consistency_executes_tests_denied", "artifact_manifest_self_consistency_readiness_closure_denied", "artifact_manifest_self_consistency_live_authority_denied", "artifact_manifest_self_consistency_mismatches", "artifact_manifest_self_consistency_match", "artifact_manifest_self_consistency_readiness_closure_allowed", "artifact_manifest_self_consistency_live_authority_granted"]`
+- artifact_manifest_self_consistency_summary_surface_json_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_markdown_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_mismatches: `[]`
+- artifact_manifest_self_consistency_summary_surface_match: `true`
+- artifact_manifest_self_consistency_summary_surface_readiness_closure_allowed: `false`
+- artifact_manifest_self_consistency_summary_surface_live_authority_granted: `false`
+
+## Checks
+
+- `backend_port_free`: `passed`
+- `write_surface_static_scan`: `passed`
+- `read_surface_fixture_evidence`: `passed`
+- `read_surface_fixture_evidence_schema`: `passed`
+- `read_surface_remediation_plan_schema`: `passed`
+- `read_surface_physical_readback_capture_plan_schema`: `passed`
+- `wing_readonly_preflight_evidence_schema`: `failed`
+- `canonical_manual_write_log_unchanged`: `passed`
+- `canonical_decision_trace_log_unchanged`: `passed`
+- `canonical_decision_memory_log_unchanged`: `passed`
+- `console_runtime_wal_unchanged`: `passed`
+- `soundcheck_parent_journal_unchanged`: `passed`
+
+## Read Surface Fixture Evidence
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- full_autonomous_ready: `false`
+- snapshot_status: `fixture_evidence_incomplete`
+- surface_count: `10`
+- surface_with_fixture_count: `10`
+- declared_fixture_path_count: `20`
+- declared_test_name_count: `55`
+- physical_gap_surface_count: `10`
+- summary_recomputed_from_rows: `true`
+- fixture_declaration_validation: `true`
+- contract_gap_consistency_enforced: `true`
+- status_counts: `{"fixture_evidence_present": 0, "missing_fixture_evidence": 0, "partial_fixture_evidence": 10}`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- violations: `[]`
+
+## Read Surface Remediation Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- live_widening_allowed: `false`
+- full_autonomous_ready: `false`
+- plan_status: `read_remediation_required`
+- action_count: `10`
+- incomplete_surface_count: `10`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- next_physical_readback_target_action_ids: `["remediate_raw_mixer_state_cache"]`
+- target_action_consistency: `true`
+- violations: `[]`
+
+## Read Surface Physical Readback Capture Plan
+
+- schema_check: `passed`
+- read_only: `true`
+- live_write: `false`
+- mutates_console_state: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- execution_allowed_by_plan: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- plan_status: `operator_capture_required`
+- capture_step_count: `1`
+- physical_gap_surface_count: `10`
+- physical_fixture_missing_surface_ids: `["raw_mixer_state_cache", "channel_identity_and_basic_controls", "channel_eq_dynamics_gate", "bus_group_main_dca_state", "matrix_state", "fx_slots_and_inserts", "routing_and_sends", "snapshots_scenes", "user_presets", "dlive_state"]`
+- next_physical_readback_surface_id: `raw_mixer_state_cache`
+- next_physical_readback_action_id: `remediate_raw_mixer_state_cache`
+- target_action_consistency: `true`
+- required_artifact_contracts: `["physical_readback_fixture", "raw_mixer_state_physical_readback_contract", "physical_readback_fixture_missing", "hardware_parity_unproven", "per_field_stale_cache_fixture_incomplete"]`
+- blocked_by: `["physical_readback_fixtures_incomplete", "operator_must_capture_and_review_physical_readback_artifact"]`
+- step_surface_id: `raw_mixer_state_cache`
+- step_remediation_action_id: `remediate_raw_mixer_state_cache`
+- violations: `[]`
+
+## WING Read-Only Preflight Evidence
+
+- schema_check: `failed`
+- read_only: `true`
+- live_write: `false`
+- queries_console: `false`
+- executes_tests: `false`
+- operator_required: `true`
+- readiness_closure_allowed_by_evidence: `false`
+- live_authority_granted: `false`
+- full_autonomous_ready: `false`
+- source_authority_denied: `true`
+- source_authority_flags: `{"full_autonomous_ready": false, "live_authority_granted": false, "readiness_closure_allowed_by_evidence": false, "readiness_matrix_update_allowed": false}`
+- evidence_status: `readonly_preflight_artifact_replacement_required`
+- artifact_count: `13`
+- valid_candidate_count: `6`
+- invalid_candidate_count: `7`
+- readiness_matrix_update_candidate_available: `false`
+- readiness_matrix_update_allowed: `false`
+- readiness_update_candidate_available: `false`
+- mvp_blocker_matrix_ids: `["wing_readonly_connection_proof", "physical_console_readback_proof", "operator_visible_evidence_report", "readiness_matrix_update_based_on_real_proof"]`
+- mvp_blockers_closed_by_evidence: `[]`
+- latest_valid_candidate_run_id: `20260713T054228Z_wing_readonly_preflight`
+- artifact_operator_next_steps: `["Regenerate or select the expected plan that exactly matches the current runtime arguments and prestart contract before opening the backend/WING WebSocket.", "Verify the backend WebSocket response contract and rerun the expected-plan read-only preflight.", "Review the read-only preflight blockers, correct the backend/WING readback path, then rerun the expected-plan preflight.", "Verify backend WebSocket responsiveness and rerun the expected-plan preflight.", "Connect the intended backend to WING mode, then rerun the expected-plan read-only preflight."]`
+- capture_tool_path: `tools/wing_readonly_preflight_runner.py`
+- capture_tool_available: `true`
+- plan_command: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--plan-only", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- plan_command_uses_plan_only: `true`
+- expected_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- runner_argparse_target_defaults_match_contract: `true`
+- expected_supported_value_types: `["dyn_on", "dyn_threshold", "eq_high_gain", "eq_low_gain", "eq_mix", "eq_on", "fader", "gain", "gate_attack", "gate_filter", "gate_frequency", "gate_gain", "gate_mode", "gate_model", "gate_on", "gate_q", "gate_ratio", "gate_release", "gate_threshold", "pan"]`
+- runner_supported_value_types: `["dyn_on", "dyn_threshold", "eq_high_gain", "eq_low_gain", "eq_mix", "eq_on", "fader", "gain", "gate_attack", "gate_filter", "gate_frequency", "gate_gain", "gate_mode", "gate_model", "gate_on", "gate_q", "gate_ratio", "gate_release", "gate_threshold", "pan"]`
+- expected_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner: `wing_readonly_preflight_runner`
+- evidence_proof_runner: `wing_readonly_preflight_runner`
+- runner_proof_runner_match_contract: `true`
+- evidence_proof_runner_match_contract: `true`
+- expected_run_summary_status: `passed`
+- expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status: `passed`
+- runner_run_summary_reason: `wing_readonly_preflight_passed`
+- evidence_expected_run_summary_status: `passed`
+- evidence_expected_run_summary_reason: `wing_readonly_preflight_passed`
+- runner_run_summary_status_match_contract: `true`
+- runner_run_summary_reason_match_contract: `true`
+- evidence_run_summary_status_match_contract: `true`
+- evidence_run_summary_reason_match_contract: `true`
+- evidence_allowed_value_types: `["dyn_on", "dyn_threshold", "eq_high_gain", "eq_low_gain", "eq_mix", "eq_on", "fader", "gain", "gate_attack", "gate_filter", "gate_frequency", "gate_gain", "gate_mode", "gate_model", "gate_on", "gate_q", "gate_ratio", "gate_release", "gate_threshold", "pan"]`
+- runner_supported_value_types_match_contract: `true`
+- evidence_allowed_value_types_match_contract: `true`
+- expected_physical_readback_statuses: `["verified_from_physical_readback"]`
+- expected_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses: `["verified_from_physical_readback"]`
+- runner_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- runner_physical_readback_statuses_match_contract: `true`
+- runner_physical_readback_sources_match_contract: `true`
+- evidence_physical_readback_statuses: `["verified_from_physical_readback"]`
+- evidence_physical_readback_sources: `["physical_readback", "physical_wing", "wing", "wing_physical_readback"]`
+- evidence_physical_readback_statuses_match_contract: `true`
+- evidence_physical_readback_sources_match_contract: `true`
+- plan_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- plan_command_target_defaults_match_contract: `true`
+- plan_command_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- plan_command_output_matches_contract: `true`
+- plan_command_channels: `3`
+- plan_command_operator_confirmed_channels: `3`
+- plan_command_value_types: `fader,gain,pan`
+- plan_command_artifact_root: `artifacts/wing_readonly_preflight`
+- plan_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- plan_command_matches_capture: `true`
+- prestart_backend_port_check_required: `true`
+- prestart_backend_port_check_must_pass_before_starting_backend: `true`
+- prestart_backend_port_check_command: `["PYTHONPATH=backend", "python3", "tools/no_wing_release_check.py", "--quick"]`
+- prestart_backend_port_check_failure_detail_fields: `["listener_processes", "listener_process_error", "listener_confirmation_checklist", "preflight_blocked_until_listener_confirmed", "intended_backend_confirmation_required", "safe_to_stop_listener_by_gate", "listener_confirmation_template_status", "listener_confirmation_template_path", "listener_confirmation_template_acceptance_status", "listener_confirmation_template_safe_to_stop_listener_by_gate", "listener_confirmation_template_live_authority_granted", "listener_confirmation_template_accepted_by_template", "listener_confirmation_template_operator_placeholder_fields", "listener_confirmation_template_execution_allowed_by_template", "listener_confirmation_template_readiness_closure_allowed_by_template", "listener_confirmation_template_required_edits", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "fail_closed_reason", "operator_next_step"]`
+- capture_command_template: `["python3", "tools/wing_readonly_preflight_runner.py", "--url", "ws://localhost:8765", "--channels", "3", "--operator-confirm-channels", "3", "--operator-confirm-session-ready", "--value-types", "fader,gain,pan", "--require-physical-readback", "--artifact-root", "artifacts/wing_readonly_preflight", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--expected-plan", "artifacts/wing_readonly_preflight_plan/latest_plan.json"]`
+- capture_command_url: `ws://localhost:8765`
+- capture_command_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- capture_command_target_defaults_match_contract: `true`
+- capture_command_channels: `3`
+- capture_command_operator_confirmed_channels: `3`
+- capture_command_requires_operator_channel_confirmation: `true`
+- capture_command_operator_confirmation_matches_channels: `true`
+- capture_command_requires_physical_readback: `true`
+- capture_command_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- capture_command_prestart_summary_matches_plan: `true`
+- capture_command_expected_plan: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- capture_command_expected_plan_matches_contract: `true`
+- capture_command_expected_plan_matches_plan_output: `true`
+- review_tool_path: `tools/review_wing_readonly_preflight_artifacts.py`
+- review_tool_available: `true`
+- review_command: `["python3", "tools/review_wing_readonly_preflight_artifacts.py", "--artifact-root", "artifacts/wing_readonly_preflight", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_REVIEW_LATEST.md", "--decision-template-output", "artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json"]`
+- review_command_writes_decision_template: `true`
+- review_decision_template_output: `artifacts/wing_readonly_preflight_review_decisions/pending_review_decision_template.json`
+- review_decision_template_output_matches_contract: `true`
+- review_exit_codes: `{"artifact_missing": 2, "candidate_ready": 0, "invalid_artifact": 3}`
+- review_manual_checklist_ids: `["confirm_artifact_paths", "confirm_operator_channel_scope", "confirm_operator_session_ready", "confirm_physical_readbacks", "confirm_event_log_readonly_sequence", "confirm_event_log_run_id_binding", "confirm_no_live_authority"]`
+- review_manual_checklist_complete: `true`
+- review_decision_template_required_fields: `["review_id", "artifact_source_id", "run_id", "artifact_captured_at", "artifact_root", "summary_path", "summary_sha256", "events_path", "events_sha256", "channels", "value_types", "operator_confirmed_channels", "operator_confirmed_session_ready", "readback_count", "physical_readback_count", "request_id_policy", "request_id_correlation_required", "event_log_run_id_matches_summary", "decision", "reviewed_by", "reviewed_at", "checklist_ids", "backend_port_prestart_check_required", "backend_port_prestart_check_must_pass_before_starting_backend", "backend_port_prestart_check_command", "backend_port_prestart_check_command_text", "backend_port_prestart_check_failure_detail_fields", "backend_port_prestart_summary_required", "backend_port_prestart_summary_path", "backend_port_prestart_summary_sha256", "backend_port_prestart_summary_type", "backend_port_prestart_summary_status", "backend_port_prestart_summary_connection_policy", "backend_port_prestart_summary_read_only", "backend_port_prestart_summary_live_write", "backend_port_prestart_summary_contacts_backend", "backend_port_prestart_summary_contacts_wing", "backend_port_prestart_summary_mutates_console_state", "backend_port_prestart_summary_queries_console", "backend_port_prestart_summary_executes_tests", "backend_port_prestart_check_status", "artifact_manifest_verifier_must_pass_before_websocket", "artifact_manifest_verifier_passed_before_websocket", "artifact_manifest_verifier_websocket_opened_after_pass", "safe_to_stop_listener_by_gate", "live_authority_granted", "backend_port_prestart_gate_execution_allowed", "backend_port_prestart_gate_readiness_closure_allowed", "backend_port_prestart_gate_live_authority_granted", "plan_safe_to_stop_listener_by_gate", "plan_live_authority_granted", "plan_backend_port_prestart_gate_execution_allowed", "plan_backend_port_prestart_gate_readiness_closure_allowed", "plan_backend_port_prestart_gate_live_authority_granted", "safe_to_stop_listener_by_gate_matches_plan", "live_authority_granted_matches_plan", "backend_port_prestart_gate_execution_allowed_matches_plan", "backend_port_prestart_gate_readiness_closure_allowed_matches_plan", "backend_port_prestart_gate_live_authority_granted_matches_plan"]`
+- review_decision_template_contract_complete: `true`
+- review_decision_template_status: `operator_must_replace_placeholders_before_ledger_acceptance`
+- review_decision_template_status_matches_contract: `true`
+- handoff_packet_tool_path: `tools/build_wing_readonly_preflight_handoff_packet.py`
+- handoff_packet_tool_available: `true`
+- handoff_packet_command: `["python3", "tools/build_wing_readonly_preflight_handoff_packet.py", "--url", "ws://localhost:8765", "--channels", "3", "--value-types", "fader,gain,pan", "--artifact-root", "artifacts/wing_readonly_preflight", "--plan-output", "artifacts/wing_readonly_preflight_plan/latest_plan.json", "--prestart-summary", "artifacts/no_wing_release_check/<run_id>/summary.json", "--output", "Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md"]`
+- handoff_packet_output: `Docs/reports/WING_READONLY_PREFLIGHT_HANDOFF_PACKET_LATEST.md`
+- handoff_packet_output_matches_contract: `true`
+- handoff_packet_plan_output: `artifacts/wing_readonly_preflight_plan/latest_plan.json`
+- handoff_packet_plan_output_matches_contract: `true`
+- handoff_packet_plan_output_matches_plan_command: `true`
+- handoff_packet_url: `ws://localhost:8765`
+- handoff_packet_target_defaults: `{"artifact_root": "artifacts/wing_readonly_preflight", "channels": "3", "url": "ws://localhost:8765", "value_types": "fader,gain,pan"}`
+- handoff_packet_target_defaults_match_contract: `true`
+- handoff_packet_artifact_root: `artifacts/wing_readonly_preflight`
+- handoff_packet_prestart_summary: `artifacts/no_wing_release_check/<run_id>/summary.json`
+- handoff_packet_channels: `3`
+- handoff_packet_value_types: `fader,gain,pan`
+- handoff_packet_url_matches_capture: `true`
+- handoff_packet_artifact_root_matches_capture: `true`
+- handoff_packet_prestart_summary_matches_capture: `true`
+- handoff_packet_channel_matches_capture: `true`
+- handoff_packet_value_types_match_capture: `true`
+- blocked_by: `["operator_must_replace_invalid_readonly_preflight_artifact"]`
+- violations: `["wing_readonly_preflight_invalid_artifacts_present"]`
+
+## Failed Checks
+
+- `wing_readonly_preflight_evidence_schema`
+
+## Summary Markdown Top-Level Coverage
+
+- no_wing_summary_markdown_top_level_coverage_required: `true`
+- no_wing_summary_markdown_top_level_coverage_required_field_lines: `["no_wing_summary_markdown_top_level_coverage_required", "no_wing_summary_markdown_top_level_coverage_required_field_lines", "no_wing_summary_markdown_top_level_checked_key_count", "no_wing_summary_markdown_top_level_missing_keys", "no_wing_summary_markdown_top_level_allowed_missing_keys", "no_wing_summary_markdown_top_level_unexpected_missing_keys", "no_wing_summary_markdown_top_level_unexpected_missing_keys_empty", "no_wing_summary_markdown_top_level_interesting_missing_keys", "no_wing_summary_markdown_top_level_interesting_missing_keys_empty", "no_wing_summary_markdown_top_level_coverage_missing_field_lines", "no_wing_summary_markdown_top_level_coverage_field_lines_rendered", "no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed", "no_wing_summary_markdown_top_level_coverage_live_authority_granted"]`
+- no_wing_summary_markdown_top_level_checked_key_count: `120`
+- no_wing_summary_markdown_top_level_missing_keys: `["results"]`
+- no_wing_summary_markdown_top_level_allowed_missing_keys: `["results"]`
+- no_wing_summary_markdown_top_level_unexpected_missing_keys: `[]`
+- no_wing_summary_markdown_top_level_unexpected_missing_keys_empty: `true`
+- no_wing_summary_markdown_top_level_interesting_missing_keys: `[]`
+- no_wing_summary_markdown_top_level_interesting_missing_keys_empty: `true`
+- no_wing_summary_markdown_top_level_coverage_missing_field_lines: `[]`
+- no_wing_summary_markdown_top_level_coverage_field_lines_rendered: `true`
+- no_wing_summary_markdown_top_level_coverage_readiness_closure_allowed: `false`
+- no_wing_summary_markdown_top_level_coverage_live_authority_granted: `false`

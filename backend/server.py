@@ -359,6 +359,7 @@ UNAUTHENTICATED_READ_ONLY_MESSAGE_TYPES = frozenset(
         "get_pending_actions",
         "get_phase_alignment_status",
         "get_processing_pipeline_snapshot",
+        "query_mixer_parameter",
         "get_ready_for_live",
         "get_replay_runs",
         "get_routing_sends_snapshot",

@@ -1,0 +1,46 @@
+{
+  "schema": "wing_readonly_preflight_comparison.v1",
+  "generated_at_utc": "2026-07-13T05:44:00Z",
+  "before_summary": "artifacts/wing_readonly_preflight/20260713T052747Z_wing_readonly_preflight/summary.json",
+  "after_summary": "artifacts/wing_readonly_preflight/20260713T054228Z_wing_readonly_preflight/summary.json",
+  "coverage": {
+    "channels": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+    "value_types": [
+      "fader",
+      "gain",
+      "pan",
+      "eq_on",
+      "eq_mix",
+      "eq_low_gain",
+      "eq_high_gain",
+      "dyn_on",
+      "dyn_threshold",
+      "gate_on",
+      "gate_threshold",
+      "gate_model",
+      "gate_ratio",
+      "gate_attack",
+      "gate_release"
+    ],
+    "unique_parameter_count": 240,
+    "full_console_coverage": false
+  },
+  "before_status": "passed",
+  "after_status": "passed",
+  "before_physical_readback_count": 240,
+  "after_physical_readback_count": 240,
+  "missing_before_count": 0,
+  "missing_after_count": 0,
+  "value_difference_count": 0,
+  "address_difference_count": 0,
+  "metadata_difference_count": 0,
+  "before_write_request_sent": false,
+  "after_write_request_sent": false,
+  "conclusion": "measured_surface_unchanged_no_write_observed",
+  "reset_proven": false,
+  "limitations": [
+    "The comparison covers only channels 1-16 and the 15 listed parameter types.",
+    "It does not cover routing, mute, sends, inserts, FX, buses, DCA, Main, scenes, channels 17-48, or complete EQ and dynamics state.",
+    "Two equal snapshots do not exclude an external writer changing and restoring a value between snapshots."
+  ]
+}

@@ -2832,8 +2832,10 @@ class TestAutoMixerServerRuntimeErrors:
             server = AutoMixerServer()
         server.send_to_client = AsyncMock()
         get_handler = AsyncMock()
+        parameter_handler = AsyncMock()
         meter_handler = AsyncMock()
         server._dispatch["get_dashboard_snapshot"] = get_handler
+        server._dispatch["query_mixer_parameter"] = parameter_handler
         server._dispatch["subscribe_meters"] = meter_handler
 
         await server.handle_client_message(
@@ -2842,10 +2844,15 @@ class TestAutoMixerServerRuntimeErrors:
         )
         await server.handle_client_message(
             "ws",
+            '{"type":"query_mixer_parameter","channel":1,"value_type":"fader"}',
+        )
+        await server.handle_client_message(
+            "ws",
             '{"type":"subscribe_meters"}',
         )
 
         get_handler.assert_awaited_once()
+        parameter_handler.assert_awaited_once()
         meter_handler.assert_awaited_once()
         server.send_to_client.assert_not_awaited()
 

@@ -1,6 +1,7 @@
 """Tests for backend/handlers/soundcheck_handlers.py."""
 
 import asyncio
+import json
 import os
 import sys
 from unittest.mock import AsyncMock, MagicMock
@@ -454,9 +455,78 @@ async def test_auto_engine_imports_soundcheck_recommendations_on_running_state(m
     assert imported["blocked_count"] == 0
     assert imported["imported_count"] == 1
     assert imported["results"] == []
+    assert imported["result_count"] == 0
+    assert imported["results_compacted"] is True
+    assert imported["full_results_endpoint"] == "get_decision_queue"
     assert imported["trigger"] == "auto_soundcheck_state"
     assert imported["trigger_state"] == "running"
     assert imported["recommendation_derivation_complete"] is False
+
+
+@pytest.mark.asyncio
+async def test_auto_engine_compacts_large_soundcheck_import_broadcast(monkeypatch):
+    server = DummyServer()
+    handlers = register_handlers(server)
+    bundle = {
+        "schema_version": "soundcheck_recommendation_bundle/v1",
+        "proposals": [],
+    }
+    server.import_soundcheck_recommendations_to_operator_queue = MagicMock(
+        return_value={
+            "type": "operator_proposals_imported",
+            "status": "ok",
+            "success": True,
+            "created_count": 1,
+            "existing_count": 0,
+            "blocked_count": 0,
+            "imported_count": 1,
+            "results": [
+                {
+                    "type": "operator_proposal_created",
+                    "status": "created",
+                    "success": True,
+                    "proposal": {
+                        "id": "large-proposal",
+                        "title": "Large proposal",
+                        "target": 1,
+                        "kind": "supervised_soundcheck_transaction",
+                        "status": "pending",
+                        "can_apply": False,
+                        "apply_blockers": ["master_capture_route_proof_required"],
+                        "raw": {"oversized_evidence": "x" * 1_000_000},
+                    },
+                }
+            ],
+        }
+    )
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            self.on_state_change = kwargs["on_state_change"]
+            self.state = type("State", (), {"value": "idle"})()
+            self.get_soundcheck_recommendation_bundle = MagicMock(return_value=bundle)
+
+        def start_async(self):
+            return None
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+
+    await handlers["start_auto_engine"]("ws", {})
+    server.auto_soundcheck_engine.on_state_change("running", "ready")
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
+
+    imported = next(
+        item
+        for item in server.broadcast_messages
+        if item.get("type") == "operator_proposals_imported"
+    )
+    assert imported["result_count"] == 1
+    assert imported["results_omitted_count"] == 0
+    assert imported["results_compacted"] is True
+    assert imported["results"][0]["proposal"]["id"] == "large-proposal"
+    assert "raw" not in imported["results"][0]["proposal"]
+    assert len(json.dumps(imported)) < 10_000
 
 
 @pytest.mark.asyncio

@@ -17,6 +17,64 @@ from supervised_console_parameter_registry import (
 logger = logging.getLogger(__name__)
 
 
+OPERATOR_PROPOSAL_IMPORT_BROADCAST_RESULT_LIMIT = 200
+
+
+def compact_operator_proposal_import_summary(summary):
+    """Bound automatic import events while full proposals remain in the queue."""
+
+    payload = dict(summary or {})
+    results = payload.get("results")
+    if not isinstance(results, list):
+        return payload
+
+    compact_results = []
+    for result in results[:OPERATOR_PROPOSAL_IMPORT_BROADCAST_RESULT_LIMIT]:
+        if not isinstance(result, dict):
+            continue
+        compact_result = {
+            key: copy.deepcopy(result.get(key))
+            for key in (
+                "type",
+                "status",
+                "success",
+                "reason",
+                "proposal_id",
+            )
+            if result.get(key) is not None
+        }
+        proposal = result.get("proposal")
+        if isinstance(proposal, dict):
+            compact_proposal = {
+                key: copy.deepcopy(proposal.get(key))
+                for key in (
+                    "id",
+                    "title",
+                    "target",
+                    "kind",
+                    "severity",
+                    "confidence",
+                    "status",
+                    "source",
+                    "can_apply",
+                    "requires_approval",
+                    "apply_blockers",
+                )
+                if proposal.get(key) is not None
+            }
+            compact_result["proposal"] = compact_proposal
+            if not compact_result.get("proposal_id") and compact_proposal.get("id"):
+                compact_result["proposal_id"] = compact_proposal["id"]
+        compact_results.append(compact_result)
+
+    payload["results"] = compact_results
+    payload["result_count"] = len(results)
+    payload["results_compacted"] = True
+    payload["results_omitted_count"] = max(0, len(results) - len(compact_results))
+    payload["full_results_endpoint"] = "get_decision_queue"
+    return payload
+
+
 def register_handlers(server):
     def _engine_cleanup_incomplete():
         engine = server.auto_soundcheck_engine
@@ -342,7 +400,7 @@ def register_handlers(server):
                 "trigger": "auto_soundcheck_state",
                 "trigger_state": trigger_state,
             })
-            await server.broadcast(summary)
+            await server.broadcast(compact_operator_proposal_import_summary(summary))
 
         conflict = None
         async with server._audio_capture_lock:

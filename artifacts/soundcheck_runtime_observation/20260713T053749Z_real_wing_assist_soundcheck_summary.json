@@ -1,0 +1,80 @@
+{
+  "schema": "real_wing_assist_soundcheck_summary.v1",
+  "generated_at_utc": "2026-07-13T05:45:00Z",
+  "status": "soundcheck_incomplete",
+  "console": {
+    "model": "WING Rack",
+    "name": "ATMOSPHERA-WNG",
+    "ip": "192.168.1.102",
+    "firmware": "3.0.5-4-ga4ea833d:release"
+  },
+  "runtime": {
+    "operator_mode": "assist",
+    "observation_only": true,
+    "proposal_only": true,
+    "auto_apply": false,
+    "audio_device": "WING",
+    "sample_rate_hz": 48000,
+    "capture_channel_count": 48,
+    "selected_source_channels": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+  },
+  "readiness": {
+    "run_id": "soundcheck-034e168a872b48bdbc7cdd7d5c394d8a",
+    "safety_state": "blocked_global",
+    "execution_status": "blocked_global",
+    "baseline_verified": false,
+    "global_blockers_before_cleanup": ["master_capture_route_proof_required"],
+    "logical_total": 105,
+    "operator_review": 59,
+    "pending": 46,
+    "physical_steps_planned": 46,
+    "physical_steps_committed": 0,
+    "physical_steps_rolled_back": 0
+  },
+  "decision_queue": {
+    "pending_count": 101,
+    "effective_console_apply_allowed": false,
+    "item_can_apply_true_count": 8,
+    "item_can_apply_truth_surface_inconsistent": true,
+    "kind_counts": {
+      "fader": 8,
+      "HighPassAdjust": 11,
+      "GateAdjust": 4,
+      "ChannelEQMove": 11,
+      "CompressorAdjust": 5,
+      "PanAdjust": 11,
+      "DCAFaderMove": 5,
+      "supervised_soundcheck_transaction": 46
+    },
+    "supervised_transaction_blocker": "soundcheck_preflight:blocked_global:master_capture_route_proof_required",
+    "normal_live_family_allowlist_count": 0
+  },
+  "master_mix_verdict": {
+    "status": "ISSUES",
+    "lufs_integrated": -32.65,
+    "true_peak_dbtp": -13.92,
+    "crest_db": 18.56,
+    "lr_balance_db": 0.0,
+    "correlation": 0.997,
+    "mono_fold_ratio": 0.999,
+    "tilt_deviation_db": 2.36,
+    "vocal_presence_db": 7.47,
+    "issues": ["громкость микса -32.6 LUFS вне -20.0±6.0"],
+    "source": "main_postfader"
+  },
+  "console_write_count": 0,
+  "correction_reset_performed": false,
+  "post_run_measured_surface_difference_count": 0,
+  "evidence": {
+    "continuous_observation": "artifacts/soundcheck_runtime_observation/20260713T052931Z_soundcheck_runtime_observation/summary.json",
+    "master_mix_report": "reports/master_mix_eval_20260713T083930.json",
+    "before_readback": "artifacts/wing_readonly_preflight/20260713T052747Z_wing_readonly_preflight/summary.json",
+    "after_readback": "artifacts/wing_readonly_preflight/20260713T054228Z_wing_readonly_preflight/summary.json",
+    "before_after_comparison": "artifacts/wing_readonly_preflight/20260713T054228Z_wing_readonly_preflight/comparison_to_20260713T052747Z.json"
+  },
+  "known_runtime_defects": [
+    "The automatic operator_proposals_imported event exceeded 64 MiB before compaction.",
+    "The full decision_queue snapshot remains unbounded by serialized byte size.",
+    "Eight legacy fader items reported item.can_apply=true while the queue and operator mode denied console apply."
+  ]
+}
