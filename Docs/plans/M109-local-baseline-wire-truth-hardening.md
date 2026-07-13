@@ -154,8 +154,8 @@ operator session. Reset must not be impersonated as a soundcheck transaction.
 
 ## Current status
 
-- M109-CP01: implemented; `6368 passed, 1 skipped`; independent diff review
-  found no P0/P1 and its documentation findings are resolved.
+- M109-CP01: committed as `b3f7d05ac`; `6368 passed, 1 skipped`; independent
+  diff review found no P0/P1 and its documentation findings are resolved.
 - M109-CP00: superseded by the restored validated working-tree status.
 - M109-CP02: HOLD until exact v2 wire messages, digest projection, cursor,
   retention and overflow semantics are fixed in an ADR.

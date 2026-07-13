@@ -2,9 +2,9 @@
 
 Generated: 2026-07-12T22:48:19Z
 
-## M109-CP01 validated working tree — 2026-07-13
+## M109-CP01 committed source checkpoint — 2026-07-13
 
-- Base HEAD: `abf6b5d5e494bfa5343fab40424d456ea4339ec9`; M109 diff pending commit.
+- Validated source commit: `b3f7d05ac1f0a2ddc9812e4723a2b3f130fefa6a`.
 - Mandatory suite: `6368 passed, 1 skipped in 382.42s`.
 - Full no-WING release-check module: `457 passed`.
 - WING truth rails: `135 passed`.
@@ -19,8 +19,8 @@ Generated: 2026-07-12T22:48:19Z
   `soundcheck_incomplete`, reset applied `false`, corrections applied `0`, live
   authority `false`.
 - Active plan: `Docs/plans/M109-local-baseline-wire-truth-hardening.md`.
-- The older ledger-backed checkpoint below remains the last committed handoff
-  until this validated diff is committed.
+- The older ledger-backed checkpoint below remains the previous full handoff;
+  this section binds the newer CP01 validation to its source commit.
 
 ## Soundcheck execution P1 closure — 2026-07-12
 

@@ -8,8 +8,9 @@ Status: WAITING_FOR_EXTERNAL_VALIDATION
 
 ## M109-CP01 validation restored — 2026-07-13
 
-The mandatory working-tree command based on
-`abf6b5d5e494bfa5343fab40424d456ea4339ec9` now passes: `6368 passed,
+The committed CP01 source checkpoint
+`b3f7d05ac1f0a2ddc9812e4723a2b3f130fefa6a` passes the mandatory command:
+`6368 passed,
 1 skipped in 382.42s`. M109-CP01 made four positive synthetic/contract tests
 artifact-history-hermetic, retained deterministic negative checks, and aligned
 two current-evidence truth rails with the preserved invalid WING attempts.
@@ -20,8 +21,8 @@ public-release readiness remain **88/100**, below the 95 target: normal
 allowlist `0`, `soundcheck_incomplete`, no DSP reset, no applied correction,
 and no live authority. Active hardening plan:
 `Docs/plans/M109-local-baseline-wire-truth-hardening.md`. The older ledger-backed
-checkpoint below remains the last committed handoff until this validated diff
-is committed.
+checkpoint below remains the previous full handoff; this section is the newer
+CP01 source-commit validation binding.
 
 ## Superseding soundcheck execution status — 2026-07-12
 
