@@ -17,6 +17,15 @@ except ImportError:  # pragma: no cover - package import compatibility
     from backend.operator_mode_policy import WING_DEPLOYMENT_LIVE_WRITE_KINDS
 
 try:
+    from operator_proposal_queue import (
+        SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.operator_proposal_queue import (
+        SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
+    )
+
+try:
     from processing_proposal_adapters import build_operator_correction_payload
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.processing_proposal_adapters import build_operator_correction_payload
@@ -802,6 +811,13 @@ def build_soundcheck_operator_proposals(
                 "soundcheck_item": dict(item),
             },
         }
+        if requested_change:
+            proposal.update({
+                "operator_review_only": True,
+                "operator_review_only_reason": (
+                    SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+                ),
+            })
         gated = _gate_proposal_cache_freshness(proposal, mixer_client)
         proposals.append(_attach_operator_correction(gated, method_id="auto_soundcheck_engine"))
 

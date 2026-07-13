@@ -8,7 +8,10 @@ from unittest.mock import patch
 
 import pytest
 
-from operator_proposal_queue import OperatorProposalQueue
+from operator_proposal_queue import (
+    OperatorProposalQueue,
+    SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
+)
 from operator_recommendation_bridge import build_soundcheck_operator_proposals
 from operator_product_state import build_decision_queue
 from server import AutoMixerServer
@@ -73,6 +76,40 @@ def test_soundcheck_bridge_imports_transaction_plan_into_operator_queue():
     assert queued["kind"] == "supervised_soundcheck_transaction"
     assert queued["can_apply"] is False
     assert queued["apply_blockers"] == ["write_kind_not_live_allowed:eq_hpf:eq"]
+
+
+def test_unmatched_soundcheck_fader_stays_operator_review_only():
+    proposals = build_soundcheck_operator_proposals({
+        "schema_version": "soundcheck_recommendation_bundle/v1",
+        "proposals": [
+            {
+                "proposal_id": "legacy-fader",
+                "action_type": "set_fader_db",
+                "target": {"mixer_channel": 2},
+                "current_state": {"fader_db": -10.0},
+                "requested_state": {"fader_db": -8.5},
+            }
+        ],
+    })
+
+    assert len(proposals) == 1
+    assert proposals[0]["requested_change"]["value_type"] == "fader"
+    assert proposals[0]["operator_review_only"] is True
+    assert proposals[0]["operator_review_only_reason"] == (
+        SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+    )
+
+    queue = OperatorProposalQueue()
+    created = queue.create(proposals[0], supervised_mode("fader"))
+    queued = created["proposal"]
+
+    assert queued["status"] == "pending"
+    assert queued["can_apply"] is False
+    assert queued["requires_approval"] is False
+    assert queued["apply_blockers"] == [
+        SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+    ]
+    assert queued["raw"]["operator_review_only"] is True
 
 
 def test_operator_queue_nested_plan_is_immutable_on_ingress_and_egress():

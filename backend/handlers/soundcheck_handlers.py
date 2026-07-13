@@ -2,6 +2,7 @@
 
 import asyncio
 import copy
+import json
 import logging
 
 from audio_capture import LIVE_CAPTURE_MAX_CHANNELS
@@ -18,22 +19,106 @@ logger = logging.getLogger(__name__)
 
 
 OPERATOR_PROPOSAL_IMPORT_BROADCAST_RESULT_LIMIT = 200
+OPERATOR_PROPOSAL_IMPORT_BROADCAST_MAX_BYTES = 128 * 1024
+OPERATOR_PROPOSAL_IMPORT_BROADCAST_TEXT_LIMIT = 2048
+OPERATOR_PROPOSAL_IMPORT_BROADCAST_TOP_LEVEL_KEYS = (
+    "type",
+    "status",
+    "success",
+    "complete",
+    "source",
+    "reason",
+    "operator_mode",
+    "imported_count",
+    "created_count",
+    "existing_count",
+    "blocked_count",
+    "generated_at",
+    "recommendation_derivation_complete",
+    "trigger",
+    "trigger_state",
+    "soundcheck_readiness",
+)
+
+
+def _bounded_broadcast_value(value, *, depth=0):
+    """Return plain JSON data with bounded strings, depth, and fan-out."""
+
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        if len(value) <= OPERATOR_PROPOSAL_IMPORT_BROADCAST_TEXT_LIMIT:
+            return value
+        return f"{value[:OPERATOR_PROPOSAL_IMPORT_BROADCAST_TEXT_LIMIT]}...<truncated>"
+    if depth >= 4:
+        return "<nested_value_omitted>"
+    if isinstance(value, dict):
+        bounded = {}
+        items = list(value.items())
+        for raw_key, raw_value in items[:64]:
+            key = str(raw_key)[:128]
+            bounded[key] = _bounded_broadcast_value(raw_value, depth=depth + 1)
+        if len(items) > 64:
+            bounded["__omitted_key_count__"] = len(items) - 64
+        return bounded
+    if isinstance(value, (list, tuple)):
+        bounded = [
+            _bounded_broadcast_value(item, depth=depth + 1)
+            for item in value[:64]
+        ]
+        if len(value) > 64:
+            bounded.append({"__omitted_item_count__": len(value) - 64})
+        return bounded
+    return _bounded_broadcast_value(str(value), depth=depth)
+
+
+def _serialized_broadcast_bytes(payload):
+    # Match ws_transport.serialize_message: json.dumps defaults to escaped UTF-8.
+    return len(json.dumps(payload).encode("utf-8"))
+
+
+def _counts_only_import_summary(summary, *, result_count):
+    payload = {}
+    for key in OPERATOR_PROPOSAL_IMPORT_BROADCAST_TOP_LEVEL_KEYS:
+        if key == "soundcheck_readiness" or key not in summary:
+            continue
+        payload[key] = _bounded_broadcast_value(summary.get(key))
+    payload.update({
+        "results": [],
+        "result_count": result_count,
+        "results_compacted": True,
+        "results_counts_only": True,
+        "results_omitted_count": result_count,
+        "full_results_endpoint": "get_decision_queue",
+        "soundcheck_readiness_endpoint": "get_auto_soundcheck_status",
+        "soundcheck_readiness_omitted": isinstance(
+            summary.get("soundcheck_readiness"),
+            dict,
+        ),
+    })
+    return payload
 
 
 def compact_operator_proposal_import_summary(summary):
-    """Bound automatic import events while full proposals remain in the queue."""
+    """Hard-bound automatic import events while full proposals stay in the queue."""
 
-    payload = dict(summary or {})
-    results = payload.get("results")
+    source = dict(summary or {})
+    results = source.get("results")
     if not isinstance(results, list):
-        return payload
+        results = []
+
+    payload = {
+        key: _bounded_broadcast_value(source.get(key))
+        for key in OPERATOR_PROPOSAL_IMPORT_BROADCAST_TOP_LEVEL_KEYS
+        if key in source
+    }
 
     compact_results = []
     for result in results[:OPERATOR_PROPOSAL_IMPORT_BROADCAST_RESULT_LIMIT]:
         if not isinstance(result, dict):
             continue
         compact_result = {
-            key: copy.deepcopy(result.get(key))
+            key: _bounded_broadcast_value(result.get(key))
             for key in (
                 "type",
                 "status",
@@ -46,7 +131,7 @@ def compact_operator_proposal_import_summary(summary):
         proposal = result.get("proposal")
         if isinstance(proposal, dict):
             compact_proposal = {
-                key: copy.deepcopy(proposal.get(key))
+                key: _bounded_broadcast_value(proposal.get(key))
                 for key in (
                     "id",
                     "title",
@@ -72,6 +157,27 @@ def compact_operator_proposal_import_summary(summary):
     payload["results_compacted"] = True
     payload["results_omitted_count"] = max(0, len(results) - len(compact_results))
     payload["full_results_endpoint"] = "get_decision_queue"
+    payload["soundcheck_readiness_endpoint"] = "get_auto_soundcheck_status"
+    if _serialized_broadcast_bytes(payload) > OPERATOR_PROPOSAL_IMPORT_BROADCAST_MAX_BYTES:
+        payload = _counts_only_import_summary(source, result_count=len(results))
+    if _serialized_broadcast_bytes(payload) > OPERATOR_PROPOSAL_IMPORT_BROADCAST_MAX_BYTES:
+        # Defensive final form: only fixed-size fields and numeric counts survive.
+        payload = {
+            "type": "operator_proposals_imported",
+            "status": "compacted",
+            "success": bool(source.get("success")),
+            "results": [],
+            "result_count": len(results),
+            "results_compacted": True,
+            "results_counts_only": True,
+            "results_omitted_count": len(results),
+            "full_results_endpoint": "get_decision_queue",
+            "soundcheck_readiness_endpoint": "get_auto_soundcheck_status",
+            "soundcheck_readiness_omitted": isinstance(
+                source.get("soundcheck_readiness"),
+                dict,
+            ),
+        }
     return payload
 
 

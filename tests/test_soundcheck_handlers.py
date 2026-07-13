@@ -10,7 +10,11 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from handlers.soundcheck_handlers import register_handlers
+from handlers.soundcheck_handlers import (
+    OPERATOR_PROPOSAL_IMPORT_BROADCAST_MAX_BYTES,
+    compact_operator_proposal_import_summary,
+    register_handlers,
+)
 
 
 class DummyServer:
@@ -527,6 +531,59 @@ async def test_auto_engine_compacts_large_soundcheck_import_broadcast(monkeypatc
     assert imported["results"][0]["proposal"]["id"] == "large-proposal"
     assert "raw" not in imported["results"][0]["proposal"]
     assert len(json.dumps(imported)) < 10_000
+
+
+def test_soundcheck_import_broadcast_has_hard_utf8_byte_budget():
+    long_utf8 = "Вокал очень длинное описание 🎛️ " * 500
+    results = [
+        {
+            "type": "operator_proposal_created",
+            "status": "created",
+            "success": True,
+            "proposal": {
+                "id": f"proposal-{index}",
+                "title": long_utf8,
+                "target": {"channel": index + 1, "label": long_utf8},
+                "kind": "fader",
+                "status": "pending",
+                "source": "soundcheck_recommendation_bundle",
+                "can_apply": False,
+                "apply_blockers": [long_utf8, long_utf8],
+                "raw": {"oversized_evidence": long_utf8},
+            },
+        }
+        for index in range(101)
+    ]
+    summary = {
+        "type": "operator_proposals_imported",
+        "status": "ok",
+        "success": True,
+        "source": "soundcheck_recommendation_bundle",
+        "imported_count": len(results),
+        "created_count": len(results),
+        "existing_count": 0,
+        "blocked_count": 0,
+        "results": results,
+        "soundcheck_readiness": {"oversized": long_utf8 * 20},
+        "unexpected_top_level_evidence": long_utf8 * 20,
+    }
+
+    compacted = compact_operator_proposal_import_summary(summary)
+    serialized = json.dumps(compacted).encode("utf-8")
+
+    assert len(serialized) <= OPERATOR_PROPOSAL_IMPORT_BROADCAST_MAX_BYTES
+    assert compacted["result_count"] == 101
+    assert compacted["results"] == []
+    assert compacted["results_compacted"] is True
+    assert compacted["results_counts_only"] is True
+    assert compacted["results_omitted_count"] == 101
+    assert compacted["soundcheck_readiness_omitted"] is True
+    assert compacted["full_results_endpoint"] == "get_decision_queue"
+    assert compacted["soundcheck_readiness_endpoint"] == (
+        "get_auto_soundcheck_status"
+    )
+    assert "unexpected_top_level_evidence" not in compacted
+    assert long_utf8 not in serialized.decode("utf-8")
 
 
 @pytest.mark.asyncio

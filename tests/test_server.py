@@ -20,6 +20,9 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from handlers import automation_handlers, fx_handlers, mixer_handlers, routing_handlers, snapshot_handlers
 from backend.operator_mode_policy import SUPPORTED_MANUAL_LIVE_WRITE_KINDS
+from operator_proposal_queue import (
+    SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION,
+)
 from operator_product_state import build_safety_monitor
 from runtime_identity import (
     RUNTIME_CRITICAL_SOURCE_PATHS,
@@ -5844,6 +5847,96 @@ class TestWingDeploymentWriteBoundary:
             proposal_id=proposal_id,
             expected_current_value=-8.0,
         )
+
+    @pytest.mark.asyncio
+    async def test_legacy_soundcheck_fader_cannot_bypass_transaction_after_mode_switch(
+        self,
+        dummy_wing_server,
+    ):
+        server = dummy_wing_server
+        server.operator_mode = "assist"
+        websocket = MagicMock()
+        websocket.send = AsyncMock()
+        server._apply_manual_console_write = AsyncMock()
+
+        await server._dispatch["create_operator_proposal"](
+            websocket,
+            {
+                "id": "legacy-soundcheck-fader",
+                "title": "Legacy soundcheck fader",
+                "source": "soundcheck_recommendation_bundle",
+                "channel": 1,
+                "value_type": "fader",
+                "value": -9.0,
+                "reason": "unmatched soundcheck recommendation",
+            },
+        )
+        created = self._decode_last_message(websocket)
+        proposal_id = created["proposal"]["id"]
+        assert created["proposal"]["status"] == "pending"
+        assert created["proposal"]["can_apply"] is False
+        assert created["proposal"]["apply_blockers"] == [
+            SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+        ]
+
+        server.operator_mode = "auto"
+        server._auto_mode_unlocked = True
+        server._wing_deployment_write_boundary_enabled = False
+        server._wing_observation_only = False
+        server.connection_mode = "offline"
+
+        await server._dispatch["preflight_operator_proposal_apply_batch"](
+            websocket,
+            {
+                "approved": True,
+                "idempotency_key_prefix": "legacy-soundcheck-batch",
+            },
+        )
+        batch = self._decode_last_message(websocket)
+        assert batch["summary"]["selected_count"] == 0
+        assert batch["summary"]["skipped_analysis_only_ids"] == [proposal_id]
+
+        await server._dispatch["preflight_operator_proposal_apply"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "idempotency_key": "legacy-soundcheck-preflight",
+            },
+        )
+        preflight = self._decode_last_message(websocket)
+        assert preflight["status"] == "blocked"
+        assert preflight["reason"] == (
+            SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+        )
+        assert preflight["no_console_send_proven"] is True
+        assert preflight["idempotency"]["reserved"] is False
+
+        await server._dispatch["apply_operator_proposal"](
+            websocket,
+            {
+                "proposal_id": proposal_id,
+                "approved": True,
+                "approval_id": proposal_id,
+                "idempotency_key": "legacy-soundcheck-apply",
+            },
+        )
+        blocked = self._decode_last_message(websocket)
+        assert blocked["type"] == "operator_proposal_apply_blocked"
+        assert blocked["reason"] == (
+            SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+        )
+        assert blocked["proposal_status"] == "pending"
+        assert blocked["idempotency_reserved"] is False
+        assert blocked["no_console_send_proven"] is True
+        assert server.operator_proposal_queue.find(
+            proposal_id=proposal_id
+        ).status == "pending"
+        assert "legacy-soundcheck-apply" not in (
+            server._operator_apply_idempotency_keys
+        )
+        server._apply_manual_console_write.assert_not_called()
+        server.mixer_client.set_channel_fader.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_operator_proposal_apply_accepts_matching_wing_surface_contract(self, dummy_wing_server):

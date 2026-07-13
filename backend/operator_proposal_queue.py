@@ -27,6 +27,10 @@ APPLYABLE_VALUE_TYPES = set(LIVE_ALLOWED_WRITE_KINDS)
 DEFAULT_PROPOSAL_TTL_SECONDS = 120
 MIN_PROPOSAL_TTL_SECONDS = 5
 MAX_PROPOSAL_TTL_SECONDS = 300
+SOUNDCHECK_RECOMMENDATION_SOURCE = "soundcheck_recommendation_bundle"
+SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION = (
+    "soundcheck_correction_requires_supervised_transaction"
+)
 
 
 def _utc_datetime_now() -> datetime:
@@ -166,6 +170,22 @@ def _apply_blockers_for_transaction_plan(plan: Any) -> List[str]:
     return sorted(set(blockers))
 
 
+def soundcheck_proposal_apply_blocker(proposal: Any) -> Optional[str]:
+    """Keep soundcheck corrections off the generic manual-write apply path."""
+
+    if str(getattr(proposal, "source", "") or "") != SOUNDCHECK_RECOMMENDATION_SOURCE:
+        return None
+    raw = getattr(proposal, "raw", None)
+    transaction_plan = (
+        raw.get("supervised_transaction_plan")
+        if isinstance(raw, dict)
+        else None
+    )
+    if isinstance(transaction_plan, dict):
+        return None
+    return SOUNDCHECK_CORRECTION_REQUIRES_SUPERVISED_TRANSACTION
+
+
 @dataclass
 class OperatorProposal:
     id: str
@@ -216,6 +236,9 @@ class OperatorProposal:
                 if self.requested_changes
                 else _apply_blockers_for_change(self.requested_change)
             )
+        source_blocker = soundcheck_proposal_apply_blocker(self)
+        if source_blocker and source_blocker not in apply_blockers:
+            apply_blockers = [source_blocker, *apply_blockers]
         expires = _parse_utc_timestamp(self.expires_at)
         expired = bool(
             expires is not None

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
+from operator_proposal_queue import soundcheck_proposal_apply_blocker
 from operator_product_state import (
     build_agent_communications_snapshot,
     build_bus_main_dca_snapshot,
@@ -2709,6 +2710,22 @@ def register_handlers(server):
                 },
             )
 
+        source_blocker = soundcheck_proposal_apply_blocker(proposal)
+        if source_blocker:
+            return operator_apply_preflight_payload(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                reason=source_blocker,
+                idempotency=idempotency,
+                requested_change=proposal.requested_change,
+                requested_changes=proposal.requested_changes or None,
+                extra={
+                    **preflight_extra,
+                    "apply_blockers": [source_blocker],
+                    "no_console_send_proven": True,
+                },
+            )
+
         if not idempotency["provided"]:
             return operator_apply_preflight_payload(
                 proposal=proposal,
@@ -4111,6 +4128,41 @@ def register_handlers(server):
             await server.send_to_client(websocket, {
                 "type": "operator_proposal_apply_blocked",
                 **result,
+            })
+            return
+
+        source_blocker = soundcheck_proposal_apply_blocker(proposal)
+        if source_blocker:
+            proposal_view = proposal.to_dict()
+            record_apply_trace(
+                proposal=proposal,
+                operator_mode=operator_mode,
+                requested_change=(proposal.requested_change or {}),
+                idempotency_key=data.get("idempotency_key"),
+                status="blocked",
+                blocked_reason=source_blocker,
+                metadata={
+                    "no_console_send_proven": True,
+                    "proposal_status_mutation": False,
+                    "idempotency_reserved": False,
+                },
+            )
+            await server.send_to_client(websocket, {
+                "type": "operator_proposal_apply_blocked",
+                "status": "blocked",
+                "success": False,
+                "reason": source_blocker,
+                "apply_blockers": [source_blocker],
+                "proposal": proposal_view,
+                "proposal_status": proposal.status,
+                "idempotency_reserved": False,
+                "no_console_send_proven": True,
+                "apply_result": {
+                    "status": "blocked",
+                    "reason": source_blocker,
+                    "apply_blockers": [source_blocker],
+                    "no_console_send_proven": True,
+                },
             })
             return
 

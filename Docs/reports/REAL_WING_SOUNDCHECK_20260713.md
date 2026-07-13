@@ -79,11 +79,15 @@ remain, including channel 16 high gain at `+3 dB`.
    silently timed out after the first 30 frames. Large plans are now paced.
 3. The automatic proposal-import broadcast exceeded 64 MiB because it repeated
    full raw evidence inside every result. Automatic import events are now
-   compacted; full proposals remain in the queue.
+   compacted and hard-limited to 128 KiB; full proposals remain in the queue.
 4. The full decision-queue response is still not bounded by serialized bytes.
-5. Eight legacy fader records exposed `item.can_apply=true` while the effective
-   queue/operator capability was `can_apply=false`. Apply was not attempted,
-   but the contradictory truth surface is a P1 UI/API defect.
+5. During the recorded run, eight legacy fader records exposed
+   `item.can_apply=true` while the effective queue/operator capability was
+   `can_apply=false`. Apply was not attempted. Post-run hardening now keeps
+   unmatched soundcheck corrections operator-review-only with
+   `soundcheck_correction_requires_supervised_transaction`, and repeats that
+   gate in backend preflight/apply before idempotency or console send. The
+   machine summary above intentionally remains the immutable historical result.
 6. M006 owner intent is recorded, but no correction family has current normal
    live apply authority and the immutable Main 47/48 route proof is absent.
 
@@ -91,6 +95,8 @@ remain, including channel 16 high gain at `+3 dB`.
 
 - `tests/test_soundcheck_handlers.py`: 15 passed.
 - Combined focused server/preflight/soundcheck tests: 91 passed.
+- Post-run P1 regression: 56 soundcheck/transaction tests and 30 apply-preflight
+  tests passed; an independent read-only patch review found no findings.
 - Physical readback: 240/240 before and 240/240 after, zero differences.
 - Backend shutdown was graceful and disconnected the WING client.
 - The final no-WING quick check remained failed only because the artifact root
@@ -104,8 +110,8 @@ remain, including channel 16 high gain at `+3 dB`.
 1. Add a backend-integrated DSP-only maintenance reset transaction with durable
    WAL, complete physical snapshot, CAS readback, and reverse rollback.
 2. Prove the immutable Main 47/48 capture route and fresh headroom evidence.
-3. Bound decision-queue responses by serialized byte size and remove the
-   `item.can_apply`/effective-mode contradiction.
+3. Bound full decision-queue responses by serialized byte size and produce a
+   fresh live import artifact demonstrating the corrected apply truth surface.
 4. Promote correction families only through isolated physical apply/readback/
    rollback proofs, then execute the staged plan and re-measure.
 
