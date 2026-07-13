@@ -79,28 +79,34 @@ preserving exact blockers and server-side full-detail/apply semantics.
 
 Design requirements:
 
-- separate internal/full and wire/list serializers;
-- no `raw` or unbounded `result` in list rows;
-- pin global hazards, unresolved `can_apply=false` rows, and highest-severity
-  blockers before ordinary newest-first rows;
-- deterministic cursor pagination for remaining rows;
-- exact total/included/omitted counts;
-- both operator proposals and mixing-agent pending actions obey row and byte
-  limits;
-- a stable detail-by-ID API returns the complete server-side proposal together
-  with an immutable content digest and explicit retention/version metadata;
-- apply fails closed when the reviewed detail digest is absent or differs from
-  the current complete server-side proposal;
-- close code 1009 is surfaced and cannot create an infinite reconnect/mock-data
-  loop;
-- hard size assertion uses the actual WebSocket serialization path.
+- freeze canonical v2 review content and SHA-256 at proposal creation;
+- separate internal/full and compact wire/list serializers and never call full
+  `to_dict()` while selecting list rows;
+- no `raw`, `result`, plans, blobs or unbounded arrays in list rows;
+- pin explicit global hazards, unresolved `can_apply=false` rows, and
+  high/critical rows before ordinary newest-first rows;
+- use connection-bound frozen snapshots with 30-second TTL and hard count/byte
+  retention limits;
+- return exact total/included/remaining counts and a degraded counts-only
+  envelope when pinned metadata cannot fit;
+- both operator proposals and stable analysis-only MixingAgent rows obey row and
+  whole-payload byte limits;
+- authenticated detail returns complete canonical review content in digest-bound
+  base64 chunks of at most 64 KiB raw each;
+- canonical apply and every internal executor require the matching digest before
+  any mutation, idempotency reservation, backend contact or console send;
+- pre-v2 proposals and the bounded v1 read shim have no live apply authority;
+- close code 1009 is terminal/manual-retry and cannot activate mock data;
+- hard 131,072-byte assertions use the actual WebSocket serialization path for
+  list, detail and compact mutation responses.
 
 Required evidence:
 
 1. A 1 MiB raw proposal produces a response no larger than 128 KiB.
 2. Long Cyrillic/emoji rows remain within budget with exact counts.
 3. Legacy soundcheck blockers and `can_apply=false` survive compaction.
-4. Existing API consumers and apply paths remain compatible.
+4. Existing read consumers receive a bounded compatibility shim; apply paths
+   migrate atomically and have no digestless compatibility bypass.
 5. An old critical blocker cannot be displaced by newer low-risk rows.
 6. Missing detail and digest mismatch return explicit fail-closed errors.
 
@@ -157,8 +163,12 @@ operator session. Reset must not be impersonated as a soundcheck transaction.
 - M109-CP01: committed as `b3f7d05ac`; `6368 passed, 1 skipped`; independent
   diff review found no P0/P1 and its documentation findings are resolved.
 - M109-CP00: superseded by the restored validated working-tree status.
-- M109-CP02: HOLD until exact v2 wire messages, digest projection, cursor,
-  retention and overflow semantics are fixed in an ADR.
+- M109-CP02: exact v2 wire messages, digest projection, cursor, retention,
+  overflow, chunked detail, immutable execution snapshot and no-bypass apply
+  semantics are accepted in
+  `Docs/adr/M109-CP02-decision-queue-wire-contract.md`; two independent
+  architecture reviews and the engineering gate returned GO. Server
+  implementation is in progress.
 - M109-CP03: planned.
 - Hardware-dependent work: deferred to an attended session.
 
@@ -168,14 +178,15 @@ operator session. Reset must not be impersonated as a soundcheck transaction.
 |--------|---------|-----|------|--------|----------|
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 1 | COMPLETE | Renamed local milestone; added CP00, priority queue and digest contract |
 | Codex Review | `/codex review` | Independent 2nd opinion | 1 | DEGRADED | CLI/model mismatch; Council fallback independently agreed on CP01 |
-| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | COMPLETE | GO after CP00; require opt-in helper and deterministic fail-closed checks |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 2 | COMPLETE | CP02 GO after version/digest, TOCTOU, retention, hazard, cursor and post-write receipt contracts were made exact |
 | Design Review | `/plan-design-review` | UI/UX gaps | 0 | SKIPPED | CP01 has no UI change |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 1 | COMPLETE | CP01 clear; CP02 held for an exact versioned API/error contract |
 | Final diff review | independent subagent | Regression and safety | 1 | COMPLETE | No P0/P1; post-commit truth binding required |
 
 **UNRESOLVED:** 0 user decisions; autonomous scope is bounded by existing safety rules.
 
-**VERDICT:** CP01 CLEARED; CP02 remains HOLD pending its exact wire-contract ADR.
+**VERDICT:** CP01 CLEARED; CP02 ADR and engineering gate CLEARED for bounded
+implementation. Hardware authority remains unchanged.
 
 ## CEO Review — scope and strategy
 
