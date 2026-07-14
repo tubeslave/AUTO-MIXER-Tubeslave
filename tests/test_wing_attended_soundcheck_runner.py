@@ -1599,6 +1599,7 @@ def _hardware_identity():
             "manufacturer": "BEHRINGER",
             "transport": "usb",
             "input_channels": 48,
+            "output_channels": 48,
             "sample_rate_hz": 48_000,
         },
         "usb": {
@@ -3558,6 +3559,11 @@ def test_route_result_semantic_verifier_accepts_valid_artifact(tmp_path):
         "capture_count",
         "capture_peak",
         "hardware_vendor",
+        "hardware_output",
+        "hardware_output_missing",
+        "hardware_input_float",
+        "hardware_output_float",
+        "hardware_sample_rate_float",
         "hardware_sha",
         "runtime_binding",
         "firmware_family",
@@ -3588,6 +3594,40 @@ def test_route_result_semantic_verifier_rejects_hash_valid_false_evidence(
         elif mutation_name == "hardware_vendor":
             hardware = evidence["capture"]["hardware_identity"]
             hardware["usb"]["vendor_id"] = 999
+            binding = {
+                key: hardware[key]
+                for key in (
+                    "schema",
+                    "device_name",
+                    "device_index",
+                    "console_serial",
+                    "coreaudio",
+                    "usb",
+                    "serial_binding",
+                )
+            }
+            hardware["binding_sha256"] = hashlib.sha256(
+                runner._canonical_json_bytes(binding)
+            ).hexdigest()
+        elif mutation_name in {
+            "hardware_output",
+            "hardware_output_missing",
+            "hardware_input_float",
+            "hardware_output_float",
+            "hardware_sample_rate_float",
+        }:
+            hardware = evidence["capture"]["hardware_identity"]
+            field, value = {
+                "hardware_output": ("output_channels", 0),
+                "hardware_output_missing": ("output_channels", None),
+                "hardware_input_float": ("input_channels", 48.0),
+                "hardware_output_float": ("output_channels", 48.0),
+                "hardware_sample_rate_float": ("sample_rate_hz", 48_000.0),
+            }[mutation_name]
+            if mutation_name == "hardware_output_missing":
+                hardware["coreaudio"].pop(field)
+            else:
+                hardware["coreaudio"][field] = value
             binding = {
                 key: hardware[key]
                 for key in (

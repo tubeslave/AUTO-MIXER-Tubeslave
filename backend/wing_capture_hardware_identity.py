@@ -37,6 +37,14 @@ def _blocked(reason: str, **details: Any) -> dict[str, Any]:
     }
 
 
+def _is_exact_non_bool_int(value: Any, expected: int) -> bool:
+    return (
+        not isinstance(value, bool)
+        and isinstance(value, int)
+        and value == expected
+    )
+
+
 def verify_wing_capture_hardware_identity(
     *,
     device_name: str,
@@ -86,10 +94,18 @@ def verify_wing_capture_hardware_identity(
         == "BEHRINGER",
         "usb_transport": audio.get("coreaudio_device_transport")
         == "coreaudio_device_type_usb",
-        "input_channels": audio.get("coreaudio_device_input")
-        == WING_CAPTURE_CHANNELS,
-        "sample_rate": audio.get("coreaudio_device_srate")
-        == WING_CAPTURE_SAMPLE_RATE_HZ,
+        "input_channels": _is_exact_non_bool_int(
+            audio.get("coreaudio_device_input"),
+            WING_CAPTURE_CHANNELS,
+        ),
+        "output_channels": _is_exact_non_bool_int(
+            audio.get("coreaudio_device_output"),
+            WING_CAPTURE_CHANNELS,
+        ),
+        "sample_rate": _is_exact_non_bool_int(
+            audio.get("coreaudio_device_srate"),
+            WING_CAPTURE_SAMPLE_RATE_HZ,
+        ),
     }
     if not all(audio_checks.values()):
         return _blocked("coreaudio_capture_not_physical_wing", checks=audio_checks)
@@ -163,6 +179,7 @@ def verify_wing_capture_hardware_identity(
             "manufacturer": "BEHRINGER",
             "transport": "usb",
             "input_channels": WING_CAPTURE_CHANNELS,
+            "output_channels": WING_CAPTURE_CHANNELS,
             "sample_rate_hz": WING_CAPTURE_SAMPLE_RATE_HZ,
         },
         "usb": {

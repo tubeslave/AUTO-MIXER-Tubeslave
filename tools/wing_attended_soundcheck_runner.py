@@ -1898,13 +1898,20 @@ class ProofOwnedBackendSession:
                 audio_device_index,
             )
             and hardware.get("console_serial") == console_serial
-            and coreaudio
+            and isinstance(coreaudio, Mapping)
+            and set(coreaudio)
             == {
-                "manufacturer": "BEHRINGER",
-                "transport": "usb",
-                "input_channels": 48,
-                "sample_rate_hz": 48_000,
+                "manufacturer",
+                "transport",
+                "input_channels",
+                "output_channels",
+                "sample_rate_hz",
             }
+            and coreaudio.get("manufacturer") == "BEHRINGER"
+            and coreaudio.get("transport") == "usb"
+            and exact_integer(coreaudio.get("input_channels"), 48)
+            and exact_integer(coreaudio.get("output_channels"), 48)
+            and exact_integer(coreaudio.get("sample_rate_hz"), 48_000)
             and isinstance(usb, Mapping)
             and exact_integer(usb.get("vendor_id"), 5015)
             and exact_integer(usb.get("product_id"), 1291)

@@ -86,24 +86,38 @@ def _capture_status(sample_count: int):
 
 def _hardware_identity(
     *,
-    binding_sha256: str = "a" * 64,
-    usb_serial: str = "0100Q1V0604AAE214",
+    binding_sha256: str | None = None,
+    usb_serial: str = "WINGUNIT1214",
 ):
-    return {
+    binding = {
         "schema": "automixer.wing_capture_hardware_identity.v1",
-        "verified": True,
-        "reason": "physical_wing_usb_capture_bound_to_console",
         "device_name": "Unit WING USB 48ch",
         "device_index": 7,
-        "console_serial": "WING-UNIT",
-        "hardware_uid": f"usb:1397:050b:{usb_serial}:00100000",
-        "binding_sha256": binding_sha256,
+        "console_serial": "WINGUNIT1",
+        "coreaudio": {
+            "manufacturer": "BEHRINGER",
+            "transport": "usb",
+            "input_channels": 48,
+            "output_channels": 48,
+            "sample_rate_hz": 48_000,
+        },
         "usb": {
             "vendor_id": 5015,
             "product_id": 1291,
             "serial": usb_serial,
             "location_id": 1048576,
         },
+        "serial_binding": "chassis_serial_plus_three_digit_usb_interface",
+    }
+    return {
+        **binding,
+        "verified": True,
+        "reason": "physical_wing_usb_capture_bound_to_console",
+        "hardware_uid": f"usb:1397:050b:{usb_serial}:00100000",
+        "binding_sha256": binding_sha256
+        or hashlib.sha256(
+            route_module.canonical_json_bytes(binding)
+        ).hexdigest(),
     }
 
 
@@ -127,7 +141,7 @@ def _configure_route_server(server, tmp_path, websocket, secret):
     client._transport_generation = 1
     client.query_parameter = MagicMock()
     route = {
-        "/$syscfg/$serial": "WING-UNIT",
+        "/$syscfg/$serial": "WINGUNIT1",
         "/$syscfg/$firmware": "3.0.5-unit",
         **MASTER_CAPTURE_ROUTE_EXPECTED,
     }
@@ -464,7 +478,7 @@ async def test_route_drift_blocks_without_artifact_or_authority(
         nonlocal call_count
         call_count += 1
         value = {
-            "/$syscfg/$serial": "WING-UNIT",
+            "/$syscfg/$serial": "WINGUNIT1",
             "/$syscfg/$firmware": "3.0.5-unit",
             **MASTER_CAPTURE_ROUTE_EXPECTED,
         }[address]
@@ -537,7 +551,7 @@ async def test_route_capture_rejects_firmware_prefix_and_non_wing_device(
     secret = secrets.token_bytes(32)
     client = _configure_route_server(server, tmp_path, websocket, secret)
     route = {
-        "/$syscfg/$serial": "WING-UNIT",
+        "/$syscfg/$serial": "WINGUNIT1",
         "/$syscfg/$firmware": "3.0.50",
         **MASTER_CAPTURE_ROUTE_EXPECTED,
     }
@@ -684,7 +698,7 @@ async def test_owner_disconnect_tombstone_blocks_inflight_route_issuance(
     secret = secrets.token_bytes(32)
     client = _configure_route_server(server, tmp_path, websocket, secret)
     route = {
-        "/$syscfg/$serial": "WING-UNIT",
+        "/$syscfg/$serial": "WINGUNIT1",
         "/$syscfg/$firmware": "3.0.5",
         **MASTER_CAPTURE_ROUTE_EXPECTED,
     }
@@ -996,6 +1010,49 @@ async def test_fresh_hardware_drift_revokes_route_before_audio_recheck_use(
     assert refreshed["failed_checks"] == [
         "fresh_capture_hardware_identity_current"
     ]
+    assert server._master_capture_route_authority is None
+
+
+@pytest.mark.asyncio
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+async def test_fresh_hardware_output_mode_failure_revokes_route_authority(
+    mock_config,
+    mock_bleed,
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+        str(tmp_path / "runtime"),
+    )
+    server = AutoMixerServer()
+    websocket = object()
+    secret = secrets.token_bytes(32)
+    _configure_route_server(server, tmp_path, websocket, secret)
+    issued = await server.capture_wing_master_route_proof(
+        websocket=websocket,
+        request=_route_request(secret, nonce="7" * 32),
+    )
+    assert issued["status"] == "issued"
+    server._m110_capture_hardware_identity.return_value = {
+        "schema": "automixer.wing_capture_hardware_identity.v1",
+        "verified": False,
+        "reason": "coreaudio_capture_not_physical_wing",
+        "details": {"checks": {"output_channels": False}},
+    }
+
+    refreshed = (
+        await server._verified_master_capture_route_proof_with_fresh_hardware()
+    )
+
+    assert refreshed["verified"] is False
+    assert refreshed["failed_checks"] == [
+        "fresh_capture_hardware_identity_current"
+    ]
+    assert refreshed["hardware_identity_reason"] == (
+        "coreaudio_capture_not_physical_wing"
+    )
     assert server._master_capture_route_authority is None
 
 

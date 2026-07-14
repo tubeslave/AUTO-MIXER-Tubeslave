@@ -68,8 +68,8 @@ conservative true peak `max(sample_peak) + 3 dB <= -1 dBTP`.
 
 The audio identity is hardware-bound, not name-bound. On macOS the backend
 requires exactly one CoreAudio row with the selected exact name, manufacturer
-`BEHRINGER`, USB transport, 48 inputs and 48 kHz, plus exactly one `ioreg` USB
-device named WING with vendor ID `5015` (`0x1397`), product ID `1291`
+`BEHRINGER`, USB transport, 48 inputs, 48 outputs and 48 kHz, plus exactly one
+`ioreg` USB device named WING with vendor ID `5015` (`0x1397`), product ID `1291`
 (`0x050b`) and a stable location ID. Its USB serial must equal the OSC chassis
 serial or equal that serial followed by exactly three decimal digits. The
 latter is the observed WING USB-interface convention on this console
