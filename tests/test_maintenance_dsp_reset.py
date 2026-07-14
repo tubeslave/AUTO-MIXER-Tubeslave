@@ -112,6 +112,8 @@ def _physical_values():
     for spec in M110_PRESERVATION_SPECS:
         if spec.address in IDENTITY_VALUES:
             values[spec.address] = IDENTITY_VALUES[spec.address]
+        elif spec.address == "/main/1/mute":
+            values[spec.address] = 1
         elif spec.value_kind == "binary":
             values[spec.address] = 0
         elif spec.value_kind == "integer":
@@ -252,6 +254,7 @@ class _Hooks:
         self.boundary_ok = True
         self.terminal_ok = True
         self.audio_status = "passed"
+        self.audio_calls = 0
         self.audio_queries = None
         self.on_audio = None
         self.on_terminal = None
@@ -259,6 +262,7 @@ class _Hooks:
 
     def values(self):
         async def audio():
+            self.audio_calls += 1
             if self.audio_queries is not None:
                 self.audio_queries.query_parameter("/main/1/fdr", 0.1)
             if self.on_audio is not None:
@@ -751,6 +755,9 @@ async def test_server_reset_capture_timeout_returns_strict_blocked_terminal(
     server._verified_master_capture_route_proof_with_fresh_hardware = AsyncMock(
         return_value={"verified": True}
     )
+    server._m110_main_output_checkpoint_is_current = MagicMock(
+        return_value=True
+    )
 
     with patch(
         "server.capture_m110_reset_preimage",
@@ -831,6 +838,9 @@ async def test_server_owns_fixed_reset_proposal_capture_and_private_provenance(
     server._verify_m110_cp05_hardware_gate = MagicMock(return_value={})
     server._verified_master_capture_route_proof_with_fresh_hardware = AsyncMock(
         return_value={"verified": True}
+    )
+    server._m110_main_output_checkpoint_is_current = MagicMock(
+        return_value=True
     )
 
     created = await server.create_m110_maintenance_reset_proposal(
@@ -943,8 +953,13 @@ async def test_server_owns_fixed_reset_proposal_capture_and_private_provenance(
     )
     assert claim["claimed"] is True
     server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
-    server._supervised_transaction_audio_recheck = AsyncMock(
-        return_value=AudioRecheckResult("passed")
+    server._m110_reset_contained_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult(
+            "passed",
+            evidence={
+                "capture_status_after": {"captured_sample_count": 1_000_000}
+            },
+        )
     )
     server.activate_system_emergency_stop = AsyncMock(
         return_value={"success": True, "teardown_complete": True}
@@ -971,7 +986,7 @@ async def test_server_owns_fixed_reset_proposal_capture_and_private_provenance(
     assert [address for address, _value in wing.send_calls[:64]] == list(
         M110_RESET_ADDRESSES
     )
-    server._supervised_transaction_audio_recheck.assert_awaited()
+    server._m110_reset_contained_audio_recheck.assert_awaited()
     server.activate_system_emergency_stop.assert_not_awaited()
 
     finalized = server.operator_proposal_queue.mark_apply_result(
@@ -1196,8 +1211,13 @@ async def test_server_fixed_reset_proof_uses_dedicated_executor_and_strict_wal(
         "reason": None,
     }
     server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
-    server._supervised_transaction_audio_recheck = AsyncMock(
-        return_value=AudioRecheckResult("passed")
+    server._m110_reset_contained_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult(
+            "passed",
+            evidence={
+                "capture_status_after": {"captured_sample_count": 1_000_000}
+            },
+        )
     )
     server.activate_system_emergency_stop = AsyncMock(
         return_value={"success": True, "teardown_complete": True}
@@ -1250,7 +1270,7 @@ async def test_server_fixed_reset_proof_uses_dedicated_executor_and_strict_wal(
     server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred.assert_called_once_with(
         reservation
     )
-    server._supervised_transaction_audio_recheck.assert_awaited_once()
+    assert server._m110_reset_contained_audio_recheck.await_count == 2
     server.activate_system_emergency_stop.assert_not_awaited()
 
 
@@ -1281,8 +1301,13 @@ async def test_server_fixed_reset_commit_uses_dedicated_executor_and_keeps_reset
         "reason": None,
     }
     server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
-    server._supervised_transaction_audio_recheck = AsyncMock(
-        return_value=AudioRecheckResult("passed")
+    server._m110_reset_contained_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult(
+            "passed",
+            evidence={
+                "capture_status_after": {"captured_sample_count": 1_000_000}
+            },
+        )
     )
     server.activate_system_emergency_stop = AsyncMock(
         return_value={"success": True, "teardown_complete": True}
@@ -1639,7 +1664,7 @@ async def test_repeated_cancellation_cannot_interrupt_proof_rollback():
 
 
 @pytest.mark.asyncio
-async def test_final_sweep_catches_silent_reenable_during_audio_and_restores():
+async def test_incremental_safety_catches_silent_reenable_and_restores():
     wing, hooks, executor, approved, authority = await _executor_fixture()
     original = dict(wing.values)
 
@@ -1677,10 +1702,42 @@ async def test_audio_not_applicable_is_not_a_real_reset_recheck():
         restored_proof_receipt=authority[1],
     )
 
-    assert result.status == "rolled_back"
-    assert result.reason == "m110_audio_recheck_failed"
+    assert result.status == "blocked"
+    assert result.reason == "m110_prewrite_audio_recheck_failed"
     assert result.audio_recheck_passed is False
     assert wing.values == original
+
+
+@pytest.mark.asyncio
+async def test_reset_requires_verified_main_mute_before_any_send():
+    values = _physical_values()
+    values["/main/1/mute"] = 0
+    wing = _FakeWing(values)
+    approved = await capture_m110_reset_preimage(
+        wing.query_parameter,
+        expected_identity_values=IDENTITY_VALUES,
+    )
+    wing.query_calls.clear()
+    hooks = _Hooks()
+    executor = M110MaintenanceDspResetExecutor(wing, hooks.values())
+    grant, receipt = _reset_authority(
+        proof_run=False,
+        approved_preimage=approved,
+        wing_client=wing,
+    )
+
+    result = await executor.execute(
+        transaction_id="m110-reset-uncontained-main",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=grant,
+        restored_proof_receipt=receipt,
+    )
+
+    assert result.status == "blocked"
+    assert result.reason == "m110_reset_main_output_containment_missing"
+    assert wing.send_calls == []
+    assert hooks.prepared == []
 
 
 @pytest.mark.asyncio
@@ -2258,7 +2315,7 @@ async def test_untrusted_outside_value_is_json_safe_and_cannot_escape_cleanup():
 async def test_authority_exception_at_preterminal_check_forces_known_rollback():
     wing, hooks, executor, approved, authority = await _executor_fixture()
     original = dict(wing.values)
-    hooks.raise_authority_at = 195
+    hooks.raise_authority_at = 323
 
     result = await executor.execute(
         transaction_id="m110-reset-final-authority-exception",
@@ -2607,7 +2664,11 @@ async def test_proof_authority_expiry_after_audio_never_records_proof_success():
         proof_run=True
     )
     original = dict(wing.values)
-    hooks.on_audio = lambda: setattr(hooks, "authority", False)
+    def expire_after_final_audio():
+        if hooks.audio_calls == 2:
+            hooks.authority = False
+
+    hooks.on_audio = expire_after_final_audio
 
     result = await executor.execute(
         transaction_id="m110-proof-authority-expired-after-audio",

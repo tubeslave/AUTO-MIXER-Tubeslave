@@ -12,6 +12,7 @@ import argparse
 import asyncio
 import json
 import os
+import shutil
 import sys
 import time
 import uuid
@@ -224,6 +225,16 @@ async def run(args: argparse.Namespace) -> int:
     manual_write_artifacts_dir = (run_dir / "manual_write_gate").resolve()
     decision_trace_path = manual_write_artifacts_dir / "decision_traces.jsonl"
     decision_memory_path = manual_write_artifacts_dir / "decision_memory.jsonl"
+    result_runtime_dir = (
+        Path.home()
+        / ".automixer"
+        / "runtime"
+        / "gain_proof_dry_run"
+        / run_id
+    ).resolve()
+    operator_proposal_result_dir = (
+        result_runtime_dir / "operator_proposal_results"
+    )
     recorder = EventRecorder(run_dir)
 
     summary: Dict[str, Any] = {
@@ -244,6 +255,10 @@ async def run(args: argparse.Namespace) -> int:
         "manual_write_artifacts_dir": str(manual_write_artifacts_dir),
         "decision_trace_path": str(decision_trace_path),
         "decision_memory_path": str(decision_memory_path),
+        "operator_proposal_result_runtime_dir": str(result_runtime_dir),
+        "operator_proposal_result_dir": str(operator_proposal_result_dir),
+        "operator_proposal_result_runtime_isolated": False,
+        "operator_proposal_result_runtime_cleaned": False,
         "evidence_stores_isolated": False,
         "forbidden_messages": ["set_gain", "set_fader", "set_eq", "set_compressor", "route_output", "load_snap", "save_snap"],
         "started_at": datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
@@ -267,7 +282,7 @@ async def run(args: argparse.Namespace) -> int:
                         manual_write_artifacts_dir
                     ),
                     "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR": str(
-                        run_dir / "operator_proposal_results"
+                        operator_proposal_result_dir
                     ),
                 },
             ),
@@ -291,11 +306,19 @@ async def run(args: argparse.Namespace) -> int:
             server._manual_write_artifacts_dir,
             server.automation_trace_store.path,
             server.decision_memory_store.path,
-            server.operator_proposal_queue._result_store.root,
         )
         if not all(path.resolve().is_relative_to(run_dir.resolve()) for path in isolated_paths):
             raise RuntimeError("dry-run evidence path escaped the run artifact directory")
+        result_store_root = (
+            server.operator_proposal_queue._result_store.root.resolve()
+        )
+        if not (
+            result_store_root == operator_proposal_result_dir.resolve()
+            and result_store_root.is_relative_to(result_runtime_dir)
+        ):
+            raise RuntimeError("dry-run result evidence escaped private runtime")
         summary["console_runtime_isolated"] = True
+        summary["operator_proposal_result_runtime_isolated"] = True
         summary["evidence_stores_isolated"] = True
         fake_mixer = FakeProofMixer(args.channel, args.initial_gain_db)
         server.connection_mode = "wing"
@@ -462,6 +485,20 @@ async def run(args: argparse.Namespace) -> int:
         recorder.write_summary(summary)
         print(json.dumps(summary, indent=2, sort_keys=True))
         return 1
+    finally:
+        try:
+            shutil.rmtree(result_runtime_dir)
+        except FileNotFoundError:
+            pass
+        except OSError as cleanup_error:
+            summary["operator_proposal_result_runtime_cleanup_error"] = (
+                type(cleanup_error).__name__
+            )
+        summary["operator_proposal_result_runtime_cleaned"] = (
+            not result_runtime_dir.exists()
+        )
+        if recorder.summary_path.exists():
+            recorder.write_summary(summary)
 
 
 def main(argv: Optional[list[str]] = None) -> int:

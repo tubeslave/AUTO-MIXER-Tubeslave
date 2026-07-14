@@ -98,6 +98,293 @@ def test_parameter_translation_covers_all_generated_soundcheck_families():
     assert translated[-1][0].address == "/main/1/fdr"
 
 
+def test_m110_gate_processor_uses_exact_wing_fw305_enum_tokens():
+    op = operation(
+        "gate_expander",
+        "gate",
+        {
+            "m110_processor_block": "gate",
+            "model": "GATE",
+            "mix_pct": 100.0,
+            "gain_db": 0.0,
+            "threshold_db": -40.0,
+            "range_db": 20.0,
+            "attack_ms": 5.0,
+            "hold_ms": 30.0,
+            "release_ms": 120.0,
+            "accent_pct": 0.0,
+            "ratio": "GATE",
+            "sidechain": {
+                "type": "OFF",
+                "freq_hz": 1000.0,
+                "q": 1.0,
+                "source": "SELF",
+                "tap": "IN",
+            },
+            "enabled": True,
+        },
+    )
+
+    by_address = {
+        write.address: write.value
+        for write in parameter_writes_for_operation(op)
+    }
+
+    assert by_address["/ch/3/gate/ratio"] == "GATE"
+    assert by_address["/ch/3/gatesc/type"] == "OFF"
+    assert by_address["/ch/3/gatesc/src"] == "SELF"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("op", "old_values"),
+    [
+        (operation("fader", "fader", -12.0), {"/ch/3/fdr": -8.0}),
+        (
+            operation("gain_trim", "trim", -4.0),
+            {"/ch/3/in/set/trim": 0.0},
+        ),
+        (
+            operation(
+                "fx_sends_inserts",
+                "send",
+                {"send_bus": 2, "level_db": -18.0},
+            ),
+            {"/ch/3/send/2/lvl": -12.0},
+        ),
+        (
+            operation("dynamics_compressor", "compressor", -2.0),
+            {"/ch/3/dyn/gain": 0.0},
+        ),
+        (
+            operation(
+                "bus_group_dca_matrix",
+                "dca",
+                {"dca_id": 1, "target_db": -6.0},
+                parameter="dca_1_fader_db",
+                channel=None,
+            ),
+            {"/dca/1/fdr": -3.0},
+        ),
+        (
+            operation(
+                "master_output",
+                "master",
+                {"main_id": 1, "target_db": -8.0},
+                parameter="main_1_fader_db",
+                channel=None,
+            ),
+            {"/main/1/fdr": -4.0},
+        ),
+        (operation("mute", "mute", True), {"/ch/3/mute": 0}),
+        (
+            operation(
+                "eq_hpf",
+                "eq",
+                {
+                    "band": 2,
+                    "freq_hz": 300.0,
+                    "gain_db": -2.0,
+                    "q": 1.0,
+                },
+            ),
+            {
+                "/ch/3/eq/2f": 300.0,
+                "/ch/3/eq/2g": 0.0,
+                "/ch/3/eq/2q": 1.0,
+            },
+        ),
+    ],
+)
+async def test_audio_failure_retention_proves_only_monotonic_targets_read_only(
+    op,
+    old_values,
+):
+    wing = FakeWing()
+    writes = parameter_writes_for_operation(op)
+    reads = audible_state_reads_for_operation(op)
+    for write in writes:
+        wing.values[write.address] = old_values.get(
+            write.address,
+            write.value,
+        )
+    for read in reads:
+        wing.values[read.address] = read.value
+    adapter = WingSupervisedFamilyAdapter(op.family_id, wing)
+    snapshot = await adapter.snapshot(op)
+    for write in writes:
+        wing.values[write.address] = write.value
+
+    result = await adapter.assess_audio_failure_retention(
+        op,
+        snapshot,
+        AdapterStepResult(
+            True,
+            True,
+            "applied",
+            {
+                "writes": [
+                    {
+                        "address": write.address,
+                        "value": write.value,
+                        "sent": True,
+                    }
+                    for write in writes
+                ]
+            },
+        ),
+    )
+
+    assert result.success is True
+    assert result.physical_verified is True
+    assert result.evidence["retention_eligible"] is True
+    assert result.evidence["target_physical_verified"] is True
+    assert result.evidence["write_attempted"] is False
+    assert wing.sent == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("op", "old_overrides"),
+    [
+        (operation("pan_phase_delay", "pan", -10.0), {"/ch/3/pan": 0.0}),
+        (
+            operation(
+                "eq_hpf",
+                "eq",
+                {
+                    "band": 2,
+                    "freq_hz": 300.0,
+                    "gain_db": -2.0,
+                    "q": 1.0,
+                },
+            ),
+            {
+                "/ch/3/eq/2f": 200.0,
+                "/ch/3/eq/2g": 0.0,
+                "/ch/3/eq/2q": 1.0,
+            },
+        ),
+        (
+            operation(
+                "dynamics_compressor",
+                "compressor",
+                {
+                    "threshold_db": -18.0,
+                    "ratio": 3.0,
+                    "attack_ms": 20.0,
+                    "release_ms": 100.0,
+                    "makeup_db": -2.0,
+                    "enabled": True,
+                },
+            ),
+            {"/ch/3/dyn/thr": -12.0, "/ch/3/dyn/gain": 0.0},
+        ),
+    ],
+)
+async def test_audio_failure_retention_rejects_spatial_or_multi_parameter_changes(
+    op,
+    old_overrides,
+):
+    wing = FakeWing()
+    writes = parameter_writes_for_operation(op)
+    reads = audible_state_reads_for_operation(op)
+    for write in writes:
+        wing.values[write.address] = old_overrides.get(
+            write.address,
+            write.value,
+        )
+    for read in reads:
+        wing.values[read.address] = read.value
+    adapter = WingSupervisedFamilyAdapter(op.family_id, wing)
+    snapshot = await adapter.snapshot(op)
+    for write in writes:
+        wing.values[write.address] = write.value
+
+    result = await adapter.assess_audio_failure_retention(
+        op,
+        snapshot,
+        AdapterStepResult(True, True, "applied"),
+    )
+
+    assert result.success is False
+    assert result.evidence["retention_eligible"] is False
+    assert result.evidence["write_attempted"] is False
+    assert wing.sent == []
+
+
+@pytest.mark.asyncio
+async def test_audio_failure_retention_readback_failure_never_writes():
+    op = operation("fader", "fader", -12.0)
+    wing = FakeWing()
+    wing.values["/ch/3/fdr"] = -8.0
+    adapter = WingSupervisedFamilyAdapter(op.family_id, wing)
+    snapshot = await adapter.snapshot(op)
+    wing.values["/ch/3/fdr"] = -12.0
+    wing.query_status = "timeout"
+
+    result = await adapter.assess_audio_failure_retention(
+        op,
+        snapshot,
+        AdapterStepResult(True, True, "applied"),
+    )
+
+    assert result.success is False
+    assert result.evidence["retention_eligible"] is True
+    assert result.evidence["target_physical_verified"] is False
+    assert wing.sent == []
+
+
+@pytest.mark.asyncio
+async def test_processor_enable_runs_safety_immediately_before_and_after_enable():
+    wing = FakeWing()
+    op = ConsoleTransactionOperation(
+        operation_id="m110:hpf:ch3",
+        family_id="eq_hpf",
+        write_kind="hpf",
+        target_value={
+            "m110_processor_block": "hpf",
+            "freq_hz": 90.0,
+            "slope_db_per_octave": "12",
+            "enabled": True,
+        },
+        channel=3,
+        parameter="m110_complete_hpf_block",
+        metadata={"m110_processor_enable_bundle": True},
+    )
+    writes = parameter_writes_for_operation(op)
+    for write in writes:
+        wing.values[write.address] = 0
+    events = []
+
+    async def before_enable(operation):
+        events.append(("before_enable", len(wing.sent), operation.operation_id))
+        return True
+
+    async def audio_recheck(operation, snapshot, apply_evidence):
+        events.append(("post_enable", len(wing.sent), operation.operation_id))
+        return AudioRecheckResult("passed")
+
+    adapter = WingSupervisedFamilyAdapter(
+        "eq_hpf",
+        wing,
+        audio_recheck=audio_recheck,
+        write_authority_current=lambda: True,
+        before_processor_enable=before_enable,
+        processor_enable_authorized=True,
+    )
+    snapshot = await adapter.snapshot(op)
+
+    result = await adapter.apply(op, snapshot)
+
+    assert result.success is True
+    assert events == [
+        ("before_enable", len(writes) - 1, op.operation_id),
+        ("post_enable", len(writes), op.operation_id),
+    ]
+    assert wing.sent[-1] == (writes[-1].address, 1)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("op", "enable_address", "mutation_addresses"),

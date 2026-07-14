@@ -3,6 +3,16 @@ export const DECISION_QUEUE_WIRE_SCHEMA = 'automixer.decision_queue.v2';
 export const PROPOSAL_REVIEW_SCHEMA = 'automixer.operator_proposal.review_content.v2';
 export const PROPOSAL_DETAIL_MEDIA_TYPE = 'application/vnd.automixer.operator-proposal-review+json;version=2';
 
+/** @typedef {import('../types').DecisionQueueState} DecisionQueueState */
+/** @typedef {import('../types').TransportTerminalClose} TransportTerminalClose */
+/**
+ * @typedef {object} ProposalDetailMetadata
+ * @property {number} chunkCount
+ * @property {number} totalRawBytes
+ * @property {string} contentSha256
+ * @property {string} currentStateKey
+ */
+
 const FIRST_PAGE_SIZE = 50;
 const MAX_DETAIL_CHUNK_BYTES = 65_536;
 const MAX_DETAIL_TOTAL_BYTES = 2_097_152;
@@ -239,6 +249,14 @@ function normalizeQueueItem(value, applyUiDisabled) {
   };
 }
 
+/**
+ * @param {{
+ *   availability?: DecisionQueueState['availability'],
+ *   error?: string,
+ *   terminalClose?: TransportTerminalClose | null
+ * }} [options]
+ * @returns {DecisionQueueState}
+ */
 export function createUnavailableDecisionQueueState({
   availability = 'unavailable',
   error = '',
@@ -303,6 +321,11 @@ export function markDecisionQueueLoading(previous, { pagination = false } = {}) 
   };
 }
 
+/**
+ * @param {unknown} frame
+ * @param {DecisionQueueState | null} [previous]
+ * @returns {DecisionQueueState}
+ */
 export function parseDecisionQueueFrame(frame, previous = null) {
   const data = record(frame);
   if (
@@ -581,6 +604,12 @@ async function sha256Hex(bytes) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+/**
+ * @param {unknown} frame
+ * @param {unknown} identity
+ * @param {number} expectedChunkIndex
+ * @param {ProposalDetailMetadata | null} [expectedMetadata]
+ */
 export async function verifyProposalDetailFrame(
   frame,
   identity,

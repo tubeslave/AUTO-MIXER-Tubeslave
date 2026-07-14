@@ -36,6 +36,7 @@ from autofoh_safety import (
     SendLevelAdjust,
     TypedCorrectionAction,
 )
+from compressor_adaptation import ratio_float_to_wing
 from supervised_console_parameter_registry import (
     get_supervised_console_family,
 )
@@ -379,7 +380,10 @@ def _semantic_target(action: TypedCorrectionAction) -> tuple[str, str, int | Non
     if isinstance(action, CompressorAdjust):
         return "dynamics_compressor", "compressor", action.channel_id, "compressor", {
             "threshold_db": action.threshold_db,
-            "ratio": action.ratio,
+            # WING exposes a discrete ratio enum.  Bind the reviewed absolute
+            # target to the value that can actually be written and read back;
+            # otherwise a proposal for (for example) 7:1 could only commit 6:1.
+            "ratio": float(ratio_float_to_wing(float(action.ratio))),
             "attack_ms": action.attack_ms,
             "release_ms": action.release_ms,
             "makeup_db": action.makeup_db,

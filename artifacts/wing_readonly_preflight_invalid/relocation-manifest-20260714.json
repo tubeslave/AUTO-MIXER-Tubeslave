@@ -1,0 +1,220 @@
+{
+  "schema": "automixer.wing_readonly_preflight_negative_archive.v1",
+  "created_at_utc": "2026-07-14T14:00:14Z",
+  "introduced_by_commit": "e5330d5e582d44ab0cd41cd6d2e4ca6af8c7dc09",
+  "source_root": "artifacts/wing_readonly_preflight",
+  "archive_root": "artifacts/wing_readonly_preflight_invalid",
+  "policy": "immutable_invalid_capture_archive_not_candidate",
+  "read_only": true,
+  "admissible_for_readiness": false,
+  "readiness_closure_allowed": false,
+  "live_authority_granted": false,
+  "payload_bytes_modified": false,
+  "entries": [
+    {
+      "run_id": "20260713T051955Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "expected_plan_mismatch",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T051955Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T051955Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T051955Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T051955Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 24372,
+          "sha256": "8f3914b6da6688311b71dc393217b58a1a71870c5151c31a1922537ea15349a5"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T052026Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "unexpected_response_type",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T052026Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T052026Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "events.jsonl",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052026Z_wing_readonly_preflight/events.jsonl",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052026Z_wing_readonly_preflight/events.jsonl",
+          "size_bytes": 14473,
+          "sha256": "ae0f4686c6683811bacad4ea909497c76ca7e77bc74c80e21e6c4df7e0d0723d"
+        },
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052026Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052026Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 27923,
+          "sha256": "0fc8439fa9fe2dddfd0ac27e6e29d54058005930572ed97a1fcf9af1c6aca014"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T052335Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "wing_readonly_preflight_blocked",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T052335Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T052335Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "events.jsonl",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052335Z_wing_readonly_preflight/events.jsonl",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052335Z_wing_readonly_preflight/events.jsonl",
+          "size_bytes": 282679,
+          "sha256": "4f7c71844b187540e39671f4affbbd6ad10fda1958436b6e896c38e793e85bbb"
+        },
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052335Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052335Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 214191,
+          "sha256": "58674b67bb773e5162b29007515e88611d203831420742b3345056b9575848c2"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T052452Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "read_only_preflight_timeout",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T052452Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T052452Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "events.jsonl",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052452Z_wing_readonly_preflight/events.jsonl",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052452Z_wing_readonly_preflight/events.jsonl",
+          "size_bytes": 42954,
+          "sha256": "44d3d6b871f1930eeb4677120af8e37d1e96050a5589914c8080bccdf5064590"
+        },
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052452Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052452Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 28143,
+          "sha256": "4d24ef8fb0aaccc1142c3b974fe8b0d1c7c48000c4c3cd3375c4849338d954be"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T052547Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "read_only_preflight_timeout",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T052547Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T052547Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "events.jsonl",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052547Z_wing_readonly_preflight/events.jsonl",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052547Z_wing_readonly_preflight/events.jsonl",
+          "size_bytes": 42954,
+          "sha256": "3c8a993814e05f1bf17d123c95709f573c393fc0e30cd643fecc277d1327ee2a"
+        },
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T052547Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T052547Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 28144,
+          "sha256": "aa3560e9a18295b22b090cf1196dcf151376c4c55706d90fa3ad8aeee81118c8"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T054127Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "expected_plan_mismatch",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T054127Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T054127Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T054127Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T054127Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 28960,
+          "sha256": "d0cbaaa93bc3a8f33c1cc062c74fc6ac684dd10bf4df79e7e12a4d6a13d328d7"
+        }
+      ]
+    },
+    {
+      "run_id": "20260713T054142Z_wing_readonly_preflight",
+      "status": "blocked",
+      "reason": "backend_not_in_wing_mode",
+      "original_directory": "artifacts/wing_readonly_preflight/20260713T054142Z_wing_readonly_preflight",
+      "archived_directory": "artifacts/wing_readonly_preflight_invalid/20260713T054142Z_wing_readonly_preflight",
+      "files": [
+        {
+          "name": "events.jsonl",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T054142Z_wing_readonly_preflight/events.jsonl",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T054142Z_wing_readonly_preflight/events.jsonl",
+          "size_bytes": 2786,
+          "sha256": "ffcbed7b12d1c5154629b4ae7ac5a65d21364bb27d95faa8033767ca50850709"
+        },
+        {
+          "name": "summary.json",
+          "original_path": "artifacts/wing_readonly_preflight/20260713T054142Z_wing_readonly_preflight/summary.json",
+          "archived_path": "artifacts/wing_readonly_preflight_invalid/20260713T054142Z_wing_readonly_preflight/summary.json",
+          "size_bytes": 26958,
+          "sha256": "4fc1f59abce225193290d8b7446775af3044bbcbd3aeae0f8aca56de58ba435a"
+        }
+      ]
+    }
+  ],
+  "referenced_sidecars": [
+    {
+      "kind": "full_dsp_baseline_plan",
+      "path": "artifacts/wing_readonly_preflight/20260713T0519Z_full_dsp_baseline_plan.json",
+      "size_bytes": 89342,
+      "sha256": "8ebfc83a5adad509f441861f52b293646312b490a0c29826422248e284412467",
+      "moved": false
+    },
+    {
+      "kind": "full_dsp_baseline_plan",
+      "path": "artifacts/wing_readonly_preflight/20260713T0520Z_full_dsp_baseline_plan.json",
+      "size_bytes": 89342,
+      "sha256": "563cbc8212e7e84f73f56ad4830615e55b3b5e44a404a4d7ffbdeec881f4920e",
+      "moved": false
+    },
+    {
+      "kind": "full_dsp_baseline_plan",
+      "path": "artifacts/wing_readonly_preflight/20260713T0523Z_full_dsp_baseline_plan.json",
+      "size_bytes": 89342,
+      "sha256": "4344e22979090ac53d455d88342744ad5bd9d586150483a5c40a3155616e279a",
+      "moved": false
+    },
+    {
+      "kind": "verified_dsp_baseline_plan",
+      "path": "artifacts/wing_readonly_preflight/20260713T0524Z_verified_dsp_baseline_plan.json",
+      "size_bytes": 73088,
+      "sha256": "57723182e49717b9a07a5f3021acc542fb96de5d0b299c96a6568657d36d433e",
+      "moved": false
+    },
+    {
+      "kind": "verified_dsp_baseline_plan",
+      "path": "artifacts/wing_readonly_preflight/20260713T0526Z_verified_dsp_baseline_plan.json",
+      "size_bytes": 73088,
+      "sha256": "61ec2a36a625b5b98036a48cf7eec5a1bbb39e2760a8d6ce1ce6f490fd4ce945",
+      "moved": false
+    },
+    {
+      "kind": "no_wing_prestart_summary",
+      "path": "artifacts/no_wing_release_check/20260713T051812Z_no_wing_release_check/backend_port_prestart/summary.json",
+      "size_bytes": 29040,
+      "sha256": "23f55c1c0dc6ae417877c5876e325a2218910e22a47de7b90e6af861f8ffd5a4",
+      "moved": false
+    },
+    {
+      "kind": "no_wing_release_summary",
+      "path": "artifacts/no_wing_release_check/20260713T051812Z_no_wing_release_check/summary.json",
+      "size_bytes": 1183273,
+      "sha256": "af5b0ecbbcf96c79e9cd58ef9e3dda25aab5c7d8524e2499a45396e0eae669b9",
+      "moved": false
+    },
+    {
+      "kind": "no_wing_prestart_summary",
+      "path": "artifacts/no_wing_release_check/20260713T052155Z_no_wing_release_check/backend_port_prestart/summary.json",
+      "size_bytes": 29040,
+      "sha256": "d65e93cfc7e48f6cf8c977f20a92e4c2ae26f28146c612f88c213a18a39249db",
+      "moved": false
+    }
+  ]
+}

@@ -104,6 +104,12 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert summary["physical_wing"] is False
     assert summary["console_runtime_isolated"] is True
     assert summary["evidence_stores_isolated"] is True
+    assert summary["operator_proposal_result_runtime_isolated"] is True
+    assert summary["operator_proposal_result_runtime_cleaned"] is True
+    assert not Path(summary["operator_proposal_result_runtime_dir"]).exists()
+    assert Path(summary["operator_proposal_result_dir"]).parent == Path(
+        summary["operator_proposal_result_runtime_dir"]
+    )
     assert Path(summary["console_runtime_dir"]) == (
         Path(summary["summary_path"]).parent / "console_runtime"
     )

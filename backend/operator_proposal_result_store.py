@@ -27,6 +27,7 @@ from decision_queue_wire_contract import (
     canonical_json_bytes,
     is_sha256_digest,
     sha256_digest,
+    terminal_result_proves_verified_already_satisfied_apply,
     terminal_result_proves_verified_apply,
     terminal_result_proves_verified_restored_proof,
 )
@@ -261,7 +262,10 @@ def result_requires_pinned_evidence(result: Dict[str, Any]) -> bool:
     ):
         if result.get(key) is not False:
             return True
-    known_verified_apply = terminal_result_proves_verified_apply(result)
+    known_verified_apply = bool(
+        terminal_result_proves_verified_apply(result)
+        or terminal_result_proves_verified_already_satisfied_apply(result)
+    )
     if (
         "physical_state_restored" in result
         and result.get("physical_state_restored") is not True
@@ -519,7 +523,12 @@ class ResultEvidenceStore:
             value.get("rollback_state_unknown") is True
             or (
                 value.get("physical_state_restored") is False
-                and not terminal_result_proves_verified_apply(value)
+                and not (
+                    terminal_result_proves_verified_apply(value)
+                    or terminal_result_proves_verified_already_satisfied_apply(
+                        value
+                    )
+                )
             )
         ):
             fatal_codes.append("terminal_rollback_state_unknown")

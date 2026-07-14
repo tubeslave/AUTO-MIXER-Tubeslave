@@ -279,6 +279,61 @@ async def test_start_auto_soundcheck_handler_starts_new_engine_with_observe_only
 
 
 @pytest.mark.asyncio
+async def test_m110_analysis_requires_fresh_soundcheck_unmuted_checkpoint(
+    monkeypatch,
+):
+    server = DummyServer()
+    websocket = object()
+    control = object()
+    route = type("Route", (), {"_owner_ref": websocket})()
+    server.audio_capture = type(
+        "SharedCapture",
+        (),
+        {"running": True, "num_channels": 48},
+    )()
+    server._audio_capture_preview_owner = websocket
+    server._master_capture_route_authority = route
+    server._verified_m110_attended_control = MagicMock(
+        return_value=(control, "current")
+    )
+    server._verified_master_capture_route_proof_with_fresh_hardware = (
+        AsyncMock(return_value={"verified": True, "reason": "current"})
+    )
+    server._m110_full_reset_is_current = MagicMock(return_value=True)
+    server._m110_main_output_checkpoint_is_current = MagicMock(
+        return_value=False
+    )
+    constructor = MagicMock()
+    monkeypatch.setattr(
+        "handlers.soundcheck_handlers.AutoSoundcheckEngine",
+        constructor,
+    )
+    handlers = register_handlers(server)
+
+    await handlers["start_m110_soundcheck_analysis"](
+        websocket,
+        {"type": "start_m110_soundcheck_analysis"},
+    )
+
+    payload = server.sent_messages[-1][1]
+    assert payload["type"] == "m110_soundcheck_analysis_result"
+    assert payload["status"] == "blocked"
+    assert payload["reason"] == (
+        "m110_soundcheck_unmuted_checkpoint_required"
+    )
+    server._m110_main_output_checkpoint_is_current.assert_called_once_with(
+        "soundcheck_unmuted",
+        websocket=websocket,
+        control=control,
+        route=route,
+        maximum_age_sec=5.0,
+    )
+    constructor.assert_not_called()
+    assert server.auto_soundcheck_engine is None
+    assert server.audio_capture.running is True
+
+
+@pytest.mark.asyncio
 async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
     server = DummyServer()
     handlers = register_handlers(server)

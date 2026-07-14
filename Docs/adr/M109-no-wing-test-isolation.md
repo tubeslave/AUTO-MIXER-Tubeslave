@@ -1,5 +1,11 @@
 # ADR M109 — isolate static no-WING contract tests from live artifact history
 
+Later bounded supersession: ADR M110 permits only the seven exact run IDs and
+twelve exact payload hashes recorded in
+`artifacts/wing_readonly_preflight_invalid/relocation-manifest-20260714.json`
+to move byte-for-byte into immutable negative provenance. All other M109
+production intake and fail-closed rules remain in force.
+
 ## Evidence-driven amendment — 2026-07-13
 
 The initial three repaired tests passed, then the complete module exposed one

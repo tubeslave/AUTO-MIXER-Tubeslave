@@ -18,6 +18,18 @@ Status values:
 
 ## Current external validation handoff
 
+M110 overlay (2026-07-14): the frozen table below remains historical. Active
+operator-directed work is `STATE.json.active_work`: CP00 complete, CP01-CP04
+implemented/offline-validated, CP05 pending in the canonical marker pair, and
+HW01-HW05 pending. The current cycle has not contacted WING/USB or written the
+console. M005 behavior is closed; M006 permission is one attended-run input,
+not standing authority. The reset path bypasses 64 CH1-16 processor enables and
+restores only 77 known M006-changed addresses (23/14/14 stages), preserving all
+other state. Source commit/CP05, writer-directory release, route proof, physical
+reset/apply, stable two-pass final audits, SHA-bound listening and teardown are
+still required. Strict live remains `88/100`, allowlist `0`, authority `false`,
+and the `95/100` target open.
+
 Soundcheck execution update (2026-07-12): local staged kernel `96/100`, strict
 real-live soundcheck `88/100`, full-project local engineering `95/100`, strict
 public release `88/100`. The normal live allowlist remains `0`. The monolithic

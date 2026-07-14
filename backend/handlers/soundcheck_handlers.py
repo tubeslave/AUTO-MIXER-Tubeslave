@@ -310,9 +310,109 @@ def register_handlers(server):
 
     async def _start_engine(websocket, data, *, soundcheck_events: bool):
         """Start the new AutoSoundcheckEngine as the canonical soundcheck path."""
+        m110_analysis = bool(
+            isinstance(data, dict)
+            and data.get("type") == "start_m110_soundcheck_analysis"
+        )
+        m110_terminal_state = {"sent": False}
+
+        async def send_m110_terminal(payload):
+            if not m110_analysis or m110_terminal_state["sent"]:
+                return
+            m110_terminal_state["sent"] = True
+            await server.send_to_client(
+                websocket,
+                {
+                    "type": "m110_soundcheck_analysis_result",
+                    "live_authority_granted": False,
+                    "readiness_closure_allowed": False,
+                    **dict(payload),
+                },
+            )
+        blocked_response_type = (
+            "m110_soundcheck_analysis_result"
+            if m110_analysis
+            else "auto_soundcheck_status"
+            if soundcheck_events
+            else "auto_engine_status"
+        )
+        shared_capture = None
+        if m110_analysis:
+            control, control_reason = server._verified_m110_attended_control(
+                websocket
+            )
+            route_view = (
+                await server._verified_master_capture_route_proof_with_fresh_hardware()
+            )
+            route = server._master_capture_route_authority
+            shared_capture = getattr(server, "audio_capture", None)
+            route_ready = bool(
+                route_view.get("verified") is True
+                and route is not None
+                and getattr(route, "_owner_ref", None) is websocket
+            )
+            capture_ready = bool(
+                server._audio_capture_preview_owner is websocket
+                and shared_capture is not None
+                and getattr(shared_capture, "running", False) is True
+            )
+            reset_ready = bool(
+                control is not None
+                and route_ready
+                and server._m110_full_reset_is_current(
+                    websocket=websocket,
+                    control=control,
+                    route=route,
+                )
+            )
+            unmuted_checkpoint_ready = bool(
+                reset_ready
+                and server._m110_main_output_checkpoint_is_current(
+                    "soundcheck_unmuted",
+                    websocket=websocket,
+                    control=control,
+                    route=route,
+                    maximum_age_sec=5.0,
+                )
+            )
+            m110_ready = bool(
+                control is not None
+                and route_ready
+                and capture_ready
+                and reset_ready
+                and unmuted_checkpoint_ready
+            )
+            if not m110_ready:
+                if control is None:
+                    blocked_reason = control_reason
+                elif not route_ready:
+                    blocked_reason = (
+                        route_view.get("reason")
+                        or "m110_route_authority_not_current"
+                    )
+                elif not capture_ready:
+                    blocked_reason = "m110_shared_capture_not_current"
+                elif not reset_ready:
+                    blocked_reason = "m110_committed_reset_required"
+                else:
+                    blocked_reason = (
+                        "m110_soundcheck_unmuted_checkpoint_required"
+                    )
+                await server.send_to_client(
+                    websocket,
+                    {
+                        "type": blocked_response_type,
+                        "status": "blocked",
+                        "success": False,
+                        "reason": blocked_reason,
+                        "live_authority_granted": False,
+                        "readiness_closure_allowed": False,
+                    },
+                )
+                return
         if getattr(server, "_packaged_offline_lock", False):
             await server.send_to_client(websocket, {
-                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "type": blocked_response_type,
                 "status": "blocked",
                 "is_running": False,
                 "running": False,
@@ -324,7 +424,7 @@ def register_handlers(server):
             return
         if _engine_cleanup_incomplete():
             await server.send_to_client(websocket, {
-                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "type": blocked_response_type,
                 "status": "blocked",
                 "is_running": False,
                 "running": False,
@@ -335,7 +435,7 @@ def register_handlers(server):
             return
         if _engine_is_active():
             await server.send_to_client(websocket, {
-                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "type": blocked_response_type,
                 "is_running": True,
                 "running": True,
                 "error": "Auto soundcheck engine already running",
@@ -345,10 +445,22 @@ def register_handlers(server):
         mixer_config = server.config.get("mixer", {})
         audio_config = server.config.get("audio", {})
         try:
-            selected_channels, num_channels = _channel_selection(data)
+            selected_channels, num_channels = _channel_selection(
+                {} if m110_analysis else data
+            )
+            if m110_analysis:
+                capture_channels = int(
+                    getattr(shared_capture, "num_channels", 0) or 0
+                )
+                if capture_channels < 48:
+                    raise ValueError(
+                        "M110 shared capture must expose channels 1..48"
+                    )
+                selected_channels = list(range(1, 17))
+                num_channels = capture_channels
         except (TypeError, ValueError) as exc:
             await server.send_to_client(websocket, {
-                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "type": blocked_response_type,
                 "status": "blocked",
                 "is_running": False,
                 "running": False,
@@ -359,13 +471,24 @@ def register_handlers(server):
             })
             return
 
-        mixer_type = data.get("mixer_type", mixer_config.get("type", "dlive"))
+        mixer_type = (
+            "wing"
+            if m110_analysis
+            else data.get("mixer_type", mixer_config.get("type", "dlive"))
+        )
         mixer_ip = data.get("mixer_ip", mixer_config.get("ip", "192.168.3.70"))
         mixer_port = data.get(
             "mixer_port",
             mixer_config.get("port", 51328 if mixer_type == "dlive" else 2223)
         )
-        audio_device = data.get("audio_device", data.get("device_id", audio_config.get("device_name", "soundgrid")))
+        audio_device = (
+            str(server._master_capture_route_authority.capture_device)
+            if m110_analysis
+            else data.get(
+                "audio_device",
+                data.get("device_id", audio_config.get("device_name", "soundgrid")),
+            )
+        )
         # The canonical soundcheck path measures and proposes. All physical writes
         # must pass through the supervised manual gate with explicit approval.
         observe_only = True
@@ -425,6 +548,12 @@ def register_handlers(server):
                 return
             recommendation_import["done"] = True
             if not hasattr(server, "import_soundcheck_recommendations_to_operator_queue"):
+                if m110_analysis:
+                    await send_m110_terminal({
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "soundcheck_recommendation_import_unavailable",
+                    })
                 return
             if getattr(server, "auto_soundcheck_engine", None) is not engine:
                 await server.broadcast({
@@ -435,6 +564,12 @@ def register_handlers(server):
                     "trigger": "auto_soundcheck_state",
                     "trigger_state": trigger_state,
                 })
+                if m110_analysis:
+                    await send_m110_terminal({
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "soundcheck_engine_superseded",
+                    })
                 return
             bundle = None
             if hasattr(engine, "get_soundcheck_recommendation_bundle"):
@@ -507,13 +642,63 @@ def register_handlers(server):
                 "trigger_state": trigger_state,
             })
             await server.broadcast(compact_operator_proposal_import_summary(summary))
+            if m110_analysis:
+                registered = server._m110_current_soundcheck_manifest()
+                analysis_complete = bool(
+                    isinstance(manifest, dict)
+                    and isinstance(registered, dict)
+                    and registered.get("run_id") == manifest.get("run_id")
+                    and getattr(engine, "_derivation_complete", False) is True
+                )
+                await send_m110_terminal({
+                    "status": "complete" if analysis_complete else "blocked",
+                    "success": analysis_complete,
+                    "reason": (
+                        "m110_soundcheck_manifest_registered"
+                        if analysis_complete
+                        else "m110_soundcheck_manifest_registration_failed"
+                    ),
+                    "run_id": (
+                        manifest.get("run_id")
+                        if isinstance(manifest, dict)
+                        else None
+                    ),
+                    "plan_revision": (
+                        manifest.get("plan_revision")
+                        if isinstance(manifest, dict)
+                        else None
+                    ),
+                    "imported_count": summary.get("imported_count"),
+                    "soundcheck_readiness": summary.get(
+                        "soundcheck_readiness"
+                    ),
+                    "shared_capture_retained": bool(
+                        engine.audio_capture is shared_capture
+                        and getattr(shared_capture, "running", False)
+                    ),
+                })
+
+        async def import_soundcheck_recommendations_safely(trigger_state):
+            try:
+                await _import_soundcheck_recommendations(trigger_state)
+            except BaseException as exc:
+                logger.exception("M110 soundcheck recommendation import failed")
+                await send_m110_terminal({
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "m110_soundcheck_recommendation_import_failed",
+                    "exception_type": type(exc).__name__,
+                })
 
         conflict = None
         async with server._audio_capture_lock:
             measurement_task = getattr(server, "_system_measurement_task", None)
             if measurement_task is not None and not measurement_task.done():
                 conflict = "audio_capture_in_use_by_system_measurement"
-            elif getattr(server, "audio_capture", None) is not None:
+            elif (
+                getattr(server, "audio_capture", None) is not None
+                and not m110_analysis
+            ):
                 conflict = "audio_capture_in_use_by_preview"
             elif _engine_is_active():
                 conflict = "auto_soundcheck_already_running"
@@ -526,7 +711,7 @@ def register_handlers(server):
 
         if conflict is not None:
             await server.send_to_client(websocket, {
-                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "type": blocked_response_type,
                 "status": "blocked",
                 "is_running": bool(server.auto_soundcheck_running),
                 "running": bool(server.auto_soundcheck_running),
@@ -556,7 +741,7 @@ def register_handlers(server):
                     if getattr(getattr(server, "mixer_client", None), "is_connected", False)
                     else None
                 ),
-                audio_capture=None,
+                audio_capture=shared_capture if m110_analysis else None,
             )
             server.auto_soundcheck_engine = engine
         except BaseException:
@@ -565,6 +750,13 @@ def register_handlers(server):
                     server.auto_soundcheck_engine = None
                 server.auto_soundcheck_running = False
                 server.auto_soundcheck_observe_only = False
+            if m110_analysis:
+                await send_m110_terminal({
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "m110_soundcheck_engine_construction_failed",
+                })
+                return
             raise
 
         original_on_state = on_state
@@ -574,8 +766,18 @@ def register_handlers(server):
             if state in {"running", "stopped"}:
                 _schedule(
                     loop,
-                    _import_soundcheck_recommendations(state),
+                    import_soundcheck_recommendations_safely(state),
                     "auto soundcheck recommendation import",
+                )
+            elif state == "error" and m110_analysis:
+                _schedule(
+                    loop,
+                    send_m110_terminal({
+                        "status": "blocked",
+                        "success": False,
+                        "reason": "m110_soundcheck_engine_error",
+                    }),
+                    "M110 soundcheck error terminal",
                 )
 
         engine.on_state_change = on_state_with_recommendation_import
@@ -587,11 +789,24 @@ def register_handlers(server):
                     server.auto_soundcheck_engine = None
                 server.auto_soundcheck_running = False
                 server.auto_soundcheck_observe_only = False
+            if m110_analysis:
+                await send_m110_terminal({
+                    "status": "blocked",
+                    "success": False,
+                    "reason": "m110_soundcheck_engine_start_failed",
+                })
+                return
             raise
 
         live_action_config = getattr(engine, "correction_executor_config", None)
         await server.send_to_client(websocket, {
-            "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+            "type": (
+                "m110_soundcheck_analysis_status"
+                if m110_analysis
+                else "auto_soundcheck_status"
+                if soundcheck_events
+                else "auto_engine_status"
+            ),
             "status": "started",
             "is_running": True,
             "running": True,
@@ -610,6 +825,28 @@ def register_handlers(server):
 
     async def handle_start_auto_soundcheck(websocket, data):
         await _start_engine(websocket, data, soundcheck_events=True)
+
+    async def handle_start_m110_soundcheck_analysis(websocket, data):
+        await _start_engine(websocket, data, soundcheck_events=True)
+
+    async def handle_stop_m110_soundcheck_analysis(websocket, data):
+        if getattr(server, "_audio_capture_preview_owner", None) is not websocket:
+            await server.send_to_client(websocket, {
+                "type": "m110_soundcheck_analysis_stop_result",
+                "status": "blocked",
+                "success": False,
+                "reason": "m110_soundcheck_analysis_owner_required",
+            })
+            return
+        await server._stop_auto_soundcheck_engine_async(observe_only=False)
+        await server.send_to_client(websocket, {
+            "type": "m110_soundcheck_analysis_stop_result",
+            "status": "stopped",
+            "success": True,
+            "shared_capture_retained": bool(
+                getattr(getattr(server, "audio_capture", None), "running", False)
+            ),
+        })
 
     async def handle_stop_auto_soundcheck(websocket, data):
         await server._stop_auto_soundcheck_engine_async(observe_only=False)
@@ -870,6 +1107,12 @@ def register_handlers(server):
 
     return {
         "start_auto_soundcheck": handle_start_auto_soundcheck,
+        "start_m110_soundcheck_analysis": (
+            handle_start_m110_soundcheck_analysis
+        ),
+        "stop_m110_soundcheck_analysis": (
+            handle_stop_m110_soundcheck_analysis
+        ),
         "stop_auto_soundcheck": handle_stop_auto_soundcheck,
         "get_auto_soundcheck_status": handle_get_auto_soundcheck_status,
         "accept_soundcheck_replan": handle_accept_soundcheck_replan,

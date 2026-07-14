@@ -132,7 +132,13 @@ def context(
     )
 
 
-def restore_only_grant(plan, adapter, *, key="proof-restore"):
+def restore_only_grant(
+    plan,
+    adapter,
+    *,
+    key="proof-restore",
+    capability_kind="restore_only_proof",
+):
     safety_binding = {
         "adapter_revision": "unit-adapter-v1",
         "protocol_revision": "unit-protocol-v1",
@@ -163,7 +169,7 @@ def restore_only_grant(plan, adapter, *, key="proof-restore"):
         bundle_kind=(
             "single_soundcheck_operation"
             if len(plan.operations) == 1
-            else "maintenance_dsp_reset_bundle"
+            else "soundcheck_atomic_group"
         ),
         operations=operation_rows,
         prepared_operations=[adapter.prepare(item) for item in plan.operations],
@@ -175,8 +181,10 @@ def restore_only_grant(plan, adapter, *, key="proof-restore"):
     route = object()
     transport = object()
     capture = object()
+    control = object()
+    proof_receipt = object()
     binding = M110CapabilityBinding(
-        capability_kind="restore_only_proof",
+        capability_kind=capability_kind,
         runtime_instance_nonce="1" * 32,
         runtime_manifest_sha256="sha256:" + "2" * 64,
         launch_manifest_sha256="sha256:" + "6" * 64,
@@ -196,14 +204,28 @@ def restore_only_grant(plan, adapter, *, key="proof-restore"):
         review_content_digest="sha256:" + "7" * 64,
         operation_digest=canonical_operation_bundle_digest(bundle),
         canonical_bundle_bytes=bundle_bytes,
+        bundle_kind=bundle["bundle_kind"],
         approval_id="operator-approval",
         idempotency_key=key,
         scope_addresses=scope,
         target_fingerprints=targets,
+        proof_receipt_id=(
+            "m110proof_v1_" + "9" * 64
+            if capability_kind != "restore_only_proof"
+            else ""
+        ),
         _owner_ref=owner,
         _route_ref=route,
         _transport_ref=transport,
         _capture_ref=capture,
+        _control_ref=(
+            control if capability_kind != "restore_only_proof" else None
+        ),
+        _proof_receipt_ref=(
+            proof_receipt
+            if capability_kind != "restore_only_proof"
+            else None
+        ),
     )
     store = SupervisedCapabilityStore(token_factory=lambda: "8" * 64)
     issued, _ = store.issue(binding)
@@ -216,7 +238,9 @@ def coordinator(
     adapters,
     generation=lambda: 7,
     emergency=None,
+    emergency_latch=None,
     prepared_callback=None,
+    before_operation_apply_callback=None,
     before_apply_callback=None,
 ):
     emergency_calls = []
@@ -224,17 +248,470 @@ def coordinator(
     async def stop(reason):
         emergency_calls.append(reason)
 
+    def latch(_reason):
+        return {"status": "latched", "success": True}
+
     return (
         SupervisedConsoleTransactionCoordinator(
             family_contracts=contracts,
             adapters=adapters,
             emergency_generation_getter=generation,
+            emergency_latch=emergency_latch or latch,
             emergency_stop=emergency or stop,
             prepared_callback=prepared_callback,
+            before_operation_apply_callback=(
+                before_operation_apply_callback
+            ),
             before_apply_callback=before_apply_callback,
         ),
         emergency_calls,
     )
+
+
+class AudioFailureRetentionAdapter(FakeAdapter):
+    def __init__(self, family_id: str, *, retention_verified: bool = True):
+        super().__init__(family_id)
+        self.retention_verified = retention_verified
+        self.state = 0.0
+
+    async def snapshot(self, operation):
+        self.calls.append(("snapshot", operation.operation_id))
+        return {
+            "physical_verified": True,
+            "values": {
+                f"/{self.family_id}/{operation.operation_id}": self.state
+            },
+        }
+
+    async def apply(self, operation, snapshot):
+        self.calls.append(("apply", operation.operation_id))
+        self.state = float(operation.target_value)
+        return AdapterStepResult(
+            True,
+            True,
+            "sent",
+            {
+                "writes": [
+                    {
+                        "address": f"/{self.family_id}/{operation.operation_id}",
+                        "value": operation.target_value,
+                        "sent": True,
+                    }
+                ]
+            },
+        )
+
+    async def audio_recheck(self, operation, snapshot, apply_result):
+        self.calls.append(("audio", operation.operation_id))
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    async def assess_audio_failure_retention(
+        self,
+        operation,
+        snapshot,
+        apply_result,
+    ):
+        self.calls.append(("retain", operation.operation_id))
+        return AdapterStepResult(
+            self.retention_verified,
+            self.retention_verified,
+            (
+                "audio_failure_safe_target_retained"
+                if self.retention_verified
+                else "audio_failure_retention_target_unverified"
+            ),
+            {
+                "retention_eligible": True,
+                "target_physical_verified": self.retention_verified,
+                "write_attempted": False,
+            },
+        )
+
+    async def rollback(self, operation, snapshot, apply_result):
+        self.calls.append(("rollback", operation.operation_id))
+        self.state = float(
+            snapshot["values"][
+                f"/{self.family_id}/{operation.operation_id}"
+            ]
+        )
+        return AdapterStepResult(True, True, "rollback_verified")
+
+
+@pytest.mark.asyncio
+async def test_audio_failure_retains_verified_cut_without_rollback_up():
+    adapter = AudioFailureRetentionAdapter("fader")
+    service, emergency = coordinator(
+        {"fader": contract("fader", "fader")},
+        {"fader": adapter},
+    )
+    cut = ConsoleTransactionOperation(
+        operation_id="fader-cut",
+        family_id="fader",
+        write_kind="fader",
+        target_value=-2.0,
+        channel=1,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan("txn-retain-cut", (cut,), "safer cut"),
+        context(key="retain-cut"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "feedback_risk_detected"
+    assert result.contained_operation_ids == ["fader-cut"]
+    assert result.contained_target_physical_verified is True
+    assert result.audio_failure_recovery_state_known is True
+    assert adapter.state == -2.0
+    assert ("rollback", "fader-cut") not in adapter.calls
+    assert emergency == [
+        "supervised_transaction_audio_safety_failed:txn-retain-cut"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_audio_failure_rolls_back_before_long_emergency_teardown():
+    order = []
+    teardown_started = asyncio.Event()
+    release_teardown = asyncio.Event()
+    adapter = FakeAdapter("eq_hpf")
+
+    async def failed_audio(operation, snapshot, apply_result):
+        adapter.calls.append(("audio", operation.operation_id))
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    adapter.audio_recheck = failed_audio
+    original_rollback = adapter.rollback
+
+    async def ordered_rollback(operation, snapshot, apply_result):
+        order.append("rollback")
+        return await original_rollback(operation, snapshot, apply_result)
+
+    adapter.rollback = ordered_rollback
+
+    def latch(_reason):
+        order.append("latch")
+        return {"status": "latched", "success": True}
+
+    async def delayed_teardown(_reason):
+        order.append("teardown_started")
+        teardown_started.set()
+        await release_teardown.wait()
+
+    service, _ = coordinator(
+        {"eq_hpf": contract("eq_hpf", "eq")},
+        {"eq_hpf": adapter},
+        emergency=delayed_teardown,
+        emergency_latch=latch,
+    )
+    task = asyncio.create_task(
+        service.execute(
+            ConsoleTransactionPlan(
+                "txn-immediate-recovery",
+                (operation("eq-cut"),),
+                "recover before teardown",
+            ),
+            context(key="immediate-recovery"),
+        )
+    )
+
+    await asyncio.wait_for(teardown_started.wait(), timeout=1.0)
+
+    assert order == ["latch", "rollback", "teardown_started"]
+    assert task.done() is False
+    release_teardown.set()
+    result = await asyncio.wait_for(task, timeout=1.0)
+    assert result.status == "rolled_back"
+    assert result.rollback_operation_ids == ["eq-cut"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("latch_result", "teardown_result", "expected_latch", "expected_teardown"),
+    [
+        (
+            False,
+            {
+                "status": "stopped",
+                "success": True,
+                "teardown_complete": True,
+            },
+            False,
+            True,
+        ),
+        (
+            {"status": "latched", "success": True},
+            False,
+            True,
+            False,
+        ),
+        (
+            {"status": "latched", "success": False},
+            {
+                "status": "stopped",
+                "success": True,
+                "teardown_complete": True,
+            },
+            False,
+            True,
+        ),
+        (
+            {"status": "latched", "success": True},
+            {
+                "status": "stop_incomplete",
+                "success": False,
+                "teardown_complete": False,
+                "teardown_errors": [{"step": "unit"}],
+            },
+            True,
+            False,
+        ),
+    ],
+)
+async def test_audio_failure_reports_incomplete_emergency_phases(
+    latch_result,
+    teardown_result,
+    expected_latch,
+    expected_teardown,
+):
+    adapter = FakeAdapter("eq_hpf")
+
+    async def failed_audio(operation, snapshot, apply_result):
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    adapter.audio_recheck = failed_audio
+    service, _ = coordinator(
+        {"eq_hpf": contract("eq_hpf", "eq")},
+        {"eq_hpf": adapter},
+        emergency_latch=lambda _reason: latch_result,
+        emergency=lambda _reason: teardown_result,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan(
+            "txn-incomplete-emergency-phase",
+            (operation("eq-cut"),),
+            "report incomplete emergency phase",
+        ),
+        context(key="incomplete-emergency-phase"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.emergency_latch_succeeded is expected_latch
+    assert result.emergency_teardown_succeeded is expected_teardown
+    assert result.emergency_stop_complete is False
+    emergency_events = [
+        event
+        for event in result.events
+        if event.get("phase") in {"emergency_latch", "emergency_teardown"}
+    ]
+    assert [event["success"] for event in emergency_events] == [
+        expected_latch,
+        expected_teardown,
+    ]
+
+
+@pytest.mark.asyncio
+async def test_emergency_latch_cancelled_error_is_terminal_not_propagated():
+    adapter = FakeAdapter("eq_hpf")
+
+    async def failed_audio(operation, snapshot, apply_result):
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    def cancelled_latch(_reason):
+        raise asyncio.CancelledError()
+
+    adapter.audio_recheck = failed_audio
+    service, _ = coordinator(
+        {"eq_hpf": contract("eq_hpf", "eq")},
+        {"eq_hpf": adapter},
+        emergency_latch=cancelled_latch,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan(
+            "txn-cancelled-latch",
+            (operation("eq-cut"),),
+            "contain cancelled latch",
+        ),
+        context(key="cancelled-latch"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.emergency_latch_succeeded is False
+    assert result.emergency_teardown_succeeded is True
+    assert result.emergency_stop_complete is False
+    latch_event = next(
+        event
+        for event in result.events
+        if event.get("phase") == "emergency_latch"
+    )
+    assert latch_event["exception_type"] == "CancelledError"
+
+
+@pytest.mark.asyncio
+async def test_synchronous_emergency_teardown_exception_is_contained():
+    adapter = FakeAdapter("eq_hpf")
+
+    async def failed_audio(operation, snapshot, apply_result):
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    def broken_teardown(_reason):
+        raise RuntimeError("synthetic teardown failure")
+
+    adapter.audio_recheck = failed_audio
+    service, _ = coordinator(
+        {"eq_hpf": contract("eq_hpf", "eq")},
+        {"eq_hpf": adapter},
+        emergency=broken_teardown,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan(
+            "txn-sync-teardown-error",
+            (operation("eq-cut"),),
+            "contain synchronous teardown error",
+        ),
+        context(key="sync-teardown-error"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.emergency_latch_succeeded is True
+    assert result.emergency_teardown_succeeded is False
+    assert result.emergency_stop_complete is False
+    teardown_event = next(
+        event
+        for event in result.events
+        if event.get("phase") == "emergency_teardown"
+    )
+    assert teardown_event["exception_type"] == "RuntimeError"
+
+
+@pytest.mark.asyncio
+async def test_emergency_teardown_cancelled_error_is_terminal_not_propagated():
+    adapter = FakeAdapter("eq_hpf")
+
+    async def failed_audio(operation, snapshot, apply_result):
+        return AudioRecheckResult("failed", "feedback_risk_detected")
+
+    async def cancelled_teardown(_reason):
+        raise asyncio.CancelledError()
+
+    adapter.audio_recheck = failed_audio
+    service, _ = coordinator(
+        {"eq_hpf": contract("eq_hpf", "eq")},
+        {"eq_hpf": adapter},
+        emergency=cancelled_teardown,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan(
+            "txn-cancelled-teardown",
+            (operation("eq-cut"),),
+            "contain cancelled teardown",
+        ),
+        context(key="cancelled-teardown"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.emergency_latch_succeeded is True
+    assert result.emergency_teardown_succeeded is False
+    assert result.emergency_stop_complete is False
+    teardown_event = next(
+        event
+        for event in result.events
+        if event.get("phase") == "emergency_teardown"
+    )
+    assert teardown_event["exception_type"] == "CancelledError"
+
+
+@pytest.mark.asyncio
+async def test_unverified_retained_cut_never_blindly_rolls_back_up():
+    adapter = AudioFailureRetentionAdapter(
+        "fader",
+        retention_verified=False,
+    )
+    service, _ = coordinator(
+        {"fader": contract("fader", "fader")},
+        {"fader": adapter},
+    )
+    cut = ConsoleTransactionOperation(
+        operation_id="fader-unverified",
+        family_id="fader",
+        write_kind="fader",
+        target_value=-2.0,
+        channel=1,
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan(
+            "txn-retain-unverified",
+            (cut,),
+            "safer cut",
+        ),
+        context(key="retain-unverified"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.retention_unverified_operation_ids == [
+        "fader-unverified"
+    ]
+    assert result.audio_failure_recovery_state_known is False
+    assert ("rollback", "fader-unverified") not in adapter.calls
+
+
+@pytest.mark.asyncio
+async def test_pre_send_audio_failure_retains_prior_cut_and_skips_next_send():
+    adapter = AudioFailureRetentionAdapter("fader")
+    audio_calls = 0
+
+    async def audio_recheck(operation, snapshot, apply_result):
+        nonlocal audio_calls
+        audio_calls += 1
+        adapter.calls.append(("audio", operation.operation_id))
+        return AudioRecheckResult("passed")
+
+    adapter.audio_recheck = audio_recheck
+
+    async def before_operation(operation):
+        if operation.operation_id == "fader-cut-2":
+            raise RuntimeError("feedback_risk_detected")
+        return True
+
+    service, _ = coordinator(
+        {"fader": contract("fader", "fader")},
+        {"fader": adapter},
+        before_operation_apply_callback=before_operation,
+    )
+    cuts = (
+        ConsoleTransactionOperation(
+            operation_id="fader-cut-1",
+            family_id="fader",
+            write_kind="fader",
+            target_value=-2.0,
+            channel=1,
+        ),
+        ConsoleTransactionOperation(
+            operation_id="fader-cut-2",
+            family_id="fader",
+            write_kind="fader",
+            target_value=-4.0,
+            channel=2,
+        ),
+    )
+
+    result = await service.execute(
+        ConsoleTransactionPlan("txn-pre-send-retain", cuts, "two cuts"),
+        context(key="pre-send-retain"),
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "feedback_risk_detected"
+    assert result.applied_operation_ids == ["fader-cut-1"]
+    assert result.contained_operation_ids == ["fader-cut-1"]
+    assert ("apply", "fader-cut-2") not in adapter.calls
+    assert ("rollback", "fader-cut-1") not in adapter.calls
+    assert audio_calls == 1
 
 
 @pytest.mark.asyncio
@@ -452,6 +929,7 @@ class AtomicStateAdapter:
         address = f"/ch/{operation.channel}/fdr"
         return {
             "addresses": [address],
+            "write_count": 1,
             "writes": [
                 {
                     "address": address,
@@ -570,6 +1048,186 @@ async def test_atomic_group_skips_satisfied_member_and_applies_only_changed_memb
     assert result.applied_operation_ids == ["fader-2"]
     assert ("apply", "fader-1") not in adapter.calls
     assert ("apply", "fader-2") in adapter.calls
+
+
+@pytest.mark.asyncio
+async def test_restore_only_proof_all_targets_satisfied_uses_two_pass_no_write():
+    state = {"fader-1": -2.0, "fader-2": -2.0}
+    adapter = AtomicStateAdapter(state)
+    row = replace(
+        contract("fader", "fader"),
+        lifecycle=LIFECYCLE_PROOF_CANDIDATE,
+        hardware_proof="missing",
+        live_allowed_write_kinds=(),
+    )
+    service, emergency = coordinator({"fader": row}, {"fader": adapter})
+    plan = ConsoleTransactionPlan(
+        "atomic-proof-all-satisfied",
+        (
+            atomic_fader_operation("fader-1", 1, -2.0),
+            atomic_fader_operation("fader-2", 2, -2.0),
+        ),
+        "verify already-restored targets",
+    )
+    grant = restore_only_grant(
+        plan,
+        adapter,
+        key="proof-all-satisfied",
+    )
+
+    result = await service.execute(
+        plan,
+        context(
+            proof_run=True,
+            restore_after_verify=True,
+            key="proof-all-satisfied",
+            capability_grant=grant,
+        ),
+    )
+
+    assert result.status == "proof_passed"
+    assert result.reason == (
+        "proof_already_satisfied_two_pass_readback_verified"
+    )
+    assert result.applied_operation_ids == []
+    assert result.rollback_operation_ids == []
+    assert result.already_satisfied_operation_ids == ["fader-1", "fader-2"]
+    assert [call for call in adapter.calls if call[0] == "apply"] == []
+    assert [call for call in adapter.calls if call[0] == "rollback"] == []
+    assert [call for call in adapter.calls if call[0] == "audio"] == [
+        ("audio", "fader-1"),
+        ("audio", "fader-2"),
+    ]
+    assert [call for call in adapter.calls if call[0] == "snapshot"] == [
+        ("snapshot", "fader-1"),
+        ("snapshot", "fader-2"),
+        ("snapshot", "fader-1"),
+        ("snapshot", "fader-2"),
+    ]
+    assert emergency == []
+
+
+@pytest.mark.asyncio
+async def test_restore_only_proof_all_targets_satisfied_requires_audio_recheck():
+    state = {"fader-1": -2.0, "fader-2": -2.0}
+
+    def fail_second_audio(operation):
+        if operation.operation_id == "fader-2":
+            raise RuntimeError("live_audio_recheck_failed")
+
+    adapter = AtomicStateAdapter(state, on_audio=fail_second_audio)
+    row = replace(
+        contract("fader", "fader"),
+        lifecycle=LIFECYCLE_PROOF_CANDIDATE,
+        hardware_proof="missing",
+        live_allowed_write_kinds=(),
+    )
+    service, emergency = coordinator({"fader": row}, {"fader": adapter})
+    plan = ConsoleTransactionPlan(
+        "atomic-proof-all-satisfied-audio-fails",
+        (
+            atomic_fader_operation("fader-1", 1, -2.0),
+            atomic_fader_operation("fader-2", 2, -2.0),
+        ),
+        "reject already-restored targets without audio evidence",
+    )
+    grant = restore_only_grant(
+        plan,
+        adapter,
+        key="proof-all-satisfied-audio-fails",
+    )
+
+    result = await service.execute(
+        plan,
+        context(
+            proof_run=True,
+            restore_after_verify=True,
+            key="proof-all-satisfied-audio-fails",
+            capability_grant=grant,
+        ),
+    )
+
+    assert result.status == "blocked"
+    assert result.reason == "audio_recheck_exception"
+    assert result.applied_operation_ids == []
+    assert result.rollback_operation_ids == []
+    assert [call for call in adapter.calls if call[0] == "apply"] == []
+    assert [call for call in adapter.calls if call[0] == "rollback"] == []
+    assert [call for call in adapter.calls if call[0] == "audio"] == [
+        ("audio", "fader-1"),
+        ("audio", "fader-2"),
+    ]
+    assert len(emergency) == 1
+    assert emergency[0].startswith(
+        "supervised_transaction_audio_safety_failed:"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("capability_kind", "proof_run", "expected_status"),
+    [
+        ("restore_only_proof", True, "proof_passed"),
+        ("soundcheck_child_commit_once", False, "applied"),
+    ],
+)
+async def test_private_single_operation_already_satisfied_is_two_pass_no_write(
+    capability_kind,
+    proof_run,
+    expected_status,
+):
+    state = {"fader-1": -2.0}
+    adapter = AtomicStateAdapter(state)
+    row = replace(
+        contract("fader", "fader"),
+        lifecycle=LIFECYCLE_PROOF_CANDIDATE,
+        hardware_proof="missing",
+        live_allowed_write_kinds=(),
+    )
+    service, emergency = coordinator({"fader": row}, {"fader": adapter})
+    single_operation = replace(
+        atomic_fader_operation("fader-1", 1, -2.0),
+        metadata={},
+    )
+    plan = ConsoleTransactionPlan(
+        f"private-single-already-satisfied-{capability_kind}",
+        (single_operation,),
+        "idempotent private single-operation lane",
+    )
+    key = f"private-single-{capability_kind}"
+    grant = restore_only_grant(
+        plan,
+        adapter,
+        key=key,
+        capability_kind=capability_kind,
+    )
+
+    result = await service.execute(
+        plan,
+        context(
+            proof_run=proof_run,
+            restore_after_verify=proof_run,
+            key=key,
+            capability_grant=grant,
+        ),
+    )
+
+    assert result.status == expected_status
+    assert result.applied_operation_ids == []
+    assert result.rollback_operation_ids == []
+    assert result.already_satisfied_operation_ids == ["fader-1"]
+    assert [call for call in adapter.calls if call[0] == "apply"] == []
+    assert [call for call in adapter.calls if call[0] == "rollback"] == []
+    assert [call for call in adapter.calls if call[0] == "audio"] == [
+        ("audio", "fader-1"),
+    ]
+    assert [call for call in adapter.calls if call[0] == "snapshot"] == [
+        ("snapshot", "fader-1"),
+    ]
+    assert [call for call in adapter.calls if call[0] == "verify"] == [
+        ("verify", "fader-1"),
+    ]
+    assert emergency == []
 
 
 @pytest.mark.asyncio

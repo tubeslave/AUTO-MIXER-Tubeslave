@@ -1,5 +1,29 @@
 # Autopilot Last Report
 
+## M110 software-complete, hardware-pending snapshot — 2026-07-14
+
+- The global M001 status/checkpoint stays unchanged; M110 is
+  `STATE.json.active_work`.
+- CP00 is complete; CP01-CP04 are implemented/offline-validated. CP05 remains
+  marker-controlled and pending in this source snapshot; HW01-HW05 are pending.
+- The attended route -> mute/contain -> 64-address reset -> exact M006 preimage
+  restore -> unmute -> analysis -> interleaved lanes -> audit -> SHA-bound
+  listening -> repeated audit -> teardown path is implemented.
+- M006 restore is fixed at 23/14/14 operations, 33/63/14 scoped addresses and
+  19/52/6 changed addresses (77 unique); it preserves state outside the
+  archived transaction and is not a factory reset.
+- The latest independent P1 review found the HW05 runner could ignore an
+  interleaved `readiness_invalidated` event. A persistent session latch now
+  rejects the event both before terminal and during terminal grace; the
+  reviewer reran all 97 runner tests with no remaining P0/P1.
+- No WING/USB contact or live write occurred in this M110 cycle. Reset and
+  correction counts remain zero. M005 behavior is closed; M006 permission is
+  not standing authority.
+- Strict real-live/public readiness remains `88/100`, normal allowlist `0`,
+  live authority `false`; the requested `95/100` awaits CP05 and real HW05.
+- No writer owner record exists, but the empty writer-lease directory remains a
+  deliberate pre-CP05 blocker until final release.
+
 ## Soundcheck staged-execution closure — 2026-07-12
 
 - Latest heartbeat: 2026-07-12T22:48:19Z.

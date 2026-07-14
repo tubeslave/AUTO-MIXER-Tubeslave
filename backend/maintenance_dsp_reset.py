@@ -892,6 +892,21 @@ class M110DeliveredMutationObserver:
         return self.snapshot()
 
 
+def m110_reset_main_output_contained(review: Mapping[str, Any]) -> bool:
+    """Return true only when the physical Main output is already muted."""
+
+    manifest = review.get("preservation_manifest")
+    rows = manifest.get("rows") if isinstance(manifest, Mapping) else None
+    if not isinstance(rows, list):
+        return False
+    return any(
+        isinstance(row, Mapping)
+        and row.get("address") == "/main/1/mute"
+        and row.get("value") in {1, 1.0, True, "1"}
+        for row in rows
+    )
+
+
 class M110MaintenanceMutationGate:
     """Authorize only executor-owned reset or exact-preimage rollback sends."""
 
@@ -1205,7 +1220,7 @@ class M110ResetHooks:
     persist_prepared: Callable[[Mapping[str, Any]], Any]
     mark_send_may_have_occurred: Callable[[], Any]
     persist_terminal: Callable[[str, Mapping[str, Any]], Any]
-    audio_recheck: Callable[[], Any]
+    audio_recheck: Callable[..., Any]
     emergency_stop: Callable[[str], Any]
 
 
@@ -1806,6 +1821,54 @@ class M110MaintenanceDspResetExecutor:
         after_rows: list[dict[str, Any]] | None = None
         full_surface_restoration_unknown = False
 
+        async def run_audio_recheck(
+            phase: str,
+            *,
+            address: str | None = None,
+            operation_id: str | None = None,
+        ) -> bool:
+            callback = self.hooks.audio_recheck
+            try:
+                signature = inspect.signature(callback)
+            except (TypeError, ValueError):
+                accepts_context = False
+            else:
+                accepts_context = bool(
+                    "phase" in signature.parameters
+                    or any(
+                        parameter.kind
+                        == inspect.Parameter.VAR_KEYWORD
+                        for parameter in signature.parameters.values()
+                    )
+                )
+            audio = await _maybe_await(
+                callback(
+                    phase=phase,
+                    address=address,
+                    operation_id=operation_id,
+                )
+                if accepts_context
+                else callback()
+            )
+            passed = self._audio_passed(audio)
+            result.audio_recheck_passed = passed
+            event = {
+                "phase": phase,
+                "result": (
+                    asdict(audio)
+                    if hasattr(audio, "__dataclass_fields__")
+                    else dict(audio)
+                    if isinstance(audio, Mapping)
+                    else {"type": type(audio).__name__}
+                ),
+            }
+            if address is not None:
+                event["address"] = address
+            if operation_id is not None:
+                event["operation_id"] = operation_id
+            result.events.append(event)
+            return passed
+
         try:
             gate.start()
             if not forward_authority_current():
@@ -1827,6 +1890,8 @@ class M110MaintenanceDspResetExecutor:
                     current_review["preservation_manifest"]["rows"],
                 ):
                     failure_reason = "m110_review_preservation_manifest_changed"
+                elif not m110_reset_main_output_contained(current_review):
+                    failure_reason = "m110_reset_main_output_containment_missing"
                 else:
                     # Use the immediate physical recapture as the actual CAS and
                     # rollback preimage; it is equal to the reviewed binary rows.
@@ -1932,6 +1997,11 @@ class M110MaintenanceDspResetExecutor:
                                 "m110_result_send_boundary_persist_failed"
                             )
 
+            if not failure_reason and not await run_audio_recheck(
+                "prewrite_audio_recheck"
+            ):
+                failure_reason = "m110_prewrite_audio_recheck_failed"
+
             if not failure_reason:
                 for row in M110_RESET_OPERATION_DEFINITIONS:
                     address = row["address"]
@@ -1950,6 +2020,47 @@ class M110MaintenanceDspResetExecutor:
                         result.events.append(
                             {
                                 "phase": "forward_cas",
+                                "address": address,
+                                "expected": preimage[address],
+                                "actual": current_value,
+                                "query": cas_evidence,
+                            }
+                        )
+                        break
+                    if observer and self._observer_failed(observer.snapshot()):
+                        failure_reason = "m110_delivered_outside_event_detected"
+                        break
+                    if self._gate_failed(gate.snapshot()):
+                        failure_reason = "m110_outside_mutation_attempt_detected"
+                        break
+                    if not forward_authority_current():
+                        failure_reason = "m110_write_authority_expired_before_send"
+                        break
+                    # The reset surface is attenuation-only (processor bypass)
+                    # and Main is already physically muted.  Per-address
+                    # acoustic rescans used to repeat the same expensive
+                    # 40-query/device-identity proof 128 times.  Safety between
+                    # sends is instead enforced by the wildcard mutation
+                    # observer, the exact CAS immediately below, the mutation
+                    # boundary and the authority fence.  Any Main/unrelated
+                    # console change is therefore detected before the next
+                    # send, while one full prewrite and one full final audio
+                    # proof remain mandatory.
+                    if observer and self._observer_failed(observer.snapshot()):
+                        failure_reason = "m110_delivered_outside_event_detected"
+                        break
+                    if self._gate_failed(gate.snapshot()):
+                        failure_reason = "m110_outside_mutation_attempt_detected"
+                        break
+                    if not forward_authority_current():
+                        failure_reason = "m110_write_authority_expired_before_send"
+                        break
+                    current_value, cas_evidence = await self._query_binary(address)
+                    if current_value != preimage[address]:
+                        failure_reason = f"m110_forward_cas_changed:{address}"
+                        result.events.append(
+                            {
+                                "phase": "forward_cas_after_audio_recheck",
                                 "address": address,
                                 "expected": preimage[address],
                                 "actual": current_value,
@@ -2036,20 +2147,7 @@ class M110MaintenanceDspResetExecutor:
                     ):
                         failure_reason = "m110_write_authority_expired_after_writes"
                     if not failure_reason:
-                        audio = await _maybe_await(self.hooks.audio_recheck())
-                        result.audio_recheck_passed = self._audio_passed(audio)
-                        result.events.append(
-                            {
-                                "phase": "audio_recheck",
-                                "result": (
-                                    asdict(audio)
-                                    if hasattr(audio, "__dataclass_fields__")
-                                    else dict(audio)
-                                    if isinstance(audio, Mapping)
-                                    else {"type": type(audio).__name__}
-                                ),
-                            }
-                        )
+                        await run_audio_recheck("audio_recheck")
                         if not result.audio_recheck_passed:
                             failure_reason = "m110_audio_recheck_failed"
                         elif observer and self._observer_failed(observer.snapshot()):
@@ -2635,6 +2733,7 @@ class M110MaintenanceDspResetExecutor:
                 ),
                 "applied_operation_ids": list(result.applied_operation_ids),
                 "rollback_operation_ids": list(result.rollback_operation_ids),
+                "already_satisfied_operation_ids": [],
                 "physical_verified": physical_verified,
                 "audio_recheck_passed": result.audio_recheck_passed,
                 "proof_target_verified": proof_target_verified,
@@ -2649,6 +2748,13 @@ class M110MaintenanceDspResetExecutor:
                         rollback_required
                         or result.rollback_operation_ids
                     )
+                ),
+                "rollback_status": (
+                    "verified"
+                    if status_value == "proof_passed"
+                    else "not_attempted"
+                    if status_value == "applied"
+                    else "unknown"
                 ),
                 "write_state_unknown": result.write_state_unknown,
                 "rollback_state_unknown": result.rollback_state_unknown,

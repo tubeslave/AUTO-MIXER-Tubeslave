@@ -2,6 +2,28 @@
 
 Generated: 2026-07-12T22:48:19Z
 
+## M110 attended reset/soundcheck source snapshot — 2026-07-14
+
+- Global status remains `WAITING_FOR_EXTERNAL_VALIDATION`, milestone `M001`,
+  checkpoint `M001-EXTERNAL-WING-READONLY-ARTIFACT`.
+- `STATE.json.active_work` is M110. CP00 is complete; CP01-CP04 are implemented
+  and offline-validated; CP05 is pending in the canonical markers. HW01-HW05
+  remain pending.
+- In this M110 cycle: WING/USB contact `false`, live writes `0`, reset applied
+  `false`, corrections applied `0`.
+- M005 behavior is closed. M006 permission is one-session attended authority
+  only, never standing authority or a normal allowlist promotion.
+- Reset is not a factory reset: it bypasses 64 CH1-16 processor enables, then
+  restores the archived pre-M006 values in 23/14/14 operation stages over
+  33/63/14 scoped addresses. The changed counts are 19/52/6, 77 unique total;
+  all surfaces outside that archived transaction are preserved.
+- The full CP05-bound execute path and final two-audit/SHA-listening boundary
+  are implemented. Before real HW05, strict real-live readiness remains
+  `88/100`, normal allowlist `0`, standing live authority `false`, target
+  `95/100` not met.
+- The writer-lease owner record is absent. Its empty directory still exists in
+  this pre-CP05 snapshot and must be removed at the release cut.
+
 ## M109-CP01 committed source checkpoint — 2026-07-13
 
 - Validated source commit: `b3f7d05ac1f0a2ddc9812e4723a2b3f130fefa6a`.

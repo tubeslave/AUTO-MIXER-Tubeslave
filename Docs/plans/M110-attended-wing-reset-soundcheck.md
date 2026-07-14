@@ -16,14 +16,14 @@
 | M110-CP00 | Council contract | brief, proposals, critiques, ADR, plan | exact messages, grants, terminals, reset preserve set and rollback | none |
 | M110-CP01 | Main 47/48 provenance | fixed route module/handler/persistent runner/verifier, CoreAudio+USB binding, backend ingress gate | inherited-FD manifest/HMAC, stream/USB drift, semantic artifact, teardown, raw-ingress and no-write tests | none during implementation |
 | M110-CP02 | One-shot proof authority | token store, grants, queue/result/wire/coordinator | replay/concurrency/binding/cancellation and `proof_restored` tests | none during implementation |
-| M110-CP03 | DSP reset and processor enable | maintenance reset, finite physical preserve manifest, atomic params+enable lane | exact 64-address cap, full preimage, no-outside-send, delivered-observer-event, rollback and manifest tests | none during implementation |
-| M110-CP04 | Staged child commit | exact-bundle proof-to-commit capability, single-operation decomposition and replan | identical bundle digest, no sibling inference, local-vs-global blocker and honest readiness tests | none during implementation |
+| M110-CP03 | DSP reset, M006 preimage restore and processor enable | maintenance reset, finite physical preserve manifest, three exact M006 stages, atomic params+enable lane | exact 64-address cap, M006 23/14/14 operation stages, full preimage, no-outside-send, rollback, restart and manifest tests | none during implementation |
+| M110-CP04 | Staged child commit | exact-bundle proof-to-commit capability, single-operation or declared atomic-group execution and replan | identical complete bundle digest, no sibling inference, local-vs-global blocker, atomic parent journal and honest readiness tests | none during implementation |
 | M110-CP05 | Final software gate | frontend, no-WING, full suite, static scan, independent review, commit, full Git-tree binding | clean committed source, released development lease, passed canonical marker and source digest | none |
 | M110-HW01 | Route proof | proof-owned backend in analyze/observation mode | issued artifact/ledger, exact console/capture/headroom | attended real WING |
 | M110-HW02 | Exact bundle proofs | one canonical permanent bundle at a time, forced restore | `proof_passed`, WAL `proof_restored`, physical restoration and identical bundle digest | attended real WING |
-| M110-HW03 | DSP reset | exact channels 1–16 maintenance proposal | complete preimage, applied reset, finite-manifest equality, no-outside-send and delivered-observer-event evidence | attended real WING |
+| M110-HW03 | DSP reset and known-correction removal | exact channels 1–16 maintenance proposal plus three fixed M006 preimage stages | complete preimage, applied reset, exact M006 CAS/commit, finite-manifest equality, no-outside-send and delivered-observer-event evidence | attended real WING |
 | M110-HW04 | Staged soundcheck | foundation → tonal/dynamics → spatial/FX | exact reviewed child receipts, replans, headroom, no unresolved important corrections | attended real WING |
-| M110-HW05 | Final audit | full readback/reanalysis and operator truth | `safe_core_ready`/`show_mix_ready` or explicit incomplete blockers, score | attended real WING |
+| M110-HW05 | Final audit | two-pass ledger/readiness/audio audit, SHA-bound listening, repeated audit and teardown | identical verified-state/ledger hashes, `show_mix_ready` or explicit incomplete blockers, score | attended real WING |
 
 CP03 defines and tests the executor contract only; it grants no hardware
 authority. Before CP05 can pass, the production server must own construction of
@@ -41,21 +41,28 @@ absent.
 3. Keep the same proof-owned process and use exact
    `arm_m110_attended_control` to enter supervised capability-only mode without
    reconnecting. Any restart/reconnect repeats step 2.
-4. Prepare and review the fixed reset bundle, run its exact restore-only proof,
-   then perform a new complete physical recapture before issuing its
-   commit-once grant, apply it and verify preserved state.
-5. Run canonical analysis, generate processor and soundcheck bundles, and
-   decompose every staged child into separately reviewed single operations.
-6. For each resulting bundle in stage order: review exact bytes, run the
+4. With every audible output physically contained and Main 1 verified muted,
+   prepare and review the fixed reset bundle, run its exact restore-only proof,
+   recapture, issue its commit-once grant, apply and verify preserved state.
+5. Still muted, prove and commit the immutable M006 preimage restore in fixed
+   `foundation_level` (23 operations / 33 scoped / 19 changed),
+   `tonal_dynamics` (14 / 63 / 52), `spatial_balance` (14 / 14 / 6)
+   order: 77 unique changed addresses total. A CAS mismatch blocks before send;
+   state outside M006 stays untouched.
+6. Verify Main 1 unmuted, run fresh canonical analysis, then generate processor
+   and soundcheck bundles. Musical children are single operations unless the
+   planner marks an exact indivisible `soundcheck_atomic_group`.
+7. For each resulting bundle in stage order: review exact bytes, run the
    matching restore-only proof, issue the exact commit-once grant, and apply.
-   Only fixed reset and atomic processor bundles may be composite; family-level
-   proof is insufficient.
-7. Bound every local replan, regenerate and re-prove any changed bundle, and
+   Fixed reset, M006 restore, complete processor blocks and declared atomic
+   groups are the only composite cases; family-level proof is insufficient.
+8. Bound every local replan, regenerate and re-prove any changed bundle, and
    preserve already verified safe sibling progress unless a global hazard stops
    the run.
-8. Re-read route and every affected/preserved surface twice after all stages,
-   remeasure audio and record the honest terminal readiness. Historical
-   verification-cut receipts alone cannot satisfy HW05 freshness.
+9. Re-read every committed surface twice around audio/Main/route checks, obtain
+   the verified-state SHA, require five-minute SHA-bound physical listening,
+   repeat the full audit, verify clean teardown and record honest readiness.
+   Historical verification-cut receipts alone cannot satisfy HW05 freshness.
 
 ## Mandatory software commands
 
@@ -76,21 +83,28 @@ readback plus WAL recovery before resumption.
 
 ## Current status
 
-- M110-CP00: accepted for implementation.
+- M110-CP00: complete; Council contract and ADR are accepted.
 - M110-CP01: implementation is present and offline-validated; hardware remains
   gated by CP05.
 - M110-CP02: implemented and offline-validated, including typed single-use
   grants, strict durable WAL projection, result capacity, receipt minting and
   same-session proof authority.
-- M110-CP03: in progress. The fixed 64-address reset subset is server-owned and
-  offline-validated end to end through proof, durable receipt, fresh recapture
-  and permanent commit. Processor enable remains unfinished, so CP03 is not
-  complete.
-- M110-CP04: pending for exact processor/soundcheck child proof-to-commit
-  capability promotion. The existing staged decomposition/replan kernel alone
-  does not grant M110 hardware authority.
-- M110-CP05: pending. Top-level `--execute` remains fail-closed.
-- M110-HW01..HW05: forbidden until CP05 is committed and clean.
+- M110-CP03: implemented and offline-validated. The fixed 64-address reset and
+  three exact M006 restore stages (23/14/14 operations) and processor-enable
+  bundles are server-owned, preimage/CAS-bound, physical-readback-gated and
+  recover through durable child and parent journals without widening ordinary
+  live authority.
+- M110-CP04: implemented and offline-validated. Processor and musical children
+  use exact proof-to-commit bundles, local blockers preserve safe sibling
+  progress, bounded replans are run/revision/content bound, and an audio-safety
+  failure never blindly rolls a verified attenuation target upward.
+- M110-CP05 is controlled only by the two canonical committed markers. Hardware
+  remains fail-closed unless every required check is true, the development
+  lease is absent, the evidence SHA is exact and the source binding matches the
+  clean committed tree at process start. At this pre-commit checkpoint both
+  markers remain pending and no M110 WING/USB contact has occurred.
+- M110-HW01..HW05 remain pending and must run in order in one attended session;
+  no software-only result can mark them complete.
 - A pending/stale CP05 marker blocks connect, USB capture, route proof and every
   discovery/alternate-mixer ingress before resource construction; cleanup and
   emergency messages remain available.

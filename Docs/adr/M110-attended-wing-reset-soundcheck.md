@@ -1,14 +1,16 @@
 # ADR M110 — attended WING reset and staged soundcheck authority
 
-Status: accepted for implementation after Council review on 2026-07-13.
+Status: accepted; software implementation complete and hardware validation
+pending as of 2026-07-14.
 
 ## 1. Context
 
-The project can analyze the real WING and plan staged child transactions, but
-normal live authority is intentionally empty. The current route proof is
-self-declared, proof execution is disconnected from the canonical writer, no
-safe DSP reset exists, and reset processing cannot be re-enabled under a
-separate approval. These gaps prevent the requested real reset and soundcheck.
+The project can analyze the real WING and plan staged child transactions, while
+normal live authority intentionally remains empty. M110 adds a separate,
+source-bound attended path for one reset and one staged soundcheck without
+widening that standing authority. The software path is implemented and tested;
+it grants no hardware readiness until committed CP05 evidence and HW01-HW05
+physical proof exist.
 
 ## 2. Options considered
 
@@ -221,11 +223,16 @@ path-sorted server-constant `M110_RUNTIME_CRITICAL_PATHS` tuple exactly:
 ```text
 Docs/reports/M110_CP05_SOFTWARE_VALIDATION.json
 backend/audio_capture.py
+backend/auto_soundcheck_engine.py
+backend/contracts/m110_m006_restore_20260711.json
 backend/decision_queue_wire_contract.py
 backend/handlers/connection_handlers.py
 backend/handlers/product_state_handlers.py
+backend/handlers/soundcheck_handlers.py
 backend/m110_cp05_hardware_gate.py
 backend/m110_manual_write_wal.py
+backend/m110_m006_restore.py
+backend/m110_processor_enable.py
 backend/maintenance_dsp_reset.py
 backend/master_capture_route_proof.py
 backend/operator_proposal_queue.py
@@ -233,6 +240,7 @@ backend/operator_proposal_result_store.py
 backend/osc/enhanced_osc_client.py
 backend/runtime_identity.py
 backend/server.py
+backend/soundcheck_mix_readiness.py
 backend/soundcheck_transaction_plan.py
 backend/supervised_console_transaction.py
 backend/supervised_family_proof_plan.py
@@ -302,6 +310,36 @@ blocked. Preconnect also requires current launch source, an RFC1918 unicast host
 or writer lease, healthy WAL, no emergency and no active writer. Thus neither
 raw WebSocket messages nor a future caller can bypass CP05.
 
+#### Bounded supersession of M109 artifact-location policy — 2026-07-14
+
+Seven exact failed read-only captures are archived byte for byte under
+`artifacts/wing_readonly_preflight_invalid/`:
+
+- `20260713T051955Z_wing_readonly_preflight`;
+- `20260713T052026Z_wing_readonly_preflight`;
+- `20260713T052335Z_wing_readonly_preflight`;
+- `20260713T052452Z_wing_readonly_preflight`;
+- `20260713T052547Z_wing_readonly_preflight`;
+- `20260713T054127Z_wing_readonly_preflight`; and
+- `20260713T054142Z_wing_readonly_preflight`.
+
+Their twelve payload blobs and eight referenced sidecars are bound by original
+and archive paths, size and SHA-256 in
+`artifacts/wing_readonly_preflight_invalid/relocation-manifest-20260714.json`;
+payload bytes and embedded original paths
+remain unchanged. The archive is immutable negative provenance and is never
+candidate intake. The canonical root is the candidate-intake surface, not the
+complete historical store.
+
+This decision supersedes ADR M109 only for those seven run IDs and twelve exact
+hashes. It changes no production discovery code, does not delete history,
+weaken deterministic invalid-artifact tests, satisfy CP05/HW01-HW05, grant
+readiness or live authority, or establish wildcard/latest-valid selection.
+Every future invalid capture remains fail-closed in the canonical root unless a
+new ADR and exact relocation manifest separately authorize it. Rollback is the
+exact reverse rename plus removal of this manifest, restoring the prior
+13-total/6-valid/7-invalid intake history.
+
 The fixed capability enum and confirmation literals are:
 
 - `restore_only_proof` → `ISSUE_RESTORE_ONLY_PROOF_CAPABILITY`;
@@ -323,7 +361,23 @@ exact addresses/parameter model, scope, direction/value bounds, target values,
 tolerances, audio contract and console/firmware/route/runtime identity. Proof
 receipt ID and evidence expiry are deliberately outside operation identity;
 the permanent lane checks them separately for exact same-process origin and
-freshness. The only bundle kinds are:
+freshness. The five canonical bundle kinds are:
+
+- `single_soundcheck_operation`: exactly one logical operation after a staged
+  planner child is decomposed before review;
+- `soundcheck_atomic_group`: a planner-declared indivisible group whose exact
+  complete operation set must be proved and committed together;
+- `maintenance_dsp_reset_bundle`: the fixed server-generated reset set of at
+  most 64 operations;
+- `m006_exact_preimage_restore_bundle`: one of the three server-owned exact
+  M006 preimage stages; and
+- `processor_enable_bundle`: one channel/processor complete conservative
+  parameter block plus its enable-last operation.
+
+`M110_SOUNDCHECK_BUNDLE_KINDS` is deliberately the narrower two-kind set
+containing only `single_soundcheck_operation` and `soundcheck_atomic_group`;
+the other three are fixed maintenance/processor bundles and are never accepted
+as ordinary planner children.
 
 The fixed reset proposal capture owns one 90-second total deadline across both
 the 64-address reset sweep and the 184-address preservation sweep. A commit
@@ -331,13 +385,6 @@ recapture additionally reserves the final 30 seconds of the restored-proof
 receipt window for prepare, capability issue and Apply. If that remaining
 window is unavailable, the server returns a strict no-send blocked terminal;
 it never starts a capture that can only expire before commit.
-
-- `single_soundcheck_operation`: exactly one logical operation after a staged
-  planner child is decomposed before review;
-- `maintenance_dsp_reset_bundle`: the fixed server-generated reset set of at
-  most 64 operations; and
-- `processor_enable_bundle`: one channel/processor complete conservative
-  parameter block plus its enable-last operation.
 
 Every finite numeric target, tolerance and bound is encoded in the bundle as a
 canonical decimal string, never a JSON float: parse with `Decimal(str(value))`,
@@ -482,6 +529,44 @@ phase, `compensation_attempted:false` and require fresh physical reconciliation.
 A failure before the success attempt may still restore the preimage under the
 sealed gate.
 
+### Exact M006 preimage restore and parent journals
+
+The operator's M006 permission is consumed only by the fixed server-owned
+restore path. It is not standing authority and it does not replay the M006
+postimage. After the 64 processor-enable reset, the backend restores the exact
+pre-M006 values captured by the immutable 51-operation fixture
+`backend/contracts/m110_m006_restore_20260711.json`, bound to its tracked file
+SHA, source event SHA and source transaction ID.
+
+Restoration is split into three atomic stages in this fixed order:
+
+- `foundation_level`: 23 operations, 33 scoped addresses, 19 changed;
+- `tonal_dynamics`: 14 operations, 63 scoped addresses, 52 changed; and
+- `spatial_balance`: 14 operations, 14 scoped addresses, 6 changed.
+
+Across the three stages the exact changed-address union is 77 addresses. The
+larger scoped set remains part of proof/CAS identity even when a row is already
+satisfied and therefore emits no send.
+
+Each stage first proves and rolls back the exact bundle, then recaptures and
+commits the byte-identical bundle with compare-and-swap expected-current values.
+Those expectations are the archived M006 postimage, except the four processor
+enable surfaces that the preceding reset must already hold at zero. A mismatch
+blocks before send. The restore changes only addresses proven different from
+the preimage, keeps EQ/HPF/gate/compressor bypassed, and leaves every unknown or
+manual surface outside the archived M006 transaction untouched. It therefore
+means “remove the known M006 corrections,” not factory-reset the console.
+
+Reset, M006 and staged soundcheck parents are journaled independently of child
+WAL terminals. A parent commit is true only after the server appends and fsyncs
+its own canonical record. Trusted wire receipts project exact applied,
+already-satisfied and rollback operation IDs plus the server-bound parent
+result; client terminal fields cannot forge them. Multi-operation child
+outcomes and commit checkpoints append as atomic batches and replay all-or-none
+after restart. A malformed later batch restores none of that journal, and an
+unrecorded parent commit revokes forward authority instead of reporting a
+successful stage.
+
 ### Processor enable and permanent soundcheck
 
 After reset, one atomic `processor_enable_commit_once` grant owns both the
@@ -499,10 +584,11 @@ grant. It requires a recent same-process `proof_passed` whose canonical
 operation-bundle bytes and digest are identical under the exclusions defined
 above. A multi-operation staged child is split into independently reviewed
 single-operation bundles before proof or commit; grouping survives only in the
-local stage journal and never broadens authority. The fixed reset and atomic
-processor bundles are the only composite bundle types. A proof for a sibling
-address, a subset/superset, reordered operations or merely the same family/
-write kind grants nothing. Local
+local stage journal and never broadens authority. Composite execution is
+limited to the fixed reset, fixed M006 restore, complete processor block and a
+planner-declared `soundcheck_atomic_group`; every other musical child is a
+single operation. A proof for a sibling address, a subset/superset, reordered
+operations or merely the same family/write kind grants nothing. Local
 blockers remain local and trigger bounded replan; global hazards stop the run.
 Final status is honest: `safe_core_ready`,
 `show_mix_ready`, or `soundcheck_incomplete`.
@@ -531,8 +617,32 @@ No address, target or transaction plan crosses from the runner. Re-arming is
 not used between proposals because arm intentionally clears prepared bundles
 and prior process-private proof receipts. Any malformed, blocked, duplicate or
 wrong-stage terminal tears down the entire proof-owned session. The top-level
-real `--execute` flow remains blocked until processor enable and exact staged
-soundcheck child capabilities are complete.
+real `--execute` flow is implemented but remains unreachable until committed
+CP05 passes. It runs route proof, arm, operator-confirmed Main mute, fixed reset,
+three-stage M006 preimage restore, operator-confirmed Main unmute, fresh
+analysis, interleaved processor/musical lanes, final audit, SHA-bound listening,
+a second final audit and verified teardown in one proof-owned process.
+
+### HW05 audit and listening boundary
+
+HW05 cannot be inferred from child receipts. The backend first performs fresh
+final readiness reconciliation, captures that exact console-change fence, and
+then reads every address in the committed surface ledger twice in opposite
+orders around a combined live-audio check, Main-unmuted readback and fresh route
+check. Before and after every console read and every awaited operation it
+revalidates connection/transport/emergency generations, authority identity,
+the same readiness-fence object, current clock-sensitive `show_mix_ready`, no
+global blocker and no in-progress Apply. A last-read change or freshness expiry
+therefore blocks instead of returning a stale verified hash.
+
+The canonical verified-state SHA-256 is shown to the operator only after that
+audit. Listening confirmation is exact-SHA-bound and expires after five
+minutes. The runner then repeats the complete final audit; the run can close
+only when both state hashes, ledger hashes and run identities match and the
+proof-owned backend terminates cleanly. Any interleaved backend
+`readiness_invalidated` event is a permanent session-level latch before or
+after a terminal and prevents closure. Otherwise the durable outcome is
+`soundcheck_incomplete`, never an optimistic success.
 
 ## 4. Why this won
 
@@ -620,3 +730,14 @@ strict blocked protocol terminals, and commit recapture cannot consume the
 entire restored-proof receipt window. The review also required the strict M110
 manual WAL module to be included in both runtime identity and the exact CP05
 critical-path manifest.
+
+The final independent P1 cycle on 2026-07-14 first reproduced late readiness
+invalidation on the fourth/last ledger read, expiry during the audio await and
+invalidation while hashing the state. All three now fail closed at the exact
+server audit pass. The same review then found an adjacent runner defect: an
+interleaved `auto_soundcheck_status/readiness_invalidated` event could be
+consumed before terminal or during terminal grace without failing the session.
+A persistent session latch now makes both orders fatal and rejects every later
+terminal before another WebSocket read. The reviewer verified benign progress
+events remain accepted, reran all 97 runner tests and reported no remaining
+P0/P1. This is software evidence only and does not close CP05 or hardware.

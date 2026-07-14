@@ -7,6 +7,13 @@ Paperclip, ADRs, tests, or git history.
 
 ## Active Tasks
 
+- M110 attended WING reset and staged soundcheck is the current
+  operator-directed task. Finish CP05 from committed source, remove the empty
+  writer-lease directory, then execute HW01-HW05 in one proof-owned session.
+  Do not claim 95/100 before the repeated final audit and SHA-bound listening
+  prove `show_mix_ready`; do not convert the one-run M006 permission into
+  standing authority.
+
 - Use `Docs/MVP_WING_SUPERVISED.md` and
   `.ai/project-layer/wing_mvp_blockers.md` as the current execution rail.
 - Use `.ai/project-layer/autonomous_mvp_and_model_routing.md` and
@@ -44,3 +51,16 @@ Paperclip, ADRs, tests, or git history.
 
 Append task updates with date, owner, status, evidence, and next action. Do not
 delete old tasks unless a human explicitly requests pruning.
+
+## 2026-07-14 — M110 pre-hardware source checkpoint
+
+- Owner: Codex + attended operator.
+- Status: CP00 complete; CP01-CP04 implemented/offline-validated; CP05 and
+  HW01-HW05 pending.
+- Evidence: exact 64-address processor bypass; fixed M006 restore stages
+  23/14/14 with 77 unique changed addresses; durable parent/child journals;
+  split/replan lanes; two-pass HW05 audit; session-latched readiness
+  invalidation; no WING/USB contact or live write in this cycle.
+- Next action: finish full source tests and independent review, commit source,
+  bind/commit CP05 after lease release, then run the real attended workflow and
+  record actual readiness without widening the normal allowlist.

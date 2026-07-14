@@ -1454,15 +1454,15 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
     }
     assert (
         directive["wing_readonly_preflight_review_status"]
-        == "blocked"
+        == "candidate_ready_for_manual_review"
     )
     assert (
         directive["wing_readonly_preflight_review_evidence_status"]
-        == "readonly_preflight_artifact_replacement_required"
+        == "readonly_preflight_candidate_available"
     )
     assert (
         directive["wing_readonly_preflight_readiness_update_candidate_available"]
-        is False
+        is True
     )
     latest_run_id = directive["wing_readonly_preflight_latest_valid_candidate_run_id"]
     latest_source_id = directive["wing_readonly_preflight_latest_valid_candidate_source_id"]
@@ -1471,6 +1471,12 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
         f"artifacts/wing_readonly_preflight/{latest_run_id}/summary.json"
     )
     if directive["selected_blocker_status"] == "blocked_by_real_artifact_review":
+        assert (
+            directive[
+                "wing_readonly_preflight_manual_readiness_update_candidate_available"
+            ]
+            is False
+        )
         assert directive["selected_action_source"] == "WING Read-Only Decision Review"
         assert directive["wing_readonly_preflight_decision_status"] == "blocked"
         ledger_status = directive["wing_readonly_preflight_decision_ledger_status"]
@@ -1493,6 +1499,12 @@ def test_project_director_selects_operator_review_for_real_wing_candidate():
         assert "does not contact WING/backend" in directive["selected_action"]
         assert "grant live authority" in directive["selected_action"]
     else:
+        assert (
+            directive[
+                "wing_readonly_preflight_manual_readiness_update_candidate_available"
+            ]
+            is True
+        )
         assert (
             directive["selected_action_source"]
             == "WING Supervised Fader Rollback Proof"

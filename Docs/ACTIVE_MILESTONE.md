@@ -6,6 +6,30 @@ Title: WING read-only preflight evidence gate
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
+## M110 attended reset/soundcheck pre-hardware checkpoint — 2026-07-14
+
+The global M001 shell remains unchanged. Operator-directed active work is
+M110: CP00 is complete; CP01-CP04 are implemented and offline-validated; CP05
+is owned at runtime by the two canonical marker files and is still pending in
+this source snapshot. HW01-HW05 have not run. This M110 cycle has contacted no
+WING or USB capture surface, made zero live writes, applied no reset and applied
+zero corrections.
+
+M005 behavior is closed. The operator's M006 permission is recorded only for
+one CP05-bound attended session and is not standing authority. Reset means 64
+processor bypass addresses on channels 1-16 followed by exact removal of the
+known M006 corrections: stages 23/14/14, scopes 33/63/14, changed 19/52/6 and
+77 unique changed addresses; state outside the archived M006 transaction is
+preserved. The full route -> reset -> M006 restore -> analysis -> staged lanes
+-> two HW05 audits with SHA-bound listening path is implemented.
+
+Until CP05 and real HW05 succeed, strict real-live readiness remains **88/100**,
+not 95: normal allowlist `0`, standing authority `false`, and
+`show_mix_ready` is not physically proved on this source. At this snapshot the
+writer-lease owner record is absent, but the empty lease directory still exists
+and must be removed before CP05. Canonical current details are in
+`ops/autopilot/STATE.json.active_work`; marker files remain the hardware gate.
+
 ## M109-CP01 validation restored — 2026-07-13
 
 The committed CP01 source checkpoint

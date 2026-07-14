@@ -8,8 +8,26 @@ Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none. The audit implementation lease is released before final
-full-suite and no-WING validation; runtime lease artifacts are absent.
+Writer lease: none (no owner record). The empty
+`ops/autopilot/WRITER_LEASE/` directory still exists in this pre-CP05 snapshot
+and blocks M110 until its final `rmdir`; runtime ownership is not inferred from
+directory emptiness.
+
+## M110 pre-hardware checkpoint — 2026-07-14
+
+The M001 program shell remains waiting. M110 CP00 is complete; CP01-CP04 are
+implemented/offline-validated; the canonical software/hardware marker pair
+still owns CP05 truth, and HW01-HW05 are pending. No WING, USB capture or live
+write occurred in this M110 cycle; reset is false and applied corrections are
+zero.
+
+M005 behavior is closed. M006 permission is recorded only for the one attended
+CP05-bound run and grants no standing authority. The implemented path resets
+64 processor-enable addresses, restores exactly 77 known M006-changed
+addresses in 23/14/14 stages while preserving all unrelated state, then runs
+fresh analysis, interleaved lanes and two full final audits around SHA-bound
+operator listening. Before that physical proof, strict live is `88/100`,
+normal allowlist `0`, `show_mix_ready` unproved and the `95/100` target open.
 
 ## Soundcheck staged-execution checkpoint — 2026-07-12
 

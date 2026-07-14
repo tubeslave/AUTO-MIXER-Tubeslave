@@ -30,9 +30,11 @@ from soundcheck_mix_readiness import (
     assess_soundcheck_manifest,
     build_soundcheck_replan_draft,
     build_proposal_only_readiness,
+    classify_transition_reason,
     coupled_safe_alternative_plan_errors,
     plan_preflight_assessment,
     soundcheck_manifest_logical_id_errors,
+    soundcheck_replan_lineage_errors,
     validate_replacement,
 )
 from soundcheck_transaction_plan import (
@@ -63,6 +65,42 @@ def _operation_from_raw(raw):
         parameter=raw.get("parameter", ""),
         metadata=dict(raw.get("metadata") or {}),
     )
+
+
+@pytest.mark.asyncio
+async def test_m110_replan_rejects_client_fields_before_any_state_access():
+    server = object.__new__(AutoMixerServer)
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("invalid ingress must not inspect live state")
+
+    server._m110_capability_global_blockers = forbidden
+    request = {
+        "type": "advance_m110_soundcheck_replan",
+        "contract_version": 1,
+        "replan_selector": "next_bounded_split_revision",
+        "run_id": "client-selected-run",
+    }
+
+    result = await server.advance_m110_soundcheck_replan(
+        websocket=object(),
+        request=request,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == "m110_soundcheck_replan_request_invalid"
+    assert result["console_mutation_write_attempt_count"] == 0
+    assert result["live_mixer_writes"] is False
+
+
+def test_feedback_risk_is_a_global_soundcheck_blocker():
+    scope, disposition, evidence = classify_transition_reason(
+        "feedback_risk_detected"
+    )
+
+    assert scope == "global"
+    assert disposition == "blocked_global"
+    assert evidence == ("fresh_global_preflight",)
 
 
 def _m006_shape():
@@ -528,6 +566,137 @@ def test_archived_m006_shape_with_counterfactual_verified_holds_replans_fader_ve
     ]
     assert len(coupled) == 1
     assert len(coupled[0]["operations"]) == 14
+    assert soundcheck_replan_lineage_errors(manifest, draft) == []
+
+    m110_split_only = build_soundcheck_replan_draft(
+        manifest,
+        assessment,
+        snapshots_by_operation=snapshots,
+        adapters=adapters,
+        include_safe_alternatives=False,
+    )
+    assert m110_split_only["draft_available"] is True
+    assert m110_split_only["split_operation_count"] == 8
+    assert m110_split_only["safe_alternative_operation_count"] == 0
+    assert not any(
+        plan.get("coupled_safe_alternative_group") is True
+        for plan in m110_split_only["revised_manifest"]["plans"]
+    )
+    assert soundcheck_replan_lineage_errors(
+        manifest,
+        m110_split_only,
+    ) == []
+
+    missing_residual = copy.deepcopy(m110_split_only)
+    removed_residual = missing_residual["revised_manifest"][
+        "readiness_residuals"
+    ].pop(0)
+    assert (
+        "split_continuation_residual_invalid:"
+        + removed_residual["current_step_operation_id"]
+        in soundcheck_replan_lineage_errors(manifest, missing_residual)
+    )
+
+    weakened_residual = copy.deepcopy(m110_split_only)
+    weakened_residual["revised_manifest"]["readiness_residuals"][0].update(
+        {
+            "status": "done",
+            "musically_required": False,
+            "new_plan_revision_and_approval_required": False,
+        }
+    )
+    weakened_step_id = weakened_residual["revised_manifest"][
+        "readiness_residuals"
+    ][0]["current_step_operation_id"]
+    assert (
+        f"split_continuation_residual_invalid:{weakened_step_id}"
+        in soundcheck_replan_lineage_errors(manifest, weakened_residual)
+    )
+
+    looped = copy.deepcopy(m110_split_only)
+    looped_operation = next(
+        operation
+        for plan in looped["revised_manifest"]["plans"]
+        for operation in plan.get("operations") or []
+        if dict(operation.get("metadata") or {}).get("replacement_of")
+    )
+    looped_operation["metadata"]["split_step_index"] = 9
+    assert (
+        "replacement_split_index_invalid:"
+        + looped_operation["operation_id"]
+        in soundcheck_replan_lineage_errors(manifest, looped)
+    )
+
+    weakened_metadata = copy.deepcopy(m110_split_only)
+    weakened_operation = next(
+        operation
+        for plan in weakened_metadata["revised_manifest"]["plans"]
+        for operation in plan.get("operations") or []
+        if dict(operation.get("metadata") or {}).get("replacement_of")
+    )
+    weakened_operation["metadata"]["musically_required"] = False
+    assert (
+        "replacement_metadata_safety_drift:"
+        + weakened_operation["operation_id"]
+        in soundcheck_replan_lineage_errors(manifest, weakened_metadata)
+    )
+
+    stalled = copy.deepcopy(m110_split_only)
+    stalled_operation = next(
+        operation
+        for plan in stalled["revised_manifest"]["plans"]
+        for operation in plan.get("operations") or []
+        if dict(operation.get("metadata") or {}).get("replacement_of")
+    )
+    stalled_operation["target_value"] = stalled_operation["metadata"][
+        "split_baseline_target_value"
+    ]
+    assert (
+        "replacement_target_made_no_progress:"
+        + stalled_operation["operation_id"]
+        in soundcheck_replan_lineage_errors(manifest, stalled)
+    )
+
+    tampered = copy.deepcopy(m110_split_only)
+    replacement_parents = {
+        str(dict(operation.get("metadata") or {}).get("replacement_of") or "")
+        for plan in tampered["revised_manifest"]["plans"]
+        for operation in plan.get("operations") or []
+        if isinstance(operation, dict)
+    }
+    dropped_id = next(
+        str(operation.get("operation_id") or "")
+        for plan in tampered["revised_manifest"]["plans"]
+        for operation in plan.get("operations") or []
+        if isinstance(operation, dict)
+        and operation.get("operation_id") not in replacement_parents
+        and not dict(operation.get("metadata") or {}).get("replacement_of")
+    )
+    for plan in tampered["revised_manifest"]["plans"]:
+        plan["operations"] = [
+            operation
+            for operation in plan.get("operations") or []
+            if operation.get("operation_id") != dropped_id
+        ]
+        plan["logical_correction_ids"] = [
+            operation_id
+            for operation_id in plan.get("logical_correction_ids") or []
+            if operation_id != dropped_id
+        ]
+    tampered["revised_manifest"]["plans"] = [
+        plan
+        for plan in tampered["revised_manifest"]["plans"]
+        if plan.get("operations")
+    ]
+    tampered["revised_manifest"]["plan_count"] = len(
+        tampered["revised_manifest"]["plans"]
+    )
+    tampered["revised_manifest"]["operation_count"] -= 1
+
+    assert (
+        f"operation_lineage_dropped:{dropped_id}"
+        in soundcheck_replan_lineage_errors(manifest, tampered)
+    )
 
 
 def test_global_snapshot_failure_stops_every_child_before_execution():
@@ -1038,6 +1207,127 @@ def test_trusted_fader_reanalysis_replaces_boost_with_global_safe_downward_trans
         for plan in draft["revised_manifest"]["plans"]
         for raw in plan["operations"]
     )
+
+
+def test_completed_atomic_translation_decouples_with_full_lineage_next_revision():
+    manifest = build_soundcheck_transaction_plans(
+        [
+            ChannelFaderMove("bring vocal forward", 1, -6.0),
+            ChannelFaderMove("balance guitar", 2, -12.0),
+        ],
+        run_id="safe-fader-translation-continuation",
+    ).to_dict()
+    adapter = WingSupervisedFamilyAdapter("fader", object())
+    first_operations = {
+        raw["operation_id"]: raw
+        for plan in manifest["plans"]
+        for raw in plan["operations"]
+    }
+    first_snapshots = {
+        operation_id: {
+            "physical_verified": True,
+            "values": {
+                f"/ch/{raw['channel']}/fdr": (
+                    -12.0 if raw["channel"] == 1 else -10.0
+                )
+            },
+        }
+        for operation_id, raw in first_operations.items()
+    }
+    first_assessment = assess_soundcheck_manifest(
+        manifest,
+        snapshots_by_operation=first_snapshots,
+        adapters={"fader": adapter},
+    )
+    first_epoch = time.time() - 2.0
+    first_assessment["source_coverage"] = {
+        "verified": True,
+        "captured_at_epoch": first_epoch,
+        "max_age_sec": 300.0,
+        "selected_channel_ids": [1, 2],
+        "stage_coverage": {"foundation_level": True},
+        "per_source_stage_coverage": {
+            "1": {"foundation_level": "analyzed"},
+            "2": {"foundation_level": "analyzed"},
+        },
+        "per_source_fader_intent": _source_fader_intents(
+            manifest["run_id"],
+            first_epoch,
+            {1: -6.0, 2: -12.0},
+            {1: -12.0, 2: -10.0},
+        ),
+    }
+    first_assessment["main_47_48_evidence"] = {
+        "route_verified": True,
+        "fresh": True,
+        "signal_present": True,
+        "headroom_safe": True,
+        "captured_at_epoch": first_epoch,
+        "max_age_sec": 5.0,
+    }
+    first_assessment["selected_source_audible_paths"] = (
+        _source_audible_paths({1: -12.0, 2: -10.0}, first_epoch)
+    )
+    first_draft = build_soundcheck_replan_draft(
+        manifest,
+        first_assessment,
+        snapshots_by_operation=first_snapshots,
+        adapters={"fader": adapter},
+    )
+    second_manifest = first_draft["revised_manifest"]
+    coupled = next(
+        plan
+        for plan in second_manifest["plans"]
+        if plan.get("coupled_safe_alternative_group") is True
+    )
+    second_snapshots = {
+        raw["operation_id"]: {
+            "physical_verified": True,
+            "values": {f"/ch/{raw['channel']}/fdr": raw["target_value"]},
+        }
+        for raw in coupled["operations"]
+    }
+    second_assessment = assess_soundcheck_manifest(
+        second_manifest,
+        snapshots_by_operation=second_snapshots,
+        adapters={"fader": adapter},
+    )
+    second_epoch = first_epoch + 1.0
+    second_assessment["source_coverage"] = {
+        **first_assessment["source_coverage"],
+        "captured_at_epoch": second_epoch,
+        "per_source_fader_intent": _source_fader_intents(
+            manifest["run_id"],
+            second_epoch,
+            {1: -12.0, 2: -18.0},
+            {1: -12.0, 2: -16.0},
+        ),
+    }
+    second_draft = build_soundcheck_replan_draft(
+        second_manifest,
+        second_assessment,
+        snapshots_by_operation=second_snapshots,
+        adapters={"fader": adapter},
+        include_safe_alternatives=False,
+    )
+
+    assert second_draft["draft_available"] is True
+    assert second_draft["split_operation_count"] == 2
+    assert second_draft["safe_alternative_operation_count"] == 0
+    assert all(
+        plan.get("coupled_safe_alternative_group") is not True
+        and len(plan["operations"]) == 1
+        for plan in second_draft["revised_manifest"]["plans"]
+    )
+    assert {
+        raw["target_value"]
+        for plan in second_draft["revised_manifest"]["plans"]
+        for raw in plan["operations"]
+    } == {-12.0, -18.0}
+    assert soundcheck_replan_lineage_errors(
+        second_manifest,
+        second_draft,
+    ) == []
 
 
 def test_global_translation_uses_fresh_hold_current_for_selected_source_without_target():
@@ -1618,6 +1908,24 @@ def test_coupled_group_contract_binds_original_targets_to_source_intent():
     )
 
     assert "coupled_group_source_intent_binding_mismatch" in errors
+
+
+def test_coupled_group_support_set_must_reference_replaced_boosts():
+    server, coupled = _coupled_fader_refresh_case("support-binding")
+    tampered = copy.deepcopy(coupled)
+    for operation in tampered["operations"]:
+        operation["metadata"]["supports_replacement_of"] = [
+            "bogus-operation"
+        ]
+
+    errors = coupled_safe_alternative_plan_errors(
+        tampered,
+        source_coverage=server._soundcheck_manifests["support-binding"][
+            "source_coverage"
+        ],
+    )
+
+    assert "coupled_group_supported_boost_set_not_replaced" in errors
 
 
 def test_coupled_group_requires_exact_ordered_logical_operation_membership():
@@ -2667,6 +2975,78 @@ def test_server_aggregates_child_results_but_never_infers_ready_from_one_apply()
     assert readiness["logical_counts"]["applied"] == 0
     assert readiness["logical_counts"]["pending"] == 2
     assert readiness["mix_readiness"] == "soundcheck_incomplete"
+
+
+def test_child_outcome_batch_journal_failure_cannot_partially_advance_group():
+    manifest = build_soundcheck_transaction_plans(
+        [
+            ChannelFaderMove("left", 1, -12.0),
+            ChannelFaderMove("right", 2, -12.0),
+        ],
+        run_id="atomic-outcome-journal",
+    ).to_dict()
+    plan = copy.deepcopy(manifest["plans"][0])
+    plan["transaction_id"] = "soundcheck:atomic-outcome-journal"
+    plan["operations"] = [
+        copy.deepcopy(operation)
+        for item in manifest["plans"]
+        for operation in item["operations"]
+    ]
+    plan["logical_correction_ids"] = [
+        operation["operation_id"] for operation in plan["operations"]
+    ]
+    plan["atomic_group_commit_required"] = True
+    manifest["plans"] = [plan]
+    manifest["normal_plans"] = [plan]
+    manifest["separate_approval_plans"] = []
+    bind_soundcheck_manifest_content_sha256(manifest)
+    operation_ids = [
+        item["operation_id"] for item in plan["operations"]
+    ]
+    proposal = type(
+        "Proposal",
+        (),
+        {"raw": {"supervised_transaction_plan": plan}},
+    )()
+    server = object.__new__(AutoMixerServer)
+    server._soundcheck_manifests = {manifest["run_id"]: manifest}
+    server._soundcheck_outcomes = {manifest["run_id"]: {}}
+    server._soundcheck_global_blockers = {manifest["run_id"]: []}
+    server._soundcheck_preflight_assessments = {}
+    server._active_soundcheck_run_id = manifest["run_id"]
+    server.last_soundcheck_readiness = build_proposal_only_readiness(manifest)
+    journal_calls = []
+    server._append_soundcheck_parent_journal = (
+        lambda event_type, run_id, **payload: journal_calls.append(
+            (event_type, run_id, payload)
+        )
+        or None
+    )
+    result = {
+        **_committed_outcome(),
+        "applied_operation_ids": operation_ids,
+        "already_satisfied_operation_ids": [],
+    }
+
+    server.record_soundcheck_child_result(proposal, result)
+
+    assert len(journal_calls) == 1
+    assert journal_calls[0][0] == "child_outcome_batch"
+    assert len(journal_calls[0][2]["outcomes"]) == 2
+    assert server._soundcheck_outcomes[manifest["run_id"]] == {}
+    assert "durable_parent_outcome_record_failed" in (
+        server._soundcheck_global_blockers[manifest["run_id"]]
+    )
+
+    server._soundcheck_global_blockers[manifest["run_id"]] = []
+    server._append_soundcheck_parent_journal = (
+        lambda *_args, **_kwargs: "/tmp/soundcheck-parent-journal"
+    )
+    server.record_soundcheck_child_result(proposal, result)
+
+    assert set(server._soundcheck_outcomes[manifest["run_id"]]) == set(
+        operation_ids
+    )
 
 
 class _ReadOnlyWing:
@@ -4137,6 +4517,65 @@ async def test_accept_replan_rechecks_active_run_after_preflight_await():
 
 
 @pytest.mark.asyncio
+async def test_accept_replan_pre_publish_guard_blocks_before_journal_or_import():
+    manifest = build_soundcheck_transaction_plans(
+        [],
+        run_id="accept-pre-publish-guard",
+    ).to_dict()
+    revised = {
+        **manifest,
+        "plan_revision": 2,
+        "plan_fingerprint": "accept-pre-publish-guard-revision-2",
+    }
+    bind_soundcheck_manifest_content_sha256(revised)
+    server = object.__new__(AutoMixerServer)
+    server._soundcheck_manifests = {manifest["run_id"]: copy.deepcopy(manifest)}
+    server._active_soundcheck_run_id = manifest["run_id"]
+    server.last_soundcheck_readiness = {"run_id": manifest["run_id"]}
+    server._soundcheck_replan_drafts = {
+        manifest["run_id"]: {
+            "draft_id": "guarded-draft",
+            "from_plan_revision": 1,
+            "to_plan_revision": 2,
+            "revised_manifest": revised,
+        }
+    }
+    imported = []
+    guarded = []
+
+    async def preflight(_manifest):
+        return {"assessments": [], "global_blockers": []}
+
+    async def pre_publish_guard(candidate):
+        guarded.append(candidate["manifest_content_sha256"])
+        return {
+            "allowed": False,
+            "reason": "m110_soundcheck_replan_state_changed_before_publish",
+            "blockers": ["route_authority_changed"],
+        }
+
+    server.preflight_soundcheck_manifest = preflight
+    server.import_soundcheck_recommendations_to_operator_queue = (
+        lambda *_args, **_kwargs: imported.append(True) or {}
+    )
+
+    result = await server.accept_soundcheck_replan_draft(
+        run_id=manifest["run_id"],
+        draft_id="guarded-draft",
+        approved=True,
+        approval_id="server-owned-approval",
+        pre_publish_guard=pre_publish_guard,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == (
+        "m110_soundcheck_replan_state_changed_before_publish"
+    )
+    assert guarded and imported == []
+    assert server._soundcheck_manifests[manifest["run_id"]] == manifest
+
+
+@pytest.mark.asyncio
 async def test_all_already_satisfied_plan_has_read_only_finalize_path():
     manifest = build_soundcheck_transaction_plans(
         [ChannelFaderMove("already balanced", 1, -12.0)],
@@ -4244,6 +4683,272 @@ def test_parent_manifest_and_child_outcome_restore_durably_but_readiness_reopens
         "mixer_not_connected",
         "soundcheck_restart_requires_fresh_preflight_and_reimport",
     ]
+
+
+def test_real_child_outcome_batch_replays_all_atomic_operations_after_restart(
+    tmp_path,
+):
+    manifest = build_soundcheck_transaction_plans(
+        [
+            ChannelFaderMove("left", 1, -12.0),
+            ChannelFaderMove("right", 2, -12.0),
+        ],
+        run_id="durable-atomic-batch",
+    ).to_dict()
+    plan = copy.deepcopy(manifest["plans"][0])
+    plan["transaction_id"] = "soundcheck:durable-atomic-batch"
+    plan["operations"] = [
+        copy.deepcopy(operation)
+        for child in manifest["plans"]
+        for operation in child["operations"]
+    ]
+    plan["logical_correction_ids"] = [
+        operation["operation_id"] for operation in plan["operations"]
+    ]
+    manifest["plans"] = [plan]
+    manifest["normal_plans"] = [plan]
+    manifest["separate_approval_plans"] = []
+    bind_soundcheck_manifest_content_sha256(manifest)
+    operation_ids = [
+        operation["operation_id"] for operation in plan["operations"]
+    ]
+    journal_path = tmp_path / "soundcheck_parent_journal.jsonl"
+    writer = object.__new__(AutoMixerServer)
+    writer._console_runtime_dir = tmp_path
+    writer._soundcheck_parent_journal_path = journal_path
+    writer._soundcheck_manifests = {manifest["run_id"]: manifest}
+    writer._soundcheck_outcomes = {manifest["run_id"]: {}}
+    writer._soundcheck_global_blockers = {manifest["run_id"]: []}
+    writer._soundcheck_preflight_assessments = {}
+    writer._active_soundcheck_run_id = manifest["run_id"]
+    writer.last_soundcheck_readiness = build_proposal_only_readiness(manifest)
+    assert writer._append_soundcheck_parent_journal(
+        "manifest_registered",
+        manifest["run_id"],
+        plan_revision=manifest["plan_revision"],
+        plan_fingerprint=manifest["plan_fingerprint"],
+        manifest=manifest,
+    )
+    proposal = type(
+        "Proposal",
+        (),
+        {"raw": {"supervised_transaction_plan": plan}},
+    )()
+    writer.record_soundcheck_child_result(
+        proposal,
+        {
+            **_committed_outcome(),
+            "applied_operation_ids": operation_ids,
+            "already_satisfied_operation_ids": [],
+        },
+    )
+    assert set(writer._soundcheck_outcomes[manifest["run_id"]]) == set(
+        operation_ids
+    )
+
+    restored = object.__new__(AutoMixerServer)
+    restored._soundcheck_parent_journal_path = journal_path
+    restored._soundcheck_parent_journal_error = None
+    restored._soundcheck_manifests = {}
+    restored._soundcheck_outcomes = {}
+    restored._soundcheck_global_blockers = {}
+    restored._soundcheck_preflight_assessments = {}
+    restored.last_soundcheck_readiness = {}
+    restored._recover_soundcheck_parent_journal_state()
+
+    outcomes = restored._soundcheck_outcomes[manifest["run_id"]]
+    assert set(outcomes) == set(operation_ids)
+    assert all(
+        outcome["restored_from_parent_journal"] is True
+        and outcome["final_reconciliation_verified"] is False
+        for outcome in outcomes.values()
+    )
+
+
+@pytest.mark.parametrize("malformed_second_batch", [False, True])
+def test_real_m110_multi_batch_replay_is_all_or_none(
+    tmp_path,
+    malformed_second_batch,
+):
+    manifest = build_soundcheck_transaction_plans(
+        [
+            ChannelFaderMove("left", 1, -12.0),
+            ChannelFaderMove("right", 2, -12.0),
+        ],
+        run_id=(
+            "m110-multi-batch-malformed"
+            if malformed_second_batch
+            else "m110-multi-batch-valid"
+        ),
+    ).to_dict()
+    assert len(manifest["plans"]) == 2
+    journal_path = tmp_path / "soundcheck_parent_journal.jsonl"
+    writer = object.__new__(AutoMixerServer)
+    writer._console_runtime_dir = tmp_path
+    writer._soundcheck_parent_journal_path = journal_path
+    assert writer._append_soundcheck_parent_journal(
+        "manifest_registered",
+        manifest["run_id"],
+        plan_revision=manifest["plan_revision"],
+        plan_fingerprint=manifest["plan_fingerprint"],
+        manifest=manifest,
+    )
+    batches = []
+    expected_operation_ids = []
+    for index, plan in enumerate(manifest["plans"]):
+        operation_id = plan["operations"][0]["operation_id"]
+        expected_operation_ids.append(operation_id)
+        batches.append(
+            {
+                "transaction_id": plan["transaction_id"],
+                "outcomes": [
+                    {
+                        "operation_id": (
+                            "wrong-operation-id"
+                            if malformed_second_batch and index == 1
+                            else operation_id
+                        ),
+                        "outcome": _committed_outcome(),
+                    }
+                ],
+            }
+        )
+    target_delta = {
+        "/ch/1/fdr": {
+            "target_value": -12.0,
+            "tolerance": "0.05",
+            "source_kind": "soundcheck_child",
+            "operation_digest": "sha256:" + "b" * 64,
+        },
+        "/ch/2/fdr": {
+            "target_value": -12.0,
+            "tolerance": "0.05",
+            "source_kind": "soundcheck_child",
+            "operation_digest": "sha256:" + "b" * 64,
+        },
+    }
+    assert writer._append_soundcheck_parent_journal(
+        "m110_child_commit_batch",
+        manifest["run_id"],
+        plan_revision=manifest["plan_revision"],
+        plan_fingerprint=manifest["plan_fingerprint"],
+        manifest_content_sha256=manifest["manifest_content_sha256"],
+        proposal_id="m110-soundcheck-child-commit-" + "a" * 32,
+        result_digest="sha256:" + "c" * 64,
+        operation_digest="sha256:" + "b" * 64,
+        bundle_kind="soundcheck_atomic_group",
+        target_delta=target_delta,
+        target_delta_sha256=(
+            AutoMixerServer._m110_committed_surface_ledger_sha256(
+                target_delta
+            )
+        ),
+        committed_surface_ledger_sha256="sha256:" + "d" * 64,
+        batches=batches,
+    )
+
+    restored = object.__new__(AutoMixerServer)
+    restored._soundcheck_parent_journal_path = journal_path
+    restored._soundcheck_parent_journal_error = None
+    restored._soundcheck_manifests = {}
+    restored._soundcheck_outcomes = {}
+    restored._soundcheck_global_blockers = {}
+    restored._soundcheck_preflight_assessments = {}
+    restored.last_soundcheck_readiness = {}
+    restored._recover_soundcheck_parent_journal_state()
+
+    outcomes = restored._soundcheck_outcomes[manifest["run_id"]]
+    if malformed_second_batch:
+        assert restored._soundcheck_parent_journal_error == (
+            "invalid_soundcheck_parent_outcome_batch:2"
+        )
+        assert outcomes == {}
+    else:
+        assert restored._soundcheck_parent_journal_error is None
+        assert set(outcomes) == set(expected_operation_ids)
+        assert all(
+            outcome["restored_from_parent_journal"] is True
+            for outcome in outcomes.values()
+        )
+
+
+def test_m110_parent_commit_batch_collision_latches_recovery_failure(tmp_path):
+    manifest = build_soundcheck_transaction_plans(
+        [ChannelFaderMove("balance", 1, -12.0)],
+        run_id="m110-batch-collision",
+    ).to_dict()
+    plan = manifest["plans"][0]
+    operation_id = plan["operations"][0]["operation_id"]
+    journal_path = tmp_path / "soundcheck_parent_journal.jsonl"
+    writer = object.__new__(AutoMixerServer)
+    writer._console_runtime_dir = tmp_path
+    writer._soundcheck_parent_journal_path = journal_path
+    assert writer._append_soundcheck_parent_journal(
+        "manifest_registered",
+        manifest["run_id"],
+        plan_revision=manifest["plan_revision"],
+        plan_fingerprint=manifest["plan_fingerprint"],
+        manifest=manifest,
+    )
+    target_delta = {
+        "/ch/1/fdr": {
+            "target_value": -12.0,
+            "tolerance": "0.05",
+            "source_kind": "soundcheck_child",
+            "operation_digest": "sha256:" + "b" * 64,
+        }
+    }
+    common = {
+        "plan_revision": manifest["plan_revision"],
+        "plan_fingerprint": manifest["plan_fingerprint"],
+        "manifest_content_sha256": manifest["manifest_content_sha256"],
+        "proposal_id": "m110-soundcheck-child-commit-" + "a" * 32,
+        "result_digest": "sha256:" + "c" * 64,
+        "operation_digest": "sha256:" + "b" * 64,
+        "bundle_kind": "single_soundcheck_operation",
+        "target_delta": target_delta,
+        "target_delta_sha256": (
+            AutoMixerServer._m110_committed_surface_ledger_sha256(
+                target_delta
+            )
+        ),
+        "committed_surface_ledger_sha256": "sha256:" + "d" * 64,
+        "batches": [
+            {
+                "transaction_id": plan["transaction_id"],
+                "outcomes": [
+                    {
+                        "operation_id": operation_id,
+                        "outcome": _committed_outcome(),
+                    }
+                ],
+            }
+        ],
+    }
+    assert writer._append_soundcheck_parent_journal(
+        "m110_child_commit_batch",
+        manifest["run_id"],
+        **common,
+    )
+    assert writer._append_soundcheck_parent_journal(
+        "m110_child_commit_batch",
+        manifest["run_id"],
+        **{**common, "bundle_kind": "soundcheck_atomic_group"},
+    )
+
+    restored = object.__new__(AutoMixerServer)
+    restored._soundcheck_parent_journal_path = journal_path
+    restored._soundcheck_parent_journal_error = None
+    restored._soundcheck_manifests = {}
+    restored._soundcheck_outcomes = {}
+    restored._soundcheck_global_blockers = {}
+    restored._soundcheck_preflight_assessments = {}
+    restored.last_soundcheck_readiness = {}
+    restored._recover_soundcheck_parent_journal_state()
+
+    assert "m110_soundcheck_parent_commit_collision" in (
+        restored._soundcheck_parent_journal_error
+    )
 
 
 def test_parent_journal_rejects_same_revision_content_collision(tmp_path):

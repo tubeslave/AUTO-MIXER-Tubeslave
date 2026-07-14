@@ -9,13 +9,16 @@ only execution kernel.
 from __future__ import annotations
 
 from collections import Counter
+import copy
 from dataclasses import asdict, dataclass
 import hashlib
 import json
 import math
+import re
 import time
 from typing import Any, Dict, Iterable, Mapping, Sequence
 
+from compressor_adaptation import ratio_float_to_wing
 from soundcheck_transaction_plan import (
     FAMILY_ORDER,
     STAGE_ORDER,
@@ -92,6 +95,7 @@ GLOBAL_BLOCKER_REASONS = frozenset(
         "master_true_peak_unavailable_or_stale",
         "master_true_peak_headroom_insufficient",
         "feedback_state_unavailable_or_stale",
+        "feedback_risk_detected",
     }
 )
 
@@ -313,6 +317,7 @@ def classify_transition_reason(reason: str | None) -> tuple[str, str, tuple[str,
         or normalized in {
             "master_audio_signal_missing",
             "feedback_state_unavailable_or_stale",
+            "feedback_risk_detected",
         }
     )
     if global_reason:
@@ -520,11 +525,22 @@ def coupled_safe_alternative_plan_errors(
         or len(set(channels)) != len(channels)
     ):
         errors.append("coupled_group_selected_channels_invalid")
+    if isinstance(source_coverage, Mapping):
+        selected_channels = {
+            int(channel)
+            for channel in source_coverage.get("selected_channel_ids") or []
+            if isinstance(channel, int)
+            and not isinstance(channel, bool)
+            and 1 <= channel <= 48
+        }
+        if set(channels) != selected_channels:
+            errors.append("coupled_group_must_cover_full_selected_source_vector")
 
     trusted_ids: set[str] = set()
     evidence_digests: set[str] = set()
     translations: set[float] = set()
     support_sets: set[tuple[str, ...]] = set()
+    replacement_roots: list[str] = []
     fader_intents = (
         dict(source_coverage.get("per_source_fader_intent") or {})
         if isinstance(source_coverage, Mapping)
@@ -558,16 +574,37 @@ def coupled_safe_alternative_plan_errors(
             errors.append("coupled_group_strategy_invalid")
         role = str(metadata.get("member_role") or "")
         if role == "replacement":
-            if not str(metadata.get("replacement_of") or "").strip():
+            replacement_root = str(
+                metadata.get("replacement_of") or ""
+            ).strip()
+            if not replacement_root:
                 errors.append("coupled_group_replacement_provenance_missing")
+            else:
+                replacement_roots.append(replacement_root)
+            if metadata.get("supporting_hold_current_operation") is not False:
+                errors.append("coupled_group_replacement_support_flag_invalid")
         elif role == "hold_current_support":
             if metadata.get("replacement_of"):
                 errors.append("coupled_group_hold_must_not_claim_replacement")
+            hold_readback_epoch = metadata.get(
+                "hold_readback_captured_at_epoch"
+            )
+            if not (
+                metadata.get("supporting_hold_current_operation") is True
+                and metadata.get("hold_current_baseline") is True
+                and isinstance(hold_readback_epoch, (int, float))
+                and not isinstance(hold_readback_epoch, bool)
+                and math.isfinite(float(hold_readback_epoch))
+            ):
+                errors.append("coupled_group_hold_readback_binding_invalid")
         else:
             errors.append("coupled_group_member_role_invalid")
         trusted_id = str(metadata.get("trusted_reanalysis_id") or "").strip()
         digest = str(metadata.get("analysis_evidence_digest") or "").strip()
-        if not trusted_id or not digest:
+        if (
+            not trusted_id
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        ):
             errors.append("coupled_group_analysis_binding_missing")
         trusted_ids.add(trusted_id)
         evidence_digests.add(digest)
@@ -659,6 +696,12 @@ def coupled_safe_alternative_plan_errors(
         errors.append("coupled_group_translation_inconsistent")
     if len(support_sets) != 1:
         errors.append("coupled_group_supported_boost_set_inconsistent")
+    if len(replacement_roots) != len(set(replacement_roots)):
+        errors.append("coupled_group_replacement_roots_not_unique")
+    if len(support_sets) == 1 and not set(next(iter(support_sets))).issubset(
+        set(replacement_roots)
+    ):
+        errors.append("coupled_group_supported_boost_set_not_replaced")
     return sorted(set(errors))
 
 
@@ -978,6 +1021,526 @@ def validate_replacement(
     }
 
 
+def _target_progresses_toward_final(
+    baseline: Any,
+    target: Any,
+    final_target: Any,
+) -> bool:
+    """Return true only for a non-regressing, measurable bounded step."""
+
+    if all(
+        isinstance(value, Mapping)
+        for value in (baseline, target, final_target)
+    ):
+        baseline_map = dict(baseline)
+        target_map = dict(target)
+        final_map = dict(final_target)
+        if set(target_map) != set(final_map) or not set(final_map).issubset(
+            baseline_map
+        ):
+            return False
+        progressed = False
+        for key, final_value in final_map.items():
+            baseline_value = baseline_map.get(key)
+            target_value = target_map.get(key)
+            if (
+                isinstance(baseline_value, (int, float))
+                and not isinstance(baseline_value, bool)
+                and isinstance(target_value, (int, float))
+                and not isinstance(target_value, bool)
+                and isinstance(final_value, (int, float))
+                and not isinstance(final_value, bool)
+                and all(
+                    math.isfinite(float(value))
+                    for value in (
+                        baseline_value,
+                        target_value,
+                        final_value,
+                    )
+                )
+            ):
+                before = abs(float(baseline_value) - float(final_value))
+                after = abs(float(target_value) - float(final_value))
+                if after > before + 1e-9:
+                    return False
+                progressed = progressed or after < before - 1e-9
+                continue
+            if baseline_value == final_value:
+                if target_value != final_value:
+                    return False
+            elif target_value == final_value:
+                progressed = True
+            elif target_value != baseline_value:
+                return False
+        return progressed
+    if (
+        isinstance(baseline, (int, float))
+        and not isinstance(baseline, bool)
+        and isinstance(target, (int, float))
+        and not isinstance(target, bool)
+        and isinstance(final_target, (int, float))
+        and not isinstance(final_target, bool)
+        and all(
+            math.isfinite(float(value))
+            for value in (baseline, target, final_target)
+        )
+    ):
+        before = abs(float(baseline) - float(final_target))
+        after = abs(float(target) - float(final_target))
+        return after < before - 1e-9
+    return baseline != final_target and target == final_target
+
+
+def soundcheck_replan_lineage_errors(
+    current_manifest: Mapping[str, Any],
+    draft: Mapping[str, Any],
+) -> list[str]:
+    """Reject replans that drop or forge logical correction lineage."""
+
+    revised = draft.get("revised_manifest")
+    if not isinstance(revised, Mapping):
+        return ["revised_manifest_missing"]
+
+    def indexed_operations(
+        manifest: Mapping[str, Any],
+    ) -> tuple[dict[str, Dict[str, Any]], dict[str, Mapping[str, Any]], list[str]]:
+        by_id: dict[str, Dict[str, Any]] = {}
+        plan_by_id: dict[str, Mapping[str, Any]] = {}
+        duplicates: list[str] = []
+        for plan in manifest.get("plans") or []:
+            if not isinstance(plan, Mapping):
+                continue
+            for operation in plan.get("operations") or []:
+                if not isinstance(operation, Mapping):
+                    continue
+                operation_id = str(operation.get("operation_id") or "").strip()
+                if not operation_id or operation_id in by_id:
+                    duplicates.append(operation_id or "missing")
+                    continue
+                by_id[operation_id] = dict(operation)
+                plan_by_id[operation_id] = plan
+        return by_id, plan_by_id, duplicates
+
+    old_by_id, old_plan_by_id, old_duplicates = indexed_operations(
+        current_manifest
+    )
+    new_by_id, new_plan_by_id, new_duplicates = indexed_operations(revised)
+    errors: list[str] = []
+    if old_duplicates:
+        errors.append("current_operation_identity_invalid")
+    if new_duplicates:
+        errors.append("revised_operation_identity_invalid")
+    if not old_by_id:
+        errors.append("current_operation_lineage_missing")
+
+    safe_details = [
+        item
+        for item in draft.get("safe_alternatives") or []
+        if isinstance(item, Mapping)
+    ]
+    safe_ids = {
+        str(value or "").strip()
+        for detail in safe_details
+        for value in detail.get("replacement_operation_ids") or []
+        if str(value or "").strip()
+    }
+    expected_analysis_id = str(
+        draft.get("trusted_reanalysis_id") or ""
+    ).strip()
+    expected_analysis_digest = str(
+        draft.get("analysis_evidence_digest") or ""
+    ).strip()
+    trusted_evidence = (
+        {expected_analysis_id: expected_analysis_digest}
+        if expected_analysis_id and expected_analysis_digest
+        else {}
+    )
+    current_revision = current_manifest.get("plan_revision")
+    next_revision = (
+        current_revision + 1
+        if isinstance(current_revision, int)
+        and not isinstance(current_revision, bool)
+        else None
+    )
+    preserved_ids: set[str] = set()
+    replacement_parents: dict[str, str] = {}
+    split_replacement_ids: set[str] = set()
+
+    for operation_id, operation in new_by_id.items():
+        metadata = (
+            dict(operation.get("metadata") or {})
+            if isinstance(operation.get("metadata"), Mapping)
+            else {}
+        )
+        plan = new_plan_by_id.get(operation_id, {})
+        coupled_member = bool(
+            isinstance(plan, Mapping)
+            and plan.get("coupled_safe_alternative_group") is True
+            and plan.get("atomic_group_commit_required") is True
+        )
+        if operation_id in old_by_id:
+            if operation != old_by_id[operation_id]:
+                errors.append(
+                    f"preserved_operation_mutated:{operation_id}"
+                )
+            preserved_ids.add(operation_id)
+            continue
+
+        role = str(metadata.get("member_role") or "")
+        parent_id = str(metadata.get("replacement_of") or "").strip()
+        if role == "hold_current_support" and not parent_id:
+            if operation_id not in safe_ids or not coupled_member:
+                errors.append(
+                    f"unbound_supporting_operation:{operation_id}"
+                )
+            hold_split_index = metadata.get("split_step_index")
+            if (
+                isinstance(hold_split_index, bool)
+                or not isinstance(hold_split_index, int)
+                or not 1 <= hold_split_index <= 8
+            ):
+                errors.append(
+                    f"replacement_split_index_invalid:{operation_id}"
+                )
+            if not _target_progresses_toward_final(
+                metadata.get("split_baseline_target_value"),
+                operation.get("target_value"),
+                metadata.get("final_target_value"),
+            ):
+                errors.append(
+                    f"replacement_target_made_no_progress:{operation_id}"
+                )
+            continue
+        if not parent_id or parent_id not in old_by_id:
+            errors.append(f"unknown_replan_operation:{operation_id}")
+            continue
+        if parent_id in replacement_parents:
+            errors.append(f"duplicate_replacement_parent:{parent_id}")
+        replacement_parents[parent_id] = operation_id
+        original = old_by_id[parent_id]
+        original_metadata = (
+            dict(original.get("metadata") or {})
+            if isinstance(original.get("metadata"), Mapping)
+            else {}
+        )
+        expected_root = str(
+            original_metadata.get("root_correction_id") or parent_id
+        )
+        if str(metadata.get("root_correction_id") or "") != expected_root:
+            errors.append(f"replacement_root_drift:{operation_id}")
+        if metadata.get("plan_revision") != next_revision:
+            errors.append(f"replacement_revision_drift:{operation_id}")
+        if metadata.get("substitution_hop") != 1:
+            errors.append(f"replacement_hop_invalid:{operation_id}")
+        replacement_split_index = metadata.get("split_step_index")
+        if (
+            isinstance(replacement_split_index, bool)
+            or not isinstance(replacement_split_index, int)
+            or not 1 <= replacement_split_index <= 8
+        ):
+            errors.append(f"replacement_split_index_invalid:{operation_id}")
+        validation = validate_replacement(
+            original,
+            operation,
+            effective_live_write_kinds={
+                str(operation.get("write_kind") or "")
+            },
+            trusted_reanalysis_evidence=trusted_evidence,
+            current_plan_revision=(
+                current_revision
+                if isinstance(current_revision, int)
+                and not isinstance(current_revision, bool)
+                else 0
+            ),
+        )
+        if validation.get("accepted") is not True:
+            errors.extend(
+                f"replacement_invalid:{operation_id}:{reason}"
+                for reason in validation.get("reasons") or []
+            )
+        allowed_metadata_drift = {
+            "logical_correction_id",
+            "replacement_of",
+            "root_correction_id",
+            "substitution_hop",
+            "trusted_reanalysis_id",
+            "analysis_evidence_digest",
+            "source_analysis_captured_at_epoch",
+            "absolute_target",
+            "plan_revision",
+            "final_target_value",
+            "split_baseline_target_value",
+            "split_step_index",
+            "split_reason",
+            "pre_translation_final_target_value",
+            "safe_alternative_strategy",
+            "global_fader_translation_db",
+            "constructive_lane_used",
+            "supporting_hold_current_operation",
+            "member_role",
+            "supports_replacement_of",
+            "atomic_group_commit_required",
+            "dependency_group_id",
+            "coupled_safe_alternative_transaction_id",
+            "completed_atomic_group_decoupling",
+        }
+        if any(
+            metadata.get(field_name) != original_metadata.get(field_name)
+            for field_name in set(original_metadata).union(metadata)
+            if field_name not in allowed_metadata_drift
+        ):
+            errors.append(f"replacement_metadata_safety_drift:{operation_id}")
+        target_progressed = _target_progresses_toward_final(
+            metadata.get("split_baseline_target_value"),
+            operation.get("target_value"),
+            metadata.get("final_target_value"),
+        )
+        safe_noop_replacement = bool(
+            operation_id in safe_ids
+            and metadata.get("split_baseline_target_value")
+            == operation.get("target_value")
+            == metadata.get("final_target_value")
+        )
+        old_plan = old_plan_by_id.get(parent_id, {})
+        completed_atomic_noop = bool(
+            metadata.get("completed_atomic_group_decoupling") is True
+            and isinstance(old_plan, Mapping)
+            and old_plan.get("coupled_safe_alternative_group") is True
+            and old_plan.get("atomic_group_commit_required") is True
+            and new_plan_by_id.get(operation_id, {}).get(
+                "coupled_safe_alternative_group"
+            )
+            is not True
+            and metadata.get("split_baseline_target_value")
+            == operation.get("target_value")
+            == metadata.get("final_target_value")
+        )
+        if (
+            not target_progressed
+            and not safe_noop_replacement
+            and not completed_atomic_noop
+        ):
+            errors.append(f"replacement_target_made_no_progress:{operation_id}")
+
+        if operation_id in safe_ids:
+            if role != "replacement" or not coupled_member:
+                errors.append(
+                    f"safe_replacement_group_binding_invalid:{operation_id}"
+                )
+            continue
+
+        split_replacement_ids.add(operation_id)
+        if any(
+            operation.get(field_name) != original.get(field_name)
+            for field_name in (
+                "family_id",
+                "write_kind",
+                "channel",
+                "parameter",
+            )
+        ):
+            errors.append(f"split_operation_surface_drift:{operation_id}")
+        old_split_index = original_metadata.get("split_step_index", 0)
+        if (
+            isinstance(old_split_index, bool)
+            or not isinstance(old_split_index, int)
+            or metadata.get("split_step_index") != old_split_index + 1
+        ):
+            errors.append(f"split_step_index_invalid:{operation_id}")
+        old_final_target = original_metadata.get(
+            "final_target_value",
+            original.get("target_value"),
+        )
+        if metadata.get("final_target_value") != old_final_target:
+            errors.append(f"split_final_target_drift:{operation_id}")
+
+    overlap = preserved_ids.intersection(replacement_parents)
+    errors.extend(
+        f"preserved_and_replaced_parent:{operation_id}"
+        for operation_id in sorted(overlap)
+    )
+    covered_old_ids = preserved_ids.union(replacement_parents)
+    for operation_id in sorted(set(old_by_id).difference(covered_old_ids)):
+        errors.append(f"operation_lineage_dropped:{operation_id}")
+
+    seen_atomic_plans: set[int] = set()
+    for parent_id, old_plan in old_plan_by_id.items():
+        if not (
+            isinstance(old_plan, Mapping)
+            and old_plan.get("coupled_safe_alternative_group") is True
+            and old_plan.get("atomic_group_commit_required") is True
+            and id(old_plan) not in seen_atomic_plans
+        ):
+            continue
+        seen_atomic_plans.add(id(old_plan))
+        parent_ids = [
+            str(operation.get("operation_id") or "")
+            for operation in old_plan.get("operations") or []
+            if isinstance(operation, Mapping)
+        ]
+        child_ids = [
+            replacement_parents.get(operation_id, "")
+            for operation_id in parent_ids
+        ]
+        if not (
+            parent_ids
+            and all(child_ids)
+            and all(
+                dict(new_by_id[child_id].get("metadata") or {}).get(
+                    "completed_atomic_group_decoupling"
+                )
+                is True
+                for child_id in child_ids
+            )
+            and all(
+                new_plan_by_id[child_id].get(
+                    "coupled_safe_alternative_group"
+                )
+                is not True
+                and new_plan_by_id[child_id].get(
+                    "atomic_group_commit_required"
+                )
+                is not True
+                and len(new_plan_by_id[child_id].get("operations") or []) == 1
+                for child_id in child_ids
+            )
+        ):
+            errors.append(
+                "atomic_group_lineage_not_safely_decoupled:"
+                + str(old_plan.get("transaction_id") or parent_id)
+            )
+
+    actual_safe_ids = safe_ids.intersection(new_by_id)
+    if safe_ids != actual_safe_ids:
+        errors.append("safe_alternative_operation_missing")
+    if draft.get("safe_alternative_operation_count") != len(actual_safe_ids):
+        errors.append("safe_alternative_operation_count_mismatch")
+    if draft.get("split_operation_count") != len(split_replacement_ids):
+        errors.append("split_operation_count_mismatch")
+    if revised.get("unsupported_actions") != current_manifest.get(
+        "unsupported_actions"
+    ):
+        errors.append("unsupported_action_lineage_drift")
+    current_logical_count = int(
+        current_manifest.get("logical_correction_count")
+        or (
+            len(old_by_id)
+            + len(current_manifest.get("unsupported_actions") or [])
+        )
+    )
+    if revised.get("logical_correction_count") != current_logical_count:
+        errors.append("logical_correction_count_drift")
+    if revised.get("plan_count") != len(
+        [plan for plan in revised.get("plans") or [] if isinstance(plan, Mapping)]
+    ):
+        errors.append("revised_plan_count_mismatch")
+    if revised.get("operation_count") != len(new_by_id):
+        errors.append("revised_operation_count_mismatch")
+
+    old_residuals = [
+        dict(item)
+        for item in current_manifest.get("readiness_residuals") or []
+        if isinstance(item, Mapping)
+    ]
+    new_residuals = [
+        dict(item)
+        for item in revised.get("readiness_residuals") or []
+        if isinstance(item, Mapping)
+    ]
+    for child_id, child in new_by_id.items():
+        child_metadata = (
+            dict(child.get("metadata") or {})
+            if isinstance(child.get("metadata"), Mapping)
+            else {}
+        )
+        if "final_target_value" not in child_metadata:
+            continue
+        final_target = child_metadata.get(
+            "final_target_value",
+            child.get("target_value"),
+        )
+        expected_logical_id = (
+            "soundcheck:deferred:"
+            + str(child_metadata.get("root_correction_id") or child_id)
+        )
+        continuation_rows = [
+            item
+            for item in new_residuals
+            if item.get("reason") == "split_target_remaining"
+            and item.get("current_step_operation_id") == child_id
+        ]
+        if child.get("target_value") != final_target:
+            if not (
+                len(continuation_rows) == 1
+                and continuation_rows[0].get("logical_correction_id")
+                == expected_logical_id
+                and continuation_rows[0].get("final_target_value")
+                == final_target
+                and continuation_rows[0].get("status") == "pending"
+                and continuation_rows[0].get("scope") == "operation"
+                and continuation_rows[0].get("disposition")
+                == "operator_review"
+                and continuation_rows[0].get("stage")
+                == child_metadata.get("stage")
+                and continuation_rows[0].get("required_for")
+                == child_metadata.get("required_for")
+                and continuation_rows[0].get("channel")
+                == child.get("channel")
+                and continuation_rows[0].get("musically_required") is True
+                and continuation_rows[0].get(
+                    "new_plan_revision_and_approval_required"
+                )
+                is True
+            ):
+                errors.append(
+                    f"split_continuation_residual_invalid:{child_id}"
+                )
+        elif continuation_rows:
+            errors.append(f"completed_split_has_residual:{child_id}")
+    for residual in old_residuals:
+        if residual in new_residuals:
+            continue
+        parent_id = str(
+            residual.get("current_step_operation_id") or ""
+        ).strip()
+        child_id = replacement_parents.get(parent_id)
+        if (
+            residual.get("reason") != "split_target_remaining"
+            or not child_id
+        ):
+            errors.append(
+                "readiness_residual_lineage_dropped:"
+                + str(residual.get("logical_correction_id") or parent_id)
+            )
+            continue
+        child = new_by_id[child_id]
+        child_metadata = (
+            dict(child.get("metadata") or {})
+            if isinstance(child.get("metadata"), Mapping)
+            else {}
+        )
+        final_target = child_metadata.get(
+            "final_target_value",
+            child.get("target_value"),
+        )
+        if child.get("target_value") == final_target:
+            continue
+        if not any(
+            item.get("reason") == "split_target_remaining"
+            and item.get("logical_correction_id")
+            == residual.get("logical_correction_id")
+            and item.get("current_step_operation_id") == child_id
+            and item.get("final_target_value") == final_target
+            for item in new_residuals
+        ):
+            errors.append(
+                "split_residual_lineage_invalid:"
+                + str(residual.get("logical_correction_id") or parent_id)
+            )
+
+    return sorted(set(errors))
+
+
 def _validate_supporting_down_only_fader(
     operation: Mapping[str, Any],
     *,
@@ -1091,11 +1654,14 @@ def _bounded_split_target(
             if field not in final_target:
                 continue
             _address, current = current_address(suffix)
-            result[field] = _bounded_numeric_step(
+            bounded_value = _bounded_numeric_step(
                 current,
                 float(final_target[field]),
                 maximum_delta,
             )
+            if field == "ratio":
+                bounded_value = float(ratio_float_to_wing(bounded_value))
+            result[field] = bounded_value
         return result
 
     if reason == "gain_down_delta_exceeds_6db":
@@ -1166,10 +1732,14 @@ def _bounded_split_target(
     if reason == "compressor_ratio_delta_exceeds_2":
         _address, current = current_address("/dyn/ratio")
         result = dict(current_target)
-        result["ratio"] = _bounded_numeric_step(
-            current,
-            float(final_target["ratio"]),
-            2.0,
+        result["ratio"] = float(
+            ratio_float_to_wing(
+                _bounded_numeric_step(
+                    current,
+                    float(final_target["ratio"]),
+                    2.0,
+                )
+            )
         )
         return result
     if reason == "dynamics_threshold_delta_exceeds_3db":
@@ -1185,12 +1755,91 @@ def _bounded_split_target(
     raise ValueError(f"unsupported_split_reason:{reason}")
 
 
+def _split_baseline_target(
+    operation: ConsoleTransactionOperation,
+    snapshot: Mapping[str, Any],
+    adapter: Any,
+    reason: str,
+) -> Any:
+    """Project the fresh physical snapshot into the operation target shape."""
+
+    prepared = adapter.prepare(operation)
+    values = dict(snapshot.get("values") or {})
+    writes = list(prepared.get("writes") or [])
+
+    def current_address(suffix: str, contains: str = "") -> float:
+        for write in writes:
+            address = str(write.get("address") or "")
+            if address.endswith(suffix) and (not contains or contains in address):
+                return float(values[address])
+        raise ValueError(f"split_snapshot_address_missing:{suffix}")
+
+    target = operation.target_value
+    if reason == "gain_down_delta_exceeds_6db":
+        return current_address("/in/set/trim")
+    if reason == "fader_cut_delta_exceeded":
+        current = current_address("/fdr")
+        if isinstance(target, Mapping):
+            baseline = dict(target)
+            baseline["target_db"] = current
+            return baseline
+        return current
+    if reason == "send_cut_delta_exceeds_6db":
+        baseline = dict(target)
+        baseline["level_db"] = current_address("/lvl", "/send/")
+        return baseline
+    if reason == "eq_cut_delta_exceeds_3db":
+        baseline = dict(target)
+        baseline["gain_db"] = current_address("g", "/eq/")
+        return baseline
+    if reason == "pan_delta_exceeds_10_percent":
+        return current_address("/pan")
+    if reason == "delay_delta_exceeds_5ms":
+        baseline = dict(target)
+        baseline["delay_ms"] = current_address("/in/set/dly")
+        return baseline
+    if reason == "hpf_frequency_delta_exceeds_one_octave":
+        baseline = dict(target)
+        baseline["freq_hz"] = current_address("/flt/lcf")
+        return baseline
+    if reason in {
+        "dynamics_threshold_delta_exceeds_3db",
+        "compressor_ratio_delta_exceeds_2",
+        "compressor_makeup_cut_delta_exceeds_3db",
+    }:
+        if not isinstance(target, Mapping):
+            if reason == "compressor_makeup_cut_delta_exceeds_3db":
+                return current_address("/dyn/gain")
+            raise ValueError("split_mapping_target_required")
+        baseline = dict(target)
+        if operation.family_id == "dynamics_compressor":
+            for suffix, field in (
+                ("/dyn/thr", "threshold_db"),
+                ("/dyn/ratio", "ratio"),
+                ("/dyn/gain", "makeup_db"),
+            ):
+                if field in baseline:
+                    baseline[field] = current_address(suffix)
+            return baseline
+        if reason == "dynamics_threshold_delta_exceeds_3db":
+            baseline["threshold_db"] = current_address("/gate/thr")
+            return baseline
+        if reason == "compressor_makeup_cut_delta_exceeds_3db":
+            baseline["makeup_db"] = current_address("/dyn/gain")
+            return baseline
+        if reason == "compressor_ratio_delta_exceeds_2":
+            baseline["ratio"] = current_address("/dyn/ratio")
+            return baseline
+    raise ValueError(f"unsupported_split_reason:{reason}")
+
+
 def build_soundcheck_replan_draft(
     manifest: Mapping[str, Any],
     assessment: Mapping[str, Any],
     *,
     snapshots_by_operation: Mapping[str, Mapping[str, Any]],
     adapters: Mapping[str, Any],
+    include_safe_alternatives: bool = True,
 ) -> Dict[str, Any]:
     """Build a no-write next revision for bounded steps and operator alternatives."""
 
@@ -1602,7 +2251,8 @@ def build_soundcheck_replan_draft(
     if not boost_deltas:
         safe_alternative_blockers.append("blocked_fader_boost_missing")
     if (
-        source_ready
+        include_safe_alternatives
+        and source_ready
         and main_ready
         and not assessment.get("global_blockers")
         and fader_contract_complete
@@ -1674,7 +2324,11 @@ def build_soundcheck_replan_draft(
                 "plan_revision": next_revision,
                 "pre_translation_final_target_value": original_final_target,
                 "final_target_value": translated_final_target,
-                "split_step_index": 1,
+                "split_baseline_target_value": current,
+                "split_step_index": int(
+                    dict(operation.metadata).get("split_step_index") or 0
+                )
+                + 1,
                 "safe_alternative_strategy": "global_fader_translation_v1",
                 "global_fader_translation_db": -translation_db,
                 "constructive_lane_used": False,
@@ -1929,6 +2583,16 @@ def build_soundcheck_replan_draft(
                         reason,
                     )
                 )
+                split_baseline_target = (
+                    operation.target_value
+                    if direct_final_step
+                    else _split_baseline_target(
+                        operation,
+                        snapshot,
+                        adapter,
+                        reason,
+                    )
+                )
             except (KeyError, TypeError, ValueError):
                 continue
             replacement_id = "soundcheck:split:" + hashlib.sha256(
@@ -1965,6 +2629,7 @@ def build_soundcheck_replan_draft(
                 "absolute_target": True,
                 "plan_revision": next_revision,
                 "final_target_value": final_target,
+                "split_baseline_target_value": split_baseline_target,
                 "split_reason": reason,
             }
             replacement = {
@@ -2008,6 +2673,129 @@ def build_soundcheck_replan_draft(
                     }
                 )
 
+    atomic_group_metadata_keys = {
+        "atomic_group_commit_required",
+        "dependency_group_id",
+        "coupled_safe_alternative_transaction_id",
+        "safe_alternative_strategy",
+        "global_fader_translation_db",
+        "constructive_lane_used",
+        "supporting_hold_current_operation",
+        "member_role",
+        "supports_replacement_of",
+    }
+    decoupled_atomic_transaction_ids: set[str] = set()
+    for plan in manifest.get("plans") or []:
+        if not (
+            isinstance(plan, Mapping)
+            and plan.get("coupled_safe_alternative_group") is True
+            and plan.get("atomic_group_commit_required") is True
+        ):
+            continue
+        group_operations = [
+            dict(operation)
+            for operation in plan.get("operations") or []
+            if isinstance(operation, Mapping)
+        ]
+        group_ids = [
+            str(operation.get("operation_id") or "")
+            for operation in group_operations
+        ]
+        group_can_decouple = bool(
+            group_ids
+            and all(
+                assessment_by_id.get(operation_id, {}).get("disposition")
+                == DISPOSITION_ALREADY_SATISFIED
+                for operation_id in group_ids
+            )
+            and all(
+                operation_id in split_operations
+                or dict(operation.get("metadata") or {}).get(
+                    "final_target_value",
+                    operation.get("target_value"),
+                )
+                == operation.get("target_value")
+                for operation_id, operation in zip(group_ids, group_operations)
+            )
+            and all(
+                int(dict(operation.get("metadata") or {}).get(
+                    "split_step_index"
+                ) or 0) < 8
+                for operation in group_operations
+            )
+        )
+        if not group_can_decouple:
+            continue
+        decoupled_atomic_transaction_ids.add(
+            str(plan.get("transaction_id") or "")
+        )
+        for operation_id, operation in zip(group_ids, group_operations):
+            original_metadata = dict(operation.get("metadata") or {})
+            if operation_id in split_operations:
+                replacement = copy.deepcopy(split_operations[operation_id])
+                replacement_metadata = dict(
+                    replacement.get("metadata") or {}
+                )
+            else:
+                final_target = original_metadata.get(
+                    "final_target_value",
+                    operation.get("target_value"),
+                )
+                replacement_id = "soundcheck:decoupled:" + hashlib.sha256(
+                    json.dumps(
+                        {
+                            "replacement_of": operation_id,
+                            "target_value": operation.get("target_value"),
+                            "plan_revision": next_revision,
+                        },
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    ).encode("utf-8")
+                ).hexdigest()[:16]
+                replacement_metadata = dict(original_metadata)
+                replacement_metadata.update(
+                    {
+                        "logical_correction_id": replacement_id,
+                        "replacement_of": operation_id,
+                        "root_correction_id": original_metadata.get(
+                            "root_correction_id",
+                            operation_id,
+                        ),
+                        "substitution_hop": 1,
+                        "trusted_reanalysis_id": analysis_id,
+                        "analysis_evidence_digest": analysis_digest,
+                        "source_analysis_captured_at_epoch": (
+                            source_analysis_epoch
+                        ),
+                        "absolute_target": True,
+                        "plan_revision": next_revision,
+                        "final_target_value": final_target,
+                        "split_baseline_target_value": operation.get(
+                            "target_value"
+                        ),
+                        "split_step_index": int(
+                            original_metadata.get("split_step_index") or 0
+                        )
+                        + 1,
+                        "split_reason": (
+                            "atomic_safe_translation_completed"
+                        ),
+                    }
+                )
+                replacement = {
+                    **dict(operation),
+                    "operation_id": replacement_id,
+                    "metadata": replacement_metadata,
+                }
+            for field_name in atomic_group_metadata_keys:
+                replacement_metadata.pop(field_name, None)
+            replacement_metadata[
+                "completed_atomic_group_decoupling"
+            ] = True
+            replacement["metadata"] = replacement_metadata
+            split_operations[operation_id] = replacement
+
     replacement_operations = {
         **split_operations,
         **safe_alternative_operations,
@@ -2024,6 +2812,61 @@ def build_soundcheck_replan_draft(
     revised_plans = []
     for plan in manifest.get("plans") or []:
         if not isinstance(plan, Mapping):
+            continue
+        if str(plan.get("transaction_id") or "") in (
+            decoupled_atomic_transaction_ids
+        ):
+            for raw in plan.get("operations") or []:
+                if not isinstance(raw, Mapping):
+                    continue
+                operation_id = str(raw.get("operation_id") or "")
+                replacement = replacement_operations.get(operation_id)
+                if not isinstance(replacement, Mapping):
+                    continue
+                replacement_id = str(
+                    replacement.get("operation_id") or ""
+                )
+                stage = str(
+                    dict(replacement.get("metadata") or {}).get("stage")
+                    or plan.get("stage")
+                    or "foundation_level"
+                )
+                digest = hashlib.sha256(
+                    replacement_id.encode("utf-8")
+                ).hexdigest()[:16]
+                revised_plans.append(
+                    {
+                        **{
+                            key: value
+                            for key, value in dict(plan).items()
+                            if key
+                            not in {
+                                "preflight_assessment",
+                                "transaction_id",
+                                "operations",
+                                "logical_correction_ids",
+                                "coupled_safe_alternative_group",
+                                "atomic_group_commit_required",
+                                "reason",
+                            }
+                        },
+                        "transaction_id": (
+                            f"soundcheck:replan:{stage}:"
+                            f"r{next_revision}:{digest}"
+                        ),
+                        "reason": (
+                            "Continuation after verified atomic safe "
+                            "translation."
+                        ),
+                        "operations": [dict(replacement)],
+                        "logical_correction_ids": [replacement_id],
+                        "plan_revision": next_revision,
+                        "approved": False,
+                        "execution_allowed": False,
+                        "live_mixer_writes": False,
+                        "transport_policy": "proposal_only",
+                    }
+                )
             continue
         raw_operations = []
         for raw in plan.get("operations") or []:

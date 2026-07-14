@@ -15,7 +15,9 @@ CANONICAL_ATTENDED_OPERATION_BUNDLE_SCHEMA = (
 )
 CANONICAL_ATTENDED_BUNDLE_KINDS = (
     "single_soundcheck_operation",
+    "soundcheck_atomic_group",
     "maintenance_dsp_reset_bundle",
+    "m006_exact_preimage_restore_bundle",
     "processor_enable_bundle",
 )
 M110_CANONICAL_OPERATION_FIELDS = frozenset(

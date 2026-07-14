@@ -5,6 +5,27 @@ Status: active dependency-ordered roadmap
 Roadmap выбирается от текущего evidence state. Milestone считается валидным
 только если он finite, independently verifiable и имеет rollback.
 
+## M110 operator-directed overlay — 2026-07-14
+
+The frozen M001-M010 dependency table below is not rewritten. Current active
+work is the separate M110 attended path recorded in `STATE.json.active_work`:
+CP00 complete, CP01-CP04 implemented/offline-validated, CP05 pending, and
+HW01-HW05 pending. No WING/USB contact or write occurred in this cycle.
+
+The next finite sequence is: finish and commit software validation; remove the
+empty development lease directory; commit source-bound CP05 markers; then in
+one operator-attended process prove route, mute/contain outputs, bypass the 64
+CH1-16 processor-enable addresses, restore only the 77 known M006 changed
+addresses through exact 23/14/14 stages, unmute, analyze, execute interleaved
+processor/musical lanes, perform the final audit, confirm the exact state SHA by
+listening, repeat the audit, and verify teardown. Any CAS, headroom, connection,
+freshness, writer, rollback or readiness failure stops the run.
+
+M005 is behaviorally closed and M006 permission is recorded for that one path;
+neither creates standing authority. Strict real-live readiness remains
+`88/100` until HW05 proves `show_mix_ready`; normal allowlist remains `0` and
+the `95/100` target is not yet achieved.
+
 ## Current full-project gate — 2026-07-12
 
 Local P1 overlay completed: the soundcheck parent is decomposed into semantic

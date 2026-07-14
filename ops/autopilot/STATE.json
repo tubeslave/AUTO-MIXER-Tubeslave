@@ -1204,7 +1204,53 @@
     "readiness_closure_allowed": false,
     "readiness_matrix_update_allowed": false
   },
-  "active_work": null,
+  "active_work": {
+    "id": "M110",
+    "snapshot_at_utc": "2026-07-14T14:27:06Z",
+    "plan": "Docs/plans/M110-attended-wing-reset-soundcheck.md",
+    "adr": "Docs/adr/M110-attended-wing-reset-soundcheck.md",
+    "status": "waiting_for_cp05_and_attended_hardware",
+    "software_checkpoints": {
+      "M110-CP00": "complete",
+      "M110-CP01": "implemented_offline_validated",
+      "M110-CP02": "implemented_offline_validated",
+      "M110-CP03": "implemented_offline_validated",
+      "M110-CP04": "implemented_offline_validated",
+      "M110-CP05": "pending"
+    },
+    "hardware_checkpoints": {
+      "M110-HW01": "pending",
+      "M110-HW02": "pending",
+      "M110-HW03": "pending",
+      "M110-HW04": "pending",
+      "M110-HW05": "pending"
+    },
+    "m005_behavior_closed": true,
+    "m006_operator_permission_recorded": true,
+    "m006_permission_is_standing_authority": false,
+    "reset_contract": {
+      "factory_reset": false,
+      "processor_bypass_address_count": 64,
+      "m006_restore_operation_counts": [23, 14, 14],
+      "m006_restore_scope_address_counts": [33, 63, 14],
+      "m006_restore_changed_address_counts": [19, 52, 6],
+      "m006_restore_unique_changed_address_count": 77,
+      "preserves_surfaces_outside_archived_m006_transaction": true
+    },
+    "attended_execute_path_implemented": true,
+    "normal_live_allowlist_count": 0,
+    "standing_live_authority_granted": false,
+    "hardware_contacted_this_cycle": false,
+    "live_writes_this_cycle": false,
+    "reset_applied_this_cycle": false,
+    "corrections_applied_this_cycle": 0,
+    "development_writer_lease_owner_present": false,
+    "development_writer_lease_directory_exists": true,
+    "development_writer_lease_release_required_before_cp05": true,
+    "strict_real_live_score": 88,
+    "target_score": 95,
+    "target_achieved": false
+  },
   "latest_m006_owner_decision_verifier_commit": {
     "commit": "5eda78126",
     "full_commit": "5eda78126962cdf66370240dfb8c0e09852a1eb8",

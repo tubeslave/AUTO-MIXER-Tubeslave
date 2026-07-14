@@ -24,7 +24,12 @@ from supervised_family_proof_plan import (
     canonicalize_attended_operation,
     validate_canonical_operation_bundle,
 )
-from supervised_proof_capability import RestoreOnlyProofGrant
+from supervised_proof_capability import (
+    MaintenanceDspResetCommitOnceGrant,
+    ProcessorEnableCommitOnceGrant,
+    RestoreOnlyProofGrant,
+    SoundcheckChildCommitOnceGrant,
+)
 
 
 @dataclass(frozen=True)
@@ -115,6 +120,13 @@ class SupervisedConsoleFamilyAdapter(Protocol):
         apply_result: AdapterStepResult,
     ) -> AdapterStepResult: ...
 
+    async def assess_audio_failure_retention(
+        self,
+        operation: ConsoleTransactionOperation,
+        snapshot: Mapping[str, Any],
+        apply_result: AdapterStepResult,
+    ) -> AdapterStepResult: ...
+
     async def audio_recheck(
         self,
         operation: ConsoleTransactionOperation,
@@ -130,8 +142,19 @@ class ConsoleTransactionResult:
     reason: str
     applied_operation_ids: list[str] = field(default_factory=list)
     rollback_operation_ids: list[str] = field(default_factory=list)
+    already_satisfied_operation_ids: list[str] = field(default_factory=list)
+    contained_operation_ids: list[str] = field(default_factory=list)
+    retention_unverified_operation_ids: list[str] = field(
+        default_factory=list
+    )
+    safe_target_retention_attempted: bool = False
+    contained_target_physical_verified: bool | None = None
+    audio_failure_recovery_state_known: bool | None = None
     events: list[Dict[str, Any]] = field(default_factory=list)
     emergency_stop_activated: bool = False
+    emergency_latch_succeeded: bool = False
+    emergency_teardown_succeeded: bool = False
+    emergency_stop_complete: bool = False
     live_authority_granted: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
@@ -156,6 +179,7 @@ class SupervisedConsoleTransactionCoordinator:
         family_contracts: Mapping[str, SupervisedConsoleFamilyContract],
         adapters: Mapping[str, SupervisedConsoleFamilyAdapter],
         emergency_generation_getter: Callable[[], int],
+        emergency_latch: Callable[[str], Any],
         emergency_stop: Callable[[str], MaybeAwaitable],
         prepared_callback: Callable[
             [
@@ -166,13 +190,21 @@ class SupervisedConsoleTransactionCoordinator:
             MaybeAwaitable,
         ]
         | None = None,
+        before_operation_apply_callback: Callable[
+            [ConsoleTransactionOperation], MaybeAwaitable
+        ]
+        | None = None,
         before_apply_callback: Callable[[], MaybeAwaitable] | None = None,
     ) -> None:
         self.family_contracts = dict(family_contracts)
         self.adapters = dict(adapters)
         self.emergency_generation_getter = emergency_generation_getter
+        self.emergency_latch = emergency_latch
         self.emergency_stop = emergency_stop
         self.prepared_callback = prepared_callback
+        self.before_operation_apply_callback = (
+            before_operation_apply_callback
+        )
         self.before_apply_callback = before_apply_callback
         self._idempotency_keys: Dict[str, str] = {}
         self._lock = asyncio.Lock()
@@ -197,11 +229,29 @@ class SupervisedConsoleTransactionCoordinator:
         context: ConsoleTransactionContext,
     ) -> str | None:
         grant = context.capability_grant
+        private_commit_grant = bool(
+            type(grant)
+            in {
+                MaintenanceDspResetCommitOnceGrant,
+                ProcessorEnableCommitOnceGrant,
+                SoundcheckChildCommitOnceGrant,
+            }
+            and grant.is_authentic()
+        )
         if grant is not None:
-            if type(grant) is not RestoreOnlyProofGrant or not grant.is_authentic():
-                return "restore_only_proof_grant_required"
+            if not (
+                type(grant)
+                in {
+                    RestoreOnlyProofGrant,
+                    MaintenanceDspResetCommitOnceGrant,
+                    ProcessorEnableCommitOnceGrant,
+                    SoundcheckChildCommitOnceGrant,
+                }
+                and grant.is_authentic()
+            ):
+                return "m110_typed_capability_grant_required"
             if not grant.begin_execution():
-                return "restore_only_proof_grant_already_used"
+                return "m110_capability_grant_already_used"
         if context.approved is not True:
             return "approval_required"
         if not context.approval_id:
@@ -223,13 +273,22 @@ class SupervisedConsoleTransactionCoordinator:
         proof_lane_requested = bool(
             context.proof_run is True
             or context.restore_after_verify is True
-            or grant is not None
+            or type(grant) is RestoreOnlyProofGrant
         )
-        proof_bundle: Mapping[str, Any] | None = None
-        if proof_lane_requested:
+        if proof_lane_requested and not (
+            type(grant) is RestoreOnlyProofGrant and grant.is_authentic()
+        ):
+            return "restore_only_proof_grant_required"
+        capability_bundle: Mapping[str, Any] | None = None
+        if grant is not None:
+            if private_commit_grant and (
+                context.proof_run is True or context.restore_after_verify is True
+            ):
+                return "m110_commit_once_flags_must_be_false"
             if type(grant) is not RestoreOnlyProofGrant or not grant.is_authentic():
-                return "restore_only_proof_grant_required"
-            if (
+                if not private_commit_grant:
+                    return "m110_typed_capability_grant_required"
+            elif (
                 context.proof_run is not True
                 or context.restore_after_verify is not True
             ):
@@ -238,21 +297,21 @@ class SupervisedConsoleTransactionCoordinator:
                 context.approval_id != grant.binding.approval_id
                 or context.idempotency_key != grant.binding.idempotency_key
             ):
-                return "restore_only_proof_approval_binding_mismatch"
+                return "m110_capability_approval_binding_mismatch"
             try:
                 decoded = json.loads(
                     grant.binding.canonical_bundle_bytes.decode("utf-8")
                 )
-                proof_bundle = validate_canonical_operation_bundle(decoded)
+                capability_bundle = validate_canonical_operation_bundle(decoded)
                 if (
-                    canonical_operation_bundle_bytes(proof_bundle)
+                    canonical_operation_bundle_bytes(capability_bundle)
                     != grant.binding.canonical_bundle_bytes
                 ):
-                    return "restore_only_proof_bundle_bytes_not_canonical"
+                    return "m110_capability_bundle_bytes_not_canonical"
             except (UnicodeDecodeError, json.JSONDecodeError, ValueError):
-                return "restore_only_proof_bundle_invalid"
-            if len(proof_bundle["operations"]) != len(plan.operations):
-                return "restore_only_proof_operation_count_mismatch"
+                return "m110_capability_bundle_invalid"
+            if len(capability_bundle["operations"]) != len(plan.operations):
+                return "m110_capability_operation_count_mismatch"
 
         separate_families = set()
         plan_families = {operation.family_id for operation in plan.operations}
@@ -264,7 +323,7 @@ class SupervisedConsoleTransactionCoordinator:
                 return "unknown_family"
             if operation.write_kind not in contract.write_kinds:
                 return "write_kind_family_mismatch"
-            if not contract.permits_execution(
+            if not private_commit_grant and not contract.permits_execution(
                 write_kind=operation.write_kind,
                 proof_run=context.proof_run,
             ):
@@ -296,7 +355,7 @@ class SupervisedConsoleTransactionCoordinator:
                 if overlap:
                     return "transaction_address_overlap:" + ",".join(sorted(overlap))
                 prepared_addresses.update(addresses)
-                if proof_bundle is not None:
+                if capability_bundle is not None:
                     try:
                         proof_operation_rows.append(
                             canonicalize_attended_operation(
@@ -311,7 +370,7 @@ class SupervisedConsoleTransactionCoordinator:
                             )
                         )
                     except ValueError:
-                        return "restore_only_proof_operation_canonicalization_failed"
+                        return "m110_capability_operation_canonicalization_failed"
             if contract.separate_approval:
                 separate_families.add(contract.family_id)
 
@@ -319,10 +378,10 @@ class SupervisedConsoleTransactionCoordinator:
             len(separate_families) != 1 or len(plan_families) != 1
         ):
             return "high_risk_family_requires_separate_transaction"
-        if proof_bundle is not None and proof_operation_rows != list(
-            proof_bundle["operations"]
+        if capability_bundle is not None and proof_operation_rows != list(
+            capability_bundle["operations"]
         ):
-            return "restore_only_proof_exact_bundle_mismatch"
+            return "m110_capability_exact_bundle_mismatch"
         return None
 
     def _generation_matches(self, context: ConsoleTransactionContext) -> bool:
@@ -348,8 +407,156 @@ class SupervisedConsoleTransactionCoordinator:
         result: ConsoleTransactionResult,
         reason: str,
     ) -> None:
-        await _maybe_await(self.emergency_stop(reason))
-        result.emergency_stop_activated = True
+        latch_ok = self._latch_emergency_stop(result, reason)
+        teardown_ok = await self._complete_emergency_stop(result, reason)
+        result.emergency_stop_complete = bool(latch_ok and teardown_ok)
+
+    def _latch_emergency_stop(
+        self,
+        result: ConsoleTransactionResult,
+        reason: str,
+    ) -> bool:
+        """Synchronously revoke forward-write authority before recovery I/O."""
+
+        try:
+            latch_result = self.emergency_latch(reason)
+            if asyncio.iscoroutine(latch_result) or hasattr(
+                latch_result,
+                "__await__",
+            ):
+                raise TypeError("emergency_latch_must_be_synchronous")
+        except (asyncio.CancelledError, Exception) as exc:
+            result.events.append(
+                {
+                    "phase": "emergency_latch",
+                    "success": False,
+                    "reason": "emergency_latch_failed",
+                    "exception_type": type(exc).__name__,
+                }
+            )
+            return False
+        mapping_result = (
+            dict(latch_result)
+            if isinstance(latch_result, Mapping)
+            else None
+        )
+        latch_ok = bool(
+            latch_result is None
+            or (
+                mapping_result is not None
+                and mapping_result.get("success") is True
+                and mapping_result.get("status") == "latched"
+                and not list(mapping_result.get("phase_zero_errors") or [])
+            )
+        )
+        result.emergency_stop_activated = bool(
+            latch_ok
+            or (
+                mapping_result is not None
+                and mapping_result.get("status") == "latched"
+            )
+        )
+        result.emergency_latch_succeeded = latch_ok
+        result.events.append(
+            {
+                "phase": "emergency_latch",
+                "success": latch_ok,
+                "reason": (
+                    reason if latch_ok else "emergency_latch_reported_incomplete"
+                ),
+                "reported_status": (
+                    mapping_result.get("status")
+                    if mapping_result is not None
+                    else None
+                ),
+                "phase_zero_errors": (
+                    list(mapping_result.get("phase_zero_errors") or [])
+                    if mapping_result is not None
+                    else []
+                ),
+            }
+        )
+        return latch_ok
+
+    async def _complete_emergency_stop(
+        self,
+        result: ConsoleTransactionResult,
+        reason: str,
+    ) -> bool:
+        async def invoke_teardown() -> Any:
+            return await _maybe_await(self.emergency_stop(reason))
+
+        teardown = asyncio.create_task(invoke_teardown())
+        cancellation_deferred = False
+        while not teardown.done():
+            try:
+                await asyncio.shield(teardown)
+            except asyncio.CancelledError:
+                cancellation_deferred = True
+                continue
+            except BaseException:
+                break
+        try:
+            teardown_result = teardown.result()
+        except BaseException as exc:
+            result.events.append(
+                {
+                    "phase": "emergency_teardown",
+                    "success": False,
+                    "reason": "emergency_teardown_failed",
+                    "exception_type": type(exc).__name__,
+                }
+            )
+            result.emergency_teardown_succeeded = False
+            result.emergency_stop_complete = False
+            return False
+        mapping_result = (
+            dict(teardown_result)
+            if isinstance(teardown_result, Mapping)
+            else None
+        )
+        teardown_ok = bool(
+            teardown_result is None
+            or (
+                mapping_result is not None
+                and mapping_result.get("success") is True
+                and mapping_result.get("status") == "stopped"
+                and mapping_result.get("teardown_complete") is True
+                and not list(mapping_result.get("teardown_errors") or [])
+            )
+        )
+        result.events.append(
+            {
+                "phase": "emergency_teardown",
+                "success": teardown_ok,
+                "reason": (
+                    "emergency_teardown_complete"
+                    if teardown_ok
+                    else "emergency_teardown_reported_incomplete"
+                ),
+                "reported_status": (
+                    mapping_result.get("status")
+                    if mapping_result is not None
+                    else None
+                ),
+                "teardown_errors": (
+                    list(mapping_result.get("teardown_errors") or [])
+                    if mapping_result is not None
+                    else []
+                ),
+                "caller_cancellation_deferred": cancellation_deferred,
+            }
+        )
+        # The synchronous latch is the authoritative forward-write freeze;
+        # teardown completion is tracked separately by the server.
+        result.emergency_stop_activated = bool(
+            result.emergency_stop_activated or teardown_ok
+        )
+        result.emergency_teardown_succeeded = teardown_ok
+        result.emergency_stop_complete = bool(
+            result.emergency_latch_succeeded and teardown_ok
+        )
+        return teardown_ok
 
     def _write_authority_is_current(
         self,
@@ -468,6 +675,145 @@ class SupervisedConsoleTransactionCoordinator:
             )
         return result.success is True
 
+    async def _recover_after_audio_safety_failure(
+        self,
+        result: ConsoleTransactionResult,
+        applied: list[
+            tuple[
+                ConsoleTransactionOperation,
+                Mapping[str, Any],
+                AdapterStepResult,
+            ]
+        ],
+        context: ConsoleTransactionContext,
+    ) -> None:
+        """Freeze writes and retain only physically proven attenuation targets.
+
+        A normal rollback can be an acoustic gain increase when the applied
+        operation was a fader/trim/send/EQ cut.  Once an audio-safety boundary
+        has failed, such an increase is forbidden.  Family adapters classify
+        the direction without writing and physically re-read eligible targets;
+        ineligible operations retain the existing CAS rollback behavior.
+        """
+
+        emergency_reason = (
+            "supervised_transaction_audio_safety_failed:"
+            f"{result.transaction_id}"
+        )
+        latch_ok = self._latch_emergency_stop(result, emergency_reason)
+        rollback_candidates: list[
+            tuple[
+                ConsoleTransactionOperation,
+                Mapping[str, Any],
+                AdapterStepResult,
+            ]
+        ] = []
+        retention_seen = False
+        retention_verified = True
+        for operation, snapshot, apply_result in applied:
+            adapter = self.adapters[operation.family_id]
+            assessor = getattr(
+                adapter,
+                "assess_audio_failure_retention",
+                None,
+            )
+            if not callable(assessor):
+                rollback_candidates.append(
+                    (operation, snapshot, apply_result)
+                )
+                continue
+            try:
+                assessment = await assessor(
+                    operation,
+                    snapshot,
+                    apply_result,
+                )
+            except asyncio.CancelledError:
+                assessment = AdapterStepResult(
+                    False,
+                    False,
+                    "audio_failure_retention_cancelled",
+                    {
+                        "retention_eligible": None,
+                        "target_physical_verified": False,
+                        "cancellation_requested": True,
+                        "write_attempted": False,
+                    },
+                )
+            except Exception as exc:
+                assessment = AdapterStepResult(
+                    False,
+                    False,
+                    "audio_failure_retention_exception",
+                    {
+                        "retention_eligible": None,
+                        "target_physical_verified": False,
+                        "exception_type": type(exc).__name__,
+                        "write_attempted": False,
+                    },
+                )
+            evidence = dict(assessment.evidence or {})
+            result.events.append(
+                {
+                    "operation_id": operation.operation_id,
+                    "phase": "audio_failure_retention",
+                    "result": asdict(assessment),
+                }
+            )
+            eligible = evidence.get("retention_eligible")
+            if eligible is False:
+                rollback_candidates.append(
+                    (operation, snapshot, apply_result)
+                )
+                continue
+            # An unknown classification must never fall through to a blind
+            # rollback that could raise level.  Freeze and require review.
+            retention_seen = True
+            result.safe_target_retention_attempted = True
+            if (
+                eligible is True
+                and assessment.success
+                and assessment.physical_verified
+                and evidence.get("target_physical_verified") is True
+            ):
+                result.contained_operation_ids.append(
+                    operation.operation_id
+                )
+            else:
+                retention_verified = False
+                result.retention_unverified_operation_ids.append(
+                    operation.operation_id
+                )
+
+        rollback_state_known = True
+        if rollback_candidates:
+            await self._rollback_applied(
+                result,
+                rollback_candidates,
+                context,
+            )
+            rollback_state_known = result.status == "rolled_back"
+
+        if retention_seen:
+            contained_verified = bool(
+                retention_verified
+                and result.contained_operation_ids
+                and not result.retention_unverified_operation_ids
+            )
+            result.contained_target_physical_verified = contained_verified
+            result.audio_failure_recovery_state_known = bool(
+                contained_verified and rollback_state_known
+            )
+            result.status = "manual_review_required"
+        else:
+            result.audio_failure_recovery_state_known = rollback_state_known
+        teardown_ok = await self._complete_emergency_stop(
+            result,
+            emergency_reason,
+        )
+        if not latch_ok or not teardown_ok:
+            result.status = "manual_review_required"
+
     async def execute(
         self,
         plan: ConsoleTransactionPlan,
@@ -490,6 +836,17 @@ class SupervisedConsoleTransactionCoordinator:
                 status="running",
                 reason="transaction_started",
             )
+            grant = context.capability_grant
+            authenticated_private_lane = bool(
+                type(grant)
+                in {
+                    RestoreOnlyProofGrant,
+                    MaintenanceDspResetCommitOnceGrant,
+                    ProcessorEnableCommitOnceGrant,
+                    SoundcheckChildCommitOnceGrant,
+                }
+                and grant.is_authentic()
+            )
             applied: list[
                 tuple[
                     ConsoleTransactionOperation,
@@ -502,18 +859,34 @@ class SupervisedConsoleTransactionCoordinator:
                 reason: str,
                 *,
                 cancellation_safe: bool = False,
+                audio_safety_failure: bool = False,
             ) -> None:
                 """Contain a durable-boundary abort after earlier operations."""
 
                 result.reason = reason
                 if not applied:
                     result.status = "blocked"
+                    if audio_safety_failure:
+                        await self._recover_after_audio_safety_failure(
+                            result,
+                            [],
+                            context,
+                        )
                     return
-                if not cancellation_safe:
-                    await self._rollback_applied(result, applied, context)
+                recovery = (
+                    self._recover_after_audio_safety_failure(
+                        result,
+                        applied,
+                        context,
+                    )
+                    if audio_safety_failure
+                    else self._rollback_applied(result, applied, context)
+                )
+                if not cancellation_safe and not audio_safety_failure:
+                    await recovery
                     return
                 rollback_task = asyncio.create_task(
-                    self._rollback_applied(result, applied, context)
+                    recovery
                 )
                 while not rollback_task.done():
                     try:
@@ -599,10 +972,13 @@ class SupervisedConsoleTransactionCoordinator:
                     if (
                         transition_error
                         == "physical_target_already_satisfied"
-                        and operation.metadata.get(
-                            "atomic_group_commit_required"
+                        and (
+                            operation.metadata.get(
+                                "atomic_group_commit_required"
+                            )
+                            is True
+                            or authenticated_private_lane
                         )
-                        is True
                     ):
                         already_satisfied_operation_ids.add(
                             operation.operation_id
@@ -612,7 +988,7 @@ class SupervisedConsoleTransactionCoordinator:
                                 "operation_id": operation.operation_id,
                                 "phase": "snapshot_transition_validation",
                                 "reason": transition_error,
-                                "result": "already_satisfied_group_member",
+                                "result": "already_satisfied_private_member",
                             }
                         )
                         transition_error = None
@@ -627,6 +1003,46 @@ class SupervisedConsoleTransactionCoordinator:
                             }
                         )
                         return result
+                if (
+                    atomic_group or authenticated_private_lane
+                ) and operation.operation_id not in already_satisfied_operation_ids:
+                    prepared = adapter.prepare(operation)
+                    prepared_writes = list(prepared.get("writes") or [])
+                    prepared_reads = list(
+                        prepared.get("audible_state_reads") or []
+                    )
+                    snapshot_values = dict(snapshot.get("values") or {})
+                    target_already_satisfied = bool(
+                        prepared_writes
+                        and all(
+                            self._snapshot_values_equal(
+                                spec.get("target_value"),
+                                snapshot_values.get(str(spec.get("address") or "")),
+                                float(spec.get("tolerance") or 0.0),
+                            )
+                            for spec in prepared_writes
+                        )
+                        and all(
+                            self._snapshot_values_equal(
+                                spec.get("expected_value"),
+                                snapshot_values.get(str(spec.get("address") or "")),
+                                float(spec.get("tolerance") or 0.0),
+                            )
+                            for spec in prepared_reads
+                        )
+                    )
+                    if target_already_satisfied:
+                        already_satisfied_operation_ids.add(
+                            operation.operation_id
+                        )
+                        result.events.append(
+                            {
+                                "operation_id": operation.operation_id,
+                                "phase": "snapshot_transition_validation",
+                                "reason": "physical_target_already_satisfied",
+                                "result": "already_satisfied_private_member",
+                            }
+                        )
                 snapshots.append(snapshot)
 
             if not self._approval_is_current(context):
@@ -732,6 +1148,15 @@ class SupervisedConsoleTransactionCoordinator:
                     operation.operation_id
                     in already_satisfied_operation_ids
                 ):
+                    result.already_satisfied_operation_ids.append(
+                        operation.operation_id
+                    )
+                    already_satisfied_result = AdapterStepResult(
+                        True,
+                        True,
+                        "physical_target_already_satisfied",
+                        {"write_attempted": False},
+                    )
                     result.events.append(
                         {
                             "operation_id": operation.operation_id,
@@ -745,16 +1170,72 @@ class SupervisedConsoleTransactionCoordinator:
                             },
                         }
                     )
+                    try:
+                        audio_result = await adapter.audio_recheck(
+                            operation,
+                            snapshot,
+                            already_satisfied_result,
+                        )
+                    except asyncio.CancelledError:
+                        audio_result = AudioRecheckResult(
+                            "failed",
+                            "audio_recheck_cancelled",
+                            {"cancellation_requested": True},
+                        )
+                    except Exception as exc:
+                        audio_result = AudioRecheckResult(
+                            "failed",
+                            "audio_recheck_exception",
+                            {"exception_type": type(exc).__name__},
+                        )
+                    result.events.append(
+                        {
+                            "operation_id": operation.operation_id,
+                            "phase": "audio_recheck",
+                            "result": asdict(audio_result),
+                        }
+                    )
+                    if audio_result.status == "passed":
+                        proof_audio_passed_operation_ids.add(
+                            operation.operation_id
+                        )
+                    contract = self.family_contracts[operation.family_id]
+                    audio_ok = audio_result.passed
+                    if contract.audio_recheck_policy == AUDIO_RECHECK_REQUIRED:
+                        audio_ok = audio_result.status == "passed"
+                    elif (
+                        contract.audio_recheck_policy
+                        == AUDIO_RECHECK_NOT_APPLICABLE
+                    ):
+                        audio_ok = audio_result.status in {
+                            "passed",
+                            "not_applicable",
+                        }
+                    if context.proof_run is True:
+                        audio_ok = audio_result.status == "passed"
+                    if not audio_ok:
+                        await abort_before_next_apply(
+                            audio_result.reason or "audio_recheck_failed",
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    if not self._generation_matches(context):
+                        await abort_before_next_apply(
+                            "emergency_generation_changed_after_audio_recheck",
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    if not self._write_authority_is_current(plan):
+                        await abort_before_next_apply(
+                            "write_authority_revoked_after_audio_recheck",
+                            audio_safety_failure=True,
+                        )
+                        return result
                     processed_atomic_members.append(
                         (
                             operation,
                             snapshot,
-                            AdapterStepResult(
-                                True,
-                                True,
-                                "physical_target_already_satisfied",
-                                {},
-                            ),
+                            already_satisfied_result,
                         )
                     )
                     continue
@@ -778,6 +1259,52 @@ class SupervisedConsoleTransactionCoordinator:
                     else:
                         result.status = "blocked"
                     return result
+
+                if self.before_operation_apply_callback is not None:
+                    try:
+                        operation_boundary_result = await _maybe_await(
+                            self.before_operation_apply_callback(operation)
+                        )
+                    except asyncio.CancelledError:
+                        await abort_before_next_apply(
+                            "operation_send_safety_boundary_cancelled",
+                            cancellation_safe=True,
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    except Exception as exc:
+                        result.events.append(
+                            {
+                                "operation_id": operation.operation_id,
+                                "phase": "operation_send_safety_boundary",
+                                "reason": type(exc).__name__,
+                                "error": str(exc),
+                            }
+                        )
+                        await abort_before_next_apply(
+                            str(exc).strip()
+                            or "operation_send_safety_boundary_failed",
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    if operation_boundary_result is not True:
+                        await abort_before_next_apply(
+                            "operation_send_safety_boundary_failed",
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    if not self._generation_matches(context):
+                        await abort_before_next_apply(
+                            "emergency_generation_changed_after_operation_safety",
+                            audio_safety_failure=True,
+                        )
+                        return result
+                    if not self._write_authority_is_current(plan):
+                        await abort_before_next_apply(
+                            "write_authority_revoked_after_operation_safety",
+                            audio_safety_failure=True,
+                        )
+                        return result
 
                 if self.before_apply_callback is not None:
                     try:
@@ -818,6 +1345,16 @@ class SupervisedConsoleTransactionCoordinator:
                     if not self._approval_is_current(context):
                         await abort_before_next_apply(
                             "operator_approval_expired_after_durable_send_boundary"
+                        )
+                        return result
+                    if not self._generation_matches(context):
+                        await abort_before_next_apply(
+                            "emergency_generation_changed_after_durable_send_boundary"
+                        )
+                        return result
+                    if not self._write_authority_is_current(plan):
+                        await abort_before_next_apply(
+                            "write_authority_revoked_after_durable_send_boundary"
                         )
                         return result
 
@@ -969,20 +1506,44 @@ class SupervisedConsoleTransactionCoordinator:
                     audio_ok = audio_result.status == "passed"
                 if not audio_ok:
                     result.reason = (
-                        "proof_audio_recheck_must_pass"
-                        if context.proof_run is True
-                        else audio_result.reason or "audio_recheck_failed"
+                        audio_result.reason or "audio_recheck_failed"
                     )
-                    await self._rollback_applied(result, applied, context)
+                    recovery_task = asyncio.create_task(
+                        self._recover_after_audio_safety_failure(
+                            result,
+                            applied,
+                            context,
+                        )
+                    )
+                    while not recovery_task.done():
+                        try:
+                            await asyncio.shield(recovery_task)
+                        except asyncio.CancelledError:
+                            result.events.append(
+                                {
+                                    "phase": "audio_failure_recovery_cancellation_deferred",
+                                    "reason": result.reason,
+                                }
+                            )
+                            continue
+                    await recovery_task
                     return result
 
                 if not self._generation_matches(context):
                     result.reason = "emergency_generation_changed_after_audio_recheck"
-                    await self._rollback_applied(result, applied, context)
+                    await self._recover_after_audio_safety_failure(
+                        result,
+                        applied,
+                        context,
+                    )
                     return result
                 if not self._write_authority_is_current(plan):
                     result.reason = "write_authority_revoked_after_audio_recheck"
-                    await self._rollback_applied(result, applied, context)
+                    await self._recover_after_audio_safety_failure(
+                        result,
+                        applied,
+                        context,
+                    )
                     return result
                 if atomic_group:
                     processed_atomic_members.append(
@@ -994,21 +1555,61 @@ class SupervisedConsoleTransactionCoordinator:
                 expected_operation_ids = {
                     operation.operation_id for operation in plan.operations
                 }
+                already_satisfied_ids = set(
+                    result.already_satisfied_operation_ids
+                )
+                required_mutation_ids = (
+                    expected_operation_ids - already_satisfied_ids
+                )
                 exact_apply_and_audio_coverage = bool(
-                    expected_operation_ids
-                    and set(result.applied_operation_ids)
+                    required_mutation_ids
+                    and already_satisfied_ids.issubset(expected_operation_ids)
+                    and required_mutation_ids.union(already_satisfied_ids)
                     == expected_operation_ids
+                    and set(result.applied_operation_ids)
+                    == required_mutation_ids
                     and len(result.applied_operation_ids)
-                    == len(expected_operation_ids)
+                    == len(required_mutation_ids)
                     and proof_audio_passed_operation_ids
                     == expected_operation_ids
                 )
+                exact_already_satisfied_coverage = bool(
+                    not required_mutation_ids
+                    and already_satisfied_ids == expected_operation_ids
+                    and not result.applied_operation_ids
+                    and not result.rollback_operation_ids
+                    and proof_audio_passed_operation_ids
+                    == expected_operation_ids
+                )
+                if exact_already_satisfied_coverage:
+                    try:
+                        all_members_current = await self._reverify_atomic_members(
+                            result,
+                            processed_atomic_members,
+                        )
+                    except asyncio.CancelledError:
+                        result.status = "blocked"
+                        result.reason = (
+                            "proof_already_satisfied_reverify_cancelled"
+                        )
+                        return result
+                    if not all_members_current:
+                        result.status = "blocked"
+                        result.reason = (
+                            "proof_already_satisfied_member_drift_detected"
+                        )
+                        return result
+                    result.status = "proof_passed"
+                    result.reason = (
+                        "proof_already_satisfied_two_pass_readback_verified"
+                    )
+                    return result
                 await self._rollback_applied(result, applied, context)
                 exact_rollback_coverage = bool(
                     set(result.rollback_operation_ids)
-                    == expected_operation_ids
+                    == required_mutation_ids
                     and len(result.rollback_operation_ids)
-                    == len(expected_operation_ids)
+                    == len(required_mutation_ids)
                 )
                 if (
                     result.status == "rolled_back"
@@ -1028,7 +1629,10 @@ class SupervisedConsoleTransactionCoordinator:
                 await self._rollback_applied(result, applied, context)
                 return result
 
-            if atomic_group:
+            if atomic_group or (
+                authenticated_private_lane
+                and already_satisfied_operation_ids
+            ):
                 try:
                     atomic_members_current = await self._reverify_atomic_members(
                         result,

@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Mapping
 
 from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 from operator_proposal_queue import soundcheck_proposal_apply_blocker
@@ -17,6 +18,7 @@ from decision_queue_wire_contract import (
     MUTATION_CAPABLE_LEGACY_HANDLER_NAMES,
     OperatorProposalSequenceStateManager,
     POST_EXECUTOR_BLOCKED_HANDLER_NAMES,
+    _bind_trusted_apply_parent_commit,
     _freeze_trusted_apply_receipt,
     _freeze_trusted_prewrite_no_send_receipt,
     _freeze_trusted_sequence_execution_receipt,
@@ -33,10 +35,14 @@ from decision_queue_wire_contract import (
     decision_queue_error,
     result_detail_error,
     sha256_digest,
+    terminal_result_proves_verified_already_satisfied_apply,
     terminal_result_proves_verified_apply,
     terminal_result_proves_verified_restored_proof,
 )
-from supervised_proof_capability import validate_m110_capability_apply_request
+from supervised_proof_capability import (
+    M110_M006_RESTORE_BUNDLE_KIND,
+    validate_m110_capability_apply_request,
+)
 from operator_product_state import (
     build_agent_communications_snapshot,
     build_bus_main_dca_snapshot,
@@ -2481,16 +2487,31 @@ def register_handlers(server):
                 and bool(terminal_candidate.get("rollback_results"))
             )
         )
+        known_contained_recovery = bool(
+            terminal_candidate.get("safe_target_retention_attempted") is True
+            and terminal_candidate.get(
+                "contained_target_physical_verified"
+            )
+            is True
+            and terminal_candidate.get(
+                "audio_failure_recovery_state_known"
+            )
+            is True
+            and physical_verified
+            and terminal_candidate.get("physical_state_restored") is False
+        )
         rollback_state_unknown = bool(
             terminal_candidate.get("rollback_state_unknown") is True
             or (
                 rollback_attempted
                 and terminal_candidate.get("physical_state_restored") is False
+                and not known_contained_recovery
             )
             or (
                 rollback_attempted
                 and not physical_restored
                 and possible_console_send
+                and not known_contained_recovery
             )
         )
         emergency_required = bool(
@@ -5550,6 +5571,24 @@ def register_handlers(server):
             callable(fixed_reset_check)
             and fixed_reset_check(proposal) is True
         )
+        server_owned_check = getattr(
+            server,
+            "is_m110_server_owned_proposal",
+            None,
+        )
+        if not (
+            callable(server_owned_check)
+            and server_owned_check(proposal) is True
+        ):
+            result = preclaim_apply_blocked_result(
+                proposal,
+                "m110_server_owned_proposal_required",
+            )
+            return await send_operator_apply_response(
+                websocket,
+                "operator_proposal_apply_blocked",
+                result,
+            )
         if not isinstance(transaction_plan, dict) and not fixed_reset_proposal:
             result = preclaim_apply_blocked_result(
                 proposal,
@@ -5897,6 +5936,61 @@ def register_handlers(server):
                 result,
             )
 
+        plan_commit_context = None
+        plan_commit_capability = getattr(
+            grant_binding,
+            "capability_kind",
+            None,
+        ) in {
+            "processor_enable_commit_once",
+            "soundcheck_child_commit_once",
+        }
+        if plan_commit_capability:
+            freeze_commit_context = getattr(
+                server,
+                "freeze_m110_plan_commit_context",
+                None,
+            )
+            if callable(freeze_commit_context):
+                try:
+                    plan_commit_context = freeze_commit_context(
+                        websocket=websocket,
+                        proposal=proposal,
+                        capability_grant=grant,
+                    )
+                except Exception:
+                    plan_commit_context = None
+            if not isinstance(plan_commit_context, Mapping):
+                mark_terminal = getattr(grant, "mark_terminal", None)
+                if callable(mark_terminal):
+                    mark_terminal("plan_commit_context_freeze_failed")
+                result = await finalize_apply_result_cancellation_safe(
+                    proposal,
+                    {
+                        "status": "blocked",
+                        "reason": "m110_plan_commit_context_freeze_failed",
+                        "no_console_send_proven": True,
+                    },
+                    evidence_lifecycle=evidence_lifecycle,
+                    idempotency_key=request_facts.idempotency_key,
+                    reason_source="validation",
+                )
+                revoke = getattr(
+                    server,
+                    "revoke_m110_capability_for_proposal",
+                    None,
+                )
+                if callable(revoke):
+                    revoke(
+                        request_facts.proposal_id,
+                        reason="plan_commit_context_freeze_failed",
+                    )
+                return await send_operator_apply_response(
+                    websocket,
+                    "operator_proposal_apply_blocked",
+                    result,
+                )
+
         try:
             apply_result = await apply_capability(
                 websocket=websocket,
@@ -5980,6 +6074,8 @@ def register_handlers(server):
                         "expected_operation_digest"
                     ],
                 )
+                parent_commit_recorded = None
+                parent_commit_reason = None
                 persisted_result = finalized.get("apply_result")
                 if (
                     finalized.get("status") == "proof_passed"
@@ -6008,6 +6104,218 @@ def register_handlers(server):
                         )
                         if callable(revoke_route):
                             revoke_route("restored_proof_receipt_not_recorded")
+                reset_commit_grant = bool(
+                    fixed_reset_grant
+                    and getattr(grant_binding, "capability_kind", None)
+                    == "maintenance_dsp_reset_commit_once"
+                )
+                if reset_commit_grant:
+                    reset_commit_result = {
+                        "recorded": False,
+                        "reason": "m110_maintenance_reset_commit_terminal_invalid",
+                    }
+                    if (
+                        finalized.get("status") == "applied"
+                        and (
+                            terminal_result_proves_verified_apply(
+                                persisted_result
+                            )
+                            or terminal_result_proves_verified_already_satisfied_apply(
+                                persisted_result
+                            )
+                        )
+                    ):
+                        record_reset_commit = getattr(
+                            server,
+                            "record_m110_maintenance_reset_commit",
+                            None,
+                        )
+                        if callable(record_reset_commit):
+                            try:
+                                reset_commit_result = record_reset_commit(
+                                    websocket=websocket,
+                                    proposal=proposal,
+                                    capability_grant=grant,
+                                    terminal_result=persisted_result,
+                                    result_digest=finalized.get(
+                                        "result_digest"
+                                    ),
+                                )
+                            except Exception:
+                                reset_commit_result = {
+                                    "recorded": False,
+                                    "reason": (
+                                        "m110_maintenance_reset_commit_"
+                                        "recording_exception"
+                                    ),
+                                }
+                    reset_commit_recorded = bool(
+                        reset_commit_result.get("recorded") is True
+                    )
+                    parent_commit_recorded = reset_commit_recorded
+                    parent_commit_reason = reset_commit_result.get("reason")
+                    if not reset_commit_recorded:
+                        revoke_route = getattr(
+                            server,
+                            "_revoke_m110_route_authority",
+                            None,
+                        )
+                        if callable(revoke_route):
+                            revoke_route(
+                                "m110_maintenance_reset_commit_not_recorded"
+                            )
+                m006_commit_grant = bool(
+                    getattr(grant_binding, "bundle_kind", None)
+                    == M110_M006_RESTORE_BUNDLE_KIND
+                    and getattr(grant_binding, "capability_kind", None)
+                    == "maintenance_dsp_reset_commit_once"
+                )
+                if m006_commit_grant:
+                    commit_result = {
+                        "recorded": False,
+                        "reason": "m110_m006_restore_commit_terminal_invalid",
+                    }
+                    if (
+                        finalized.get("status") == "applied"
+                        and (
+                            terminal_result_proves_verified_apply(
+                                persisted_result
+                            )
+                            or terminal_result_proves_verified_already_satisfied_apply(
+                                persisted_result
+                            )
+                        )
+                    ):
+                        record_commit = getattr(
+                            server,
+                            "record_m110_m006_restore_commit",
+                            None,
+                        )
+                        if callable(record_commit):
+                            try:
+                                commit_result = record_commit(
+                                    websocket=websocket,
+                                    proposal=proposal,
+                                    capability_grant=grant,
+                                    terminal_result=persisted_result,
+                                    result_digest=finalized.get(
+                                        "result_digest"
+                                    ),
+                                )
+                            except Exception:
+                                commit_result = {
+                                    "recorded": False,
+                                    "reason": (
+                                        "m110_m006_restore_commit_"
+                                        "recording_exception"
+                                    ),
+                                }
+                    m006_commit_recorded = bool(
+                        commit_result.get("recorded") is True
+                    )
+                    parent_commit_recorded = m006_commit_recorded
+                    parent_commit_reason = commit_result.get("reason")
+                    if not m006_commit_recorded:
+                        revoke_route = getattr(
+                            server,
+                            "_revoke_m110_route_authority",
+                            None,
+                        )
+                        if callable(revoke_route):
+                            revoke_route(
+                                "m110_m006_restore_commit_not_recorded"
+                            )
+                if plan_commit_capability:
+                    plan_commit_result = {
+                        "recorded": False,
+                        "reason": "m110_plan_commit_terminal_invalid",
+                    }
+                    if (
+                        finalized.get("status") == "applied"
+                        and (
+                            terminal_result_proves_verified_apply(
+                                persisted_result
+                            )
+                            or terminal_result_proves_verified_already_satisfied_apply(
+                                persisted_result
+                            )
+                        )
+                    ):
+                        record_plan_commit = getattr(
+                            server,
+                            "record_m110_plan_commit",
+                            None,
+                        )
+                        if callable(record_plan_commit):
+                            try:
+                                plan_commit_result = record_plan_commit(
+                                    websocket=websocket,
+                                    proposal=proposal,
+                                    capability_grant=grant,
+                                    terminal_result=persisted_result,
+                                    result_digest=finalized.get(
+                                        "result_digest"
+                                    ),
+                                    commit_context=plan_commit_context,
+                                )
+                            except Exception:
+                                plan_commit_result = {
+                                    "recorded": False,
+                                    "reason": (
+                                        "m110_plan_commit_recording_exception"
+                                    ),
+                                }
+                    if plan_commit_result.get("recorded") is True:
+                        run_id = str(
+                            plan_commit_result.get("run_id") or ""
+                        ).strip()
+                        if run_id:
+                            try:
+                                reconciled = (
+                                    await server.reconcile_soundcheck_readiness(
+                                        run_id
+                                    )
+                                )
+                            except Exception:
+                                reconciled = None
+                                revoke_route = getattr(
+                                    server,
+                                    "_revoke_m110_route_authority",
+                                    None,
+                                )
+                                if callable(revoke_route):
+                                    revoke_route(
+                                        "m110_plan_commit_reconciliation_failed"
+                                    )
+                            if isinstance(reconciled, Mapping):
+                                finalized["soundcheck_readiness"] = dict(
+                                    reconciled
+                                )
+                    plan_commit_recorded = bool(
+                        plan_commit_result.get("recorded") is True
+                    )
+                    parent_commit_recorded = plan_commit_recorded
+                    parent_commit_reason = plan_commit_result.get("reason")
+                    if not plan_commit_recorded:
+                        revoke_route = getattr(
+                            server,
+                            "_revoke_m110_route_authority",
+                            None,
+                        )
+                        if callable(revoke_route):
+                            revoke_route("m110_plan_commit_not_recorded")
+                if (
+                    finalized.get("status") == "applied"
+                    and type(parent_commit_recorded) is bool
+                ):
+                    finalized = FinalizedApplyResult(
+                        finalized,
+                        trusted_receipt=_bind_trusted_apply_parent_commit(
+                            finalized.trusted_receipt,
+                            recorded=parent_commit_recorded,
+                            reason=parent_commit_reason,
+                        ),
+                    )
                 try:
                     record_apply_trace(
                         proposal=execution_proposal,
@@ -6057,6 +6365,27 @@ def register_handlers(server):
                                 == "restore_only_proof"
                             ),
                             "m110_maintenance_dsp_reset": fixed_reset_grant,
+                            "m110_processor_enable": (
+                                getattr(grant_binding, "bundle_kind", None)
+                                == "processor_enable_bundle"
+                            ),
+                            "m110_soundcheck_child": (
+                                getattr(grant_binding, "bundle_kind", None)
+                                in {
+                                    "single_soundcheck_operation",
+                                    "soundcheck_atomic_group",
+                                }
+                            ),
+                            "m110_capability_kind": getattr(
+                                grant_binding,
+                                "capability_kind",
+                                None,
+                            ),
+                            "m110_bundle_kind": getattr(
+                                grant_binding,
+                                "bundle_kind",
+                                None,
+                            ),
                             "capability_lane_used": True,
                             "normal_operator_mode_unchanged": True,
                             "normal_live_allowlist_changed": False,
@@ -6487,24 +6816,72 @@ def register_handlers(server):
                 idempotency_key=idempotency_key,
                 reason_source="supervised_transaction",
             )
+            persisted_apply_result = (
+                result.get("apply_result")
+                if isinstance(result.get("apply_result"), dict)
+                else {}
+            )
             record_child_result = getattr(
                 server,
                 "record_soundcheck_child_result",
                 None,
             )
             if callable(record_child_result) and not isinstance(
-                apply_result.get("soundcheck_readiness"),
+                persisted_apply_result.get("soundcheck_readiness"),
                 dict,
             ):
                 readiness = record_child_result(
                     execution_proposal,
-                    apply_result,
+                    persisted_apply_result,
                 )
+                run_id = str(transaction_plan.get("run_id") or "").strip()
+                if (
+                    persisted_apply_result.get("status") == "applied"
+                    and run_id
+                ):
+                    candidate = server._aggregate_current_soundcheck_readiness(
+                        run_id,
+                        require_final_reconciliation=False,
+                    )
+                    if (
+                        isinstance(candidate, Mapping)
+                        and candidate.get("mix_readiness")
+                        in {"safe_core_ready", "show_mix_ready"}
+                    ):
+                        reconciled = await server.reconcile_soundcheck_readiness(
+                            run_id
+                        )
+                        if isinstance(reconciled, Mapping):
+                            readiness = dict(reconciled)
+                    else:
+                        manifest = server._soundcheck_manifests.get(run_id, {})
+                        deferred_split_present = any(
+                            isinstance(raw, Mapping)
+                            and isinstance(raw.get("metadata"), Mapping)
+                            and "final_target_value" in raw["metadata"]
+                            and raw.get("target_value")
+                            != raw["metadata"].get("final_target_value")
+                            for plan in manifest.get("plans") or []
+                            if isinstance(plan, Mapping)
+                            for raw in plan.get("operations") or []
+                        )
+                        if deferred_split_present:
+                            next_preflight = (
+                                await server.preflight_soundcheck_manifest(
+                                    manifest
+                                )
+                            )
+                            result["next_soundcheck_replan"] = dict(
+                                next_preflight.get("replan") or {}
+                            )
                 if isinstance(readiness, dict):
                     result["soundcheck_readiness"] = readiness
-            elif isinstance(apply_result.get("soundcheck_readiness"), dict):
+            elif isinstance(
+                persisted_apply_result.get("soundcheck_readiness"),
+                dict,
+            ):
                 result["soundcheck_readiness"] = dict(
-                    apply_result["soundcheck_readiness"]
+                    persisted_apply_result["soundcheck_readiness"]
                 )
             record_apply_trace(
                 proposal=execution_proposal,
@@ -6515,10 +6892,10 @@ def register_handlers(server):
                     "operation_count": len(transaction_plan.get("operations") or []),
                 },
                 idempotency_key=idempotency_key,
-                status=apply_result.get("status", "unknown"),
+                status=persisted_apply_result.get("status", "unknown"),
                 blocked_reason=(
-                    apply_result.get("reason")
-                    if apply_result.get("status") != "applied"
+                    persisted_apply_result.get("reason")
+                    if persisted_apply_result.get("status") != "applied"
                     else None
                 ),
                 metadata={"supervised_transaction": True},

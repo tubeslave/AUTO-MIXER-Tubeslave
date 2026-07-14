@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+import fcntl
 import hashlib
 import json
 import os
@@ -9,8 +10,10 @@ import py_compile
 import secrets
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -168,7 +171,7 @@ class _FakeProcess:
         return self.returncode
 
     def terminate(self):
-        self.returncode = -15
+        self.returncode = 0
 
     def kill(self):
         self.returncode = -9
@@ -177,6 +180,41 @@ class _FakeProcess:
         if self.returncode is None:
             raise subprocess.TimeoutExpired("fake", timeout)
         return self.returncode
+
+
+class _StubbornFakeProcess(_FakeProcess):
+    def __init__(self):
+        super().__init__()
+        self.terminate_called = threading.Event()
+        self.kill_count = 0
+
+    def terminate(self):
+        self.terminate_called.set()
+
+    def kill(self):
+        self.kill_count += 1
+        self.returncode = -9
+
+
+class _ReplacingWriterLockFakeProcess(_StubbornFakeProcess):
+    def __init__(self, lock_path):
+        super().__init__()
+        self.lock_path = lock_path
+        self.replaced = threading.Event()
+
+    def wait(self, timeout=None):
+        if self.returncode is not None:
+            return self.returncode
+        if not self.replaced.is_set():
+            self.lock_path.unlink()
+            replacement_fd = os.open(
+                self.lock_path,
+                os.O_CREAT | os.O_RDWR,
+                0o600,
+            )
+            os.close(replacement_fd)
+            self.replaced.set()
+        raise subprocess.TimeoutExpired("fake", timeout)
 
 
 class _FakeLog:
@@ -239,6 +277,1288 @@ def _fake_backend(root: Path):
         ws_url="ws://127.0.0.1:18765",
         log_handle=_FakeLog(),
     )
+
+
+def _operator_review_callbacks():
+    events = []
+
+    def emit(payload):
+        events.append(dict(payload))
+
+    async def approve(_prompt):
+        for event in reversed(events):
+            digest = event.get("operation_digest")
+            if event.get("event") == "m110_operator_bundle_review_required":
+                return digest
+        raise AssertionError("operator review event missing before input")
+
+    return approve, emit, events
+
+
+def _replan_terminal(**overrides):
+    terminal = {
+        "type": "m110_soundcheck_replan_result",
+        "status": "advanced",
+        "success": True,
+        "reason": "m110_bounded_split_revision_advanced",
+        "run_id": "m110-run-a",
+        "from_plan_revision": 1,
+        "to_plan_revision": 2,
+        "server_owned_selection": True,
+        "client_targets_accepted": False,
+        "split_operation_count": 1,
+        "safe_alternative_operation_count": 0,
+        "replan_basis_refreshed": True,
+        "new_operator_approval_required_for_each_child": True,
+        "console_mutation_write_attempt_count": 0,
+        "live_mixer_writes": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+    terminal.update(overrides)
+    return terminal
+
+
+def _lane_created_terminal(*, lane="soundcheck", role="proof", **overrides):
+    operation_id = "source-operation-1"
+    terminal = {
+        "type": (
+            "m110_processor_enable_proposal_result"
+            if lane == "processor"
+            else "m110_soundcheck_child_proposal_result"
+        ),
+        "status": "created",
+        "success": True,
+        "proposal_id": (
+            f"m110-processor-{role}-" + "a" * 32
+            if lane == "processor"
+            else f"m110-soundcheck-child-{role}-" + "a" * 32
+        ),
+        "review_contract_version": 2,
+        "review_content_digest": "sha256:" + "b" * 64,
+        "operation_digest": "sha256:" + "c" * 64,
+        "review_preimage_sha256": "",
+        "required_capability_kind": (
+            "restore_only_proof"
+            if role == "proof"
+            else "processor_enable_commit_once"
+            if lane == "processor"
+            else "soundcheck_child_commit_once"
+        ),
+        "bundle_kind": (
+            "processor_enable_bundle"
+            if lane == "processor"
+            else runner.M110_SOUNDCHECK_SINGLE_BUNDLE_KIND
+        ),
+        "operation_count": 1,
+        "scope_addresses": ["/ch/1/eq/on"],
+        "review_operations": [
+            {
+                "operation_id": (
+                    "m110:processor:eq:ch1:0123456789abcdef"
+                    if lane == "processor"
+                    else operation_id
+                ),
+                "family_id": "eq_hpf",
+                "write_kind": "eq",
+                "target_value": {"enabled": True},
+            }
+        ],
+        "source_operation_id": (
+            None if lane == "processor" else operation_id
+        ),
+        "source_operation_ids": [operation_id],
+        "candidate_id": (
+            "m110-processor-eq-ch1-0123456789abcdef"
+            if lane == "processor"
+            else None
+        ),
+        "matching_restored_proof_receipt": role == "commit",
+        "token_issued": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+    terminal.update(overrides)
+    return terminal
+
+
+@pytest.mark.parametrize("lane", ["processor", "soundcheck"])
+def test_lane_created_terminal_binds_role_and_source_provenance(lane):
+    terminal = _lane_created_terminal(lane=lane, role="proof")
+
+    created = runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+        terminal,
+        lane=lane,
+        role="proof",
+    )
+
+    assert created["source_operation_ids"] == ["source-operation-1"]
+    assert created["review_operations"] == terminal["review_operations"]
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"source_operation_ids": []},
+        {"source_operation_ids": ["different-operation"]},
+        {"proposal_id": "m110-soundcheck-child-commit-" + "a" * 32},
+    ],
+)
+def test_soundcheck_lane_created_terminal_rejects_provenance_or_role_drift(
+    override,
+):
+    terminal = _lane_created_terminal(
+        lane="soundcheck",
+        role="proof",
+        **override,
+    )
+
+    with pytest.raises(RuntimeError, match="m110_lane_proposal_invalid"):
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            terminal,
+            lane="soundcheck",
+            role="proof",
+        )
+
+
+def _lane_apply_terminal(created, capability_kind):
+    proof_run = capability_kind == "restore_only_proof"
+    status = "proof_passed" if proof_run else "applied"
+    result_digest = "sha256:" + ("d" if proof_run else "e") * 64
+    operation_ids = [
+        item["operation_id"] for item in created["review_operations"]
+    ]
+    return {
+        "type": "operator_proposal_apply_result",
+        "contract_version": 2,
+        "status": status,
+        "success": True,
+        "proposal_id": created["proposal_id"],
+        "proposal_status": status,
+        "apply_status": status,
+        "accepted": not proof_run,
+        "owner_review_required": proof_run,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "proof_run": proof_run,
+        "restore_after_verify": proof_run,
+        "capability_kind": capability_kind,
+        "operation_digest": created["operation_digest"],
+        "bundle_kind": created["bundle_kind"],
+        "review_preimage_sha256": created.get(
+            "review_preimage_sha256"
+        ) or None,
+        "proof_target_verified": proof_run,
+        "applied_operation_ids": operation_ids,
+        "rollback_operation_ids": operation_ids if proof_run else [],
+        "already_satisfied_operation_ids": [],
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "audio_recheck_passed": True,
+        "terminal_after_console_send": True,
+        "wal_terminal": "proof_restored" if proof_run else "committed",
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "physical_state_restored": proof_run,
+        "rollback_attempted": proof_run,
+        "rollback_succeeded": proof_run,
+        "rollback_status": "verified" if proof_run else "not_attempted",
+        "parent_commit_recorded": None if proof_run else True,
+        "parent_commit_reason": (
+            "" if proof_run else "m110_plan_commit_recorded"
+        ),
+        "proof_receipt_id": (
+            None if proof_run else "m110proof_v1_" + "f" * 64
+        ),
+        "result_digest": result_digest,
+        "result_detail_available": True,
+        "result_evidence_pinned": False,
+        "proposal": {
+            "id": created["proposal_id"],
+            "status": status,
+            "review_content_digest": created["review_content_digest"],
+            "result_digest": result_digest,
+        },
+    }
+
+
+def _already_satisfied_lane_apply_terminal(created, capability_kind):
+    terminal = _lane_apply_terminal(created, capability_kind)
+    operation_ids = [
+        item["operation_id"] for item in created["review_operations"]
+    ]
+    terminal.update(
+        {
+            "applied_operation_ids": [],
+            "rollback_operation_ids": [],
+            "already_satisfied_operation_ids": operation_ids,
+            "no_console_send_proven": True,
+            "terminal_after_console_send": False,
+            "rollback_attempted": False,
+            "rollback_succeeded": False,
+            "rollback_status": (
+                "not_required_already_satisfied"
+                if capability_kind == "restore_only_proof"
+                else "not_attempted"
+            ),
+        }
+    )
+    return terminal
+
+
+@pytest.mark.parametrize(
+    ("role", "capability_kind"),
+    [
+        ("proof", "restore_only_proof"),
+        ("commit", "soundcheck_child_commit_once"),
+    ],
+)
+def test_lane_apply_terminal_accepts_exact_already_satisfied_two_pass_truth(
+    role,
+    capability_kind,
+):
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role=role),
+            lane="soundcheck",
+            role=role,
+        )
+    )
+
+    runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+        _already_satisfied_lane_apply_terminal(created, capability_kind),
+        created=created,
+        capability_kind=capability_kind,
+    )
+
+
+def test_lane_apply_terminal_rejects_partial_already_satisfied_coverage():
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role="proof"),
+            lane="soundcheck",
+            role="proof",
+        )
+    )
+    terminal = _already_satisfied_lane_apply_terminal(
+        created,
+        "restore_only_proof",
+    )
+    terminal["already_satisfied_operation_ids"] = ["different-operation"]
+
+    with pytest.raises(RuntimeError, match="m110_lane_apply_terminal_invalid"):
+        runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+            terminal,
+            created=created,
+            capability_kind="restore_only_proof",
+        )
+
+
+def test_lane_apply_terminal_rejects_unrecorded_parent_commit():
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role="commit"),
+            lane="soundcheck",
+            role="commit",
+        )
+    )
+    terminal = _lane_apply_terminal(
+        created,
+        "soundcheck_child_commit_once",
+    )
+    terminal["parent_commit_recorded"] = False
+    terminal["parent_commit_reason"] = "m110_plan_commit_journal_failed"
+
+    with pytest.raises(RuntimeError, match="m110_lane_apply_terminal_invalid"):
+        runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+            terminal,
+            created=created,
+            capability_kind="soundcheck_child_commit_once",
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "replacement"),
+    [
+        ("applied_operation_ids", []),
+        ("applied_operation_ids", ["source-operation-1"] * 2),
+        ("already_satisfied_operation_ids", ["source-operation-1"]),
+        ("rollback_operation_ids", []),
+        ("applied_operation_ids", ["different-operation"]),
+    ],
+)
+def test_lane_apply_terminal_rejects_inexact_operation_coverage(
+    field,
+    replacement,
+):
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role="proof"),
+            lane="soundcheck",
+            role="proof",
+        )
+    )
+    terminal = _lane_apply_terminal(created, "restore_only_proof")
+    terminal[field] = replacement
+
+    with pytest.raises(RuntimeError, match="m110_lane_apply_terminal_invalid"):
+        runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+            terminal,
+            created=created,
+            capability_kind="restore_only_proof",
+        )
+
+
+@pytest.mark.parametrize(
+    "capability_kind",
+    ["restore_only_proof", "soundcheck_child_commit_once"],
+)
+def test_lane_apply_terminal_accepts_exact_mixed_operation_coverage(
+    capability_kind,
+):
+    role = (
+        "proof" if capability_kind == "restore_only_proof" else "commit"
+    )
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role=role),
+            lane="soundcheck",
+            role=role,
+        )
+    )
+    first = created["review_operations"][0]
+    second_id = "source-operation-2"
+    created = {
+        **created,
+        "review_operations": [
+            first,
+            {**first, "operation_id": second_id},
+        ],
+    }
+    terminal = _lane_apply_terminal(created, capability_kind)
+    first_id = first["operation_id"]
+    terminal.update(
+        {
+            "applied_operation_ids": [first_id],
+            "rollback_operation_ids": (
+                [first_id]
+                if capability_kind == "restore_only_proof"
+                else []
+            ),
+            "already_satisfied_operation_ids": [second_id],
+        }
+    )
+
+    runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+        terminal,
+        created=created,
+        capability_kind=capability_kind,
+    )
+
+
+def _valid_final_audit_terminal(**overrides):
+    terminal = {
+        "type": "m110_soundcheck_final_audit_result",
+        "contract_version": 1,
+        "status": "verified",
+        "success": True,
+        "verified": True,
+        "reason": "m110_show_mix_full_reconciliation_verified",
+        "run_id": "m110-run-final",
+        "mix_readiness": "show_mix_ready",
+        "verified_state_sha256": "sha256:" + "a" * 64,
+        "committed_surface_ledger_sha256": "sha256:" + "b" * 64,
+        "audited_address_count": 248,
+        "audit_pass_count": 2,
+        "operator_listening_required": True,
+        "console_mutation_write_attempt_count": 0,
+        "live_mixer_writes": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+    terminal.update(overrides)
+    return terminal
+
+
+def test_final_audit_terminal_requires_read_only_two_pass_show_mix_truth():
+    validator = (
+        runner.ProofOwnedBackendSession
+        ._validate_m110_soundcheck_final_audit_terminal
+    )
+    validated = validator(
+        _valid_final_audit_terminal()
+    )
+    assert validated["verified_state_sha256"] == "sha256:" + "a" * 64
+
+    for override in (
+        {"audit_pass_count": 1},
+        {"operator_listening_required": False},
+        {"readiness_closure_allowed": True},
+        {"live_mixer_writes": True},
+        {"verified_state_sha256": None},
+    ):
+        with pytest.raises(
+            (RuntimeError, ValueError),
+            match="final_audit|verified_state_sha256",
+        ):
+            validator(_valid_final_audit_terminal(**override))
+
+
+@pytest.mark.asyncio
+async def test_sha_bound_listening_confirmation_rejects_late_ack(monkeypatch):
+    clock = iter([100.0, 106.0])
+    monkeypatch.setattr(runner.time, "time", lambda: next(clock))
+
+    with pytest.raises(
+        RuntimeError,
+        match="m110_operator_checkpoint_deadline_expired",
+    ):
+        await runner._require_exact_operator_literal(
+            lambda _prompt: asyncio.sleep(0, result="CONFIRM"),
+            prompt="listen",
+            expected="CONFIRM",
+            deadline_epoch=105.0,
+        )
+
+
+@pytest.mark.asyncio
+async def test_session_final_audit_sends_only_fixed_read_only_request(tmp_path):
+    def responder(payload):
+        if payload["type"] == "run_m110_soundcheck_final_audit":
+            assert payload == {
+                "type": "run_m110_soundcheck_final_audit",
+                "contract_version": 1,
+                "audit_selector": "active_soundcheck_full_reconciliation",
+            }
+            return [_valid_final_audit_terminal()]
+        return []
+
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=_FakeWebSocket(responder),
+        identity_result=_identity_result(),
+        route_established=True,
+        route_result={"proof_id": "m110-route"},
+        control_armed=True,
+        control_approval_id="operator-approved",
+    )
+
+    terminal = await session.run_m110_soundcheck_final_audit(
+        timeout_seconds=1.0
+    )
+
+    assert terminal["verified"] is True
+    assert terminal["readiness_closure_allowed"] is False
+    await session.close()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "responses",
+    [
+        [
+            {
+                "type": "auto_soundcheck_status",
+                "status": "readiness_invalidated",
+            },
+            _valid_final_audit_terminal(),
+        ],
+        [
+            _valid_final_audit_terminal(),
+            {
+                "type": "auto_soundcheck_status",
+                "status": "readiness_invalidated",
+            },
+        ],
+    ],
+    ids=("before_terminal", "after_terminal_during_grace"),
+)
+async def test_session_final_audit_latches_interleaved_readiness_invalidation(
+    tmp_path,
+    responses,
+):
+    websocket = _FakeWebSocket(
+        lambda payload: (
+            responses
+            if payload["type"] == "run_m110_soundcheck_final_audit"
+            else []
+        )
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+        route_established=True,
+        route_result={"proof_id": "m110-route"},
+        control_armed=True,
+        control_approval_id="operator-approved",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="m110_soundcheck_readiness_invalidated",
+    ):
+        await session.run_m110_soundcheck_final_audit(timeout_seconds=1.0)
+
+    assert session._readiness_invalidation_latched is True
+    with pytest.raises(
+        RuntimeError,
+        match="m110_soundcheck_readiness_invalidated",
+    ):
+        await session._receive_terminal(
+            "m110_soundcheck_final_audit_result",
+            timeout_seconds=1.0,
+        )
+    await session.close()
+
+
+class _FullSoundcheckSession:
+    def __init__(self, *, second_audit=None, teardown=None):
+        self.identity_result = {"runtime": "m110-test"}
+        self.trace = []
+        first_audit = _valid_final_audit_terminal()
+        self.audits = [
+            first_audit,
+            dict(second_audit or first_audit),
+        ]
+        self.teardown = teardown or {"verified": True, "errors": []}
+        self.close_count = 0
+
+    async def establish_master_route(self, **_kwargs):
+        self.trace.append("route")
+        return {"verified": True}
+
+    async def arm_m110_attended_control(self, **_kwargs):
+        self.trace.append("arm")
+        return {"armed": True}
+
+    async def verify_m110_main_output_checkpoint(self, *, checkpoint):
+        self.trace.append(f"main:{checkpoint}")
+        return {"verified": True, "checkpoint": checkpoint}
+
+    async def execute_fixed_m110_maintenance_reset(self, **_kwargs):
+        self.trace.append("reset")
+        return {"verified": True}
+
+    async def execute_m110_m006_exact_preimage_restore(self, **_kwargs):
+        self.trace.append("m006")
+        return {"verified": True, "m006_restore_complete": True}
+
+    async def run_m110_soundcheck_analysis(self):
+        self.trace.append("analysis")
+        return {"status": "analyzed"}
+
+    async def execute_m110_interleaved_soundcheck(self, **_kwargs):
+        self.trace.append("lanes")
+        return {
+            "verified": True,
+            "processor": {"verified": True},
+            "soundcheck": {
+                "reason": "show_mix_ready",
+                "soundcheck_readiness": {
+                    "mix_readiness": "show_mix_ready",
+                },
+            },
+        }
+
+    async def run_m110_soundcheck_final_audit(self):
+        self.trace.append("audit")
+        return self.audits.pop(0)
+
+    async def close(self):
+        self.trace.append("close")
+        self.close_count += 1
+        return dict(self.teardown)
+
+
+async def _run_full_soundcheck_with_fake(monkeypatch, tmp_path, session):
+    monkeypatch.setattr(
+        runner,
+        "assert_m110_cp05_hardware_gate",
+        lambda _repo_root: {"verified": True},
+    )
+
+    async def open_session(**_kwargs):
+        return session
+
+    monkeypatch.setattr(
+        runner,
+        "open_proof_owned_backend_session",
+        open_session,
+    )
+    monkeypatch.setattr(runner.time, "time", lambda: 1_000.0)
+    responses = iter(
+        [
+            runner.M110_RESET_CONTAINMENT_CONFIRMATION,
+            runner.M110_SOUNDCHECK_UNMUTE_CONFIRMATION,
+            "CONFIRM_M110_HW05_LISTENING_" + "sha256:" + "a" * 64,
+        ]
+    )
+
+    async def operator_input(_prompt):
+        session.trace.append("operator")
+        return next(responses)
+
+    async def terminal_emitter(payload):
+        session.trace.append("emit:" + str(payload.get("checkpoint")))
+
+    return await runner.run_proof_owned_full_soundcheck(
+        repo_root=tmp_path,
+        ws_port=18765,
+        artifact_root=tmp_path / "artifacts",
+        wing_ip="192.0.2.10",
+        audio_device_index=7,
+        approval_id="m110-test-approval",
+        operator_input=operator_input,
+        terminal_emitter=terminal_emitter,
+    )
+
+
+@pytest.mark.asyncio
+async def test_full_soundcheck_orchestrates_sha_bound_hw05_and_teardown(
+    monkeypatch,
+    tmp_path,
+):
+    session = _FullSoundcheckSession()
+
+    result = await _run_full_soundcheck_with_fake(
+        monkeypatch,
+        tmp_path,
+        session,
+    )
+
+    assert result["verified"] is True
+    assert result["status"] == "show_mix_ready"
+    assert result["readiness_closure_allowed"] is True
+    assert result["final_audit_before_listening"][
+        "verified_state_sha256"
+    ] == result["final_audit_after_listening"]["verified_state_sha256"]
+    assert session.trace == [
+        "route",
+        "arm",
+        "emit:reset_muted",
+        "operator",
+        "main:reset_muted",
+        "reset",
+        "m006",
+        "emit:soundcheck_unmuted",
+        "operator",
+        "main:soundcheck_unmuted",
+        "analysis",
+        "lanes",
+        "main:soundcheck_unmuted",
+        "audit",
+        "emit:hw05_verified_listening",
+        "operator",
+        "audit",
+        "close",
+    ]
+    assert session.close_count == 1
+
+
+@pytest.mark.asyncio
+async def test_full_soundcheck_rejects_state_change_after_listening_and_closes(
+    monkeypatch,
+    tmp_path,
+):
+    session = _FullSoundcheckSession(
+        second_audit=_valid_final_audit_terminal(
+            verified_state_sha256="sha256:" + "c" * 64,
+        )
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="m110_hw05_verified_state_changed_after_listening",
+    ):
+        await _run_full_soundcheck_with_fake(
+            monkeypatch,
+            tmp_path,
+            session,
+        )
+
+    assert session.close_count == 1
+    assert session.trace[-1] == "close"
+
+
+@pytest.mark.asyncio
+async def test_full_soundcheck_rejects_unverified_teardown(
+    monkeypatch,
+    tmp_path,
+):
+    session = _FullSoundcheckSession(
+        teardown={
+            "verified": False,
+            "errors": ["writer_lock_not_released"],
+        }
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match=(
+            "m110_full_soundcheck_teardown_failed:"
+            "writer_lock_not_released"
+        ),
+    ):
+        await _run_full_soundcheck_with_fake(
+            monkeypatch,
+            tmp_path,
+            session,
+        )
+
+    assert session.close_count == 1
+
+
+@pytest.mark.parametrize(
+    ("role", "capability_kind", "override"),
+    [
+        ("proof", "restore_only_proof", {"proof_target_verified": False}),
+        ("proof", "restore_only_proof", {"no_console_send_proven": True}),
+        ("proof", "restore_only_proof", {"terminal_after_console_send": False}),
+        ("proof", "restore_only_proof", {"rollback_status": "unknown"}),
+        (
+            "commit",
+            "soundcheck_child_commit_once",
+            {"review_preimage_sha256": "tampered"},
+        ),
+        (
+            "commit",
+            "soundcheck_child_commit_once",
+            {"terminal_after_console_send": False},
+        ),
+    ],
+)
+def test_lane_apply_terminal_rejects_missing_physical_truth(
+    role,
+    capability_kind,
+    override,
+):
+    created = (
+        runner.ProofOwnedBackendSession._validate_lane_proposal_terminal(
+            _lane_created_terminal(lane="soundcheck", role=role),
+            lane="soundcheck",
+            role=role,
+        )
+    )
+    terminal = _lane_apply_terminal(created, capability_kind)
+    terminal.update(override)
+
+    with pytest.raises(RuntimeError, match="m110_lane_apply_terminal_invalid"):
+        runner.ProofOwnedBackendSession._validate_lane_apply_terminal(
+            terminal,
+            created=created,
+            capability_kind=capability_kind,
+        )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("lane", ["processor", "soundcheck"])
+async def test_real_lane_step_executes_proof_and_commit_capabilities(
+    tmp_path,
+    lane,
+):
+    created_by_role = {
+        role: _lane_created_terminal(lane=lane, role=role)
+        for role in ("proof", "commit")
+    }
+    created_by_role["commit"]["operation_digest"] = created_by_role[
+        "proof"
+    ]["operation_digest"]
+    created_by_role["commit"]["scope_addresses"] = list(
+        created_by_role["proof"]["scope_addresses"]
+    )
+    created_by_role["commit"]["review_operations"] = deepcopy(
+        created_by_role["proof"]["review_operations"]
+    )
+    created_by_role["commit"]["source_operation_ids"] = list(
+        created_by_role["proof"]["source_operation_ids"]
+    )
+    created_by_role["commit"]["source_operation_id"] = created_by_role[
+        "proof"
+    ]["source_operation_id"]
+    created_by_role["commit"]["candidate_id"] = created_by_role[
+        "proof"
+    ]["candidate_id"]
+    proposal_lookup = {
+        created["proposal_id"]: (role, created)
+        for role, created in created_by_role.items()
+    }
+    issued_tokens = []
+
+    def responder(payload):
+        message_type = payload["type"]
+        if message_type.startswith("create_m110_"):
+            role = "commit" if "_commit_" in message_type else "proof"
+            created = deepcopy(created_by_role[role])
+            created["type"] = (
+                "m110_processor_enable_proposal_result"
+                if lane == "processor"
+                else "m110_soundcheck_child_proposal_result"
+            )
+            return [created]
+        if message_type == "prepare_m110_restore_only_proof":
+            role, created = proposal_lookup[payload["proposal_id"]]
+            capability_kind = (
+                "restore_only_proof"
+                if role == "proof"
+                else "processor_enable_commit_once"
+                if lane == "processor"
+                else "soundcheck_child_commit_once"
+            )
+            return [
+                {
+                    "type": "m110_restore_proof_prepare_result",
+                    "status": "prepared",
+                    "success": True,
+                    "reason": (
+                        "m110_processor_bundle_current"
+                        if lane == "processor"
+                        else "m110_soundcheck_child_bundle_current"
+                    ),
+                    "proposal_id": created["proposal_id"],
+                    "review_contract_version": 2,
+                    "review_content_digest": created[
+                        "review_content_digest"
+                    ],
+                    "operation_digest": created["operation_digest"],
+                    "bundle_kind": created["bundle_kind"],
+                    "required_capability_kind": capability_kind,
+                    "operation_count": created["operation_count"],
+                    "scope_addresses": created["scope_addresses"],
+                    "token_issued": False,
+                    "live_authority_granted": False,
+                }
+            ]
+        if message_type == "issue_supervised_capability":
+            kind = payload["capability_kind"]
+            token = "m110cap_v1_" + (
+                "1" if kind == "restore_only_proof" else "2"
+            ) * 64
+            issued_tokens.append(token)
+            return [
+                {
+                    "type": "supervised_capability_result",
+                    "status": "issued",
+                    "success": True,
+                    "reason": "m110_capability_issued",
+                    "capability_kind": kind,
+                    "proposal_id": payload["proposal_id"],
+                    "review_content_digest": payload[
+                        "expected_review_content_digest"
+                    ],
+                    "operation_digest": payload[
+                        "expected_operation_digest"
+                    ],
+                    "approval_id": payload["approval_id"],
+                    "idempotency_key": (
+                        "m110-proof:" + "3" * 32
+                        if kind == "restore_only_proof"
+                        else "m110-processor-commit:" + "4" * 32
+                        if lane == "processor"
+                        else "m110-soundcheck-commit:" + "4" * 32
+                    ),
+                    "latest_start_epoch": time.time() + 10.0,
+                    "supervised_capability_token": token,
+                    "single_use": True,
+                    "stores_plaintext_token": False,
+                    "live_authority_granted": False,
+                }
+            ]
+        if message_type == "apply_operator_proposal":
+            role, created = proposal_lookup[payload["proposal_id"]]
+            kind = (
+                "restore_only_proof"
+                if role == "proof"
+                else "processor_enable_commit_once"
+                if lane == "processor"
+                else "soundcheck_child_commit_once"
+            )
+            return [_lane_apply_terminal(created, kind)]
+        return []
+
+    websocket = _FakeWebSocket(responder)
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+    operator_input, terminal_emitter, review_events = (
+        _operator_review_callbacks()
+    )
+
+    result = await session.execute_m110_lane_step(
+        lane=lane,
+        approval_id="operator-approved",
+        operator_input=operator_input,
+        terminal_emitter=terminal_emitter,
+    )
+
+    assert result["state"] == "committed"
+    assert result["proof"]["capability_kind"] == "restore_only_proof"
+    assert result["commit"]["capability_kind"] == (
+        "processor_enable_commit_once"
+        if lane == "processor"
+        else "soundcheck_child_commit_once"
+    )
+    assert sum(
+        event.get("event") == "m110_operator_bundle_review_required"
+        for event in review_events
+    ) == 2
+    issue_requests = [
+        item
+        for item in websocket.sent
+        if item["type"] == "issue_supervised_capability"
+    ]
+    assert [item["capability_kind"] for item in issue_requests] == [
+        "restore_only_proof",
+        (
+            "processor_enable_commit_once"
+            if lane == "processor"
+            else "soundcheck_child_commit_once"
+        ),
+    ]
+    durable = json.dumps(result, sort_keys=True) + repr(session)
+    assert all(token not in durable for token in issued_tokens)
+
+
+@pytest.mark.asyncio
+async def test_m110_replan_request_is_strict_and_terminal_is_run_bound(tmp_path):
+    websocket = _FakeWebSocket(
+        lambda payload: (
+            [_replan_terminal()]
+            if payload.get("type") == "advance_m110_soundcheck_replan"
+            else []
+        )
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    result = await session.advance_m110_soundcheck_replan()
+
+    assert result == {
+        "state": "advanced",
+        "success": True,
+        "run_id": "m110-run-a",
+        "from_plan_revision": 1,
+        "to_plan_revision": 2,
+        "split_operation_count": 1,
+        "safe_alternative_operation_count": 0,
+    }
+    assert websocket.sent == [
+        {
+            "type": "advance_m110_soundcheck_replan",
+            "contract_version": 1,
+            "replan_selector": "next_bounded_split_revision",
+        }
+    ]
+
+
+@pytest.mark.asyncio
+async def test_m110_replan_accepts_safe_alternative_only_revision(tmp_path):
+    websocket = _FakeWebSocket(
+        lambda payload: (
+            [
+                _replan_terminal(
+                    split_operation_count=0,
+                    safe_alternative_operation_count=2,
+                )
+            ]
+            if payload.get("type") == "advance_m110_soundcheck_replan"
+            else []
+        )
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    result = await session.advance_m110_soundcheck_replan()
+
+    assert result["state"] == "advanced"
+    assert result["split_operation_count"] == 0
+    assert result["safe_alternative_operation_count"] == 2
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"run_id": ""},
+        {"from_plan_revision": 0, "to_plan_revision": 1},
+        {"safe_alternative_operation_count": False},
+        {
+            "split_operation_count": 0,
+            "safe_alternative_operation_count": 0,
+        },
+        {
+            "split_operation_count": 0,
+            "safe_alternative_operation_count": 1,
+        },
+    ],
+)
+async def test_m110_replan_terminal_rejects_ambiguous_identity_and_counts(
+    tmp_path,
+    override,
+):
+    websocket = _FakeWebSocket(lambda _payload: [_replan_terminal(**override)])
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    with pytest.raises(RuntimeError, match="replan_terminal_invalid"):
+        await session.advance_m110_soundcheck_replan()
+
+
+@pytest.mark.asyncio
+async def test_interleaved_replan_revision_identity_is_scoped_per_run(tmp_path):
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=_FakeWebSocket(),
+        identity_result=_identity_result(),
+    )
+    lane_steps = {
+        "processor": [
+            {"state": "complete", "success": True},
+            {"state": "complete", "success": True},
+            {"state": "complete", "success": True},
+            {"state": "complete", "success": True},
+        ],
+        "soundcheck": [
+            {
+                "state": "incomplete",
+                "success": False,
+                "run_id": "m110-run-a",
+                "replan_available": True,
+                "replan_from_plan_revision": 1,
+                "replan_to_plan_revision": 2,
+                "replan_split_operation_count": 1,
+                "replan_safe_alternative_operation_count": 0,
+                "residuals": [{"reason": "operator_review_remaining"}],
+            },
+            {
+                "state": "deferred",
+                "success": False,
+                "retry_class": "fresh_soundcheck_analysis_required",
+            },
+            {
+                "state": "incomplete",
+                "success": False,
+                "run_id": "m110-run-b",
+                "replan_available": True,
+                "replan_from_plan_revision": 1,
+                "replan_to_plan_revision": 2,
+                "replan_split_operation_count": 0,
+                "replan_safe_alternative_operation_count": 2,
+                "residuals": [{"reason": "operator_review_remaining"}],
+            },
+            {
+                "state": "complete",
+                "success": True,
+                "run_id": "m110-run-b",
+                "residuals": [],
+                "soundcheck_readiness": {"mix_readiness": "show_mix_ready"},
+            },
+        ],
+    }
+    replans = [
+        {
+            "state": "advanced",
+            "success": True,
+            "run_id": "m110-run-a",
+            "from_plan_revision": 1,
+            "to_plan_revision": 2,
+            "split_operation_count": 1,
+            "safe_alternative_operation_count": 0,
+        },
+        {
+            "state": "advanced",
+            "success": True,
+            "run_id": "m110-run-b",
+            "from_plan_revision": 1,
+            "to_plan_revision": 2,
+            "split_operation_count": 0,
+            "safe_alternative_operation_count": 2,
+        },
+    ]
+
+    async def lane_step(*, lane, **_kwargs):
+        return lane_steps[lane].pop(0)
+
+    async def advance(**_kwargs):
+        return replans.pop(0)
+
+    async def analyze(**_kwargs):
+        return {"verified": True, "run_id": "m110-run-b", "plan_revision": 1}
+
+    session.execute_m110_lane_step = lane_step
+    session.advance_m110_soundcheck_replan = advance
+    session.run_m110_soundcheck_analysis = analyze
+
+    result = await session.execute_m110_interleaved_soundcheck(
+        approval_id="operator-approved",
+        operator_input=_operator_review_callbacks()[0],
+        terminal_emitter=_operator_review_callbacks()[1],
+    )
+
+    assert result["verified"] is True
+    assert [item["run_id"] for item in result["replans"]] == [
+        "m110-run-a",
+        "m110-run-b",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_interleaved_replan_rejects_run_binding_mismatch(tmp_path):
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=_FakeWebSocket(),
+        identity_result=_identity_result(),
+    )
+
+    async def lane_step(*, lane, **_kwargs):
+        if lane == "processor":
+            return {"state": "complete", "success": True}
+        return {
+            "state": "incomplete",
+            "success": False,
+            "run_id": "m110-current-run",
+            "replan_available": True,
+            "replan_from_plan_revision": 1,
+            "replan_to_plan_revision": 2,
+            "replan_split_operation_count": 1,
+            "replan_safe_alternative_operation_count": 0,
+            "residuals": [{"reason": "split_target_remaining"}],
+        }
+
+    async def advance(**_kwargs):
+        return {
+            "state": "advanced",
+            "success": True,
+            "run_id": "m110-other-run",
+            "from_plan_revision": 1,
+            "to_plan_revision": 2,
+            "split_operation_count": 1,
+            "safe_alternative_operation_count": 0,
+        }
+
+    session.execute_m110_lane_step = lane_step
+    session.advance_m110_soundcheck_replan = advance
+
+    with pytest.raises(RuntimeError, match="replan_run_binding_mismatch"):
+        await session.execute_m110_interleaved_soundcheck(
+            approval_id="operator-approved",
+            operator_input=_operator_review_callbacks()[0],
+            terminal_emitter=_operator_review_callbacks()[1],
+        )
+
+
+@pytest.mark.asyncio
+async def test_interleaved_replan_accepts_fresh_server_recomputed_counts(
+    tmp_path,
+):
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=_FakeWebSocket(),
+        identity_result=_identity_result(),
+    )
+    soundcheck_steps = [
+        {
+            "state": "incomplete",
+            "success": False,
+            "run_id": "m110-current-run",
+            "replan_available": True,
+            "replan_from_plan_revision": 1,
+            "replan_to_plan_revision": 2,
+            "replan_split_operation_count": 8,
+            "replan_safe_alternative_operation_count": 14,
+            "residuals": [{"reason": "split_target_remaining"}],
+        },
+        {
+            "state": "complete",
+            "success": True,
+            "run_id": "m110-current-run",
+            "residuals": [],
+            "soundcheck_readiness": {"mix_readiness": "show_mix_ready"},
+        },
+    ]
+
+    async def lane_step(*, lane, **_kwargs):
+        if lane == "processor":
+            return {"state": "complete", "success": True}
+        return soundcheck_steps.pop(0)
+
+    async def advance(**_kwargs):
+        return {
+            "state": "advanced",
+            "success": True,
+            "run_id": "m110-current-run",
+            "from_plan_revision": 1,
+            "to_plan_revision": 2,
+            "split_operation_count": 8,
+            "safe_alternative_operation_count": 0,
+        }
+
+    session.execute_m110_lane_step = lane_step
+    session.advance_m110_soundcheck_replan = advance
+
+    result = await session.execute_m110_interleaved_soundcheck(
+        approval_id="operator-approved",
+        operator_input=_operator_review_callbacks()[0],
+        terminal_emitter=_operator_review_callbacks()[1],
+    )
+
+    assert result["verified"] is True
+    assert result["replans"][0]["safe_alternative_operation_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_interleaved_scheduler_does_not_infer_replan_from_residual_reason(
+    tmp_path,
+):
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=_FakeWebSocket(),
+        identity_result=_identity_result(),
+    )
+
+    async def lane_step(*, lane, **_kwargs):
+        if lane == "processor":
+            return {"state": "complete", "success": True}
+        return {
+            "state": "incomplete",
+            "success": False,
+            "run_id": "m110-current-run",
+            "replan_available": False,
+            "replan_from_plan_revision": None,
+            "replan_to_plan_revision": None,
+            "replan_split_operation_count": 0,
+            "replan_safe_alternative_operation_count": 0,
+            "residuals": [{"reason": "split_target_remaining"}],
+            "soundcheck_readiness": {
+                "mix_readiness": "soundcheck_incomplete"
+            },
+        }
+
+    session.execute_m110_lane_step = lane_step
+    session.advance_m110_soundcheck_replan = AsyncMock()
+
+    result = await session.execute_m110_interleaved_soundcheck(
+        approval_id="operator-approved",
+        operator_input=_operator_review_callbacks()[0],
+        terminal_emitter=_operator_review_callbacks()[1],
+    )
+
+    assert result["status"] == "incomplete"
+    session.advance_m110_soundcheck_replan.assert_not_awaited()
 
 
 def _route_values(*, firmware="3.0.5"):
@@ -498,7 +1818,20 @@ def _fixed_reset_created(
         "review_preimage_sha256": review_preimage_sha256,
         "required_capability_kind": capability_kind,
         "bundle_kind": "maintenance_dsp_reset_bundle",
+        "operation_count": len(runner.M110_RESET_ADDRESSES),
         "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+        "review_operations": [
+            {
+                "operation_id": str(row["operation_id"]),
+                "family_id": str(row["family_id"]),
+                "write_kind": str(row["write_kind"]),
+                "channel": int(row["channel"]),
+                "parameter": str(row["parameter"]),
+                "address": str(row["address"]),
+                "target_value": row["target_value"],
+            }
+            for row in runner.M110_RESET_OPERATION_DEFINITIONS
+        ],
     }
 
 
@@ -507,6 +1840,9 @@ def _valid_fixed_reset_terminal(created, capability_kind):
     status = "proof_passed" if proof_run else "applied"
     result_digest = "sha256:" + ("e" if proof_run else "f") * 64
     after_manifest_sha256 = "sha256:" + "2" * 64
+    operation_ids = [
+        item["operation_id"] for item in created["review_operations"]
+    ]
     return {
         "type": "operator_proposal_apply_result",
         "contract_version": 2,
@@ -542,6 +1878,9 @@ def _valid_fixed_reset_terminal(created, capability_kind):
             after_manifest_sha256
         ),
         "proof_target_verified": proof_run,
+        "applied_operation_ids": operation_ids,
+        "rollback_operation_ids": operation_ids if proof_run else [],
+        "already_satisfied_operation_ids": [],
         "no_console_send_proven": False,
         "physical_verified": True,
         "physical_state_restored": proof_run,
@@ -555,6 +1894,7 @@ def _valid_fixed_reset_terminal(created, capability_kind):
         "emergency_stop_required": False,
         "wal_terminal": "proof_restored" if proof_run else "committed",
         "audio_recheck_passed": True,
+        "rollback_status": "verified" if proof_run else "not_attempted",
         "no_outside_mutation_attempt_proven": True,
         "current_state_guaranteed_at_response": False,
         "fresh_readback_required_before_next_stage": True,
@@ -563,6 +1903,10 @@ def _valid_fixed_reset_terminal(created, capability_kind):
         "result_digest": result_digest,
         "result_detail_available": True,
         "result_evidence_pinned": False,
+        "parent_commit_recorded": None if proof_run else True,
+        "parent_commit_reason": (
+            None if proof_run else "m110_maintenance_reset_commit_recorded"
+        ),
     }
 
 
@@ -623,12 +1967,40 @@ def test_runner_builds_exact_hmac_control_and_capability_requests():
         request_nonce="1" * 32,
         secret=secret,
     )
+    processor_issue = runner.build_m110_capability_request(
+        capability_kind="processor_enable_commit_once",
+        proposal_id="proposal-3",
+        review_contract_version=2,
+        review_content_digest="sha256:" + "2" * 64,
+        operation_digest="sha256:" + "3" * 64,
+        approval_id="operator-approved",
+        request_nonce="4" * 32,
+        secret=secret,
+    )
+    soundcheck_issue = runner.build_m110_capability_request(
+        capability_kind="soundcheck_child_commit_once",
+        proposal_id="proposal-4",
+        review_contract_version=2,
+        review_content_digest="sha256:" + "5" * 64,
+        operation_digest="sha256:" + "6" * 64,
+        approval_id="operator-approved",
+        request_nonce="7" * 32,
+        secret=secret,
+    )
 
     assert validate_m110_arm_request(arm)[0] is True
     assert validate_m110_capability_issue_request(issue)[0] is True
     assert validate_m110_capability_issue_request(commit_issue)[0] is True
+    assert validate_m110_capability_issue_request(processor_issue)[0] is True
+    assert validate_m110_capability_issue_request(soundcheck_issue)[0] is True
     assert commit_issue["confirmation"] == (
         "ISSUE_MAINTENANCE_DSP_RESET_COMMIT_ONCE"
+    )
+    assert processor_issue["confirmation"] == (
+        "ISSUE_PROCESSOR_ENABLE_COMMIT_ONCE"
+    )
+    assert soundcheck_issue["confirmation"] == (
+        "ISSUE_SOUNDCHECK_CHILD_COMMIT_ONCE"
     )
     with pytest.raises(ValueError, match="review_version"):
         runner.build_m110_restore_only_capability_request(
@@ -710,6 +2082,11 @@ def test_restore_only_terminal_validator_rejects_unsafe_or_unbound_truth():
             "wal_terminal",
             "proof_restored",
         ),
+        (
+            "maintenance_dsp_reset_commit_once",
+            "parent_commit_recorded",
+            False,
+        ),
     ),
 )
 def test_fixed_reset_terminal_validator_rejects_unbound_or_unsafe_truth(
@@ -736,6 +2113,47 @@ def test_fixed_reset_terminal_validator_rejects_unbound_or_unsafe_truth(
             created=created,
             capability_kind=capability_kind,
         )
+
+
+@pytest.mark.parametrize(
+    "capability_kind",
+    ["restore_only_proof", "maintenance_dsp_reset_commit_once"],
+)
+def test_fixed_reset_terminal_accepts_exact_already_satisfied_truth(
+    capability_kind,
+):
+    role = (
+        "proof"
+        if capability_kind == "restore_only_proof"
+        else "commit"
+    )
+    created = _fixed_reset_created(role)
+    terminal = _valid_fixed_reset_terminal(created, capability_kind)
+    operation_ids = [
+        item["operation_id"] for item in created["review_operations"]
+    ]
+    terminal.update(
+        {
+            "applied_operation_ids": [],
+            "rollback_operation_ids": [],
+            "already_satisfied_operation_ids": operation_ids,
+            "no_console_send_proven": True,
+            "terminal_after_console_send": False,
+            "rollback_attempted": False,
+            "rollback_succeeded": False,
+            "rollback_status": (
+                "not_required_already_satisfied"
+                if capability_kind == "restore_only_proof"
+                else "not_attempted"
+            ),
+        }
+    )
+
+    runner.ProofOwnedBackendSession._validate_fixed_reset_apply_terminal(
+        terminal,
+        created=created,
+        capability_kind=capability_kind,
+    )
 
 
 def test_plan_only_runner_contacts_neither_backend_nor_wing(tmp_path):
@@ -910,7 +2328,7 @@ def test_isolated_bootstrap_ignores_checkout_local_valid_bytecode(tmp_path):
     assert marker.read_text(encoding="utf-8") == "SAFE"
 
 
-def test_execute_blocks_until_remaining_capability_checkpoints_exist(tmp_path):
+def test_execute_requires_exact_hardware_coordinates_before_contact(tmp_path):
     exit_code = runner.main(
         [
             "--execute",
@@ -922,13 +2340,18 @@ def test_execute_blocks_until_remaining_capability_checkpoints_exist(tmp_path):
             str(tmp_path),
         ]
     )
-    summary = json.loads((tmp_path / "plan-summary.json").read_text())
+    summary = json.loads((tmp_path / "execution-summary.json").read_text())
 
     assert exit_code == 2
     assert summary["status"] == "blocked"
-    assert "m110_remaining_capability_checkpoints_not_committed" in summary[
+    assert "wing_ip_required" in summary["authorization_failures"]
+    assert "audio_device_index_required" in summary[
         "authorization_failures"
     ]
+    assert all(
+        "remaining_capability_checkpoints" not in failure
+        for failure in summary["authorization_failures"]
+    )
     assert summary["contacts_backend"] is False
     assert summary["contacts_wing"] is False
 
@@ -964,6 +2387,14 @@ def test_spawn_uses_distinct_one_shot_fds_and_guarantees_child_teardown(
     token_text = bytes(backend.token).decode("ascii")
     assert secret_hex not in repr(backend)
     assert token_text not in repr(backend)
+    assert backend.writer_lock_fd is not None
+    pinned_lock_fd = backend.writer_lock_fd
+    pinned_metadata = os.fstat(pinned_lock_fd)
+    path_metadata = backend.writer_lock_path.lstat()
+    assert (pinned_metadata.st_dev, pinned_metadata.st_ino) == (
+        path_metadata.st_dev,
+        path_metadata.st_ino,
+    )
     rebuilt = runner.build_runner_prestart_manifest(
         root,
         launch_nonce="b" * 32,
@@ -975,6 +2406,125 @@ def test_spawn_uses_distinct_one_shot_fds_and_guarantees_child_teardown(
     assert backend.process.poll() is not None
     assert set(backend.secret) == {0}
     assert set(backend.token) == {0}
+    assert backend.writer_lock_fd is None
+    with pytest.raises(OSError):
+        os.fstat(pinned_lock_fd)
+
+
+def test_forced_child_kill_waits_until_parent_owns_writer_lock(tmp_path):
+    lock_path = tmp_path / "console_writer.lock"
+    lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    process = _StubbornFakeProcess()
+    result_holder = []
+
+    thread = threading.Thread(
+        target=lambda: result_holder.append(
+            runner._terminate_exact_child_safely(
+                process,
+                writer_lock_path=lock_path,
+                graceful_timeout_seconds=0.01,
+                poll_interval_seconds=0.01,
+            )
+        ),
+        daemon=True,
+    )
+    thread.start()
+    assert process.terminate_called.wait(timeout=1.0)
+    time.sleep(0.05)
+    assert process.kill_count == 0
+    assert thread.is_alive()
+
+    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+    os.close(lock_fd)
+    thread.join(timeout=1.0)
+
+    assert thread.is_alive() is False
+    assert process.kill_count == 1
+    assert result_holder[0]["forced"] is True
+    assert result_holder[0]["clean_shutdown"] is False
+    assert result_holder[0]["writer_lock_busy_observed"] is True
+    assert result_holder[0][
+        "writer_lock_acquired_before_forced_kill"
+    ] is True
+
+
+def test_writer_lock_inode_replacement_can_never_authorize_sigkill(tmp_path):
+    lock_path = tmp_path / "console_writer.lock"
+    old_lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    fcntl.flock(old_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    process = _ReplacingWriterLockFakeProcess(lock_path)
+    result_holder = []
+
+    thread = threading.Thread(
+        target=lambda: result_holder.append(
+            runner._terminate_exact_child_safely(
+                process,
+                writer_lock_path=lock_path,
+                graceful_timeout_seconds=0.01,
+                poll_interval_seconds=0.01,
+            )
+        ),
+        daemon=True,
+    )
+    thread.start()
+    assert process.terminate_called.wait(timeout=1.0)
+    assert process.replaced.wait(timeout=1.0)
+    fcntl.flock(old_lock_fd, fcntl.LOCK_UN)
+    os.close(old_lock_fd)
+    time.sleep(0.05)
+
+    assert process.kill_count == 0
+    assert thread.is_alive()
+    process.returncode = 0
+    thread.join(timeout=1.0)
+
+    assert thread.is_alive() is False
+    assert process.kill_count == 0
+    result = result_holder[0]
+    assert result["forced"] is False
+    assert result["writer_lock_identity_changed"] is True
+    assert result["sigkill_withheld"] is True
+    assert "writer_lock_identity_changed" in result["errors"]
+
+
+def test_backend_process_close_records_clean_nonforced_shutdown(tmp_path):
+    backend = _fake_backend(tmp_path)
+
+    result = backend.close()
+
+    assert result["terminated"] is True
+    assert result["clean_shutdown"] is True
+    assert result["forced"] is False
+    assert result["returncode"] == 0
+    assert backend.close() == result
+    assert set(backend.secret) == {0}
+    assert set(backend.token) == {0}
+
+
+@pytest.mark.asyncio
+async def test_forced_backend_shutdown_cannot_verify_session_teardown(tmp_path):
+    backend = _fake_backend(tmp_path)
+    backend.process.returncode = -9
+    backend.shutdown_result = {
+        "terminated": True,
+        "clean_shutdown": False,
+        "forced": True,
+        "returncode": -9,
+        "errors": [],
+    }
+    session = runner.ProofOwnedBackendSession(
+        backend=backend,
+        websocket=_FakeWebSocket(),
+        identity_result=_identity_result(),
+    )
+
+    teardown = await session.close()
+
+    assert teardown["verified"] is False
+    assert teardown["backend_process_terminated"] is True
+    assert teardown["backend_shutdown"]["forced"] is True
+    assert "proof_owned_backend_shutdown_unverified" in teardown["errors"]
 
 
 def test_spawn_rejects_existing_nonprivate_artifact_root_without_chmod(tmp_path):
@@ -1419,6 +2969,7 @@ def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
                 ],
                 "operation_count": len(runner.M110_RESET_ADDRESSES),
                 "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                "review_operations": list(created["review_operations"]),
                 "matching_restored_proof_receipt": (
                     created["role"] == "commit"
                 ),
@@ -1616,8 +3167,13 @@ def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
             route_artifact_root=artifact_root,
         )
         await session.arm_m110_attended_control(approval_id=approval_id)
+        operator_input, terminal_emitter, review_events = (
+            _operator_review_callbacks()
+        )
         reset = await session.execute_fixed_m110_maintenance_reset(
             approval_id=approval_id,
+            operator_input=operator_input,
+            terminal_emitter=terminal_emitter,
         )
 
         assert reset["verified"] is True
@@ -1628,6 +3184,10 @@ def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
         durable = json.dumps(reset, sort_keys=True) + repr(session)
         assert proof_token not in durable
         assert commit_token not in durable
+        assert sum(
+            event.get("event") == "m110_operator_bundle_review_required"
+            for event in review_events
+        ) == 2
         sent_types = [item["type"] for item in websocket.sent]
         assert sent_types == [
             "connect_wing",
@@ -1692,6 +3252,9 @@ def test_fixed_reset_proof_failure_closes_session_before_commit_creation(
                         ],
                         "operation_count": len(runner.M110_RESET_ADDRESSES),
                         "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                        "review_operations": list(
+                            proof_created["review_operations"]
+                        ),
                         "matching_restored_proof_receipt": False,
                         "token_issued": False,
                         "live_authority_granted": False,
@@ -1769,9 +3332,14 @@ def test_fixed_reset_proof_failure_closes_session_before_commit_creation(
             control_armed=True,
             control_approval_id="operator-approved",
         )
+        operator_input, terminal_emitter, _review_events = (
+            _operator_review_callbacks()
+        )
         with pytest.raises(RuntimeError, match="fixed_reset_apply_terminal"):
             await session.execute_fixed_m110_maintenance_reset(
                 approval_id="operator-approved",
+                operator_input=operator_input,
+                terminal_emitter=terminal_emitter,
             )
 
         assert session.closed is True

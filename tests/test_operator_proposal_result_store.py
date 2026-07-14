@@ -59,6 +59,7 @@ def _restored_proof_result(**overrides):
         "terminal_after_console_send": True,
         "rollback_attempted": True,
         "rollback_succeeded": True,
+        "rollback_status": "verified",
         "wal_terminal": "proof_restored",
         "audio_recheck_passed": True,
         "write_state_unknown": False,

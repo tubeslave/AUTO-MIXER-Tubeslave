@@ -4,7 +4,7 @@ import asyncio
 import copy
 from dataclasses import replace
 import time
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -20,7 +20,11 @@ from supervised_console_parameter_registry import (
     FAMILY_CONTRACTS,
     LIFECYCLE_LIVE_ALLOWED,
 )
-from supervised_console_transaction import ConsoleTransactionResult
+from supervised_console_transaction import (
+    AdapterStepResult,
+    AudioRecheckResult,
+    ConsoleTransactionResult,
+)
 
 
 def transaction_plan():
@@ -85,6 +89,38 @@ def verified_apply_result():
         "write_state_unknown": False,
         "rollback_state_unknown": False,
         "manual_review_required": False,
+    }
+
+
+def verified_already_satisfied_apply_result():
+    return {
+        "status": "applied",
+        "success": True,
+        "applied_operation_ids": [],
+        "rollback_operation_ids": [],
+        "already_satisfied_operation_ids": ["already-satisfied-operation"],
+        "proof_run": False,
+        "restore_after_verify": False,
+        "accepted": True,
+        "owner_review_required": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "no_console_send_proven": True,
+        "physical_verified": True,
+        "proof_target_verified": False,
+        "physical_state_restored": False,
+        "terminal_after_console_send": False,
+        "rollback_attempted": False,
+        "rollback_succeeded": False,
+        "rollback_status": "not_attempted",
+        "wal_terminal": "committed",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "fresh_analysis_required": False,
     }
 
 
@@ -453,6 +489,537 @@ async def test_verified_transaction_rollback_is_terminal_fresh_analysis_block(
 @patch("server.BleedService")
 @patch.object(AutoMixerServer, "_load_config", return_value={})
 @pytest.mark.asyncio
+async def test_supervised_idempotency_history_never_evicts_old_live_claims(
+    _mock_config,
+    _mock_bleed,
+):
+    class FakeWing:
+        is_connected = True
+
+        def query_parameter(self, address, timeout):
+            raise AssertionError("fake coordinator owns this test")
+
+        def send(self, address, value):
+            raise AssertionError("fake coordinator owns this test")
+
+    class AppliedCoordinator:
+        def __init__(self, *, prepared_callback=None, **_kwargs):
+            self.prepared_callback = prepared_callback
+
+        async def execute(self, plan, context):
+            prepared = self.prepared_callback(
+                plan,
+                context,
+                (
+                    {
+                        "physical_verified": True,
+                        "values": {"/ch/3/fdr": -10.0},
+                    },
+                ),
+            )
+            if asyncio.iscoroutine(prepared):
+                await prepared
+            operation_id = plan.operations[0].operation_id
+            return ConsoleTransactionResult(
+                transaction_id=plan.transaction_id,
+                status="applied",
+                reason="unit_applied",
+                applied_operation_ids=[operation_id],
+                events=[
+                    {
+                        "operation_id": operation_id,
+                        "phase": "apply",
+                        "result": {
+                            "success": True,
+                            "physical_verified": True,
+                            "evidence": {"writes": ["/ch/3/fdr"]},
+                        },
+                    }
+                ],
+            )
+
+    server = AutoMixerServer()
+    server.mixer_client = FakeWing()
+    server.connection_mode = "wing"
+    server._wing_observation_only = False
+    server.get_operator_mode_status = lambda: supervised_mode("fader")
+    server._record_manual_write_event = lambda *_args, **_kwargs: None
+    server._append_manual_write_wal = lambda *_args, **_kwargs: "/tmp/test-wal"
+    for index in range(1000):
+        key = f"prior-idempotency-{index}"
+        transaction_id = f"prior-transaction-{index}"
+        server._supervised_transaction_idempotency_keys[key] = transaction_id
+        server._supervised_transaction_ids[transaction_id] = key
+
+    fader_contract = next(
+        contract
+        for contract in FAMILY_CONTRACTS
+        if contract.family_id == "fader"
+    )
+    promoted_contract = replace(
+        fader_contract,
+        lifecycle=LIFECYCLE_LIVE_ALLOWED,
+        hardware_proof="accepted",
+        live_allowed_write_kinds=("fader",),
+        blockers=(),
+    )
+    plan = transaction_plan()
+    plan["transaction_id"] = "new-transaction-after-1000"
+    plan["operations"][0].update(
+        operation_id="new-fader-after-1000",
+        family_id="fader",
+        write_kind="fader",
+        target_value=-12.0,
+        parameter="channel_fader_db",
+    )
+
+    with patch("server.FAMILY_CONTRACTS", (promoted_contract,)), patch(
+        "server.SupervisedConsoleTransactionCoordinator",
+        AppliedCoordinator,
+    ):
+        applied = await server._apply_supervised_soundcheck_transaction_unlocked(
+            plan,
+            approved=True,
+            approval_id="idempotency-retention-approval",
+            idempotency_key="new-idempotency-after-1000",
+        )
+        replay = await server._apply_supervised_soundcheck_transaction_unlocked(
+            plan,
+            approved=True,
+            approval_id="idempotency-retention-approval",
+            idempotency_key="prior-idempotency-0",
+        )
+
+    assert applied["status"] == "applied"
+    assert len(server._supervised_transaction_idempotency_keys) == 1001
+    assert server._supervised_transaction_idempotency_keys[
+        "prior-idempotency-0"
+    ] == "prior-transaction-0"
+    assert replay["status"] == "blocked"
+    assert replay["reason"] == "duplicate_idempotency_key"
+    assert replay["no_console_send_proven"] is True
+
+
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+@pytest.mark.asyncio
+async def test_audio_failure_retained_cut_is_durable_manual_review_not_rollback_up(
+    _mock_config,
+    _mock_bleed,
+):
+    class FakeWing:
+        is_connected = True
+
+        def __init__(self):
+            self.values = {"/ch/3/fdr": -8.0}
+            self.sent = []
+
+        def query_parameter(self, address, timeout):
+            return {
+                "status": "received",
+                "address": address,
+                "value": self.values.get(address),
+                "confirmed_round_trips": 2,
+            }
+
+        def send(self, address, value):
+            self.sent.append((address, value))
+            self.values[address] = value
+            return True
+
+    server = AutoMixerServer()
+    server.mixer_client = FakeWing()
+    server.connection_mode = "wing"
+    server._wing_observation_only = False
+    server.get_operator_mode_status = lambda: supervised_mode("fader")
+    server._record_manual_write_event = lambda *_args, **_kwargs: None
+    wal_events = []
+
+    def append_wal(phase, transaction_id, **fields):
+        wal_events.append(
+            {
+                "phase": phase,
+                "transaction_id": transaction_id,
+                **fields,
+            }
+        )
+        return "/tmp/test-retained-cut-wal"
+
+    server._append_manual_write_wal = append_wal
+    server._supervised_transaction_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult(
+            "failed",
+            "feedback_risk_detected",
+        )
+    )
+
+    emergency_initiators = []
+
+    async def emergency_stop(_reason, *, initiator_task=None):
+        emergency_initiators.append(initiator_task)
+        server._manual_write_emergency_stopped = True
+        return {
+            "status": "stopped",
+            "success": True,
+            "teardown_complete": True,
+        }
+
+    server.activate_system_emergency_stop = emergency_stop
+    fader_contract = next(
+        contract for contract in FAMILY_CONTRACTS if contract.family_id == "fader"
+    )
+    promoted_contract = replace(
+        fader_contract,
+        lifecycle=LIFECYCLE_LIVE_ALLOWED,
+        hardware_proof="accepted",
+        live_allowed_write_kinds=("fader",),
+        blockers=(),
+    )
+    plan = transaction_plan()
+    plan["transaction_id"] = "retained-cut-manual-review"
+    plan["operations"][0].update(
+        operation_id="retained-fader-cut",
+        family_id="fader",
+        write_kind="fader",
+        target_value=-12.0,
+        channel=3,
+        parameter="channel_fader_db",
+    )
+
+    with patch("server.FAMILY_CONTRACTS", (promoted_contract,)):
+        result = await server._apply_supervised_soundcheck_transaction_unlocked(
+            plan,
+            approved=True,
+            approval_id="retained-cut-approval",
+            idempotency_key="retained-cut-idempotency",
+        )
+
+    assert server.mixer_client.sent == [("/ch/3/fdr", -12.0)]
+    assert server.mixer_client.values["/ch/3/fdr"] == -12.0
+    assert result["status"] == "manual_review_required"
+    assert result["reason"] == "feedback_risk_detected"
+    assert result["wal_terminal"] == "manual_review_required"
+    assert result["contained_operation_ids"] == ["retained-fader-cut"]
+    assert result["contained_target_physical_verified"] is True
+    assert result["audio_failure_recovery_state_known"] is True
+    assert result["physical_verified"] is True
+    assert result["physical_state_restored"] is False
+    assert result["write_state_unknown"] is False
+    assert result["rollback_state_unknown"] is False
+    assert result["manual_review_required"] is True
+    assert result["emergency_stop_activated"] is True
+    assert result["emergency_latch_succeeded"] is True
+    assert result["emergency_teardown_succeeded"] is True
+    assert result["emergency_stop_complete"] is True
+    assert result["emergency_stop_teardown_complete"] is True
+    assert result["emergency_stop_required"] is False
+    assert emergency_initiators == [asyncio.current_task()]
+    assert [event["phase"] for event in wal_events] == [
+        "prepared",
+        "manual_review_required",
+    ]
+    terminal = wal_events[-1]
+    assert terminal["contained_operation_ids"] == ["retained-fader-cut"]
+    assert terminal["contained_target_physical_verified"] is True
+    assert terminal["physical_state_restored"] is False
+    assert terminal["write_state_unknown"] is False
+    assert terminal["emergency_stop_complete"] is True
+    assert terminal["emergency_stop_required"] is False
+
+
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+@pytest.mark.asyncio
+async def test_non_retention_incomplete_emergency_is_preserved_in_wal_and_result(
+    _mock_config,
+    _mock_bleed,
+):
+    class FakeWing:
+        is_connected = True
+
+        async def query_parameter(self, address, timeout):
+            return {
+                "status": "received",
+                "address": address,
+                "value": 0.0,
+                "confirmed_round_trips": 2,
+            }
+
+    class RollbackFailureAdapter:
+        family_id = "eq_hpf"
+
+        def prepare(self, operation):
+            return {
+                "addresses": ("/ch/3/eq/2/g",),
+                "write_count": 1,
+                "writes": (
+                    {
+                        "address": "/ch/3/eq/2/g",
+                        "target_value": -2.0,
+                        "tolerance": 0.01,
+                    },
+                ),
+                "audible_state_reads": (),
+            }
+
+        def validate_snapshot(self, operation, snapshot):
+            return None
+
+        async def snapshot(self, operation):
+            return {
+                "physical_verified": True,
+                "values": {"/ch/3/eq/2/g": 0.0},
+            }
+
+        async def apply(self, operation, snapshot):
+            return AdapterStepResult(
+                True,
+                True,
+                "sent",
+                {"writes": [{"sent": True}]},
+            )
+
+        async def verify(self, operation, snapshot, apply_result):
+            return AdapterStepResult(False, False, "readback_mismatch")
+
+        async def rollback(self, operation, snapshot, apply_result):
+            return AdapterStepResult(False, False, "rollback_mismatch")
+
+        async def audio_recheck(self, operation, snapshot, apply_result):
+            return AudioRecheckResult("passed")
+
+    server = AutoMixerServer()
+    server.mixer_client = FakeWing()
+    server.connection_mode = "wing"
+    server._wing_observation_only = False
+    server.get_operator_mode_status = lambda: supervised_mode("eq")
+    server._record_manual_write_event = lambda *_args, **_kwargs: None
+    wal_events = []
+
+    def append_wal(phase, transaction_id, **fields):
+        wal_events.append(
+            {
+                "phase": phase,
+                "transaction_id": transaction_id,
+                **fields,
+            }
+        )
+        return "/tmp/test-incomplete-emergency-wal"
+
+    server._append_manual_write_wal = append_wal
+
+    async def incomplete_stop(_reason, *, initiator_task=None):
+        return {
+            "status": "stop_incomplete",
+            "success": False,
+            "teardown_complete": False,
+            "teardown_errors": [
+                {"step": "unit", "error": "RuntimeError"}
+            ],
+        }
+
+    server.activate_system_emergency_stop = incomplete_stop
+    eq_contract = next(
+        contract
+        for contract in FAMILY_CONTRACTS
+        if contract.family_id == "eq_hpf"
+    )
+    promoted_contract = replace(
+        eq_contract,
+        lifecycle=LIFECYCLE_LIVE_ALLOWED,
+        hardware_proof="accepted",
+        live_allowed_write_kinds=("eq",),
+        blockers=(),
+    )
+
+    with patch("server.FAMILY_CONTRACTS", (promoted_contract,)), patch(
+        "server.build_wing_supervised_family_adapters",
+        return_value={"eq_hpf": RollbackFailureAdapter()},
+    ):
+        result = await server._apply_supervised_soundcheck_transaction_unlocked(
+            transaction_plan(),
+            approved=True,
+            approval_id="rollback-failure-approval",
+            idempotency_key="rollback-failure-idempotency",
+        )
+
+    assert result["status"] == "manual_review_required"
+    assert result["safe_target_retention_attempted"] is False
+    assert result["emergency_latch_succeeded"] is True
+    assert result["emergency_teardown_succeeded"] is False
+    assert result["emergency_stop_complete"] is False
+    assert result["emergency_stop_teardown_complete"] is False
+    assert result["emergency_stop_required"] is True
+    terminal = wal_events[-1]
+    assert terminal["phase"] == "manual_review_required"
+    assert terminal["emergency_latch_succeeded"] is True
+    assert terminal["emergency_teardown_succeeded"] is False
+    assert terminal["emergency_stop_complete"] is False
+    assert terminal["emergency_stop_required"] is True
+    assert [
+        event["phase"] for event in terminal["emergency_events"]
+    ] == ["emergency_latch", "emergency_teardown"]
+
+
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    (
+        "failure_phase",
+        "expected_status",
+        "expected_reason",
+        "expected_wal_terminal",
+        "expected_wal_calls",
+    ),
+    [
+        (
+            "prepare",
+            "blocked",
+            "durable_write_journal_unavailable",
+            "not_prepared",
+            ["prepared"],
+        ),
+        (
+            "terminal",
+            "manual_review_required",
+            "durable_terminal_record_failed",
+            "terminal_record_failed",
+            ["prepared", "aborted_before_send"],
+        ),
+    ],
+)
+async def test_supervised_wal_failure_preserves_incomplete_emergency_truth(
+    _mock_config,
+    _mock_bleed,
+    failure_phase,
+    expected_status,
+    expected_reason,
+    expected_wal_terminal,
+    expected_wal_calls,
+):
+    class FakeWing:
+        is_connected = True
+
+        def query_parameter(self, address, timeout):
+            raise AssertionError("fake coordinator owns this test")
+
+        def send(self, address, value):
+            raise AssertionError("WAL failure test must not write")
+
+    class NoSendCoordinator:
+        def __init__(self, *, prepared_callback=None, **_kwargs):
+            self.prepared_callback = prepared_callback
+
+        async def execute(self, plan, context):
+            try:
+                prepared = self.prepared_callback(
+                    plan,
+                    context,
+                    (
+                        {
+                            "physical_verified": True,
+                            "values": {"/ch/3/fdr": -8.0},
+                        },
+                    ),
+                )
+                if asyncio.iscoroutine(prepared):
+                    await prepared
+            except RuntimeError:
+                return ConsoleTransactionResult(
+                    transaction_id=plan.transaction_id,
+                    status="blocked",
+                    reason="durable_prepare_failed",
+                )
+            return ConsoleTransactionResult(
+                transaction_id=plan.transaction_id,
+                status="blocked",
+                reason="unit_no_send",
+            )
+
+    server = AutoMixerServer()
+    server.mixer_client = FakeWing()
+    server.connection_mode = "wing"
+    server._wing_observation_only = False
+    server.get_operator_mode_status = lambda: supervised_mode("fader")
+    server._record_manual_write_event = lambda *_args, **_kwargs: None
+
+    wal_calls = []
+
+    def append_wal(phase, _transaction_id, **_fields):
+        wal_calls.append(phase)
+        if failure_phase == "prepare":
+            return None
+        return "/tmp/test-wal" if phase == "prepared" else None
+
+    server._append_manual_write_wal = append_wal
+    emergency_reasons = []
+
+    async def incomplete_stop(reason, **_kwargs):
+        emergency_reasons.append(reason)
+        server._manual_write_emergency_stopped = True
+        server._system_emergency_teardown_complete = False
+        server._system_emergency_stop_errors = [
+            {"step": "unit", "error": "RuntimeError"}
+        ]
+        return {
+            "status": "stop_incomplete",
+            "success": False,
+            "teardown_complete": False,
+            "teardown_errors": list(server._system_emergency_stop_errors),
+        }
+
+    server.activate_system_emergency_stop = incomplete_stop
+    fader_contract = next(
+        contract
+        for contract in FAMILY_CONTRACTS
+        if contract.family_id == "fader"
+    )
+    promoted_contract = replace(
+        fader_contract,
+        lifecycle=LIFECYCLE_LIVE_ALLOWED,
+        hardware_proof="accepted",
+        live_allowed_write_kinds=("fader",),
+        blockers=(),
+    )
+    plan = transaction_plan()
+    plan["transaction_id"] = f"wal-{failure_phase}-incomplete-stop"
+    plan["operations"][0].update(
+        operation_id=f"wal-{failure_phase}-fader",
+        family_id="fader",
+        write_kind="fader",
+        target_value=-12.0,
+        parameter="channel_fader_db",
+    )
+
+    with patch("server.FAMILY_CONTRACTS", (promoted_contract,)), patch(
+        "server.SupervisedConsoleTransactionCoordinator",
+        NoSendCoordinator,
+    ):
+        result = await server._apply_supervised_soundcheck_transaction_unlocked(
+            plan,
+            approved=True,
+            approval_id="wal-failure-approval",
+            idempotency_key=f"wal-{failure_phase}-key",
+        )
+
+    assert result["status"] == expected_status
+    assert result["reason"] == expected_reason
+    assert result["wal_terminal"] == expected_wal_terminal
+    assert result["emergency_stop_activated"] is True
+    assert result["emergency_stop_complete"] is False
+    assert result["emergency_stop_teardown_complete"] is False
+    assert result["emergency_stop_required"] is True
+    assert wal_calls == expected_wal_calls
+    assert emergency_reasons == [
+        f"supervised_transaction_wal_{failure_phase}_failed:"
+        f"{plan['transaction_id']}"
+    ]
+
+
+@patch("server.BleedService")
+@patch.object(AutoMixerServer, "_load_config", return_value={})
+@pytest.mark.asyncio
 @pytest.mark.parametrize("deadline_mutation", ["missing", "extended"])
 async def test_source_analysis_deadline_revokes_server_authority_mid_group(
     _mock_config,
@@ -749,6 +1316,36 @@ def test_applied_or_claimed_proposal_cannot_be_claimed_again(tmp_path):
     historical = queue.find(proposal_id=proposal.id)
     assert historical.status == "applied"
     assert queue.claim_for_apply(historical)["claimed"] is False
+
+
+def test_verified_already_satisfied_apply_is_green_and_not_a_hazard(tmp_path):
+    queue = evidence_queue(tmp_path, "already-satisfied-apply")
+    created = queue.create(
+        {
+            "id": "already-satisfied-apply",
+            "title": "Already satisfied reviewed operation",
+            "requested_change": {
+                "value_type": "fader",
+                "channel": 3,
+                "value": -12.0,
+            },
+        },
+        supervised_mode("fader"),
+    )
+    proposal = queue.find(proposal_id=created["proposal"]["id"])
+    evidence_token = reserve_evidence(queue, proposal)
+    assert queue.claim_for_apply(proposal)["claimed"] is True
+
+    completed = queue.mark_apply_result(
+        proposal,
+        verified_already_satisfied_apply_result(),
+        evidence_reservation_binding=evidence_token,
+    )
+
+    assert completed["status"] == "applied"
+    assert completed["proposal"]["status"] == "applied"
+    assert completed["proposal"]["result"]["no_console_send_proven"] is True
+    assert queue.iter_terminal_hazards() == ()
 
 
 @pytest.mark.parametrize("no_send_value", [False, None, "missing"])

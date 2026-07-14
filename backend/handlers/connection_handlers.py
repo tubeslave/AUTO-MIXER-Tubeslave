@@ -41,6 +41,20 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_verify_m110_main_output_checkpoint(websocket, data):
+        result = await server.verify_m110_main_output_checkpoint(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_run_m110_soundcheck_final_audit(websocket, data):
+        result = await server.run_m110_soundcheck_final_audit(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
     async def handle_issue_supervised_capability(websocket, data):
         result = await server.issue_m110_supervised_capability(
             websocket=websocket,
@@ -57,6 +71,34 @@ def register_handlers(server):
 
     async def handle_create_m110_maintenance_reset_proposal(websocket, data):
         result = await server.create_m110_maintenance_reset_proposal(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_create_m110_m006_restore_proposal(websocket, data):
+        result = await server.create_m110_m006_restore_proposal(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_create_m110_processor_enable_proposal(websocket, data):
+        result = await server.create_m110_processor_enable_proposal(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_create_m110_soundcheck_child_proposal(websocket, data):
+        result = await server.create_m110_soundcheck_child_proposal(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
+    async def handle_advance_m110_soundcheck_replan(websocket, data):
+        result = await server.advance_m110_soundcheck_replan(
             websocket=websocket,
             request=data,
         )
@@ -190,6 +232,12 @@ def register_handlers(server):
             handle_capture_wing_master_route_proof
         ),
         "arm_m110_attended_control": handle_arm_m110_attended_control,
+        "verify_m110_main_output_checkpoint": (
+            handle_verify_m110_main_output_checkpoint
+        ),
+        "run_m110_soundcheck_final_audit": (
+            handle_run_m110_soundcheck_final_audit
+        ),
         "issue_supervised_capability": handle_issue_supervised_capability,
         "prepare_m110_restore_only_proof": (
             handle_prepare_m110_restore_only_proof
@@ -199,6 +247,27 @@ def register_handlers(server):
         ),
         "create_m110_maintenance_reset_commit_proposal": (
             handle_create_m110_maintenance_reset_proposal
+        ),
+        "create_m110_m006_restore_proof_proposal": (
+            handle_create_m110_m006_restore_proposal
+        ),
+        "create_m110_m006_restore_commit_proposal": (
+            handle_create_m110_m006_restore_proposal
+        ),
+        "create_m110_processor_enable_proof_proposal": (
+            handle_create_m110_processor_enable_proposal
+        ),
+        "create_m110_processor_enable_commit_proposal": (
+            handle_create_m110_processor_enable_proposal
+        ),
+        "create_m110_soundcheck_child_proof_proposal": (
+            handle_create_m110_soundcheck_child_proposal
+        ),
+        "create_m110_soundcheck_child_commit_proposal": (
+            handle_create_m110_soundcheck_child_proposal
+        ),
+        "advance_m110_soundcheck_replan": (
+            handle_advance_m110_soundcheck_replan
         ),
         "connect_wing": handle_connect_wing,
         "connect_dlive": handle_connect_dlive,

@@ -2,6 +2,20 @@
 
 ## Current blockers
 
+> M110 pre-hardware truth (2026-07-14): CP00 is complete and CP01-CP04 are
+> implemented/offline-validated, but canonical CP05 is pending and HW01-HW05
+> have not run. This cycle has contacted no WING/USB surface and made zero live
+> writes; reset/correction counts remain zero. The writer-lease owner is absent,
+> but the empty lease directory itself still blocks M110 CP05 until final
+> removal. M005 behavior is closed; M006 permission is one attended-session
+> input, not standing authority. Reset is the 64-address CH1-16 bypass plus
+> exact M006 preimage restoration (23/14/14 operations, 33/63/14 scope,
+> 19/52/6 changed, 77 unique changed addresses), not a factory reset. Remaining
+> blockers are source commit, all CP05 checks/markers, attended route and
+> physical reset/apply evidence, exact operator confirmations, two stable HW05
+> audits, SHA-bound listening and clean teardown. Strict live stays `88/100`,
+> allowlist `0`, authority `false`, target `95/100` unmet.
+
 > M109-CP01 closure (2026-07-13): committed source checkpoint
 > `b3f7d05ac1f0a2ddc9812e4723a2b3f130fefa6a` passes with `6368 passed,
 > 1 skipped in 382.42s`; the full no-WING module passes `457/457` and WING

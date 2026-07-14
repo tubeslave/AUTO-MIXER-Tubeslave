@@ -158,6 +158,24 @@ def _bind_unit_master_route_capture(server, capture):
         _capture_ref=capture,
         _capture_stream_ref=stream,
     )
+    capture.sample_rate = 48_000
+
+    def synchronized(channels, sample_count):
+        timeline = np.arange(sample_count, dtype=np.float64) / 48_000.0
+        amplitudes = {
+            47: 10.0 ** (-12.0 / 20.0),
+            48: 10.0 ** (-11.0 / 20.0),
+        }
+        return {
+            "buffers": {
+                channel: amplitudes.get(channel, 0.01)
+                * np.sin(2.0 * np.pi * 997.0 * timeline)
+                for channel in channels
+            },
+            "captured_sample_count": max(sample_count, 100_000),
+        }
+
+    capture.get_synchronized_buffers.side_effect = synchronized
 
 
 def _unit_audio_capture_progress_statuses():
@@ -1847,7 +1865,7 @@ class TestAutoMixerServerConfigNormalization:
     @pytest.mark.asyncio
     @patch("server.BleedService")
     @patch.object(AutoMixerServer, "_load_config", return_value={})
-    async def test_supervised_audio_recheck_measures_master_47_48_with_true_peak_allowance(
+    async def test_supervised_audio_recheck_measures_master_47_48_with_4x_true_peak(
         self,
         mock_config,
         mock_bleed,
@@ -1888,10 +1906,100 @@ class TestAutoMixerServerConfigNormalization:
         assert result.status == "passed"
         assert result.evidence["master_channels"] == [47, 48]
         assert result.evidence["master_sample_peaks_dbfs"] == [-12.0, -11.0]
-        assert result.evidence["master_true_peak_dbtp"] == -8.0
+        assert result.evidence["master_true_peak_dbtp"] == pytest.approx(
+            -11.0,
+            abs=0.02,
+        )
+        assert result.evidence["measurement_source"] == (
+            "master_channels_true_peak_4x"
+        )
         assert result.evidence["route_proof"]["verified"] is True
         assert result.evidence["physical_route_readback"]["verified"] is True
         assert result.evidence["capture_sample_progressed"] is True
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_m110_feedback_recheck_uses_distinct_fresh_frames(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        capture = MagicMock(
+            running=True,
+            num_channels=48,
+            sample_rate=48_000,
+        )
+        rng = np.random.default_rng(7)
+
+        def synchronized(channels, sample_count):
+            return {
+                "buffers": {
+                    channel: rng.normal(0.0, 0.001, sample_count)
+                    for channel in channels
+                },
+                "captured_sample_count": 200_000,
+            }
+
+        capture.get_synchronized_buffers.side_effect = synchronized
+        operation = MagicMock(channel=1, family_id="fader", operation_id="f1")
+
+        result = server._m110_feedback_clear_recheck(
+            capture=capture,
+            operation=operation,
+            additional_channels=(2,),
+            minimum_captured_sample_count=150_000,
+        )
+
+        assert result.status == "passed"
+        assert result.reason == "fresh_feedback_clear_state"
+        assert result.evidence["channels"] == [1, 2, 47, 48]
+        assert result.evidence["frame_count"] == 12
+
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    def test_m110_feedback_recheck_blocks_growing_pure_tone(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        capture = MagicMock(
+            running=True,
+            num_channels=48,
+            sample_rate=48_000,
+        )
+        frame_size = 2048
+        frequency = 48_000.0 * 42.0 / frame_size
+        timeline = np.arange(frame_size, dtype=np.float64) / 48_000.0
+        frames = [
+            amplitude
+            * np.sin(2.0 * np.pi * frequency * timeline)
+            for amplitude in np.linspace(0.02, 0.5, 12)
+        ]
+        growing_tone = np.concatenate(frames)
+        capture.get_synchronized_buffers.return_value = {
+            "buffers": {
+                1: growing_tone,
+                47: growing_tone,
+                48: growing_tone,
+            },
+            "captured_sample_count": 200_000,
+        }
+
+        result = server._m110_feedback_clear_recheck(
+            capture=capture,
+            operation=MagicMock(
+                channel=1,
+                family_id="fader",
+                operation_id="feedback-tone",
+            ),
+        )
+
+        assert result.status == "failed"
+        assert result.reason == "feedback_risk_detected"
+        assert result.evidence["feedback_clear"] is False
+        assert result.evidence["events"]
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
@@ -2494,6 +2602,109 @@ class TestAutoMixerServerConfigNormalization:
         assert first["generation"] == duplicate["generation"] == 1
         agent.emergency_stop.assert_called_once_with()
         agent.stop.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_emergency_stop_does_not_cancel_its_initiating_voice_task(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        initiator = asyncio.current_task()
+        assert initiator is not None
+        server._voice_command_tasks.add(initiator)
+        server.auto_soundcheck_task = initiator
+        server.mixing_agent = MagicMock(spec=["emergency_stop", "stop"])
+        server.mixing_agent_task = initiator
+
+        result = await server.activate_system_emergency_stop(
+            "unit:self-drain",
+            initiator_task=initiator,
+        )
+
+        assert result["status"] == "stopped"
+        assert result["success"] is True
+        assert initiator.cancelling() == 0
+        assert initiator in server._voice_command_tasks
+        assert server.auto_soundcheck_task is initiator
+        assert server.mixing_agent_task is initiator
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_concurrent_emergency_stop_coalesces_before_broadcast(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        server.last_soundcheck_readiness = {"run_id": "unit-run"}
+        broadcast_started = asyncio.Event()
+        release_broadcast = asyncio.Event()
+
+        async def blocked_broadcast(_payload):
+            broadcast_started.set()
+            await release_broadcast.wait()
+
+        server.broadcast = blocked_broadcast
+        controller = MagicMock(spec=["set_automation_frozen", "stop"])
+        server.auto_fader_controller = controller
+        first_task = asyncio.create_task(
+            server.activate_system_emergency_stop("unit:first-concurrent")
+        )
+        await asyncio.wait_for(broadcast_started.wait(), timeout=1.0)
+
+        duplicate = await server.activate_system_emergency_stop(
+            "unit:second-concurrent"
+        )
+
+        assert duplicate["status"] == "stopping"
+        assert duplicate["success"] is False
+        assert duplicate["coalesced"] is True
+        assert duplicate["teardown_complete"] is False
+        assert server._manual_write_emergency_generation == 1
+        controller.stop.assert_not_called()
+        release_broadcast.set()
+        first = await asyncio.wait_for(first_task, timeout=1.0)
+        assert first["status"] == "stopped"
+        assert first["generation"] == duplicate["generation"] == 1
+        controller.stop.assert_called_once_with()
+
+    @pytest.mark.asyncio
+    @patch("server.BleedService")
+    @patch.object(AutoMixerServer, "_load_config", return_value={})
+    async def test_phase_zero_latch_failure_keeps_operator_reset_blocked(
+        self,
+        mock_config,
+        mock_bleed,
+    ):
+        server = AutoMixerServer()
+        controller = MagicMock(spec=["set_automation_frozen", "stop"])
+        controller.set_automation_frozen.side_effect = RuntimeError(
+            "synthetic freeze failure"
+        )
+        server.auto_fader_controller = controller
+
+        result = await server.activate_system_emergency_stop(
+            "unit:latch-failure"
+        )
+
+        assert result["status"] == "stop_incomplete"
+        assert result["success"] is False
+        assert result["teardown_complete"] is False
+        assert server._system_emergency_latch_errors == [
+            {"step": "auto_fader_freeze", "error": "RuntimeError"}
+        ]
+        reset = server.reset_manual_write_emergency_stop(
+            approved=True,
+            approval_id="unit-reset-after-latch-failure",
+        )
+        assert reset["status"] == "blocked"
+        assert reset["reason"] == "emergency_stop_teardown_incomplete"
+        assert reset["latch_errors"] == server._system_emergency_latch_errors
+        assert server._manual_write_emergency_stopped is True
 
     @pytest.mark.asyncio
     @patch("server.BleedService")
@@ -4273,6 +4484,39 @@ def dummy_wing_server(tmp_path):
 def minimal_server():
     with patch("server.BleedService"), patch.object(AutoMixerServer, "_load_config", return_value={}):
         yield AutoMixerServer(ws_host="localhost", ws_port=8765)
+
+
+@pytest.mark.asyncio
+async def test_m110_replan_protocol_gate_block_is_runner_safe(minimal_server):
+    server = minimal_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server._verify_m110_cp05_hardware_gate = MagicMock(
+        side_effect=RuntimeError("m110_cp05_hardware_gate_closed")
+    )
+    server.send_to_client = AsyncMock()
+    request = {
+        "type": "advance_m110_soundcheck_replan",
+        "contract_version": 1,
+        "replan_selector": "next_bounded_split_revision",
+    }
+
+    blocked = await server._block_m110_protocol_message(
+        websocket,
+        request["type"],
+        request,
+    )
+
+    assert blocked is True
+    response = server.send_to_client.await_args.args[1]
+    assert response["type"] == "m110_soundcheck_replan_result"
+    assert response["status"] == "blocked"
+    assert response["live_mixer_writes"] is False
+    assert response["server_owned_selection"] is True
+    assert response["client_targets_accepted"] is False
+    assert response["console_mutation_write_attempt_count"] == 0
 
 
 def test_production_server_bootstraps_result_evidence_lifecycle_when_recovery_is_clear(

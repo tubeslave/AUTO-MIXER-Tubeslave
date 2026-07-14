@@ -17,6 +17,7 @@ from decision_queue_wire_contract import (
     WIRE_MAX_BYTES,
     OutboundMessageProjectionError,
     ReviewContentError,
+    _bind_trusted_apply_parent_commit,
     _freeze_trusted_apply_receipt,
     _freeze_trusted_prewrite_no_send_receipt,
     _freeze_trusted_sequence_execution_receipt,
@@ -1012,6 +1013,7 @@ def _restored_proof_terminal(**overrides):
         "terminal_after_console_send": True,
         "rollback_attempted": True,
         "rollback_succeeded": True,
+        "rollback_status": "verified",
         "wal_terminal": "proof_restored",
         "audio_recheck_passed": True,
         "write_state_unknown": False,
@@ -1053,6 +1055,50 @@ def test_restored_proof_projects_as_distinct_non_accepted_terminal():
     assert parsed["accepted"] is False
     assert parsed["proposal_status"] == "proof_passed"
     assert parsed["apply_status"] == "proof_passed"
+    assert parsed["applied_operation_ids"] == ["proof-op"]
+    assert parsed["rollback_operation_ids"] == ["proof-op"]
+    assert parsed["already_satisfied_operation_ids"] is None
+    assert parsed["parent_commit_recorded"] is None
+
+
+def test_already_satisfied_restored_proof_projects_without_console_send():
+    identity = _freeze_verified_apply_identity(
+        SimpleNamespace(
+            proposal_id="sequence-proof-1",
+            review_contract_version=2,
+            review_content_digest="sha256:" + "6" * 64,
+        )
+    )
+    terminal = _restored_proof_terminal(
+        applied_operation_ids=[],
+        rollback_operation_ids=[],
+        already_satisfied_operation_ids=["proof-op"],
+        no_console_send_proven=True,
+        terminal_after_console_send=False,
+        rollback_attempted=False,
+        rollback_succeeded=False,
+        rollback_status="not_required_already_satisfied",
+    )
+
+    receipt = _freeze_trusted_apply_receipt(
+        identity,
+        terminal_result=terminal,
+        proposal_status="proof_passed",
+        final_status="proof_passed",
+        final_success=True,
+        result_digest="sha256:" + "7" * 64,
+        result_detail_available=True,
+        result_evidence_pinned=False,
+        reason_code=None,
+        idempotency_key="proof-key",
+        operator_idempotency_released=False,
+    )
+    parsed = json.loads(project_outbound_message({}, trusted_receipt=receipt))
+
+    assert parsed["status"] == "proof_passed"
+    assert parsed["no_console_send_proven"] is True
+    assert parsed["terminal_after_console_send"] is False
+    assert parsed["rollback_attempted"] is False
     assert parsed["proof_run"] is True
     assert parsed["restore_after_verify"] is True
     assert parsed["capability_kind"] == "restore_only_proof"
@@ -1072,6 +1118,153 @@ def test_restored_proof_projects_as_distinct_non_accepted_terminal():
             result_detail_available=True,
             result_evidence_pinned=True,
             reason_code=None,
+        )
+
+
+def test_already_satisfied_commit_projects_as_success_without_console_send():
+    terminal = {
+        "status": "applied",
+        "success": True,
+        "applied_operation_ids": [],
+        "rollback_operation_ids": [],
+        "already_satisfied_operation_ids": ["commit-op"],
+        "capability_kind": "soundcheck_child_commit_once",
+        "operation_digest": "sha256:" + "8" * 64,
+        "bundle_kind": "single_soundcheck_operation",
+        "proof_run": False,
+        "restore_after_verify": False,
+        "accepted": True,
+        "owner_review_required": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "no_console_send_proven": True,
+        "physical_verified": True,
+        "proof_target_verified": False,
+        "physical_state_restored": False,
+        "terminal_after_console_send": False,
+        "rollback_attempted": False,
+        "rollback_succeeded": False,
+        "rollback_status": "not_attempted",
+        "wal_terminal": "committed",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "fresh_analysis_required": False,
+        # Adapter/client terminal data cannot assert the later parent journal.
+        "parent_commit_recorded": True,
+        "parent_commit_reason": "forged_parent_commit",
+    }
+    receipt = _trusted_terminal_receipt(terminal_result=terminal)
+
+    parsed = json.loads(project_outbound_message({}, trusted_receipt=receipt))
+
+    assert parsed["status"] == "applied"
+    assert parsed["success"] is True
+    assert parsed["no_console_send_proven"] is True
+    assert parsed["terminal_after_console_send"] is False
+    assert parsed["applied_operation_ids"] == []
+    assert parsed["rollback_operation_ids"] == []
+    assert parsed["already_satisfied_operation_ids"] == ["commit-op"]
+    assert parsed["parent_commit_recorded"] is None
+    assert parsed["parent_commit_reason"] is None
+
+
+@pytest.mark.parametrize(
+    ("recorded", "reason"),
+    [
+        (True, "m110_plan_commit_recorded"),
+        (False, "m110_plan_commit_journal_failed"),
+    ],
+)
+def test_parent_commit_binding_projects_only_trusted_post_finalize_truth(
+    recorded,
+    reason,
+):
+    terminal = {
+        "status": "applied",
+        "success": True,
+        "applied_operation_ids": ["commit-op"],
+        "rollback_operation_ids": [],
+        "already_satisfied_operation_ids": [],
+        "proof_run": False,
+        "restore_after_verify": False,
+        "accepted": True,
+        "owner_review_required": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "capability_kind": "soundcheck_child_commit_once",
+        "operation_digest": "sha256:" + "8" * 64,
+        "bundle_kind": "single_soundcheck_operation",
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "proof_target_verified": False,
+        "physical_state_restored": False,
+        "terminal_after_console_send": True,
+        "rollback_attempted": False,
+        "rollback_succeeded": False,
+        "rollback_status": "not_attempted",
+        "wal_terminal": "committed",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+    }
+    receipt = _trusted_terminal_receipt(terminal_result=terminal)
+    bound = _bind_trusted_apply_parent_commit(
+        receipt,
+        recorded=recorded,
+        reason=reason,
+    )
+
+    parsed = json.loads(project_outbound_message({}, trusted_receipt=bound))
+
+    assert parsed["status"] == "applied"
+    assert parsed["success"] is True
+    assert parsed["physical_verified"] is True
+    assert parsed["applied_operation_ids"] == ["commit-op"]
+    assert parsed["rollback_operation_ids"] == []
+    assert parsed["already_satisfied_operation_ids"] == []
+    assert parsed["parent_commit_recorded"] is recorded
+    assert parsed["parent_commit_reason"] == reason
+
+    with pytest.raises(Exception, match="parent_commit_already_bound"):
+        _bind_trusted_apply_parent_commit(
+            bound,
+            recorded=recorded,
+            reason=reason,
+        )
+
+
+def test_parent_commit_binding_rejects_restore_only_proof_receipt():
+    identity = _freeze_verified_apply_identity(
+        SimpleNamespace(
+            proposal_id="sequence-proof-1",
+            review_contract_version=2,
+            review_content_digest="sha256:" + "6" * 64,
+        )
+    )
+    receipt = _freeze_trusted_apply_receipt(
+        identity,
+        terminal_result=_restored_proof_terminal(),
+        proposal_status="proof_passed",
+        final_status="proof_passed",
+        final_success=True,
+        result_digest="sha256:" + "7" * 64,
+        result_detail_available=True,
+        result_evidence_pinned=False,
+        reason_code=None,
+    )
+
+    with pytest.raises(Exception, match="parent_commit_binding_not_allowed"):
+        _bind_trusted_apply_parent_commit(
+            receipt,
+            recorded=True,
+            reason="m110_plan_commit_recorded",
         )
 
 
@@ -1250,6 +1443,58 @@ def test_sequence_execution_safe_no_send_and_verified_rollback_remain_distinct()
     assert projected[1]["no_console_send_proven"] is False
     assert projected[1]["write_state_unknown"] is False
     assert projected[1]["rollback_state_unknown"] is False
+
+
+def test_known_contained_audio_recovery_does_not_degrade_to_unknown_rollback():
+    retained_receipt = _trusted_terminal_receipt(
+        terminal_result={
+            "status": "manual_review_required",
+            "reason": "feedback_risk_detected",
+            "no_console_send_proven": False,
+            "physical_verified": True,
+            "physical_state_restored": False,
+            "terminal_after_console_send": True,
+            "rollback_attempted": True,
+            "rollback_succeeded": True,
+            "safe_target_retention_attempted": True,
+            "contained_operation_ids": ["retained-fader-cut"],
+            "contained_target_physical_verified": True,
+            "audio_failure_recovery_state_known": True,
+            "write_state_unknown": False,
+            "rollback_state_unknown": False,
+            "manual_review_required": True,
+            "emergency_stop_activated": True,
+            "emergency_stop_required": False,
+            "wal_terminal": "manual_review_required",
+            "rollback_status": "known_safe_target_retained",
+        },
+        final_status="apply_blocked",
+    )
+    message = _sequence_execution_message(
+        status="blocked",
+        forged_receipt=compact_trusted_apply_receipt_reference(
+            retained_receipt
+        ),
+    )
+    aggregate = _freeze_trusted_sequence_execution_receipt(
+        message,
+        child_receipts=[retained_receipt],
+        expected_candidate_count=1,
+    )
+
+    parsed = json.loads(
+        project_outbound_message(message, trusted_receipt=aggregate)
+    )
+
+    assert retained_receipt.physical_verified is True
+    assert retained_receipt.physical_state_restored is False
+    assert retained_receipt.rollback_attempted is True
+    assert retained_receipt.rollback_state_unknown is False
+    assert retained_receipt.manual_review_required is True
+    assert parsed["status"] == "blocked"
+    assert parsed["write_state_unknown"] is False
+    assert parsed["rollback_state_unknown"] is False
+    assert parsed["manual_review_required"] is True
 
 
 def test_sequence_execution_without_authentic_aggregate_is_fixed_unknown():

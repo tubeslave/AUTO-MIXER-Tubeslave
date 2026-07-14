@@ -112,11 +112,16 @@ M110_IMPORT_SCAN_EXCLUDED_DIRECTORIES = {
 M110_RUNTIME_CRITICAL_PATHS = (
     "Docs/reports/M110_CP05_SOFTWARE_VALIDATION.json",
     "backend/audio_capture.py",
+    "backend/auto_soundcheck_engine.py",
+    "backend/contracts/m110_m006_restore_20260711.json",
     "backend/decision_queue_wire_contract.py",
     "backend/handlers/connection_handlers.py",
     "backend/handlers/product_state_handlers.py",
+    "backend/handlers/soundcheck_handlers.py",
     "backend/m110_cp05_hardware_gate.py",
     "backend/m110_manual_write_wal.py",
+    "backend/m110_m006_restore.py",
+    "backend/m110_processor_enable.py",
     "backend/maintenance_dsp_reset.py",
     "backend/master_capture_route_proof.py",
     "backend/operator_proposal_queue.py",
@@ -124,6 +129,7 @@ M110_RUNTIME_CRITICAL_PATHS = (
     "backend/osc/enhanced_osc_client.py",
     "backend/runtime_identity.py",
     "backend/server.py",
+    "backend/soundcheck_mix_readiness.py",
     "backend/soundcheck_transaction_plan.py",
     "backend/supervised_console_transaction.py",
     "backend/supervised_family_proof_plan.py",
@@ -135,6 +141,16 @@ M110_RUNTIME_CRITICAL_PATHS = (
     "tools/wing_attended_soundcheck_runner.py",
     "tools/wing_supervised_family_proof_runner.py",
 )
+
+M110_SOUNDCHECK_SINGLE_BUNDLE_KIND = "single_soundcheck_operation"
+M110_SOUNDCHECK_ATOMIC_GROUP_BUNDLE_KIND = "soundcheck_atomic_group"
+M110_SOUNDCHECK_BUNDLE_KINDS = frozenset(
+    {
+        M110_SOUNDCHECK_SINGLE_BUNDLE_KIND,
+        M110_SOUNDCHECK_ATOMIC_GROUP_BUNDLE_KIND,
+    }
+)
+M110_M006_RESTORE_BUNDLE_KIND = "m006_exact_preimage_restore_bundle"
 
 
 def _canonical_json_bytes(value: Any) -> bytes:
@@ -930,8 +946,9 @@ class M110CapabilityBinding:
         if not hmac.compare_digest(actual_operation_digest, self.operation_digest):
             raise ValueError("m110_capability_binding_operation_digest_mismatch")
         if self.bundle_kind and self.bundle_kind not in {
-            "single_soundcheck_operation",
+            *M110_SOUNDCHECK_BUNDLE_KINDS,
             "maintenance_dsp_reset_bundle",
+            M110_M006_RESTORE_BUNDLE_KIND,
             "processor_enable_bundle",
         }:
             raise ValueError("m110_capability_binding_bundle_kind_invalid")
@@ -967,15 +984,36 @@ class M110CapabilityBinding:
             or self._capture_ref is None
         ):
             raise ValueError("m110_capability_binding_object_identity_required")
-        if self.capability_kind == "maintenance_dsp_reset_commit_once":
+        required_commit_bundles = {
+            "maintenance_dsp_reset_commit_once": frozenset(
+                {
+                    "maintenance_dsp_reset_bundle",
+                    M110_M006_RESTORE_BUNDLE_KIND,
+                }
+            ),
+            "processor_enable_commit_once": frozenset(
+                {"processor_enable_bundle"}
+            ),
+        }
+        required_commit_bundle_kinds = required_commit_bundles.get(
+            self.capability_kind
+        )
+        bundle_matches_commit = bool(
+            self.bundle_kind in M110_SOUNDCHECK_BUNDLE_KINDS
+            if self.capability_kind == "soundcheck_child_commit_once"
+            else self.bundle_kind in (required_commit_bundle_kinds or ())
+        )
+        if required_commit_bundle_kinds is not None or self.capability_kind == (
+            "soundcheck_child_commit_once"
+        ):
             if (
-                self.bundle_kind != "maintenance_dsp_reset_bundle"
+                not bundle_matches_commit
                 or not _valid_binding_text(self.proof_receipt_id)
                 or self._control_ref is None
                 or self._proof_receipt_ref is None
             ):
                 raise ValueError(
-                    "m110_maintenance_reset_binding_proof_receipt_required"
+                    "m110_commit_once_binding_proof_receipt_required"
                 )
 
     def matches_exactly(self, other: Any) -> bool:
@@ -1303,8 +1341,9 @@ def new_m110_restored_proof_receipt(**values: Any) -> M110RestoredProofReceipt:
                 f"m110_restored_proof_receipt_{field_name}_invalid"
             )
     if values["bundle_kind"] and values["bundle_kind"] not in {
-        "single_soundcheck_operation",
+        *M110_SOUNDCHECK_BUNDLE_KINDS,
         "maintenance_dsp_reset_bundle",
+        M110_M006_RESTORE_BUNDLE_KIND,
         "processor_enable_bundle",
     }:
         raise ValueError("m110_restored_proof_receipt_bundle_kind_invalid")
@@ -1314,7 +1353,7 @@ def new_m110_restored_proof_receipt(**values: Any) -> M110RestoredProofReceipt:
         raise ValueError(
             "m110_restored_proof_receipt_review_preimage_invalid"
         )
-    if values["bundle_kind"] == "maintenance_dsp_reset_bundle" and (
+    if values["bundle_kind"] and (
         values["_transport_ref"] is None
         or values["_capture_ref"] is None
     ):

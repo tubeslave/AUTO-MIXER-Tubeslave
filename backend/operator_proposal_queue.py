@@ -27,6 +27,7 @@ from decision_queue_wire_contract import (
     ReviewContentError,
     build_review_identity,
     is_sha256_digest,
+    terminal_result_proves_verified_already_satisfied_apply,
     terminal_result_proves_verified_apply,
     terminal_result_proves_verified_restored_proof,
 )
@@ -554,7 +555,12 @@ class OperatorProposalQueue:
                 or item.result.get("rollback_state_unknown") is True
                 or (
                     item.result.get("physical_state_restored") is False
-                    and not terminal_result_proves_verified_apply(item.result)
+                    and not (
+                        terminal_result_proves_verified_apply(item.result)
+                        or terminal_result_proves_verified_already_satisfied_apply(
+                            item.result
+                        )
+                    )
                 )
                 or item.result.get("manual_review_required") is True
             )
@@ -1352,7 +1358,12 @@ class OperatorProposalQueue:
         result = copy.deepcopy(result)
         if (
             result.get("status") == "applied"
-            and not terminal_result_proves_verified_apply(result)
+            and not (
+                terminal_result_proves_verified_apply(result)
+                or terminal_result_proves_verified_already_satisfied_apply(
+                    result
+                )
+            )
         ):
             result.update(
                 {
@@ -1489,7 +1500,10 @@ class OperatorProposalQueue:
             claimed_without_no_send_proof
             or result.get("no_console_send_proven") is False
         )
-        if terminal_result_proves_verified_apply(result):
+        if (
+            terminal_result_proves_verified_apply(result)
+            or terminal_result_proves_verified_already_satisfied_apply(result)
+        ):
             # Only the complete durable receipt can become green terminal
             # apply truth.  Physical readback alone is insufficient.
             status = "applied"

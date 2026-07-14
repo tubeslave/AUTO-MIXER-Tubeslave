@@ -13,7 +13,7 @@ import json
 import math
 import secrets
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields as dataclass_fields
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -323,6 +323,55 @@ def terminal_result_proves_verified_apply(result: Any) -> bool:
     )
 
 
+def terminal_result_proves_verified_already_satisfied_apply(
+    result: Any,
+) -> bool:
+    """Recognize a durable two-pass commit that required no console send."""
+
+    if type(result) is not dict:
+        return False
+    applied = dict.get(result, "applied_operation_ids")
+    rolled_back = dict.get(result, "rollback_operation_ids")
+    already_satisfied = dict.get(result, "already_satisfied_operation_ids")
+    identifiers_are_exact = bool(
+        type(applied) is list
+        and applied == []
+        and type(rolled_back) is list
+        and rolled_back == []
+        and type(already_satisfied) is list
+        and already_satisfied
+        and all(type(value) is str and value for value in already_satisfied)
+        and len(already_satisfied) == len(set(already_satisfied))
+    )
+    return bool(
+        identifiers_are_exact
+        and dict.get(result, "status") == "applied"
+        and dict.get(result, "success") is True
+        and dict.get(result, "proof_run") is False
+        and dict.get(result, "restore_after_verify") is False
+        and dict.get(result, "accepted") is True
+        and dict.get(result, "owner_review_required") is False
+        and dict.get(result, "live_authority_granted") is False
+        and dict.get(result, "readiness_closure_allowed") is False
+        and dict.get(result, "no_console_send_proven") is True
+        and dict.get(result, "physical_verified") is True
+        and dict.get(result, "proof_target_verified") is False
+        and dict.get(result, "physical_state_restored") is False
+        and dict.get(result, "terminal_after_console_send") is False
+        and dict.get(result, "rollback_attempted") is False
+        and dict.get(result, "rollback_succeeded") is False
+        and dict.get(result, "rollback_status") == "not_attempted"
+        and dict.get(result, "wal_terminal") == "committed"
+        and dict.get(result, "audio_recheck_passed") is True
+        and dict.get(result, "write_state_unknown") is False
+        and dict.get(result, "rollback_state_unknown") is False
+        and dict.get(result, "manual_review_required") is False
+        and dict.get(result, "emergency_stop_activated") is False
+        and dict.get(result, "emergency_stop_required") is False
+        and dict.get(result, "fresh_analysis_required") is False
+    )
+
+
 def terminal_result_proves_verified_restored_proof(result: Any) -> bool:
     """Recognize only a complete, durable, restore-only proof terminal."""
 
@@ -330,18 +379,34 @@ def terminal_result_proves_verified_restored_proof(result: Any) -> bool:
         return False
     applied = dict.get(result, "applied_operation_ids")
     rolled_back = dict.get(result, "rollback_operation_ids")
-    identifiers_are_exact = bool(
+    already_satisfied = dict.get(result, "already_satisfied_operation_ids", [])
+    identifier_lists_are_exact = bool(
         type(applied) is list
         and type(rolled_back) is list
-        and applied
-        and rolled_back
-        and all(type(value) is str and value for value in (*applied, *rolled_back))
+        and type(already_satisfied) is list
+        and all(
+            type(value) is str and value
+            for value in (*applied, *rolled_back, *already_satisfied)
+        )
         and len(applied) == len(set(applied))
         and len(rolled_back) == len(set(rolled_back))
+        and len(already_satisfied) == len(set(already_satisfied))
+        and set(applied).isdisjoint(already_satisfied)
+    )
+    mutation_proof = bool(
+        identifier_lists_are_exact
+        and applied
+        and rolled_back
         and set(applied) == set(rolled_back)
     )
+    already_satisfied_proof = bool(
+        identifier_lists_are_exact
+        and not applied
+        and not rolled_back
+        and already_satisfied
+    )
     return bool(
-        identifiers_are_exact
+        (mutation_proof or already_satisfied_proof)
         and dict.get(result, "status") == "proof_passed"
         and dict.get(result, "proof_run") is True
         and dict.get(result, "restore_after_verify") is True
@@ -354,13 +419,20 @@ def terminal_result_proves_verified_restored_proof(result: Any) -> bool:
         and dict.get(result, "owner_review_required") is True
         and dict.get(result, "live_authority_granted") is False
         and dict.get(result, "readiness_closure_allowed") is False
-        and dict.get(result, "no_console_send_proven") is False
+        and dict.get(result, "no_console_send_proven")
+        is already_satisfied_proof
         and dict.get(result, "physical_verified") is True
         and dict.get(result, "proof_target_verified") is True
         and dict.get(result, "physical_state_restored") is True
-        and dict.get(result, "terminal_after_console_send") is True
-        and dict.get(result, "rollback_attempted") is True
-        and dict.get(result, "rollback_succeeded") is True
+        and dict.get(result, "terminal_after_console_send") is mutation_proof
+        and dict.get(result, "rollback_attempted") is mutation_proof
+        and dict.get(result, "rollback_succeeded") is mutation_proof
+        and dict.get(result, "rollback_status")
+        == (
+            "verified"
+            if mutation_proof
+            else "not_required_already_satisfied"
+        )
         and dict.get(result, "wal_terminal") == "proof_restored"
         and dict.get(result, "audio_recheck_passed") is True
         and dict.get(result, "write_state_unknown") is False
@@ -529,6 +601,9 @@ class TrustedApplyReceipt:
     audio_recheck_required: Optional[bool]
     audio_recheck_passed: Optional[bool]
     audio_recheck_disposition: Optional[str]
+    applied_operation_ids: Optional[Tuple[str, ...]]
+    rollback_operation_ids: Optional[Tuple[str, ...]]
+    already_satisfied_operation_ids: Optional[Tuple[str, ...]]
     result_digest: Optional[str]
     result_detail_available: bool
     result_evidence_pinned: bool
@@ -550,6 +625,7 @@ class TrustedApplyReceipt:
     capability_kind: Optional[str]
     operation_digest: Optional[str]
     bundle_kind: Optional[str]
+    proof_receipt_id: Optional[str]
     review_preimage_sha256: Optional[str]
     before_manifest_sha256: Optional[str]
     after_manifest_sha256: Optional[str]
@@ -561,6 +637,8 @@ class TrustedApplyReceipt:
     attended_no_touch_required_during_execution: Optional[bool]
     later_console_event_invalidates_readiness_freshness: Optional[bool]
     proof_target_verified: Optional[bool]
+    parent_commit_recorded: Optional[bool]
+    parent_commit_reason: Optional[str]
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         raise TypeError(
@@ -790,13 +868,25 @@ def _freeze_trusted_apply_receipt(
             else None
         )
     )
+    known_contained_recovery = bool(
+        dict.get(result, "safe_target_retention_attempted") is True
+        and dict.get(result, "contained_target_physical_verified") is True
+        and dict.get(result, "audio_failure_recovery_state_known") is True
+        and physical_verified is True
+        and physical_restored is False
+    )
     rollback_unknown = bool(
         dict.get(result, "rollback_state_unknown") is True
-        or (rollback_attempted and physical_restored is False)
+        or (
+            rollback_attempted
+            and physical_restored is False
+            and not known_contained_recovery
+        )
         or (
             rollback_attempted
             and rollback_succeeded is not True
             and possible_send
+            and not known_contained_recovery
         )
     )
     manual_review = bool(
@@ -837,6 +927,21 @@ def _freeze_trusted_apply_receipt(
     channel = dict.get(result, "channel")
     if isinstance(channel, bool) or not isinstance(channel, int):
         channel = None
+
+    def freeze_operation_ids(value: Any) -> Optional[Tuple[str, ...]]:
+        # A supervised transaction is capped at 64 operations.  Preserve the
+        # exact ordered identifiers in immutable receipt truth, but refuse an
+        # unbounded or non-string result rather than letting it reach the wire.
+        if type(value) is not list or len(value) > 64:
+            return None
+        if not all(
+            type(operation_id) is str
+            and 0 < len(operation_id.encode("utf-8")) <= 512
+            for operation_id in value
+        ):
+            return None
+        return tuple(value)
+
     values = {
         "proposal_id": identity.proposal_id,
         "review_contract_version": identity.review_contract_version,
@@ -854,7 +959,12 @@ def _freeze_trusted_apply_receipt(
                 (
                     final_status == "applied"
                     and apply_status == "applied"
-                    and terminal_result_proves_verified_apply(result)
+                    and (
+                        terminal_result_proves_verified_apply(result)
+                        or terminal_result_proves_verified_already_satisfied_apply(
+                            result
+                        )
+                    )
                 )
                 or (
                     final_status == "proof_passed"
@@ -895,6 +1005,15 @@ def _freeze_trusted_apply_receipt(
         ),
         "audio_recheck_disposition": _exact_string(
             dict.get(result, "audio_recheck_disposition")
+        ),
+        "applied_operation_ids": freeze_operation_ids(
+            dict.get(result, "applied_operation_ids")
+        ),
+        "rollback_operation_ids": freeze_operation_ids(
+            dict.get(result, "rollback_operation_ids")
+        ),
+        "already_satisfied_operation_ids": freeze_operation_ids(
+            dict.get(result, "already_satisfied_operation_ids")
         ),
         "result_digest": normalized_result_digest,
         "result_detail_available": detail_available,
@@ -937,6 +1056,9 @@ def _freeze_trusted_apply_receipt(
             else None
         ),
         "bundle_kind": _exact_string(dict.get(result, "bundle_kind")),
+        "proof_receipt_id": _exact_string(
+            dict.get(result, "proof_receipt_id")
+        ),
         "review_preimage_sha256": (
             dict.get(result, "review_preimage_sha256")
             if is_sha256_digest(dict.get(result, "review_preimage_sha256"))
@@ -995,6 +1117,10 @@ def _freeze_trusted_apply_receipt(
         "proof_target_verified": _exact_optional_bool(
             dict.get(result, "proof_target_verified")
         ),
+        # Parent journal truth does not exist when the physical terminal is
+        # frozen.  It is attached only by the private post-finalize binder.
+        "parent_commit_recorded": None,
+        "parent_commit_reason": None,
     }
     receipt = object.__new__(TrustedApplyReceipt)
     object.__setattr__(
@@ -1005,6 +1131,51 @@ def _freeze_trusted_apply_receipt(
     for name, value in values.items():
         object.__setattr__(receipt, name, value)
     return receipt
+
+
+def _bind_trusted_apply_parent_commit(
+    receipt: TrustedApplyReceipt,
+    *,
+    recorded: bool,
+    reason: Any,
+) -> TrustedApplyReceipt:
+    """Return an authentic receipt bound to post-apply parent journal truth.
+
+    The physical terminal is already immutable at this point.  Cloning keeps
+    that truth intact while preventing either the adapter result or the raw
+    outbound message from forging the later parent-commit outcome.
+    """
+
+    if type(receipt) is not TrustedApplyReceipt or not receipt._is_authentic():
+        raise ApplyResponseProjectionError("trusted_apply_receipt_invalid")
+    if type(recorded) is not bool:
+        raise ApplyResponseProjectionError("parent_commit_recorded_invalid")
+    if receipt.final_status != "applied" or receipt.capability_kind not in {
+        "maintenance_dsp_reset_commit_once",
+        "processor_enable_commit_once",
+        "soundcheck_child_commit_once",
+    }:
+        raise ApplyResponseProjectionError("parent_commit_binding_not_allowed")
+    if receipt.parent_commit_recorded is not None:
+        raise ApplyResponseProjectionError("parent_commit_already_bound")
+
+    safe_reason = _safe_wire_reason_code(reason if reason else None)
+    clone = object.__new__(TrustedApplyReceipt)
+    for item in dataclass_fields(TrustedApplyReceipt):
+        name = item.name
+        if name == "_TrustedApplyReceipt__factory_marker":
+            object.__setattr__(
+                clone,
+                name,
+                _TRUSTED_RECEIPT_FACTORY_MARKER,
+            )
+        elif name == "parent_commit_recorded":
+            object.__setattr__(clone, name, recorded)
+        elif name == "parent_commit_reason":
+            object.__setattr__(clone, name, safe_reason)
+        else:
+            object.__setattr__(clone, name, getattr(receipt, name))
+    return clone
 
 
 def utf8_preview(value: Any, max_bytes: int) -> str:
@@ -2702,6 +2873,30 @@ def _sequence_receipt_ref_proves_safe_block(value: Any) -> bool:
     )
 
 
+def _sequence_receipt_ref_proves_known_contained_recovery(value: Any) -> bool:
+    """Recognize a failed apply whose safer physical target is still known."""
+
+    if type(value) is not dict:
+        return False
+    return bool(
+        dict.get(value, "status") == "apply_blocked"
+        and dict.get(value, "success") is False
+        and dict.get(value, "no_console_send_proven") is False
+        and dict.get(value, "physical_verified") is True
+        and dict.get(value, "physical_state_restored") is False
+        and dict.get(value, "write_state_unknown") is False
+        and dict.get(value, "rollback_state_unknown") is False
+        and dict.get(value, "manual_review_required") is True
+        and dict.get(value, "wal_terminal") == "manual_review_required"
+        and dict.get(value, "rollback_status")
+        == "known_safe_target_retained"
+        and dict.get(value, "emergency_stop_activated") is True
+        and dict.get(value, "emergency_stop_required") is False
+        and dict.get(value, "result_detail_available") is True
+        and is_sha256_digest(dict.get(value, "result_digest"))
+    )
+
+
 def _sequence_execution_unknown_payload(message: Any) -> Dict[str, Any]:
     summary = dict.get(message, "summary") if type(message) is dict else None
 
@@ -2779,6 +2974,7 @@ def _freeze_trusted_sequence_execution_receipt(
     execution_rows: List[Dict[str, Any]] = []
     applied_count = 0
     safely_blocked_count = 0
+    known_contained_review_count = 0
     unknown_count = 0
     no_send_count = 0
     possible_send_count = 0
@@ -2795,6 +2991,7 @@ def _freeze_trusted_sequence_execution_receipt(
                 | {
                     "apply_receipt_missing_or_identity_mismatch",
                     "apply_safely_blocked",
+                    "apply_known_contained_manual_review",
                     "apply_terminal_state_unknown",
                 }
             ),
@@ -2852,6 +3049,16 @@ def _freeze_trusted_sequence_execution_receipt(
             row_status = "blocked"
             row_reason = "apply_safely_blocked"
             safely_blocked_count += 1
+        elif (
+            handler_status in {"blocked", "unknown"}
+            and authentic_reference is not None
+            and _sequence_receipt_ref_proves_known_contained_recovery(
+                authentic_reference
+            )
+        ):
+            row_status = "blocked"
+            row_reason = "apply_known_contained_manual_review"
+            known_contained_review_count += 1
         else:
             row_status = "unknown"
             row_reason = "apply_receipt_missing_or_identity_mismatch"
@@ -2902,6 +3109,9 @@ def _freeze_trusted_sequence_execution_receipt(
         final_reason = "sequence_executor_stopped_on_block"
         no_send = True if possible_send_count == 0 else False
     aggregate_unknown = unknown_count > 0
+    aggregate_manual_review = bool(
+        aggregate_unknown or known_contained_review_count
+    )
     emergency_activated = any(
         (
             type(reference) is dict
@@ -2982,7 +3192,7 @@ def _freeze_trusted_sequence_execution_receipt(
             "direct_manual_console_write_called": False,
             "mutates_console_state": possible_send_count > 0,
             "stopped_on_block": not all_expected_applied and bool(execution_rows),
-            "manual_review_required": aggregate_unknown,
+            "manual_review_required": aggregate_manual_review,
         }
     )
     safety = projected.get("safety")
@@ -3015,7 +3225,7 @@ def _freeze_trusted_sequence_execution_receipt(
                 possible_send_count > 0
             ),
             "mutates_console_state": possible_send_count > 0,
-            "manual_review_required": aggregate_unknown,
+            "manual_review_required": aggregate_manual_review,
             "queries_console": False,
             "live_widening_allowed": False,
         }
@@ -3028,7 +3238,7 @@ def _freeze_trusted_sequence_execution_receipt(
             "no_console_send_proven": no_send,
             "write_state_unknown": aggregate_unknown,
             "rollback_state_unknown": aggregate_unknown,
-            "manual_review_required": aggregate_unknown,
+            "manual_review_required": aggregate_manual_review,
             "emergency_stop_activated": emergency_activated,
             "emergency_stop_required": emergency_required,
             "emergency_stop_teardown_complete": (
@@ -3369,7 +3579,12 @@ def compact_proposal_row(proposal: Any) -> Dict[str, Any]:
             or result.get("rollback_state_unknown") is True
             or (
                 result.get("physical_state_restored") is False
-                and not terminal_result_proves_verified_apply(result)
+                and not (
+                    terminal_result_proves_verified_apply(result)
+                    or terminal_result_proves_verified_already_satisfied_apply(
+                        result
+                    )
+                )
             )
         )
     )
@@ -3733,7 +3948,12 @@ def collect_global_hazards(server: Any, rows: Sequence[Mapping[str, Any]]) -> Di
             result.get("rollback_state_unknown") is True
             or (
                 result.get("physical_state_restored") is False
-                and not terminal_result_proves_verified_apply(result)
+                and not (
+                    terminal_result_proves_verified_apply(result)
+                    or terminal_result_proves_verified_already_satisfied_apply(
+                        result
+                    )
+                )
             ),
             "terminal_rollback_state_unknown",
             "terminal_result",
@@ -3907,7 +4127,12 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
     m110_capability_terminal = bool(
         receipt.final_status in {"proof_passed", "applied"}
         and receipt.capability_kind
-        in {"restore_only_proof", "maintenance_dsp_reset_commit_once"}
+        in {
+            "restore_only_proof",
+            "maintenance_dsp_reset_commit_once",
+            "processor_enable_commit_once",
+            "soundcheck_child_commit_once",
+        }
     )
     if m110_capability_terminal:
         payload.update(
@@ -3929,6 +4154,11 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
                 "bundle_kind": (
                     utf8_preview(receipt.bundle_kind, 64)
                     if receipt.bundle_kind is not None
+                    else None
+                ),
+                "proof_receipt_id": (
+                    utf8_preview(receipt.proof_receipt_id, 96)
+                    if receipt.proof_receipt_id is not None
                     else None
                 ),
                 "review_preimage_sha256": receipt.review_preimage_sha256,
@@ -3956,6 +4186,23 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
                     receipt.later_console_event_invalidates_readiness_freshness
                 ),
                 "proof_target_verified": receipt.proof_target_verified,
+                "applied_operation_ids": (
+                    list(receipt.applied_operation_ids)
+                    if receipt.applied_operation_ids is not None
+                    else None
+                ),
+                "rollback_operation_ids": (
+                    list(receipt.rollback_operation_ids)
+                    if receipt.rollback_operation_ids is not None
+                    else None
+                ),
+                "already_satisfied_operation_ids": (
+                    list(receipt.already_satisfied_operation_ids)
+                    if receipt.already_satisfied_operation_ids is not None
+                    else None
+                ),
+                "parent_commit_recorded": receipt.parent_commit_recorded,
+                "parent_commit_reason": receipt.parent_commit_reason,
             }
         )
     return payload
@@ -4117,6 +4364,13 @@ def compact_trusted_apply_receipt_reference(
         "operator_idempotency_released": idempotency_ref.get("released"),
         "channel": payload.get("channel"),
         "value_type": payload.get("value_type"),
+        "applied_operation_ids": payload.get("applied_operation_ids"),
+        "rollback_operation_ids": payload.get("rollback_operation_ids"),
+        "already_satisfied_operation_ids": payload.get(
+            "already_satisfied_operation_ids"
+        ),
+        "parent_commit_recorded": payload.get("parent_commit_recorded"),
+        "parent_commit_reason": payload.get("parent_commit_reason"),
     }
 
 

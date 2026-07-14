@@ -1460,12 +1460,17 @@ class AutoSoundcheckEngine:
                     "musically_required": True,
                 }
             )
-        selected = list(self._iter_channels())
+        observed = list(self._iter_channels())
         signalled = [
             channel
-            for channel in selected
+            for channel in observed
             if channel in self.channels and self.channels[channel].has_signal
         ]
+        # A physically present but silent input is not a source in this
+        # analysis pass.  Keeping it in selected_channel_ids would fabricate a
+        # musically-required fader residual and make one unused socket block
+        # every valid recommendation from active channels.
+        selected = list(signalled)
         coverage_by_channel = getattr(
             self,
             "_derivation_channel_stage_coverage",
@@ -1713,17 +1718,19 @@ class AutoSoundcheckEngine:
                 "analyzed_source_path_enabled": analyzed_source_path_enabled,
             }
         payload["source_coverage"] = {
-            "verified": bool(selected and len(signalled) == len(selected)),
+            "verified": bool(selected),
             "captured_at_epoch": self._derivation_captured_at_epoch,
             "max_age_sec": 300.0,
             "selected_channel_ids": selected,
             "signalled_channel_ids": signalled,
+            "observed_channel_ids": observed,
+            "silent_channel_ids": sorted(set(observed) - set(signalled)),
             "pending_checklist_count": len(pending_items),
             "stage_coverage": stage_coverage,
             "per_source_stage_coverage": per_source_stage_coverage,
             "per_source_fader_intent": per_source_fader_intent,
             "derivation_complete": bool(self._derivation_complete),
-            "coverage_basis": "per_selected_source_stage_evidence",
+            "coverage_basis": "per_signalled_source_stage_evidence",
         }
         payload["readiness_residuals"] = residuals
         payload["last_master_mix_verdict"] = master_verdict
@@ -5443,7 +5450,12 @@ class AutoSoundcheckEngine:
         finally:
             # Derivation visits active channels, but no change was physically sent.
             self._applied_channels = applied_before
-            selected = list(self._iter_channels())
+            selected = [
+                channel
+                for channel in self._iter_channels()
+                if channel in self.channels
+                and self.channels[channel].has_signal
+            ]
             all_sources_covered = bool(selected)
             for channel in selected:
                 info = self.channels.get(channel)

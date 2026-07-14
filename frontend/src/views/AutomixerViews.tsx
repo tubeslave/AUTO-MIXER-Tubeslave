@@ -13,6 +13,7 @@ import {
   tasks
 } from '../mock/automixerData';
 import type { OperatorViewData } from '../services/useOperatorBackend';
+import { createUnavailableDecisionQueueState } from '../services/decisionQueueV2.mjs';
 import type { DashboardRuntime, DirectorRuntime, RouteId, UiActions, UiState, ViewModel } from '../types';
 import { AgentsConsole, Communications } from './AgentViews';
 import { ChannelList, Groups } from './ChannelViews';
@@ -85,6 +86,7 @@ function fallbackViewData(): OperatorViewData {
     buses,
     agents,
     tasks,
+    decisionQueue: createUnavailableDecisionQueueState() as OperatorViewData['decisionQueue'],
     decisionTraces: [],
     safetyMonitor: {
       operatorMode: 'mock',

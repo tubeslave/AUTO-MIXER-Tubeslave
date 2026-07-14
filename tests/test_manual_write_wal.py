@@ -123,8 +123,10 @@ def restored_proof_wal_payloads(transaction_id):
         "audio_recheck_passed": True,
         "physical_state_restored": True,
         "terminal_after_console_send": True,
+        "no_console_send_proven": False,
         "rollback_attempted": True,
         "rollback_succeeded": True,
+        "rollback_status": "verified",
         "write_state_unknown": False,
         "rollback_state_unknown": False,
         "manual_review_required": False,
@@ -145,6 +147,7 @@ async def real_m110_wal_payloads(
     boundary_ok=True,
     fail_send_at=None,
     raise_authority_at=None,
+    raise_authority_after_terminal_phase=None,
     denied_outside_mutation=False,
     denied_outside_before_send=False,
     remove_boundary_ok=True,
@@ -155,6 +158,12 @@ async def real_m110_wal_payloads(
     hooks.audio_queries = wing
     hooks.boundary_ok = boundary_ok
     hooks.raise_authority_at = raise_authority_at
+    if raise_authority_after_terminal_phase is not None:
+        def arm_authority_failure(phase):
+            if phase == raise_authority_after_terminal_phase:
+                hooks.raise_authority_at = hooks.authority_calls + 1
+
+        hooks.on_terminal = arm_authority_failure
     wing.fail_send_at = fail_send_at
     wing.remove_boundary_ok = remove_boundary_ok
     if denied_outside_mutation:
@@ -273,6 +282,46 @@ def test_exact_restored_proof_wal_is_terminal_across_restart(
     assert restarted._manual_write_emergency_stopped is False
     restarted_lifecycle = restarted._manual_write_wal_lifecycles[transaction_id]
     assert restarted_lifecycle["events"] == lifecycle["events"]
+
+
+def test_already_satisfied_restored_proof_wal_is_terminal_without_send(
+    tmp_path,
+    monkeypatch,
+):
+    server = build_server(
+        tmp_path / "proof-already-satisfied-events",
+        monkeypatch,
+        runtime_dir=tmp_path / "proof-already-satisfied-runtime",
+    )
+    transaction_id = "m110-proof-already-satisfied"
+    prepared, terminal = restored_proof_wal_payloads(transaction_id)
+    terminal.update(
+        {
+            "applied_operation_ids": [],
+            "rollback_operation_ids": [],
+            "already_satisfied_operation_ids": ["m110-proof-operation"],
+            "terminal_after_console_send": False,
+            "no_console_send_proven": True,
+            "rollback_attempted": False,
+            "rollback_succeeded": False,
+            "rollback_status": "not_required_already_satisfied",
+        }
+    )
+
+    assert server._append_manual_write_wal(
+        "prepared",
+        transaction_id,
+        **prepared,
+    )
+    assert server._append_manual_write_wal(
+        "proof_restored",
+        transaction_id,
+        **terminal,
+    )
+
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert server._wal_lifecycle_proves_restored_proof(lifecycle) is True
+    assert transaction_id not in server._manual_write_recovery_transactions
 
 
 @pytest.mark.parametrize(
@@ -709,7 +758,7 @@ async def test_strict_m110_post_verification_compensation_is_unresolved(
     result, prepared, terminals = await real_m110_wal_payloads(
         transaction_id=transaction_id,
         proof_run=proof_run,
-        raise_authority_at=196,
+        raise_authority_after_terminal_phase="verification_pending",
     )
 
     receipts = append_m110_payload_sequence(
@@ -827,7 +876,9 @@ async def test_strict_m110_pre_success_manual_is_unresolved(
     result, prepared, terminals = await real_m110_wal_payloads(
         transaction_id=transaction_id,
         proof_run=proof_run,
-        raise_authority_at=197,
+        raise_authority_after_terminal_phase=(
+            "verified_state_pending_cleanup"
+        ),
     )
 
     receipts = append_m110_payload_sequence(
@@ -883,7 +934,9 @@ async def test_strict_m110_pre_success_manual_rejects_semantic_forgery(
     )
     _result, prepared, terminals = await real_m110_wal_payloads(
         transaction_id=transaction_id,
-        raise_authority_at=197,
+        raise_authority_after_terminal_phase=(
+            "verified_state_pending_cleanup"
+        ),
     )
     assert [phase for phase, _payload in terminals] == [
         "verification_pending",
@@ -1828,6 +1881,80 @@ async def test_reconciliation_refuses_console_value_outside_target_and_preimage(
     assert result["reason"] == "recovery_state_mixed_or_changed"
     assert transaction_id in server._manual_write_recovery_transactions
     assert server._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+async def test_restore_only_proof_target_cannot_reconcile_as_committed(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_dir = tmp_path / "proof-target-runtime"
+    transaction_id = "proof-target-retained"
+    server = build_server(
+        tmp_path / "proof-target-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert server._append_manual_write_wal(
+        "prepared",
+        transaction_id,
+        scope="supervised_transaction",
+        proof_run=True,
+        restore_after_verify=True,
+        capability_kind="restore_only_proof",
+        proposal_id="proof-target-proposal",
+        idempotency_key="proof-target-idempotency",
+        operations=[
+            {
+                "operation_id": "proof-target-operation",
+                "family_id": "fader",
+                "write_kind": "fader",
+                "writes": [
+                    {
+                        "address": "/ch/1/fdr",
+                        "target_value": -9.0,
+                        "tolerance": 0.05,
+                    }
+                ],
+                "preimage_values": {"/ch/1/fdr": -8.0},
+            }
+        ],
+    )
+    assert server._append_manual_write_wal(
+        "manual_review_required",
+        transaction_id,
+        result_status="manual_review_required",
+        safe_target_retention_attempted=True,
+        contained_operation_ids=["proof-target-operation"],
+        contained_target_physical_verified=True,
+        physical_state_restored=False,
+        manual_review_required=True,
+    )
+
+    restarted = build_server(
+        tmp_path / "proof-target-restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    mixer = PhysicalMixer()
+    mixer.state["/ch/1/fdr"] = -9.0
+    restarted.mixer_client = mixer
+
+    result = await restarted.reconcile_console_write_recovery(
+        transaction_id=transaction_id,
+        approved=True,
+        approval_id="operator-proof-recovery-review",
+    )
+
+    assert result["status"] == "blocked"
+    assert result["reason"] == (
+        "restore_only_proof_target_cannot_be_reconciled_committed"
+    )
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+    assert "reconciled_committed" not in wal_phases(
+        runtime_dir / "manual_write_wal.jsonl"
+    )
 
 
 @pytest.mark.asyncio
