@@ -1233,7 +1233,8 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     for surface_path in (M110_PLAN, CURRENT_TASKS):
         surface = surface_path.read_text(encoding="utf-8")
         assert "CP05" in surface
-        assert "physical WING" in surface
+        assert "WING Rack" in surface
+        assert "master_channel_signal_missing" in surface
         assert "HW01" in surface
         assert "HW05" in surface
         assert "48x48/48 kHz" in surface or "48 inputs/48 outputs at 48 kHz" in surface
