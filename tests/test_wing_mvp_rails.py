@@ -763,9 +763,9 @@ def test_current_state_doc_matches_autopilot_state_evidence():
         assert expected in text
 
     assert state["program_status"] == "WAITING_FOR_EXTERNAL_VALIDATION"
-    assert "M110-HW01 has not started" in text
+    assert "M110-HW01 remains incomplete" in text
     assert "current aggregate ledger is `operator_review_required`" in text
-    assert "No real hardware evidence was produced" in text
+    assert "No accepted HW01 route artifact was produced" in " ".join(text.split())
 
 
 def test_current_no_wing_quick_evidence_is_repo_local_and_fail_closed():
@@ -1038,6 +1038,24 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
         # Operator-approved supervised proof rows may contact hardware and
         # perform bounded writes, but must never widen standing authority.
         assert latest["event"].startswith("supervised_")
+        if latest_authority.get("operator_attended_diagnostic") is True:
+            assert (
+                latest["event"]
+                == "supervised_m116_hw01_no_signal_diagnostic_truth_sync"
+            )
+            diagnostics = latest["diagnostic_evidence"]
+            assert diagnostics["runner_summary_sha256"] == (
+                "sha256:3a300561f3a6b31099cf2586f0047d674ff1342abb767f761b856f384ef91273"
+            )
+            assert diagnostics["backend_log_sha256"] == (
+                "sha256:19d0d41ae6e52321f4ebf55e2dfe822bdbd500b7ad37ecaa68542c87c929e490"
+            )
+            assert diagnostics["operator_observations_machine_verified"] is False
+            assert latest["hardware_contacted"] is True
+            assert latest["live_writes"] is False
+            assert latest_authority["contacts_backend"] is True
+            assert latest_authority["contacts_wing"] is True
+            assert latest_authority["live_write"] is False
         for flag in ("live_authority_granted", "readiness_closure_allowed"):
             assert latest_authority[flag] is False
         assert state_authority["live_authority_granted"] is False
@@ -1089,7 +1107,7 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
     assert latest_authority["unrestricted_live_or_soundcheck_authority"] is False
 
 
-def test_m110_current_truth_surfaces_track_cp05_launch_and_missing_usb_blocker():
+def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     dynamic_gate = verify_m110_cp05_hardware_gate(
         repo_root=PROJECT_ROOT,
         critical_paths=M110_RUNTIME_CRITICAL_PATHS,
@@ -1106,7 +1124,7 @@ def test_m110_current_truth_surfaces_track_cp05_launch_and_missing_usb_blocker()
         "complete_current_markers_verified"
     )
     assert work["hardware_checkpoints"]["M110-HW01"] == (
-        "blocked_before_start_missing_wing_usb_coreaudio_device"
+        "attempted_blocked_master_channel_signal_missing_no_issued_artifact"
     )
     assert all(
         work["hardware_checkpoints"][checkpoint] == "pending"
@@ -1127,18 +1145,62 @@ def test_m110_current_truth_surfaces_track_cp05_launch_and_missing_usb_blocker()
     assert launch["live_write"] is False
 
     capture = work["physical_capture_prerequisite"]
-    assert capture["evidence_class"] == "ephemeral_local_enumeration"
-    assert capture["reason"] == "coreaudio_capture_name_not_unique"
-    assert capture["exact_name_candidate_count"] == 0
-    assert capture["matching_wing_usb_device_count"] == 0
+    assert capture["evidence_class"] == "ephemeral_operator_attended_diagnostic"
+    assert capture["reason"] == (
+        "coreaudio_capture_prerequisite_satisfied_usb_identity_not_reached"
+    )
+    assert capture["exact_name_candidate_count"] == 1
+    assert capture["matching_wing_coreaudio_device_count"] == 1
+    assert capture["matching_wing_usb_device_count"] is None
+    assert capture["selected_device_name"] == "WING"
+    assert capture["selected_input_channels"] == 48
+    assert capture["selected_output_channels"] == 48
+    assert capture["selected_sample_rate_hz"] == 48000
+    assert capture["console_serial"] == "0100Q1V0604AAE"
+    assert capture["console_product"] == "wing-rack"
+    assert capture["console_firmware"] == "3.0.5-4-ga4ea833d:release"
+    assert capture["serial_bound_usb_identity_verified"] is False
     assert capture["dante_virtual_soundcard_seen"] is True
     assert capture["dante_virtual_soundcard_accepted_as_substitute"] is False
-    assert capture["audio_stream_opened"] is False
+    assert capture["audio_stream_opened"] is True
+    assert capture["blocker"] is None
+
+    attempt = work["m116_hw01_no_signal_attempt"]
+    assert attempt["status"] == "blocked"
+    assert attempt["reason"] == "master_channel_signal_missing"
+    assert attempt["checkpoint_completed"] is False
+    assert attempt["route_artifact_issued"] is False
+    assert attempt["evidence_class"] == "ephemeral_operator_attended_diagnostic"
+    assert attempt["runner_summary_sha256"] == (
+        "sha256:3a300561f3a6b31099cf2586f0047d674ff1342abb767f761b856f384ef91273"
+    )
+    assert attempt["backend_log_sha256"] == (
+        "sha256:19d0d41ae6e52321f4ebf55e2dfe822bdbd500b7ad37ecaa68542c87c929e490"
+    )
+    assert attempt["capture_channel_count"] == 48
+    assert attempt["capture_sample_rate_hz"] == 48000
+    assert attempt["diagnostic_observation_class"] == (
+        "operator_attended_read_only_observation_not_independently_machine_verified"
+    )
+    assert attempt["diagnostic_observations_machine_verified"] is False
+    assert attempt["operator_observed_short_capture_all_channels_digital_zero"] is True
+    assert attempt["operator_observed_long_capture_duration_seconds"] == 120
+    assert attempt["operator_observed_long_capture_all_channels_digital_zero"] is True
+    assert attempt["operator_observed_read_only_main_usb_47_48_route_confirmed"] is True
+    assert attempt["operator_observed_read_only_main_1_unmuted_confirmed"] is True
+    assert attempt["operator_observed_console_mutation_write_attempt_count"] == 0
+    assert attempt["live_write"] is False
+    assert attempt["reset_applied"] is False
+    assert attempt["corrections_applied"] == 0
+    assert attempt["readiness_closure_allowed"] is False
+    assert attempt["live_authority_granted"] is False
+    assert attempt["clean_teardown_observed"] is True
 
     assert work["backend_contacted_this_cycle"] is True
-    assert work["hardware_contacted_this_cycle"] is False
-    assert work["usb_capture_surface_contacted_this_cycle"] is False
-    assert work["osc_or_udp_opened_this_cycle"] is False
+    assert work["hardware_contacted_this_cycle"] is True
+    assert work["usb_capture_surface_contacted_this_cycle"] is True
+    assert work["audio_stream_opened_this_cycle"] is True
+    assert work["osc_or_udp_opened_this_cycle"] is True
     assert work["live_writes_this_cycle"] is False
     assert work["reset_applied_this_cycle"] is False
     assert work["corrections_applied_this_cycle"] == 0
@@ -1622,7 +1684,7 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         assert score_gate["score_ceiling_reason"] in surface
 
     assert state["truth_revision"] == (
-        "m110_cp05_launch_verified_wing_usb_missing_strict_live_88_zero_authority_20260714"
+        "m116_real_wing_hw01_no_signal_diagnostic_strict_live_88_zero_authority_20260715"
     )
     assert state["full_release_truth_source"] == "strict_pre_release_review"
     assert state["full_release_requirements_source"] == (
@@ -2106,7 +2168,7 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
         )
     for marker in (
-        "Physical WING USB/CoreAudio device named WING",
+        "Confirmed non-silent source reaches the physical WING",
         "M110-HW01 through M110-HW05",
         "two valid 2026-07-13 read-only preflight candidates",
         "Exact WING Rack serial and same-console owner attestation",
@@ -2158,10 +2220,10 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "historical exact 2026-07-02 source retains `accepted_decision_ready`" in plan
     assert "failed CH3 fader rollback proof" in plan
     assert "operator captures and reviews a real WING read-only artifact" not in plan
-    assert "M113 CoreAudio 48x48 gate; M110 physical USB blocker" in current
+    assert "M116 real WING HW01 no-signal checkpoint" in current
     assert "current aggregate ledger is `operator_review_required`" in current
     assert re.search(r"CH3 fader state\s+restoration/verification", current)
-    assert "physical WING USB missing" in report
+    assert "HW01 blocked on digital silence" in report
     if (
         state["last_validation_summary"].get("wing_readonly_preflight_decision_status")
         == "accepted_decision_ready"

@@ -9,10 +9,11 @@ Paperclip, ADRs, tests, or git history.
 
 - M110 attended WING reset and staged soundcheck is the current
   operator-directed task. CP05 and clean detached launch-only are verified.
-  Passive CoreAudio/macOS USB enumeration found no physical WING, so HW01 is
-  blocked before start. CP05 is dynamically checked against the current
-  non-marker tree; execute HW01-HW05 in one proof-owned session only after the
-  gate passes and WING 48x48/48 kHz USB appears.
+  The real WING and 48x48/48 kHz CoreAudio stream are now reached, but HW01 is
+  blocked before route-artifact issuance on `master_channel_signal_missing`.
+  CP05 is dynamically checked against the current non-marker tree; repeat HW01
+  in one proof-owned attended session only after a confirmed non-silent Main
+  47/48 source, then continue HW02-HW05 in order.
   Do not claim 95/100 before the repeated final audit and SHA-bound listening
   prove `show_mix_ready`; do not convert the one-run M006 permission into
   standing authority.
@@ -88,3 +89,20 @@ delete old tasks unless a human explicitly requests pruning.
   `7160 passed, 3 skipped`, 150 rails and no-WING 66/66.
 - Next action: require physical WING USB 48x48/48 kHz before starting the
   attended HW01-HW05 workflow. No control-plane sync grants live authority.
+
+## 2026-07-15 — M116 real HW01 attempt blocked on digital silence
+
+- Owner: Codex + attended operator.
+- Status: CP00-CP05 complete; HW01 attempted but incomplete on
+  `master_channel_signal_missing`; HW02-HW05 pending.
+- Evidence: WING Rack serial `0100Q1V0604AAE`, firmware
+  `3.0.5-4-ga4ea833d:release`; CoreAudio WING index 1 at 48x48/48 kHz; local
+  runner summary SHA-256
+  `3a300561f3a6b31099cf2586f0047d674ff1342abb767f761b856f384ef91273`;
+  short and 120-second diagnostics observed all 48 channels at digital zero.
+  The diagnostic is not accepted HW01 evidence and serial-bound USB identity
+  was not reached.
+- Safety: mutation attempts 0, writes 0, reset false, corrections 0, authority
+  false, strict score 88/100 and allowlist 0.
+- Next action: physically contain outputs, start and keep a confirmed non-silent
+  Ableton/WING source running, then repeat HW01 from a clean CP05-bound checkout.

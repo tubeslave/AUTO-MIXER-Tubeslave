@@ -18,19 +18,21 @@ Status values:
 
 ## Current external validation handoff
 
-M110 overlay (2026-07-14): the frozen table below remains historical. Active
+M110/M116 overlay (2026-07-15): the frozen table below remains historical. Active
 operator-directed work is `STATE.json.active_work`: CP00-CP05 are complete and
-the clean detached launch-only probe passed with loopback backend contact only.
-Passive CoreAudio/macOS USB enumeration found zero physical WING devices, so
-HW01 is blocked before start and HW02-HW05 remain pending. No capture stream,
-OSC/UDP path or live write opened; reset and correction counts remain zero.
+the clean M115 checkout reached WING Rack serial `0100Q1V0604AAE`, firmware
+`3.0.5-4-ga4ea833d:release`, and CoreAudio WING at 48x48/48 kHz. Route-only
+HW01 opened backend/WING/OSC/audio and then failed closed before artifact
+issuance on `master_channel_signal_missing`; short and 120-second diagnostics
+were exact digital zero on all 48 channels. HW01 is incomplete and HW02-HW05
+remain pending. Live writes, reset and correction counts remain zero.
 M005 behavior is closed; M006 permission is one attended-run input, not
 standing authority. The reset path bypasses 64 CH1-16 processor enables and
 restores only 77 known M006-changed addresses (23/14/14 stages), preserving all
-other state. A physical WING USB 48x48/48 kHz device, route proof, physical
-reset/apply, stable two-pass final audits, SHA-bound listening and teardown are
-still required. Strict live remains `88/100`, allowlist `0`, authority `false`,
-and the `95/100` target open.
+other state. A confirmed non-silent Main 47/48 source, issued route proof,
+physical reset/apply, stable two-pass final audits, SHA-bound listening and
+teardown are still required. Strict live remains `88/100`, allowlist `0`,
+authority `false`, and the `95/100` target open.
 
 Soundcheck execution update (2026-07-12): local staged kernel `96/100`, strict
 real-live soundcheck `88/100`, full-project local engineering `95/100`, strict
@@ -62,21 +64,21 @@ retains `accepted_decision_ready`, but later candidates inherit no decision or
 authority. The supervised CH3 fader/gain-down proofs passed with apply,
 physical readback, rollback and emergency-stop/block evidence; the earlier
 `rollback_not_applied` artifact remains closed audit history. M001 now waits
-for candidate disposition, physical WING USB plus attended M110 proof,
+for candidate disposition, non-silent attended M110 proof,
 current-source provenance/technical promotion and broader public-release
 evidence; it does not require another M005 cable pull by default.
 
-- Physical WING USB/CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute
+- Confirmed non-silent source reaches the physical WING and USB Main 47/48 during an operator-attended 48x48/48 kHz capture; digital-zero input cannot satisfy HW01
 - Operator-present CP05-bound M110-HW01 through M110-HW05 run with route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown evidence
 - Operator accept or reject the two valid 2026-07-13 read-only preflight candidates; this decision-ledger requirement grants no live authority and does not reopen closed M005 behavior
 - Exact WING Rack serial and same-console owner attestation for the immutable 2026-07-11 M005 evidence; this is identity-only and grants no live authority
 - Clean committed M005 current-release compatibility replay plus an explicit verified_migration M006 owner decision bound to the recomputed migration and packet-verifier paths
 
-Current blocker from `STATE.json`: M110 remains blocked before HW01 because passive CoreAudio and macOS USB enumeration found no physical WING device; Dante Virtual Soundcard 32x32 is not an accepted substitute for WING 48x48 at 48 kHz. No capture stream or OSC/UDP path was opened, and reset/corrections remain 0. M111 now provides a truthful M005 migration route without changing native M005 provenance, but activation still requires the exact WING Rack serial and same-console owner attestation, a clean committed compatibility replay, and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
+Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream but failed closed before route-artifact issuance with reason master_channel_signal_missing; direct 3-second and 120-second captures observed exact digital zero on all 48 channels. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
-Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
+Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m113_wing_coreaudio_48x48_gate_validated` at `2026-07-14T21:27:36Z`.
+Latest ledger handoff row: `supervised_m116_hw01_no_signal_diagnostic_truth_sync` at `2026-07-14T23:19:28Z`.
 
 Historical 2026-07-12 ledger checkpoint:
 `local_engineering_95_final_tree_full_suite_no_wing_validation` at
