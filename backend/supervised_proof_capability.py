@@ -33,6 +33,7 @@ M110_MAX_MANIFEST_BYTES = 64 * 1024
 M110_MAX_TOMBSTONED_NONCES = 4096
 M110_CAPABILITY_TOKEN_PREFIX = "m110cap_v1_"
 M110_CAPABILITY_TTL_SECONDS = 30.0
+M110_RESTORED_PROOF_RECEIPT_LATEST_START_SECONDS = 120.0
 M110_MAX_ACTIVE_CAPABILITIES = 8
 M110_MAX_CAPABILITY_TOMBSTONES = 4096
 M110_CAPABILITY_KINDS = (
@@ -859,6 +860,9 @@ class M110CapabilityBinding:
     review_content_digest: str
     operation_digest: str
     canonical_bundle_bytes: bytes = field(repr=False)
+    bundle_kind: str = ""
+    review_preimage_sha256: str = ""
+    proof_receipt_id: str = ""
     approval_id: str = ""
     idempotency_key: str = ""
     scope_addresses: tuple[str, ...] = ()
@@ -867,6 +871,8 @@ class M110CapabilityBinding:
     _route_ref: Any = field(default=None, repr=False, compare=False)
     _transport_ref: Any = field(default=None, repr=False, compare=False)
     _capture_ref: Any = field(default=None, repr=False, compare=False)
+    _control_ref: Any = field(default=None, repr=False, compare=False)
+    _proof_receipt_ref: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         if self.capability_kind not in M110_CAPABILITY_KINDS:
@@ -922,6 +928,18 @@ class M110CapabilityBinding:
         ).hexdigest()
         if not hmac.compare_digest(actual_operation_digest, self.operation_digest):
             raise ValueError("m110_capability_binding_operation_digest_mismatch")
+        if self.bundle_kind and self.bundle_kind not in {
+            "single_soundcheck_operation",
+            "maintenance_dsp_reset_bundle",
+            "processor_enable_bundle",
+        }:
+            raise ValueError("m110_capability_binding_bundle_kind_invalid")
+        if self.bundle_kind == "maintenance_dsp_reset_bundle" and not (
+            _valid_sha256_digest(self.review_preimage_sha256)
+        ):
+            raise ValueError(
+                "m110_maintenance_reset_binding_review_preimage_required"
+            )
         if (
             not self.scope_addresses
             or len(self.scope_addresses) > 64
@@ -948,6 +966,16 @@ class M110CapabilityBinding:
             or self._capture_ref is None
         ):
             raise ValueError("m110_capability_binding_object_identity_required")
+        if self.capability_kind == "maintenance_dsp_reset_commit_once":
+            if (
+                self.bundle_kind != "maintenance_dsp_reset_bundle"
+                or not _valid_binding_text(self.proof_receipt_id)
+                or self._control_ref is None
+                or self._proof_receipt_ref is None
+            ):
+                raise ValueError(
+                    "m110_maintenance_reset_binding_proof_receipt_required"
+                )
 
     def matches_exactly(self, other: Any) -> bool:
         if type(other) is not M110CapabilityBinding:
@@ -973,6 +1001,9 @@ class M110CapabilityBinding:
             "review_content_digest",
             "operation_digest",
             "canonical_bundle_bytes",
+            "bundle_kind",
+            "review_preimage_sha256",
+            "proof_receipt_id",
             "approval_id",
             "idempotency_key",
             "scope_addresses",
@@ -984,6 +1015,8 @@ class M110CapabilityBinding:
             and self._route_ref is other._route_ref
             and self._transport_ref is other._transport_ref
             and self._capture_ref is other._capture_ref
+            and self._control_ref is other._control_ref
+            and self._proof_receipt_ref is other._proof_receipt_ref
         )
 
 
@@ -1004,7 +1037,13 @@ _M110_GRANT_EXECUTION_STATE_FACTORY_MARKER = object()
 
 
 class _M110GrantExecutionState:
-    __slots__ = ("_phase", "_terminal", "_lock", "_factory_marker")
+    __slots__ = (
+        "_phase",
+        "_terminal",
+        "_owner_token",
+        "_lock",
+        "_factory_marker",
+    )
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
         raise TypeError("m110_grant_execution_state_is_factory_only")
@@ -1012,21 +1051,33 @@ class _M110GrantExecutionState:
     def __setattr__(self, _name: str, _value: Any) -> None:
         raise AttributeError("m110_grant_execution_state_is_immutable")
 
-    def begin(self) -> bool:
+    def begin(self, owner_token: object | None = None) -> bool:
         if self._factory_marker is not _M110_GRANT_EXECUTION_STATE_FACTORY_MARKER:
             return False
         with self._lock:
             if self._phase != "issued":
                 return False
             object.__setattr__(self, "_phase", "executing")
+            object.__setattr__(self, "_owner_token", owner_token)
             return True
 
-    def mark_terminal(self, terminal: str) -> bool:
+    def mark_terminal(
+        self,
+        terminal: str,
+        owner_token: object | None = None,
+    ) -> bool:
         with self._lock:
             if self._phase not in {"issued", "executing"}:
                 return False
+            if (
+                self._phase == "executing"
+                and self._owner_token is not None
+                and owner_token is not self._owner_token
+            ):
+                return False
             object.__setattr__(self, "_phase", "terminal")
             object.__setattr__(self, "_terminal", str(terminal))
+            object.__setattr__(self, "_owner_token", None)
             return True
 
     def status(self) -> str:
@@ -1047,6 +1098,7 @@ def _new_m110_grant_execution_state() -> _M110GrantExecutionState:
     state = object.__new__(_M110GrantExecutionState)
     object.__setattr__(state, "_phase", "issued")
     object.__setattr__(state, "_terminal", None)
+    object.__setattr__(state, "_owner_token", None)
     object.__setattr__(state, "_lock", threading.Lock())
     object.__setattr__(
         state,
@@ -1090,10 +1142,27 @@ class _M110CapabilityGrantBase:
             return False
         return self._execution_state.begin()
 
+    def _begin_owned_execution(self) -> object | None:
+        """Claim an executor-private terminalization token atomically."""
+
+        if not self.is_authentic():
+            return None
+        if type(self._execution_state) is not _M110GrantExecutionState:
+            return None
+        owner_token = object()
+        if self._execution_state.begin(owner_token):
+            return owner_token
+        return None
+
     def mark_terminal(self, terminal: str) -> bool:
         if type(self._execution_state) is not _M110GrantExecutionState:
             return False
         return self._execution_state.mark_terminal(terminal)
+
+    def _mark_owned_terminal(self, terminal: str, owner_token: object) -> bool:
+        if type(self._execution_state) is not _M110GrantExecutionState:
+            return False
+        return self._execution_state.mark_terminal(terminal, owner_token)
 
     def execution_status(self) -> str:
         if type(self._execution_state) is not _M110GrantExecutionState:
@@ -1148,7 +1217,10 @@ class M110RestoredProofReceipt:
     proposal_id: str
     review_contract_version: int
     review_content_digest: str
+    review_preimage_sha256: str
     operation_digest: str
+    bundle_kind: str
+    canonical_bundle_bytes: bytes = field(repr=False, compare=False)
     result_digest: str
     transaction_id: str
     runtime_instance_nonce: str
@@ -1162,6 +1234,8 @@ class M110RestoredProofReceipt:
     _owner_ref: Any = field(repr=False, compare=False)
     _control_ref: Any = field(repr=False, compare=False)
     _route_ref: Any = field(repr=False, compare=False)
+    _transport_ref: Any = field(repr=False, compare=False)
+    _capture_ref: Any = field(repr=False, compare=False)
     _factory_marker: object = field(repr=False, compare=False)
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
@@ -1203,8 +1277,21 @@ def new_m110_restored_proof_receipt(**values: Any) -> M110RestoredProofReceipt:
         "_control_ref",
         "_route_ref",
     }
-    if set(values) != required:
+    optional = {
+        "bundle_kind",
+        "canonical_bundle_bytes",
+        "review_preimage_sha256",
+        "_transport_ref",
+        "_capture_ref",
+    }
+    if not required.issubset(values) or set(values).difference(required | optional):
         raise ValueError("m110_restored_proof_receipt_fields_mismatch")
+    values = dict(values)
+    values.setdefault("bundle_kind", "")
+    values.setdefault("canonical_bundle_bytes", b"")
+    values.setdefault("review_preimage_sha256", "")
+    values.setdefault("_transport_ref", None)
+    values.setdefault("_capture_ref", None)
     for field_name in (
         "proposal_id",
         "transaction_id",
@@ -1213,6 +1300,35 @@ def new_m110_restored_proof_receipt(**values: Any) -> M110RestoredProofReceipt:
         if not _valid_binding_text(values[field_name]):
             raise ValueError(
                 f"m110_restored_proof_receipt_{field_name}_invalid"
+            )
+    if values["bundle_kind"] and values["bundle_kind"] not in {
+        "single_soundcheck_operation",
+        "maintenance_dsp_reset_bundle",
+        "processor_enable_bundle",
+    }:
+        raise ValueError("m110_restored_proof_receipt_bundle_kind_invalid")
+    if values["bundle_kind"] == "maintenance_dsp_reset_bundle" and not (
+        _valid_sha256_digest(values["review_preimage_sha256"])
+    ):
+        raise ValueError(
+            "m110_restored_proof_receipt_review_preimage_invalid"
+        )
+    if values["bundle_kind"] == "maintenance_dsp_reset_bundle" and (
+        values["_transport_ref"] is None
+        or values["_capture_ref"] is None
+    ):
+        raise ValueError(
+            "m110_restored_proof_receipt_transport_capture_required"
+        )
+    if not isinstance(values["canonical_bundle_bytes"], bytes):
+        raise ValueError("m110_restored_proof_receipt_bundle_bytes_invalid")
+    if values["canonical_bundle_bytes"]:
+        bundle_digest = "sha256:" + hashlib.sha256(
+            values["canonical_bundle_bytes"]
+        ).hexdigest()
+        if not hmac.compare_digest(bundle_digest, values["operation_digest"]):
+            raise ValueError(
+                "m110_restored_proof_receipt_bundle_digest_mismatch"
             )
     for field_name in (
         "review_content_digest",

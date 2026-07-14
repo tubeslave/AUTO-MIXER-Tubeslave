@@ -39,6 +39,15 @@ class WingClient(MixerClientBase):
         self.commanded_state = {}
         self.command_timestamps = {}
         self.callbacks = {}
+        self._callbacks_lock = threading.RLock()
+        # A process-local mutation boundary can temporarily narrow every
+        # value-bearing OSC send, including sends attempted by unrelated
+        # server tasks.  Zero-argument reads remain available.  M110 uses this
+        # only while its finite maintenance transaction (and any rollback) is
+        # active; it is not standing live authority.
+        self._mutation_boundary_lock = threading.RLock()
+        self._mutation_boundary: Optional[Callable[[str, tuple[Any, ...]], bool]] = None
+        self._mutation_boundary_token: object | None = None
         
         self.is_connected = False
         
@@ -337,18 +346,19 @@ class WingClient(MixerClientBase):
             self._set_state_value(address, args)
         
         # Call registered callbacks
-        if address in self.callbacks:
-            for callback in self.callbacks[address]:
-                try:
-                    callback(address, *args)
-                except Exception as e:
-                    logger.error(f"Callback error for {address}: {e}")
-        if "*" in self.callbacks:
-            for callback in self.callbacks["*"]:
-                try:
-                    callback(address, *args)
-                except Exception as e:
-                    logger.error(f"Global callback error: {e}")
+        with self._callbacks_lock:
+            address_callbacks = tuple(self.callbacks.get(address, ()))
+            wildcard_callbacks = tuple(self.callbacks.get("*", ()))
+        for callback in address_callbacks:
+            try:
+                callback(address, *args)
+            except Exception as e:
+                logger.error(f"Callback error for {address}: {e}")
+        for callback in wildcard_callbacks:
+            try:
+                callback(address, *args)
+            except Exception as e:
+                logger.error(f"Global callback error: {e}")
 
     def set_osc_throttle(self, enabled: bool = True, hz: float = 10.0):
         """
@@ -392,6 +402,30 @@ class WingClient(MixerClientBase):
                         if delay > 0:
                             time.sleep(delay)
 
+                # The authority-bearing boundary is intentionally the final
+                # safety preflight after any throttle delay. It runs before
+                # message construction so even malformed hostile values are
+                # durably visible to the boundary audit. Its return is the
+                # write linearization point.
+                if values:
+                    with self._mutation_boundary_lock:
+                        boundary = self._mutation_boundary
+                        if boundary is not None:
+                            try:
+                                allowed = boundary(address, tuple(values))
+                            except Exception as exc:
+                                logger.error(
+                                    "Mutation boundary rejected %s: %s",
+                                    address,
+                                    exc,
+                                )
+                                return False
+                            if allowed is not True:
+                                logger.warning(
+                                    "Mutation boundary blocked OSC write: %s",
+                                    address,
+                                )
+                                return False
                 builder = OscMessageBuilder(address=address)
                 for v in values:
                     builder.add_arg(v)
@@ -414,6 +448,37 @@ class WingClient(MixerClientBase):
         except Exception as e:
             logger.error(f"Send failed: {e}")
             return False
+
+    def install_mutation_boundary(
+        self,
+        boundary: Callable[[str, tuple[Any, ...]], bool],
+    ) -> object:
+        """Install one exclusive process-local guard for value-bearing sends."""
+
+        if not callable(boundary):
+            raise TypeError("mutation_boundary_callable_required")
+        with self._osc_send_lock:
+            with self._mutation_boundary_lock:
+                if self._mutation_boundary is not None:
+                    raise RuntimeError("mutation_boundary_already_active")
+                token = object()
+                self._mutation_boundary = boundary
+                self._mutation_boundary_token = token
+                return token
+
+    def remove_mutation_boundary(self, token: object) -> bool:
+        """Remove exactly the boundary installed with ``token``."""
+
+        with self._osc_send_lock:
+            with self._mutation_boundary_lock:
+                if (
+                    self._mutation_boundary is None
+                    or self._mutation_boundary_token is not token
+                ):
+                    return False
+                self._mutation_boundary = None
+                self._mutation_boundary_token = None
+                return True
 
     def query_parameter(
         self,
@@ -473,17 +538,30 @@ class WingClient(MixerClientBase):
                 "confirmed_round_trips": 2,
             }
         finally:
-            callbacks = self.callbacks.get(address)
-            if callbacks and callback in callbacks:
-                callbacks.remove(callback)
-            if callbacks == []:
-                self.callbacks.pop(address, None)
+            self.unsubscribe(address, callback)
 
     def subscribe(self, address_pattern: str, callback: Callable):
         """Subscribe to OSC address changes"""
-        if address_pattern not in self.callbacks:
-            self.callbacks[address_pattern] = []
-        self.callbacks[address_pattern].append(callback)
+        if not isinstance(address_pattern, str) or not address_pattern:
+            raise ValueError("address_pattern_required")
+        if not callable(callback):
+            raise TypeError("callback_must_be_callable")
+        with self._callbacks_lock:
+            callbacks = self.callbacks.setdefault(address_pattern, [])
+            if callback not in callbacks:
+                callbacks.append(callback)
+
+    def unsubscribe(self, address_pattern: str, callback: Callable) -> bool:
+        """Atomically remove one callback without disturbing other observers."""
+
+        with self._callbacks_lock:
+            callbacks = self.callbacks.get(address_pattern)
+            if not callbacks or callback not in callbacks:
+                return False
+            callbacks.remove(callback)
+            if not callbacks:
+                self.callbacks.pop(address_pattern, None)
+            return True
 
     def _subscribe_to_updates(self):
         """Subscribe to Wing updates"""

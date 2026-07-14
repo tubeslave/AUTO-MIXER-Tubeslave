@@ -176,6 +176,18 @@ class EnhancedOSCClient:
     def subscribe(self, address_pattern: str, callback: Callable):
         self._wing.subscribe(address_pattern, callback)
 
+    def unsubscribe(self, address_pattern: str, callback: Callable) -> bool:
+        return self._wing.unsubscribe(address_pattern, callback)
+
+    def install_mutation_boundary(
+        self,
+        boundary: Callable[[str, tuple[Any, ...]], bool],
+    ) -> object:
+        return self._wing.install_mutation_boundary(boundary)
+
+    def remove_mutation_boundary(self, token: object) -> bool:
+        return self._wing.remove_mutation_boundary(token)
+
     def query_parameter(self, address: str, timeout: float = 0.5) -> Dict[str, Any]:
         """Query through the wrapper so send failures trigger reconnect state."""
         return self._wing.query_parameter(

@@ -81,10 +81,11 @@ RISKY_WRITE_TOKEN_RE = re.compile(
     r"mute_channel|unmute_channel"
     r")['\"]"
     r"|\b(?:self\.|client\.|mixer_client\.|osc_client\.|self\.mixer_client\.|"
-    r"self\._wing_client\.)send\(\s*(?:f)?['\"][^'\"]+['\"]\s*,"
-    r"|\b(?:client|mixer_client|osc_client|self\.mixer_client|self\._wing_client)"
+    r"self\._wing_client\.|self\._wing\.)send\(\s*(?:f)?['\"][^'\"]+['\"]\s*,"
+    r"|\b(?:client|mixer_client|osc_client|self\.mixer_client|self\._wing_client|self\._wing)"
     r"\.send\(\s*(?:addr|address)\s*,"
     r"|\bclient\.send\(\s*(?:addr|address)\s*,\s*value\s*\)"
+    r"|\b(?:self\.)?(?:wing_client|_wing_client|_wing)\.send\s*,"
 )
 
 
@@ -271,6 +272,8 @@ def test_static_scan_treats_raw_client_send_value_probes_as_write_tokens():
     assert RISKY_WRITE_TOKEN_RE.search('client.send("/ch/1/fdr", -6.0)')
     assert RISKY_WRITE_TOKEN_RE.search('self.mixer_client.send(f"/ch/{ch}/fdr", value)')
     assert RISKY_WRITE_TOKEN_RE.search('osc_client.send(f"/ch/{channel}/trim", state["current_trim"])')
+    assert RISKY_WRITE_TOKEN_RE.search("self._wing.send(address, value)")
+    assert RISKY_WRITE_TOKEN_RE.search("self.wing_client.send, address, value")
 
 
 def test_static_scan_treats_fx_and_insert_actions_as_write_tokens():

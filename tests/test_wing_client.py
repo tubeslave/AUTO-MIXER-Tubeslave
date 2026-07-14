@@ -127,6 +127,62 @@ class TestOSCThrottle:
             client.send("/ch/1/fdr")
             # No assertion needed — just ensure no exception is raised
 
+    def test_mutation_boundary_blocks_unowned_values_but_not_queries(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=False)
+            observed = []
+            token = client.install_mutation_boundary(
+                lambda address, values: (
+                    observed.append((address, values))
+                    or (address == "/ch/1/eq/on" and values == (0,))
+                )
+            )
+
+            assert client.send("/ch/1/eq/on", 0) is True
+            assert client.send("/ch/1/fdr", -12.0) is False
+            assert client.send("/ch/1/fdr") is True
+            assert client.sock.sendto.call_count == 2
+            assert observed == [
+                ("/ch/1/eq/on", (0,)),
+                ("/ch/1/fdr", (-12.0,)),
+            ]
+            assert client.remove_mutation_boundary(object()) is False
+            assert client.remove_mutation_boundary(token) is True
+            assert client.remove_mutation_boundary(token) is False
+
+    def test_mutation_boundary_is_exclusive_and_released_by_exact_token(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            token = client.install_mutation_boundary(lambda _address, _values: False)
+            with pytest.raises(RuntimeError, match="already_active"):
+                client.install_mutation_boundary(lambda _address, _values: True)
+            assert client.remove_mutation_boundary(token) is True
+            replacement = client.install_mutation_boundary(
+                lambda _address, _values: True
+            )
+            assert client.remove_mutation_boundary(replacement) is True
+
 
 class TestStateManagement:
     """Tests for WingClient state dict and callback management."""
@@ -196,6 +252,63 @@ class TestStateManagement:
             client._handle_message("/ch/2/mute", 1)
 
             assert len(all_msgs) == 2
+
+    def test_unsubscribe_removes_only_exact_callback(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            received = []
+            first = lambda addr, *args: received.append(("first", addr))
+            second = lambda addr, *args: received.append(("second", addr))
+            client.subscribe("*", first)
+            client.subscribe("*", first)
+            client.subscribe("*", second)
+
+            assert client.unsubscribe("*", first) is True
+            assert client.unsubscribe("*", first) is False
+            client._handle_message("/ch/1/fdr", 0.5)
+
+            assert received == [("second", "/ch/1/fdr")]
+
+    def test_callback_can_unsubscribe_itself_during_snapshot_dispatch(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+
+            client = WingClient(ip="127.0.0.1", port=2223)
+            received = []
+
+            def one_shot(addr, *args):
+                received.append(("one_shot", addr))
+                client.unsubscribe("*", one_shot)
+
+            def persistent(addr, *args):
+                received.append(("persistent", addr))
+
+            client.subscribe("*", one_shot)
+            client.subscribe("*", persistent)
+            client._handle_message("/ch/1/fdr", 0.5)
+            client._handle_message("/ch/2/fdr", 0.25)
+
+            assert received == [
+                ("one_shot", "/ch/1/fdr"),
+                ("persistent", "/ch/1/fdr"),
+                ("persistent", "/ch/2/fdr"),
+            ]
 
     def test_state_management_name_handling(self):
         """Name-related messages should store the string value."""

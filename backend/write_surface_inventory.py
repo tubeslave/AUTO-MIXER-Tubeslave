@@ -185,6 +185,8 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
         paths=(
             "backend/mixer_client_base.py",
             "backend/wing_client.py",
+            "backend/osc/enhanced_osc_client.py",
+            "backend/wing_supervised_console_adapters.py",
             "backend/dlive_client.py",
             "backend/mixing_station_client.py",
             "backend/osc_manager.py",
@@ -218,6 +220,29 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "Keep direct imports behind supervised gates and include any new transport "
             "client in this inventory."
         ),
+    ),
+    WriteSurface(
+        id="m110_attended_one_shot_maintenance",
+        label="M110 attended one-shot DSP maintenance executor",
+        status="lab_only",
+        paths=("backend/maintenance_dsp_reset.py",),
+        entrypoints=("M110MaintenanceDspResetExecutor.execute",),
+        write_kinds=("processor_bypass",),
+        allowed_live=False,
+        gate=(
+            "Fixed server-owned 64-address bundle; CP05 hardware gate, exact "
+            "one-shot capability, WAL-before-send, physical readback and reverse "
+            "rollback. Never part of the normal live allowlist."
+        ),
+        current_policy=(
+            "Available only inside an attended proof-owned M110 process after "
+            "software and hardware provenance gates pass."
+        ),
+        next_action=(
+            "Keep the address set server-constant and require a byte-identical "
+            "restored proof before permanent reset commit."
+        ),
+        notes=("m110_only", "one_shot_capability", "not_normal_live_authority"),
     ),
     WriteSurface(
         id="gain_fader_proposal_sources",
