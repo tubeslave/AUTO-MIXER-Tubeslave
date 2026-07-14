@@ -396,6 +396,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "tools/soundcheck_long_run_drift_audit.py",
             "tools/build_wing_readonly_preflight_handoff_packet.py",
             "tools/review_wing_readonly_preflight_artifacts.py",
+            "tools/migrate_m005_current_release_provenance.py",
             "backend/tub345_supervised_write_runner.py",
             "backend/wing_readonly_preflight_contract.py",
             "backend/wing_readonly_preflight_evidence.py",
@@ -410,6 +411,7 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "offline soundcheck long-run drift audit",
             "read-only WING preflight handoff packet builder",
             "read-only WING preflight artifact review",
+            "M005 current-release provenance migration and isolated replay",
             "TUB supervised WING write runner",
             "read-only WING preflight safety contract",
             "read-only WING preflight evidence intake",
@@ -429,7 +431,9 @@ WRITE_SURFACES: Tuple[WriteSurface, ...] = (
             "transport calls. Runtime observation may subscribe to meters and "
             "request dashboard/channel/decision/safety snapshots only. Long-run "
             "drift audit reads existing logs only and cannot create or apply "
-            "corrections."
+            "corrections. M005 provenance migration writes private evidence "
+            "artifacts and runs a sealed no-network/no-audio replay; correction "
+            "names inside that replay never grant console transport authority."
         ),
         next_action=(
             "Keep proof artifacts separate from live readiness claims until physical "

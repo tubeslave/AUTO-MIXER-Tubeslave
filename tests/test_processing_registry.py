@@ -934,6 +934,7 @@ def test_write_surface_inventory_covers_known_legacy_write_paths():
         "backend/auto_fader_v2/controller.py": "pan_phase_delay_direct_apply",
         "backend/auto_fx.py": "fx_insert_send_direct_apply",
         "backend/wing_readonly_preflight_contract.py": "proof_and_release_check_tools",
+        "tools/migrate_m005_current_release_provenance.py": "proof_and_release_check_tools",
         "backend/voice_control.py": "voice_ai_direct_commands",
         "backend/ai/agent.py": "voice_ai_direct_commands",
         "backend/reset_all_channels.py": "manual_reset_restore_scripts",
