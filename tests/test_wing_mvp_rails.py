@@ -748,7 +748,7 @@ def test_current_state_doc_matches_autopilot_state_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, \d+ skipped(?:, \d+ warnings?)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_full_suite = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
@@ -1458,6 +1458,13 @@ def test_mvp_progress_report_records_external_validation_handoff():
     assert "frozen legacy M001 packet contract" in progress_report
     for requirement in state["external_validation_requirements"]:
         assert f"  - {requirement}" in progress_report
+    assert (
+        "Current aggregate read-only decision status: "
+        f"`{latest['decision_ledger']['ledger_status']}`"
+        in progress_report
+    )
+    assert "Canonical read-only decision marker: `accepted_decision_ready`" not in progress_report
+    assert "the two items above" not in progress_report
     for requirement in score_gate["required_before_95"]:
         assert f"  - {requirement}" in progress_report
     assert (
@@ -1646,7 +1653,7 @@ def test_autopilot_operator_reports_match_latest_full_suite_evidence():
         result
         for row in ledger_rows
         for result in row.get("results", [])
-        if re.fullmatch(r"\d+ passed, 1 skipped(?:, 1 warning)?(?: in [0-9.]+s)?", result)
+        if re.fullmatch(r"\d+ passed, \d+ skipped(?:, \d+ warnings?)?(?: in [0-9.]+s)?", result)
     ]
     assert ledger_full_suite_results
     latest_ledger_result = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
@@ -2151,7 +2158,7 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "historical exact 2026-07-02 source retains `accepted_decision_ready`" in plan
     assert "failed CH3 fader rollback proof" in plan
     assert "operator captures and reviews a real WING read-only artifact" not in plan
-    assert "M111 migration hardening and M110 physical USB blocker" in current
+    assert "M112 committed validation sync; M110 physical USB blocker" in current
     assert "current aggregate ledger is `operator_review_required`" in current
     assert re.search(r"CH3 fader state\s+restoration/verification", current)
     assert "physical WING USB missing" in report

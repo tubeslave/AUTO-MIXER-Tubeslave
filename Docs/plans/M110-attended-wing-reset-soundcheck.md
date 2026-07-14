@@ -103,6 +103,11 @@ readback plus WAL recovery before resumption.
   launch-only probe with loopback backend contact, no WING/OSC/UDP/audio stream
   and no live write. Any later tracked change still invalidates the source
   binding until the markers are recomputed in one marker-only commit.
+- The current validated product/runtime baseline is
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`: `7160 passed, 3 skipped in
+  416.18s`, 150 WING/static rails and the 66/66 no-WING capsule
+  `20260714T195349Z_no_wing_release_check`. This does not replace the exact
+  launch-only provenance above or start HW01.
 - Passive CoreAudio/macOS USB enumeration found no physical WING device. HW01
   is blocked before start on `m110_wing_usb_coreaudio_device_missing`;
   HW02-HW05 remain pending and must run in order in one attended session. Dante

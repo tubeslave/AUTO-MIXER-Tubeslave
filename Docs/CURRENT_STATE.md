@@ -1,8 +1,8 @@
 # Current State
 
-Generated: 2026-07-14T19:25:55Z
+Generated: 2026-07-14T20:11:13Z
 
-## M111 migration hardening and M110 physical USB blocker — 2026-07-14
+## M112 committed validation sync; M110 physical USB blocker — 2026-07-14
 
 - Global status remains `WAITING_FOR_EXTERNAL_VALIDATION`, milestone `M001`,
   checkpoint `M001-EXTERNAL-WING-READONLY-ARTIFACT`.
@@ -13,8 +13,15 @@ Generated: 2026-07-14T19:25:55Z
   source-bound CP05 checkpoint, and its clean detached launch-only probe exited `0` with
   `status=verified`, `reason=proof_owned_backend_launch_verified`, opened only
   the loopback backend, and opened no WING, OSC/UDP or live-write surface.
+- Validation-source commit
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` includes committed M111 and the
+  M005 inventory repair. Its verified baseline is `7160 passed, 3 skipped in
+  416.18s`, with 150 WING/static truth rails. This is a validated
+  product/runtime baseline, not a self-referential claim that it is the future
+  M112 commit; exact current-tree identity is verified by the dynamic CP05
+  source binding.
 - The current-source backend-free no-WING evidence capsule is
-  `artifacts/no_wing_release_check/20260714T152531Z_no_wing_release_check`;
+  `artifacts/no_wing_release_check/20260714T195349Z_no_wing_release_check`;
   all 66 checks and detached manifest verification passed with
   `failed_checks: []`, `contacts_wing: false`, `contacts_backend: false` and
   no live authority. Only its contract-required `summary.json`, `summary.md`
@@ -149,7 +156,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
+Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -215,17 +222,19 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Current inspected M110 runtime checkpoint:
-  `5c054eb9e28d29601d974850b8874858b3fe0881`. The source checkpoint and CP05
-  marker pair are committed; M111 remains an implementation/truth tail until
-  its own validation, commit and dynamic marker-only rebind.
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`. M111, its inventory repair and
+  both intermediate marker rebinds are committed and validated. Exact current
+  tree identity remains owned by the dynamic CP05 marker contract.
 - Latest verified product/runtime commit:
-  `5c054eb9e28d29601d974850b8874858b3fe0881 Rebind M110 CP05 after truth sync`.
-  The clean detached launch-only probe passed on that exact commit.
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df Rebind M110 CP05 after inventory fix`.
+  The clean detached launch-only probe remains historically and correctly
+  bound to `5c054eb9e28d29601d974850b8874858b3fe0881`.
 - Latest verified pre-checkpoint autopilot state/evidence commit:
   `df54ea7ec Sync M006 event log path truth surfaces`
-- Current worktree state is dirty and contains the audited hardening tail plus
-  generated evidence. The current package proof is explicitly bound as
-  `dirty_tree_non_clean_checkout`; no clean-checkout release claim is made.
+- The validated product/runtime baseline is fully committed. Untracked
+  generated evidence remains outside the canonical source surface; the current
+  package proof is still explicitly `dirty_tree_non_clean_checkout`, so no
+  clean-checkout public-release claim is made.
 - Writer lease state: no active writer lease is present; the stale tracked
   `ops/autopilot/WRITER_LEASE/owner.json` runtime artifact was removed and the
   `ops/autopilot/WRITER_LEASE/` runtime directory is ignored.
@@ -2381,10 +2390,10 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `5c054eb9e28d29601d974850b8874858b3fe0881` passed with
-  `7135 passed, 1 skipped, 1 warning`. The run completed in `335.17s`. The result covers the committed M110
-  control plane before this docs/test
-  hardening tail on top of that verified base commit. This includes the M005 physical
+- The latest verified full-suite run for `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` passed with
+  `7160 passed, 3 skipped`. The run completed in `416.18s`. The result covers the committed M110/M111
+  control plane and M005 inventory repair at that validated product/runtime
+  baseline. This includes the M005 physical
   reconnect-target guard, the M006 owner-decision
   M005 event-log path binding, the M006 owner-decision reconnect-event
   packet-check binding, the M006 packet-verifier

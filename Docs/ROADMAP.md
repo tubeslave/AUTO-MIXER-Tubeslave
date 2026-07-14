@@ -14,9 +14,11 @@ launch-only probe passed with loopback backend contact and no WING/OSC/write.
 Passive CoreAudio and macOS USB enumeration found zero physical WING devices,
 so HW01 is blocked before start and HW02-HW05 remain pending.
 
-The next finite sequence is: commit this truth sync, rebind the source-bound
-CP05 markers with the runtime writer lease already released and absent, require one physical CoreAudio
-device named `WING` with 48 inputs/48 outputs at 48 kHz, then in one
+M112 records the committed `451d0fdf3` validation baseline (`7160 passed, 3
+skipped`, 150 rails, 66/66 no-WING) and completes the required dynamic CP05
+marker rebind without changing live authority. The next finite sequence now
+starts only when one physical CoreAudio device named `WING` with 48 inputs/48
+outputs at 48 kHz is present; then in one
 operator-attended process prove route, mute/contain outputs, bypass the 64
 CH1-16 processor-enable addresses, restore only the 77 known M006 changed
 addresses through exact 23/14/14 stages, unmute, analyze, execute interleaved
@@ -78,7 +80,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
+Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
 
 The detailed table below is a frozen dependency taxonomy, not the operational
 task selector; its old M002-M006 status labels are historical. Current release

@@ -20,6 +20,11 @@
 > migration route; it remains blocked on a fresh run/source-bound challenge,
 > exact same-console serial attestation, clean committed replay and explicit
 > migration-bound M006 decision.
+>
+> M112 validation truth: committed product/runtime baseline
+> `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` passed `7160 passed, 3 skipped in
+> 416.18s`, 150 WING/static rails and the 66/66 no-WING capsule. This changes no
+> hardware blocker or live authority.
 
 > Read-only decision-ledger addendum (2026-07-14): two later valid candidates
 > remain `operator_review_required`. The older exact source keeps its accepted
@@ -91,7 +96,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
+Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

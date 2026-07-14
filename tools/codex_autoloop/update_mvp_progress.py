@@ -735,6 +735,14 @@ def external_validation_handoff_lines(
     if not isinstance(full_release_requirements, list):
         full_release_requirements = []
 
+    current_decision_status = "unknown"
+    if latest_ledger:
+        decision_ledger = latest_ledger.get("decision_ledger")
+        if isinstance(decision_ledger, dict):
+            current_decision_status = str(
+                decision_ledger.get("ledger_status", current_decision_status)
+            )
+
     lines = [
         "## Current External Validation Handoff",
         "",
@@ -755,7 +763,14 @@ def external_validation_handoff_lines(
             "or public-release readiness while the current-source and public "
             "release requirements remain open."
         ),
-        "- Canonical read-only decision marker: `accepted_decision_ready`",
+        (
+            "- Current aggregate read-only decision status: "
+            f"`{current_decision_status}`"
+        ),
+        (
+            "- Historical exact-source decision marker: `accepted_decision_ready`; "
+            "it is not the current aggregate ledger status."
+        ),
         (
             "- Closed historical marker: `rollback_not_applied` is retained "
             "as audit history and closed by the passed CH3 fader rerun."
@@ -772,9 +787,9 @@ def external_validation_handoff_lines(
     for requirement in requirements:
         lines.append(f"  - {requirement}")
     lines.append(
-        "- Scope note: the two items above are current-source promotion/public "
-        "handoff items, not unfinished local engineering work and not the complete "
-        "full-release checklist."
+        "- Scope note: the external validation requirements above are current-source "
+        "promotion/public handoff items, not unfinished local engineering work and "
+        "not the complete full-release checklist."
     )
     lines.append("- Full-release requirements before 95/100:")
     for requirement in full_release_requirements:

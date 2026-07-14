@@ -34,8 +34,12 @@
   required; native M005 provenance remains false.
 - CP05 is dynamically checked against the current non-marker tree; tracked
   non-marker changes require one marker-only rebind before hardware work.
-- Latest heartbeat: 2026-07-14T19:25:55Z.
-- Latest verified full suite passed with `7135 passed, 1 skipped, 1 warning`.
+- Latest heartbeat: 2026-07-14T20:11:13Z.
+- Latest verified full suite passed with `7160 passed, 3 skipped`.
+- Validation-source baseline:
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`; 150 WING/static rails and the
+  66/66 no-WING capsule `20260714T195349Z_no_wing_release_check` passed.
+  The launch-only artifact remains correctly bound to `5c054eb9e`.
 - Two valid 2026-07-13 read-only candidates remain
   `operator_review_required`; they inherit no authority from the older
   accepted source and do not reopen closed M005 behavior.
@@ -113,7 +117,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
+Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

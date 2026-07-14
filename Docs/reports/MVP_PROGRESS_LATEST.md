@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-12T22:52:30Z`
+Generated: `2026-07-14T20:21:37Z`
 
 > Full-project release truth comes from `ops/autopilot/STATE.json.strict_pre_release_review`. The blocker inventory below is a frozen legacy M001 packet contract, not a current count of unfinished full-project work.
 
@@ -30,12 +30,11 @@ Supervised WING Rack proof.
 - Local engineering readiness: `95/100` against `95/100`; achieved: `true` (excludes public signing/notarization and standing live autonomy)
 - Public release ready from score gate: `false` (no standing supervised transaction authority)
 - Score gate: do not report public-release `95/100` or public-release readiness while the current-source and public release requirements remain open.
-- Current aggregate read-only decision marker: `operator_review_required` with two valid unreviewed 2026-07-13 candidates.
-- Historical exact-source marker: `accepted_decision_ready` applies only to `artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json`; later candidates inherit neither that decision nor live authority.
+- Current aggregate read-only decision status: `operator_review_required`
+- Historical exact-source decision marker: `accepted_decision_ready`; it is not the current aggregate ledger status.
 - Closed historical marker: `rollback_not_applied` is retained as audit history and closed by the passed CH3 fader rerun.
 - Current blocker from `STATE.json`: M110 remains blocked before HW01 because passive CoreAudio and macOS USB enumeration found no physical WING device; Dante Virtual Soundcard 32x32 is not an accepted substitute for WING 48x48 at 48 kHz. No capture stream or OSC/UDP path was opened, and reset/corrections remain 0. M111 now provides a truthful M005 migration route without changing native M005 provenance, but activation still requires the exact WING Rack serial and same-console owner attestation, a clean committed compatibility replay, and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 - Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
-- Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
 - Score ceiling reason: Strict public-release score 88/100 is separate from the achieved local engineering score of 95/100. Verified hardening includes canonical proposal-only WING WebSocket surfaces, strict address-bound physical readback and rollback CAS, one per-user writer lock and recovery WAL, atomic proposal claims, exact browser Origin and memory-only Electron token bootstrap, fail-closed read-time quarantine for legacy, offline and nested unbound physical claims with bounded tail reads, runtime identity v2, an M005 proof-owned initial non-observation connection before baseline plus observation-only reconnect, all exceptions after apply or rollback requiring manual review, and an atomic staged reanalysis candidate/commit/discard lifecycle with exact accepted-bundle identity and default-deny observation shadow. The final source-content-bound Electron 43 arm64 local smoke at artifacts/packaged_runtime_smoke/20260712T125342Z_145618f8-ef94-4eda-9b90-43eb995a3289_packaged_runtime_smoke/result.json passed 18/18 identity checks with a self-hashed embedded source manifest, authenticated launcher-token and observed backend PID binding, backend ready in 5207/20000 ms, zero external or WING sockets, and all four canonical stores unchanged. Final local validation passed 6364 backend tests, 190 frontend tests and 13 Chromium E2E tests. The post-lease five-store no-WING gate at artifacts/no_wing_release_check/20260712T224514Z_no_wing_release_check passed all 66 checks plus detached manifest verification with zero WING/backend contact, zero live writes and unchanged canonical stores. M005 behavioral proof is closed and the narrow M006 owner decision is recorded, but current-source provenance still blocks technical promotion. Public release remains blocked by immutable source/console/firmware/master-route evidence, clean-checkout package reproduction, Developer ID signing, notarization and Gatekeeper acceptance, production HTTPS/WSS token recovery, and operator-present room/PA listening validation.
 - External validation requirements:
   - Physical WING USB/CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute
@@ -43,7 +42,7 @@ Supervised WING Rack proof.
   - Operator accept or reject the two valid 2026-07-13 read-only preflight candidates; this decision-ledger requirement grants no live authority and does not reopen closed M005 behavior
   - Exact WING Rack serial and same-console owner attestation for the immutable 2026-07-11 M005 evidence; this is identity-only and grants no live authority
   - Clean committed M005 current-release compatibility replay plus an explicit verified_migration M006 owner decision bound to the recomputed migration and packet-verifier paths
-- Scope note: the five items above are current-source promotion/public handoff items, not unfinished local engineering work and not the complete full-release checklist.
+- Scope note: the external validation requirements above are current-source promotion/public handoff items, not unfinished local engineering work and not the complete full-release checklist.
 - Full-release requirements before 95/100:
   - operator-present canonical backend transaction proof on the exact WING Rack and firmware using only apply_operator_proposal, with physical snapshot, apply, readback, audio, rollback and emergency evidence
   - from a clean checkout, rebind or migrate the closed M005 physical cable-loss, timeout, stale-readback, blocked-write and reconnect-recovery artifact to the current source/runtime-identity-v2 provenance contract without repeating the cable pull unless the owner explicitly requests it
@@ -52,7 +51,7 @@ Supervised WING Rack proof.
   - real current-tree arm64 packaged-app launch smoke replay from a clean checkout, operator-accessible remote-client token provisioning and invalid or expired-token recovery without persistence or disclosure, Developer ID signing, notarization, stapling and Gatekeeper acceptance
   - operator-present room and PA listening with audible rollback, stereo master 47/48 route and true-peak verification, and emergency-stop validation
   - clean-checkout full suite plus reproduction of the final five-store no-WING, hashed-dependency and arm64 package evidence after writer-lease release, preserving all five canonical hashes and excluding documented synthetic and legacy-unbound audit rows from physical evidence
-- Latest ledger handoff row: `m110_independent_review_full_suite_green` at `2026-07-14T17:24:24Z`
+- Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 

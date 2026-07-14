@@ -83,6 +83,8 @@ delete old tasks unless a human explicitly requests pruning.
 - M111 status: offline fail-closed migration route implemented; activation
   requires a fresh source/run challenge, exact same-console serial,
   clean committed replay and explicit migration-bound M006 decision.
-- Next action: release the runtime writer lease, validate and commit the
-  non-marker tree, perform one marker-only CP05 rebind, then require physical
-  WING USB 48x48/48 kHz before starting the attended HW01-HW05 workflow.
+- M112 validation-source baseline:
+  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` is committed and verified with
+  `7160 passed, 3 skipped`, 150 rails and no-WING 66/66.
+- Next action: require physical WING USB 48x48/48 kHz before starting the
+  attended HW01-HW05 workflow. No control-plane sync grants live authority.
