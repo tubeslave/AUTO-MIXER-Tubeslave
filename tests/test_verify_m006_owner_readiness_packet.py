@@ -39,6 +39,10 @@ M005_TARGET = {
     "value_type": "fader",
     "address": "/ch/3/fdr",
 }
+M005_MIGRATION_SUMMARY_PATH = (
+    "artifacts/wing_m005_current_release_migration/"
+    "unit-migration/summary.json"
+)
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_packet", TOOL_PATH)
 assert SPEC is not None
@@ -72,11 +76,40 @@ def load_packet() -> dict:
     return json.loads(PACKET_SUMMARY.read_text(encoding="utf-8"))
 
 
+def ready_m005_migration_verification() -> dict:
+    return {
+        "schema": verifier.EXPECTED_M005_MIGRATION_SCHEMA,
+        "status": "ready_for_m006",
+        "summary_path": M005_MIGRATION_SUMMARY_PATH,
+        "historical_m005_summary": verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        "historical_m005_events": verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+        "accepted_readonly_source_id": verifier.EXPECTED_ACCEPTED_READONLY_SOURCE_ID,
+        "historical_evidence_ready": True,
+        "current_source_ready": True,
+        "compatibility_replay_ready": True,
+        "console_attestation_challenge_ready": True,
+        "console_attestation_ready": True,
+        "owner_decision_ready": True,
+        "migration_ready": True,
+        "m005_m006_input_accepted": True,
+        "m005_native_provenance_claimed": False,
+        "m005_native_current_release_accepted": False,
+        "contacts_wing": False,
+        "contacts_backend": False,
+        "live_write": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "readiness_matrix_update_allowed": False,
+        "failed_checks": [],
+    }
+
+
 def test_generated_m006_verifier_and_decision_outputs_are_gitignored() -> None:
     gitignore = (PROJECT_ROOT / ".gitignore").read_text(encoding="utf-8")
 
     assert "artifacts/wing_owner_readiness_review_verifier/" in gitignore
     assert "artifacts/wing_owner_readiness_decision_verifier/" in gitignore
+    assert "artifacts/wing_m005_current_release_migration/" in gitignore
     assert "artifacts/wing_owner_readiness_review/*/owner_decision.json" in gitignore
 
 
@@ -566,6 +599,121 @@ def test_complete_m005_summary_allows_owner_review_input_only() -> None:
     assert result["live_write"] is False
     assert result["checks"]["m005_initial_connection_phase_passed"] is True
     assert result["checks"]["m005_events_initial_connection_write_capable"] is True
+
+
+def test_verified_m005_migration_allows_owner_review_without_native_claims() -> None:
+    packet = load_packet()
+    result = verifier.verify_packet(
+        packet,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_migration_verification=ready_m005_migration_verification(),
+        m005_migration_summary_path=M005_MIGRATION_SUMMARY_PATH,
+        m005_summary_path=verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        m005_events_path=verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+    )
+
+    assert result["status"] == "ready_for_owner_review"
+    assert result["reason"] == "m006_owner_review_inputs_verified_via_m005_migration"
+    assert result["m005_acceptance_route"] == verifier.M005_ROUTE_MIGRATION
+    assert result["m005_m006_input_accepted"] is True
+    assert result["m005_migration_ready"] is True
+    assert result["m005_provenance_ready"] is False
+    assert result["m005_current_release_accepted"] is False
+    assert result["m005_owner_review_shape_ready"] is False
+    assert result["failed_checks"] == []
+    assert result["m005_native_failed_checks"]
+
+
+def test_verified_migration_rejects_noncanonical_legacy_paths() -> None:
+    result = verifier.verify_packet(
+        load_packet(),
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_migration_verification=ready_m005_migration_verification(),
+        m005_migration_summary_path=M005_MIGRATION_SUMMARY_PATH,
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert "m005_migration_legacy_summary_path_exact" in result["failed_checks"]
+    assert "m005_migration_legacy_events_path_exact" in result["failed_checks"]
+
+
+def test_invalid_explicit_migration_blocks_even_when_native_route_is_valid() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    migration_verification = ready_m005_migration_verification()
+    migration_verification["contacts_wing"] = True
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=COMPLETE_M005_SUMMARY_PATH,
+        m005_events_path=COMPLETE_M005_EVENTS_PATH,
+        m005_migration_verification=migration_verification,
+        m005_migration_summary_path=M005_MIGRATION_SUMMARY_PATH,
+        **complete_m005_verify_kwargs(m005),
+    )
+
+    assert result["status"] == "blocked"
+    assert result["m005_current_release_accepted"] is True
+    assert result["m005_m006_input_accepted"] is False
+    assert result["m005_acceptance_route"] is None
+    assert "m005_migration_contacts_wing_denied" in result["failed_checks"]
+
+
+def test_exact_historical_path_uses_verified_migration_route() -> None:
+    packet = load_packet()
+    m005 = complete_m005_summary()
+    m005["summary_path"] = verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+    m005["events_path"] = verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH
+    result = verifier.verify_packet(
+        packet,
+        m005_summary=m005,
+        proof_summaries_by_artifact=load_packet_proofs(packet),
+        m005_summary_path=verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        m005_events_path=verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+        m005_migration_verification=ready_m005_migration_verification(),
+        m005_migration_summary_path=M005_MIGRATION_SUMMARY_PATH,
+        **complete_m005_verify_kwargs(m005),
+    )
+
+    assert result["status"] == "ready_for_owner_review"
+    assert result["m005_acceptance_route"] == verifier.M005_ROUTE_MIGRATION
+    assert result["m005_current_release_accepted"] is False
+    assert result["m005_migration_ready"] is True
+
+
+@pytest.mark.parametrize(
+    ("field_name", "bad_value", "failed_check"),
+    [
+        ("historical_evidence_ready", False, "m005_migration_historical_evidence_ready"),
+        ("current_source_ready", False, "m005_migration_current_source_ready"),
+        ("compatibility_replay_ready", False, "m005_migration_compatibility_replay_ready"),
+        ("console_attestation_challenge_ready", False, "m005_migration_console_attestation_challenge_ready"),
+        ("console_attestation_ready", False, "m005_migration_console_attestation_ready"),
+        ("owner_decision_ready", False, "m005_migration_owner_decision_ready"),
+        ("accepted_readonly_source_id", "artifacts/other/summary.json", "m005_migration_readonly_source_matches_packet"),
+    ],
+)
+def test_m005_migration_roots_and_readonly_binding_fail_closed(
+    field_name: str,
+    bad_value: object,
+    failed_check: str,
+) -> None:
+    migration_verification = ready_m005_migration_verification()
+    migration_verification[field_name] = bad_value
+    result = verifier.verify_packet(
+        load_packet(),
+        proof_summaries_by_artifact=load_packet_proofs(),
+        m005_migration_verification=migration_verification,
+        m005_migration_summary_path=M005_MIGRATION_SUMMARY_PATH,
+        m005_summary_path=verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        m005_events_path=verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert failed_check in result["failed_checks"]
 
 
 def test_packet_readonly_source_must_match_m005_preflight_gate() -> None:

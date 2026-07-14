@@ -19,8 +19,11 @@ from typing import Any, Mapping
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_ROOT = PROJECT_ROOT / "backend"
+TOOLS_ROOT = PROJECT_ROOT / "tools"
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
+if str(TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(TOOLS_ROOT))
 
 from runtime_identity import (  # noqa: E402
     RUNTIME_IDENTITY_SCHEMA,
@@ -28,6 +31,13 @@ from runtime_identity import (  # noqa: E402
     capture_source_runtime_components,
     runtime_identity_manifest_sha256,
     valid_lower_hex,
+)
+from migrate_m005_current_release_provenance import (  # noqa: E402
+    EXPECTED_ACCEPTED_READONLY_SOURCE_ID,
+    EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+    EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+    MIGRATION_SCHEMA as EXPECTED_M005_MIGRATION_SCHEMA,
+    verify_migration_paths,
 )
 DEFAULT_PACKET_SUMMARY = (
     "artifacts/wing_owner_readiness_review/"
@@ -125,6 +135,8 @@ EXPECTED_M005_CONSOLE_IDENTITY_ROOT = "artifacts/wing_console_identity_owner_cha
 EXPECTED_M005_CONSOLE_MODEL = "WING Rack"
 EXPECTED_M005_CONSOLE_FIRMWARE = "3.0.5"
 MAX_M005_BOUND_BACKEND_START_DELAY_SECONDS = 600
+M005_ROUTE_NATIVE = "native_current_m005"
+M005_ROUTE_MIGRATION = "verified_migration"
 
 
 def _resolve(path_text: str | Path) -> Path:
@@ -533,6 +545,103 @@ def _m005_events_path_matches_summary_path(
     if ".." in summary_path.parts or ".." in events_path.parts:
         return False
     return events_path == summary_path.with_name("events.jsonl")
+
+
+def _record_m005_migration_checks(
+    checks: dict[str, bool],
+    *,
+    packet: Mapping[str, Any],
+    verification: Mapping[str, Any] | None,
+    migration_summary_path: str | None,
+) -> None:
+    """Validate only the explicit, independently recomputed migration route."""
+
+    _record(checks, "m005_migration_verification_supplied", verification is not None)
+    _record(
+        checks,
+        "m005_migration_summary_path_supplied",
+        isinstance(migration_summary_path, str) and bool(migration_summary_path),
+    )
+    if verification is None:
+        return
+    _record(
+        checks,
+        "m005_migration_schema_matches",
+        verification.get("schema") == EXPECTED_M005_MIGRATION_SCHEMA,
+    )
+    _record(
+        checks,
+        "m005_migration_status_ready",
+        verification.get("status") == "ready_for_m006",
+    )
+    _record(
+        checks,
+        "m005_migration_ready_true",
+        verification.get("migration_ready") is True,
+    )
+    _record(
+        checks,
+        "m005_migration_input_accepted_true",
+        verification.get("m005_m006_input_accepted") is True,
+    )
+    _record(
+        checks,
+        "m005_migration_failed_checks_empty",
+        verification.get("failed_checks") == [],
+    )
+    _record(
+        checks,
+        "m005_migration_summary_path_matches",
+        isinstance(migration_summary_path, str)
+        and verification.get("summary_path") == migration_summary_path,
+    )
+    _record(
+        checks,
+        "m005_migration_historical_paths_match",
+        verification.get("historical_m005_summary")
+        == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+        and verification.get("historical_m005_events")
+        == EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+    )
+    _record(
+        checks,
+        "m005_migration_readonly_source_matches_packet",
+        verification.get("accepted_readonly_source_id")
+        == packet.get("accepted_readonly_source_id")
+        == EXPECTED_ACCEPTED_READONLY_SOURCE_ID,
+    )
+    for field_name in (
+        "historical_evidence_ready",
+        "current_source_ready",
+        "compatibility_replay_ready",
+        "console_attestation_challenge_ready",
+        "console_attestation_ready",
+        "owner_decision_ready",
+    ):
+        _record(
+            checks,
+            f"m005_migration_{field_name}",
+            verification.get(field_name) is True,
+        )
+    _record(
+        checks,
+        "m005_migration_native_claims_denied",
+        verification.get("m005_native_provenance_claimed") is False
+        and verification.get("m005_native_current_release_accepted") is False,
+    )
+    for field_name in (
+        "contacts_wing",
+        "contacts_backend",
+        "live_write",
+        "live_authority_granted",
+        "readiness_closure_allowed",
+        "readiness_matrix_update_allowed",
+    ):
+        _record(
+            checks,
+            f"m005_migration_{field_name}_denied",
+            verification.get(field_name) is False,
+        )
 
 
 def _m005_disconnect_flow_indexes(request_types: Any) -> dict[str, int] | None:
@@ -1652,16 +1761,20 @@ def verify_packet(
     m005_events_sha256: str | None = None,
     m005_event_audit: Mapping[str, Any] | None = None,
     m005_console_identity_challenge: Mapping[str, Any] | None = None,
+    m005_migration_verification: Mapping[str, Any] | None = None,
+    m005_migration_summary_path: str | None = None,
 ) -> dict[str, Any]:
-    checks: dict[str, bool] = {}
-    _record_packet_checks(checks, packet)
+    common_checks: dict[str, bool] = {}
+    native_checks: dict[str, bool] = {}
+    migration_checks: dict[str, bool] = {}
+    _record_packet_checks(common_checks, packet)
     _record_proof_artifact_checks(
-        checks,
+        common_checks,
         packet,
         proof_summaries_by_artifact=proof_summaries_by_artifact,
     )
     _record_m005_checks(
-        checks,
+        native_checks,
         m005_summary=m005_summary,
         m005_event_request_types=m005_event_request_types,
         m005_event_initial_connection=m005_event_initial_connection,
@@ -1680,21 +1793,54 @@ def verify_packet(
         else {}
     )
     _record(
-        checks,
+        native_checks,
         "packet_accepted_readonly_source_matches_m005_gate",
         bool(m005_preflight_gate)
         and isinstance(packet.get("accepted_readonly_source_id"), str)
         and packet.get("accepted_readonly_source_id")
         == m005_preflight_gate.get("expected_accepted_readonly_source_id"),
     )
-
-    failed_checks = sorted(name for name, passed in checks.items() if not passed)
-    provenance_checks = sorted(
-        name for name in checks if name.startswith("m005_provenance_")
+    migration_requested = (
+        m005_migration_verification is not None
+        or m005_migration_summary_path is not None
     )
-    provenance_ready = bool(provenance_checks) and all(checks[name] for name in provenance_checks)
-    owner_review_shape_ready = all(
-        passed for name, passed in checks.items() if name not in provenance_checks
+    if migration_requested:
+        _record(
+            migration_checks,
+            "m005_migration_legacy_summary_path_exact",
+            m005_summary_path == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        )
+        _record(
+            migration_checks,
+            "m005_migration_legacy_events_path_exact",
+            m005_events_path == EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+        )
+        _record_m005_migration_checks(
+            migration_checks,
+            packet=packet,
+            verification=m005_migration_verification,
+            migration_summary_path=m005_migration_summary_path,
+        )
+
+    common_failed_checks = sorted(
+        name for name, passed in common_checks.items() if not passed
+    )
+    native_failed_checks = sorted(
+        name for name, passed in native_checks.items() if not passed
+    )
+    migration_failed_checks = sorted(
+        name for name, passed in migration_checks.items() if not passed
+    )
+    provenance_checks = sorted(
+        name for name in native_checks if name.startswith("m005_provenance_")
+    )
+    provenance_ready = bool(provenance_checks) and all(
+        native_checks[name] for name in provenance_checks
+    )
+    owner_review_shape_ready = not common_failed_checks and all(
+        passed
+        for name, passed in native_checks.items()
+        if name not in provenance_checks
     )
     behavioral_complete = bool(
         m005_summary
@@ -1702,9 +1848,35 @@ def verify_packet(
         and m005_summary.get("m005_complete") is True
         and m005_summary.get("missing_m005_evidence") == []
     )
-    ready = not failed_checks
-    if ready:
+    native_ready = not common_failed_checks and not native_failed_checks
+    migration_ready = bool(
+        migration_requested
+        and not common_failed_checks
+        and not migration_failed_checks
+    )
+    if migration_requested and not migration_ready:
+        acceptance_route = None
+        checks = {**common_checks, **migration_checks}
+        ready = False
+    elif native_ready:
+        acceptance_route = M005_ROUTE_NATIVE
+        checks = {**common_checks, **native_checks}
+        ready = True
+    elif migration_ready:
+        acceptance_route = M005_ROUTE_MIGRATION
+        checks = {**common_checks, **migration_checks}
+        ready = True
+    else:
+        acceptance_route = None
+        checks = {**common_checks, **native_checks}
+        ready = False
+    failed_checks = sorted(name for name, passed in checks.items() if not passed)
+    if ready and acceptance_route == M005_ROUTE_MIGRATION:
+        reason = "m006_owner_review_inputs_verified_via_m005_migration"
+    elif ready:
         reason = "m006_owner_review_inputs_verified"
+    elif migration_requested:
+        reason = "m005_current_release_migration_missing_or_mismatch"
     elif m005_summary is None:
         reason = "m005_summary_required_for_owner_review"
     elif behavioral_complete and owner_review_shape_ready and not provenance_ready:
@@ -1720,12 +1892,19 @@ def verify_packet(
         "packet_summary": packet_summary_path,
         "m005_summary": m005_summary_path,
         "m005_events": m005_events_path,
+        "m005_migration_summary": m005_migration_summary_path,
         "proof_artifact_summaries": sorted((proof_summaries_by_artifact or {}).keys()),
         "owner_review_input_ready": ready,
+        "m005_m006_input_accepted": ready,
+        "m005_acceptance_route": acceptance_route,
         "m005_behavioral_proof_complete": behavioral_complete,
         "m005_owner_review_shape_ready": owner_review_shape_ready,
         "m005_provenance_ready": provenance_ready,
-        "m005_current_release_accepted": ready,
+        "m005_current_release_accepted": native_ready,
+        "m005_migration_ready": migration_ready,
+        "m005_native_failed_checks": native_failed_checks,
+        "m005_migration_failed_checks": migration_failed_checks,
+        "m005_migration_checks": migration_checks,
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
@@ -1737,11 +1916,25 @@ def verify_packet(
     }
 
 
-def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) -> dict[str, Any]:
+def verify_packet_paths(
+    packet_summary: Path,
+    m005_summary: Path | None = None,
+    m005_migration_summary: Path | None = None,
+) -> dict[str, Any]:
     packet_path = _resolve(packet_summary)
     m005_path = _resolve(m005_summary) if m005_summary is not None else None
+    migration_path = (
+        _resolve(m005_migration_summary)
+        if m005_migration_summary is not None
+        else None
+    )
     packet = _load_json(packet_path)
     m005 = _load_json(m005_path) if m005_path is not None else None
+    migration_verification = (
+        verify_migration_paths(migration_path)
+        if migration_path is not None
+        else None
+    )
     m005_console_identity_challenge = load_m005_console_identity_challenge(m005)
     m005_event_audit, m005_events_path = load_m005_event_audit(
         m005_summary_path=m005_path,
@@ -1784,6 +1977,10 @@ def verify_packet_paths(packet_summary: Path, m005_summary: Path | None = None) 
         m005_events_sha256=m005_events_sha256,
         m005_event_audit=m005_event_audit,
         m005_console_identity_challenge=m005_console_identity_challenge,
+        m005_migration_verification=migration_verification,
+        m005_migration_summary_path=(
+            _display_path(migration_path) if migration_path is not None else None
+        ),
     )
 
 
@@ -1832,6 +2029,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--m005-migration-summary",
+        help=(
+            "Optional explicit M005 current-release migration summary. The "
+            "verifier recomputes it from its bound snapshots and fails closed."
+        ),
+    )
+    parser.add_argument(
         "--write-artifact",
         action="store_true",
         help="Write verifier summary.json under --artifact-root/<run-id>/.",
@@ -1846,6 +2050,11 @@ def main(argv: list[str] | None = None) -> int:
     result = verify_packet_paths(
         Path(args.packet_summary),
         Path(args.m005_summary) if args.m005_summary else None,
+        (
+            Path(args.m005_migration_summary)
+            if args.m005_migration_summary
+            else None
+        ),
     )
     if args.write_artifact:
         result = write_verifier_artifact(

@@ -99,10 +99,10 @@ readback plus WAL recovery before resumption.
   progress, bounded replans are run/revision/content bound, and an audio-safety
   failure never blindly rolls a verified attenuation target upward.
 - M110-CP05 is complete under the two canonical committed markers. Commit
-  `91907b8fc620857172a96176baba6e52ced081e1` passed the clean detached
+  `5c054eb9e28d29601d974850b8874858b3fe0881` passed the clean detached
   launch-only probe with loopback backend contact, no WING/OSC/UDP/audio stream
   and no live write. Any later tracked change still invalidates the source
-  binding until the markers are recomputed and recommitted.
+  binding until the markers are recomputed in one marker-only commit.
 - Passive CoreAudio/macOS USB enumeration found no physical WING device. HW01
   is blocked before start on `m110_wing_usb_coreaudio_device_missing`;
   HW02-HW05 remain pending and must run in order in one attended session. Dante

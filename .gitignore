@@ -62,6 +62,7 @@ artifacts/wing_console_identity_owner_challenge/
 artifacts/wing_timeout_disconnect_proof/
 artifacts/wing_owner_readiness_review_verifier/
 artifacts/wing_owner_readiness_decision_verifier/
+artifacts/wing_m005_current_release_migration/
 artifacts/wing_owner_readiness_review/*/owner_decision.json
 artifacts/wing_owner_readiness_review/*/owner_decision-*.json
 artifacts/show_assist_auto_v1/

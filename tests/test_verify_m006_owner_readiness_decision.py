@@ -40,6 +40,10 @@ M005_EVENTS_REL = (
     "artifacts/wing_timeout_disconnect_proof/"
     "unit_m005_disconnect_timeout_stale_proof/events.jsonl"
 )
+M005_MIGRATION_SUMMARY_REL = (
+    "artifacts/wing_m005_current_release_migration/"
+    "unit-migration/summary.json"
+)
 
 SPEC = importlib.util.spec_from_file_location("verify_m006_owner_readiness_decision", TOOL_PATH)
 assert SPEC is not None
@@ -67,10 +71,17 @@ def ready_packet_verifier_report() -> dict:
         "m005_events": M005_EVENTS_REL,
         "proof_artifact_summaries": list(packet["input_proof_artifacts"]),
         "owner_review_input_ready": True,
+        "m005_m006_input_accepted": True,
+        "m005_acceptance_route": verifier.M005_ROUTE_NATIVE,
         "m005_behavioral_proof_complete": True,
         "m005_owner_review_shape_ready": True,
         "m005_provenance_ready": True,
         "m005_current_release_accepted": True,
+        "m005_migration_summary": None,
+        "m005_migration_ready": False,
+        "m005_native_failed_checks": [],
+        "m005_migration_failed_checks": [],
+        "m005_migration_checks": {},
         "live_authority_granted": False,
         "readiness_closure_allowed": False,
         "readiness_matrix_update_allowed": False,
@@ -91,6 +102,28 @@ def ready_packet_verifier_report() -> dict:
         },
         "failed_checks": [],
     }
+
+
+def ready_migration_packet_verifier_report() -> dict:
+    report = ready_packet_verifier_report()
+    report.update(
+        {
+            "reason": verifier.EXPECTED_PACKET_VERIFIER_MIGRATION_REASON,
+            "m005_acceptance_route": verifier.M005_ROUTE_MIGRATION,
+            "m005_owner_review_shape_ready": False,
+            "m005_provenance_ready": False,
+            "m005_current_release_accepted": False,
+            "m005_migration_summary": M005_MIGRATION_SUMMARY_REL,
+            "m005_summary": verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+            "m005_events": verifier.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+            "m005_migration_ready": True,
+            "m005_native_failed_checks": ["m005_provenance_schema_matches"],
+            "m005_migration_failed_checks": [],
+            "m005_migration_checks": {"migration_unit_ready": True},
+            "checks": {"packet_unit_ready": True, "migration_unit_ready": True},
+        }
+    )
+    return report
 
 
 def accepted_decision() -> dict:
@@ -114,7 +147,13 @@ def accepted_decision() -> dict:
     return decision
 
 
-def verify(decision: dict, *, packet_verifier: dict | None = None) -> dict:
+def verify(
+    decision: dict,
+    *,
+    packet_verifier: dict | None = None,
+    migration_summary_path: str | None = None,
+    m005_summary_path: str = M005_SUMMARY_REL,
+) -> dict:
     return verifier.verify_decision(
         decision,
         packet=load_packet(),
@@ -122,7 +161,8 @@ def verify(decision: dict, *, packet_verifier: dict | None = None) -> dict:
         decision_summary_path=DECISION_TEMPLATE_REL,
         packet_summary_path=PACKET_SUMMARY_REL,
         packet_verifier_summary_path=PACKET_VERIFIER_SUMMARY_REL if packet_verifier else None,
-        m005_summary_path=M005_SUMMARY_REL,
+        m005_summary_path=m005_summary_path,
+        m005_migration_summary_path=migration_summary_path,
     )
 
 
@@ -160,6 +200,78 @@ def test_accepted_decision_allows_matrix_update_candidate_only() -> None:
     assert result["contacts_wing"] is False
     assert result["contacts_backend"] is False
     assert result["live_write"] is False
+
+
+def test_migration_decision_requires_and_accepts_explicit_route_binding() -> None:
+    decision = accepted_decision()
+    decision["m005_summary"] = verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+    decision["m005_acceptance_route"] = verifier.M005_ROUTE_MIGRATION
+    decision["m005_migration_summary"] = M005_MIGRATION_SUMMARY_REL
+
+    result = verify(
+        decision,
+        packet_verifier=ready_migration_packet_verifier_report(),
+        migration_summary_path=M005_MIGRATION_SUMMARY_REL,
+        m005_summary_path=verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+    )
+
+    assert result["status"] == "ready_for_readiness_matrix_update"
+    assert result["m005_acceptance_route"] == verifier.M005_ROUTE_MIGRATION
+    assert result["m005_m006_input_accepted"] is True
+    assert result["m005_migration_summary"] == M005_MIGRATION_SUMMARY_REL
+    assert result["failed_checks"] == []
+
+
+def test_migration_decision_rejects_noncanonical_legacy_summary() -> None:
+    decision = accepted_decision()
+    decision["m005_acceptance_route"] = verifier.M005_ROUTE_MIGRATION
+    decision["m005_migration_summary"] = M005_MIGRATION_SUMMARY_REL
+
+    result = verify(
+        decision,
+        packet_verifier=ready_migration_packet_verifier_report(),
+        migration_summary_path=M005_MIGRATION_SUMMARY_REL,
+    )
+
+    assert result["status"] == "blocked"
+    assert (
+        "packet_verifier_migration_legacy_paths_exact"
+        in result["failed_checks"]
+    )
+    assert (
+        "decision_m005_migration_legacy_summary_exact"
+        in result["failed_checks"]
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda decision: decision.pop("m005_acceptance_route", None),
+        lambda decision: decision.pop("m005_migration_summary", None),
+        lambda decision: decision.update(
+            {"m005_migration_summary": "artifacts/other/summary.json"}
+        ),
+    ],
+)
+def test_migration_decision_missing_or_mismatched_binding_fails_closed(
+    mutation,
+) -> None:
+    decision = accepted_decision()
+    decision["m005_summary"] = verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+    decision["m005_acceptance_route"] = verifier.M005_ROUTE_MIGRATION
+    decision["m005_migration_summary"] = M005_MIGRATION_SUMMARY_REL
+    mutation(decision)
+
+    result = verify(
+        decision,
+        packet_verifier=ready_migration_packet_verifier_report(),
+        migration_summary_path=M005_MIGRATION_SUMMARY_REL,
+        m005_summary_path=verifier.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+    )
+
+    assert result["status"] == "blocked"
+    assert result["owner_decision_accepted"] is False
 
 
 def test_rejected_owner_decision_fails_closed() -> None:

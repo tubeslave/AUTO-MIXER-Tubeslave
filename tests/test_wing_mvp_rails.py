@@ -28,6 +28,7 @@ from backend.no_live_transport_contract import (
     REQUIRED_ZERO_RUNTIME_OBSERVATIONS,
     evaluate_no_live_transport_contract,
 )
+from backend.m110_cp05_hardware_gate import verify_m110_cp05_hardware_gate
 from backend.offline_replay_evaluation_contract import (
     REQUIRED_EVALUATION_TYPES,
     REQUIRED_QUALITY_AXES,
@@ -58,6 +59,7 @@ from backend.safety_kernel_trace_contract import (
     REQUIRED_TRACE_SCENARIOS as SAFETY_KERNEL_REQUIRED_TRACE_SCENARIOS,
     evaluate_safety_kernel_trace_contract,
 )
+from backend.supervised_proof_capability import M110_RUNTIME_CRITICAL_PATHS
 from backend import wing_readonly_preflight_contract as readonly_contract
 from tools import build_wing_readonly_preflight_handoff_packet as handoff_packet
 from tools import no_wing_release_check as release_check
@@ -1088,6 +1090,12 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
 
 
 def test_m110_current_truth_surfaces_track_cp05_launch_and_missing_usb_blocker():
+    dynamic_gate = verify_m110_cp05_hardware_gate(
+        repo_root=PROJECT_ROOT,
+        critical_paths=M110_RUNTIME_CRITICAL_PATHS,
+    )
+    assert dynamic_gate["verified"] is True
+    assert dynamic_gate["reason"] == "m110_cp05_hardware_gate_verified"
     state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
     work = state["active_work"]
     evidence = json.loads(M110_CP05_EVIDENCE.read_text(encoding="utf-8"))
@@ -1227,9 +1235,9 @@ def test_autopilot_latest_ledger_records_external_validation_handoff():
     for marker in (
         "Do not widen live authority",
         "M005",
-        "disconnect/timeout/stale-state",
+        "2026-07-11 M005 run",
         "M006",
-        "readiness review",
+        "verified_migration",
     ):
         assert marker in latest["next_operator_action"]
     for requirement in latest["external_validation_requirements"]:
@@ -1732,26 +1740,8 @@ def test_goal_transition_fallback_contract_stays_report_only_without_native_goal
             assert "M005" in state["next_action"]
             assert "M006" in state["next_action"]
         else:
-            assert (
-                "Operator reviews artifacts/wing_readonly_preflight" in state["next_action"]
-                or "Operator uses the Operator Decision Queue" in state["next_action"]
-            )
-            if "Operator Decision Queue" in state["next_action"]:
-                assert (
-                    "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-                    in state["next_action"]
-                )
-                assert (
-                    state["last_validation_summary"].get(
-                        "wing_readonly_preflight_operator_decision_queue_report"
-                    )
-                    == "Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md"
-                )
-            else:
-                assert (
-                    "artifacts/wing_readonly_preflight_review_decisions/"
-                    "pending_review_decision_template.json"
-                ) in state["next_action"]
+            assert "Do not widen live authority" in state["next_action"]
+            assert "verified_migration" in state["next_action"]
     else:
         assert "operator-supervised WING read-only preflight" in state["next_action"]
 
@@ -2069,9 +2059,9 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             assert "Do not widen live authority" in state["next_action"]
             for marker in (
                 "M005",
-                "disconnect/timeout/stale-state",
+                "2026-07-11 M005 run",
                 "M006",
-                "readiness review",
+                "verified_migration",
             ):
                 assert marker in state["next_operator_action"]
         else:
@@ -2112,8 +2102,8 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
         "Physical WING USB/CoreAudio device named WING",
         "M110-HW01 through M110-HW05",
         "two valid 2026-07-13 read-only preflight candidates",
-        "Current-release provenance rebind for the closed M005",
-        "Technical M006 readiness review promotion",
+        "Exact WING Rack serial and same-console owner attestation",
+        "Clean committed M005 current-release compatibility replay",
     ):
         assert any(marker in item for item in state["external_validation_requirements"])
 
@@ -2161,7 +2151,7 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "historical exact 2026-07-02 source retains `accepted_decision_ready`" in plan
     assert "failed CH3 fader rollback proof" in plan
     assert "operator captures and reviews a real WING read-only artifact" not in plan
-    assert "M110 CP05/launch checkpoint and physical USB blocker" in current
+    assert "M111 migration hardening and M110 physical USB blocker" in current
     assert "current aggregate ledger is `operator_review_required`" in current
     assert re.search(r"CH3 fader state\s+restoration/verification", current)
     assert "physical WING USB missing" in report

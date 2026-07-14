@@ -10,8 +10,9 @@ Paperclip, ADRs, tests, or git history.
 - M110 attended WING reset and staged soundcheck is the current
   operator-directed task. CP05 and clean detached launch-only are verified.
   Passive CoreAudio/macOS USB enumeration found no physical WING, so HW01 is
-  blocked before start. The truth-sync lease is released and absent; rebind CP05, then execute
-  HW01-HW05 in one proof-owned session after WING 48x48/48 kHz USB appears.
+  blocked before start. CP05 is dynamically checked against the current
+  non-marker tree; execute HW01-HW05 in one proof-owned session only after the
+  gate passes and WING 48x48/48 kHz USB appears.
   Do not claim 95/100 before the repeated final audit and SHA-bound listening
   prove `show_mix_ready`; do not convert the one-run M006 permission into
   standing authority.
@@ -69,16 +70,19 @@ delete old tasks unless a human explicitly requests pruning.
   bind/commit CP05 after lease release, then run the real attended workflow and
   record actual readiness without widening the normal allowlist.
 
-## 2026-07-14 — M110 CP05 launch verified; WING USB prerequisite missing
+## 2026-07-14 — M111 migration route; M110 WING USB prerequisite missing
 
 - Owner: Codex + attended operator.
 - Status: CP00-CP05 complete; clean detached launch-only verified; HW01 blocked
   before start because exact CoreAudio WING candidate count is `0`; HW02-HW05
   pending.
-- Evidence: commit `91907b8fc620857172a96176baba6e52ced081e1`; launch summary
-  `/Users/dmitrijvolkov/.automixer/runtime/m110_attended/20260714T184500Z_91907b8fc_launch/plan-summary.json`;
+- Evidence: commit `5c054eb9e28d29601d974850b8874858b3fe0881`; launch summary
+  `/Users/dmitrijvolkov/.automixer/runtime/m110_attended_final_20260714T173441Z/plan-summary.json`;
   local CoreAudio/macOS USB enumeration classified as
   `ephemeral_local_enumeration`; no audio stream, WING, OSC/UDP or live write.
-- Next action: finish and commit truth synchronization with the runtime writer
-  lease released and absent, rebind CP05 to the final tree, then require physical WING USB
-  48x48/48 kHz before starting the attended HW01-HW05 workflow.
+- M111 status: offline fail-closed migration route implemented; activation
+  requires a fresh source/run challenge, exact same-console serial,
+  clean committed replay and explicit migration-bound M006 decision.
+- Next action: release the runtime writer lease, validate and commit the
+  non-marker tree, perform one marker-only CP05 rebind, then require physical
+  WING USB 48x48/48 kHz before starting the attended HW01-HW05 workflow.

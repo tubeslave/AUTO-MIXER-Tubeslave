@@ -1,11 +1,11 @@
 # Autopilot Last Report
 
-## M110 CP05/launch verified; physical WING USB missing — 2026-07-14
+## M111 migration hardened; M110 physical WING USB missing — 2026-07-14
 
 - The global M001 status/checkpoint stays unchanged; M110 is
   `STATE.json.active_work`.
 - CP00-CP05 are complete under the canonical source-bound marker contract.
-  Commit `91907b8fc620857172a96176baba6e52ced081e1` passed the clean detached
+  Commit `5c054eb9e28d29601d974850b8874858b3fe0881` passed the clean detached
   launch-only probe with loopback backend contact and no WING/OSC/UDP/audio
   stream/live write.
 - Passive CoreAudio and macOS USB enumeration found zero physical WING devices.
@@ -28,9 +28,13 @@
   not standing authority.
 - Strict real-live/public readiness remains `88/100`, normal allowlist `0`,
   live authority `false`; the requested `95/100` awaits real HW01-HW05.
-- The truth-sync writer lease is released and its directory is absent. Final
-  CP05 marker rebind remains required before any hardware attempt.
-- Latest heartbeat: 2026-07-14T17:24:24Z.
+- M111 now has a fail-closed offline migration route for exact M005 bytes. A
+  fresh run/source-bound owner challenge, exact same-console serial, clean
+  committed replay and explicit migration-bound M006 decision are still
+  required; native M005 provenance remains false.
+- CP05 is dynamically checked against the current non-marker tree; tracked
+  non-marker changes require one marker-only rebind before hardware work.
+- Latest heartbeat: 2026-07-14T19:25:55Z.
 - Latest verified full suite passed with `7135 passed, 1 skipped, 1 warning`.
 - Two valid 2026-07-13 read-only candidates remain
   `operator_review_required`; they inherit no authority from the older
@@ -97,19 +101,19 @@ Canonical report:
   The final retry at `20260712T131015Z` correctly blocked on current USB silence;
   USB 47/48 route and Main unmuted/0 dB readback remained correct.
 
-Current blocker from `STATE.json`: M110 CP05 and the clean detached launch-only probe are verified on the committed control plane, but passive CoreAudio and macOS USB enumeration found no physical WING device. Therefore M110-HW01 has not started, no capture stream or OSC/UDP path was opened, and reset/corrections remain 0. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven. M005 behavior is closed and narrow M006 owner intent is recorded, while current-source promotion and the remaining public-release gates stay fail-closed.
+Current blocker from `STATE.json`: M110 remains blocked before HW01 because passive CoreAudio and macOS USB enumeration found no physical WING device; Dante Virtual Soundcard 32x32 is not an accepted substitute for WING 48x48 at 48 kHz. No capture stream or OSC/UDP path was opened, and reset/corrections remain 0. M111 now provides a truthful M005 migration route without changing native M005 provenance, but activation still requires the exact WING Rack serial and same-console owner attestation, a clean committed compatibility replay, and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
 ### Current external validation requirements
 
 - Physical WING USB/CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute
 - Operator-present CP05-bound M110-HW01 through M110-HW05 run with route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown evidence
 - Operator accept or reject the two valid 2026-07-13 read-only preflight candidates; this decision-ledger requirement grants no live authority and does not reopen closed M005 behavior
-- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
-- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
+- Exact WING Rack serial and same-console owner attestation for the immutable 2026-07-11 M005 evidence; this is identity-only and grants no live authority
+- Clean committed M005 current-release compatibility replay plus an explicit verified_migration M006 owner decision bound to the recomputed migration and packet-verifier paths
 
-Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Then rerun the CP05-bound attended M110-HW01-HW05 process for route, reset, staged soundcheck, rollback, SHA-bound listening and teardown. Operator uses the Operator Decision Queue in Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md to accept or reject the two valid 2026-07-13 read-only preflight candidates without granting authority. Separately rebind the closed M005 disconnect/timeout/stale-state evidence and rerun the M006 readiness review; complete clean-checkout signing/notarization/Gatekeeper and production remote-auth recovery separately.
+Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m110_independent_review_full_suite_green` at `2026-07-14T17:24:24Z`.
+Latest ledger handoff row: `m111_m005_migration_fail_closed_handoff` at `2026-07-14T19:25:55Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

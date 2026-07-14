@@ -20,7 +20,13 @@ TOOLS_ROOT = PROJECT_ROOT / "tools"
 if str(TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(TOOLS_ROOT))
 
-from verify_m006_owner_readiness_packet import verify_packet_paths  # noqa: E402
+from verify_m006_owner_readiness_packet import (  # noqa: E402
+    EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+    EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+    M005_ROUTE_MIGRATION,
+    M005_ROUTE_NATIVE,
+    verify_packet_paths,
+)
 DEFAULT_DECISION_SUMMARY = (
     "artifacts/wing_owner_readiness_review/"
     "20260704T191101Z_m006_owner_readiness_review_packet/owner_decision_template.json"
@@ -46,6 +52,9 @@ EXPECTED_M005_READBACK_TARGET_BINDING = [
 EXPECTED_PACKET_STATUS = "ready_for_owner_review_after_m005"
 EXPECTED_PACKET_VERIFIER_STATUS = "ready_for_owner_review"
 EXPECTED_PACKET_VERIFIER_REASON = "m006_owner_review_inputs_verified"
+EXPECTED_PACKET_VERIFIER_MIGRATION_REASON = (
+    "m006_owner_review_inputs_verified_via_m005_migration"
+)
 EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS = {
     "m005_events_stale_readback_payload_present",
     "m005_events_stale_readback_matches_summary",
@@ -206,6 +215,20 @@ def _is_repo_relative_packet_verifier_summary(path_text: Any) -> bool:
     )
 
 
+def _is_repo_relative_m005_migration_summary(path_text: Any) -> bool:
+    if not isinstance(path_text, str):
+        return False
+    path = Path(path_text)
+    return (
+        not path.is_absolute()
+        and ".." not in path.parts
+        and len(path.parts) >= 4
+        and path.parts[0] == "artifacts"
+        and path.parts[1] == "wing_m005_current_release_migration"
+        and path.name == "summary.json"
+    )
+
+
 def _is_repo_relative_m005_summary(path_text: Any) -> bool:
     return _is_repo_relative_path(
         path_text,
@@ -338,6 +361,7 @@ def _record_packet_verifier_checks(
     packet_verifier_summary_path: str | None,
     packet_summary_path: str | None,
     m005_summary_path: str | None,
+    m005_migration_summary_path: str | None,
 ) -> None:
     _record(
         checks,
@@ -363,10 +387,26 @@ def _record_packet_verifier_checks(
         "packet_verifier_status_ready",
         packet_verifier.get("status") == EXPECTED_PACKET_VERIFIER_STATUS,
     )
+    route = packet_verifier.get("m005_acceptance_route")
+    if route is None and (
+        packet_verifier.get("m005_provenance_ready") is True
+        and packet_verifier.get("m005_current_release_accepted") is True
+    ):
+        route = M005_ROUTE_NATIVE
+    _record(
+        checks,
+        "packet_verifier_m005_acceptance_route_valid",
+        route in {M005_ROUTE_NATIVE, M005_ROUTE_MIGRATION},
+    )
     _record(
         checks,
         "packet_verifier_reason_verified",
-        packet_verifier.get("reason") == EXPECTED_PACKET_VERIFIER_REASON,
+        packet_verifier.get("reason")
+        == (
+            EXPECTED_PACKET_VERIFIER_MIGRATION_REASON
+            if route == M005_ROUTE_MIGRATION
+            else EXPECTED_PACKET_VERIFIER_REASON
+        ),
     )
     _record(
         checks,
@@ -378,40 +418,99 @@ def _record_packet_verifier_checks(
         "packet_verifier_owner_review_input_ready",
         packet_verifier.get("owner_review_input_ready") is True,
     )
-    for field_name in (
-        "m005_behavioral_proof_complete",
-        "m005_owner_review_shape_ready",
-        "m005_provenance_ready",
-        "m005_current_release_accepted",
-    ):
-        _record(
-            checks,
-            f"packet_verifier_{field_name}",
-            packet_verifier.get(field_name) is True,
-        )
+    _record(
+        checks,
+        "packet_verifier_m005_m006_input_accepted",
+        packet_verifier.get("m005_m006_input_accepted") is True,
+    )
     packet_verifier_checks = _get_mapping(packet_verifier, "checks")
     _record(
         checks,
         "packet_verifier_checks_present",
         isinstance(packet_verifier.get("checks"), Mapping),
     )
-    provenance_check_names = [
-        name for name in packet_verifier_checks if name.startswith("m005_provenance_")
-    ]
-    _record(
-        checks,
-        "packet_verifier_m005_provenance_checks_present_and_true",
-        bool(provenance_check_names)
-        and all(packet_verifier_checks.get(name) is True for name in provenance_check_names),
-    )
-    for check_name in sorted(
-        EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS
-        | EXPECTED_PACKET_VERIFIER_M005_RECONNECT_EVENT_CHECKS
-    ):
+    if route == M005_ROUTE_NATIVE:
+        for field_name in (
+            "m005_behavioral_proof_complete",
+            "m005_owner_review_shape_ready",
+            "m005_provenance_ready",
+            "m005_current_release_accepted",
+        ):
+            _record(
+                checks,
+                f"packet_verifier_{field_name}",
+                packet_verifier.get(field_name) is True,
+            )
+        provenance_check_names = [
+            name
+            for name in packet_verifier_checks
+            if name.startswith("m005_provenance_")
+        ]
         _record(
             checks,
-            f"packet_verifier_{check_name}",
-            packet_verifier_checks.get(check_name) is True,
+            "packet_verifier_m005_provenance_checks_present_and_true",
+            bool(provenance_check_names)
+            and all(
+                packet_verifier_checks.get(name) is True
+                for name in provenance_check_names
+            ),
+        )
+        for check_name in sorted(
+            EXPECTED_PACKET_VERIFIER_M005_STALE_EVENT_CHECKS
+            | EXPECTED_PACKET_VERIFIER_M005_RECONNECT_EVENT_CHECKS
+        ):
+            _record(
+                checks,
+                f"packet_verifier_{check_name}",
+                packet_verifier_checks.get(check_name) is True,
+            )
+        _record(
+            checks,
+            "packet_verifier_native_migration_path_absent",
+            packet_verifier.get("m005_migration_summary") is None
+            and m005_migration_summary_path is None,
+        )
+    elif route == M005_ROUTE_MIGRATION:
+        _record(
+            checks,
+            "packet_verifier_migration_ready",
+            packet_verifier.get("m005_migration_ready") is True,
+        )
+        _record(
+            checks,
+            "packet_verifier_migration_native_claims_false",
+            packet_verifier.get("m005_provenance_ready") is False
+            and packet_verifier.get("m005_current_release_accepted") is False,
+        )
+        _record(
+            checks,
+            "packet_verifier_migration_failures_empty",
+            packet_verifier.get("m005_migration_failed_checks") == [],
+        )
+        migration_checks = _get_mapping(packet_verifier, "m005_migration_checks")
+        _record(
+            checks,
+            "packet_verifier_migration_checks_present_and_true",
+            bool(migration_checks)
+            and all(value is True for value in migration_checks.values()),
+        )
+        _record(
+            checks,
+            "packet_verifier_migration_summary_matches",
+            packet_verifier.get("m005_migration_summary")
+            == m005_migration_summary_path
+            and _is_repo_relative_m005_migration_summary(
+                m005_migration_summary_path
+            ),
+        )
+        _record(
+            checks,
+            "packet_verifier_migration_legacy_paths_exact",
+            m005_summary_path == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+            and packet_verifier.get("m005_summary")
+            == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+            and packet_verifier.get("m005_events")
+            == EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
         )
     for field_name, expected in {**AUTHORITY_DENIAL_FLAGS, **TRANSPORT_DENIAL_FLAGS}.items():
         _record(checks, f"packet_verifier_{field_name}_denied", packet_verifier.get(field_name) is expected)
@@ -446,6 +545,8 @@ def _record_decision_checks(
     packet_summary_path: str | None,
     packet_verifier_summary_path: str | None,
     m005_summary_path: str | None,
+    m005_migration_summary_path: str | None,
+    m005_acceptance_route: str | None,
 ) -> None:
     decision_value = decision.get("decision")
     _record(checks, "decision_summary_path_supplied", isinstance(decision_summary_path, str) and bool(decision_summary_path))
@@ -471,6 +572,41 @@ def _record_decision_checks(
     )
     _record(checks, "decision_m005_summary_matches", decision.get("m005_summary") == m005_summary_path)
     _record(checks, "decision_m005_summary_repo_relative", _is_repo_relative_m005_summary(decision.get("m005_summary")))
+    if m005_acceptance_route == M005_ROUTE_MIGRATION:
+        _record(
+            checks,
+            "decision_m005_migration_legacy_summary_exact",
+            m005_summary_path == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH
+            and decision.get("m005_summary")
+            == EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+        )
+        _record(
+            checks,
+            "decision_m005_acceptance_route_matches_migration",
+            decision.get("m005_acceptance_route") == M005_ROUTE_MIGRATION,
+        )
+        _record(
+            checks,
+            "decision_m005_migration_summary_matches",
+            decision.get("m005_migration_summary")
+            == m005_migration_summary_path
+            and _is_repo_relative_m005_migration_summary(
+                m005_migration_summary_path
+            ),
+        )
+    else:
+        _record(
+            checks,
+            "decision_m005_acceptance_route_native_or_legacy",
+            decision.get("m005_acceptance_route")
+            in {None, M005_ROUTE_NATIVE},
+        )
+        _record(
+            checks,
+            "decision_m005_migration_summary_absent_for_native",
+            decision.get("m005_migration_summary") is None
+            and m005_migration_summary_path is None,
+        )
 
     accepted_rows = decision.get("accepted_safety_row_ids")
     accepted_kinds = decision.get("accepted_live_write_kinds")
@@ -541,6 +677,7 @@ def verify_decision(
     packet_summary_path: str | None = None,
     packet_verifier_summary_path: str | None = None,
     m005_summary_path: str | None = None,
+    m005_migration_summary_path: str | None = None,
 ) -> dict[str, Any]:
     checks: dict[str, bool] = {}
     _record_packet_checks(
@@ -548,12 +685,23 @@ def verify_decision(
         packet=packet,
         packet_summary_path=packet_summary_path,
     )
+    packet_route = (
+        packet_verifier.get("m005_acceptance_route")
+        if isinstance(packet_verifier, Mapping)
+        else None
+    )
+    if packet_route is None and isinstance(packet_verifier, Mapping) and (
+        packet_verifier.get("m005_provenance_ready") is True
+        and packet_verifier.get("m005_current_release_accepted") is True
+    ):
+        packet_route = M005_ROUTE_NATIVE
     _record_packet_verifier_checks(
         checks,
         packet_verifier=packet_verifier,
         packet_verifier_summary_path=packet_verifier_summary_path,
         packet_summary_path=packet_summary_path,
         m005_summary_path=m005_summary_path,
+        m005_migration_summary_path=m005_migration_summary_path,
     )
     _record_decision_checks(
         checks,
@@ -563,6 +711,8 @@ def verify_decision(
         packet_summary_path=packet_summary_path,
         packet_verifier_summary_path=packet_verifier_summary_path,
         m005_summary_path=m005_summary_path,
+        m005_migration_summary_path=m005_migration_summary_path,
+        m005_acceptance_route=packet_route,
     )
 
     failed_checks = sorted(name for name, passed in checks.items() if not passed)
@@ -586,6 +736,9 @@ def verify_decision(
         "packet_summary": packet_summary_path,
         "packet_verifier_summary": packet_verifier_summary_path,
         "m005_summary": m005_summary_path,
+        "m005_migration_summary": m005_migration_summary_path,
+        "m005_acceptance_route": packet_route if ready else None,
+        "m005_m006_input_accepted": ready,
         "owner_decision_accepted": ready,
         "readiness_matrix_update_candidate_ready": ready,
         "accepted_safety_row_ids": EXPECTED_ALLOWED_ROW_IDS if ready else [],
@@ -606,6 +759,7 @@ def verify_decision_paths(
     packet_summary: Path,
     packet_verifier_summary: Path | None = None,
     m005_summary: Path | None = None,
+    m005_migration_summary: Path | None = None,
 ) -> dict[str, Any]:
     decision_path = _resolve(decision_summary)
     packet_path = _resolve(packet_summary)
@@ -622,10 +776,22 @@ def verify_decision_paths(
         if isinstance(decision.get("m005_summary"), str)
         else None
     )
+    effective_migration_path = (
+        _resolve(m005_migration_summary)
+        if m005_migration_summary is not None
+        else _resolve(decision.get("m005_migration_summary"))
+        if isinstance(decision.get("m005_migration_summary"), str)
+        else None
+    )
     recomputed_packet_verifier = (
         verify_packet_paths(
             Path(_display_path(packet_path)),
             Path(_display_path(effective_m005_path)),
+            (
+                Path(_display_path(effective_migration_path))
+                if effective_migration_path is not None
+                else None
+            ),
         )
         if packet_verifier_path is not None and effective_m005_path is not None
         else None
@@ -643,6 +809,11 @@ def verify_decision_paths(
             _display_path(effective_m005_path)
             if effective_m005_path is not None
             else decision.get("m005_summary")
+        ),
+        m005_migration_summary_path=(
+            _display_path(effective_migration_path)
+            if effective_migration_path is not None
+            else None
         ),
     )
     result["packet_verifier_recomputed_from_current_artifacts"] = bool(
@@ -706,6 +877,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--m005-migration-summary",
+        help=(
+            "Explicit verified M005 migration summary. Required when the "
+            "owner decision selects the verified_migration route."
+        ),
+    )
+    parser.add_argument(
         "--write-artifact",
         action="store_true",
         help="Write decision-verifier summary.json under --artifact-root/<run-id>/.",
@@ -722,6 +900,11 @@ def main(argv: list[str] | None = None) -> int:
         Path(args.packet_summary),
         Path(args.packet_verifier_summary) if args.packet_verifier_summary else None,
         Path(args.m005_summary) if args.m005_summary else None,
+        (
+            Path(args.m005_migration_summary)
+            if args.m005_migration_summary
+            else None
+        ),
     )
     if args.write_artifact:
         result = write_verifier_artifact(

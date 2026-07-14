@@ -1,7 +1,7 @@
 {
   "schema": "automixer.autopilot.state.v1",
   "truth_revision": "m110_cp05_launch_verified_wing_usb_missing_strict_live_88_zero_authority_20260714",
-  "current_head_truth_revision": "m110_cp05_commit_91907b8fc_launch_verified_wing_usb_missing_20260714",
+  "current_head_truth_revision": "m111_m005_migration_route_dynamic_cp05_gate_wing_usb_missing_20260714",
   "full_release_truth_source": "strict_pre_release_review",
   "external_validation_scope": "M110 attended hardware proof is blocked before HW01 by missing physical WING USB/CoreAudio capture; public-release and current-source promotion remain separate external gates",
   "full_release_requirements_source": "strict_pre_release_review.required_before_95",
@@ -9,13 +9,13 @@
   "active_milestone": "M001",
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
-  "last_verified_commit": "91907b8fc620857172a96176baba6e52ced081e1",
-  "last_heartbeat_utc": "2026-07-14T17:24:24Z",
+  "last_verified_commit": "5c054eb9e28d29601d974850b8874858b3fe0881",
+  "last_heartbeat_utc": "2026-07-14T19:25:55Z",
   "current_writer_lease": null,
   "current_head_validation": {
-    "head": "91907b8fc620857172a96176baba6e52ced081e1",
-    "inspected_at_utc": "2026-07-14T15:38:43Z",
-    "validation_scope": "committed_m110_cp05_and_clean_detached_launch_only_checkpoint",
+    "head": "5c054eb9e28d29601d974850b8874858b3fe0881",
+    "inspected_at_utc": "2026-07-14T17:34:41Z",
+    "validation_scope": "last_recorded_full_suite_commit_plus_clean_detached_launch_only_checkpoint; current CP05 status is dynamically verified against the non-marker git tree",
     "status": "passed",
     "strict_readiness_score": 88,
     "last_strict_live_evidence_score": 88,
@@ -41,9 +41,9 @@
     "active_plan": "Docs/plans/M110-attended-wing-reset-soundcheck.md"
   },
   "current_attempt_count": 0,
-  "current_blocker": "M110 CP05 and the clean detached launch-only probe are verified on the committed control plane, but passive CoreAudio and macOS USB enumeration found no physical WING device. Therefore M110-HW01 has not started, no capture stream or OSC/UDP path was opened, and reset/corrections remain 0. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven. M005 behavior is closed and narrow M006 owner intent is recorded, while current-source promotion and the remaining public-release gates stay fail-closed.",
-  "next_action": "Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Then rerun the CP05-bound attended M110-HW01-HW05 process for route, reset, staged soundcheck, rollback, SHA-bound listening and teardown. Operator uses the Operator Decision Queue in Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md to accept or reject the two valid 2026-07-13 read-only preflight candidates without granting authority. Separately rebind the closed M005 disconnect/timeout/stale-state evidence and rerun the M006 readiness review; complete clean-checkout signing/notarization/Gatekeeper and production remote-auth recovery separately.",
-  "next_operator_action": "Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Then rerun the CP05-bound attended M110-HW01-HW05 process for route, reset, staged soundcheck, rollback, SHA-bound listening and teardown. Operator uses the Operator Decision Queue in Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md to accept or reject the two valid 2026-07-13 read-only preflight candidates without granting authority. Separately rebind the closed M005 disconnect/timeout/stale-state evidence and rerun the M006 readiness review; complete clean-checkout signing/notarization/Gatekeeper and production remote-auth recovery separately.",
+  "current_blocker": "M110 remains blocked before HW01 because passive CoreAudio and macOS USB enumeration found no physical WING device; Dante Virtual Soundcard 32x32 is not an accepted substitute for WING 48x48 at 48 kHz. No capture stream or OSC/UDP path was opened, and reset/corrections remain 0. M111 now provides a truthful M005 migration route without changing native M005 provenance, but activation still requires the exact WING Rack serial and same-console owner attestation, a clean committed compatibility replay, and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.",
+  "next_action": "Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.",
+  "next_operator_action": "Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.",
   "local_engineering_readiness": {
     "score": 95,
     "threshold": 95,
@@ -1097,8 +1097,8 @@
     "Physical WING USB/CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute",
     "Operator-present CP05-bound M110-HW01 through M110-HW05 run with route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown evidence",
     "Operator accept or reject the two valid 2026-07-13 read-only preflight candidates; this decision-ledger requirement grants no live authority and does not reopen closed M005 behavior",
-    "Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it",
-    "Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority"
+    "Exact WING Rack serial and same-console owner attestation for the immutable 2026-07-11 M005 evidence; this is identity-only and grants no live authority",
+    "Clean committed M005 current-release compatibility replay plus an explicit verified_migration M006 owner decision bound to the recomputed migration and packet-verifier paths"
   ],
   "stop_file": "ops/autopilot/STOP",
   "writer_lease_dir": "ops/autopilot/WRITER_LEASE",
@@ -1215,7 +1215,7 @@
   },
   "active_work": {
     "id": "M110",
-    "snapshot_at_utc": "2026-07-14T15:38:43Z",
+    "snapshot_at_utc": "2026-07-14T18:55:24Z",
     "plan": "Docs/plans/M110-attended-wing-reset-soundcheck.md",
     "adr": "Docs/adr/M110-attended-wing-reset-soundcheck.md",
     "status": "waiting_for_physical_wing_usb_before_hw01",
@@ -1237,6 +1237,16 @@
     "m005_behavior_closed": true,
     "m006_operator_permission_recorded": true,
     "m006_permission_is_standing_authority": false,
+    "m005_current_release_migration": {
+      "schema": "automixer.m005_current_release_migration.v1",
+      "implementation_status": "implemented_offline_fail_closed",
+      "activation_status": "blocked_pending_fresh_run_source_challenge_owner_console_attestation_and_clean_committed_replay",
+      "native_m005_provenance_claimed": false,
+      "native_m005_current_release_accepted": false,
+      "accepted_readonly_source_id": "artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json",
+      "requires_explicit_m006_decision_route": "verified_migration",
+      "live_authority_granted": false
+    },
     "reset_contract": {
       "factory_reset": false,
       "processor_bypass_address_count": 64,
@@ -1249,9 +1259,9 @@
     "attended_execute_path_implemented": true,
     "cp05_hardware_gate_verified": true,
     "launch_only": {
-      "artifact": "/Users/dmitrijvolkov/.automixer/runtime/m110_attended/20260714T184500Z_91907b8fc_launch/plan-summary.json",
-      "artifact_sha256": "a9aff33cfbb6dd9a23d4e866ac6dfd6224cdfe9a2765382a71cd48ea61fc55a5",
-      "source_commit": "91907b8fc620857172a96176baba6e52ced081e1",
+      "artifact": "/Users/dmitrijvolkov/.automixer/runtime/m110_attended_final_20260714T173441Z/plan-summary.json",
+      "artifact_sha256": "b028dbce014fac6ea27268e963370847d53afdd007e1440ccd312668f567e7f1",
+      "source_commit": "5c054eb9e28d29601d974850b8874858b3fe0881",
       "status": "verified",
       "reason": "proof_owned_backend_launch_verified",
       "exit_code": 0,
@@ -1261,7 +1271,7 @@
       "live_write": false
     },
     "physical_capture_prerequisite": {
-      "checked_at_utc": "2026-07-14T15:38:43Z",
+      "checked_at_utc": "2026-07-14T18:55:24Z",
       "coreaudio_enumeration_attempted": true,
       "macos_usb_enumeration_attempted": true,
       "exact_name_candidate_count": 0,

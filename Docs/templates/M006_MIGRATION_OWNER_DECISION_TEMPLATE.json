@@ -1,0 +1,50 @@
+{
+  "schema": "automixer.m006_owner_readiness_decision.v1",
+  "generated_at_utc": null,
+  "status": "pending_owner_review",
+  "decision": "pending_owner_review",
+  "reviewed_by": null,
+  "reviewed_at_utc": null,
+  "packet_summary": "artifacts/wing_owner_readiness_review/20260704T191101Z_m006_owner_readiness_review_packet/summary.json",
+  "packet_verifier_summary": null,
+  "m005_summary": "artifacts/wing_timeout_disconnect_proof/20260711T131505Z_wing_m005_disconnect_timeout_stale_proof/summary.json",
+  "m005_acceptance_route": "verified_migration",
+  "m005_migration_summary": null,
+  "accepted_safety_row_ids": [],
+  "accepted_live_write_kinds": [],
+  "accepted_proof_artifacts": [],
+  "rejected_safety_row_ids": [
+    "bus_group_matrix",
+    "dynamics_compressor",
+    "eq_autoeq",
+    "fx_sends_inserts",
+    "gate_expander",
+    "mute_supervised",
+    "pan_phase_delay",
+    "routing_snapshots_scenes"
+  ],
+  "readiness_matrix_update_candidate": false,
+  "live_authority_granted": false,
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "contacts_wing": false,
+  "contacts_backend": false,
+  "live_write": false,
+  "m005_acceptance": {
+    "physical_cable_loss": false,
+    "stale_readback_unavailable": false,
+    "blocked_write_while_disconnected": false,
+    "reconnect_recovery_verified": false,
+    "rollback_request_sent": false,
+    "request_audit_contains_rollback": false,
+    "authority_denied_during_m005": false
+  },
+  "scope_guardrails": {
+    "gain_up_allowed": false,
+    "fader_boosts_allowed": false,
+    "direct_write_allowed": false,
+    "full_auto_apply_allowed": false,
+    "non_fader_gain_surfaces_allowed": false
+  },
+  "operator_notes": "Copy this template beside the M006 packet only after a migration packet and its recomputed packet-verifier summary are ready. Fill the exact artifact paths and record a separate owner decision; this template grants no authority."
+}

@@ -21,6 +21,14 @@ for _key, _value in _OFFLINE_MODEL_ENV_DEFAULTS.items():
 @pytest.fixture(autouse=True)
 def isolate_automixer_env(tmp_path):
     """Keep AUTOMIXER_* overrides and audit writes isolated per test."""
+    preserve_m005_replay_dirs = (
+        os.environ.get('AUTOMIXER_M005_MIGRATION_REPLAY_ISOLATED') == '1'
+    )
+    replay_dir_keys = {
+        'AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR',
+        'AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR',
+        'AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR',
+    }
     automixer_keys = [
         'AUTOMIXER_MIXER_IP',
         'AUTOMIXER_MIXER_PORT',
@@ -38,16 +46,19 @@ def isolate_automixer_env(tmp_path):
     original = {key: os.environ.get(key) for key in env_keys}
 
     for key in automixer_keys:
+        if preserve_m005_replay_dirs and key in replay_dir_keys:
+            continue
         os.environ.pop(key, None)
-    os.environ['AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR'] = str(
-        tmp_path / 'manual_write_gate'
-    )
-    os.environ['AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR'] = str(
-        tmp_path / 'operator_proposal_results'
-    )
-    os.environ['AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR'] = str(
-        tmp_path / 'console_runtime'
-    )
+    if not preserve_m005_replay_dirs:
+        os.environ['AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR'] = str(
+            tmp_path / 'manual_write_gate'
+        )
+        os.environ['AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR'] = str(
+            tmp_path / 'operator_proposal_results'
+        )
+        os.environ['AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR'] = str(
+            tmp_path / 'console_runtime'
+        )
     os.environ['AUTOMIXER_TEST_CORRECTION_RUNTIME_DIR'] = str(
         tmp_path / 'correction_runtime'
     )
