@@ -23,4 +23,3 @@ Keep the narrow terminal-tag grammar and fail-closed future unknown tags.
 
 Move the predicate to the shared route-proof module and test both independent
 trust boundaries with the exact physical string.
-

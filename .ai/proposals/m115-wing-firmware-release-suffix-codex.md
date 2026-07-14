@@ -48,4 +48,3 @@ from a clean detached checkout.
 An alternate review may prefer a dedicated parser or pinning the exact build
 hash. The decision should favor the smallest grammar that explains current
 physical evidence while preserving established accepted forms.
-

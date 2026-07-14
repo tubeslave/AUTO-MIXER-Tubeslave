@@ -23,4 +23,3 @@ tests for arbitrary colon tags.
 ## 5. Revised recommendation
 
 Adopt the independent design with the narrow regex from the Codex proposal.
-

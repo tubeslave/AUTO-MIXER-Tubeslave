@@ -47,4 +47,3 @@ detached worktree.
 An unknown future terminal tag remains blocked deliberately. Rollback is the
 M115 source commit plus a recomputed CP05 marker-only commit. No hardware retry
 may reuse authority from either failed route attempt.
-

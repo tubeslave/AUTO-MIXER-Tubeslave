@@ -45,4 +45,3 @@ the exact full string and zero write count.
 
 Codex may prefer the smallest inline regex edit. The shared predicate costs a
 few lines but removes a demonstrated two-gate drift hazard.
-

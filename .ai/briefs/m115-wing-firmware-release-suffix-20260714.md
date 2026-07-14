@@ -32,4 +32,3 @@ tag `:release`.
 - Add regression and adversarial tests before another hardware attempt.
 - Rebind CP05 and use a new clean detached worktree for the retry.
 - No reset or correction may occur until HW01 succeeds.
-
