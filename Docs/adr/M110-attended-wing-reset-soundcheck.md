@@ -225,6 +225,7 @@ backend/decision_queue_wire_contract.py
 backend/handlers/connection_handlers.py
 backend/handlers/product_state_handlers.py
 backend/m110_cp05_hardware_gate.py
+backend/m110_manual_write_wal.py
 backend/maintenance_dsp_reset.py
 backend/master_capture_route_proof.py
 backend/operator_proposal_queue.py
@@ -323,6 +324,13 @@ tolerances, audio contract and console/firmware/route/runtime identity. Proof
 receipt ID and evidence expiry are deliberately outside operation identity;
 the permanent lane checks them separately for exact same-process origin and
 freshness. The only bundle kinds are:
+
+The fixed reset proposal capture owns one 90-second total deadline across both
+the 64-address reset sweep and the 184-address preservation sweep. A commit
+recapture additionally reserves the final 30 seconds of the restored-proof
+receipt window for prepare, capability issue and Apply. If that remaining
+window is unavailable, the server returns a strict no-send blocked terminal;
+it never starts a capture that can only expire before commit.
 
 - `single_soundcheck_operation`: exactly one logical operation after a staged
   planner child is decomposed before review;
@@ -516,12 +524,15 @@ child/capture/transport teardown even under cancellation. Secrets and tokens
 never enter argv, logs or artifacts.
 
 On the retained WebSocket the fixed order is route proof, one control arm, then
-for each already-reviewed proof proposal prepare, issue and Apply. Re-arming is
+server-owned proposal creation, prepare, issue and Apply. The fixed reset path
+runs proof first, records the durable same-process receipt, performs a fresh
+complete recapture, then creates and applies the permanent commit proposal.
+No address, target or transaction plan crosses from the runner. Re-arming is
 not used between proposals because arm intentionally clears prepared bundles
 and prior process-private proof receipts. Any malformed, blocked, duplicate or
-wrong-stage terminal tears down the entire proof-owned session. CP02 exposes
-this same-session protocol but does not unblock the top-level real `--execute`
-flow until CP03/CP04 can create the required fixed proposals in that process.
+wrong-stage terminal tears down the entire proof-owned session. The top-level
+real `--execute` flow remains blocked until processor enable and exact staged
+soundcheck child capabilities are complete.
 
 ## 4. Why this won
 
@@ -602,3 +613,10 @@ separate processor-enable lane. The main disagreement was a new proof execute
 message versus canonical Apply. Canonical Apply won because it preserves one
 external write entrypoint; private typed grants and adversarial no-mint tests
 are mandatory conditions of that choice.
+
+The 2026-07-14 independent patch review found no P0 defect. It identified and
+closed two reset-path issues before CP05: physical sweep timeouts now remain
+strict blocked protocol terminals, and commit recapture cannot consume the
+entire restored-proof receipt window. The review also required the strict M110
+manual WAL module to be included in both runtime identity and the exact CP05
+critical-path manifest.

@@ -186,10 +186,12 @@ from master_capture_route_proof import (
 )
 from supervised_proof_capability import (
     M110_AUTHORITY_FD_ENV,
+    M110_RESTORED_PROOF_RECEIPT_LATEST_START_SECONDS,
     M110_RUNTIME_CRITICAL_PATHS,
     M110AttendedControlAuthority,
     M110CapabilityBinding,
     M110RestoredProofReceipt,
+    MaintenanceDspResetCommitOnceGrant,
     RestoreOnlyProofGrant,
     SupervisedCapabilityStore,
     consume_m110_attended_launch_authority,
@@ -198,6 +200,18 @@ from supervised_proof_capability import (
     validate_m110_arm_request,
     validate_m110_capability_apply_request,
     validate_m110_capability_issue_request,
+)
+from maintenance_dsp_reset import (
+    M110_RESET_ADAPTER_REVISION,
+    M110_RESET_ADDRESSES,
+    M110_RESET_BUNDLE_KIND,
+    M110_RESET_OPERATION_DEFINITIONS,
+    M110_RESET_PROTOCOL_REVISION,
+    M110MaintenanceDspResetExecutor,
+    M110ResetHooks,
+    build_fixed_m110_reset_canonical_bundle,
+    capture_m110_reset_preimage,
+    m110_reset_review_preimage_document,
 )
 from supervised_family_proof_plan import (
     build_canonical_operation_bundle_from_prepared,
@@ -1036,6 +1050,10 @@ class AutoMixerServer:
         ] = None
         self._m110_capability_store = SupervisedCapabilityStore()
         self._m110_prepared_capability_bundles: Dict[str, Dict[str, Any]] = {}
+        self._m110_fixed_reset_proposal_contexts: Dict[
+            str,
+            Dict[str, Any],
+        ] = {}
         self._m110_restored_proof_receipts: Dict[str, Dict[str, Any]] = {}
         self._m110_transport_owner_connection_id: Optional[int] = None
         self._m110_transport_owner_ref: Optional[
@@ -1646,6 +1664,8 @@ class AutoMixerServer:
             "start_audio_capture_preview",
             "capture_wing_master_route_proof",
             "arm_m110_attended_control",
+            "create_m110_maintenance_reset_proof_proposal",
+            "create_m110_maintenance_reset_commit_proposal",
             "prepare_m110_restore_only_proof",
             "issue_supervised_capability",
             "apply_operator_proposal",
@@ -1692,6 +1712,23 @@ class AutoMixerServer:
                 or not payload.get("proposal_id")
             ):
                 blockers.append("m110_restore_proof_prepare_request_invalid")
+        if message_type in {
+            "create_m110_maintenance_reset_proof_proposal",
+            "create_m110_maintenance_reset_commit_proposal",
+        } and not blockers:
+            if not (
+                type(payload) is dict
+                and set(payload)
+                == {"type", "contract_version", "bundle_selector"}
+                and payload.get("type") == message_type
+                and payload.get("contract_version") == 1
+                and not isinstance(payload.get("contract_version"), bool)
+                and payload.get("bundle_selector")
+                == "fixed_channels_1_16_dsp_bypass"
+            ):
+                blockers.append(
+                    "m110_maintenance_reset_proposal_request_invalid"
+                )
         if message_type == "apply_operator_proposal" and not blockers:
             valid, reason = validate_m110_capability_apply_request(payload)
             if not valid:
@@ -1737,6 +1774,14 @@ class AutoMixerServer:
             response = {"type": "supervised_capability_result", **common}
         elif message_type == "prepare_m110_restore_only_proof":
             response = {"type": "m110_restore_proof_prepare_result", **common}
+        elif message_type in {
+            "create_m110_maintenance_reset_proof_proposal",
+            "create_m110_maintenance_reset_commit_proposal",
+        }:
+            response = {
+                "type": "m110_maintenance_reset_proposal_result",
+                **common,
+            }
         elif message_type == "apply_operator_proposal":
             response = {
                 "type": "operator_proposal_apply_blocked",
@@ -14807,6 +14852,13 @@ class AutoMixerServer:
         )
         if isinstance(prepared_bundles, dict):
             prepared_bundles.pop(proposal_id, None)
+        fixed_contexts = getattr(
+            self,
+            "_m110_fixed_reset_proposal_contexts",
+            None,
+        )
+        if isinstance(fixed_contexts, dict):
+            fixed_contexts.pop(proposal_id, None)
         return revoked
 
     def _on_operator_proposal_terminal(
@@ -14838,6 +14890,13 @@ class AutoMixerServer:
         )
         if isinstance(prepared_bundles, dict):
             prepared_bundles.clear()
+        fixed_contexts = getattr(
+            self,
+            "_m110_fixed_reset_proposal_contexts",
+            None,
+        )
+        if isinstance(fixed_contexts, dict):
+            fixed_contexts.clear()
         restored_receipts = getattr(self, "_m110_restored_proof_receipts", None)
         if isinstance(restored_receipts, dict):
             restored_receipts.clear()
@@ -14972,10 +15031,18 @@ class AutoMixerServer:
                     isinstance(event, Mapping)
                     and event_payload.get("scope")
                     == "supervised_transaction"
-                    and event_payload.get("proof_run") is True
-                    and event_payload.get("restore_after_verify") is True
                     and event_payload.get("capability_kind")
-                    == "restore_only_proof"
+                    == active_binding.capability_kind
+                    and event_payload.get("proof_run")
+                    is (
+                        active_binding.capability_kind
+                        == "restore_only_proof"
+                    )
+                    and event_payload.get("restore_after_verify")
+                    is (
+                        active_binding.capability_kind
+                        == "restore_only_proof"
+                    )
                     and event_payload.get("proposal_id")
                     == active_binding.proposal_id
                     and event_payload.get("review_content_digest")
@@ -16138,6 +16205,7 @@ class AutoMixerServer:
                 reason="attended_control_rearmed"
             )
             self._m110_prepared_capability_bundles.clear()
+            self._m110_fixed_reset_proposal_contexts.clear()
             self._m110_restored_proof_receipts.clear()
             control = new_m110_attended_control_authority(
                 runtime_instance_nonce=str(runtime.get("instance_nonce") or ""),
@@ -16178,6 +16246,430 @@ class AutoMixerServer:
                 "readiness_closure_allowed": False,
             }
 
+    def _m110_fixed_reset_safety_binding(
+        self,
+        route: MasterCaptureRouteAuthority,
+    ) -> Dict[str, Any]:
+        runtime = self._runtime_identity
+        source = runtime.get("source", {})
+        return {
+            "adapter_revision": M110_RESET_ADAPTER_REVISION,
+            "protocol_revision": M110_RESET_PROTOCOL_REVISION,
+            "runtime_instance_nonce": str(
+                runtime.get("instance_nonce") or ""
+            ),
+            "runtime_manifest_sha256": self._m110_prefixed_sha256(
+                runtime.get("manifest_sha256")
+            ),
+            "source_head": str(source.get("head") or ""),
+            "source_tree": str(source.get("tree") or ""),
+            "console_serial": str(route.console_serial),
+            "firmware_version": str(route.firmware_version),
+            "route_proof_id": str(route.proof_id),
+            "route_artifact_sha256": str(route.artifact_sha256),
+            "capture_hardware_uid": str(route.capture_hardware_uid),
+            "connection_generation": self._mixer_connection_generation,
+            "transport_generation": self._current_mixer_transport_generation(),
+            "emergency_generation": self._manual_write_emergency_generation,
+        }
+
+    def _m110_fixed_reset_receipt_current(
+        self,
+        receipt: Any,
+        *,
+        websocket: WebSocketServerProtocol,
+        control: M110AttendedControlAuthority,
+        route: MasterCaptureRouteAuthority,
+        bundle_bytes: bytes,
+        operation_digest: str,
+        review_preimage_sha256: str,
+    ) -> bool:
+        age = (
+            time.monotonic() - float(receipt.created_at_monotonic)
+            if type(receipt) is M110RestoredProofReceipt
+            else math.inf
+        )
+        return bool(
+            type(receipt) is M110RestoredProofReceipt
+            and receipt.is_authentic()
+            and receipt.bundle_kind == M110_RESET_BUNDLE_KIND
+            and receipt.canonical_bundle_bytes == bundle_bytes
+            and receipt.operation_digest == operation_digest
+            and receipt.review_preimage_sha256 == review_preimage_sha256
+            and receipt.runtime_instance_nonce
+            == self._runtime_identity.get("instance_nonce")
+            and receipt.source_head
+            == self._runtime_identity.get("source", {}).get("head")
+            and receipt.source_tree
+            == self._runtime_identity.get("source", {}).get("tree")
+            and receipt.route_proof_id == route.proof_id
+            and receipt.route_artifact_sha256 == route.artifact_sha256
+            and receipt.owner_connection_id == id(websocket)
+            and receipt._owner_ref is websocket
+            and receipt._control_ref is control
+            and receipt._route_ref is route
+            and receipt._transport_ref is self.mixer_client
+            and receipt._capture_ref is self.audio_capture
+            and math.isfinite(age)
+            and 0.0 <= age < M110_RESTORED_PROOF_RECEIPT_LATEST_START_SECONDS
+        )
+
+    async def create_m110_maintenance_reset_proposal(
+        self,
+        *,
+        websocket: WebSocketServerProtocol,
+        request: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Capture and review the fixed 1-16 DSP reset without client plans."""
+
+        role_by_type = {
+            "create_m110_maintenance_reset_proof_proposal": "proof",
+            "create_m110_maintenance_reset_commit_proposal": "commit",
+        }
+        role = role_by_type.get(
+            request.get("type") if isinstance(request, Mapping) else None
+        )
+        response_type = "m110_maintenance_reset_proposal_result"
+
+        def blocked(reason: Any, **extra: Any) -> Dict[str, Any]:
+            return {
+                "type": response_type,
+                "status": "blocked",
+                "success": False,
+                "reason": str(reason),
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+                **extra,
+            }
+
+        if not (
+            type(request) is dict
+            and set(request)
+            == {"type", "contract_version", "bundle_selector"}
+            and role in {"proof", "commit"}
+            and request.get("contract_version") == 1
+            and not isinstance(request.get("contract_version"), bool)
+            and request.get("bundle_selector")
+            == "fixed_channels_1_16_dsp_bypass"
+        ):
+            return blocked("m110_maintenance_reset_proposal_request_invalid")
+        blockers = self._m110_capability_global_blockers(websocket)
+        if blockers:
+            return blocked(
+                "m110_capability_global_safety_gate_failed",
+                blockers=blockers,
+            )
+        control, control_reason = self._verified_m110_attended_control(websocket)
+        if control is None:
+            return blocked(control_reason)
+        try:
+            self._verify_m110_cp05_hardware_gate()
+        except Exception as exc:
+            return blocked(str(exc))
+        route_view = (
+            await self._verified_master_capture_route_proof_with_fresh_hardware()
+        )
+        route = self._master_capture_route_authority
+        if not (
+            route_view.get("verified") is True
+            and isinstance(route, MasterCaptureRouteAuthority)
+            and route._owner_ref is websocket
+        ):
+            return blocked(
+                route_view.get("reason")
+                or "m110_route_authority_not_current"
+            )
+        async with self._console_write_scope(
+            deadline_epoch=time.time() + 2.0,
+        ) as writer_acquired:
+            if writer_acquired is not True:
+                return blocked("console_writer_conflict_timeout")
+            try:
+                self._verify_m110_cp05_hardware_gate()
+            except Exception as exc:
+                return blocked(str(exc))
+            current_control, control_reason = (
+                self._verified_m110_attended_control(websocket)
+            )
+            current_route_view = (
+                await self._verified_master_capture_route_proof_with_fresh_hardware()
+            )
+            current_route = self._master_capture_route_authority
+            if not (
+                current_control is control
+                and current_route is route
+                and current_route_view.get("verified") is True
+            ):
+                return blocked(
+                    current_route_view.get("reason") or control_reason
+                )
+            blockers = self._m110_capability_global_blockers(websocket)
+            if blockers:
+                return blocked(
+                    "m110_capability_global_safety_gate_failed",
+                    blockers=blockers,
+                )
+            expected_identity_values = {
+                "/$syscfg/$serial": route.console_serial,
+                "/$syscfg/$firmware": route.firmware_version,
+                "/io/out/USB/47/grp": "MAIN",
+                "/io/out/USB/47/in": 0,
+                "/io/out/USB/48/grp": "MAIN",
+                "/io/out/USB/48/in": 1,
+            }
+            receipt = None
+            try:
+                bundle = build_fixed_m110_reset_canonical_bundle(
+                    self._m110_fixed_reset_safety_binding(route)
+                )
+                bundle_bytes = canonical_operation_bundle_bytes(bundle)
+                operation_digest = canonical_operation_bundle_digest(bundle)
+                scope_addresses, target_fingerprints = canonical_bundle_scope(
+                    bundle
+                )
+                # One proposal capture owns both finite sweeps and must finish
+                # inside the attended runner's bounded response window.
+                total_capture_deadline = 90.0
+                if role == "commit":
+                    receipt = self._m110_restored_proof_receipts.get(
+                        operation_digest
+                    )
+                    receipt_review_sha = getattr(
+                        receipt,
+                        "review_preimage_sha256",
+                        "",
+                    )
+                    if not self._m110_fixed_reset_receipt_current(
+                        receipt,
+                        websocket=websocket,
+                        control=control,
+                        route=route,
+                        bundle_bytes=bundle_bytes,
+                        operation_digest=operation_digest,
+                        review_preimage_sha256=receipt_review_sha,
+                    ):
+                        return blocked(
+                            "m110_current_restored_proof_receipt_required"
+                        )
+                    receipt_age = time.monotonic() - float(
+                        receipt.created_at_monotonic
+                    )
+                    # Leave a full capability TTL after recapture so prepare,
+                    # issue and Apply never depend on winning a receipt-expiry
+                    # race on a slow but otherwise valid console.
+                    total_capture_deadline = min(
+                        total_capture_deadline,
+                        M110_RESTORED_PROOF_RECEIPT_LATEST_START_SECONDS
+                        - receipt_age
+                        - 30.0,
+                    )
+                    if total_capture_deadline <= 0.0:
+                        return blocked(
+                            "m110_restored_proof_receipt_capture_window_expired"
+                        )
+                captured = await capture_m110_reset_preimage(
+                    self.mixer_client.query_parameter,
+                    expected_identity_values=expected_identity_values,
+                    total_deadline_seconds=total_capture_deadline,
+                )
+                reviewed = m110_reset_review_preimage_document(captured)
+            except (TypeError, ValueError, RuntimeError, OSError) as exc:
+                return blocked(
+                    f"m110_maintenance_reset_capture_invalid:{exc}"
+                )
+            if role == "commit":
+                if not self._m110_fixed_reset_receipt_current(
+                    receipt,
+                    websocket=websocket,
+                    control=control,
+                    route=route,
+                    bundle_bytes=bundle_bytes,
+                    operation_digest=operation_digest,
+                    review_preimage_sha256=reviewed[
+                        "review_preimage_sha256"
+                    ],
+                ):
+                    return blocked(
+                        "m110_current_restored_proof_receipt_required"
+                    )
+            proposal_id = (
+                f"m110-maintenance-reset-{role}-" + uuid.uuid4().hex
+            )
+            required_capability_kind = (
+                "restore_only_proof"
+                if role == "proof"
+                else "maintenance_dsp_reset_commit_once"
+            )
+            proposal_result = self.operator_proposal_queue.create(
+                {
+                    "id": proposal_id,
+                    "title": (
+                        "M110 fixed DSP reset proof (channels 1-16)"
+                        if role == "proof"
+                        else "M110 fixed DSP reset commit (channels 1-16)"
+                    ),
+                    "kind": f"m110_maintenance_dsp_reset_{role}",
+                    "source": "m110_server_owned_maintenance",
+                    "severity": "high",
+                    "reason": (
+                        "Verify and restore the exact fixed DSP bypass surface"
+                        if role == "proof"
+                        else "Permanently bypass the exact verified DSP surface"
+                    ),
+                    "ttl_seconds": 120,
+                    "m110_maintenance_reset": {
+                        "schema": "automixer.m110_maintenance_reset_review.v1",
+                        "role": role,
+                        "required_capability_kind": required_capability_kind,
+                        "bundle_kind": M110_RESET_BUNDLE_KIND,
+                        "operation_digest": operation_digest,
+                        "review_preimage_sha256": reviewed[
+                            "review_preimage_sha256"
+                        ],
+                        "operation_count": len(M110_RESET_ADDRESSES),
+                        "scope_addresses": list(scope_addresses),
+                        "target_value": 0,
+                    },
+                },
+                self.get_operator_mode_status(),
+            )
+            if proposal_result.get("status") != "created":
+                return blocked(
+                    proposal_result.get("reason")
+                    or "m110_maintenance_reset_proposal_create_failed"
+                )
+            proposal = self.operator_proposal_queue.find(
+                proposal_id=proposal_id
+            )
+            if proposal is None:
+                return blocked("m110_maintenance_reset_proposal_missing")
+            approved_preimage = {
+                "reset_rows": json.loads(
+                    json.dumps(reviewed["reset_preimage"]["rows"])
+                ),
+                "preservation_manifest": json.loads(
+                    json.dumps(reviewed["preservation_manifest"])
+                ),
+            }
+            self._m110_fixed_reset_proposal_contexts[proposal_id] = {
+                "proposal": proposal,
+                "role": role,
+                "required_capability_kind": required_capability_kind,
+                "bundle_kind": M110_RESET_BUNDLE_KIND,
+                "operation_digest": operation_digest,
+                "canonical_bundle_bytes": bundle_bytes,
+                "scope_addresses": scope_addresses,
+                "target_fingerprints": target_fingerprints,
+                "operation_count": len(M110_RESET_OPERATION_DEFINITIONS),
+                "review_preimage_sha256": reviewed[
+                    "review_preimage_sha256"
+                ],
+                "approved_preimage": approved_preimage,
+                "review_contract_version": proposal.review_contract_version,
+                "review_content_digest": proposal.review_content_digest,
+                "owner_connection_id": id(websocket),
+                "_owner_ref": websocket,
+                "_control_ref": control,
+                "_route_ref": route,
+                "_transport_ref": self.mixer_client,
+                "_capture_ref": self.audio_capture,
+                "_proof_receipt_ref": receipt,
+            }
+            return {
+                "type": response_type,
+                "status": "created",
+                "success": True,
+                "reason": "m110_maintenance_reset_proposal_created",
+                "proposal_id": proposal_id,
+                "review_contract_version": proposal.review_contract_version,
+                "review_content_digest": proposal.review_content_digest,
+                "required_capability_kind": required_capability_kind,
+                "bundle_kind": M110_RESET_BUNDLE_KIND,
+                "operation_digest": operation_digest,
+                "review_preimage_sha256": reviewed[
+                    "review_preimage_sha256"
+                ],
+                "operation_count": len(M110_RESET_ADDRESSES),
+                "scope_addresses": list(scope_addresses),
+                "matching_restored_proof_receipt": receipt is not None,
+                "token_issued": False,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+            }
+
+    def _build_m110_fixed_reset_bundle(
+        self,
+        *,
+        websocket: WebSocketServerProtocol,
+        proposal: Any,
+        control: M110AttendedControlAuthority,
+    ) -> tuple[Optional[Dict[str, Any]], str]:
+        context = self._m110_fixed_reset_proposal_contexts.get(
+            str(getattr(proposal, "id", "") or "")
+        )
+        route = self._master_capture_route_authority
+        if not (
+            isinstance(context, Mapping)
+            and context.get("proposal") is proposal
+            and context.get("_owner_ref") is websocket
+            and context.get("_control_ref") is control
+            and context.get("_route_ref") is route
+            and context.get("_transport_ref") is self.mixer_client
+            and context.get("_capture_ref") is self.audio_capture
+            and context.get("owner_connection_id") == id(websocket)
+            and context.get("bundle_kind") == M110_RESET_BUNDLE_KIND
+        ):
+            return None, "m110_fixed_reset_private_context_required"
+        try:
+            current_bundle = build_fixed_m110_reset_canonical_bundle(
+                self._m110_fixed_reset_safety_binding(route)
+            )
+            current_bundle_bytes = canonical_operation_bundle_bytes(
+                current_bundle
+            )
+        except (TypeError, ValueError):
+            return None, "m110_fixed_reset_bundle_rebuild_failed"
+        exact_fields_current = bool(
+            context.get("canonical_bundle_bytes") == current_bundle_bytes
+            and context.get("operation_digest")
+            == canonical_operation_bundle_digest(current_bundle)
+            and context.get("review_contract_version")
+            == getattr(proposal, "review_contract_version", None)
+            and context.get("review_content_digest")
+            == getattr(proposal, "review_content_digest", None)
+        )
+        if not exact_fields_current:
+            return None, "m110_fixed_reset_context_drift"
+        if context.get("role") == "commit" and not (
+            isinstance(route, MasterCaptureRouteAuthority)
+            and self._m110_fixed_reset_receipt_current(
+                context.get("_proof_receipt_ref"),
+                websocket=websocket,
+                control=control,
+                route=route,
+                bundle_bytes=context["canonical_bundle_bytes"],
+                operation_digest=context["operation_digest"],
+                review_preimage_sha256=context[
+                    "review_preimage_sha256"
+                ],
+            )
+        ):
+            return None, "m110_current_restored_proof_receipt_required"
+        return {
+            **dict(context),
+            "proposal_id": str(proposal.id),
+        }, "m110_fixed_reset_bundle_current"
+
+    def is_m110_fixed_reset_proposal(self, proposal: Any) -> bool:
+        context = self._m110_fixed_reset_proposal_contexts.get(
+            str(getattr(proposal, "id", "") or "")
+        )
+        return bool(
+            isinstance(context, Mapping)
+            and context.get("proposal") is proposal
+            and context.get("bundle_kind") == M110_RESET_BUNDLE_KIND
+        )
+
     def _build_m110_restore_only_bundle(
         self,
         *,
@@ -16209,6 +16701,12 @@ class AutoMixerServer:
         )
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", review_digest):
             return None, "m110_restore_proof_review_digest_invalid"
+        if str(proposal.id) in self._m110_fixed_reset_proposal_contexts:
+            return self._build_m110_fixed_reset_bundle(
+                websocket=websocket,
+                proposal=proposal,
+                control=control,
+            )
         raw = getattr(proposal, "raw", None)
         plan_payload = (
             raw.get("supervised_transaction_plan")
@@ -16285,12 +16783,18 @@ class AutoMixerServer:
             "review_content_digest": review_digest,
             "operation_digest": operation_digest,
             "canonical_bundle_bytes": bundle_bytes,
+            "bundle_kind": "single_soundcheck_operation",
+            "review_preimage_sha256": "",
             "scope_addresses": scope_addresses,
             "target_fingerprints": target_fingerprints,
+            "operation_count": 1,
             "owner_connection_id": id(websocket),
             "_owner_ref": websocket,
             "_control_ref": control,
             "_route_ref": route,
+            "_transport_ref": self.mixer_client,
+            "_capture_ref": self.audio_capture,
+            "_proof_receipt_ref": None,
         }, "m110_restore_proof_bundle_current"
 
     async def prepare_m110_restore_only_proof(
@@ -16366,7 +16870,15 @@ class AutoMixerServer:
             "review_contract_version": prepared["review_contract_version"],
             "review_content_digest": prepared["review_content_digest"],
             "operation_digest": prepared["operation_digest"],
-            "operation_count": 1,
+            "bundle_kind": prepared.get("bundle_kind"),
+            "review_preimage_sha256": prepared.get(
+                "review_preimage_sha256"
+            ),
+            "required_capability_kind": prepared.get(
+                "required_capability_kind",
+                "restore_only_proof",
+            ),
+            "operation_count": prepared.get("operation_count", 1),
             "scope_addresses": list(prepared["scope_addresses"]),
             "token_issued": False,
             "live_authority_granted": False,
@@ -16404,7 +16916,11 @@ class AutoMixerServer:
                 "success": False,
                 "reason": authority_reason,
             }
-        if request.get("capability_kind") != "restore_only_proof":
+        capability_kind = request.get("capability_kind")
+        if capability_kind not in {
+            "restore_only_proof",
+            "maintenance_dsp_reset_commit_once",
+        }:
             return {
                 "type": "supervised_capability_result",
                 "status": "blocked",
@@ -16461,6 +16977,9 @@ class AutoMixerServer:
             "review_content_digest",
             "operation_digest",
             "canonical_bundle_bytes",
+            "bundle_kind",
+            "review_preimage_sha256",
+            "required_capability_kind",
             "scope_addresses",
             "target_fingerprints",
             "owner_connection_id",
@@ -16469,7 +16988,13 @@ class AutoMixerServer:
             prior.get("_owner_ref") is websocket
             and prior.get("_control_ref") is control
             and prior.get("_route_ref") is self._master_capture_route_authority
+            and prior.get("_transport_ref") is self.mixer_client
+            and prior.get("_capture_ref") is self.audio_capture
+            and prior.get("_proof_receipt_ref")
+            is current.get("_proof_receipt_ref")
             and all(prior.get(name) == current.get(name) for name in exact_fields)
+            and capability_kind
+            == current.get("required_capability_kind", "restore_only_proof")
             and request.get("expected_review_contract_version")
             == current["review_contract_version"]
             and request.get("expected_review_content_digest")
@@ -16487,10 +17012,15 @@ class AutoMixerServer:
         runtime = self._runtime_identity
         launch = runtime.get("launch_binding", {})
         source = runtime.get("source", {})
-        idempotency_key = "m110-proof:" + uuid.uuid4().hex
+        idempotency_key = (
+            "m110-proof:"
+            if capability_kind == "restore_only_proof"
+            else "m110-reset-commit:"
+        ) + uuid.uuid4().hex
+        proof_receipt = current.get("_proof_receipt_ref")
         try:
             binding = M110CapabilityBinding(
-                capability_kind="restore_only_proof",
+                capability_kind=capability_kind,
                 runtime_instance_nonce=str(runtime.get("instance_nonce") or ""),
                 runtime_manifest_sha256=self._m110_prefixed_sha256(
                     runtime.get("manifest_sha256")
@@ -16514,6 +17044,16 @@ class AutoMixerServer:
                 review_content_digest=current["review_content_digest"],
                 operation_digest=current["operation_digest"],
                 canonical_bundle_bytes=current["canonical_bundle_bytes"],
+                bundle_kind=current.get("bundle_kind", ""),
+                review_preimage_sha256=current.get(
+                    "review_preimage_sha256",
+                    "",
+                ),
+                proof_receipt_id=(
+                    proof_receipt.receipt_id
+                    if type(proof_receipt) is M110RestoredProofReceipt
+                    else ""
+                ),
                 approval_id=str(request["approval_id"]),
                 idempotency_key=idempotency_key,
                 scope_addresses=current["scope_addresses"],
@@ -16522,6 +17062,8 @@ class AutoMixerServer:
                 _route_ref=route,
                 _transport_ref=self.mixer_client,
                 _capture_ref=self.audio_capture,
+                _control_ref=control,
+                _proof_receipt_ref=proof_receipt,
             )
         except ValueError as exc:
             return {
@@ -16588,6 +17130,9 @@ class AutoMixerServer:
             "review_content_digest",
             "operation_digest",
             "canonical_bundle_bytes",
+            "bundle_kind",
+            "review_preimage_sha256",
+            "required_capability_kind",
             "scope_addresses",
             "target_fingerprints",
             "owner_connection_id",
@@ -16596,6 +17141,10 @@ class AutoMixerServer:
             prior.get("_owner_ref") is websocket
             and prior.get("_control_ref") is control
             and prior.get("_route_ref") is self._master_capture_route_authority
+            and prior.get("_transport_ref") is self.mixer_client
+            and prior.get("_capture_ref") is self.audio_capture
+            and prior.get("_proof_receipt_ref")
+            is current.get("_proof_receipt_ref")
             and all(prior.get(name) == current.get(name) for name in exact_fields)
             and request.get("expected_review_contract_version")
             == current["review_contract_version"]
@@ -16609,9 +17158,14 @@ class AutoMixerServer:
         runtime = self._runtime_identity
         launch = runtime.get("launch_binding", {})
         source = runtime.get("source", {})
+        capability_kind = current.get(
+            "required_capability_kind",
+            "restore_only_proof",
+        )
+        proof_receipt = current.get("_proof_receipt_ref")
         try:
             return M110CapabilityBinding(
-                capability_kind="restore_only_proof",
+                capability_kind=capability_kind,
                 runtime_instance_nonce=str(runtime.get("instance_nonce") or ""),
                 runtime_manifest_sha256=self._m110_prefixed_sha256(
                     runtime.get("manifest_sha256")
@@ -16635,6 +17189,16 @@ class AutoMixerServer:
                 review_content_digest=current["review_content_digest"],
                 operation_digest=current["operation_digest"],
                 canonical_bundle_bytes=current["canonical_bundle_bytes"],
+                bundle_kind=current.get("bundle_kind", ""),
+                review_preimage_sha256=current.get(
+                    "review_preimage_sha256",
+                    "",
+                ),
+                proof_receipt_id=(
+                    proof_receipt.receipt_id
+                    if type(proof_receipt) is M110RestoredProofReceipt
+                    else ""
+                ),
                 approval_id=str(request["approval_id"]),
                 idempotency_key=str(request["idempotency_key"]),
                 scope_addresses=current["scope_addresses"],
@@ -16643,6 +17207,8 @@ class AutoMixerServer:
                 _route_ref=route,
                 _transport_ref=self.mixer_client,
                 _capture_ref=self.audio_capture,
+                _control_ref=control,
+                _proof_receipt_ref=proof_receipt,
             ), "m110_capability_apply_binding_current"
         except ValueError as exc:
             return None, f"m110_capability_apply_binding_invalid:{exc}"
@@ -16694,7 +17260,14 @@ class AutoMixerServer:
                 "blockers": blockers,
             }
         grant, reason = self._m110_capability_store.consume(token, binding)
-        if type(grant) is not RestoreOnlyProofGrant or not grant.is_authentic():
+        expected_grant_type = (
+            RestoreOnlyProofGrant
+            if binding.capability_kind == "restore_only_proof"
+            else MaintenanceDspResetCommitOnceGrant
+            if binding.capability_kind == "maintenance_dsp_reset_commit_once"
+            else None
+        )
+        if type(grant) is not expected_grant_type or not grant.is_authentic():
             return {"consumed": False, "reason": reason}
         return {
             "consumed": True,
@@ -16708,6 +17281,7 @@ class AutoMixerServer:
         *,
         websocket: WebSocketServerProtocol,
         proposal: Any,
+        capability_grant: Any = None,
         terminal_result: Any,
         result_digest: Any,
     ) -> Dict[str, Any]:
@@ -16741,15 +17315,36 @@ class AutoMixerServer:
             terminal_result.get("transaction_id") or ""
         ).strip()
         lifecycle = self._manual_write_wal_lifecycles.get(transaction_id)
-        if not self._wal_lifecycle_proves_restored_proof(lifecycle):
+        grant_binding = getattr(capability_grant, "binding", None)
+        fixed_reset_proof = bool(
+            type(capability_grant) is RestoreOnlyProofGrant
+            and capability_grant.is_authentic()
+            and type(grant_binding) is M110CapabilityBinding
+            and grant_binding.bundle_kind == M110_RESET_BUNDLE_KIND
+            and grant_binding.capability_kind == "restore_only_proof"
+        )
+        wal_proves_restored = bool(
+            classify_m110_lifecycle(lifecycle) == M110_LIFECYCLE_RESOLVED
+            and tuple(lifecycle.get("phases") or ())
+            == (
+                "prepared",
+                "verification_pending",
+                "verified_state_pending_cleanup",
+                "proof_restored",
+            )
+            if fixed_reset_proof and isinstance(lifecycle, Mapping)
+            else self._wal_lifecycle_proves_restored_proof(lifecycle)
+        )
+        if not wal_proves_restored:
             return {
                 "recorded": False,
                 "reason": "m110_restored_proof_wal_invalid",
             }
-        prepared = lifecycle.get("prepared")
-        terminal = lifecycle.get("latest_event")
+        prepared_event = lifecycle.get("prepared")
+        terminal_event = lifecycle.get("latest_event")
+        prepared = self._wal_event_payload_projection(prepared_event)
+        terminal = self._wal_event_payload_projection(terminal_event)
         wal_identity_fields = (
-            "transaction_id",
             "proposal_id",
             "review_content_digest",
             "operation_digest",
@@ -16796,6 +17391,21 @@ class AutoMixerServer:
             == terminal_result.get("operation_digest")
             and prepared.get("expected_operation_ids")
             == terminal_result.get("applied_operation_ids")
+            and str(lifecycle.get("transaction_id") or "")
+            == transaction_id
+            and (
+                not fixed_reset_proof
+                or (
+                    terminal_result.get("bundle_kind")
+                    == grant_binding.bundle_kind
+                    and terminal_result.get("review_preimage_sha256")
+                    == grant_binding.review_preimage_sha256
+                    and terminal_result.get("operation_digest")
+                    == grant_binding.operation_digest
+                    and terminal_result.get("proposal_id")
+                    == grant_binding.proposal_id
+                )
+            )
         ):
             return {
                 "recorded": False,
@@ -16842,34 +17452,118 @@ class AutoMixerServer:
                 "reason": control_reason,
             }
         operation_digest = terminal_result["operation_digest"]
-        if operation_digest in self._m110_restored_proof_receipts:
-            return {
-                "recorded": False,
-                "reason": "m110_restored_proof_receipt_already_exists",
-            }
+        existing_receipt = self._m110_restored_proof_receipts.get(
+            operation_digest
+        )
+        if type(existing_receipt) is M110RestoredProofReceipt:
+            existing_age = (
+                time.monotonic() - existing_receipt.created_at_monotonic
+            )
+            if (
+                existing_receipt.is_authentic()
+                and math.isfinite(existing_age)
+                and 0.0
+                <= existing_age
+                < M110_RESTORED_PROOF_RECEIPT_LATEST_START_SECONDS
+            ):
+                return {
+                    "recorded": False,
+                    "reason": "m110_restored_proof_receipt_already_exists",
+                }
         runtime = self._runtime_identity
         source = runtime.get("source", {})
+        receipt_owner = grant_binding if fixed_reset_proof else None
+        if fixed_reset_proof and not (
+            grant_binding._owner_ref is websocket
+            and grant_binding._control_ref is control
+            and grant_binding._route_ref is route
+            and grant_binding._transport_ref is self.mixer_client
+            and grant_binding._capture_ref is self.audio_capture
+        ):
+            return {
+                "recorded": False,
+                "reason": "m110_restored_proof_grant_binding_invalid",
+            }
         try:
             receipt = new_m110_restored_proof_receipt(
                 proposal_id=proposal.id,
                 review_contract_version=proposal.review_contract_version,
                 review_content_digest=proposal.review_content_digest,
+                review_preimage_sha256=(
+                    receipt_owner.review_preimage_sha256
+                    if receipt_owner is not None
+                    else ""
+                ),
                 operation_digest=operation_digest,
+                bundle_kind=(
+                    receipt_owner.bundle_kind
+                    if receipt_owner is not None
+                    else ""
+                ),
+                canonical_bundle_bytes=(
+                    receipt_owner.canonical_bundle_bytes
+                    if receipt_owner is not None
+                    else b""
+                ),
                 result_digest=result_digest,
                 transaction_id=transaction_id,
-                runtime_instance_nonce=str(
-                    runtime.get("instance_nonce") or ""
+                runtime_instance_nonce=(
+                    receipt_owner.runtime_instance_nonce
+                    if receipt_owner is not None
+                    else str(runtime.get("instance_nonce") or "")
                 ),
-                source_head=str(source.get("head") or ""),
-                source_tree=str(source.get("tree") or ""),
-                route_proof_id=route.proof_id,
-                route_artifact_sha256=route.artifact_sha256,
-                owner_connection_id=id(websocket),
+                source_head=(
+                    receipt_owner.source_head
+                    if receipt_owner is not None
+                    else str(source.get("head") or "")
+                ),
+                source_tree=(
+                    receipt_owner.source_tree
+                    if receipt_owner is not None
+                    else str(source.get("tree") or "")
+                ),
+                route_proof_id=(
+                    receipt_owner.route_proof_id
+                    if receipt_owner is not None
+                    else route.proof_id
+                ),
+                route_artifact_sha256=(
+                    receipt_owner.route_artifact_sha256
+                    if receipt_owner is not None
+                    else route.artifact_sha256
+                ),
+                owner_connection_id=(
+                    receipt_owner.owner_connection_id
+                    if receipt_owner is not None
+                    else id(websocket)
+                ),
                 created_at_epoch=time.time(),
                 created_at_monotonic=time.monotonic(),
-                _owner_ref=websocket,
-                _control_ref=control,
-                _route_ref=route,
+                _owner_ref=(
+                    receipt_owner._owner_ref
+                    if receipt_owner is not None
+                    else websocket
+                ),
+                _control_ref=(
+                    receipt_owner._control_ref
+                    if receipt_owner is not None
+                    else control
+                ),
+                _route_ref=(
+                    receipt_owner._route_ref
+                    if receipt_owner is not None
+                    else route
+                ),
+                _transport_ref=(
+                    receipt_owner._transport_ref
+                    if receipt_owner is not None
+                    else None
+                ),
+                _capture_ref=(
+                    receipt_owner._capture_ref
+                    if receipt_owner is not None
+                    else None
+                ),
             )
         except (TypeError, ValueError):
             return {
@@ -17457,10 +18151,11 @@ class AutoMixerServer:
 
     def _m110_consumed_grant_forward_current(
         self,
-        grant: RestoreOnlyProofGrant,
+        grant: Any,
     ) -> bool:
         if not (
-            type(grant) is RestoreOnlyProofGrant
+            type(grant)
+            in {RestoreOnlyProofGrant, MaintenanceDspResetCommitOnceGrant}
             and grant.is_authentic()
             and grant.execution_status() == "executing"
         ):
@@ -17487,6 +18182,7 @@ class AutoMixerServer:
         return bool(
             control._route_ref is route
             and binding._owner_ref is control._owner_ref
+            and binding._control_ref is control
             and binding._route_ref is route
             and binding._transport_ref is self.mixer_client
             and binding._capture_ref is self.audio_capture
@@ -17509,6 +18205,516 @@ class AutoMixerServer:
             and not self._system_emergency_stop_errors
             and self._manual_write_wal_integrity_ok is True
         )
+
+    def _project_m110_maintenance_dsp_reset_result(
+        self,
+        *,
+        capability_grant: Any,
+        transaction_id: str,
+        execution_result: Any,
+        wal_receipts: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        """Project physical truth from the strict durable WAL, never RAM alone."""
+
+        binding = getattr(capability_grant, "binding", None)
+        lifecycle = self._manual_write_wal_lifecycles.get(transaction_id)
+        classification = classify_m110_lifecycle(lifecycle)
+        latest_event = (
+            lifecycle.get("latest_event")
+            if isinstance(lifecycle, Mapping)
+            else None
+        )
+        terminal_payload = (
+            latest_event.get(M110_WAL_PAYLOAD_FIELD)
+            if isinstance(latest_event, Mapping)
+            else None
+        )
+        latest_phase = str(
+            latest_event.get("phase") if isinstance(latest_event, Mapping) else ""
+        ).strip()
+        latest_receipt = next(
+            (
+                receipt
+                for receipt in reversed(tuple(wal_receipts))
+                if isinstance(receipt, Mapping)
+                and receipt.get("transaction_id") == transaction_id
+                and receipt.get("phase") == latest_phase
+            ),
+            None,
+        )
+        receipt_bound = bool(
+            isinstance(latest_receipt, Mapping)
+            and isinstance(latest_event, Mapping)
+            and latest_receipt.get("payload_sha256")
+            == latest_event.get(M110_WAL_PAYLOAD_SHA256_FIELD)
+            and re.fullmatch(
+                r"sha256:[0-9a-f]{64}",
+                str(latest_receipt.get("record_sha256") or ""),
+            )
+        )
+        proof_run = type(capability_grant) is RestoreOnlyProofGrant
+        capability_kind = (
+            "restore_only_proof"
+            if proof_run
+            else "maintenance_dsp_reset_commit_once"
+        )
+        expected_success_phase = "proof_restored" if proof_run else "committed"
+        expected_success_status = "proof_passed" if proof_run else "applied"
+        expected_binding = {
+            "proposal_id": getattr(binding, "proposal_id", None),
+            "approval_id": getattr(binding, "approval_id", None),
+            "idempotency_key": getattr(binding, "idempotency_key", None),
+            "review_content_digest": getattr(
+                binding,
+                "review_content_digest",
+                None,
+            ),
+            "operation_digest": getattr(binding, "operation_digest", None),
+            "bundle_kind": getattr(binding, "bundle_kind", None),
+            "proof_run": proof_run,
+            "restore_after_verify": proof_run,
+            "capability_kind": capability_kind,
+        }
+        binding_matches = bool(
+            isinstance(terminal_payload, Mapping)
+            and all(
+                terminal_payload.get(field_name) == expected_value
+                for field_name, expected_value in expected_binding.items()
+            )
+            and (
+                not str(terminal_payload.get("proof_receipt_id") or "")
+                if proof_run
+                else terminal_payload.get("proof_receipt_id")
+                == getattr(binding, "proof_receipt_id", "")
+            )
+        )
+        result_view = (
+            execution_result.to_dict()
+            if callable(getattr(execution_result, "to_dict", None))
+            else dict(execution_result)
+            if isinstance(execution_result, Mapping)
+            else {}
+        )
+        result_matches = bool(
+            isinstance(terminal_payload, Mapping)
+            and result_view.get("transaction_id") == transaction_id
+            and result_view.get("status")
+            == terminal_payload.get("result_status")
+            and result_view.get("reason")
+            == terminal_payload.get("result_reason")
+            and result_view.get("applied_operation_ids")
+            == terminal_payload.get("applied_operation_ids")
+            and result_view.get("rollback_operation_ids")
+            == terminal_payload.get("rollback_operation_ids")
+            and all(
+                result_view.get(field_name)
+                == terminal_payload.get(field_name)
+                for field_name in (
+                    "physical_verified",
+                    "audio_recheck_passed",
+                    "physical_state_restored",
+                    "write_state_unknown",
+                    "rollback_state_unknown",
+                    "manual_review_required",
+                    "emergency_stop_activated",
+                )
+            )
+        )
+        durable_projection_valid = bool(
+            classification in {M110_LIFECYCLE_RESOLVED, M110_LIFECYCLE_UNRESOLVED}
+            and isinstance(terminal_payload, Mapping)
+            and receipt_bound
+            and binding_matches
+            and result_matches
+        )
+        exact_no_send_abort = bool(
+            durable_projection_valid
+            and classification == M110_LIFECYCLE_RESOLVED
+            and self._wal_lifecycle_proves_no_send(lifecycle)
+        )
+        success = bool(
+            durable_projection_valid
+            and classification == M110_LIFECYCLE_RESOLVED
+            and latest_phase == expected_success_phase
+            and terminal_payload.get("result_status") == expected_success_status
+        )
+        if durable_projection_valid:
+            projected = dict(terminal_payload)
+        else:
+            projected = {}
+        if success:
+            status = expected_success_status
+            reason = str(terminal_payload.get("result_reason") or "")
+        elif exact_no_send_abort:
+            status = "blocked"
+            reason = str(
+                terminal_payload.get("result_reason")
+                or "m110_reset_blocked_before_send"
+            )
+        else:
+            status = "manual_review_required"
+            reason = (
+                str(terminal_payload.get("result_reason") or "")
+                if durable_projection_valid
+                else "m110_durable_result_projection_failed"
+            )
+        return {
+            **projected,
+            "transaction_id": transaction_id,
+            "status": status,
+            "reason": reason,
+            "success": success,
+            "proof_run": proof_run,
+            "restore_after_verify": proof_run,
+            "capability_kind": capability_kind,
+            "proposal_id": getattr(binding, "proposal_id", None),
+            "approval_id": getattr(binding, "approval_id", None),
+            "idempotency_key": getattr(binding, "idempotency_key", None),
+            "review_content_digest": getattr(
+                binding,
+                "review_content_digest",
+                None,
+            ),
+            "operation_digest": getattr(binding, "operation_digest", None),
+            "bundle_kind": getattr(binding, "bundle_kind", None),
+            "review_preimage_sha256": getattr(
+                binding,
+                "review_preimage_sha256",
+                "",
+            ),
+            "proof_receipt_id": getattr(binding, "proof_receipt_id", ""),
+            "wal_terminal": latest_phase or "missing",
+            "wal_lifecycle_classification": classification or "missing",
+            "wal_payload_sha256": (
+                latest_event.get(M110_WAL_PAYLOAD_SHA256_FIELD)
+                if isinstance(latest_event, Mapping)
+                else None
+            ),
+            "wal_record_sha256": (
+                latest_receipt.get("record_sha256")
+                if isinstance(latest_receipt, Mapping)
+                else None
+            ),
+            "durable_result_projection_valid": durable_projection_valid,
+            "no_console_send_proven": exact_no_send_abort,
+            "manual_review_required": bool(
+                not success
+                and not exact_no_send_abort
+                or projected.get("manual_review_required") is True
+            ),
+        }
+
+    async def _execute_m110_maintenance_dsp_reset_grant(
+        self,
+        *,
+        capability_grant: Any,
+        approved_preimage: Mapping[str, Any],
+        transaction_id: str,
+        result_evidence_reservation_binding: Any,
+        restored_proof_receipt: M110RestoredProofReceipt | None = None,
+    ) -> Dict[str, Any]:
+        """Run the finite 64-operation executor behind server-owned hooks."""
+
+        grant = capability_grant
+        if not (
+            type(grant)
+            in {RestoreOnlyProofGrant, MaintenanceDspResetCommitOnceGrant}
+            and grant.is_authentic()
+            and grant.execution_status() == "issued"
+        ):
+            return self._supervised_transaction_no_send_blocked(
+                "m110_maintenance_reset_grant_required"
+            )
+        binding = grant.binding
+        if not (
+            type(result_evidence_reservation_binding)
+            is ResultEvidenceReservationBinding
+            and result_evidence_reservation_binding.proposal_id
+            == binding.proposal_id
+            and result_evidence_reservation_binding.review_content_digest
+            == binding.review_content_digest
+        ):
+            grant.mark_terminal("result_reservation_invalid_before_executor")
+            return self._supervised_transaction_no_send_blocked(
+                "m110_result_evidence_reservation_binding_required"
+            )
+        transaction_id = str(transaction_id or "").strip()
+        if not transaction_id:
+            grant.mark_terminal("transaction_id_invalid_before_executor")
+            return self._supervised_transaction_no_send_blocked(
+                "m110_reset_transaction_id_required"
+            )
+
+        wal_receipts: list[Mapping[str, Any]] = []
+
+        def append_phase(
+            phase: str,
+            payload: Mapping[str, Any],
+        ) -> Optional[Dict[str, Any]]:
+            receipt = self._append_m110_manual_write_wal(
+                phase,
+                transaction_id,
+                payload,
+            )
+            if isinstance(receipt, Mapping):
+                wal_receipts.append(dict(receipt))
+            return receipt
+
+        def mark_send_boundary() -> bool:
+            transition = (
+                self.operator_proposal_queue
+                .mark_result_evidence_send_may_have_occurred(
+                    result_evidence_reservation_binding
+                )
+            )
+            return bool(
+                isinstance(transition, Mapping)
+                and transition.get("transitioned") is True
+            )
+
+        operation = M110_RESET_OPERATION_DEFINITIONS[0]
+        audio_operation = ConsoleTransactionOperation(
+            operation_id=str(operation["operation_id"]),
+            family_id=str(operation["family_id"]),
+            write_kind=str(operation["write_kind"]),
+            channel=int(operation["channel"]),
+            parameter=str(operation["parameter"]),
+            target_value=0,
+        )
+
+        async def audio_recheck() -> AudioRecheckResult:
+            return await self._supervised_transaction_audio_recheck(
+                audio_operation,
+                {},
+                {},
+            )
+
+        hooks = M110ResetHooks(
+            authority_current=lambda: self._m110_consumed_grant_forward_current(
+                grant
+            ),
+            persist_prepared=lambda payload: append_phase("prepared", payload),
+            mark_send_may_have_occurred=mark_send_boundary,
+            persist_terminal=append_phase,
+            audio_recheck=audio_recheck,
+            emergency_stop=self.activate_system_emergency_stop,
+        )
+        executor = M110MaintenanceDspResetExecutor(self.mixer_client, hooks)
+        expected_identity_values = {
+            "/$syscfg/$serial": binding.console_serial,
+            "/$syscfg/$firmware": binding.firmware_version,
+            "/io/out/USB/47/grp": "MAIN",
+            "/io/out/USB/47/in": 0,
+            "/io/out/USB/48/grp": "MAIN",
+            "/io/out/USB/48/in": 1,
+        }
+        execution = asyncio.create_task(
+            executor.execute(
+                transaction_id=transaction_id,
+                approved_preimage=approved_preimage,
+                expected_identity_values=expected_identity_values,
+                capability_grant=grant,
+                restored_proof_receipt=restored_proof_receipt,
+            )
+        )
+        cancellation_deferred = False
+        while not execution.done():
+            try:
+                await asyncio.shield(execution)
+            except asyncio.CancelledError:
+                cancellation_deferred = True
+        execution_result = execution.result()
+        projected = self._project_m110_maintenance_dsp_reset_result(
+            capability_grant=grant,
+            transaction_id=transaction_id,
+            execution_result=execution_result,
+            wal_receipts=wal_receipts,
+        )
+        if cancellation_deferred:
+            projected["caller_cancellation_deferred_until_terminal"] = True
+        return projected
+
+    async def apply_m110_capability_transaction(
+        self,
+        *,
+        websocket: WebSocketServerProtocol,
+        request: Mapping[str, Any],
+        capability_grant: Any,
+        proposal: Any,
+        plan_payload: Optional[Mapping[str, Any]],
+        result_evidence_reservation_binding: Any,
+    ) -> Dict[str, Any]:
+        """Dispatch a consumed typed grant without trusting proposal markers."""
+
+        grant = capability_grant
+        binding = getattr(grant, "binding", None)
+        if not (
+            type(binding) is M110CapabilityBinding
+            and binding.bundle_kind == M110_RESET_BUNDLE_KIND
+        ):
+            if not isinstance(plan_payload, Mapping):
+                if callable(getattr(grant, "mark_terminal", None)):
+                    grant.mark_terminal("legacy_plan_missing_after_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    "m110_restore_proof_supervised_plan_required"
+                )
+            return await self.apply_m110_restore_only_proof_transaction(
+                websocket=websocket,
+                request=request,
+                capability_grant=grant,
+                proposal=proposal,
+                plan_payload=plan_payload,
+                result_evidence_reservation_binding=(
+                    result_evidence_reservation_binding
+                ),
+            )
+        if not (
+            type(grant)
+            in {RestoreOnlyProofGrant, MaintenanceDspResetCommitOnceGrant}
+            and grant.is_authentic()
+            and grant.execution_status() == "issued"
+        ):
+            return self._supervised_transaction_no_send_blocked(
+                "m110_maintenance_reset_grant_required"
+            )
+        valid, reason = validate_m110_capability_apply_request(
+            {
+                **dict(request),
+                "supervised_capability_token": "m110cap_v1_" + "0" * 64,
+            }
+        )
+        binding_matches_request = bool(
+            request.get("proposal_id") == binding.proposal_id
+            and request.get("approval_id") == binding.approval_id
+            and request.get("idempotency_key") == binding.idempotency_key
+            and request.get("expected_review_contract_version")
+            == binding.review_contract_version
+            and request.get("expected_review_content_digest")
+            == binding.review_content_digest
+            and request.get("expected_operation_digest")
+            == binding.operation_digest
+        )
+        if not valid or not binding_matches_request:
+            grant.mark_terminal("request_changed_after_capability_consume")
+            return self._supervised_transaction_no_send_blocked(
+                reason if not valid else "m110_capability_apply_binding_mismatch"
+            )
+        if not (
+            type(result_evidence_reservation_binding)
+            is ResultEvidenceReservationBinding
+            and result_evidence_reservation_binding.proposal_id
+            == binding.proposal_id
+            and result_evidence_reservation_binding.review_content_digest
+            == binding.review_content_digest
+        ):
+            grant.mark_terminal("result_reservation_invalid_after_consume")
+            return self._supervised_transaction_no_send_blocked(
+                "m110_result_evidence_reservation_binding_required"
+            )
+        context = self._m110_fixed_reset_proposal_contexts.get(
+            binding.proposal_id
+        )
+        if not (
+            isinstance(context, Mapping)
+            and context.get("proposal") is proposal
+            and context.get("canonical_bundle_bytes")
+            == binding.canonical_bundle_bytes
+            and context.get("review_preimage_sha256")
+            == binding.review_preimage_sha256
+            and context.get("required_capability_kind")
+            == binding.capability_kind
+        ):
+            grant.mark_terminal("fixed_context_invalid_after_consume")
+            return self._supervised_transaction_no_send_blocked(
+                "m110_fixed_reset_private_context_required"
+            )
+        async with self._console_write_scope(
+            deadline_epoch=time.time() + 2.0,
+        ) as writer_acquired:
+            if writer_acquired is not True:
+                grant.mark_terminal("writer_conflict_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    "console_writer_conflict_timeout"
+                )
+            try:
+                self._verify_m110_cp05_hardware_gate()
+            except Exception as exc:
+                grant.mark_terminal("cp05_gate_failed_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(str(exc))
+            route_view = (
+                await self._verified_master_capture_route_proof_with_fresh_hardware()
+            )
+            if route_view.get("verified") is not True:
+                grant.mark_terminal("route_stale_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    route_view.get("reason")
+                    or "m110_route_authority_not_current"
+                )
+            global_blockers = self._m110_capability_global_blockers(websocket)
+            if global_blockers:
+                grant.mark_terminal("global_hazard_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    "m110_capability_global_safety_gate_failed",
+                    blockers=global_blockers,
+                )
+            current_binding, binding_reason = (
+                self._m110_capability_binding_for_apply(
+                    websocket=websocket,
+                    request={
+                        **dict(request),
+                        "supervised_capability_token": (
+                            "m110cap_v1_" + "0" * 64
+                        ),
+                    },
+                    proposal=proposal,
+                )
+            )
+            if current_binding is None or not binding.matches_exactly(
+                current_binding
+            ):
+                grant.mark_terminal("binding_drift_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    binding_reason
+                )
+            operation = M110_RESET_OPERATION_DEFINITIONS[0]
+            prewrite_audio = await self._supervised_transaction_audio_recheck(
+                ConsoleTransactionOperation(
+                    operation_id=str(operation["operation_id"]),
+                    family_id=str(operation["family_id"]),
+                    write_kind=str(operation["write_kind"]),
+                    channel=int(operation["channel"]),
+                    parameter=str(operation["parameter"]),
+                    target_value=0,
+                ),
+                {},
+                {},
+            )
+            if prewrite_audio.status != "passed":
+                grant.mark_terminal("headroom_failed_after_capability_consume")
+                return self._supervised_transaction_no_send_blocked(
+                    prewrite_audio.reason
+                    or "m110_prewrite_master_headroom_not_verified"
+                )
+            post_audio_blockers = self._m110_capability_global_blockers(
+                websocket
+            )
+            if post_audio_blockers:
+                grant.mark_terminal("hazard_after_headroom_precheck")
+                return self._supervised_transaction_no_send_blocked(
+                    "m110_capability_global_safety_gate_failed",
+                    blockers=post_audio_blockers,
+                )
+            return await self._execute_m110_maintenance_dsp_reset_grant(
+                capability_grant=grant,
+                approved_preimage=context["approved_preimage"],
+                transaction_id=(
+                    "m110-reset-" + uuid.uuid4().hex
+                ),
+                result_evidence_reservation_binding=(
+                    result_evidence_reservation_binding
+                ),
+                restored_proof_receipt=context.get("_proof_receipt_ref"),
+            )
 
     async def apply_m110_restore_only_proof_transaction(
         self,

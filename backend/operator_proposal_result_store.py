@@ -261,9 +261,11 @@ def result_requires_pinned_evidence(result: Dict[str, Any]) -> bool:
     ):
         if result.get(key) is not False:
             return True
+    known_verified_apply = terminal_result_proves_verified_apply(result)
     if (
         "physical_state_restored" in result
         and result.get("physical_state_restored") is not True
+        and not known_verified_apply
     ):
         return True
     known_no_send = _result_proves_exact_safe_no_send(result)
@@ -274,7 +276,6 @@ def result_requires_pinned_evidence(result: Dict[str, Any]) -> bool:
         and result.get("wal_terminal") == "rolled_back"
         and result.get("status") in {"blocked", "rolled_back"}
     )
-    known_verified_apply = terminal_result_proves_verified_apply(result)
     known_restored_proof = terminal_result_proves_verified_restored_proof(result)
     return not (
         known_no_send
@@ -516,7 +517,10 @@ class ResultEvidenceStore:
             fatal_codes.append("terminal_write_state_unknown")
         if (
             value.get("rollback_state_unknown") is True
-            or value.get("physical_state_restored") is False
+            or (
+                value.get("physical_state_restored") is False
+                and not terminal_result_proves_verified_apply(value)
+            )
         ):
             fatal_codes.append("terminal_rollback_state_unknown")
         if value.get("manual_review_required") is True:

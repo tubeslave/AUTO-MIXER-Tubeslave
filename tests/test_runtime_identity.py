@@ -3,11 +3,44 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from pathlib import Path
 
 import pytest
 
 import backend.runtime_identity as runtime_identity
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _javascript_runtime_critical_paths(relative_path: str) -> list[str]:
+    source = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+    match = re.search(
+        r"EXPECTED_RUNTIME_CRITICAL_SOURCE_PATHS\s*=\s*\[(.*?)\]\.sort\(\);",
+        source,
+        flags=re.DOTALL,
+    )
+    assert match is not None
+    return re.findall(r"'([^']+)'", match.group(1))
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    (
+        "frontend/scripts/smoke-packaged-runtime.mjs",
+        "frontend/scripts/verify-macos-release.mjs",
+    ),
+)
+def test_frontend_release_verifiers_share_backend_runtime_identity_scope(
+    relative_path,
+):
+    assert sorted(_javascript_runtime_critical_paths(relative_path)) == sorted(
+        runtime_identity.RUNTIME_CRITICAL_SOURCE_PATHS
+    )
+    assert "backend/m110_manual_write_wal.py" in (
+        runtime_identity.RUNTIME_CRITICAL_SOURCE_PATHS
+    )
 
 
 def _fake_git(_root: Path, *arguments: str) -> bytes:

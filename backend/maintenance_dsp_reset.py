@@ -538,23 +538,49 @@ async def capture_m110_reset_preimage(
     expected_identity_values: Mapping[str, Any],
     timeout: float = M110_RESET_QUERY_TIMEOUT_SECONDS,
     sweep_deadline_seconds: float = M110_RESET_SWEEP_DEADLINE_SECONDS,
+    total_deadline_seconds: float | None = None,
 ) -> dict[str, Any]:
     """Capture the exact reset preimage and the finite preserve manifest."""
 
     if not callable(query_parameter):
         raise TypeError("m110_query_parameter_callable_required")
+    if total_deadline_seconds is not None and not (
+        isinstance(total_deadline_seconds, (int, float))
+        and not isinstance(total_deadline_seconds, bool)
+        and math.isfinite(float(total_deadline_seconds))
+        and float(total_deadline_seconds) > 0.0
+    ):
+        raise ValueError("m110_total_capture_deadline_invalid")
+    capture_started = time.monotonic()
+
+    def next_sweep_deadline() -> float:
+        if total_deadline_seconds is None:
+            return float(sweep_deadline_seconds)
+        remaining = float(total_deadline_seconds) - (
+            time.monotonic() - capture_started
+        )
+        if remaining <= 0.0:
+            raise TimeoutError("m110_total_capture_deadline_exceeded")
+        return min(float(sweep_deadline_seconds), remaining)
+
     reset_rows, reset_evidence = await _capture_rows(
         query_parameter,
         M110_RESET_PREIMAGE_SPECS,
         timeout=timeout,
-        sweep_deadline_seconds=sweep_deadline_seconds,
+        sweep_deadline_seconds=next_sweep_deadline(),
     )
     manifest_rows, manifest_evidence = await _capture_rows(
         query_parameter,
         M110_PRESERVATION_SPECS,
         timeout=timeout,
-        sweep_deadline_seconds=sweep_deadline_seconds,
+        sweep_deadline_seconds=next_sweep_deadline(),
     )
+    if (
+        total_deadline_seconds is not None
+        and time.monotonic() - capture_started
+        > float(total_deadline_seconds)
+    ):
+        raise TimeoutError("m110_total_capture_deadline_exceeded")
     identity_addresses = {
         "/$syscfg/$serial",
         "/$syscfg/$firmware",

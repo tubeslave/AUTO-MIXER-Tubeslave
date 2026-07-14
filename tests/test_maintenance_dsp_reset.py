@@ -6,6 +6,8 @@ import hashlib
 import json
 import threading
 import time
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -38,6 +40,13 @@ from supervised_proof_capability import (
     new_m110_restored_proof_receipt,
 )
 from supervised_console_transaction import AudioRecheckResult
+from operator_proposal_result_store import ResultEvidenceReservationBinding
+from m110_manual_write_wal import (
+    M110_LIFECYCLE_RESOLVED,
+    classify_m110_lifecycle,
+)
+from master_capture_route_proof import MasterCaptureRouteAuthority
+from server import AutoMixerServer
 
 
 IDENTITY_VALUES = {
@@ -48,6 +57,41 @@ IDENTITY_VALUES = {
     "/io/out/USB/48/grp": "MAIN",
     "/io/out/USB/48/in": 1,
 }
+
+
+def _server_route_authority(*, websocket, transport, capture):
+    return MasterCaptureRouteAuthority(
+        proof_id="m110-fixed-reset-route",
+        issued_at_epoch=time.time(),
+        expires_at_epoch=time.time() + 600.0,
+        runtime_instance_nonce="1" * 32,
+        runtime_manifest_sha256="sha256:" + "2" * 64,
+        launch_manifest_sha256="sha256:" + "8" * 64,
+        connection_generation=1,
+        transport_generation=2,
+        transport_instance_id=id(transport),
+        owner_connection_id=id(websocket),
+        emergency_generation=3,
+        console_serial=IDENTITY_VALUES["/$syscfg/$serial"],
+        firmware_version=IDENTITY_VALUES["/$syscfg/$firmware"],
+        capture_device="WING",
+        capture_device_index=1,
+        capture_channel_count=48,
+        capture_sample_rate_hz=48_000,
+        capture_instance_id=id(capture),
+        capture_hardware_uid="m110-reset-unit-capture",
+        capture_hardware_binding_sha256="9" * 64,
+        capture_usb_serial="unit",
+        capture_usb_location_id=1,
+        master_channels=(47, 48),
+        artifact_path="/tmp/m110-fixed-reset-route.json",
+        artifact_sha256="sha256:" + "5" * 64,
+        evidence_sha256="sha256:" + "6" * 64,
+        _transport_ref=transport,
+        _capture_ref=capture,
+        _capture_stream_ref=object(),
+        _owner_ref=websocket,
+    )
 
 
 def _payload_sha256(payload):
@@ -487,6 +531,25 @@ async def test_capture_requires_double_physical_readback_and_identity_match():
 
 
 @pytest.mark.asyncio
+async def test_capture_total_deadline_bounds_both_physical_sweeps():
+    query = _query(_physical_values())
+
+    async def slow_query(address, timeout):
+        await asyncio.sleep(0.01)
+        return query(address, timeout)
+
+    with pytest.raises(
+        TimeoutError,
+        match="m110_(?:physical_sweep|total_capture)_deadline_exceeded",
+    ):
+        await capture_m110_reset_preimage(
+            slow_query,
+            expected_identity_values=IDENTITY_VALUES,
+            total_deadline_seconds=0.005,
+        )
+
+
+@pytest.mark.asyncio
 async def test_capture_rejects_one_round_trip_wrong_address_and_identity():
     values = _physical_values()
 
@@ -643,6 +706,626 @@ async def test_maintenance_proof_restores_all_64_members_in_reverse():
     ]
     assert wing.boundary is None
     assert "*" not in wing.callbacks
+
+
+@pytest.mark.asyncio
+async def test_server_reset_capture_timeout_returns_strict_blocked_terminal(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+        str(tmp_path / "console-runtime"),
+    )
+    with patch.object(AutoMixerServer, "_load_config", return_value={}), patch(
+        "server.BleedService"
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+    websocket = object()
+    wing = _FakeWing(_physical_values())
+    wing.is_connected = True
+    capture = object()
+    control = object()
+    route = _server_route_authority(
+        websocket=websocket,
+        transport=wing,
+        capture=capture,
+    )
+    server.mixer_client = wing
+    server.audio_capture = capture
+    server._master_capture_route_authority = route
+    server._runtime_identity = {
+        "instance_nonce": "1" * 32,
+        "manifest_sha256": "2" * 64,
+        "launch_binding": {"prestart_manifest_sha256": "8" * 64},
+        "source": {"head": "3" * 40, "tree": "4" * 40},
+    }
+    server._mixer_connection_generation = 1
+    server._manual_write_emergency_generation = 3
+    server._current_mixer_transport_generation = MagicMock(return_value=2)
+    server._m110_capability_global_blockers = MagicMock(return_value=[])
+    server._verified_m110_attended_control = MagicMock(
+        return_value=(control, "current")
+    )
+    server._verify_m110_cp05_hardware_gate = MagicMock(return_value={})
+    server._verified_master_capture_route_proof_with_fresh_hardware = AsyncMock(
+        return_value={"verified": True}
+    )
+
+    with patch(
+        "server.capture_m110_reset_preimage",
+        new=AsyncMock(
+            side_effect=TimeoutError("m110_physical_sweep_deadline_exceeded")
+        ),
+    ):
+        result = await server.create_m110_maintenance_reset_proposal(
+            websocket=websocket,
+            request={
+                "type": "create_m110_maintenance_reset_proof_proposal",
+                "contract_version": 1,
+                "bundle_selector": "fixed_channels_1_16_dsp_bypass",
+            },
+        )
+
+    assert result["type"] == "m110_maintenance_reset_proposal_result"
+    assert result["status"] == "blocked"
+    assert result["success"] is False
+    assert result["reason"] == (
+        "m110_maintenance_reset_capture_invalid:"
+        "m110_physical_sweep_deadline_exceeded"
+    )
+    assert result["live_authority_granted"] is False
+    assert result["readiness_closure_allowed"] is False
+    assert wing.send_calls == []
+
+
+@pytest.mark.asyncio
+async def test_server_owns_fixed_reset_proposal_capture_and_private_provenance(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+        str(tmp_path / "console-runtime"),
+    )
+    monkeypatch.setenv(
+        "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
+        str(tmp_path / "manual-events"),
+    )
+    monkeypatch.setenv(
+        "AUTOMIXER_OPERATOR_PROPOSAL_RESULT_DIR",
+        str(tmp_path / "proposal-results"),
+    )
+    with patch.object(AutoMixerServer, "_load_config", return_value={}), patch(
+        "server.BleedService"
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+    websocket = object()
+    wing = _FakeWing(_physical_values())
+    wing.is_connected = True
+    capture = object()
+    control = object()
+    route = _server_route_authority(
+        websocket=websocket,
+        transport=wing,
+        capture=capture,
+    )
+    server.mixer_client = wing
+    server.audio_capture = capture
+    server._master_capture_route_authority = route
+    server._runtime_identity = {
+        "instance_nonce": "1" * 32,
+        "manifest_sha256": "2" * 64,
+        "launch_binding": {
+            "prestart_manifest_sha256": "8" * 64,
+        },
+        "source": {"head": "3" * 40, "tree": "4" * 40},
+    }
+    server._mixer_connection_generation = 1
+    server._manual_write_emergency_generation = 3
+    server._current_mixer_transport_generation = MagicMock(return_value=2)
+    server._m110_capability_global_blockers = MagicMock(return_value=[])
+    server._verified_m110_attended_control = MagicMock(
+        return_value=(control, "current")
+    )
+    server._verify_m110_cp05_hardware_gate = MagicMock(return_value={})
+    server._verified_master_capture_route_proof_with_fresh_hardware = AsyncMock(
+        return_value={"verified": True}
+    )
+
+    created = await server.create_m110_maintenance_reset_proposal(
+        websocket=websocket,
+        request={
+            "type": "create_m110_maintenance_reset_proof_proposal",
+            "contract_version": 1,
+            "bundle_selector": "fixed_channels_1_16_dsp_bypass",
+        },
+    )
+
+    assert created["status"] == "created"
+    assert created["required_capability_kind"] == "restore_only_proof"
+    assert created["bundle_kind"] == "maintenance_dsp_reset_bundle"
+    assert created["operation_count"] == 64
+    assert created["scope_addresses"] == list(M110_RESET_ADDRESSES)
+    assert "approved_preimage" not in created
+    assert "canonical_bundle_bytes" not in created
+    assert len(wing.query_calls) == (
+        len(M110_RESET_ADDRESSES) + len(M110_PRESERVATION_ADDRESSES)
+    )
+    assert wing.send_calls == []
+    proposal = server.operator_proposal_queue.find(
+        proposal_id=created["proposal_id"]
+    )
+    assert proposal is not None
+    assert "supervised_transaction_plan" not in proposal.raw
+    context = server._m110_fixed_reset_proposal_contexts[proposal.id]
+    assert context["proposal"] is proposal
+    assert context["approved_preimage"]["reset_rows"]
+    assert context["approved_preimage"]["preservation_manifest"][
+        "row_count"
+    ] == 184
+
+    prepared = await server.prepare_m110_restore_only_proof(
+        websocket=websocket,
+        request={
+            "type": "prepare_m110_restore_only_proof",
+            "contract_version": 1,
+            "proposal_id": proposal.id,
+            "bundle_selector": "reviewed_supervised_transaction",
+        },
+    )
+    assert prepared["status"] == "prepared"
+    assert prepared["operation_count"] == 64
+    assert prepared["required_capability_kind"] == "restore_only_proof"
+    assert prepared["review_preimage_sha256"] == context[
+        "review_preimage_sha256"
+    ]
+
+    forged = SimpleNamespace(**proposal.__dict__)
+    forged_context, forged_reason = server._build_m110_fixed_reset_bundle(
+        websocket=websocket,
+        proposal=forged,
+        control=control,
+    )
+    assert forged_context is None
+    assert forged_reason == "m110_fixed_reset_private_context_required"
+
+    server._m110_launch_authority = MagicMock()
+    server._m110_launch_authority.verify_and_tombstone_request.return_value = (
+        True,
+        "verified",
+    )
+    issued = await server.issue_m110_supervised_capability(
+        websocket=websocket,
+        request={
+            "type": "issue_supervised_capability",
+            "contract_version": 1,
+            "capability_kind": "restore_only_proof",
+            "proposal_id": proposal.id,
+            "expected_review_contract_version": 2,
+            "expected_review_content_digest": proposal.review_content_digest,
+            "expected_operation_digest": context["operation_digest"],
+            "approval_id": "m110-fixed-reset-proof-approval",
+            "confirmation": "ISSUE_RESTORE_ONLY_PROOF_CAPABILITY",
+            "request_nonce": "a" * 32,
+            "authority_proof": "hmac-sha256:" + "b" * 64,
+        },
+    )
+    assert issued["status"] == "issued"
+    apply_request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-fixed-reset-proof-approval",
+        "idempotency_key": issued["idempotency_key"],
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": context["operation_digest"],
+    }
+    consumed = server.consume_m110_capability_for_apply(
+        websocket=websocket,
+        request=apply_request,
+        token=issued["supervised_capability_token"],
+        proposal=proposal,
+    )
+    assert consumed["consumed"] is True, consumed
+    grant = consumed["grant"]
+    binding = grant.binding
+    reservation_result = server.operator_proposal_queue.reserve_result_evidence(
+        proposal
+    )
+    assert reservation_result["reserved"] is True
+    reservation = reservation_result["reservation_binding"]
+    claim = server.operator_proposal_queue.claim_verified_for_apply(
+        proposal,
+        expected_review_contract_version=2,
+        expected_review_content_digest=proposal.review_content_digest,
+    )
+    assert claim["claimed"] is True
+    server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
+    server._supervised_transaction_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult("passed")
+    )
+    server.activate_system_emergency_stop = AsyncMock(
+        return_value={"success": True, "teardown_complete": True}
+    )
+    wing.query_calls.clear()
+
+    result = await server.apply_m110_capability_transaction(
+        websocket=websocket,
+        request=apply_request,
+        capability_grant=grant,
+        proposal=proposal,
+        plan_payload=None,
+        result_evidence_reservation_binding=reservation,
+    )
+
+    assert result["status"] == "proof_passed"
+    assert result["success"] is True
+    assert result["bundle_kind"] == "maintenance_dsp_reset_bundle"
+    assert result["review_preimage_sha256"] == context[
+        "review_preimage_sha256"
+    ]
+    assert result["durable_result_projection_valid"] is True
+    assert result["physical_state_restored"] is True
+    assert [address for address, _value in wing.send_calls[:64]] == list(
+        M110_RESET_ADDRESSES
+    )
+    server._supervised_transaction_audio_recheck.assert_awaited()
+    server.activate_system_emergency_stop.assert_not_awaited()
+
+    finalized = server.operator_proposal_queue.mark_apply_result(
+        proposal,
+        result,
+        evidence_reservation_binding=reservation,
+    )
+    assert finalized["status"] == "proof_passed"
+    assert proposal.status == "proof_passed"
+    receipt_result = server.record_m110_restored_proof_receipt(
+        websocket=websocket,
+        proposal=proposal,
+        capability_grant=grant,
+        terminal_result=proposal.result,
+        result_digest=proposal.result_digest,
+    )
+    assert receipt_result == {
+        "recorded": True,
+        "reason": "m110_restored_proof_receipt_recorded",
+    }
+    receipt = server._m110_restored_proof_receipts[
+        binding.operation_digest
+    ]
+    assert receipt.bundle_kind == "maintenance_dsp_reset_bundle"
+    assert receipt.canonical_bundle_bytes == binding.canonical_bundle_bytes
+    assert receipt.review_preimage_sha256 == binding.review_preimage_sha256
+
+    wing.send_calls.clear()
+    wing.query_calls.clear()
+    receipt_created_at = receipt.created_at_monotonic
+    object.__setattr__(
+        receipt,
+        "created_at_monotonic",
+        time.monotonic() - 91.0,
+    )
+    insufficient_window = await server.create_m110_maintenance_reset_proposal(
+        websocket=websocket,
+        request={
+            "type": "create_m110_maintenance_reset_commit_proposal",
+            "contract_version": 1,
+            "bundle_selector": "fixed_channels_1_16_dsp_bypass",
+        },
+    )
+    assert insufficient_window["status"] == "blocked"
+    assert insufficient_window["reason"] == (
+        "m110_restored_proof_receipt_capture_window_expired"
+    )
+    assert wing.query_calls == []
+    object.__setattr__(
+        receipt,
+        "created_at_monotonic",
+        receipt_created_at,
+    )
+
+    with patch(
+        "server.capture_m110_reset_preimage",
+        wraps=capture_m110_reset_preimage,
+    ) as commit_capture:
+        commit_created = await server.create_m110_maintenance_reset_proposal(
+            websocket=websocket,
+            request={
+                "type": "create_m110_maintenance_reset_commit_proposal",
+                "contract_version": 1,
+                "bundle_selector": "fixed_channels_1_16_dsp_bypass",
+            },
+        )
+    assert commit_created["status"] == "created"
+    assert commit_created["required_capability_kind"] == (
+        "maintenance_dsp_reset_commit_once"
+    )
+    assert commit_created["matching_restored_proof_receipt"] is True
+    assert wing.send_calls == []
+    assert len(wing.query_calls) == (
+        len(M110_RESET_ADDRESSES) + len(M110_PRESERVATION_ADDRESSES)
+    )
+    commit_total_deadline = commit_capture.await_args.kwargs[
+        "total_deadline_seconds"
+    ]
+    assert 0.0 < commit_total_deadline <= 90.0
+    commit_proposal = server.operator_proposal_queue.find(
+        proposal_id=commit_created["proposal_id"]
+    )
+    assert commit_proposal is not None
+    commit_context = server._m110_fixed_reset_proposal_contexts[
+        commit_proposal.id
+    ]
+    assert commit_context["_proof_receipt_ref"] is receipt
+    commit_prepared = await server.prepare_m110_restore_only_proof(
+        websocket=websocket,
+        request={
+            "type": "prepare_m110_restore_only_proof",
+            "contract_version": 1,
+            "proposal_id": commit_proposal.id,
+            "bundle_selector": "reviewed_supervised_transaction",
+        },
+    )
+    assert commit_prepared["status"] == "prepared"
+    assert commit_prepared["required_capability_kind"] == (
+        "maintenance_dsp_reset_commit_once"
+    )
+    commit_issued = await server.issue_m110_supervised_capability(
+        websocket=websocket,
+        request={
+            "type": "issue_supervised_capability",
+            "contract_version": 1,
+            "capability_kind": "maintenance_dsp_reset_commit_once",
+            "proposal_id": commit_proposal.id,
+            "expected_review_contract_version": 2,
+            "expected_review_content_digest": (
+                commit_proposal.review_content_digest
+            ),
+            "expected_operation_digest": commit_context[
+                "operation_digest"
+            ],
+            "approval_id": "m110-fixed-reset-commit-approval",
+            "confirmation": "ISSUE_MAINTENANCE_DSP_RESET_COMMIT_ONCE",
+            "request_nonce": "c" * 32,
+            "authority_proof": "hmac-sha256:" + "d" * 64,
+        },
+    )
+    assert commit_issued["status"] == "issued", commit_issued
+    commit_request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": commit_proposal.id,
+        "approved": True,
+        "approval_id": "m110-fixed-reset-commit-approval",
+        "idempotency_key": commit_issued["idempotency_key"],
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": (
+            commit_proposal.review_content_digest
+        ),
+        "expected_operation_digest": commit_context["operation_digest"],
+    }
+    commit_consumed = server.consume_m110_capability_for_apply(
+        websocket=websocket,
+        request=commit_request,
+        token=commit_issued["supervised_capability_token"],
+        proposal=commit_proposal,
+    )
+    assert commit_consumed["consumed"] is True, commit_consumed
+    commit_grant = commit_consumed["grant"]
+    commit_binding = commit_grant.binding
+    assert commit_binding.capability_kind == (
+        "maintenance_dsp_reset_commit_once"
+    )
+    assert commit_binding._proof_receipt_ref is receipt
+    commit_reservation_result = (
+        server.operator_proposal_queue.reserve_result_evidence(
+            commit_proposal
+        )
+    )
+    assert commit_reservation_result["reserved"] is True
+    commit_reservation = commit_reservation_result["reservation_binding"]
+    commit_claim = server.operator_proposal_queue.claim_verified_for_apply(
+        commit_proposal,
+        expected_review_contract_version=2,
+        expected_review_content_digest=(
+            commit_proposal.review_content_digest
+        ),
+    )
+    assert commit_claim["claimed"] is True
+    wing.send_calls.clear()
+
+    commit_result = await server.apply_m110_capability_transaction(
+        websocket=websocket,
+        request=commit_request,
+        capability_grant=commit_grant,
+        proposal=commit_proposal,
+        plan_payload=None,
+        result_evidence_reservation_binding=commit_reservation,
+    )
+
+    assert commit_result["status"] == "applied"
+    assert commit_result["success"] is True
+    assert commit_result["wal_terminal"] == "committed"
+    assert commit_result["physical_state_restored"] is False
+    assert commit_result["rollback_state_unknown"] is False
+    assert commit_result["manual_review_required"] is False
+    assert [address for address, _value in wing.send_calls] == list(
+        M110_RESET_ADDRESSES
+    )
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    commit_finalized = server.operator_proposal_queue.mark_apply_result(
+        commit_proposal,
+        commit_result,
+        evidence_reservation_binding=commit_reservation,
+    )
+    assert commit_finalized["status"] == "applied"
+    assert commit_proposal.status == "applied"
+    assert commit_proposal not in (
+        server.operator_proposal_queue.iter_terminal_hazards()
+    )
+
+
+@pytest.mark.asyncio
+async def test_server_fixed_reset_proof_uses_dedicated_executor_and_strict_wal(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+        str(tmp_path / "console-runtime"),
+    )
+    monkeypatch.setenv(
+        "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
+        str(tmp_path / "manual-events"),
+    )
+    with patch.object(AutoMixerServer, "_load_config", return_value={}), patch(
+        "server.BleedService"
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+    wing, _hooks, _executor, approved, authority = await _executor_fixture(
+        proof_run=True
+    )
+    original = dict(wing.values)
+    grant = authority[0]
+    binding = grant.binding
+    server.mixer_client = wing
+    server.operator_proposal_queue = MagicMock()
+    server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred.return_value = {
+        "transitioned": True,
+        "reason": None,
+    }
+    server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
+    server._supervised_transaction_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult("passed")
+    )
+    server.activate_system_emergency_stop = AsyncMock(
+        return_value={"success": True, "teardown_complete": True}
+    )
+    reservation = ResultEvidenceReservationBinding(
+        token="a" * 32,
+        proposal_id=binding.proposal_id,
+        review_content_digest=binding.review_content_digest,
+    )
+    transaction_id = "m110-server-fixed-reset-proof"
+
+    result = await server._execute_m110_maintenance_dsp_reset_grant(
+        capability_grant=grant,
+        approved_preimage=approved,
+        transaction_id=transaction_id,
+        result_evidence_reservation_binding=reservation,
+    )
+
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert result["status"] == "proof_passed"
+    assert result["success"] is True
+    assert result["durable_result_projection_valid"] is True
+    assert result["wal_terminal"] == "proof_restored"
+    assert result["physical_verified"] is True
+    assert result["physical_state_restored"] is True
+    assert result["manual_review_required"] is False
+    assert result["no_console_send_proven"] is False
+    assert lifecycle["phases"] == [
+        "prepared",
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "proof_restored",
+    ]
+    assert classify_m110_lifecycle(lifecycle) == M110_LIFECYCLE_RESOLVED
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id not in server._manual_write_prepared_transactions
+    assert transaction_id not in server._manual_write_recovery_transactions
+    assert [address for address, _value in wing.send_calls[:64]] == list(
+        M110_RESET_ADDRESSES
+    )
+    assert {value for _address, value in wing.send_calls[:64]} == {0}
+    assert wing.values == original
+    assert result["applied_operation_ids"] == [
+        row["operation_id"] for row in M110_RESET_OPERATION_DEFINITIONS
+    ]
+    assert result["rollback_operation_ids"] == [
+        row["operation_id"]
+        for row in reversed(M110_RESET_OPERATION_DEFINITIONS)
+    ]
+    server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred.assert_called_once_with(
+        reservation
+    )
+    server._supervised_transaction_audio_recheck.assert_awaited_once()
+    server.activate_system_emergency_stop.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_server_fixed_reset_commit_uses_dedicated_executor_and_keeps_reset(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "AUTOMIXER_TEST_CONSOLE_RUNTIME_DIR",
+        str(tmp_path / "console-runtime"),
+    )
+    monkeypatch.setenv(
+        "AUTOMIXER_MANUAL_WRITE_ARTIFACTS_DIR",
+        str(tmp_path / "manual-events"),
+    )
+    with patch.object(AutoMixerServer, "_load_config", return_value={}), patch(
+        "server.BleedService"
+    ):
+        server = AutoMixerServer(ws_host="localhost", ws_port=8765)
+    wing, _hooks, _executor, approved, authority = await _executor_fixture()
+    grant, restored_receipt = authority
+    binding = grant.binding
+    server.mixer_client = wing
+    server.operator_proposal_queue = MagicMock()
+    server.operator_proposal_queue.mark_result_evidence_send_may_have_occurred.return_value = {
+        "transitioned": True,
+        "reason": None,
+    }
+    server._m110_consumed_grant_forward_current = MagicMock(return_value=True)
+    server._supervised_transaction_audio_recheck = AsyncMock(
+        return_value=AudioRecheckResult("passed")
+    )
+    server.activate_system_emergency_stop = AsyncMock(
+        return_value={"success": True, "teardown_complete": True}
+    )
+    reservation = ResultEvidenceReservationBinding(
+        token="b" * 32,
+        proposal_id=binding.proposal_id,
+        review_content_digest=binding.review_content_digest,
+    )
+    transaction_id = "m110-server-fixed-reset-commit"
+
+    result = await server._execute_m110_maintenance_dsp_reset_grant(
+        capability_grant=grant,
+        approved_preimage=approved,
+        transaction_id=transaction_id,
+        result_evidence_reservation_binding=reservation,
+        restored_proof_receipt=restored_receipt,
+    )
+
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert result["status"] == "applied"
+    assert result["success"] is True
+    assert result["durable_result_projection_valid"] is True
+    assert result["wal_terminal"] == "committed"
+    assert result["physical_verified"] is True
+    assert result["physical_state_restored"] is False
+    assert result["rollback_state_unknown"] is False
+    assert result["manual_review_required"] is False
+    assert lifecycle["phases"] == [
+        "prepared",
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "committed",
+    ]
+    assert classify_m110_lifecycle(lifecycle) == M110_LIFECYCLE_RESOLVED
+    assert [address for address, _value in wing.send_calls] == list(
+        M110_RESET_ADDRESSES
+    )
+    assert {value for _address, value in wing.send_calls} == {0}
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    assert transaction_id not in server._manual_write_prepared_transactions
+    assert transaction_id not in server._manual_write_recovery_transactions
+    server.activate_system_emergency_stop.assert_not_awaited()
 
 
 @pytest.mark.asyncio

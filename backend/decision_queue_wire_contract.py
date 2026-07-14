@@ -549,6 +549,17 @@ class TrustedApplyReceipt:
     restore_after_verify: Optional[bool]
     capability_kind: Optional[str]
     operation_digest: Optional[str]
+    bundle_kind: Optional[str]
+    review_preimage_sha256: Optional[str]
+    before_manifest_sha256: Optional[str]
+    after_manifest_sha256: Optional[str]
+    verification_cut_reset_surface_sha256: Optional[str]
+    verification_cut_preservation_manifest_sha256: Optional[str]
+    no_outside_mutation_attempt_proven: Optional[bool]
+    current_state_guaranteed_at_response: Optional[bool]
+    fresh_readback_required_before_next_stage: Optional[bool]
+    attended_no_touch_required_during_execution: Optional[bool]
+    later_console_event_invalidates_readiness_freshness: Optional[bool]
     proof_target_verified: Optional[bool]
 
     def __init__(self, *_args: Any, **_kwargs: Any) -> None:
@@ -781,7 +792,7 @@ def _freeze_trusted_apply_receipt(
     )
     rollback_unknown = bool(
         dict.get(result, "rollback_state_unknown") is True
-        or physical_restored is False
+        or (rollback_attempted and physical_restored is False)
         or (
             rollback_attempted
             and rollback_succeeded is not True
@@ -924,6 +935,62 @@ def _freeze_trusted_apply_receipt(
             dict.get(result, "operation_digest")
             if is_sha256_digest(dict.get(result, "operation_digest"))
             else None
+        ),
+        "bundle_kind": _exact_string(dict.get(result, "bundle_kind")),
+        "review_preimage_sha256": (
+            dict.get(result, "review_preimage_sha256")
+            if is_sha256_digest(dict.get(result, "review_preimage_sha256"))
+            else None
+        ),
+        "before_manifest_sha256": (
+            dict.get(result, "before_manifest_sha256")
+            if is_sha256_digest(dict.get(result, "before_manifest_sha256"))
+            else None
+        ),
+        "after_manifest_sha256": (
+            dict.get(result, "after_manifest_sha256")
+            if is_sha256_digest(dict.get(result, "after_manifest_sha256"))
+            else None
+        ),
+        "verification_cut_reset_surface_sha256": (
+            dict.get(result, "verification_cut_reset_surface_sha256")
+            if is_sha256_digest(
+                dict.get(result, "verification_cut_reset_surface_sha256")
+            )
+            else None
+        ),
+        "verification_cut_preservation_manifest_sha256": (
+            dict.get(
+                result,
+                "verification_cut_preservation_manifest_sha256",
+            )
+            if is_sha256_digest(
+                dict.get(
+                    result,
+                    "verification_cut_preservation_manifest_sha256",
+                )
+            )
+            else None
+        ),
+        "no_outside_mutation_attempt_proven": _exact_optional_bool(
+            dict.get(result, "no_outside_mutation_attempt_proven")
+        ),
+        "current_state_guaranteed_at_response": _exact_optional_bool(
+            dict.get(result, "current_state_guaranteed_at_response")
+        ),
+        "fresh_readback_required_before_next_stage": _exact_optional_bool(
+            dict.get(result, "fresh_readback_required_before_next_stage")
+        ),
+        "attended_no_touch_required_during_execution": _exact_optional_bool(
+            dict.get(result, "attended_no_touch_required_during_execution")
+        ),
+        "later_console_event_invalidates_readiness_freshness": (
+            _exact_optional_bool(
+                dict.get(
+                    result,
+                    "later_console_event_invalidates_readiness_freshness",
+                )
+            )
         ),
         "proof_target_verified": _exact_optional_bool(
             dict.get(result, "proof_target_verified")
@@ -3299,7 +3366,11 @@ def compact_proposal_row(proposal: Any) -> Dict[str, Any]:
         and (
             result.get("write_state_unknown") is True
             or result.get("manual_review_required") is True
-            or result.get("physical_state_restored") is False
+            or result.get("rollback_state_unknown") is True
+            or (
+                result.get("physical_state_restored") is False
+                and not terminal_result_proves_verified_apply(result)
+            )
         )
     )
     if terminal_hazard:
@@ -3658,7 +3729,16 @@ def collect_global_hazards(server: Any, rows: Sequence[Mapping[str, Any]]) -> Di
             or "proposal"
         )
         add(result.get("write_state_unknown") is True, "terminal_write_state_unknown", "terminal_result", entity)
-        add(result.get("physical_state_restored") is False, "terminal_rollback_state_unknown", "terminal_result", entity)
+        add(
+            result.get("rollback_state_unknown") is True
+            or (
+                result.get("physical_state_restored") is False
+                and not terminal_result_proves_verified_apply(result)
+            ),
+            "terminal_rollback_state_unknown",
+            "terminal_result",
+            entity,
+        )
         add(result.get("manual_review_required") is True, "terminal_manual_review_after_send", "terminal_result", entity)
         add(
             str(result.get("reason") or "")
@@ -3824,7 +3904,12 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
         "response_degraded": False,
         "wire": {},
     }
-    if receipt.final_status == "proof_passed":
+    m110_capability_terminal = bool(
+        receipt.final_status in {"proof_passed", "applied"}
+        and receipt.capability_kind
+        in {"restore_only_proof", "maintenance_dsp_reset_commit_once"}
+    )
+    if m110_capability_terminal:
         payload.update(
             {
                 "accepted": receipt.accepted,
@@ -3841,6 +3926,35 @@ def _receipt_projection(receipt: TrustedApplyReceipt) -> Dict[str, Any]:
                     else None
                 ),
                 "operation_digest": receipt.operation_digest,
+                "bundle_kind": (
+                    utf8_preview(receipt.bundle_kind, 64)
+                    if receipt.bundle_kind is not None
+                    else None
+                ),
+                "review_preimage_sha256": receipt.review_preimage_sha256,
+                "before_manifest_sha256": receipt.before_manifest_sha256,
+                "after_manifest_sha256": receipt.after_manifest_sha256,
+                "verification_cut_reset_surface_sha256": (
+                    receipt.verification_cut_reset_surface_sha256
+                ),
+                "verification_cut_preservation_manifest_sha256": (
+                    receipt.verification_cut_preservation_manifest_sha256
+                ),
+                "no_outside_mutation_attempt_proven": (
+                    receipt.no_outside_mutation_attempt_proven
+                ),
+                "current_state_guaranteed_at_response": (
+                    receipt.current_state_guaranteed_at_response
+                ),
+                "fresh_readback_required_before_next_stage": (
+                    receipt.fresh_readback_required_before_next_stage
+                ),
+                "attended_no_touch_required_during_execution": (
+                    receipt.attended_no_touch_required_during_execution
+                ),
+                "later_console_event_invalidates_readiness_freshness": (
+                    receipt.later_console_event_invalidates_readiness_freshness
+                ),
                 "proof_target_verified": receipt.proof_target_verified,
             }
         )

@@ -79,7 +79,17 @@ readback plus WAL recovery before resumption.
 - M110-CP00: accepted for implementation.
 - M110-CP01: implementation is present and offline-validated; hardware remains
   gated by CP05.
-- M110-CP02..CP05: pending.
+- M110-CP02: implemented and offline-validated, including typed single-use
+  grants, strict durable WAL projection, result capacity, receipt minting and
+  same-session proof authority.
+- M110-CP03: in progress. The fixed 64-address reset subset is server-owned and
+  offline-validated end to end through proof, durable receipt, fresh recapture
+  and permanent commit. Processor enable remains unfinished, so CP03 is not
+  complete.
+- M110-CP04: pending for exact processor/soundcheck child proof-to-commit
+  capability promotion. The existing staged decomposition/replan kernel alone
+  does not grant M110 hardware authority.
+- M110-CP05: pending. Top-level `--execute` remains fail-closed.
 - M110-HW01..HW05: forbidden until CP05 is committed and clean.
 - A pending/stale CP05 marker blocks connect, USB capture, route proof and every
   discovery/alternate-mixer ingress before resource construction; cleanup and

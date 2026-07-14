@@ -30,6 +30,13 @@ from supervised_proof_capability import (
 )
 
 
+def test_m110_runtime_critical_path_binds_manual_write_wal():
+    assert "backend/m110_manual_write_wal.py" in M110_RUNTIME_CRITICAL_PATHS
+    assert tuple(M110_RUNTIME_CRITICAL_PATHS) == (
+        runner.EARLY_M110_RUNTIME_CRITICAL_PATHS
+    )
+
+
 def _git(root: Path, *args: str) -> None:
     subprocess.run(
         ["/usr/bin/git", *args],
@@ -469,6 +476,96 @@ def _valid_restore_only_terminal(
     }
 
 
+def _fixed_reset_created(
+    role,
+    *,
+    operation_digest="sha256:" + "c" * 64,
+    review_preimage_sha256="sha256:" + "9" * 64,
+):
+    capability_kind = (
+        "restore_only_proof"
+        if role == "proof"
+        else "maintenance_dsp_reset_commit_once"
+    )
+    return {
+        "role": role,
+        "proposal_id": f"m110-maintenance-reset-{role}-" + "a" * 32,
+        "review_contract_version": 2,
+        "review_content_digest": (
+            "sha256:" + ("b" if role == "proof" else "d") * 64
+        ),
+        "operation_digest": operation_digest,
+        "review_preimage_sha256": review_preimage_sha256,
+        "required_capability_kind": capability_kind,
+        "bundle_kind": "maintenance_dsp_reset_bundle",
+        "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+    }
+
+
+def _valid_fixed_reset_terminal(created, capability_kind):
+    proof_run = capability_kind == "restore_only_proof"
+    status = "proof_passed" if proof_run else "applied"
+    result_digest = "sha256:" + ("e" if proof_run else "f") * 64
+    after_manifest_sha256 = "sha256:" + "2" * 64
+    return {
+        "type": "operator_proposal_apply_result",
+        "contract_version": 2,
+        "status": status,
+        "success": True,
+        "reason": "",
+        "proposal_id": created["proposal_id"],
+        "proposal_status": status,
+        "proposal": {
+            "id": created["proposal_id"],
+            "review_contract_version": 2,
+            "review_content_digest": created["review_content_digest"],
+            "status": status,
+            "result_digest": result_digest,
+            "result_detail_available": True,
+            "result_evidence_pinned": False,
+        },
+        "apply_status": status,
+        "accepted": False,
+        "owner_review_required": True,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+        "proof_run": proof_run,
+        "restore_after_verify": proof_run,
+        "capability_kind": capability_kind,
+        "operation_digest": created["operation_digest"],
+        "bundle_kind": "maintenance_dsp_reset_bundle",
+        "review_preimage_sha256": created["review_preimage_sha256"],
+        "before_manifest_sha256": "sha256:" + "1" * 64,
+        "after_manifest_sha256": after_manifest_sha256,
+        "verification_cut_reset_surface_sha256": "sha256:" + "3" * 64,
+        "verification_cut_preservation_manifest_sha256": (
+            after_manifest_sha256
+        ),
+        "proof_target_verified": proof_run,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "physical_state_restored": proof_run,
+        "terminal_after_console_send": True,
+        "write_state_unknown": False,
+        "rollback_attempted": proof_run,
+        "rollback_succeeded": proof_run,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+        "wal_terminal": "proof_restored" if proof_run else "committed",
+        "audio_recheck_passed": True,
+        "no_outside_mutation_attempt_proven": True,
+        "current_state_guaranteed_at_response": False,
+        "fresh_readback_required_before_next_stage": True,
+        "attended_no_touch_required_during_execution": True,
+        "later_console_event_invalidates_readiness_freshness": True,
+        "result_digest": result_digest,
+        "result_detail_available": True,
+        "result_evidence_pinned": False,
+    }
+
+
 def test_authority_packet_is_length_prefixed_manifest_plus_secret():
     secret = secrets.token_bytes(32)
     manifest = {
@@ -516,9 +613,23 @@ def test_runner_builds_exact_hmac_control_and_capability_requests():
         request_nonce="d" * 32,
         secret=secret,
     )
+    commit_issue = runner.build_m110_capability_request(
+        capability_kind="maintenance_dsp_reset_commit_once",
+        proposal_id="proposal-2",
+        review_contract_version=2,
+        review_content_digest="sha256:" + "e" * 64,
+        operation_digest="sha256:" + "f" * 64,
+        approval_id="operator-approved",
+        request_nonce="1" * 32,
+        secret=secret,
+    )
 
     assert validate_m110_arm_request(arm)[0] is True
     assert validate_m110_capability_issue_request(issue)[0] is True
+    assert validate_m110_capability_issue_request(commit_issue)[0] is True
+    assert commit_issue["confirmation"] == (
+        "ISSUE_MAINTENANCE_DSP_RESET_COMMIT_ONCE"
+    )
     with pytest.raises(ValueError, match="review_version"):
         runner.build_m110_restore_only_capability_request(
             proposal_id="proposal-1",
@@ -577,6 +688,54 @@ def test_restore_only_terminal_validator_rejects_unsafe_or_unbound_truth():
                 review_digest=review_digest,
                 operation_digest=operation_digest,
             )
+
+
+@pytest.mark.parametrize(
+    "capability_kind,unsafe_field,unsafe_value",
+    (
+        ("restore_only_proof", "bundle_kind", "single_soundcheck_operation"),
+        ("restore_only_proof", "current_state_guaranteed_at_response", True),
+        (
+            "maintenance_dsp_reset_commit_once",
+            "physical_state_restored",
+            True,
+        ),
+        (
+            "maintenance_dsp_reset_commit_once",
+            "rollback_attempted",
+            True,
+        ),
+        (
+            "maintenance_dsp_reset_commit_once",
+            "wal_terminal",
+            "proof_restored",
+        ),
+    ),
+)
+def test_fixed_reset_terminal_validator_rejects_unbound_or_unsafe_truth(
+    capability_kind,
+    unsafe_field,
+    unsafe_value,
+):
+    role = (
+        "proof" if capability_kind == "restore_only_proof" else "commit"
+    )
+    created = _fixed_reset_created(role)
+    valid = _valid_fixed_reset_terminal(created, capability_kind)
+    runner.ProofOwnedBackendSession._validate_fixed_reset_apply_terminal(
+        valid,
+        created=created,
+        capability_kind=capability_kind,
+    )
+
+    invalid = deepcopy(valid)
+    invalid[unsafe_field] = unsafe_value
+    with pytest.raises(RuntimeError, match="fixed_reset_apply_terminal"):
+        runner.ProofOwnedBackendSession._validate_fixed_reset_apply_terminal(
+            invalid,
+            created=created,
+            capability_kind=capability_kind,
+        )
 
 
 def test_plan_only_runner_contacts_neither_backend_nor_wing(tmp_path):
@@ -1219,6 +1378,412 @@ def test_same_session_arm_prepare_issue_apply_restores_and_erases_token(
         assert teardown["verified"] is True
         assert session.control_armed is False
         assert backend.process.poll() is not None
+
+    asyncio.run(scenario())
+
+
+def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
+    tmp_path,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        artifact_root = tmp_path / "route-artifacts"
+        identity = _identity_result()
+        approval_id = "operator-approved"
+        proof_created = _fixed_reset_created("proof")
+        commit_created = _fixed_reset_created("commit")
+        proof_token = "m110cap_v1_" + "4" * 64
+        commit_token = "m110cap_v1_" + "5" * 64
+        route_proof = {}
+
+        def created_terminal(created):
+            return {
+                "type": "m110_maintenance_reset_proposal_result",
+                "status": "created",
+                "success": True,
+                "reason": "m110_maintenance_reset_proposal_created",
+                "proposal_id": created["proposal_id"],
+                "review_contract_version": 2,
+                "review_content_digest": created[
+                    "review_content_digest"
+                ],
+                "required_capability_kind": created[
+                    "required_capability_kind"
+                ],
+                "bundle_kind": created["bundle_kind"],
+                "operation_digest": created["operation_digest"],
+                "review_preimage_sha256": created[
+                    "review_preimage_sha256"
+                ],
+                "operation_count": len(runner.M110_RESET_ADDRESSES),
+                "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                "matching_restored_proof_receipt": (
+                    created["role"] == "commit"
+                ),
+                "token_issued": False,
+                "live_authority_granted": False,
+                "readiness_closure_allowed": False,
+            }
+
+        def prepared_terminal(created):
+            return {
+                "type": "m110_restore_proof_prepare_result",
+                "status": "prepared",
+                "success": True,
+                "reason": "m110_fixed_reset_bundle_current",
+                "proposal_id": created["proposal_id"],
+                "review_contract_version": 2,
+                "review_content_digest": created[
+                    "review_content_digest"
+                ],
+                "operation_digest": created["operation_digest"],
+                "bundle_kind": created["bundle_kind"],
+                "review_preimage_sha256": created[
+                    "review_preimage_sha256"
+                ],
+                "required_capability_kind": created[
+                    "required_capability_kind"
+                ],
+                "operation_count": len(runner.M110_RESET_ADDRESSES),
+                "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                "token_issued": False,
+                "live_authority_granted": False,
+            }
+
+        def responder(payload):
+            message_type = payload["type"]
+            if message_type == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if message_type == "start_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": True,
+                        "preview": True,
+                        "owned_by_requester": True,
+                        "source_type": "sounddevice",
+                        "real_input": True,
+                        "device_name": "WING",
+                        "device_index": 7,
+                        "num_channels": 48,
+                        "sample_rate": 48_000,
+                    }
+                ]
+            if message_type == "capture_wing_master_route_proof":
+                result = _route_result(artifact_root, payload, identity)
+                route_proof["id"] = result["proof_id"]
+                return [result]
+            if message_type == "arm_m110_attended_control":
+                return [
+                    {
+                        "type": "m110_attended_control_result",
+                        "status": "armed",
+                        "success": True,
+                        "reason": "m110_supervised_capability_only_armed",
+                        "route_proof_id": route_proof["id"],
+                        "supervised_capability_only": True,
+                        "normal_operator_mode_unchanged": True,
+                        "normal_live_allowlist_changed": False,
+                        "live_authority_granted": False,
+                        "readiness_closure_allowed": False,
+                    }
+                ]
+            if message_type.startswith(
+                "create_m110_maintenance_reset_"
+            ):
+                assert set(payload) == {
+                    "type",
+                    "contract_version",
+                    "bundle_selector",
+                }
+                created = (
+                    proof_created
+                    if "_proof_" in message_type
+                    else commit_created
+                )
+                return [created_terminal(created)]
+            if message_type == "prepare_m110_restore_only_proof":
+                assert set(payload) == {
+                    "type",
+                    "contract_version",
+                    "proposal_id",
+                    "bundle_selector",
+                }
+                created = (
+                    proof_created
+                    if payload["proposal_id"] == proof_created["proposal_id"]
+                    else commit_created
+                )
+                return [prepared_terminal(created)]
+            if message_type == "issue_supervised_capability":
+                assert validate_m110_capability_issue_request(payload)[0] is True
+                proof_run = payload["capability_kind"] == "restore_only_proof"
+                created = proof_created if proof_run else commit_created
+                return [
+                    {
+                        "type": "supervised_capability_result",
+                        "status": "issued",
+                        "success": True,
+                        "reason": "m110_capability_issued",
+                        "capability_kind": payload["capability_kind"],
+                        "proposal_id": created["proposal_id"],
+                        "review_contract_version": 2,
+                        "review_content_digest": created[
+                            "review_content_digest"
+                        ],
+                        "operation_digest": created["operation_digest"],
+                        "approval_id": approval_id,
+                        "idempotency_key": (
+                            "m110-proof:" + "6" * 32
+                            if proof_run
+                            else "m110-reset-commit:" + "7" * 32
+                        ),
+                        "latest_start_epoch": time.time() + 20.0,
+                        "supervised_capability_token": (
+                            proof_token if proof_run else commit_token
+                        ),
+                        "single_use": True,
+                        "stores_plaintext_token": False,
+                        "live_authority_granted": False,
+                    }
+                ]
+            if message_type == "apply_operator_proposal":
+                assert set(payload) == {
+                    "type",
+                    "proposal_id",
+                    "approved",
+                    "approval_id",
+                    "idempotency_key",
+                    "expected_review_contract_version",
+                    "expected_review_content_digest",
+                    "expected_operation_digest",
+                    "supervised_capability_token",
+                }
+                proof_run = payload["proposal_id"] == proof_created[
+                    "proposal_id"
+                ]
+                created = proof_created if proof_run else commit_created
+                assert payload["supervised_capability_token"] == (
+                    proof_token if proof_run else commit_token
+                )
+                return [
+                    _valid_fixed_reset_terminal(
+                        created,
+                        (
+                            "restore_only_proof"
+                            if proof_run
+                            else "maintenance_dsp_reset_commit_once"
+                        ),
+                    )
+                ]
+            if message_type == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if message_type == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=identity,
+        )
+        await session.establish_master_route(
+            wing_ip="192.168.1.102",
+            audio_device_index=7,
+            approval_id=approval_id,
+            request_id="m110-route-test",
+            request_nonce="1" * 32,
+            route_artifact_root=artifact_root,
+        )
+        await session.arm_m110_attended_control(approval_id=approval_id)
+        reset = await session.execute_fixed_m110_maintenance_reset(
+            approval_id=approval_id,
+        )
+
+        assert reset["verified"] is True
+        assert reset["reset_applied"] is True
+        assert reset["proof"]["terminal"]["wal_terminal"] == "proof_restored"
+        assert reset["commit"]["terminal"]["wal_terminal"] == "committed"
+        assert reset["token_retained"] is False
+        durable = json.dumps(reset, sort_keys=True) + repr(session)
+        assert proof_token not in durable
+        assert commit_token not in durable
+        sent_types = [item["type"] for item in websocket.sent]
+        assert sent_types == [
+            "connect_wing",
+            "start_audio_capture_preview",
+            "capture_wing_master_route_proof",
+            "arm_m110_attended_control",
+            "create_m110_maintenance_reset_proof_proposal",
+            "prepare_m110_restore_only_proof",
+            "issue_supervised_capability",
+            "apply_operator_proposal",
+            "create_m110_maintenance_reset_commit_proposal",
+            "prepare_m110_restore_only_proof",
+            "issue_supervised_capability",
+            "apply_operator_proposal",
+        ]
+        assert sum(
+            proof_token in json.dumps(item) for item in websocket.sent
+        ) == 1
+        assert sum(
+            commit_token in json.dumps(item) for item in websocket.sent
+        ) == 1
+        assert all(
+            "transaction_plan" not in item
+            and "supervised_transaction_plan" not in item
+            for item in websocket.sent
+        )
+
+        teardown = await session.close()
+        assert teardown["verified"] is True
+
+    asyncio.run(scenario())
+
+
+def test_fixed_reset_proof_failure_closes_session_before_commit_creation(
+    tmp_path,
+):
+    async def scenario():
+        proof_created = _fixed_reset_created("proof")
+        token = "m110cap_v1_" + "8" * 64
+
+        def responder(payload):
+            message_type = payload["type"]
+            if message_type == "create_m110_maintenance_reset_proof_proposal":
+                return [
+                    {
+                        "type": "m110_maintenance_reset_proposal_result",
+                        "status": "created",
+                        "success": True,
+                        "reason": "m110_maintenance_reset_proposal_created",
+                        "proposal_id": proof_created["proposal_id"],
+                        "review_contract_version": 2,
+                        "review_content_digest": proof_created[
+                            "review_content_digest"
+                        ],
+                        "required_capability_kind": "restore_only_proof",
+                        "bundle_kind": "maintenance_dsp_reset_bundle",
+                        "operation_digest": proof_created[
+                            "operation_digest"
+                        ],
+                        "review_preimage_sha256": proof_created[
+                            "review_preimage_sha256"
+                        ],
+                        "operation_count": len(runner.M110_RESET_ADDRESSES),
+                        "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                        "matching_restored_proof_receipt": False,
+                        "token_issued": False,
+                        "live_authority_granted": False,
+                        "readiness_closure_allowed": False,
+                    }
+                ]
+            if message_type == "prepare_m110_restore_only_proof":
+                return [
+                    {
+                        "type": "m110_restore_proof_prepare_result",
+                        "status": "prepared",
+                        "success": True,
+                        "reason": "m110_fixed_reset_bundle_current",
+                        "proposal_id": proof_created["proposal_id"],
+                        "review_contract_version": 2,
+                        "review_content_digest": proof_created[
+                            "review_content_digest"
+                        ],
+                        "operation_digest": proof_created[
+                            "operation_digest"
+                        ],
+                        "bundle_kind": "maintenance_dsp_reset_bundle",
+                        "review_preimage_sha256": proof_created[
+                            "review_preimage_sha256"
+                        ],
+                        "required_capability_kind": "restore_only_proof",
+                        "operation_count": len(runner.M110_RESET_ADDRESSES),
+                        "scope_addresses": list(runner.M110_RESET_ADDRESSES),
+                        "token_issued": False,
+                        "live_authority_granted": False,
+                    }
+                ]
+            if message_type == "issue_supervised_capability":
+                return [
+                    {
+                        "type": "supervised_capability_result",
+                        "status": "issued",
+                        "success": True,
+                        "reason": "m110_capability_issued",
+                        "capability_kind": "restore_only_proof",
+                        "proposal_id": proof_created["proposal_id"],
+                        "review_contract_version": 2,
+                        "review_content_digest": proof_created[
+                            "review_content_digest"
+                        ],
+                        "operation_digest": proof_created[
+                            "operation_digest"
+                        ],
+                        "approval_id": "operator-approved",
+                        "idempotency_key": "m110-proof:" + "9" * 32,
+                        "latest_start_epoch": time.time() + 20.0,
+                        "supervised_capability_token": token,
+                        "single_use": True,
+                        "stores_plaintext_token": False,
+                        "live_authority_granted": False,
+                    }
+                ]
+            if message_type == "apply_operator_proposal":
+                terminal = _valid_fixed_reset_terminal(
+                    proof_created,
+                    "restore_only_proof",
+                )
+                terminal["physical_state_restored"] = False
+                return [terminal]
+            return []
+
+        backend = _fake_backend(tmp_path)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+            route_established=True,
+            route_result={"proof_id": "route-proof"},
+            control_armed=True,
+            control_approval_id="operator-approved",
+        )
+        with pytest.raises(RuntimeError, match="fixed_reset_apply_terminal"):
+            await session.execute_fixed_m110_maintenance_reset(
+                approval_id="operator-approved",
+            )
+
+        assert session.closed is True
+        assert websocket.closed is True
+        sent_types = [item["type"] for item in websocket.sent]
+        assert "create_m110_maintenance_reset_commit_proposal" not in sent_types
+        assert sent_types == [
+            "create_m110_maintenance_reset_proof_proposal",
+            "prepare_m110_restore_only_proof",
+            "issue_supervised_capability",
+            "apply_operator_proposal",
+        ]
 
     asyncio.run(scenario())
 

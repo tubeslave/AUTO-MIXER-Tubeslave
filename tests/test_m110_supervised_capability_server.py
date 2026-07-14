@@ -423,6 +423,100 @@ async def test_handler_uses_capability_lane_and_never_persists_plaintext_token(
 
 
 @pytest.mark.asyncio
+async def test_handler_routes_fixed_reset_without_client_transaction_plan(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    server._runtime_identity.setdefault("launch_binding", {})["mode"] = (
+        "m110_attended_runner"
+    )
+    server.mixer_client = MagicMock(is_connected=True)
+    created = server.operator_proposal_queue.create(
+        {
+            "id": "m110-fixed-reset-handler",
+            "title": "M110 server-owned fixed reset proof",
+            "kind": "m110_maintenance_dsp_reset_proof",
+            "source": "m110_server_owned_maintenance",
+            "m110_maintenance_reset": {
+                "bundle_kind": "maintenance_dsp_reset_bundle",
+                "operation_count": 64,
+            },
+        },
+        server.get_operator_mode_status(),
+    )
+    assert created["status"] == "created"
+    proposal = server.operator_proposal_queue.find(
+        proposal_id="m110-fixed-reset-handler"
+    )
+    operation_digest = "sha256:" + "9" * 64
+    apply_result = _restored_proof_result(
+        proposal_id=proposal.id,
+        review_digest=proposal.review_content_digest,
+        operation_digest=operation_digest,
+    )
+    apply_result.update(
+        {
+            "bundle_kind": "maintenance_dsp_reset_bundle",
+            "review_preimage_sha256": "sha256:" + "8" * 64,
+        }
+    )
+    server.is_m110_fixed_reset_proposal = MagicMock(return_value=True)
+    server.preview_m110_capability_apply = MagicMock(
+        return_value={"valid": True, "reason": "current"}
+    )
+    grant = MagicMock()
+    grant.binding = SimpleNamespace(
+        bundle_kind="maintenance_dsp_reset_bundle",
+        capability_kind="restore_only_proof",
+    )
+    server.consume_m110_capability_for_apply = MagicMock(
+        return_value={
+            "consumed": True,
+            "reason": "m110_capability_consumed",
+            "grant": grant,
+        }
+    )
+    server.apply_m110_capability_transaction = AsyncMock(
+        return_value=apply_result
+    )
+    server.apply_m110_restore_only_proof_transaction = AsyncMock()
+    server.record_m110_restored_proof_receipt = MagicMock(
+        return_value={"recorded": True, "reason": "recorded"}
+    )
+    server.record_automation_decision_trace = MagicMock()
+    server.send_to_client = AsyncMock()
+    token = "m110cap_v1_" + "e" * 64
+    request = {
+        "type": "apply_operator_proposal",
+        "proposal_id": proposal.id,
+        "approved": True,
+        "approval_id": "m110-fixed-reset-handler-approval",
+        "idempotency_key": "m110-proof:fixed-reset-handler",
+        "expected_review_contract_version": 2,
+        "expected_review_content_digest": proposal.review_content_digest,
+        "expected_operation_digest": operation_digest,
+        "supervised_capability_token": token,
+    }
+
+    await server._dispatch["apply_operator_proposal"](websocket, request)
+
+    terminal = server.operator_proposal_queue.find(proposal_id=proposal.id)
+    assert terminal.status == "proof_passed"
+    dispatched = server.apply_m110_capability_transaction.await_args.kwargs
+    assert dispatched["capability_grant"] is grant
+    assert dispatched["plan_payload"] is None
+    server.apply_m110_restore_only_proof_transaction.assert_not_awaited()
+    receipt_call = server.record_m110_restored_proof_receipt.call_args.kwargs
+    assert receipt_call["capability_grant"] is grant
+    assert request.get("supervised_capability_token") is None
+    assert token not in json.dumps(
+        server.send_to_client.await_args.args[1],
+        default=str,
+    )
+
+
+@pytest.mark.asyncio
 async def test_post_consume_claim_exception_releases_evidence_and_grant(
     m110_server,
 ):

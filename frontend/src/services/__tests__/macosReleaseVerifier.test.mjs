@@ -420,7 +420,7 @@ test('release smoke evidence is source-bound, app-bound, and no-WING', () => {
       exists: true,
       mode: 0o644,
       size: 100 + index,
-      sha256: index.toString(16).repeat(64)
+      sha256: index.toString(16).padStart(64, '0')
     })
   );
   const runtimeSource = {

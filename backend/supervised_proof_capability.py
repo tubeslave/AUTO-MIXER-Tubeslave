@@ -116,6 +116,7 @@ M110_RUNTIME_CRITICAL_PATHS = (
     "backend/handlers/connection_handlers.py",
     "backend/handlers/product_state_handlers.py",
     "backend/m110_cp05_hardware_gate.py",
+    "backend/m110_manual_write_wal.py",
     "backend/maintenance_dsp_reset.py",
     "backend/master_capture_route_proof.py",
     "backend/operator_proposal_queue.py",

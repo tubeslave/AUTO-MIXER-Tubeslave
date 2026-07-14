@@ -55,6 +55,13 @@ def register_handlers(server):
         )
         await server.send_to_client(websocket, result)
 
+    async def handle_create_m110_maintenance_reset_proposal(websocket, data):
+        result = await server.create_m110_maintenance_reset_proposal(
+            websocket=websocket,
+            request=data,
+        )
+        await server.send_to_client(websocket, result)
+
     async def handle_connect_dlive(websocket, data):
         await server.connect_dlive(
             ip=data.get("ip", "192.168.3.70"),
@@ -186,6 +193,12 @@ def register_handlers(server):
         "issue_supervised_capability": handle_issue_supervised_capability,
         "prepare_m110_restore_only_proof": (
             handle_prepare_m110_restore_only_proof
+        ),
+        "create_m110_maintenance_reset_proof_proposal": (
+            handle_create_m110_maintenance_reset_proposal
+        ),
+        "create_m110_maintenance_reset_commit_proposal": (
+            handle_create_m110_maintenance_reset_proposal
         ),
         "connect_wing": handle_connect_wing,
         "connect_dlive": handle_connect_dlive,

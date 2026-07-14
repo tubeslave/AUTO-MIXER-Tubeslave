@@ -2464,9 +2464,34 @@ def register_handlers(server):
                 and not physical_restored
             )
         )
+        rollback_attempted = bool(
+            terminal_candidate.get("rollback_attempted") is True
+            or (
+                isinstance(
+                    terminal_candidate.get("rollback_operation_ids"),
+                    list,
+                )
+                and bool(terminal_candidate.get("rollback_operation_ids"))
+            )
+            or (
+                isinstance(
+                    terminal_candidate.get("rollback_results"),
+                    list,
+                )
+                and bool(terminal_candidate.get("rollback_results"))
+            )
+        )
         rollback_state_unknown = bool(
             terminal_candidate.get("rollback_state_unknown") is True
-            or terminal_candidate.get("physical_state_restored") is False
+            or (
+                rollback_attempted
+                and terminal_candidate.get("physical_state_restored") is False
+            )
+            or (
+                rollback_attempted
+                and not physical_restored
+                and possible_console_send
+            )
         )
         emergency_required = bool(
             possible_console_send
@@ -5516,7 +5541,16 @@ def register_handlers(server):
             if isinstance(getattr(proposal, "raw", None), dict)
             else None
         )
-        if not isinstance(transaction_plan, dict):
+        fixed_reset_check = getattr(
+            server,
+            "is_m110_fixed_reset_proposal",
+            None,
+        )
+        fixed_reset_proposal = bool(
+            callable(fixed_reset_check)
+            and fixed_reset_check(proposal) is True
+        )
+        if not isinstance(transaction_plan, dict) and not fixed_reset_proposal:
             result = preclaim_apply_blocked_result(
                 proposal,
                 "m110_restore_proof_supervised_plan_required",
@@ -5558,7 +5592,7 @@ def register_handlers(server):
 
         apply_capability = getattr(
             server,
-            "apply_m110_restore_only_proof_transaction",
+            "apply_m110_capability_transaction",
             None,
         )
         record_receipt = getattr(
@@ -5831,7 +5865,12 @@ def register_handlers(server):
                 "operator_proposal_apply_blocked",
                 result,
             )
-        if not isinstance(transaction_plan, dict):
+        grant_binding = getattr(grant, "binding", None)
+        fixed_reset_grant = bool(
+            getattr(grant_binding, "bundle_kind", None)
+            == "maintenance_dsp_reset_bundle"
+        )
+        if not isinstance(transaction_plan, dict) and not fixed_reset_grant:
             mark_terminal = getattr(grant, "mark_terminal", None)
             if callable(mark_terminal):
                 mark_terminal("review_changed_after_capability_consume")
@@ -5952,6 +5991,7 @@ def register_handlers(server):
                         receipt_result = record_receipt(
                             websocket=websocket,
                             proposal=proposal,
+                            capability_grant=grant,
                             terminal_result=persisted_result,
                             result_digest=finalized.get("result_digest"),
                         )
@@ -5974,11 +6014,24 @@ def register_handlers(server):
                         operator_mode=server.get_operator_mode_status(),
                         requested_change={
                             "value_type": "supervised_transaction",
-                            "transaction_id": transaction_plan.get(
-                                "transaction_id"
+                            "transaction_id": (
+                                transaction_plan.get("transaction_id")
+                                if isinstance(transaction_plan, dict)
+                                else persisted_result.get("transaction_id")
+                                if isinstance(persisted_result, dict)
+                                else None
                             ),
-                            "operation_count": len(
-                                transaction_plan.get("operations") or []
+                            "operation_count": (
+                                len(transaction_plan.get("operations") or [])
+                                if isinstance(transaction_plan, dict)
+                                else len(
+                                    persisted_result.get(
+                                        "applied_operation_ids"
+                                    )
+                                    or []
+                                )
+                                if isinstance(persisted_result, dict)
+                                else 0
                             ),
                         },
                         idempotency_key=request_facts.idempotency_key,
@@ -5989,12 +6042,21 @@ def register_handlers(server):
                                 if isinstance(persisted_result, dict)
                                 else finalized.get("reason")
                             )
-                            if finalized.get("status") != "proof_passed"
+                            if finalized.get("status")
+                            not in {"proof_passed", "applied"}
                             else None
                         ),
                         metadata={
                             "supervised_transaction": True,
-                            "m110_restore_only_proof": True,
+                            "m110_restore_only_proof": (
+                                getattr(
+                                    grant_binding,
+                                    "capability_kind",
+                                    None,
+                                )
+                                == "restore_only_proof"
+                            ),
+                            "m110_maintenance_dsp_reset": fixed_reset_grant,
                             "capability_lane_used": True,
                             "normal_operator_mode_unchanged": True,
                             "normal_live_allowlist_changed": False,

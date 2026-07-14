@@ -551,7 +551,11 @@ class OperatorProposalQueue:
             if isinstance(item.result, dict)
             and (
                 item.result.get("write_state_unknown") is True
-                or item.result.get("physical_state_restored") is False
+                or item.result.get("rollback_state_unknown") is True
+                or (
+                    item.result.get("physical_state_restored") is False
+                    and not terminal_result_proves_verified_apply(item.result)
+                )
                 or item.result.get("manual_review_required") is True
             )
         )

@@ -1075,6 +1075,75 @@ def test_restored_proof_projects_as_distinct_non_accepted_terminal():
         )
 
 
+def test_m110_committed_reset_is_known_applied_and_projects_bound_evidence():
+    identity = _freeze_verified_apply_identity(
+        SimpleNamespace(
+            proposal_id="sequence-reset-commit-1",
+            review_contract_version=2,
+            review_content_digest="sha256:" + "6" * 64,
+        )
+    )
+    terminal = {
+        "status": "applied",
+        "capability_kind": "maintenance_dsp_reset_commit_once",
+        "operation_digest": "sha256:" + "8" * 64,
+        "bundle_kind": "maintenance_dsp_reset_bundle",
+        "review_preimage_sha256": "sha256:" + "9" * 64,
+        "before_manifest_sha256": "sha256:" + "a" * 64,
+        "after_manifest_sha256": "sha256:" + "b" * 64,
+        "verification_cut_reset_surface_sha256": "sha256:" + "c" * 64,
+        "verification_cut_preservation_manifest_sha256": (
+            "sha256:" + "b" * 64
+        ),
+        "no_outside_mutation_attempt_proven": True,
+        "current_state_guaranteed_at_response": False,
+        "fresh_readback_required_before_next_stage": True,
+        "attended_no_touch_required_during_execution": True,
+        "later_console_event_invalidates_readiness_freshness": True,
+        "no_console_send_proven": False,
+        "physical_verified": True,
+        "physical_state_restored": False,
+        "terminal_after_console_send": True,
+        "rollback_attempted": False,
+        "rollback_succeeded": False,
+        "wal_terminal": "committed",
+        "audio_recheck_passed": True,
+        "write_state_unknown": False,
+        "rollback_state_unknown": False,
+        "manual_review_required": False,
+        "emergency_stop_activated": False,
+        "emergency_stop_required": False,
+    }
+    receipt = _freeze_trusted_apply_receipt(
+        identity,
+        terminal_result=terminal,
+        proposal_status="applied",
+        final_status="applied",
+        final_success=True,
+        result_digest="sha256:" + "7" * 64,
+        result_detail_available=True,
+        result_evidence_pinned=False,
+        reason_code=None,
+        idempotency_key="reset-commit-key",
+        operator_idempotency_released=False,
+    )
+    parsed = json.loads(project_outbound_message({}, trusted_receipt=receipt))
+
+    assert receipt.success is True
+    assert receipt.rollback_state_unknown is False
+    assert receipt.manual_review_required is False
+    assert parsed["status"] == "applied"
+    assert parsed["success"] is True
+    assert parsed["capability_kind"] == (
+        "maintenance_dsp_reset_commit_once"
+    )
+    assert parsed["bundle_kind"] == "maintenance_dsp_reset_bundle"
+    assert parsed["review_preimage_sha256"] == "sha256:" + "9" * 64
+    assert parsed["physical_state_restored"] is False
+    assert parsed["rollback_state_unknown"] is False
+    assert parsed["fresh_readback_required_before_next_stage"] is True
+
+
 def _sequence_execution_message(*, status="applied", forged_receipt=None):
     return {
         "type": "operator_proposal_apply_sequence_execution_result",

@@ -41,6 +41,7 @@ RUNTIME_CRITICAL_SOURCE_PATHS = (
     "backend/supervised_family_proof_plan.py",
     "backend/supervised_proof_capability.py",
     "backend/master_capture_route_proof.py",
+    "backend/m110_manual_write_wal.py",
     "backend/maintenance_dsp_reset.py",
     "backend/wing_supervised_console_adapters.py",
     "tools/wing_attended_soundcheck_runner.py",

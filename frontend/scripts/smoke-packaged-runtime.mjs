@@ -46,15 +46,22 @@ const EXPECTED_RUNTIME_CRITICAL_SOURCE_PATHS = [
   'backend/handlers/connection_handlers.py',
   'backend/handlers/mixer_handlers.py',
   'backend/handlers/product_state_handlers.py',
+  'backend/m110_manual_write_wal.py',
+  'backend/maintenance_dsp_reset.py',
+  'backend/master_capture_route_proof.py',
   'backend/mixer_client_base.py',
   'backend/operator_mode_policy.py',
   'backend/runtime_identity.py',
   'backend/server.py',
   'backend/supervised_console_parameter_registry.py',
   'backend/supervised_console_transaction.py',
+  'backend/supervised_family_proof_plan.py',
+  'backend/supervised_proof_capability.py',
   'backend/wing_client.py',
   'backend/wing_supervised_console_adapters.py',
-  'backend/ws_transport.py'
+  'backend/ws_transport.py',
+  'tools/wing_attended_soundcheck_runner.py',
+  'tools/wing_supervised_family_proof_runner.py'
 ].sort();
 function parseArgs(argv) {
   const options = {

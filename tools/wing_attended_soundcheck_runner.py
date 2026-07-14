@@ -57,6 +57,7 @@ EARLY_M110_RUNTIME_CRITICAL_PATHS = (
     "backend/handlers/connection_handlers.py",
     "backend/handlers/product_state_handlers.py",
     "backend/m110_cp05_hardware_gate.py",
+    "backend/m110_manual_write_wal.py",
     "backend/maintenance_dsp_reset.py",
     "backend/master_capture_route_proof.py",
     "backend/operator_proposal_queue.py",
@@ -355,6 +356,10 @@ from master_capture_route_proof import (  # noqa: E402
 from m110_cp05_hardware_gate import (  # noqa: E402
     verify_m110_cp05_hardware_gate,
 )
+from maintenance_dsp_reset import (  # noqa: E402
+    M110_RESET_ADDRESSES,
+    M110_RESET_BUNDLE_KIND,
+)
 from supervised_proof_capability import (  # noqa: E402
     M110_CAPABILITY_CONFIRMATIONS,
     M110_ALLOWED_UNTRACKED_REPORT,
@@ -651,8 +656,9 @@ def build_m110_attended_control_request(
     return request
 
 
-def build_m110_restore_only_capability_request(
+def build_m110_capability_request(
     *,
+    capability_kind: str,
     proposal_id: str,
     review_contract_version: int,
     review_content_digest: str,
@@ -663,6 +669,11 @@ def build_m110_restore_only_capability_request(
 ) -> dict[str, Any]:
     """Build the exact signed capability-issue envelope for one bundle."""
 
+    if capability_kind not in {
+        "restore_only_proof",
+        "maintenance_dsp_reset_commit_once",
+    }:
+        raise ValueError("m110_capability_kind_not_supported_by_runner")
     if review_contract_version != 2 or isinstance(
         review_contract_version,
         bool,
@@ -672,15 +683,13 @@ def build_m110_restore_only_capability_request(
         {
             "type": "issue_supervised_capability",
             "contract_version": 1,
-            "capability_kind": "restore_only_proof",
+            "capability_kind": capability_kind,
             "proposal_id": proposal_id,
             "expected_review_contract_version": review_contract_version,
             "expected_review_content_digest": review_content_digest,
             "expected_operation_digest": operation_digest,
             "approval_id": approval_id,
-            "confirmation": M110_CAPABILITY_CONFIRMATIONS[
-                "restore_only_proof"
-            ],
+            "confirmation": M110_CAPABILITY_CONFIRMATIONS[capability_kind],
             "request_nonce": request_nonce,
         },
         secret=secret,
@@ -689,6 +698,30 @@ def build_m110_restore_only_capability_request(
     if not valid:
         raise ValueError(f"m110_capability_request_builder_invalid:{reason}")
     return request
+
+
+def build_m110_restore_only_capability_request(
+    *,
+    proposal_id: str,
+    review_contract_version: int,
+    review_content_digest: str,
+    operation_digest: str,
+    approval_id: str,
+    request_nonce: str,
+    secret: bytes,
+) -> dict[str, Any]:
+    """Preserve the legacy proof builder as an exact narrow wrapper."""
+
+    return build_m110_capability_request(
+        capability_kind="restore_only_proof",
+        proposal_id=proposal_id,
+        review_contract_version=review_contract_version,
+        review_content_digest=review_content_digest,
+        operation_digest=operation_digest,
+        approval_id=approval_id,
+        request_nonce=request_nonce,
+        secret=secret,
+    )
 
 
 def _write_all(fd: int, value: bytes) -> None:
@@ -960,6 +993,7 @@ M110_CONTROL_TERMINAL_TYPES = frozenset(
         "audio_capture_status",
         "wing_master_route_proof_result",
         "m110_attended_control_result",
+        "m110_maintenance_reset_proposal_result",
         "m110_restore_proof_prepare_result",
         "supervised_capability_result",
         "operator_proposal_apply_result",
@@ -1822,6 +1856,424 @@ class ProofOwnedBackendSession:
                     visit(item, depth + 1)
 
         visit(payload, 0)
+
+    @classmethod
+    def _validate_fixed_reset_proposal_terminal(
+        cls,
+        terminal: Mapping[str, Any],
+        *,
+        role: str,
+    ) -> dict[str, Any]:
+        cls._assert_no_capability_secret(terminal)
+        if role not in {"proof", "commit"}:
+            raise ValueError("m110_fixed_reset_role_invalid")
+        required_kind = (
+            "restore_only_proof"
+            if role == "proof"
+            else "maintenance_dsp_reset_commit_once"
+        )
+        proposal_id = terminal.get("proposal_id")
+        review_digest = cls._require_sha256(
+            terminal.get("review_content_digest"),
+            field_name="review_content_digest",
+        )
+        operation_digest = cls._require_sha256(
+            terminal.get("operation_digest"),
+            field_name="operation_digest",
+        )
+        review_preimage_sha256 = cls._require_sha256(
+            terminal.get("review_preimage_sha256"),
+            field_name="review_preimage_sha256",
+        )
+        if not (
+            terminal.get("type") == "m110_maintenance_reset_proposal_result"
+            and terminal.get("status") == "created"
+            and terminal.get("success") is True
+            and terminal.get("reason")
+            == "m110_maintenance_reset_proposal_created"
+            and isinstance(proposal_id, str)
+            and re.fullmatch(
+                rf"m110-maintenance-reset-{role}-[0-9a-f]{{32}}",
+                proposal_id,
+            )
+            is not None
+            and terminal.get("review_contract_version") == 2
+            and not isinstance(terminal.get("review_contract_version"), bool)
+            and terminal.get("required_capability_kind") == required_kind
+            and terminal.get("bundle_kind") == M110_RESET_BUNDLE_KIND
+            and terminal.get("operation_count") == len(M110_RESET_ADDRESSES)
+            and not isinstance(terminal.get("operation_count"), bool)
+            and terminal.get("scope_addresses") == list(M110_RESET_ADDRESSES)
+            and terminal.get("matching_restored_proof_receipt")
+            is (role == "commit")
+            and terminal.get("token_issued") is False
+            and terminal.get("live_authority_granted") is False
+            and terminal.get("readiness_closure_allowed") is False
+        ):
+            raise RuntimeError(
+                "m110_fixed_reset_proposal_invalid:"
+                + cls._bounded_terminal_failure_context(terminal)
+            )
+        return {
+            "role": role,
+            "proposal_id": proposal_id,
+            "review_contract_version": 2,
+            "review_content_digest": review_digest,
+            "operation_digest": operation_digest,
+            "review_preimage_sha256": review_preimage_sha256,
+            "required_capability_kind": required_kind,
+            "bundle_kind": M110_RESET_BUNDLE_KIND,
+            "scope_addresses": list(M110_RESET_ADDRESSES),
+        }
+
+    @classmethod
+    def _validate_fixed_reset_apply_terminal(
+        cls,
+        terminal: Mapping[str, Any],
+        *,
+        created: Mapping[str, Any],
+        capability_kind: str,
+    ) -> None:
+        cls._assert_no_capability_secret(terminal)
+        proof_run = capability_kind == "restore_only_proof"
+        if capability_kind not in {
+            "restore_only_proof",
+            "maintenance_dsp_reset_commit_once",
+        }:
+            raise ValueError("m110_fixed_reset_capability_kind_invalid")
+        expected_status = "proof_passed" if proof_run else "applied"
+        expected_wal = "proof_restored" if proof_run else "committed"
+        result_digest = cls._require_sha256(
+            terminal.get("result_digest"),
+            field_name="fixed_reset_result_digest",
+        )
+        for field_name in (
+            "review_preimage_sha256",
+            "before_manifest_sha256",
+            "after_manifest_sha256",
+            "verification_cut_reset_surface_sha256",
+            "verification_cut_preservation_manifest_sha256",
+        ):
+            cls._require_sha256(
+                terminal.get(field_name),
+                field_name=field_name,
+            )
+        proposal = terminal.get("proposal")
+        if not (
+            terminal.get("type") == "operator_proposal_apply_result"
+            and terminal.get("contract_version") == 2
+            and not isinstance(terminal.get("contract_version"), bool)
+            and terminal.get("status") == expected_status
+            and terminal.get("success") is True
+            and terminal.get("proposal_id") == created.get("proposal_id")
+            and terminal.get("proposal_status") == expected_status
+            and terminal.get("apply_status") == expected_status
+            and terminal.get("accepted") is False
+            and terminal.get("owner_review_required") is True
+            and terminal.get("live_authority_granted") is False
+            and terminal.get("readiness_closure_allowed") is False
+            and terminal.get("proof_run") is proof_run
+            and terminal.get("restore_after_verify") is proof_run
+            and terminal.get("capability_kind") == capability_kind
+            and terminal.get("operation_digest")
+            == created.get("operation_digest")
+            and terminal.get("bundle_kind") == M110_RESET_BUNDLE_KIND
+            and terminal.get("review_preimage_sha256")
+            == created.get("review_preimage_sha256")
+            and terminal.get("proof_target_verified") is proof_run
+            and terminal.get("no_console_send_proven") is False
+            and terminal.get("physical_verified") is True
+            and terminal.get("physical_state_restored") is proof_run
+            and terminal.get("terminal_after_console_send") is True
+            and terminal.get("write_state_unknown") is False
+            and terminal.get("rollback_attempted") is proof_run
+            and terminal.get("rollback_succeeded") is proof_run
+            and terminal.get("rollback_state_unknown") is False
+            and terminal.get("manual_review_required") is False
+            and terminal.get("emergency_stop_activated") is False
+            and terminal.get("emergency_stop_required") is False
+            and terminal.get("wal_terminal") == expected_wal
+            and terminal.get("audio_recheck_passed") is True
+            and terminal.get("no_outside_mutation_attempt_proven") is True
+            and terminal.get("current_state_guaranteed_at_response") is False
+            and terminal.get("fresh_readback_required_before_next_stage")
+            is True
+            and terminal.get("attended_no_touch_required_during_execution")
+            is True
+            and terminal.get(
+                "later_console_event_invalidates_readiness_freshness"
+            )
+            is True
+            and terminal.get(
+                "verification_cut_preservation_manifest_sha256"
+            )
+            == terminal.get("after_manifest_sha256")
+            and terminal.get("result_detail_available") is True
+            and terminal.get("result_evidence_pinned") is False
+            and isinstance(proposal, Mapping)
+            and proposal.get("id") == created.get("proposal_id")
+            and proposal.get("status") == expected_status
+            and proposal.get("review_contract_version") == 2
+            and proposal.get("review_content_digest")
+            == created.get("review_content_digest")
+            and proposal.get("result_digest") == result_digest
+            and proposal.get("result_detail_available") is True
+            and proposal.get("result_evidence_pinned") is False
+        ):
+            raise RuntimeError(
+                "m110_fixed_reset_apply_terminal_invalid:"
+                + cls._bounded_terminal_failure_context(terminal)
+            )
+
+    async def _create_fixed_reset_proposal(
+        self,
+        *,
+        role: str,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        await self._send_json(
+            {
+                "type": f"create_m110_maintenance_reset_{role}_proposal",
+                "contract_version": 1,
+                "bundle_selector": "fixed_channels_1_16_dsp_bypass",
+            }
+        )
+        terminal = await self._receive_terminal(
+            "m110_maintenance_reset_proposal_result",
+            timeout_seconds=min(float(timeout_seconds), 120.0),
+        )
+        return self._validate_fixed_reset_proposal_terminal(
+            terminal,
+            role=role,
+        )
+
+    async def _prepare_issue_apply_fixed_reset(
+        self,
+        *,
+        created: Mapping[str, Any],
+        capability_kind: str,
+        approval_id: str,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        proposal_id = str(created["proposal_id"])
+        await self._send_json(
+            {
+                "type": "prepare_m110_restore_only_proof",
+                "contract_version": 1,
+                "proposal_id": proposal_id,
+                "bundle_selector": "reviewed_supervised_transaction",
+            }
+        )
+        prepared = await self._receive_terminal(
+            "m110_restore_proof_prepare_result",
+            timeout_seconds=min(float(timeout_seconds), 20.0),
+        )
+        if not (
+            prepared.get("status") == "prepared"
+            and prepared.get("success") is True
+            and prepared.get("reason") == "m110_fixed_reset_bundle_current"
+            and prepared.get("proposal_id") == proposal_id
+            and prepared.get("review_contract_version") == 2
+            and not isinstance(prepared.get("review_contract_version"), bool)
+            and prepared.get("review_content_digest")
+            == created.get("review_content_digest")
+            and prepared.get("operation_digest")
+            == created.get("operation_digest")
+            and prepared.get("bundle_kind") == M110_RESET_BUNDLE_KIND
+            and prepared.get("review_preimage_sha256")
+            == created.get("review_preimage_sha256")
+            and prepared.get("required_capability_kind") == capability_kind
+            and prepared.get("operation_count") == len(M110_RESET_ADDRESSES)
+            and not isinstance(prepared.get("operation_count"), bool)
+            and prepared.get("scope_addresses") == list(M110_RESET_ADDRESSES)
+            and prepared.get("token_issued") is False
+            and prepared.get("live_authority_granted") is False
+        ):
+            raise RuntimeError(
+                "m110_fixed_reset_prepare_failed:"
+                + self._bounded_terminal_failure_context(prepared)
+            )
+
+        issue_request = build_m110_capability_request(
+            capability_kind=capability_kind,
+            proposal_id=proposal_id,
+            review_contract_version=2,
+            review_content_digest=str(created["review_content_digest"]),
+            operation_digest=str(created["operation_digest"]),
+            approval_id=approval_id,
+            request_nonce=secrets.token_hex(16),
+            secret=bytes(self.backend.secret),
+        )
+        await self._send_json(issue_request)
+        issued = await self._receive_terminal(
+            "supervised_capability_result",
+            timeout_seconds=min(float(timeout_seconds), 20.0),
+        )
+        raw_token = issued.pop("supervised_capability_token", None)
+        idempotency_key = issued.get("idempotency_key")
+        latest_start_epoch = issued.get("latest_start_epoch")
+        idempotency_pattern = (
+            r"m110-proof:[0-9a-f]{32}"
+            if capability_kind == "restore_only_proof"
+            else r"m110-reset-commit:[0-9a-f]{32}"
+        )
+        now = time.time()
+        if not (
+            issued.get("status") == "issued"
+            and issued.get("success") is True
+            and issued.get("reason") == "m110_capability_issued"
+            and issued.get("capability_kind") == capability_kind
+            and issued.get("proposal_id") == proposal_id
+            and issued.get("review_contract_version") == 2
+            and issued.get("review_content_digest")
+            == created.get("review_content_digest")
+            and issued.get("operation_digest")
+            == created.get("operation_digest")
+            and issued.get("approval_id") == approval_id
+            and isinstance(idempotency_key, str)
+            and re.fullmatch(idempotency_pattern, idempotency_key) is not None
+            and isinstance(latest_start_epoch, (int, float))
+            and not isinstance(latest_start_epoch, bool)
+            and math.isfinite(float(latest_start_epoch))
+            and now < float(latest_start_epoch) <= now + 31.0
+            and isinstance(raw_token, str)
+            and re.fullmatch(r"m110cap_v1_[0-9a-f]{64}", raw_token) is not None
+            and issued.get("single_use") is True
+            and issued.get("stores_plaintext_token") is False
+            and issued.get("live_authority_granted") is False
+        ):
+            raw_token = None
+            raise RuntimeError(
+                "m110_fixed_reset_capability_issue_failed:"
+                + self._bounded_terminal_failure_context(issued)
+            )
+
+        token = bytearray(raw_token.encode("ascii"))
+        raw_token = None
+        apply_request = {
+            "type": "apply_operator_proposal",
+            "proposal_id": proposal_id,
+            "approved": True,
+            "approval_id": approval_id,
+            "idempotency_key": idempotency_key,
+            "expected_review_contract_version": 2,
+            "expected_review_content_digest": created[
+                "review_content_digest"
+            ],
+            "expected_operation_digest": created["operation_digest"],
+            "supervised_capability_token": token.decode("ascii"),
+        }
+        try:
+            await self._send_json(apply_request)
+        finally:
+            apply_request.pop("supervised_capability_token", None)
+            for index in range(len(token)):
+                token[index] = 0
+        terminal = await self._receive_terminal(
+            "operator_proposal_apply_result",
+            timeout_seconds=float(timeout_seconds),
+        )
+        self._validate_fixed_reset_apply_terminal(
+            terminal,
+            created=created,
+            capability_kind=capability_kind,
+        )
+        return {
+            "verified": True,
+            "proposal_id": proposal_id,
+            "capability_kind": capability_kind,
+            "operation_digest": created["operation_digest"],
+            "review_preimage_sha256": created["review_preimage_sha256"],
+            "scope_addresses": list(M110_RESET_ADDRESSES),
+            "terminal": terminal,
+            "token_retained": False,
+        }
+
+    async def execute_fixed_m110_maintenance_reset(
+        self,
+        *,
+        approval_id: str,
+        timeout_seconds: float = 120.0,
+    ) -> dict[str, Any]:
+        """Proof, recapture and permanently bypass the fixed 1-16 DSP set."""
+
+        try:
+            return await self._execute_fixed_m110_maintenance_reset(
+                approval_id=approval_id,
+                timeout_seconds=timeout_seconds,
+            )
+        except BaseException:
+            await self.close()
+            raise
+
+    async def _execute_fixed_m110_maintenance_reset(
+        self,
+        *,
+        approval_id: str,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        if not self.route_established or self.route_result is None:
+            raise RuntimeError("m110_master_route_must_precede_capability")
+        if self.closed:
+            raise RuntimeError("proof_owned_backend_session_closed")
+        if not self.control_armed:
+            raise RuntimeError("m110_attended_control_must_be_armed")
+        if approval_id != self.control_approval_id:
+            raise RuntimeError("m110_attended_control_approval_mismatch")
+        if not (
+            isinstance(timeout_seconds, (int, float))
+            and not isinstance(timeout_seconds, bool)
+            and math.isfinite(float(timeout_seconds))
+            and 0.0 < float(timeout_seconds) <= 180.0
+        ):
+            raise ValueError("m110_capability_timeout_invalid")
+
+        proof_created = await self._create_fixed_reset_proposal(
+            role="proof",
+            timeout_seconds=timeout_seconds,
+        )
+        proof = await self._prepare_issue_apply_fixed_reset(
+            created=proof_created,
+            capability_kind="restore_only_proof",
+            approval_id=approval_id,
+            timeout_seconds=timeout_seconds,
+        )
+        commit_created = await self._create_fixed_reset_proposal(
+            role="commit",
+            timeout_seconds=timeout_seconds,
+        )
+        if not (
+            commit_created.get("operation_digest")
+            == proof_created.get("operation_digest")
+            and commit_created.get("review_preimage_sha256")
+            == proof_created.get("review_preimage_sha256")
+            and commit_created.get("scope_addresses")
+            == proof_created.get("scope_addresses")
+        ):
+            raise RuntimeError("m110_fixed_reset_proof_commit_binding_drift")
+        commit = await self._prepare_issue_apply_fixed_reset(
+            created=commit_created,
+            capability_kind="maintenance_dsp_reset_commit_once",
+            approval_id=approval_id,
+            timeout_seconds=timeout_seconds,
+        )
+        return {
+            "verified": True,
+            "reason": "m110_fixed_maintenance_reset_committed",
+            "operation_digest": commit_created["operation_digest"],
+            "review_preimage_sha256": commit_created[
+                "review_preimage_sha256"
+            ],
+            "scope_addresses": list(M110_RESET_ADDRESSES),
+            "proof": proof,
+            "commit": commit,
+            "same_websocket_retained": True,
+            "backend_process_retained": self.backend.process.poll() is None,
+            "token_retained": False,
+            "reset_applied": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+        }
 
     @classmethod
     def _validate_restore_only_proof_terminal(
