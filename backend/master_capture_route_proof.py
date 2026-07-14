@@ -52,6 +52,18 @@ MASTER_CAPTURE_ROUTE_EXPECTED = {
 MASTER_CAPTURE_ROUTE_TTL_SECONDS = 30 * 60
 MASTER_CAPTURE_ROUTE_ARTIFACT_MAX_BYTES = 64 * 1024
 _SAFE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+_M110_WING_FIRMWARE_VERSION = re.compile(
+    r"3\.0\.5(?:[-+ ][A-Za-z0-9._+-]+(?::release)?)?"
+)
+
+
+def is_m110_wing_firmware_version(value: Any) -> bool:
+    """Accept only the verified fw3.0.5 family and exact release tag."""
+
+    return bool(
+        isinstance(value, str)
+        and _M110_WING_FIRMWARE_VERSION.fullmatch(value) is not None
+    )
 
 
 def canonical_json_bytes(value: Any) -> bytes:

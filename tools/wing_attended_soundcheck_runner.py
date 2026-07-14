@@ -362,6 +362,7 @@ from master_capture_route_proof import (  # noqa: E402
     MASTER_CAPTURE_ROUTE_ADDRESSES,
     MASTER_CAPTURE_ROUTE_EXPECTED,
     MASTER_CAPTURE_ROUTE_REQUEST_CONFIRMATION,
+    is_m110_wing_firmware_version,
     validate_master_capture_route_request,
     verify_master_capture_route_artifact,
 )
@@ -1805,12 +1806,9 @@ class ProofOwnedBackendSession:
                 result.get("console_serial", ""),
             )
             is not None,
-            "firmware": isinstance(result.get("firmware_version"), str)
-            and re.fullmatch(
-                r"3\.0\.5(?:[-+ ][A-Za-z0-9._+-]+)?",
-                result.get("firmware_version", ""),
-            )
-            is not None,
+            "firmware": is_m110_wing_firmware_version(
+                result.get("firmware_version")
+            ),
             "hardware_uid": isinstance(result.get("capture_hardware_uid"), str)
             and result.get("capture_hardware_uid", "").startswith("usb:"),
             "usb_serial": isinstance(result.get("capture_usb_serial"), str)

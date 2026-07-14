@@ -1717,12 +1717,17 @@ def _route_result(
     request,
     identity,
     *,
+    firmware="3.0.5",
     mutation=None,
     ttl_seconds=1_800,
 ):
     proof_id = secrets.token_hex(16)
     issued = time.time() - 1.0
-    evidence = _valid_route_evidence(request, identity)
+    evidence = _valid_route_evidence(
+        request,
+        identity,
+        firmware=firmware,
+    )
     if mutation is not None:
         mutation(evidence)
     artifact = write_master_capture_route_artifact(
@@ -4179,6 +4184,38 @@ def test_route_result_semantic_verifier_accepts_valid_artifact(tmp_path):
     assert verified["hardware_binding_verified"] is True
 
 
+def test_route_result_semantic_verifier_accepts_real_release_firmware(
+    tmp_path,
+):
+    identity = _identity_result()
+    request = runner.build_route_capture_request(
+        request_id="m110-route-real-release",
+        approval_id="operator-approved",
+        request_nonce="e" * 32,
+        secret=b"s" * 32,
+    )
+    artifact_root = tmp_path / "route-artifacts"
+    firmware = "3.0.5-4-ga4ea833d:release"
+    result = _route_result(
+        artifact_root,
+        request,
+        identity,
+        firmware=firmware,
+    )
+
+    verified = runner.ProofOwnedBackendSession._validate_route_result(
+        result=result,
+        request=request,
+        audio_device_index=7,
+        route_artifact_root=artifact_root,
+        identity_result=identity,
+    )
+
+    assert verified["verified"] is True
+    assert result["firmware_version"] == firmware
+    assert result["console_mutation_write_attempt_count"] == 0
+
+
 @pytest.mark.parametrize(
     "mutation_name",
     [
@@ -4194,6 +4231,7 @@ def test_route_result_semantic_verifier_accepts_valid_artifact(tmp_path):
         "hardware_sha",
         "runtime_binding",
         "firmware_family",
+        "firmware_tag",
         "ttl",
     ],
 )
@@ -4284,6 +4322,15 @@ def test_route_result_semantic_verifier_rejects_hash_valid_false_evidence(
                 route_pass["readbacks"]["/$syscfg/$firmware"][
                     "value"
                 ] = "3.0.4"
+        elif mutation_name == "firmware_tag":
+            firmware = "3.0.5-4-ga4ea833d:debug"
+            evidence["console"]["firmware"] = firmware
+            for pass_name in ("pass_1", "pass_2"):
+                route_pass = evidence["route"][pass_name]
+                route_pass["values"]["/$syscfg/$firmware"] = firmware
+                route_pass["readbacks"]["/$syscfg/$firmware"][
+                    "value"
+                ] = firmware
 
     artifact_root = tmp_path / f"route-{mutation_name}"
     result = _route_result(

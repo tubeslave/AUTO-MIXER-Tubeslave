@@ -187,6 +187,7 @@ from master_capture_route_proof import (
     MASTER_CAPTURE_ROUTE_EXPECTED,
     MasterCaptureRouteAuthority,
     discard_master_capture_route_artifact,
+    is_m110_wing_firmware_version,
     new_route_proof_id,
     route_authority_expiry,
     route_value_matches,
@@ -16521,10 +16522,7 @@ class AutoMixerServer:
             errors.append("console_serial_unavailable")
         if not isinstance(firmware, str) or not firmware.strip():
             errors.append("console_firmware_unavailable")
-        elif re.fullmatch(
-            r"3\.0\.5(?:[-+ ][A-Za-z0-9._+-]+)?",
-            firmware.strip(),
-        ) is None:
+        elif not is_m110_wing_firmware_version(firmware.strip()):
             errors.append("console_firmware_not_m110_verified_family")
         for address, expected in MASTER_CAPTURE_ROUTE_EXPECTED.items():
             if not route_value_matches(expected, values.get(address)):

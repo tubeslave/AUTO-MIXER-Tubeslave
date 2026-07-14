@@ -20,6 +20,7 @@ from master_capture_route_proof import (
     MASTER_CAPTURE_ROUTE_REQUEST_CONFIRMATION,
     MASTER_CAPTURE_ROUTE_ARTIFACT_MAX_BYTES,
     discard_master_capture_route_artifact,
+    is_m110_wing_firmware_version,
     validate_master_capture_route_request,
     verify_master_capture_route_artifact,
     write_master_capture_route_artifact,
@@ -121,7 +122,14 @@ def _hardware_identity(
     }
 
 
-def _configure_route_server(server, tmp_path, websocket, secret):
+def _configure_route_server(
+    server,
+    tmp_path,
+    websocket,
+    secret,
+    *,
+    firmware="3.0.5-unit",
+):
     _launch_authority(server, secret)
     server._verify_m110_cp05_hardware_gate = MagicMock(
         return_value={"verified": True}
@@ -142,7 +150,7 @@ def _configure_route_server(server, tmp_path, websocket, secret):
     client.query_parameter = MagicMock()
     route = {
         "/$syscfg/$serial": "WINGUNIT1",
-        "/$syscfg/$firmware": "3.0.5-unit",
+        "/$syscfg/$firmware": firmware,
         **MASTER_CAPTURE_ROUTE_EXPECTED,
     }
     client.query_parameter.side_effect = lambda address, timeout: {
@@ -227,6 +235,25 @@ def test_route_capture_request_contract_is_exact():
         {**valid, "confirmation": "yes"},
     ):
         assert validate_master_capture_route_request(mutation)
+
+
+@pytest.mark.parametrize(
+    ("firmware", "accepted"),
+    [
+        ("3.0.5", True),
+        ("3.0.5-unit", True),
+        ("3.0.5-4-ga4ea833d", True),
+        ("3.0.5-4-ga4ea833d:release", True),
+        ("3.0.50", False),
+        ("3.0.6-4-ga4ea833d:release", False),
+        ("3.0.5:release", False),
+        ("3.0.5-4-ga4ea833d:debug", False),
+        ("3.0.5-4-ga4ea833d:release:extra", False),
+        ("3.0.5-4-ga4ea833d/release", False),
+    ],
+)
+def test_m110_wing_firmware_version_contract(firmware, accepted):
+    assert is_m110_wing_firmware_version(firmware) is accepted
 
 
 def test_route_audit_artifact_is_private_content_addressed_evidence(tmp_path):
@@ -357,7 +384,14 @@ async def test_fixed_route_capture_issues_only_process_private_authority(
     server = AutoMixerServer()
     websocket = object()
     secret = secrets.token_bytes(32)
-    client = _configure_route_server(server, tmp_path, websocket, secret)
+    firmware = "3.0.5-4-ga4ea833d:release"
+    client = _configure_route_server(
+        server,
+        tmp_path,
+        websocket,
+        secret,
+        firmware=firmware,
+    )
 
     result = await server.capture_wing_master_route_proof(
         websocket=websocket,
@@ -366,6 +400,7 @@ async def test_fixed_route_capture_issues_only_process_private_authority(
 
     assert result["status"] == "issued"
     assert result["success"] is True
+    assert result["firmware_version"] == firmware
     assert result["console_mutation_write_attempt_count"] == 0
     assert result["live_authority_granted"] is False
     assert result["conservative_true_peak_dbtp"] < -1.0
