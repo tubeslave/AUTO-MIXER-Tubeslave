@@ -151,6 +151,12 @@ def test_exact_restored_proof_wal_is_terminal_across_restart(
     )
     lifecycle = server._manual_write_wal_lifecycles[transaction_id]
     assert server._wal_lifecycle_proves_restored_proof(lifecycle) is True
+    assert [event["phase"] for event in lifecycle["events"]] == [
+        "prepared",
+        "proof_restored",
+    ]
+    assert lifecycle["events"][0] is lifecycle["prepared"]
+    assert lifecycle["events"][-1] is lifecycle["latest_event"]
     assert transaction_id not in server._manual_write_recovery_transactions
 
     restarted = build_server(
@@ -161,6 +167,8 @@ def test_exact_restored_proof_wal_is_terminal_across_restart(
     assert restarted._manual_write_wal_integrity_ok is True
     assert restarted._manual_write_recovery_transactions == {}
     assert restarted._manual_write_emergency_stopped is False
+    restarted_lifecycle = restarted._manual_write_wal_lifecycles[transaction_id]
+    assert restarted_lifecycle["events"] == lifecycle["events"]
 
 
 @pytest.mark.parametrize(

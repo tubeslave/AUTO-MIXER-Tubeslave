@@ -7655,6 +7655,24 @@ class AutoMixerServer:
             and terminal.get("readiness_closure_allowed") is False
         )
 
+    @classmethod
+    def _wal_lifecycle_terminal_resolved(cls, lifecycle: Any) -> bool:
+        """Use one terminal decision for live append and startup recovery."""
+
+        if not isinstance(lifecycle, Mapping):
+            return False
+        terminal = lifecycle.get("latest_event")
+        if not isinstance(terminal, Mapping):
+            return False
+        phase = str(terminal.get("phase") or "").strip()
+        if phase not in MANUAL_WRITE_WAL_TERMINAL_PHASES:
+            return False
+        if phase == "aborted_before_send":
+            return cls._wal_lifecycle_proves_no_send(lifecycle)
+        if phase == "proof_restored":
+            return cls._wal_lifecycle_proves_restored_proof(lifecycle)
+        return True
+
     def _wal_binding_fully_proven_no_send(
         self,
         *,
@@ -7772,21 +7790,14 @@ class AutoMixerServer:
             lifecycle = {
                 "transaction_id": transaction_id,
                 "phases": [*(prior_lifecycle.get("phases") or ()), phase],
+                "events": [*(prior_lifecycle.get("events") or ()), event],
                 "prepared": prior_lifecycle.get("prepared"),
                 "latest_event": event,
             }
             if phase == "prepared" and lifecycle["prepared"] is None:
                 lifecycle["prepared"] = event
             self._manual_write_wal_lifecycles[transaction_id] = lifecycle
-            exact_no_send = self._wal_lifecycle_proves_no_send(lifecycle)
-            exact_restored_proof = self._wal_lifecycle_proves_restored_proof(
-                lifecycle
-            )
-            terminal_resolved = bool(
-                phase in MANUAL_WRITE_WAL_TERMINAL_PHASES
-                and (phase != "aborted_before_send" or exact_no_send)
-                and (phase != "proof_restored" or exact_restored_proof)
-            )
+            terminal_resolved = self._wal_lifecycle_terminal_resolved(lifecycle)
             if terminal_resolved:
                 self._manual_write_recovery_transactions.pop(transaction_id, None)
                 self._manual_write_prepared_transactions.pop(transaction_id, None)
@@ -7864,11 +7875,13 @@ class AutoMixerServer:
                         {
                             "transaction_id": transaction_id,
                             "phases": [],
+                            "events": [],
                             "prepared": None,
                             "latest_event": None,
                         },
                     )
                     lifecycle["phases"].append(phase)
+                    lifecycle["events"].append(event)
                     if phase == "prepared" and lifecycle["prepared"] is None:
                         lifecycle["prepared"] = event
                     lifecycle["latest_event"] = event
@@ -7962,15 +7975,7 @@ class AutoMixerServer:
         for transaction_id, lifecycle in lifecycles.items():
             event = lifecycle.get("latest_event") or {}
             phase = str(event.get("phase") or "")
-            exact_no_send = self._wal_lifecycle_proves_no_send(lifecycle)
-            exact_restored_proof = self._wal_lifecycle_proves_restored_proof(
-                lifecycle
-            )
-            terminal_resolved = bool(
-                phase in MANUAL_WRITE_WAL_TERMINAL_PHASES
-                and (phase != "aborted_before_send" or exact_no_send)
-                and (phase != "proof_restored" or exact_restored_proof)
-            )
+            terminal_resolved = self._wal_lifecycle_terminal_resolved(lifecycle)
             if terminal_resolved:
                 continue
             prepared = lifecycle.get("prepared") or {}
