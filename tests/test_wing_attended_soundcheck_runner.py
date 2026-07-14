@@ -267,6 +267,23 @@ def _identity_result():
     }
 
 
+def _capture_status(**overrides):
+    status = {
+        "type": "audio_capture_status",
+        "running": True,
+        "source_type": "sounddevice",
+        "real_input": False,
+        "callback_age_sec": None,
+        "captured_sample_count": 0,
+        "device_name": "WING",
+        "device_index": 7,
+        "num_channels": 48,
+        "sample_rate": 48_000,
+    }
+    status.update(overrides)
+    return status
+
+
 def _fake_backend(root: Path):
     return runner.ProofOwnedBackendProcess(
         process=_FakeProcess(),
@@ -2661,6 +2678,8 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
                         "owned_by_requester": True,
                         "source_type": "sounddevice",
                         "real_input": True,
+                        "callback_age_sec": 0.0,
+                        "captured_sample_count": 12_000,
                         "device_name": "WING",
                         "device_index": 7,
                         "num_channels": 48,
@@ -2699,6 +2718,7 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
         )
 
         assert route["verified"] is True
+        assert route["audio_capture_status"]["readiness_poll_count"] == 0
         assert route["same_websocket_retained"] is True
         assert route["backend_process_retained"] is True
         assert session.closed is False
@@ -2718,6 +2738,609 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
             "stop_audio_capture_preview",
             "disconnect_wing",
         ]
+
+    asyncio.run(scenario())
+
+
+def test_route_waits_for_same_capture_first_callback_before_proof(
+    tmp_path,
+    monkeypatch,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        artifact_root = tmp_path / "route-artifacts"
+        identity = _identity_result()
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                    )
+                ]
+            if payload["type"] == "get_audio_capture_status":
+                return [
+                    _capture_status(
+                        real_input=True,
+                        callback_age_sec=0.01,
+                        captured_sample_count=1_024,
+                    )
+                ]
+            if payload["type"] == "capture_wing_master_route_proof":
+                return [_route_result(artifact_root, payload, identity)]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=identity,
+        )
+        route = await session.establish_master_route(
+            wing_ip="192.168.1.102",
+            audio_device_index=7,
+            approval_id="operator-approved",
+            request_id="m110-delayed-callback",
+            request_nonce="d" * 32,
+            route_artifact_root=artifact_root,
+        )
+
+        assert route["verified"] is True
+        assert route["audio_capture_status"]["readiness_poll_count"] == 1
+        assert route["audio_capture_status"]["captured_sample_count"] == 1_024
+        assert [item["type"] for item in websocket.sent[:4]] == [
+            "connect_wing",
+            "start_audio_capture_preview",
+            "get_audio_capture_status",
+            "capture_wing_master_route_proof",
+        ]
+        teardown = await session.close()
+        assert teardown["verified"] is True
+        assert teardown["capture_stopped"] is True
+        assert teardown["mixer_disconnected"] is True
+        assert teardown["backend_process_terminated"] is True
+        assert teardown["route_authority_retained"] is False
+        assert teardown["errors"] == []
+
+    asyncio.run(scenario())
+
+
+def test_capture_callback_timeout_stops_preview_before_disconnect(
+    tmp_path,
+    monkeypatch,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_TIMEOUT_SECONDS",
+            0.04,
+        )
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                    )
+                ]
+            if payload["type"] == "get_audio_capture_status":
+                return [_capture_status()]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+        )
+        started = time.monotonic()
+        with pytest.raises(RuntimeError, match="not_ready_within_1s"):
+            await session.establish_master_route(
+                wing_ip="192.168.1.102",
+                audio_device_index=7,
+                approval_id="operator-approved",
+            )
+        assert time.monotonic() - started < 0.25
+        message_types = [item["type"] for item in websocket.sent]
+        assert "capture_wing_master_route_proof" not in message_types
+        assert message_types[-2:] == [
+            "stop_audio_capture_preview",
+            "disconnect_wing",
+        ]
+        assert session.closed is True
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("initial_override", "failure"),
+    [
+        ({"error": "capture_failed"}, "capture_failed"),
+        ({"device_index": True}, "device_index"),
+    ],
+)
+def test_owned_capture_with_invalid_initial_status_is_explicitly_stopped(
+    tmp_path,
+    initial_override,
+    failure,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                        **initial_override,
+                    )
+                ]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+        )
+        with pytest.raises(RuntimeError, match=failure):
+            await session.establish_master_route(
+                wing_ip="192.168.1.102",
+                audio_device_index=1,
+                approval_id="operator-approved",
+            )
+        assert [item["type"] for item in websocket.sent] == [
+            "connect_wing",
+            "start_audio_capture_preview",
+            "stop_audio_capture_preview",
+            "disconnect_wing",
+        ]
+        assert session.closed is True
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("poll_override", "failure"),
+    [
+        ({"running": False}, "running"),
+        ({"error": "capture_failed"}, "error_absent"),
+        ({"source_type": "silence"}, "source_type"),
+        ({"device_name": "OTHER"}, "device_name"),
+        ({"device_name": "WING Rack"}, "device_name"),
+        ({"device_index": True}, "device_index"),
+        ({"num_channels": 47}, "num_channels"),
+        ({"sample_rate": 48_000.0}, "sample_rate"),
+        ({"real_input": "true"}, "real_input_boolean"),
+        ({"captured_sample_count": True}, "sample_count"),
+        ({"owned_by_requester": False}, "optional_owner"),
+        ({"preview": False}, "optional_preview"),
+    ],
+)
+def test_capture_status_drift_fails_before_route_and_stops_owned_preview(
+    tmp_path,
+    monkeypatch,
+    poll_override,
+    failure,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                    )
+                ]
+            if payload["type"] == "get_audio_capture_status":
+                return [_capture_status(**poll_override)]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+        )
+        with pytest.raises(RuntimeError, match=failure):
+            await session.establish_master_route(
+                wing_ip="192.168.1.102",
+                audio_device_index=7,
+                approval_id="operator-approved",
+            )
+        message_types = [item["type"] for item in websocket.sent]
+        assert "capture_wing_master_route_proof" not in message_types
+        assert message_types[-2:] == [
+            "stop_audio_capture_preview",
+            "disconnect_wing",
+        ]
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize(
+    ("ready_override", "failure"),
+    [
+        (
+            {
+                "real_input": True,
+                "callback_age_sec": 1.01,
+                "captured_sample_count": 1_024,
+            },
+            "invalid_callback_freshness",
+        ),
+        (
+            {
+                "real_input": True,
+                "callback_age_sec": 0.01,
+                "captured_sample_count": 0,
+            },
+            "missing_sample_progression",
+        ),
+    ],
+)
+def test_capture_ready_claim_requires_fresh_callback_and_sample_progression(
+    tmp_path,
+    monkeypatch,
+    ready_override,
+    failure,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                    )
+                ]
+            if payload["type"] == "get_audio_capture_status":
+                return [_capture_status(**ready_override)]
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+        )
+        with pytest.raises(RuntimeError, match=failure):
+            await session.establish_master_route(
+                wing_ip="192.168.1.102",
+                audio_device_index=7,
+                approval_id="operator-approved",
+            )
+        assert "capture_wing_master_route_proof" not in [
+            item["type"] for item in websocket.sent
+        ]
+
+    asyncio.run(scenario())
+
+
+def test_cancellation_during_capture_poll_drains_owned_preview_teardown(
+    tmp_path,
+    monkeypatch,
+):
+    async def scenario():
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        _write_open_cp05_gate(repo)
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+        get_sent = asyncio.Event()
+
+        def responder(payload):
+            if payload["type"] == "connect_wing":
+                return [
+                    {
+                        "type": "connection_status",
+                        "connected": True,
+                        "mode": "wing",
+                        "ip": "192.168.1.102",
+                        "observation_only": True,
+                        "record_telemetry": False,
+                    }
+                ]
+            if payload["type"] == "start_audio_capture_preview":
+                return [
+                    _capture_status(
+                        preview=True,
+                        owned_by_requester=True,
+                    )
+                ]
+            if payload["type"] == "get_audio_capture_status":
+                get_sent.set()
+                return []
+            if payload["type"] == "stop_audio_capture_preview":
+                return [
+                    _capture_status(),
+                    {
+                        "type": "audio_capture_status",
+                        "running": False,
+                        "preview": True,
+                        "owned_by_requester": True,
+                    }
+                ]
+            if payload["type"] == "disconnect_wing":
+                return [{"type": "connection_status", "connected": False}]
+            return []
+
+        backend = _fake_backend(repo)
+        websocket = _FakeWebSocket(responder)
+        session = runner.ProofOwnedBackendSession(
+            backend=backend,
+            websocket=websocket,
+            identity_result=_identity_result(),
+        )
+        task = asyncio.create_task(
+            session.establish_master_route(
+                wing_ip="192.168.1.102",
+                audio_device_index=7,
+                approval_id="operator-approved",
+            )
+        )
+        await asyncio.wait_for(get_sent.wait(), timeout=0.5)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert [item["type"] for item in websocket.sent][-2:] == [
+            "stop_audio_capture_preview",
+            "disconnect_wing",
+        ]
+        assert session.closed is True
+        assert session.teardown_result["verified"] is True
+        assert session.teardown_result["capture_stopped"] is True
+        assert session.teardown_result["mixer_disconnected"] is True
+        assert session.teardown_result["errors"] == []
+
+    asyncio.run(scenario())
+
+
+def test_capture_readiness_poll_rate_respects_backend_sustained_limit():
+    assert runner.M110_CAPTURE_READY_POLL_INTERVAL_SECONDS >= 0.1
+    assert runner.M110_CAPTURE_READY_TIMEOUT_SECONDS == 1.0
+
+
+def test_capture_readiness_rejects_ready_terminal_after_absolute_deadline(
+    tmp_path,
+    monkeypatch,
+):
+    async def scenario():
+        session = runner.ProofOwnedBackendSession(
+            backend=_fake_backend(tmp_path),
+            websocket=_FakeWebSocket(),
+            identity_result=_identity_result(),
+        )
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_TIMEOUT_SECONDS",
+            0.04,
+        )
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_POLL_INTERVAL_SECONDS",
+            0.001,
+        )
+
+        async def late_ready_terminal(_expected_type, *, timeout_seconds):
+            assert 0.0 < timeout_seconds < 0.04
+            await asyncio.sleep(0.05)
+            return _capture_status(
+                real_input=True,
+                callback_age_sec=0.0,
+                captured_sample_count=1_024,
+            )
+
+        monkeypatch.setattr(session, "_receive_terminal", late_ready_terminal)
+        started = time.monotonic()
+        with pytest.raises(RuntimeError, match="not_ready_within_1s"):
+            await session._await_m110_capture_ready(
+                initial_status=_capture_status(
+                    preview=True,
+                    owned_by_requester=True,
+                ),
+                audio_device_index=7,
+            )
+        assert time.monotonic() - started < 0.1
+        assert [item["type"] for item in session.websocket.sent] == [
+            "get_audio_capture_status"
+        ]
+
+    asyncio.run(scenario())
+
+
+def test_capture_readiness_actual_poll_cadence_is_bounded(
+    tmp_path,
+    monkeypatch,
+):
+    async def scenario():
+        get_timestamps = []
+
+        def responder(payload):
+            if payload["type"] == "get_audio_capture_status":
+                get_timestamps.append(time.monotonic())
+                return [_capture_status()]
+            return []
+
+        session = runner.ProofOwnedBackendSession(
+            backend=_fake_backend(tmp_path),
+            websocket=_FakeWebSocket(responder),
+            identity_result=_identity_result(),
+        )
+        monkeypatch.setattr(
+            runner,
+            "M110_CAPTURE_READY_TIMEOUT_SECONDS",
+            0.46,
+        )
+        with pytest.raises(RuntimeError, match="not_ready_within_1s"):
+            await session._await_m110_capture_ready(
+                initial_status=_capture_status(
+                    preview=True,
+                    owned_by_requester=True,
+                ),
+                audio_device_index=7,
+            )
+        assert 2 <= len(get_timestamps) <= 4
+        assert all(
+            later - earlier >= 0.09
+            for earlier, later in zip(get_timestamps, get_timestamps[1:])
+        )
 
     asyncio.run(scenario())
 
@@ -2760,6 +3383,8 @@ def test_same_session_arm_prepare_issue_apply_restores_and_erases_token(
                         "owned_by_requester": True,
                         "source_type": "sounddevice",
                         "real_input": True,
+                        "callback_age_sec": 0.0,
+                        "captured_sample_count": 12_000,
                         "device_name": "WING",
                         "device_index": 7,
                         "num_channels": 48,
@@ -3045,6 +3670,8 @@ def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
                         "owned_by_requester": True,
                         "source_type": "sounddevice",
                         "real_input": True,
+                        "callback_age_sec": 0.0,
+                        "captured_sample_count": 12_000,
                         "device_name": "WING",
                         "device_index": 7,
                         "num_channels": 48,

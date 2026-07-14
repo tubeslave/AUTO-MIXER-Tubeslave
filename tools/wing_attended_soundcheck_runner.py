@@ -414,6 +414,9 @@ M110_SOUNDCHECK_UNMUTE_CONFIRMATION = (
     "UNMUTE_MAIN_1_FOR_M110_SOUNDCHECK"
 )
 M110_RUNNER_CLIENT_ID = "m110-attended-runner"
+M110_CAPTURE_READY_TIMEOUT_SECONDS = 1.0
+M110_CAPTURE_READY_POLL_INTERVAL_SECONDS = 0.1
+M110_TERMINAL_DUPLICATE_GRACE_SECONDS = 0.025
 DEFAULT_ARTIFACT_ROOT = Path.home() / ".automixer" / "runtime" / "m110_attended"
 DEFAULT_ROUTE_ARTIFACT_ROOT = (
     Path.home() / ".automixer" / "runtime" / "m110_master_route_proofs"
@@ -1359,6 +1362,11 @@ class ProofOwnedBackendSession:
         init=False,
         repr=False,
     )
+    _capture_status_get_in_flight: bool = field(
+        default=False,
+        init=False,
+        repr=False,
+    )
 
     @classmethod
     async def open(
@@ -1478,7 +1486,7 @@ class ProofOwnedBackendSession:
         self,
         expected_type: str,
         *,
-        grace_seconds: float = 0.025,
+        grace_seconds: float = M110_TERMINAL_DUPLICATE_GRACE_SECONDS,
     ) -> None:
         deadline = time.monotonic() + grace_seconds
         while True:
@@ -1558,6 +1566,208 @@ class ProofOwnedBackendSession:
         ):
             values.append(f"error={error}")
         return ";".join(values) or "terminal_contract_mismatch"
+
+    @staticmethod
+    def _m110_capture_identity_failures(
+        status: Mapping[str, Any],
+        *,
+        audio_device_index: int,
+        expected_device_name: str | None = None,
+    ) -> list[str]:
+        device_name = status.get("device_name")
+        checks = {
+            "running": status.get("running") is True,
+            "error_absent": status.get("error") is None
+            or status.get("error") == "",
+            "source_type": status.get("source_type") == "sounddevice",
+            "device_name": isinstance(device_name, str)
+            and bool(device_name)
+            and re.search(
+                r"(?:^|[^a-z0-9])wing(?:[^a-z0-9]|$)",
+                device_name,
+                flags=re.IGNORECASE,
+            )
+            is not None
+            and (
+                expected_device_name is None
+                or device_name == expected_device_name
+            ),
+            "device_index": type(status.get("device_index")) is int
+            and status.get("device_index") == audio_device_index,
+            "num_channels": type(status.get("num_channels")) is int
+            and status.get("num_channels") == 48,
+            "sample_rate": type(status.get("sample_rate")) is int
+            and status.get("sample_rate") == 48_000,
+            "real_input_boolean": type(status.get("real_input")) is bool,
+            "sample_count": type(status.get("captured_sample_count")) is int
+            and status.get("captured_sample_count") >= 0,
+            "optional_preview": "preview" not in status
+            or status.get("preview") is True,
+            "optional_owner": "owned_by_requester" not in status
+            or status.get("owned_by_requester") is True,
+        }
+        return [name for name, passed in checks.items() if not passed]
+
+    @staticmethod
+    def _m110_capture_readiness_state(
+        status: Mapping[str, Any],
+        *,
+        initial_sample_count: int,
+    ) -> str:
+        real_input = status.get("real_input")
+        sample_count = status.get("captured_sample_count")
+        callback_age = status.get("callback_age_sec")
+        if real_input is False:
+            if callback_age is None and sample_count == initial_sample_count == 0:
+                return "pending_first_callback"
+            return "invalid_not_ready_state"
+        if real_input is not True:
+            return "invalid_real_input_state"
+        if not (
+            isinstance(callback_age, (int, float))
+            and not isinstance(callback_age, bool)
+            and math.isfinite(float(callback_age))
+            and 0.0 <= float(callback_age) <= 1.0
+        ):
+            return "invalid_callback_freshness"
+        if not (
+            type(sample_count) is int
+            and sample_count > initial_sample_count
+        ):
+            return "missing_sample_progression"
+        return "ready"
+
+    async def _await_m110_capture_ready(
+        self,
+        *,
+        initial_status: Mapping[str, Any],
+        audio_device_index: int,
+    ) -> dict[str, Any]:
+        device_name = str(initial_status["device_name"])
+        initial_sample_count = int(initial_status["captured_sample_count"])
+        deadline = time.monotonic() + M110_CAPTURE_READY_TIMEOUT_SECONDS
+        poll_count = 0
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= M110_TERMINAL_DUPLICATE_GRACE_SECONDS:
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_not_ready_within_1s"
+                )
+            sleep_seconds = min(
+                M110_CAPTURE_READY_POLL_INTERVAL_SECONDS,
+                max(
+                    0.0,
+                    remaining - M110_TERMINAL_DUPLICATE_GRACE_SECONDS,
+                ),
+            )
+            if sleep_seconds > 0.0:
+                await asyncio.sleep(sleep_seconds)
+            remaining = deadline - time.monotonic()
+            if remaining <= M110_TERMINAL_DUPLICATE_GRACE_SECONDS:
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_not_ready_within_1s"
+                )
+            try:
+                self._capture_status_get_in_flight = True
+                await asyncio.wait_for(
+                    self._send_json({"type": "get_audio_capture_status"}),
+                    timeout=(
+                        remaining - M110_TERMINAL_DUPLICATE_GRACE_SECONDS
+                    ),
+                )
+                remaining = deadline - time.monotonic()
+                if remaining <= M110_TERMINAL_DUPLICATE_GRACE_SECONDS:
+                    raise asyncio.TimeoutError
+                status = await self._receive_terminal(
+                    "audio_capture_status",
+                    timeout_seconds=(
+                        remaining - M110_TERMINAL_DUPLICATE_GRACE_SECONDS
+                    ),
+                )
+                self._capture_status_get_in_flight = False
+            except asyncio.TimeoutError as exc:
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_not_ready_within_1s"
+                ) from exc
+            if time.monotonic() > deadline:
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_not_ready_within_1s"
+                )
+            poll_count += 1
+            identity_failures = self._m110_capture_identity_failures(
+                status,
+                audio_device_index=audio_device_index,
+                expected_device_name=device_name,
+            )
+            if identity_failures:
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_status_drift:"
+                    + ",".join(identity_failures)
+                )
+            readiness = self._m110_capture_readiness_state(
+                status,
+                initial_sample_count=initial_sample_count,
+            )
+            if readiness == "ready":
+                return {
+                    **dict(initial_status),
+                    **dict(status),
+                    "preview": True,
+                    "owned_by_requester": True,
+                    "device_id": audio_device_index,
+                    "readiness_poll_count": poll_count,
+                }
+            if readiness != "pending_first_callback":
+                raise RuntimeError(
+                    "m110_real_48_channel_capture_status_invalid:"
+                    + readiness
+                )
+
+    async def _receive_m110_owned_capture_stop_terminal(
+        self,
+        *,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        """Correlate STOP despite one possible late response to the last GET."""
+
+        deadline = time.monotonic() + timeout_seconds
+        late_get_status_seen = False
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0.0:
+                raise asyncio.TimeoutError
+            payload = await self._recv_object(remaining)
+            if payload.get("type") != "audio_capture_status":
+                self._reject_unexpected_terminal(
+                    payload,
+                    expected_type="audio_capture_status",
+                )
+                continue
+            if (
+                payload.get("running") is False
+                and payload.get("preview") is True
+                and payload.get("owned_by_requester") is True
+            ):
+                self._capture_status_get_in_flight = False
+                return payload
+            # The poll loop has at most one outstanding read-only GET.  If it
+            # is cancelled after send, its generic status can precede the STOP
+            # response and carries neither preview nor owner fields.
+            if (
+                self._capture_status_get_in_flight
+                and not late_get_status_seen
+                and payload.get("running") is True
+                and "preview" not in payload
+                and "owned_by_requester" not in payload
+                and (
+                    payload.get("error") is None
+                    or payload.get("error") == ""
+                )
+            ):
+                late_get_status_seen = True
+                self._capture_status_get_in_flight = False
+                continue
+            raise RuntimeError("m110_owned_capture_stop_terminal_invalid")
 
     @staticmethod
     def _validate_route_result(
@@ -2109,19 +2319,51 @@ class ProofOwnedBackendSession:
             capture.get("running") is True
             and capture.get("preview") is True
             and capture.get("owned_by_requester") is True
-            and capture.get("source_type") == "sounddevice"
-            and capture.get("real_input") is True
-            and capture.get("device_index") == audio_device_index
-            and isinstance(capture.get("device_name"), str)
-            and bool(capture.get("device_name"))
-            and capture.get("num_channels") == 48
-            and capture.get("sample_rate") == 48_000
         ):
             raise RuntimeError(
                 "m110_real_48_channel_capture_start_failed:"
                 + self._bounded_terminal_failure_context(capture)
             )
+        # Ownership is established even if the first CoreAudio callback has
+        # not arrived yet.  Latch teardown before any later identity/freshness
+        # check so every failure explicitly stops this preview.
         self.capture_started = True
+        if not (
+            capture.get("error") is None
+            or capture.get("error") == ""
+        ):
+            raise RuntimeError(
+                "m110_real_48_channel_capture_start_failed:"
+                + self._bounded_terminal_failure_context(capture)
+            )
+        identity_failures = self._m110_capture_identity_failures(
+            capture,
+            audio_device_index=audio_device_index,
+        )
+        if identity_failures:
+            raise RuntimeError(
+                "m110_real_48_channel_capture_start_failed:identity="
+                + ",".join(identity_failures)
+            )
+        initial_sample_count = int(capture["captured_sample_count"])
+        readiness = self._m110_capture_readiness_state(
+            capture,
+            initial_sample_count=(
+                0 if capture.get("real_input") is True else initial_sample_count
+            ),
+        )
+        if readiness == "pending_first_callback":
+            capture = await self._await_m110_capture_ready(
+                initial_status=capture,
+                audio_device_index=audio_device_index,
+            )
+        elif readiness == "ready":
+            capture = {**capture, "readiness_poll_count": 0}
+        else:
+            raise RuntimeError(
+                "m110_real_48_channel_capture_start_failed:"
+                + readiness
+            )
 
         await self._send_json(request)
         route_result = await self._receive_terminal(
@@ -4786,8 +5028,7 @@ class ProofOwnedBackendSession:
             if self.capture_started:
                 try:
                     await self._send_json({"type": "stop_audio_capture_preview"})
-                    stopped = await self._receive_terminal(
-                        "audio_capture_status",
+                    stopped = await self._receive_m110_owned_capture_stop_terminal(
                         timeout_seconds=3.0,
                     )
                     capture_stopped = bool(
