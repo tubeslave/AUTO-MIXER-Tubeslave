@@ -98,13 +98,16 @@ readback plus WAL recovery before resumption.
   use exact proof-to-commit bundles, local blockers preserve safe sibling
   progress, bounded replans are run/revision/content bound, and an audio-safety
   failure never blindly rolls a verified attenuation target upward.
-- M110-CP05 is controlled only by the two canonical committed markers. Hardware
-  remains fail-closed unless every required check is true, the development
-  lease is absent, the evidence SHA is exact and the source binding matches the
-  clean committed tree at process start. At this pre-commit checkpoint both
-  markers remain pending and no M110 WING/USB contact has occurred.
-- M110-HW01..HW05 remain pending and must run in order in one attended session;
-  no software-only result can mark them complete.
+- M110-CP05 is complete under the two canonical committed markers. Commit
+  `91907b8fc620857172a96176baba6e52ced081e1` passed the clean detached
+  launch-only probe with loopback backend contact, no WING/OSC/UDP/audio stream
+  and no live write. Any later tracked change still invalidates the source
+  binding until the markers are recomputed and recommitted.
+- Passive CoreAudio/macOS USB enumeration found no physical WING device. HW01
+  is blocked before start on `m110_wing_usb_coreaudio_device_missing`;
+  HW02-HW05 remain pending and must run in order in one attended session. Dante
+  Virtual Soundcard is not a substitute for the serial-bound WING USB capture
+  with 48 inputs/48 outputs at 48 kHz.
 - A pending/stale CP05 marker blocks connect, USB capture, route proof and every
   discovery/alternate-mixer ingress before resource construction; cleanup and
   emergency messages remain available.

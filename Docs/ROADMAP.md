@@ -9,12 +9,15 @@ Roadmap выбирается от текущего evidence state. Milestone с�
 
 The frozen M001-M010 dependency table below is not rewritten. Current active
 work is the separate M110 attended path recorded in `STATE.json.active_work`:
-CP00 complete, CP01-CP04 implemented/offline-validated, CP05 pending, and
-HW01-HW05 pending. No WING/USB contact or write occurred in this cycle.
+CP00-CP05 complete under the source-bound marker contract. A clean detached
+launch-only probe passed with loopback backend contact and no WING/OSC/write.
+Passive CoreAudio and macOS USB enumeration found zero physical WING devices,
+so HW01 is blocked before start and HW02-HW05 remain pending.
 
-The next finite sequence is: finish and commit software validation; remove the
-empty development lease directory; commit source-bound CP05 markers; then in
-one operator-attended process prove route, mute/contain outputs, bypass the 64
+The next finite sequence is: commit this truth sync, rebind the source-bound
+CP05 markers with the runtime writer lease already released and absent, require one physical CoreAudio
+device named `WING` with 48 inputs/48 outputs at 48 kHz, then in one
+operator-attended process prove route, mute/contain outputs, bypass the 64
 CH1-16 processor-enable addresses, restore only the 77 known M006 changed
 addresses through exact 23/14/14 stages, unmute, analyze, execute interleaved
 processor/musical lanes, perform the final audit, confirm the exact state SHA by
@@ -49,21 +52,33 @@ signed, dirty-tree-bound and `releaseEligible=false`.
 
 The next finite external sequence is intentionally narrow:
 
-1. rebind the already closed M005 behavioral artifact to current-source
-   provenance without another cable pull unless the owner explicitly asks;
-2. rerun the M006 technical verifier against that provenance and the already
-   recorded narrow owner decision, without widening any unproven family;
-3. perform an operator-present current-tree staged-child proof on the exact
-   WING, including source-path query latency, rollback and terminal
-   `safe_core_ready`/`show_mix_ready` evidence;
+1. connect the physical WING USB/CoreAudio device and perform the attended
+   CP05-bound M110 staged soundcheck proof;
+2. record accepted or rejected decisions for the two valid 2026-07-13
+   read-only candidates without inheriting authority from older evidence;
+3. rebind the already closed M005 behavioral artifact to current-source
+   provenance without another cable pull unless the owner explicitly asks,
+   then rerun the M006 technical verifier without widening any unproven family;
 4. separately complete clean-checkout reproduction, Developer ID/notary/
    Gatekeeper, production remote-auth recovery and room/PA validation.
 
-Current blocker from `STATE.json`: The monolithic soundcheck defect is closed locally: staged execution kernel readiness is 96/100 and full-project local engineering remains 95/100. Strict real-live soundcheck readiness is 88/100 because the normal live allowlist is 0, the current-tree staged child flow has no physical WING completion proof, real safe_core_ready/show_mix_ready are unproven, source-path query latency is unproven, and EQ boost/compressor makeup/gain-up/send-up substitutions remain operator-review-only. M005 behavior is closed and narrow M006 owner intent is recorded, but current-source provenance and technical promotion remain fail-closed. Strict public-release readiness stays 88/100 and standing live authority remains denied.
+## Current external validation requirements
 
-Next operator action from `STATE.json`: Do not widen live authority. Rebind the closed M005 disconnect/timeout/stale-state behavior to current-source provenance without another cable pull unless explicitly requested, rerun the M006 technical readiness review verifier against the recorded narrow owner decision, then perform an operator-present current-tree staged-child proof on the exact WING with source-path latency, rollback, safe_core_ready/show_mix_ready and room/PA evidence. Complete clean-checkout reproduction, Developer ID signing/notarization/Gatekeeper and production remote-auth recovery separately.
+- Physical WING USB/CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute
+- Operator-present CP05-bound M110-HW01 through M110-HW05 run with route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown evidence
+- Operator accept or reject the two valid 2026-07-13 read-only preflight candidates; this decision-ledger requirement grants no live authority and does not reopen closed M005 behavior
+- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
+- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
 
-Latest ledger handoff row: `soundcheck_atomic_reanalysis_final_validation` at `2026-07-12T22:48:19Z`.
+No live authority changed: release-ready live correction families remain `0`,
+live-allowed safety rows remain `0`, and current supervised live-write kinds
+remain `0`.
+
+Current blocker from `STATE.json`: M110 CP05 and the clean detached launch-only probe are verified on the committed control plane, but passive CoreAudio and macOS USB enumeration found no physical WING device. Therefore M110-HW01 has not started, no capture stream or OSC/UDP path was opened, and reset/corrections remain 0. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven. M005 behavior is closed and narrow M006 owner intent is recorded, while current-source promotion and the remaining public-release gates stay fail-closed.
+
+Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Then rerun the CP05-bound attended M110-HW01-HW05 process for route, reset, staged soundcheck, rollback, SHA-bound listening and teardown. Operator uses the Operator Decision Queue in Docs/reports/WING_READONLY_PREFLIGHT_DECISION_REVIEW_LATEST.md to accept or reject the two valid 2026-07-13 read-only preflight candidates without granting authority. Separately rebind the closed M005 disconnect/timeout/stale-state evidence and rerun the M006 readiness review; complete clean-checkout signing/notarization/Gatekeeper and production remote-auth recovery separately.
+
+Latest ledger handoff row: `m110_independent_review_full_suite_green` at `2026-07-14T17:24:24Z`.
 
 The detailed table below is a frozen dependency taxonomy, not the operational
 task selector; its old M002-M006 status labels are historical. Current release
@@ -203,26 +218,18 @@ Exactly one milestone is active: `M001`, currently
 `WAITING_FOR_EXTERNAL_VALIDATION`. See `Docs/ACTIVE_MILESTONE.md` and
 `Docs/plans/M001-wing-readonly-preflight-evidence-gate.md`.
 
-Current M001 waiting reason: the canonical WING read-only decision is
-`accepted_decision_ready`, and the supervised CH3 fader/gain-down proofs have
-passed with apply, physical readback, rollback and emergency-stop/block
-evidence. The earlier `rollback_not_applied` artifact remains closed audit
+Current M001 waiting reason: the aggregate WING read-only decision ledger is
+`operator_review_required` because two valid 2026-07-13 candidates remain
+unreviewed. The historical exact source
+`artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json`
+retains its `accepted_decision_ready` record, but later candidates inherit
+neither that decision nor live authority. The supervised CH3 fader/gain-down
+proofs passed with apply, physical readback, rollback and emergency-stop/block
+evidence, and the earlier `rollback_not_applied` artifact remains closed audit
 history. M005 disconnect/timeout/stale-state behavior is closed and the narrow
 M006 owner decision is recorded; no roadmap row advances to standing live
-authority until current-source provenance and technical promotion pass.
-
-## Current external validation requirements
-
-- Current-release provenance rebind for the closed M005 disconnect/timeout/stale-state proof without repeating the physical cable pull unless the owner explicitly requests it
-- Technical M006 readiness review promotion after the current verifier accepts that provenance; the narrow owner decision is already recorded and grants no live authority
-
-Next operator action from `STATE.json`: Do not widen live authority. Treat M005 disconnect/timeout/stale-state behavior as closed and the narrow M006 readiness review owner decision as recorded; do not repeat the physical cable pull unless the owner explicitly requests it. For public release, rebind or migrate the closed M005 evidence to a clean current-source provenance packet, rerun the M006 technical verifier, reproduce the package from a clean checkout, complete Developer ID signing/notarization/Gatekeeper checks, and perform operator-present room/PA audible rollback validation.
-
-Latest ledger handoff row:
-`local_engineering_95_final_tree_full_suite_no_wing_validation` at
-`2026-07-12T13:56:06Z`. No live authority changed; release-ready live
-correction families remain `0`, live-allowed safety rows remain `0`, and
-current supervised live-write kinds remain `0`.
+authority until the pending decisions, current-source provenance, M110 hardware
+proof and technical promotion pass.
 
 Latest M005 readback target binding guard: `d3eb93a62`; M005 baseline, stale-readback and reconnect-readback payloads, including `events.jsonl` stale/reconnect payloads, now must match the requested `channel`, `value_type` and WING `address` before M005 completion or M006 owner-review input can be ready. This grants no backend/WING contact, proposal creation, live apply, readiness-matrix update or live authority.
 

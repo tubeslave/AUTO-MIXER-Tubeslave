@@ -8,8 +8,10 @@ Paperclip, ADRs, tests, or git history.
 ## Active Tasks
 
 - M110 attended WING reset and staged soundcheck is the current
-  operator-directed task. Finish CP05 from committed source, remove the empty
-  writer-lease directory, then execute HW01-HW05 in one proof-owned session.
+  operator-directed task. CP05 and clean detached launch-only are verified.
+  Passive CoreAudio/macOS USB enumeration found no physical WING, so HW01 is
+  blocked before start. The truth-sync lease is released and absent; rebind CP05, then execute
+  HW01-HW05 in one proof-owned session after WING 48x48/48 kHz USB appears.
   Do not claim 95/100 before the repeated final audit and SHA-bound listening
   prove `show_mix_ready`; do not convert the one-run M006 permission into
   standing authority.
@@ -19,9 +21,11 @@ Paperclip, ADRs, tests, or git history.
 - Use `.ai/project-layer/autonomous_mvp_and_model_routing.md` and
   `.ai/agent-core/model_budget_policy.md` for Goal-mode autonomy, virtual
   subagent routing, and model-budget protection.
-- Follow `tools/codex_autoloop/project_director_agent.py` before selecting
-  Codex work; the selected task must come from the first non-closed WING MVP
-  blocker.
+- Consult `tools/codex_autoloop/project_director_agent.py` before selecting
+  autonomous work, but take the active task from `ops/autopilot/STATE.json`,
+  `Docs/ACTIVE_MILESTONE.md` and the current external handoff. The first
+  non-closed row in the frozen legacy WING MVP table is dependency evidence,
+  not a task selector and not a reason to loop on one historical blocker.
 - Keep `Docs/CORRECTION_METHODS_ROADMAP.md` and
   `.ai/project-layer/correction_methods_backlog.md` visible for Gain/Trim, Pan,
   EQ, Comp, FX, Balance, routing, scene, and output methods.
@@ -64,3 +68,17 @@ delete old tasks unless a human explicitly requests pruning.
 - Next action: finish full source tests and independent review, commit source,
   bind/commit CP05 after lease release, then run the real attended workflow and
   record actual readiness without widening the normal allowlist.
+
+## 2026-07-14 — M110 CP05 launch verified; WING USB prerequisite missing
+
+- Owner: Codex + attended operator.
+- Status: CP00-CP05 complete; clean detached launch-only verified; HW01 blocked
+  before start because exact CoreAudio WING candidate count is `0`; HW02-HW05
+  pending.
+- Evidence: commit `91907b8fc620857172a96176baba6e52ced081e1`; launch summary
+  `/Users/dmitrijvolkov/.automixer/runtime/m110_attended/20260714T184500Z_91907b8fc_launch/plan-summary.json`;
+  local CoreAudio/macOS USB enumeration classified as
+  `ephemeral_local_enumeration`; no audio stream, WING, OSC/UDP or live write.
+- Next action: finish and commit truth synchronization with the runtime writer
+  lease released and absent, rebind CP05 to the final tree, then require physical WING USB
+  48x48/48 kHz before starting the attended HW01-HW05 workflow.

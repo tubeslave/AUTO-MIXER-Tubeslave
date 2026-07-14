@@ -1,10 +1,18 @@
 # Plan M001: Real WING Rack interaction path
 
-Status: active operator plan, accepted read-only decision recorded; the
-supervised CH3 fader and gain-down proofs have passed on the real console with
-operator approval, and the next external steps are the M005
-disconnect/timeout/stale-state protection proof and the M006 owner readiness
-review.
+Status: historical accepted-source operator plan, superseded for current
+next-action selection by M110 and `ops/autopilot/STATE.json`. The supervised
+CH3 fader and gain-down proofs remain historical passed evidence for their
+exact source and operator approval only.
+
+## Current decision-ledger amendment — 2026-07-14
+
+The exact 2026-07-02 accepted record remains accepted for its bound source.
+Two later valid 2026-07-13 read-only candidates have no accepted/rejected
+records, so the current aggregate ledger is `operator_review_required`.
+They do not inherit the older decision, readiness or live authority. The
+`accepted_decision_ready` values below are an accepted-source snapshot, not
+the current global ledger status; M110 remains the current operator path.
 
 ## Purpose
 
@@ -20,13 +28,13 @@ The plan does not grant full autonomous live mixing authority.
 
 The current gate is not transport failure. Read-only WING commands have worked:
 connection, channel-name scan, physical readback and observation soundcheck
-analysis. The canonical read-only decision ledger is accepted-ready, and the
+analysis. The accepted-source snapshot ledger below is accepted-ready, and the
 earlier failed CH3 fader rollback is closed by the passed rerun
 `20260704T045741Z_wing_operator_proposal_ch3_fader` plus the passed gain-down
 proof `20260704T045820Z_wing_operator_proposal_ch3_gain`, both with apply,
 physical readback, rollback and emergency-stop/block evidence.
 
-Current gate state:
+Accepted-source snapshot:
 
 - decision review status: `accepted_decision_ready`;
 - accepted decision records: `1`;
@@ -362,9 +370,11 @@ On any unexpected state:
 
 ## Current Executable Slice
 
-Because the read-only decision gate is accepted-ready and the supervised CH3
-fader/gain-down proofs have passed, but M005 and M006 still require
-operator/owner action, unattended Codex work may execute only the safe slice:
+Because only the historical exact 2026-07-02 source is accepted-ready while
+the current aggregate decision remains `operator_review_required`, and because
+physical WING USB/M110 proof plus current-source M005 provenance and M006
+technical promotion remain open, unattended Codex work may execute only the
+safe slice:
 
 1. no-WING quick safety gate;
 2. decision review status refresh;
