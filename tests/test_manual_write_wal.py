@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import copy
+import hashlib
 import json
 import os
 import pwd
@@ -12,6 +14,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from server import AutoMixerServer
+from m110_manual_write_wal import (
+    M110_WAL_CONTRACT,
+    canonical_sha256 as m110_wal_payload_sha256,
+    freeze_wal_payload,
+)
+from tests.test_maintenance_dsp_reset import (
+    IDENTITY_VALUES as M110_IDENTITY_VALUES,
+    _executor_fixture as m110_executor_fixture,
+)
+from maintenance_dsp_reset import M110ResetHooks
 
 
 class PhysicalMixer:
@@ -126,6 +138,98 @@ def restored_proof_wal_payloads(transaction_id):
     return prepared, terminal
 
 
+async def real_m110_wal_payloads(
+    *,
+    proof_run=False,
+    transaction_id,
+    boundary_ok=True,
+    fail_send_at=None,
+    raise_authority_at=None,
+    denied_outside_mutation=False,
+    denied_outside_before_send=False,
+    remove_boundary_ok=True,
+):
+    wing, hooks, executor, approved, authority = await m110_executor_fixture(
+        proof_run=proof_run,
+    )
+    hooks.audio_queries = wing
+    hooks.boundary_ok = boundary_ok
+    hooks.raise_authority_at = raise_authority_at
+    wing.fail_send_at = fail_send_at
+    wing.remove_boundary_ok = remove_boundary_ok
+    if denied_outside_mutation:
+        def attempt_outside_mutation(client, call_number):
+            if call_number == 4:
+                assert client.send("/ch/1/fdr", -10.0) is False
+
+        wing.after_value_send = attempt_outside_mutation
+    if denied_outside_before_send:
+        attempted = False
+
+        def attempt_outside_during_recapture(client, _address):
+            nonlocal attempted
+            if not attempted:
+                attempted = True
+                assert client.send("/ch/1/fdr", -10.0) is False
+
+        wing.after_query = attempt_outside_during_recapture
+    result = await executor.execute(
+        transaction_id=transaction_id,
+        approved_preimage=approved,
+        expected_identity_values=M110_IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+    return result, copy.deepcopy(hooks.prepared[0]), copy.deepcopy(hooks.terminals)
+
+
+def append_m110_payload_sequence(server, transaction_id, prepared, terminals):
+    receipts = [
+        server._append_m110_manual_write_wal(
+            "prepared",
+            transaction_id,
+            prepared,
+        )
+    ]
+    receipts.extend(
+        server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        )
+        for phase, payload in terminals
+    )
+    return receipts
+
+
+def m110_post_success_incident(success_payload, success_phase):
+    payload = copy.deepcopy(success_payload)
+    payload.update(
+        {
+            "result_status": "manual_review_required",
+            "result_reason": "m110_write_authority_expired_before_terminal",
+            "manual_review_required": True,
+            "physical_verified": False,
+            "emergency_stop_activated": True,
+            "emergency_stop_activation_failed": False,
+            "emergency_stop_required": True,
+            "no_outside_mutation_attempt_proven": False,
+            "accepted": False,
+            "owner_review_required": True,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "post_linearization_incident": True,
+            "linearized_terminal_phase": success_phase,
+            "linearized_state_preserved_by_executor": True,
+            "success_terminal_attempted": True,
+            "success_terminal_durable_confirmed": True,
+            "compensation_attempted": False,
+            "rollback_attempted_after_linearization": False,
+        }
+    )
+    return payload
+
+
 def test_exact_restored_proof_wal_is_terminal_across_restart(
     tmp_path,
     monkeypatch,
@@ -220,6 +324,1076 @@ def test_near_miss_restored_proof_wal_remains_recovery_hazard(
         monkeypatch,
         runtime_dir=runtime_dir,
     )
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+async def test_strict_m110_success_receipt_and_restart_are_content_bound(
+    tmp_path,
+    monkeypatch,
+    proof_run,
+):
+    transaction_id = f"strict-m110-{'proof' if proof_run else 'commit'}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        proof_run=proof_run,
+        transaction_id=transaction_id,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    lifecycle = server._manual_write_wal_lifecycles[transaction_id]
+    assert server._wal_lifecycle_terminal_resolved(lifecycle) is True
+    assert transaction_id not in server._manual_write_recovery_transactions
+    assert lifecycle["phases"] == [
+        "prepared",
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "proof_restored" if proof_run else "committed",
+    ]
+    expected_payloads = [prepared, *[payload for _phase, payload in terminals]]
+    raw_rows = server._manual_write_wal_path().read_bytes().splitlines(
+        keepends=True
+    )
+    for receipt, event, expected_payload, raw_row in zip(
+        receipts,
+        lifecycle["events"],
+        expected_payloads,
+        raw_rows,
+    ):
+        assert receipt["payload_sha256"] == m110_wal_payload_sha256(
+            expected_payload
+        )
+        assert event["wal_contract"] == M110_WAL_CONTRACT
+        assert event["wal_payload"] == freeze_wal_payload(expected_payload)
+        assert event["wal_payload_sha256"] == receipt["payload_sha256"]
+        assert receipt["record_sha256"] == (
+            "sha256:" + hashlib.sha256(raw_row).hexdigest()
+        )
+        assert receipt["record_size_bytes"] == len(raw_row)
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert restarted._manual_write_recovery_transactions == {}
+    assert restarted._manual_write_emergency_stopped is False
+    assert restarted._manual_write_wal_lifecycles[transaction_id][
+        "events"
+    ] == lifecycle["events"]
+    assert result.wal_terminal == (
+        "proof_restored" if proof_run else "committed"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("prefix_length", [1, 2, 3])
+async def test_strict_m110_valid_prefix_is_integral_but_unresolved(
+    tmp_path,
+    monkeypatch,
+    prefix_length,
+):
+    transaction_id = f"strict-m110-prefix-{prefix_length}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    sequence = [("prepared", prepared), *terminals]
+
+    for phase, payload in sequence[:prefix_length]:
+        assert server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        )
+
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+async def test_strict_m110_real_abort_before_send_is_resolved_across_restart(
+    tmp_path,
+    monkeypatch,
+):
+    transaction_id = "strict-m110-real-abort-before-send"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        boundary_ok=False,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "blocked"
+    assert result.applied_operation_ids == []
+    assert result.wal_terminal == "aborted_before_send"
+    assert [phase for phase, _payload in terminals] == ["aborted_before_send"]
+    assert transaction_id not in server._manual_write_recovery_transactions
+    assert server._manual_write_wal_integrity_ok is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert restarted._manual_write_recovery_transactions == {}
+    assert restarted._manual_write_emergency_stopped is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+async def test_strict_m110_denied_outsider_before_send_is_safe_abort(
+    tmp_path,
+    monkeypatch,
+    proof_run,
+):
+    transaction_id = f"strict-m110-denied-outsider-before-send-{proof_run}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        proof_run=proof_run,
+        denied_outside_before_send=True,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "blocked"
+    assert result.reason == "m110_outside_mutation_attempt_detected"
+    assert result.applied_operation_ids == []
+    assert [phase for phase, _payload in terminals] == ["aborted_before_send"]
+    assert terminals[-1][1]["no_outside_mutation_attempt_proven"] is False
+    assert terminals[-1][1]["mutation_audit"]["denied_attempts"]
+    assert server._manual_write_wal_integrity_ok is True
+    assert server._manual_write_recovery_transactions == {}
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert restarted._manual_write_recovery_transactions == {}
+    assert restarted._manual_write_emergency_stopped is False
+
+
+@pytest.mark.asyncio
+async def test_strict_m110_cancelled_boundary_abort_is_valid_zero_send(
+    tmp_path,
+    monkeypatch,
+):
+    transaction_id = "strict-m110-cancelled-boundary-abort"
+    wing, hooks, executor, approved, authority = await m110_executor_fixture()
+    base_hooks = hooks.values()
+    boundary_started = asyncio.Event()
+    release_boundary = asyncio.Event()
+
+    async def boundary():
+        boundary_started.set()
+        await release_boundary.wait()
+        return True
+
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=boundary,
+        persist_terminal=base_hooks.persist_terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=base_hooks.emergency_stop,
+    )
+    execution = asyncio.create_task(
+        executor.execute(
+            transaction_id=transaction_id,
+            approved_preimage=approved,
+            expected_identity_values=M110_IDENTITY_VALUES,
+            capability_grant=authority[0],
+            restored_proof_receipt=authority[1],
+        )
+    )
+    await boundary_started.wait()
+    execution.cancel()
+    release_boundary.set()
+    result = await execution
+    server = build_server(tmp_path / "events", monkeypatch)
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        copy.deepcopy(hooks.prepared[0]),
+        copy.deepcopy(hooks.terminals),
+    )
+
+    assert all(receipts)
+    assert result.status == "blocked"
+    assert result.reason == "m110_reset_cancelled"
+    assert result.wal_terminal == "aborted_before_send"
+    assert wing.send_calls == []
+    assert hooks.terminals[-1][1]["cancellation_requested"] is True
+    assert server._manual_write_wal_integrity_ok is True
+    assert server._manual_write_recovery_transactions == {}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("unsafe_field", "unsafe_value"),
+    [
+        ("emergency_stop_activation_failed", True),
+        ("accepted", True),
+        ("live_authority_granted", True),
+        ("readiness_closure_allowed", True),
+        ("delivered_observer_clean", False),
+        ("no_outside_mutation_attempt_proven", False),
+    ],
+)
+async def test_strict_m110_malformed_abort_before_send_is_invalid(
+    tmp_path,
+    monkeypatch,
+    unsafe_field,
+    unsafe_value,
+):
+    transaction_id = f"strict-m110-malformed-abort-{unsafe_field}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        boundary_ok=False,
+    )
+    assert server._append_m110_manual_write_wal(
+        "prepared",
+        transaction_id,
+        prepared,
+    )
+    terminal_phase, terminal_payload = terminals[-1]
+    terminal_payload[unsafe_field] = unsafe_value
+
+    assert server._append_m110_manual_write_wal(
+        terminal_phase,
+        transaction_id,
+        terminal_payload,
+    ) is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
+    assert transaction_id in restarted._manual_write_recovery_transactions
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case_id", "executor_options"),
+    [
+        ("send-failure", {"fail_send_at": 32}),
+        ("late-authority-expiry", {"raise_authority_at": 195}),
+        ("denied-outside-mutation", {"denied_outside_mutation": True}),
+    ],
+)
+async def test_strict_m110_real_rollback_is_integral_but_unresolved(
+    tmp_path,
+    monkeypatch,
+    case_id,
+    executor_options,
+):
+    transaction_id = f"strict-m110-real-rollback-{case_id}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        **executor_options,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "rolled_back"
+    assert [phase for phase, _payload in terminals] == [
+        "verified_state_pending_cleanup",
+        "rolled_back",
+    ]
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+async def test_strict_m110_post_verification_compensation_is_unresolved(
+    tmp_path,
+    monkeypatch,
+    proof_run,
+):
+    transaction_id = f"strict-m110-post-verification-rollback-{proof_run}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        proof_run=proof_run,
+        raise_authority_at=196,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "rolled_back"
+    assert result.reason == "m110_write_authority_expired_before_terminal"
+    assert [phase for phase, _payload in terminals] == [
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "rolled_back",
+    ]
+    assert terminals[-1][1]["verification_candidate_phase"] == (
+        "proof_restored" if proof_run else "committed"
+    )
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+@pytest.mark.parametrize(
+    ("case_id", "executor_options", "expected_phases"),
+    [
+        (
+            "abort",
+            {"boundary_ok": False, "remove_boundary_ok": False},
+            ["aborted_before_send", "manual_review_required"],
+        ),
+        (
+            "rollback",
+            {"fail_send_at": 32, "remove_boundary_ok": False},
+            [
+                "verified_state_pending_cleanup",
+                "rolled_back",
+                "manual_review_required",
+            ],
+        ),
+    ],
+)
+async def test_strict_m110_completed_terminal_then_manual_is_unresolved(
+    tmp_path,
+    monkeypatch,
+    case_id,
+    executor_options,
+    expected_phases,
+    proof_run,
+):
+    transaction_id = f"strict-m110-{case_id}-then-manual-{proof_run}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        proof_run=proof_run,
+        **executor_options,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "manual_review_required"
+    assert [phase for phase, _payload in terminals] == expected_phases
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+async def test_strict_m110_pre_success_manual_is_unresolved(
+    tmp_path,
+    monkeypatch,
+    proof_run,
+):
+    transaction_id = f"strict-m110-pre-success-manual-{proof_run}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        proof_run=proof_run,
+        raise_authority_at=197,
+    )
+
+    receipts = append_m110_payload_sequence(
+        server,
+        transaction_id,
+        prepared,
+        terminals,
+    )
+
+    assert all(receipts)
+    assert result.status == "manual_review_required"
+    assert [phase for phase, _payload in terminals] == [
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "manual_review_required",
+    ]
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        "candidate_status",
+        "shortened_operation_history",
+        "coordinated_operation_erasure",
+        "arbitrary_cut_sha",
+        "audit_no_outside_mismatch",
+    ],
+)
+async def test_strict_m110_pre_success_manual_rejects_semantic_forgery(
+    tmp_path,
+    monkeypatch,
+    corruption,
+):
+    transaction_id = f"strict-m110-pre-success-manual-{corruption}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        raise_authority_at=197,
+    )
+    assert [phase for phase, _payload in terminals] == [
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "manual_review_required",
+    ]
+    for phase, payload in [("prepared", prepared), *terminals[:-1]]:
+        assert server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        )
+    manual_phase, manual_payload = terminals[-1]
+    if corruption == "candidate_status":
+        manual_payload["verification_candidate_status"] = "fabricated"
+    elif corruption == "shortened_operation_history":
+        manual_payload["applied_operation_ids"] = []
+    elif corruption == "coordinated_operation_erasure":
+        manual_payload.update(
+            {
+                "applied_operation_ids": [],
+                "rollback_operation_ids": [],
+                "rollback_attempted": False,
+                "rollback_succeeded": False,
+                "physical_state_restored": False,
+            }
+        )
+    elif corruption == "arbitrary_cut_sha":
+        manual_payload.update(
+            {
+                "verification_cut_epoch": 1.0,
+                "verification_cut_reset_surface_sha256": (
+                    "sha256:" + "0" * 64
+                ),
+                "verification_cut_preservation_manifest_sha256": (
+                    manual_payload["after_manifest_sha256"]
+                ),
+                "physical_truth_scope": (
+                    "verified_as_of_m110_verification_cut"
+                ),
+            }
+        )
+    else:
+        manual_payload["mutation_audit"][
+            "no_outside_mutation_attempt_proven"
+        ] = False
+        manual_payload["mutation_audit_sha256"] = m110_wal_payload_sha256(
+            manual_payload["mutation_audit"]
+        )
+
+    assert server._append_m110_manual_write_wal(
+        manual_phase,
+        transaction_id,
+        manual_payload,
+    ) is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("corruption", ["binding_drift", "duplicate_prepared"])
+async def test_strict_m110_rollback_rejects_binding_drift_and_duplicate_prepare(
+    tmp_path,
+    monkeypatch,
+    corruption,
+):
+    transaction_id = f"strict-m110-rollback-{corruption}"
+    server = build_server(tmp_path / "events", monkeypatch)
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+        fail_send_at=32,
+    )
+    assert server._append_m110_manual_write_wal(
+        "prepared",
+        transaction_id,
+        prepared,
+    )
+    if corruption == "duplicate_prepared":
+        assert server._append_m110_manual_write_wal(
+            "prepared",
+            transaction_id,
+            prepared,
+        ) is None
+    else:
+        candidate_phase, candidate_payload = terminals[0]
+        assert server._append_m110_manual_write_wal(
+            candidate_phase,
+            transaction_id,
+            candidate_payload,
+        )
+        final_phase, final_payload = terminals[-1]
+        final_payload["proposal_id"] = "different-proposal"
+        assert server._append_m110_manual_write_wal(
+            final_phase,
+            transaction_id,
+            final_payload,
+        ) is None
+
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("unsafe_field", "unsafe_value"),
+    [
+        ("physical_verified", False),
+        ("emergency_stop_activation_failed", True),
+    ],
+)
+async def test_strict_m110_malformed_success_is_integrity_failure_live_and_restart(
+    tmp_path,
+    monkeypatch,
+    unsafe_field,
+    unsafe_value,
+):
+    transaction_id = f"strict-m110-malformed-success-{unsafe_field}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    for phase, payload in [("prepared", prepared), *terminals[:-1]]:
+        assert server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        )
+    final_phase, final_payload = terminals[-1]
+    final_payload[unsafe_field] = unsafe_value
+
+    assert server._append_m110_manual_write_wal(
+        final_phase,
+        transaction_id,
+        final_payload,
+    ) is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("unsafe_field", "unsafe_value"),
+    [
+        ("write_state_unknown", True),
+        ("emergency_stop_required", True),
+        ("cancellation_requested", True),
+        ("delivered_observer_clean", False),
+    ],
+)
+async def test_strict_m110_malformed_pending_cannot_be_healed_by_valid_commit(
+    tmp_path,
+    monkeypatch,
+    unsafe_field,
+    unsafe_value,
+):
+    transaction_id = f"strict-m110-malformed-pending-{unsafe_field}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    assert server._append_m110_manual_write_wal(
+        "prepared",
+        transaction_id,
+        prepared,
+    )
+    pending_phase, pending_payload = terminals[0]
+    pending_payload[unsafe_field] = unsafe_value
+
+    assert server._append_m110_manual_write_wal(
+        pending_phase,
+        transaction_id,
+        pending_payload,
+    ) is None
+    for phase, payload in terminals[1:]:
+        assert server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        ) is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._wal_lifecycle_terminal_resolved(
+        server._manual_write_wal_lifecycles[transaction_id]
+    ) is False
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+async def test_strict_m110_success_followed_by_incident_is_unresolved_not_corrupt(
+    tmp_path,
+    monkeypatch,
+):
+    transaction_id = "strict-m110-post-success-incident"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    assert all(
+        append_m110_payload_sequence(
+            server,
+            transaction_id,
+            prepared,
+            terminals,
+        )
+    )
+    success_phase, success_payload = terminals[-1]
+    incident = m110_post_success_incident(success_payload, success_phase)
+
+    assert server._append_m110_manual_write_wal(
+        "manual_review_required",
+        transaction_id,
+        incident,
+    )
+    assert server._manual_write_wal_integrity_ok is True
+    assert transaction_id in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("unsafe_field", "unsafe_value"),
+    [
+        ("verification_candidate_status", "fabricated"),
+        ("applied_operation_ids", []),
+        ("after_manifest_sha256", "sha256:" + "0" * 64),
+        ("mutation_audit_sha256", "sha256:" + "0" * 64),
+        ("post_linearization_incident", False),
+    ],
+)
+async def test_strict_m110_post_success_incident_is_bound_to_success_history(
+    tmp_path,
+    monkeypatch,
+    unsafe_field,
+    unsafe_value,
+):
+    transaction_id = f"strict-m110-incident-history-{unsafe_field}"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    assert all(
+        append_m110_payload_sequence(
+            server,
+            transaction_id,
+            prepared,
+            terminals,
+        )
+    )
+    success_phase, success_payload = terminals[-1]
+    incident = m110_post_success_incident(success_payload, success_phase)
+    incident[unsafe_field] = unsafe_value
+
+    assert server._append_m110_manual_write_wal(
+        "manual_review_required",
+        transaction_id,
+        incident,
+    ) is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
+    assert transaction_id in restarted._manual_write_recovery_transactions
+    assert restarted._manual_write_emergency_stopped is True
+
+
+@pytest.mark.asyncio
+async def test_strict_m110_directory_fsync_ambiguity_keeps_row_then_incident(
+    tmp_path,
+    monkeypatch,
+):
+    transaction_id = "strict-m110-directory-fsync-ambiguity"
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+    for phase, payload in [("prepared", prepared), *terminals[:-1]]:
+        assert server._append_m110_manual_write_wal(
+            phase,
+            transaction_id,
+            payload,
+        )
+    success_phase, success_payload = terminals[-1]
+    original_fsync_directory = server._fsync_directory
+    server._fsync_directory = MagicMock(
+        side_effect=OSError("injected_directory_fsync_failure")
+    )
+
+    assert server._append_m110_manual_write_wal(
+        success_phase,
+        transaction_id,
+        success_payload,
+    ) is None
+    assert server._manual_write_wal_lifecycles[transaction_id]["phases"][-1] == (
+        success_phase
+    )
+    server._fsync_directory = original_fsync_directory
+    incident = m110_post_success_incident(success_payload, success_phase)
+    assert server._append_m110_manual_write_wal(
+        "manual_review_required",
+        transaction_id,
+        incident,
+    )
+
+    rows = [
+        json.loads(line)
+        for line in server._manual_write_wal_path()
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    assert [row["phase"] for row in rows][-2:] == [
+        success_phase,
+        "manual_review_required",
+    ]
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is True
+    assert transaction_id in restarted._manual_write_recovery_transactions
+
+
+@pytest.mark.asyncio
+async def test_strict_m110_file_fsync_failure_latches_integrity_before_receipt(
+    tmp_path,
+    monkeypatch,
+):
+    transaction_id = "strict-m110-file-fsync-failure"
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir(parents=True)
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    _result, prepared, _terminals = await real_m110_wal_payloads(
+        transaction_id=transaction_id,
+    )
+
+    with patch("server.os.fsync", side_effect=OSError("injected_file_fsync")):
+        receipt = server._append_m110_manual_write_wal(
+            "prepared",
+            transaction_id,
+            prepared,
+        )
+
+    assert receipt is None
+    assert server._manual_write_wal_integrity_ok is False
+    assert server._manual_write_emergency_stopped is True
+    assert server._manual_write_emergency_generation == 1
+
+
+def test_strict_m110_rejects_reserved_payload_and_nonfinite_number(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+
+    assert server._append_m110_manual_write_wal(
+        "prepared",
+        "strict-m110-reserved",
+        {"schema": "caller-controlled"},
+    ) is None
+    assert server._append_m110_manual_write_wal(
+        "prepared",
+        "strict-m110-nan",
+        {"unsafe": float("nan")},
+    ) is None
+    assert not server._manual_write_wal_path().exists()
+
+
+def test_strict_m110_nonfinite_row_fails_closed_during_restart(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_dir = tmp_path / "runtime"
+    runtime_dir.mkdir(parents=True)
+    transaction_id = "strict-m110-nan-restart"
+    row = {
+        "schema": "automixer.manual_write_wal.v1",
+        "timestamp": "2026-07-13T10:00:00Z",
+        "transaction_id": transaction_id,
+        "phase": "prepared",
+        "scope": "supervised_transaction",
+        "maintenance_dsp_reset": True,
+        "wal_contract": M110_WAL_CONTRACT,
+        "wal_payload": {"unsafe": float("nan")},
+        "wal_payload_sha256": "sha256:" + "1" * 64,
+    }
+    (runtime_dir / "manual_write_wal.jsonl").write_text(
+        json.dumps(row) + "\n",
+        encoding="utf-8",
+    )
+
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+    assert server._manual_write_emergency_stopped is True
+
+
+def test_flat_m110_marker_cannot_downgrade_into_legacy_terminal_acceptance(
+    tmp_path,
+    monkeypatch,
+):
+    runtime_dir = tmp_path / "runtime"
+    server = build_server(
+        tmp_path / "events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    transaction_id = "flat-m110-downgrade"
+
+    assert server._append_manual_write_wal(
+        "prepared",
+        transaction_id,
+        scope="supervised_transaction",
+        bundle_kind="maintenance_dsp_reset_bundle",
+    )
+    assert server._append_manual_write_wal(
+        "committed",
+        transaction_id,
+        result_status="applied",
+    )
+
+    assert server._manual_write_wal_integrity_ok is False
+    assert transaction_id in server._manual_write_recovery_transactions
+
+    restarted = build_server(
+        tmp_path / "restart-events",
+        monkeypatch,
+        runtime_dir=runtime_dir,
+    )
+    assert restarted._manual_write_wal_integrity_ok is False
     assert transaction_id in restarted._manual_write_recovery_transactions
     assert restarted._manual_write_emergency_stopped is True
 

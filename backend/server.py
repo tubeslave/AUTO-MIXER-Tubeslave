@@ -206,6 +206,18 @@ from supervised_family_proof_plan import (
     canonical_operation_bundle_digest,
 )
 from m110_cp05_hardware_gate import verify_m110_cp05_hardware_gate
+from m110_manual_write_wal import (
+    M110_LIFECYCLE_INVALID,
+    M110_LIFECYCLE_RESOLVED,
+    M110_LIFECYCLE_UNRESOLVED,
+    M110_WAL_CONTRACT,
+    M110_WAL_PAYLOAD_FIELD,
+    M110_WAL_PAYLOAD_SHA256_FIELD,
+    canonical_json_bytes as m110_wal_canonical_json_bytes,
+    canonical_sha256 as m110_wal_canonical_sha256,
+    classify_m110_lifecycle,
+    freeze_wal_payload,
+)
 from wing_capture_hardware_identity import (
     collect_wing_capture_hardware_identity,
 )
@@ -1081,6 +1093,7 @@ class AutoMixerServer:
         self._manual_write_recovery_transactions: Dict[str, Dict[str, Any]] = {}
         self._manual_write_wal_lifecycles: Dict[str, Dict[str, Any]] = {}
         self._manual_write_wal_integrity_ok = True
+        self._manual_write_wal_thread_lock = threading.RLock()
         self._recover_manual_write_wal_state()
         self._soundcheck_parent_journal_error: Optional[str] = None
         self._recover_soundcheck_parent_journal_state()
@@ -7557,19 +7570,56 @@ class AutoMixerServer:
             cls._fsync_directory(created.parent)
 
     @staticmethod
-    def _wal_lifecycle_proves_no_send(lifecycle: Any) -> bool:
+    def _wal_event_payload_projection(event: Any) -> Mapping[str, Any]:
+        """Expose the caller payload without trusting it as the WAL envelope."""
+
+        if isinstance(event, Mapping):
+            payload = event.get(M110_WAL_PAYLOAD_FIELD)
+            if (
+                event.get("wal_contract") == M110_WAL_CONTRACT
+                and isinstance(payload, Mapping)
+            ):
+                return payload
+            return event
+        return {}
+
+    @classmethod
+    def _wal_lifecycle_proves_no_send(cls, lifecycle: Any) -> bool:
         """Accept only the exact durable sequence that cannot include a send."""
 
         if not isinstance(lifecycle, Mapping):
             return False
         phases = tuple(lifecycle.get("phases") or ())
         prepared = lifecycle.get("prepared")
-        return bool(
+        terminal = lifecycle.get("latest_event")
+        events = lifecycle.get("events")
+        if not (
             phases == ("prepared", "aborted_before_send")
+            and isinstance(events, list)
+            and len(events) == 2
             and isinstance(prepared, Mapping)
-            and prepared.get("schema") == "automixer.manual_write_wal.v1"
-            and str(prepared.get("transaction_id") or "").strip()
-            == str(lifecycle.get("transaction_id") or "").strip()
+            and isinstance(terminal, Mapping)
+            and prepared == events[0]
+            and terminal == events[1]
+        ):
+            return False
+        transaction_id = str(lifecycle.get("transaction_id") or "").strip()
+        if not transaction_id:
+            return False
+        for index, event in enumerate(events):
+            if not (
+                isinstance(event, Mapping)
+                and event.get("schema") == "automixer.manual_write_wal.v1"
+                and str(event.get("transaction_id") or "").strip()
+                == transaction_id
+                and str(event.get("phase") or "").strip() == phases[index]
+            ):
+                return False
+        m110_classification = classify_m110_lifecycle(lifecycle)
+        return bool(
+            m110_classification == M110_LIFECYCLE_RESOLVED
+            if m110_classification is not None
+            else True
         )
 
     @staticmethod
@@ -7669,6 +7719,9 @@ class AutoMixerServer:
             return False
         if phase == "aborted_before_send":
             return cls._wal_lifecycle_proves_no_send(lifecycle)
+        m110_classification = classify_m110_lifecycle(lifecycle)
+        if m110_classification is not None:
+            return m110_classification == M110_LIFECYCLE_RESOLVED
         if phase == "proof_restored":
             return cls._wal_lifecycle_proves_restored_proof(lifecycle)
         return True
@@ -7685,11 +7738,12 @@ class AutoMixerServer:
             prepared = lifecycle.get("prepared")
             if not isinstance(prepared, Mapping):
                 continue
+            prepared_payload = self._wal_event_payload_projection(prepared)
             if scope is not None and str(
-                prepared.get("scope") or ""
+                prepared_payload.get("scope") or ""
             ).strip() != scope:
                 continue
-            if str(prepared.get(field) or "").strip() == value:
+            if str(prepared_payload.get(field) or "").strip() == value:
                 matches.append(lifecycle)
         return bool(
             self._manual_write_wal_integrity_ok
@@ -7707,13 +7761,14 @@ class AutoMixerServer:
         prepared = lifecycle.get("prepared")
         if not isinstance(prepared, Mapping):
             return
-        scope = str(prepared.get("scope") or "").strip()
-        key = str(prepared.get("idempotency_key") or "").strip()
-        proposal_id = str(prepared.get("proposal_id") or "").strip()
+        prepared_payload = self._wal_event_payload_projection(prepared)
+        scope = str(prepared_payload.get("scope") or "").strip()
+        key = str(prepared_payload.get("idempotency_key") or "").strip()
+        proposal_id = str(prepared_payload.get("proposal_id") or "").strip()
         first_seen = {
             "created_at": prepared.get("timestamp"),
-            "proposal_id": prepared.get("proposal_id"),
-            "approval_id": prepared.get("approval_id"),
+            "proposal_id": prepared_payload.get("proposal_id"),
+            "approval_id": prepared_payload.get("approval_id"),
             "restored_from_wal": True,
             "transaction_id": transaction_id,
         }
@@ -7756,6 +7811,80 @@ class AutoMixerServer:
         else:
             self._durable_operator_apply_idempotency_keys[key] = first_seen
 
+    def _record_manual_write_wal_event(
+        self,
+        event: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Project one already file-fsynced event into live recovery state."""
+
+        transaction_id = str(event.get("transaction_id") or "").strip()
+        phase = str(event.get("phase") or "").strip()
+        if not transaction_id or not phase:
+            raise ValueError("manual_write_wal_event_identity_missing")
+        prior_lifecycle = self._manual_write_wal_lifecycles.get(
+            transaction_id,
+            {},
+        )
+        lifecycle: Dict[str, Any] = {
+            "transaction_id": transaction_id,
+            "phases": [*(prior_lifecycle.get("phases") or ()), phase],
+            "events": [*(prior_lifecycle.get("events") or ()), dict(event)],
+            "prepared": prior_lifecycle.get("prepared"),
+            "latest_event": dict(event),
+        }
+        if phase == "prepared" and lifecycle["prepared"] is None:
+            lifecycle["prepared"] = lifecycle["events"][-1]
+        lifecycle["latest_event"] = lifecycle["events"][-1]
+        self._manual_write_wal_lifecycles[transaction_id] = lifecycle
+
+        m110_classification = classify_m110_lifecycle(lifecycle)
+        malformed_legacy_proof = bool(
+            m110_classification is None
+            and phase == "proof_restored"
+            and not self._wal_lifecycle_proves_restored_proof(lifecycle)
+        )
+        if (
+            m110_classification == M110_LIFECYCLE_INVALID
+            or malformed_legacy_proof
+        ):
+            self._manual_write_wal_integrity_ok = False
+            if not self._manual_write_emergency_stopped:
+                self._manual_write_emergency_stopped = True
+                self._manual_write_emergency_generation += 1
+        elif (
+            m110_classification == M110_LIFECYCLE_UNRESOLVED
+            and (
+                phase in MANUAL_WRITE_WAL_TERMINAL_PHASES
+                or phase == "manual_review_required"
+            )
+            and not self._manual_write_emergency_stopped
+        ):
+            self._manual_write_emergency_stopped = True
+            self._manual_write_emergency_generation += 1
+
+        terminal_resolved = self._wal_lifecycle_terminal_resolved(lifecycle)
+        if terminal_resolved:
+            self._manual_write_recovery_transactions.pop(transaction_id, None)
+            self._manual_write_prepared_transactions.pop(transaction_id, None)
+        else:
+            if phase == "prepared":
+                self._manual_write_prepared_transactions.setdefault(
+                    transaction_id,
+                    lifecycle["events"][-1],
+                )
+            prepared = lifecycle.get("prepared") or {}
+            self._manual_write_recovery_transactions[transaction_id] = {
+                **prepared,
+                "phase": phase,
+                "phase_sequence": list(lifecycle["phases"]),
+                "latest_event": lifecycle["latest_event"],
+            }
+        self._update_runtime_wal_binding_state(
+            transaction_id,
+            lifecycle,
+        )
+        return lifecycle
+
     def _append_manual_write_wal(
         self,
         phase: str,
@@ -7769,59 +7898,109 @@ class AutoMixerServer:
         if not transaction_id or not phase:
             return None
         try:
-            self._ensure_durable_directory(self._console_runtime_dir)
-            path = self._manual_write_wal_path()
+            normalized_payload = convert_numpy_types(payload)
+            if not isinstance(normalized_payload, Mapping):
+                raise TypeError("manual_write_wal_payload_object_required")
+            event = {
+                **dict(normalized_payload),
+                "schema": "automixer.manual_write_wal.v1",
+                "timestamp": _utc_timestamp(),
+                "transaction_id": transaction_id,
+                "phase": phase,
+            }
+            with self._manual_write_wal_thread_lock:
+                self._ensure_durable_directory(self._console_runtime_dir)
+                path = self._manual_write_wal_path()
+                with path.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        json.dumps(event, ensure_ascii=False, sort_keys=True)
+                        + "\n"
+                    )
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                # Once the file itself is durable, runtime recovery must know
+                # about the row even if directory fsync reports ambiguity.
+                self._record_manual_write_wal_event(event)
+                self._fsync_directory(path.parent)
+                return str(path)
+        except Exception as exc:
+            logger.error(
+                "Could not durably append manual write WAL: %s",
+                exc,
+                exc_info=True,
+            )
+            return None
+
+    def _append_m110_manual_write_wal(
+        self,
+        phase: str,
+        transaction_id: str,
+        payload: Mapping[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        """Append one server-owned canonical M110 row and return its receipt."""
+
+        transaction_id = str(transaction_id or "").strip()
+        phase = str(phase or "").strip()
+        if not transaction_id or not phase:
+            return None
+        write_started = False
+        event_projected = False
+        try:
+            normalized_payload = convert_numpy_types(payload)
+            frozen_payload = freeze_wal_payload(normalized_payload)
+            payload_sha256 = m110_wal_canonical_sha256(frozen_payload)
             event = {
                 "schema": "automixer.manual_write_wal.v1",
                 "timestamp": _utc_timestamp(),
                 "transaction_id": transaction_id,
                 "phase": phase,
-                **convert_numpy_types(payload),
+                "scope": "supervised_transaction",
+                "maintenance_dsp_reset": True,
+                "wal_contract": M110_WAL_CONTRACT,
+                M110_WAL_PAYLOAD_FIELD: frozen_payload,
+                M110_WAL_PAYLOAD_SHA256_FIELD: payload_sha256,
             }
-            with path.open("a", encoding="utf-8") as handle:
-                handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            self._fsync_directory(path.parent)
-            prior_lifecycle = self._manual_write_wal_lifecycles.get(
-                transaction_id,
-                {},
+            record_bytes = m110_wal_canonical_json_bytes(event) + b"\n"
+            record_sha256 = (
+                "sha256:" + hashlib.sha256(record_bytes).hexdigest()
             )
-            lifecycle = {
-                "transaction_id": transaction_id,
-                "phases": [*(prior_lifecycle.get("phases") or ()), phase],
-                "events": [*(prior_lifecycle.get("events") or ()), event],
-                "prepared": prior_lifecycle.get("prepared"),
-                "latest_event": event,
-            }
-            if phase == "prepared" and lifecycle["prepared"] is None:
-                lifecycle["prepared"] = event
-            self._manual_write_wal_lifecycles[transaction_id] = lifecycle
-            terminal_resolved = self._wal_lifecycle_terminal_resolved(lifecycle)
-            if terminal_resolved:
-                self._manual_write_recovery_transactions.pop(transaction_id, None)
-                self._manual_write_prepared_transactions.pop(transaction_id, None)
-            else:
-                if phase == "prepared":
-                    self._manual_write_prepared_transactions.setdefault(
-                        transaction_id,
-                        event,
-                    )
-                prepared = lifecycle.get("prepared") or {}
-                self._manual_write_recovery_transactions[transaction_id] = {
-                    **prepared,
+            with self._manual_write_wal_thread_lock:
+                self._ensure_durable_directory(self._console_runtime_dir)
+                path = self._manual_write_wal_path()
+                with path.open("ab") as handle:
+                    write_started = True
+                    written = handle.write(record_bytes)
+                    if written != len(record_bytes):
+                        raise OSError("m110_manual_write_wal_short_write")
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                lifecycle = self._record_manual_write_wal_event(event)
+                event_projected = True
+                self._fsync_directory(path.parent)
+                if (
+                    classify_m110_lifecycle(lifecycle)
+                    == M110_LIFECYCLE_INVALID
+                ):
+                    self._manual_write_wal_integrity_ok = False
+                    return None
+                return {
+                    "path": str(path),
+                    "schema": "automixer.m110_wal_append_receipt.v1",
+                    "transaction_id": transaction_id,
                     "phase": phase,
-                    "phase_sequence": list(lifecycle["phases"]),
-                    "latest_event": event,
+                    "payload_sha256": payload_sha256,
+                    "record_sha256": record_sha256,
+                    "record_size_bytes": len(record_bytes),
                 }
-            self._update_runtime_wal_binding_state(
-                transaction_id,
-                lifecycle,
-            )
-            return str(path)
         except Exception as exc:
+            if write_started and not event_projected:
+                with self._manual_write_wal_thread_lock:
+                    self._manual_write_wal_integrity_ok = False
+                    if not self._manual_write_emergency_stopped:
+                        self._manual_write_emergency_stopped = True
+                        self._manual_write_emergency_generation += 1
             logger.error(
-                "Could not durably append manual write WAL: %s",
+                "Could not durably append M110 manual write WAL: %s",
                 exc,
                 exc_info=True,
             )
@@ -7892,14 +8071,22 @@ class AutoMixerServer:
                 "error": str(exc),
             }
         for lifecycle in lifecycles.values():
+            m110_classification = classify_m110_lifecycle(lifecycle)
+            if m110_classification == M110_LIFECYCLE_INVALID:
+                integrity_ok = False
+                continue
             if (
-                tuple(lifecycle.get("phases") or ())
+                m110_classification is None
+                and tuple(lifecycle.get("phases") or ())
                 and tuple(lifecycle.get("phases") or ())[-1]
                 == "proof_restored"
                 and not self._wal_lifecycle_proves_restored_proof(lifecycle)
             ):
                 integrity_ok = False
-        self._manual_write_wal_integrity_ok = integrity_ok
+        self._manual_write_wal_integrity_ok = bool(
+            self._manual_write_wal_integrity_ok and integrity_ok
+        )
+        integrity_ok = self._manual_write_wal_integrity_ok
         self._manual_write_wal_lifecycles = lifecycles
 
         live_operator_keys = {
@@ -7922,9 +8109,12 @@ class AutoMixerServer:
             prepared = lifecycle.get("prepared")
             if not isinstance(prepared, Mapping):
                 continue
-            key = str(prepared.get("idempotency_key") or "").strip()
-            scope = str(prepared.get("scope") or "").strip()
-            proposal_id = str(prepared.get("proposal_id") or "").strip()
+            prepared_payload = self._wal_event_payload_projection(prepared)
+            key = str(prepared_payload.get("idempotency_key") or "").strip()
+            scope = str(prepared_payload.get("scope") or "").strip()
+            proposal_id = str(
+                prepared_payload.get("proposal_id") or ""
+            ).strip()
             if key:
                 key_groups.setdefault((scope, key), []).append(lifecycle)
             if proposal_id:
@@ -7947,6 +8137,7 @@ class AutoMixerServer:
                 continue
             representative = group[0]
             prepared = representative.get("prepared") or {}
+            prepared_payload = self._wal_event_payload_projection(prepared)
             transaction_id = str(representative.get("transaction_id") or "")
             if scope == "supervised_transaction":
                 self._supervised_transaction_idempotency_keys[key] = transaction_id
@@ -7963,8 +8154,8 @@ class AutoMixerServer:
                 continue
             durable_record = {
                 "created_at": prepared.get("timestamp"),
-                "proposal_id": prepared.get("proposal_id"),
-                "approval_id": prepared.get("approval_id"),
+                "proposal_id": prepared_payload.get("proposal_id"),
+                "approval_id": prepared_payload.get("approval_id"),
                 "restored_from_wal": True,
                 "transaction_id": transaction_id,
             }
@@ -8828,7 +9019,8 @@ class AutoMixerServer:
                     os.close(lock_fd)
                     yield False
                     return
-                self._recover_manual_write_wal_state()
+                with self._manual_write_wal_thread_lock:
+                    self._recover_manual_write_wal_state()
             except BaseException:
                 os.close(lock_fd)
                 raise
@@ -14775,16 +14967,20 @@ class AutoMixerServer:
             recovery = self._manual_write_recovery_transactions
 
             def own_row(event: Any) -> bool:
+                event_payload = self._wal_event_payload_projection(event)
                 return bool(
                     isinstance(event, Mapping)
-                    and event.get("scope") == "supervised_transaction"
-                    and event.get("proof_run") is True
-                    and event.get("restore_after_verify") is True
-                    and event.get("capability_kind") == "restore_only_proof"
-                    and event.get("proposal_id") == active_binding.proposal_id
-                    and event.get("review_content_digest")
+                    and event_payload.get("scope")
+                    == "supervised_transaction"
+                    and event_payload.get("proof_run") is True
+                    and event_payload.get("restore_after_verify") is True
+                    and event_payload.get("capability_kind")
+                    == "restore_only_proof"
+                    and event_payload.get("proposal_id")
+                    == active_binding.proposal_id
+                    and event_payload.get("review_content_digest")
                     == active_binding.review_content_digest
-                    and event.get("operation_digest")
+                    and event_payload.get("operation_digest")
                     == active_binding.operation_digest
                 )
 

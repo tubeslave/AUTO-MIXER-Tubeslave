@@ -10,6 +10,7 @@ import pytest
 
 from decision_queue_wire_contract import canonical_json_bytes
 from master_capture_route_proof import MasterCaptureRouteAuthority
+from m110_manual_write_wal import M110_WAL_CONTRACT
 from operator_proposal_queue import OperatorProposalQueue
 from operator_proposal_result_store import (
     ResultEvidenceReservationBinding,
@@ -113,6 +114,52 @@ def _plan():
             }
         ],
     }
+
+
+def test_capability_blockers_recognize_server_owned_nested_m110_wal_row(
+    m110_server,
+):
+    server = m110_server
+    websocket = object()
+    binding = _binding(websocket=websocket)
+    payload = {
+        "scope": "supervised_transaction",
+        "proof_run": True,
+        "restore_after_verify": True,
+        "capability_kind": "restore_only_proof",
+        "proposal_id": binding.proposal_id,
+        "review_content_digest": binding.review_content_digest,
+        "operation_digest": binding.operation_digest,
+    }
+    event = {
+        "schema": "automixer.manual_write_wal.v1",
+        "transaction_id": "m110-nested-own-row",
+        "phase": "prepared",
+        "wal_contract": M110_WAL_CONTRACT,
+        "wal_payload": payload,
+    }
+    server._manual_write_prepared_transactions = {
+        "m110-nested-own-row": event,
+    }
+    server._manual_write_recovery_transactions = {
+        "m110-nested-own-row": {
+            **event,
+            "phase_sequence": ["prepared"],
+            "latest_event": event,
+        },
+    }
+    server._m110_route_global_blockers = MagicMock(
+        return_value=[
+            "manual_write_wal_prepared_transaction_present",
+            "manual_write_wal_recovery_required",
+            "independent_blocker",
+        ]
+    )
+
+    assert server._m110_capability_global_blockers(
+        websocket,
+        active_binding=binding,
+    ) == ["independent_blocker"]
 
 
 def _restored_proof_result(*, proposal_id, review_digest, operation_digest):
