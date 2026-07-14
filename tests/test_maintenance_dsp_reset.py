@@ -17,6 +17,7 @@ from maintenance_dsp_reset import (
     M110_RESET_OPERATION_DEFINITIONS,
     M110_RESET_TARGETS,
     M110_RESET_PROTOCOL_REVISION,
+    M110DeliveredMutationObserver,
     M110MaintenanceDspResetExecutor,
     M110MaintenanceMutationGate,
     M110ResetHooks,
@@ -47,6 +48,17 @@ IDENTITY_VALUES = {
     "/io/out/USB/48/grp": "MAIN",
     "/io/out/USB/48/in": 1,
 }
+
+
+def _payload_sha256(payload):
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 def _physical_values():
@@ -177,6 +189,12 @@ class _FakeWing:
         self.boundary_token = None
         return True
 
+    def mutation_boundary_matches(self, token):
+        return bool(
+            self.boundary is not None
+            and self.boundary_token is token
+        )
+
 
 class _Hooks:
     def __init__(self):
@@ -214,10 +232,18 @@ class _Hooks:
             return self.authority
 
         def terminal(phase, payload):
-            self.terminals.append((phase, copy.deepcopy(dict(payload))))
+            recorded = copy.deepcopy(dict(payload))
+            self.terminals.append((phase, recorded))
             if self.on_terminal is not None:
                 self.on_terminal(phase)
-            return "wal.jsonl" if self.terminal_ok else None
+            return (
+                {
+                    "path": "wal.jsonl",
+                    "payload_sha256": _payload_sha256(recorded),
+                }
+                if self.terminal_ok
+                else None
+            )
 
         return M110ResetHooks(
             authority_current=authority,
@@ -550,6 +576,13 @@ async def test_maintenance_commit_writes_exact_64_and_preserves_manifest():
     assert result.wal_terminal == "committed"
     assert result.physical_verified is True
     assert result.audio_recheck_passed is True
+    assert result.verification_cut_epoch is not None
+    assert result.verification_cut_epoch > 0
+    assert result.verification_cut_reset_surface_sha256.startswith("sha256:")
+    assert (
+        result.verification_cut_preservation_manifest_sha256
+        == result.after_manifest_sha256
+    )
     assert [address for address, _value in wing.send_calls] == list(
         M110_RESET_ADDRESSES
     )
@@ -610,6 +643,65 @@ async def test_maintenance_proof_restores_all_64_members_in_reverse():
     ]
     assert wing.boundary is None
     assert "*" not in wing.callbacks
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("address", "changed_value", "expected_reason"),
+    [
+        (
+            M110_RESET_ADDRESSES[0],
+            0,
+            "m110_review_reset_preimage_changed",
+        ),
+        (
+            "/ch/1/in/set/trim",
+            -8.0,
+            "m110_review_preservation_manifest_changed",
+        ),
+    ],
+)
+async def test_next_commit_fresh_recapture_blocks_post_proof_drift(
+    address,
+    changed_value,
+    expected_reason,
+):
+    wing, _hooks, proof_executor, approved, proof_authority = (
+        await _executor_fixture(proof_run=True)
+    )
+    proof = await proof_executor.execute(
+        transaction_id="m110-reset-proof-before-fresh-recapture",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=proof_authority[0],
+        restored_proof_receipt=proof_authority[1],
+    )
+    assert proof.status == "proof_passed"
+    sends_before_commit = list(wing.send_calls)
+    wing.values[address] = changed_value
+    commit_authority = _reset_authority(
+        proof_run=False,
+        approved_preimage=approved,
+        wing_client=wing,
+    )
+    commit_hooks = _Hooks()
+    commit_executor = M110MaintenanceDspResetExecutor(
+        wing,
+        commit_hooks.values(),
+    )
+
+    commit = await commit_executor.execute(
+        transaction_id=f"m110-reset-fresh-recapture-{address}",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=commit_authority[0],
+        restored_proof_receipt=commit_authority[1],
+    )
+
+    assert commit.status == "blocked"
+    assert commit.reason == expected_reason
+    assert wing.send_calls == sends_before_commit
+    assert commit.wal_terminal == "not_prepared"
 
 
 @pytest.mark.asyncio
@@ -755,6 +847,48 @@ async def test_terminal_wal_failure_restores_commit_before_emergency_latch():
     assert result.physical_state_restored is True
     assert result.rollback_state_unknown is False
     assert wing.values == original
+    assert not any(
+        event.get("phase") == "recovery_gate_installed"
+        for event in result.events
+    )
+    assert hooks.emergencies
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_success_append_never_rolls_back_linearized_state():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+
+    def ambiguous_terminal(phase, payload):
+        hooks.terminals.append((phase, copy.deepcopy(dict(payload))))
+        return None if phase == "committed" else "wal.jsonl"
+
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=ambiguous_terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=base_hooks.emergency_stop,
+    )
+    result = await executor.execute(
+        transaction_id="m110-reset-ambiguous-success-append",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_reset_terminal_wal_failed"
+    assert result.physical_state_restored is False
+    assert result.rollback_state_unknown is False
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    incident = hooks.terminals[-1][1]
+    assert incident["post_linearization_incident"] is True
+    assert incident["success_terminal_attempted"] is True
+    assert incident["success_terminal_durable_confirmed"] is False
+    assert incident["compensation_attempted"] is False
     assert hooks.emergencies
 
 
@@ -867,7 +1001,7 @@ async def test_audio_not_applicable_is_not_a_real_reset_recheck():
 
 
 @pytest.mark.asyncio
-async def test_attempt_during_terminal_is_compensated_and_never_final_success():
+async def test_attempt_after_commit_is_incident_without_rewriting_commit():
     wing, hooks, executor, approved, authority = await _executor_fixture()
     original = dict(wing.values)
 
@@ -886,22 +1020,153 @@ async def test_attempt_during_terminal_is_compensated_and_never_final_success():
 
     assert result.status == "manual_review_required"
     assert result.reason == "m110_post_terminal_safety_audit_failed"
-    assert result.physical_state_restored is True
-    assert wing.values == original
+    assert result.physical_state_restored is False
+    assert result.rollback_state_unknown is False
+    assert wing.values != original
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
     assert [phase for phase, _payload in hooks.terminals] == [
         "verification_pending",
         "verified_state_pending_cleanup",
         "committed",
         "manual_review_required",
     ]
-    assert hooks.terminals[-1][1]["no_outside_mutation_attempt_proven"] is False
+    incident = hooks.terminals[-1][1]
+    assert incident["no_outside_mutation_attempt_proven"] is False
+    assert incident["post_linearization_incident"] is True
+    assert incident["linearized_terminal_phase"] == "committed"
+    assert incident["compensation_attempted"] is False
+    assert incident["rollback_attempted_after_linearization"] is False
     assert hooks.emergencies
 
 
 @pytest.mark.asyncio
-async def test_boundary_remove_failure_compensates_durable_commit_and_restores():
+async def test_sync_terminal_self_cancel_becomes_no_write_incident():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+
+    def cancel_after_terminal_append(phase):
+        if phase == "committed":
+            task = asyncio.current_task()
+            assert task is not None
+            task.cancel()
+
+    hooks.on_terminal = cancel_after_terminal_append
+    result = await executor.execute(
+        transaction_id="m110-reset-sync-terminal-self-cancel",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_reset_cancelled"
+    assert result.physical_state_restored is False
+    assert result.rollback_state_unknown is False
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    assert [phase for phase, _payload in hooks.terminals] == [
+        "verification_pending",
+        "verified_state_pending_cleanup",
+        "committed",
+        "manual_review_required",
+    ]
+    incident = hooks.terminals[-1][1]
+    assert incident["post_linearization_incident"] is True
+    assert incident["compensation_attempted"] is False
+    assert incident["cancellation_requested"] is True
+
+
+@pytest.mark.asyncio
+async def test_denied_writer_between_detach_audit_and_terminal_never_commits(
+    monkeypatch,
+):
     wing, hooks, executor, approved, authority = await _executor_fixture()
     original = dict(wing.values)
+    original_snapshot = M110MaintenanceMutationGate.snapshot
+    injected = False
+
+    def snapshot_with_gap_attempt(gate):
+        nonlocal injected
+        audit = original_snapshot(gate)
+        if (
+            not injected
+            and audit.get("active") is True
+            and audit.get("sealed") is True
+            and "*" not in wing.callbacks
+            and hooks.terminals
+            and hooks.terminals[-1][0] == "verified_state_pending_cleanup"
+        ):
+            injected = True
+            assert wing.send("/ch/2/fdr", -7.0) is False
+        return audit
+
+    monkeypatch.setattr(
+        M110MaintenanceMutationGate,
+        "snapshot",
+        snapshot_with_gap_attempt,
+    )
+    result = await executor.execute(
+        transaction_id="m110-reset-final-gate-baseline-race",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert injected is True
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_preterminal_success_invariant_failed"
+    assert result.physical_state_restored is True
+    assert wing.values == original
+    phases = [phase for phase, _payload in hooks.terminals]
+    assert "committed" not in phases
+    assert phases[-1] == "manual_review_required"
+
+
+@pytest.mark.asyncio
+async def test_observer_event_between_candidate_and_detach_never_commits(
+    monkeypatch,
+):
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    original_snapshot = M110DeliveredMutationObserver.snapshot
+    injected = False
+
+    def snapshot_with_gap_event(observer):
+        nonlocal injected
+        audit = original_snapshot(observer)
+        if (
+            not injected
+            and audit.get("active") is True
+            and hooks.terminals
+            and hooks.terminals[-1][0] == "verified_state_pending_cleanup"
+        ):
+            injected = True
+            wing._deliver("/bus/1/fdr", -20.0)
+        return audit
+
+    monkeypatch.setattr(
+        M110DeliveredMutationObserver,
+        "snapshot",
+        snapshot_with_gap_event,
+    )
+    result = await executor.execute(
+        transaction_id="m110-reset-final-observer-baseline-race",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert injected is True
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_observer_detach_safety_audit_failed"
+    phases = [phase for phase, _payload in hooks.terminals]
+    assert "committed" not in phases
+    assert phases[-1] == "manual_review_required"
+
+
+@pytest.mark.asyncio
+async def test_boundary_remove_failure_leaves_commit_and_gate_fail_closed():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
     wing.remove_boundary_ok = False
 
     result = await executor.execute(
@@ -914,14 +1179,21 @@ async def test_boundary_remove_failure_compensates_durable_commit_and_restores()
 
     assert result.status == "manual_review_required"
     assert result.reason == "m110_mutation_boundary_remove_failed"
-    assert result.physical_state_restored is True
-    assert wing.values == original
+    assert result.physical_state_restored is False
+    assert result.rollback_state_unknown is False
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    assert wing.boundary is not None
+    assert result.mutation_audit["active"] is True
+    assert result.mutation_audit["sealed"] is True
     assert [phase for phase, _payload in hooks.terminals] == [
         "verification_pending",
         "verified_state_pending_cleanup",
         "committed",
         "manual_review_required",
     ]
+    incident = hooks.terminals[-1][1]
+    assert incident["post_linearization_incident"] is True
+    assert incident["compensation_attempted"] is False
     assert hooks.emergencies
 
 
@@ -978,15 +1250,18 @@ async def test_observer_detach_drift_is_caught_before_gate_removal():
     assert hooks.terminals[-1][0] == "manual_review_required"
     assert hooks.terminals[-1][1]["preservation_mismatches"]
     detach_phases = [phase for phase, _payload in hooks.terminals]
-    assert "committed" in detach_phases
+    assert "committed" not in detach_phases
+    assert detach_phases[:2] == [
+        "verification_pending",
+        "verified_state_pending_cleanup",
+    ]
     assert detach_phases[-1] == "manual_review_required"
     assert wing.boundary is None
 
 
 @pytest.mark.asyncio
-async def test_gate_close_attempt_is_audited_and_compensated_before_terminal():
+async def test_gate_close_attempt_is_audited_after_irrevocable_commit():
     wing, hooks, executor, approved, authority = await _executor_fixture()
-    original = dict(wing.values)
     attempts = []
 
     def attempt_during_remove(client):
@@ -1005,33 +1280,37 @@ async def test_gate_close_attempt_is_audited_and_compensated_before_terminal():
     assert attempts == [False]
     assert result.status == "manual_review_required"
     assert result.reason == "m110_mutation_boundary_close_audit_failed"
-    assert result.physical_state_restored is True
-    assert wing.values == original
+    assert result.physical_state_restored is False
+    assert result.rollback_state_unknown is False
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
     assert hooks.terminals[-1][0] == "manual_review_required"
-    assert hooks.terminals[-1][1]["no_outside_mutation_attempt_proven"] is False
+    incident = hooks.terminals[-1][1]
+    assert incident["no_outside_mutation_attempt_proven"] is False
+    assert incident["post_linearization_incident"] is True
+    assert incident["compensation_attempted"] is False
     assert [phase for phase, _payload in hooks.terminals][-2:] == [
         "committed",
         "manual_review_required",
     ]
-    assert wing.boundary is None
+    assert wing.boundary is not None
+    assert result.mutation_audit["active"] is True
+    assert result.mutation_audit["sealed"] is True
+    assert wing.send("/ch/2/fdr", -7.0) is False
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("address", "changed_value", "restored", "unknown"),
+    ("address", "changed_value"),
     [
-        (M110_RESET_ADDRESSES[0], 1, True, False),
-        ("/ch/1/in/set/trim", -8.0, False, True),
+        (M110_RESET_ADDRESSES[0], 1),
+        ("/ch/1/in/set/trim", -8.0),
     ],
 )
-async def test_physical_drift_during_gate_removal_is_observed_and_not_success(
+async def test_physical_change_after_verification_cut_is_a_later_event(
     address,
     changed_value,
-    restored,
-    unknown,
 ):
     wing, hooks, executor, approved, authority = await _executor_fixture()
-    original = dict(wing.values)
 
     def drift_during_remove(client):
         client.on_remove_boundary = None
@@ -1047,19 +1326,24 @@ async def test_physical_drift_during_gate_removal_is_observed_and_not_success(
         restored_proof_receipt=authority[1],
     )
 
-    assert result.status == "manual_review_required"
-    assert result.reason == "m110_mutation_boundary_close_physical_audit_failed"
-    assert result.physical_state_restored is restored
-    assert result.rollback_state_unknown is unknown
-    if restored:
-        assert wing.values == original
-    else:
-        assert wing.values[address] == changed_value
-        assert result.preservation_mismatches
+    # The final 64+184 verification cut defines the historical physical truth.
+    # A later console event must be caught by the next mandatory fresh readback
+    # rather than causing an unsafe compensating write after terminal attempt.
+    assert result.status == "applied"
+    assert result.reason == "m110_maintenance_dsp_reset_committed"
+    assert result.physical_verified is True
+    assert result.wal_terminal == "committed"
+    assert result.physical_truth_scope == (
+        "verified_as_of_m110_verification_cut"
+    )
+    assert result.current_state_guaranteed_at_response is False
+    assert result.fresh_readback_required_before_next_stage is True
+    assert result.attended_no_touch_required_during_execution is True
+    assert wing.values[address] == changed_value
     phases = [phase for phase, _payload in hooks.terminals]
-    assert "committed" in phases
-    assert phases[-1] == "manual_review_required"
-    assert hooks.emergencies
+    assert phases[-1] == "committed"
+    assert "manual_review_required" not in phases
+    assert hooks.emergencies == []
     assert wing.boundary is None
     assert "*" not in wing.callbacks
 
@@ -1157,7 +1441,7 @@ async def test_proof_drift_after_rollback_is_restored_again_before_terminal():
 
 
 @pytest.mark.asyncio
-async def test_proof_terminal_drift_gets_compensating_manual_terminal_and_restore():
+async def test_proof_change_after_verification_cut_is_a_later_console_event():
     wing, hooks, executor, approved, authority = await _executor_fixture(proof_run=True)
     original = dict(wing.values)
 
@@ -1175,19 +1459,24 @@ async def test_proof_terminal_drift_gets_compensating_manual_terminal_and_restor
         restored_proof_receipt=authority[1],
     )
 
-    assert result.status == "manual_review_required"
+    assert result.status == "proof_passed"
     assert result.physical_state_restored is True
     assert result.rollback_state_unknown is False
-    assert wing.values == original
+    assert result.physical_truth_scope == (
+        "verified_as_of_m110_verification_cut"
+    )
+    assert result.current_state_guaranteed_at_response is False
+    assert result.fresh_readback_required_before_next_stage is True
+    assert result.attended_no_touch_required_during_execution is True
+    assert wing.values != original
+    assert wing.values["/ch/1/eq/on"] == 0
     proof_phases = [phase for phase, _payload in hooks.terminals]
-    assert proof_phases[:3] == [
+    assert proof_phases == [
         "verification_pending",
         "verified_state_pending_cleanup",
         "proof_restored",
     ]
-    assert proof_phases[3:]
-    assert set(proof_phases[3:]) == {"manual_review_required"}
-    assert hooks.emergencies
+    assert hooks.emergencies == []
 
 
 @pytest.mark.asyncio
@@ -1218,6 +1507,24 @@ async def test_proof_wal_terminal_has_strict_restored_truth_fields():
     assert terminal["readiness_closure_allowed"] is False
     assert terminal["before_manifest"]["row_count"] == 184
     assert terminal["after_manifest"]["row_count"] == 184
+    assert terminal["mutation_audit"]["active"] is True
+    assert terminal["mutation_audit"]["sealed"] is True
+    assert terminal["mutation_audit"]["denied_attempts"] == []
+    assert terminal["delivered_observer_audit"]["active"] is False
+    assert terminal["delivered_observer_audit"]["unsubscribe_failed"] is False
+    assert terminal["physical_truth_scope"] == (
+        "verified_as_of_m110_verification_cut"
+    )
+    assert terminal["current_state_guaranteed_at_response"] is False
+    assert terminal["fresh_readback_required_before_next_stage"] is True
+    assert terminal["attended_no_touch_required_during_execution"] is True
+    assert terminal[
+        "later_console_event_invalidates_readiness_freshness"
+    ] is True
+    assert terminal["verification_cut_epoch"] > 0
+    assert terminal["verification_cut_reset_surface_sha256"].startswith(
+        "sha256:"
+    )
     assert terminal["mutation_audit_sha256"].startswith("sha256:")
     assert terminal["delivered_observer_audit_sha256"].startswith("sha256:")
 
@@ -1475,11 +1782,15 @@ async def test_terminal_persist_cancellation_is_true_in_compensating_wal():
     async def terminal(phase, payload):
         nonlocal terminal_calls
         terminal_calls += 1
-        hooks.terminals.append((phase, copy.deepcopy(dict(payload))))
+        recorded = copy.deepcopy(dict(payload))
+        hooks.terminals.append((phase, recorded))
         if terminal_calls == 1:
             terminal_started.set()
             await release_terminal.wait()
-        return "wal.jsonl"
+        return {
+            "path": "wal.jsonl",
+            "payload_sha256": _payload_sha256(recorded),
+        }
 
     base_hooks = hooks.values()
     executor.hooks = M110ResetHooks(
@@ -1516,7 +1827,7 @@ async def test_terminal_persist_cancellation_is_true_in_compensating_wal():
 
 
 @pytest.mark.asyncio
-async def test_terminal_preservation_drift_cannot_claim_full_restoration():
+async def test_preservation_change_after_verification_cut_is_a_later_event():
     wing, hooks, executor, approved, authority = await _executor_fixture()
     original = dict(wing.values)
 
@@ -1535,12 +1846,13 @@ async def test_terminal_preservation_drift_cannot_claim_full_restoration():
     )
 
     assert wing.values != original
-    assert result.status == "manual_review_required"
+    assert wing.values["/ch/1/fdr"] == -10.0
+    assert result.status == "applied"
     assert result.physical_state_restored is False
-    assert result.rollback_state_unknown is True
-    assert hooks.terminals[-1][0] == "manual_review_required"
+    assert result.rollback_state_unknown is False
+    assert hooks.terminals[-1][0] == "committed"
     assert hooks.terminals[-1][1]["physical_state_restored"] is False
-    assert hooks.terminals[-1][1]["rollback_state_unknown"] is True
+    assert hooks.terminals[-1][1]["rollback_state_unknown"] is False
 
 
 @pytest.mark.asyncio
@@ -1604,3 +1916,545 @@ async def test_reset_address_toggle_away_from_target_is_observer_failure():
     assert result.reason == "m110_delivered_outside_event_detected"
     assert wing.values == original
     assert any(audit["unexpected_events"] for audit in result.observer_audits)
+
+
+@pytest.mark.asyncio
+async def test_proof_authority_expiry_after_audio_never_records_proof_success():
+    wing, hooks, executor, approved, authority = await _executor_fixture(
+        proof_run=True
+    )
+    original = dict(wing.values)
+    hooks.on_audio = lambda: setattr(hooks, "authority", False)
+
+    result = await executor.execute(
+        transaction_id="m110-proof-authority-expired-after-audio",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "rolled_back"
+    assert result.reason == "m110_write_authority_expired_before_terminal"
+    assert result.physical_state_restored is True
+    assert wing.values == original
+    assert "proof_restored" not in [phase for phase, _ in hooks.terminals]
+
+
+@pytest.mark.asyncio
+async def test_proof_authority_expiry_before_success_terminal_never_succeeds():
+    wing, hooks, executor, approved, authority = await _executor_fixture(
+        proof_run=True
+    )
+    original = dict(wing.values)
+    sends_at_expiry = []
+
+    def expire_at_candidate(phase):
+        if phase == "verified_state_pending_cleanup":
+            sends_at_expiry.append(len(wing.send_calls))
+            hooks.authority = False
+
+    hooks.on_terminal = expire_at_candidate
+    result = await executor.execute(
+        transaction_id="m110-proof-authority-expired-before-success",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_write_authority_expired_before_terminal"
+    assert wing.values == original
+    assert sends_at_expiry == [len(wing.send_calls)]
+    phases = [phase for phase, _ in hooks.terminals]
+    assert "proof_restored" not in phases
+    assert phases[-1] == "manual_review_required"
+
+
+@pytest.mark.asyncio
+async def test_proof_authority_expiry_during_success_is_no_write_incident():
+    wing, hooks, executor, approved, authority = await _executor_fixture(
+        proof_run=True
+    )
+    original = dict(wing.values)
+    sends_at_success = []
+
+    def expire_at_success(phase):
+        if phase == "proof_restored":
+            sends_at_success.append(len(wing.send_calls))
+            hooks.authority = False
+
+    hooks.on_terminal = expire_at_success
+    result = await executor.execute(
+        transaction_id="m110-proof-authority-expired-during-success",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_write_authority_expired_before_terminal"
+    assert wing.values == original
+    assert sends_at_success == [len(wing.send_calls)]
+    phases = [phase for phase, _ in hooks.terminals]
+    assert phases[-2:] == ["proof_restored", "manual_review_required"]
+    incident = hooks.terminals[-1][1]
+    assert incident["success_terminal_attempted"] is True
+    assert incident["success_terminal_durable_confirmed"] is True
+    assert incident["compensation_attempted"] is False
+    assert hooks.emergencies
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("proof_run", [False, True])
+async def test_authority_expiry_during_gate_release_is_no_write_incident(
+    proof_run,
+):
+    wing, hooks, executor, approved, authority = await _executor_fixture(
+        proof_run=proof_run
+    )
+    sends_at_close = []
+
+    def expire_during_remove(client):
+        hooks.authority = False
+        sends_at_close.append(len(client.send_calls))
+
+    wing.on_remove_boundary = expire_during_remove
+    result = await executor.execute(
+        transaction_id=f"m110-authority-expired-gate-release-{proof_run}",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_write_authority_expired_after_terminal"
+    assert sends_at_close == [len(wing.send_calls)]
+    assert hooks.terminals[-2][0] == (
+        "proof_restored" if proof_run else "committed"
+    )
+    assert hooks.terminals[-1][0] == "manual_review_required"
+    assert hooks.terminals[-1][1]["compensation_attempted"] is False
+    assert wing.boundary is not None
+    assert wing.send("/ch/2/fdr", -7.0) is False
+
+
+@pytest.mark.asyncio
+async def test_final_observed_sweep_rejects_change_to_already_read_reset_row():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    original = dict(wing.values)
+    injected = False
+    candidate_manifest_passes = 0
+
+    def mutate_during_last_manifest_query(client, address):
+        nonlocal injected, candidate_manifest_passes
+        if (
+            hooks.terminals
+            and hooks.terminals[-1][0]
+            == "verified_state_pending_cleanup"
+            and address == M110_PRESERVATION_ADDRESSES[-1]
+        ):
+            candidate_manifest_passes += 1
+        if (
+            not injected
+            and candidate_manifest_passes == 2
+            and address == M110_PRESERVATION_ADDRESSES[-1]
+            and "*" in client.callbacks
+        ):
+            injected = True
+            reset_address = M110_RESET_ADDRESSES[0]
+            client.values[reset_address] = 1
+            client._deliver(reset_address, 1)
+
+    wing.after_query = mutate_during_last_manifest_query
+    result = await executor.execute(
+        transaction_id="m110-final-observed-sweep-race",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert injected is True
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_observer_detach_safety_audit_failed"
+    assert wing.values == original
+    assert "committed" not in [phase for phase, _ in hooks.terminals]
+
+
+@pytest.mark.asyncio
+async def test_success_terminal_receipt_must_bind_actual_persisted_payload():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+
+    def terminal(phase, payload):
+        if phase == "committed":
+            payload["physical_verified"] = False
+            recorded = copy.deepcopy(dict(payload))
+            hooks.terminals.append((phase, recorded))
+            payload["physical_verified"] = True
+        else:
+            recorded = copy.deepcopy(dict(payload))
+            hooks.terminals.append((phase, recorded))
+        return {
+            "path": "wal.jsonl",
+            "payload_sha256": _payload_sha256(recorded),
+        }
+
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=base_hooks.emergency_stop,
+    )
+    result = await executor.execute(
+        transaction_id="m110-success-terminal-content-bound-receipt",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_success_terminal_receipt_unbound"
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    assert hooks.terminals[-2][0] == "committed"
+    assert hooks.terminals[-2][1]["physical_verified"] is False
+    assert hooks.terminals[-1][0] == "manual_review_required"
+    assert hooks.terminals[-1][1]["compensation_attempted"] is False
+
+
+@pytest.mark.asyncio
+async def test_ambiguous_boundary_remove_reinstalls_sealed_no_write_gate():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+
+    def remove_then_raise(client):
+        client.boundary = None
+        client.boundary_token = None
+        client.on_remove_boundary = None
+        raise RuntimeError("removed_then_failed")
+
+    wing.on_remove_boundary = remove_then_raise
+    result = await executor.execute(
+        transaction_id="m110-ambiguous-boundary-remove",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_mutation_boundary_remove_failed"
+    assert result.mutation_audit["recovery_boundary_installed"] is True
+    assert result.mutation_audit["boundary_state_unknown"] is False
+    assert wing.boundary is not None
+    assert wing.send("/ch/2/fdr", -7.0) is False
+
+
+@pytest.mark.asyncio
+async def test_close_fault_emergency_hook_cannot_send_after_success_attempt():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+    emergency_send_results = []
+
+    def denied_attempt_during_remove(client):
+        emergency_send_results.append(client.send("/ch/2/fdr", -7.0))
+
+    async def emergency(_reason):
+        emergency_send_results.append(wing.send("/ch/3/fdr", -9.0))
+        return {"success": True, "teardown_complete": True}
+
+    wing.on_remove_boundary = denied_attempt_during_remove
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=base_hooks.persist_terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=emergency,
+    )
+    result = await executor.execute(
+        transaction_id="m110-close-fault-no-write-emergency",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert emergency_send_results == [False, False]
+    assert all(
+        address not in {"/ch/2/fdr", "/ch/3/fdr"}
+        for address, _value in wing.send_calls
+    )
+    assert wing.boundary is not None
+
+
+@pytest.mark.asyncio
+async def test_success_terminal_payload_mutation_is_no_write_incident():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+
+    def terminal(phase, payload):
+        recorded = copy.deepcopy(dict(payload))
+        hooks.terminals.append((phase, recorded))
+        if phase == "committed":
+            payload["physical_verified"] = False
+        return {
+            "path": "wal.jsonl",
+            "payload_sha256": _payload_sha256(recorded),
+        }
+
+    async def emergency(_reason):
+        hooks.authority = False
+        hooks.emergencies.append("payload_mutation")
+        return {"success": True, "teardown_complete": True}
+
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=emergency,
+    )
+    result = await executor.execute(
+        transaction_id="m110-success-terminal-payload-mutated",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_success_terminal_payload_mutated"
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    phases = [phase for phase, _ in hooks.terminals]
+    assert phases[-2:] == ["committed", "manual_review_required"]
+    assert phases.count("manual_review_required") == 1
+    assert hooks.emergencies == ["payload_mutation"]
+
+
+@pytest.mark.asyncio
+async def test_no_callbacks_run_when_recovery_gate_cannot_be_installed():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+    terminal_send_results = []
+    emergency_send_results = []
+    committed_seen = False
+
+    def poison_boundary_recovery(client):
+        client.boundary = None
+        client.boundary_token = None
+        client.on_remove_boundary = None
+
+    def terminal(phase, payload):
+        nonlocal committed_seen
+        recorded = copy.deepcopy(dict(payload))
+        hooks.terminals.append((phase, recorded))
+        if phase == "committed":
+            committed_seen = True
+            wing.mutation_boundary_matches = lambda _token: False
+
+            def fail_install(_boundary):
+                raise RuntimeError("recovery_install_failed")
+
+            wing.install_mutation_boundary = fail_install
+        elif committed_seen:
+            terminal_send_results.append(wing.send("/ch/4/fdr", -5.0))
+        return {
+            "path": "wal.jsonl",
+            "payload_sha256": _payload_sha256(recorded),
+        }
+
+    async def emergency(_reason):
+        emergency_send_results.append(wing.send("/ch/3/fdr", -6.0))
+        return {"success": True, "teardown_complete": True}
+
+    wing.on_remove_boundary = poison_boundary_recovery
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=emergency,
+    )
+    result = await executor.execute(
+        transaction_id="m110-recovery-gate-unavailable",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert result.status == "manual_review_required"
+    assert result.wal_terminal == "terminal_record_failed"
+    assert result.emergency_stop_activation_failed is True
+    assert terminal_send_results == []
+    assert emergency_send_results == []
+    assert [phase for phase, _ in hooks.terminals][-1] == "committed"
+    assert any(
+        event.get("phase") == "post_terminal_callbacks_suppressed"
+        for event in result.events
+    )
+    assert all(
+        address not in {"/ch/3/fdr", "/ch/4/fdr"}
+        for address, _value in wing.send_calls
+    )
+
+
+@pytest.mark.asyncio
+async def test_preclose_audit_catches_attempt_after_stale_post_success_snapshot(
+    monkeypatch,
+):
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    original_snapshot = M110MaintenanceMutationGate.snapshot
+    attempts = []
+    injected = False
+
+    def snapshot_then_attempt(gate):
+        nonlocal injected
+        audit = original_snapshot(gate)
+        if (
+            not injected
+            and audit.get("active") is True
+            and audit.get("sealed") is True
+            and hooks.terminals
+            and hooks.terminals[-1][0] == "committed"
+        ):
+            injected = True
+            attempts.append(wing.send("/ch/5/fdr", -4.0))
+        return audit
+
+    monkeypatch.setattr(
+        M110MaintenanceMutationGate,
+        "snapshot",
+        snapshot_then_attempt,
+    )
+    result = await executor.execute(
+        transaction_id="m110-preclose-stale-snapshot-attempt",
+        approved_preimage=approved,
+        expected_identity_values=IDENTITY_VALUES,
+        capability_grant=authority[0],
+        restored_proof_receipt=authority[1],
+    )
+
+    assert injected is True
+    assert attempts == [False]
+    assert result.status == "manual_review_required"
+    assert result.reason == "m110_mutation_boundary_close_audit_failed"
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+    assert [phase for phase, _ in hooks.terminals][-2:] == [
+        "committed",
+        "manual_review_required",
+    ]
+    assert hooks.terminals[-1][1]["compensation_attempted"] is False
+    assert wing.boundary is not None
+    assert wing.send("/ch/6/fdr", -3.0) is False
+
+
+@pytest.mark.asyncio
+async def test_sync_incident_hook_self_cancel_gets_corrective_truth_row():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+    cancelled_in_incident = False
+
+    def attempt_during_remove(client):
+        assert client.send("/ch/2/fdr", -7.0) is False
+
+    def terminal(phase, payload):
+        nonlocal cancelled_in_incident
+        recorded = copy.deepcopy(dict(payload))
+        hooks.terminals.append((phase, recorded))
+        if phase == "manual_review_required" and not cancelled_in_incident:
+            cancelled_in_incident = True
+            task = asyncio.current_task()
+            assert task is not None
+            task.cancel()
+        return {
+            "path": "wal.jsonl",
+            "payload_sha256": _payload_sha256(recorded),
+        }
+
+    wing.on_remove_boundary = attempt_during_remove
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=base_hooks.emergency_stop,
+    )
+    task = asyncio.create_task(
+        executor.execute(
+            transaction_id="m110-sync-incident-self-cancel",
+            approved_preimage=approved,
+            expected_identity_values=IDENTITY_VALUES,
+            capability_grant=authority[0],
+            restored_proof_receipt=authority[1],
+        )
+    )
+    result = await task
+
+    assert result.status == "manual_review_required"
+    manual_payloads = [
+        payload
+        for phase, payload in hooks.terminals
+        if phase == "manual_review_required"
+    ]
+    assert [row["cancellation_requested"] for row in manual_payloads] == [
+        False,
+        True,
+    ]
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)
+
+
+@pytest.mark.asyncio
+async def test_sync_emergency_self_cancel_is_true_in_first_incident_row():
+    wing, hooks, executor, approved, authority = await _executor_fixture()
+    base_hooks = hooks.values()
+
+    def attempt_during_remove(client):
+        assert client.send("/ch/2/fdr", -7.0) is False
+
+    def emergency(_reason):
+        task = asyncio.current_task()
+        assert task is not None
+        task.cancel()
+        return {"success": True, "teardown_complete": True}
+
+    wing.on_remove_boundary = attempt_during_remove
+    executor.hooks = M110ResetHooks(
+        authority_current=base_hooks.authority_current,
+        persist_prepared=base_hooks.persist_prepared,
+        mark_send_may_have_occurred=base_hooks.mark_send_may_have_occurred,
+        persist_terminal=base_hooks.persist_terminal,
+        audio_recheck=base_hooks.audio_recheck,
+        emergency_stop=emergency,
+    )
+    task = asyncio.create_task(
+        executor.execute(
+            transaction_id="m110-sync-emergency-self-cancel",
+            approved_preimage=approved,
+            expected_identity_values=IDENTITY_VALUES,
+            capability_grant=authority[0],
+            restored_proof_receipt=authority[1],
+        )
+    )
+    result = await task
+
+    assert result.status == "manual_review_required"
+    manual_payloads = [
+        payload
+        for phase, payload in hooks.terminals
+        if phase == "manual_review_required"
+    ]
+    assert len(manual_payloads) == 1
+    assert manual_payloads[0]["cancellation_requested"] is True
+    assert all(wing.values[address] == 0 for address in M110_RESET_ADDRESSES)

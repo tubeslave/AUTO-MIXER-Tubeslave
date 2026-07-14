@@ -898,6 +898,8 @@ class M110MaintenanceMutationGate:
         self._total_event_count = 0
         self._overflow = False
         self._remove_failed = False
+        self._boundary_state_unknown = False
+        self._recovery_boundary_installed = False
         self._events: list[dict[str, Any]] = []
 
     def _record_event_locked(self, event: Mapping[str, Any]) -> None:
@@ -1056,10 +1058,16 @@ class M110MaintenanceMutationGate:
                 "max_events": self._max_events,
                 "overflow": self._overflow,
                 "remove_failed": self._remove_failed,
+                "boundary_state_unknown": self._boundary_state_unknown,
+                "recovery_boundary_installed": (
+                    self._recovery_boundary_installed
+                ),
                 "events": events,
                 "denied_attempts": denied,
                 "no_outside_mutation_attempt_proven": (
-                    not denied and not self._overflow
+                    not denied
+                    and not self._overflow
+                    and not self._boundary_state_unknown
                 ),
             }
 
@@ -1082,28 +1090,84 @@ class M110MaintenanceMutationGate:
 
     def close(self) -> dict[str, Any]:
         remove = getattr(self._wing_client, "remove_mutation_boundary", None)
+        matches = getattr(self._wing_client, "mutation_boundary_matches", None)
+        install = getattr(self._wing_client, "install_mutation_boundary", None)
         with self._lock:
             token = self._token
+        remove_exception_type = None
         try:
             removed = bool(
                 token is not None
                 and callable(remove)
                 and remove(token) is True
             )
-        except BaseException:
+        except BaseException as exc:
             removed = False
+            remove_exception_type = type(exc).__name__
+        still_owned: bool | None = None
+        if not removed and token is not None and callable(matches):
+            try:
+                still_owned = matches(token) is True
+            except BaseException:
+                still_owned = None
+        recovery_token: object | None = None
+        recovery_exception_type = None
+        if not removed and still_owned is not True and callable(install):
+            try:
+                recovery_token = install(self._boundary)
+            except BaseException as exc:
+                recovery_exception_type = type(exc).__name__
         with self._lock:
             if removed:
                 self._active = False
                 self._sealed = True
                 self._token = None
                 self._remove_failed = False
-            else:
+                self._boundary_state_unknown = False
+                self._recovery_boundary_installed = False
+            elif still_owned is True:
+                self._active = True
+                self._sealed = True
                 self._remove_failed = True
+                self._boundary_state_unknown = False
+                self._recovery_boundary_installed = False
                 self._record_event_locked(
                     {
                         "event": "mutation_boundary_remove_failed",
                         "observed_at_monotonic": time.monotonic(),
+                        "remove_exception_type": remove_exception_type,
+                        "original_boundary_still_owned": True,
+                    }
+                )
+            elif recovery_token is not None:
+                self._active = True
+                self._sealed = True
+                self._token = recovery_token
+                self._remove_failed = True
+                self._boundary_state_unknown = False
+                self._recovery_boundary_installed = True
+                self._record_event_locked(
+                    {
+                        "event": "mutation_boundary_recovery_installed",
+                        "observed_at_monotonic": time.monotonic(),
+                        "remove_exception_type": remove_exception_type,
+                        "original_boundary_still_owned": still_owned,
+                    }
+                )
+            else:
+                self._active = False
+                self._sealed = True
+                self._token = None
+                self._remove_failed = True
+                self._boundary_state_unknown = True
+                self._recovery_boundary_installed = False
+                self._record_event_locked(
+                    {
+                        "event": "mutation_boundary_remove_failed",
+                        "observed_at_monotonic": time.monotonic(),
+                        "remove_exception_type": remove_exception_type,
+                        "original_boundary_still_owned": still_owned,
+                        "recovery_exception_type": recovery_exception_type,
                     }
                 )
         return self.snapshot()
@@ -1139,6 +1203,14 @@ class M110MaintenanceResetResult:
     live_authority_granted: bool = False
     before_manifest_sha256: str = ""
     after_manifest_sha256: str = ""
+    verification_cut_epoch: float | None = None
+    verification_cut_reset_surface_sha256: str = ""
+    verification_cut_preservation_manifest_sha256: str = ""
+    physical_truth_scope: str = "not_verified_at_terminal_cut"
+    current_state_guaranteed_at_response: bool = False
+    attended_no_touch_required_during_execution: bool = True
+    fresh_readback_required_before_next_stage: bool = True
+    later_console_event_invalidates_readiness_freshness: bool = True
     preservation_mismatches: tuple[dict[str, Any], ...] = ()
     observer_audits: list[dict[str, Any]] = field(default_factory=list)
     mutation_audit: dict[str, Any] = field(default_factory=dict)
@@ -1453,6 +1525,7 @@ class M110MaintenanceDspResetExecutor:
         return bool(
             audit.get("overflow") is True
             or audit.get("remove_failed") is True
+            or audit.get("boundary_state_unknown") is True
             or audit.get("denied_attempts")
         )
 
@@ -2078,12 +2151,7 @@ class M110MaintenanceDspResetExecutor:
                 rollback_required = True
                 rollback_success = await perform_rollback()
 
-        if (
-            forward_success
-            and not proof_run
-            and not rollback_required
-            and not forward_authority_current()
-        ):
+        if forward_success and not forward_authority_current():
             failure_reason = "m110_write_authority_expired_before_terminal"
 
         live_observer_audit = observer.snapshot() if observer is not None else {}
@@ -2129,9 +2197,10 @@ class M110MaintenanceDspResetExecutor:
             result.physical_state_restored = False
             result.rollback_state_unknown = True
 
-        # Observer and mutation boundary remain installed while the durable
-        # terminal is appended. Any physical transition or attempted writer in
-        # that interval is detected and compensated below.
+        # Observer and mutation boundary remain installed through the staged
+        # verification passes. The observer is detached only after the final
+        # 64+184 sweep; the sealed mutation boundary remains until after the
+        # success WAL attempt. Failures before that attempt may be compensated.
         clean_observer = not self._observer_failed(
             sealed_observer_audit
         )
@@ -2151,6 +2220,7 @@ class M110MaintenanceDspResetExecutor:
             and clean_preservation
             and clean_gate
             and not cancellation_requested
+            and not failure_reason
         ):
             result.status = "proof_passed"
             result.reason = "m110_reset_proof_applied_and_restored"
@@ -2209,6 +2279,23 @@ class M110MaintenanceDspResetExecutor:
                 cancellation_requested = True
                 finalizer_cancellation = True
 
+        def task_cancellation_pending() -> bool:
+            return bool(
+                current_task is not None
+                and current_task.cancelling() > initial_cancelling
+            )
+
+        async def consume_pending_task_cancellation() -> bool:
+            """Observe a sync-hook cancel request without losing truth."""
+
+            if not task_cancellation_pending():
+                return False
+            try:
+                await asyncio.sleep(0)
+            except asyncio.CancelledError:
+                return True
+            return True
+
         def mark_manual(
             reason: str,
             *,
@@ -2229,19 +2316,45 @@ class M110MaintenanceDspResetExecutor:
         async def persist_phase(
             phase: str,
             payload: Mapping[str, Any],
-        ) -> tuple[bool, bool]:
+        ) -> tuple[bool, bool, str]:
+            cancelled_at_call = task_cancellation_pending()
+            record_cancellation(cancelled_at_call)
             try:
-                path, cancelled = await _call_durable_hook(
+                receipt, cancelled = await _call_durable_hook(
                     self.hooks.persist_terminal,
                     phase,
                     payload,
                 )
+                post_hook_cancelled = (
+                    await consume_pending_task_cancellation()
+                )
+                cancelled = bool(
+                    cancelled
+                    or cancelled_at_call
+                    or post_hook_cancelled
+                )
                 record_cancellation(cancelled)
-                return bool(path), bool(cancelled)
+                if isinstance(receipt, Mapping):
+                    path = receipt.get("path")
+                    payload_sha256 = str(
+                        receipt.get("payload_sha256") or ""
+                    )
+                else:
+                    path = receipt
+                    payload_sha256 = ""
+                return bool(path), bool(cancelled), payload_sha256
             except BaseException as exc:
                 cancelled = bool(
-                    isinstance(exc, M110DurableHookFailure)
-                    and exc.cancellation_requested
+                    cancelled_at_call
+                    or task_cancellation_pending()
+                    or isinstance(
+                        exc,
+                        (asyncio.CancelledError, M110SafetyCallCancelled),
+                    )
+                    or (
+                        isinstance(exc, M110DurableHookFailure)
+                        and exc.cancellation_requested
+                    )
                 )
                 record_cancellation(cancelled)
                 result.events.append(
@@ -2252,7 +2365,7 @@ class M110MaintenanceDspResetExecutor:
                         "cancellation_requested": cancelled,
                     }
                 )
-                return False, cancelled
+                return False, cancelled, ""
 
         async def verify_surface(
             *,
@@ -2401,12 +2514,19 @@ class M110MaintenanceDspResetExecutor:
             if emergency_attempted:
                 return
             emergency_attempted = True
+            record_cancellation(task_cancellation_pending())
             try:
                 emergency_value, emergency_cancelled = (
                     await _call_durable_hook(
                         self.hooks.emergency_stop,
                         f"m110_maintenance_reset_unverified:{transaction_id}",
                     )
+                )
+                post_emergency_cancelled = (
+                    await consume_pending_task_cancellation()
+                )
+                emergency_cancelled = bool(
+                    emergency_cancelled or post_emergency_cancelled
                 )
                 record_cancellation(emergency_cancelled)
                 emergency_ok = bool(
@@ -2421,8 +2541,18 @@ class M110MaintenanceDspResetExecutor:
             except BaseException as exc:
                 record_cancellation(
                     bool(
-                        isinstance(exc, M110DurableHookFailure)
-                        and exc.cancellation_requested
+                        task_cancellation_pending()
+                        or isinstance(
+                            exc,
+                            (
+                                asyncio.CancelledError,
+                                M110SafetyCallCancelled,
+                            ),
+                        )
+                        or (
+                            isinstance(exc, M110DurableHookFailure)
+                            and exc.cancellation_requested
+                        )
                     )
                 )
                 result.emergency_stop_activated = False
@@ -2510,6 +2640,26 @@ class M110MaintenanceDspResetExecutor:
                 "readiness_closure_allowed": False,
                 "before_manifest_sha256": result.before_manifest_sha256,
                 "after_manifest_sha256": result.after_manifest_sha256,
+                "physical_truth_scope": result.physical_truth_scope,
+                "verification_cut_epoch": result.verification_cut_epoch,
+                "verification_cut_reset_surface_sha256": (
+                    result.verification_cut_reset_surface_sha256
+                ),
+                "verification_cut_preservation_manifest_sha256": (
+                    result.verification_cut_preservation_manifest_sha256
+                ),
+                "current_state_guaranteed_at_response": (
+                    result.current_state_guaranteed_at_response
+                ),
+                "attended_no_touch_required_during_execution": (
+                    result.attended_no_touch_required_during_execution
+                ),
+                "fresh_readback_required_before_next_stage": (
+                    result.fresh_readback_required_before_next_stage
+                ),
+                "later_console_event_invalidates_readiness_freshness": (
+                    result.later_console_event_invalidates_readiness_freshness
+                ),
                 "before_manifest": {
                     "schema": M110_RESET_MANIFEST_SCHEMA,
                     "row_count": len(before_rows),
@@ -2547,9 +2697,10 @@ class M110MaintenanceDspResetExecutor:
             baseline_gate = gate.snapshot()
             baseline_manifest_sha = result.after_manifest_sha256
             baseline_mismatches = tuple(result.preservation_mismatches)
-            first_path, first_cancelled = await persist_phase(
+            first_manual_payload = terminal_payload()
+            first_path, first_cancelled, _first_digest = await persist_phase(
                 "manual_review_required",
-                terminal_payload(),
+                first_manual_payload,
             )
 
             reset_ok = True
@@ -2591,7 +2742,11 @@ class M110MaintenanceDspResetExecutor:
                 )
             correction_required = bool(
                 not first_path
-                or first_cancelled
+                or (
+                    first_cancelled
+                    and first_manual_payload.get("cancellation_requested")
+                    is not True
+                )
                 or not reset_ok
                 or not manifest_ok
                 or observer_changed
@@ -2600,9 +2755,11 @@ class M110MaintenanceDspResetExecutor:
             )
             if not correction_required:
                 return first_path
-            correction_path, correction_cancelled = await persist_phase(
+            correction_path, correction_cancelled, _correction_digest = (
+                await persist_phase(
                 "manual_review_required",
                 terminal_payload(),
+                )
             )
             if correction_cancelled:
                 mark_manual(
@@ -2613,6 +2770,114 @@ class M110MaintenanceDspResetExecutor:
                 )
             return bool(correction_path)
 
+        async def persist_no_write_incident(
+            reason: str,
+            *,
+            linearized_terminal_phase: str,
+            success_terminal_attempted: bool,
+            success_terminal_durable_confirmed: bool,
+        ) -> bool:
+            """Persist a post-cut incident without mutating console state."""
+
+            nonlocal gate, emergency_attempted
+            result.status = "manual_review_required"
+            result.reason = str(reason)
+            result.manual_review_required = True
+            result.physical_verified = False
+            current_gate = gate.snapshot()
+            gate_guaranteed = bool(
+                current_gate.get("active") is True
+                and current_gate.get("sealed") is True
+                and current_gate.get("boundary_state_unknown") is not True
+            )
+            if not gate_guaranteed:
+                replacement = M110MaintenanceMutationGate(
+                    self.wing_client,
+                    preimage,
+                    authority_current=forward_authority_current,
+                )
+                try:
+                    replacement.start()
+                    replacement.seal()
+                    gate = replacement
+                    gate_guaranteed = True
+                    result.events.append(
+                        {
+                            "phase": "post_terminal_no_write_gate_installed",
+                            "audit": gate.snapshot(),
+                        }
+                    )
+                except BaseException as exc:
+                    try:
+                        replacement.close()
+                    except BaseException:
+                        pass
+                    result.events.append(
+                        {
+                            "phase": (
+                                "post_terminal_no_write_gate_install_failed"
+                            ),
+                            "exception_type": type(exc).__name__,
+                        }
+                    )
+            if gate_guaranteed:
+                await activate_emergency()
+            else:
+                emergency_attempted = True
+                result.emergency_stop_activated = False
+                result.emergency_stop_activation_failed = True
+                result.events.append(
+                    {
+                        "phase": "post_terminal_callbacks_suppressed",
+                        "reason": "sealed_no_write_gate_unavailable",
+                        "emergency_hook_called": False,
+                        "terminal_hook_called": False,
+                    }
+                )
+                return False
+
+            def build_incident_payload() -> dict[str, Any]:
+                incident_payload = terminal_payload()
+                incident_payload.update({
+                    "post_linearization_incident": bool(
+                        success_terminal_attempted
+                    ),
+                    "linearized_terminal_phase": str(
+                        linearized_terminal_phase
+                    ),
+                    "linearized_state_preserved_by_executor": True,
+                    "success_terminal_attempted": bool(
+                        success_terminal_attempted
+                    ),
+                    "success_terminal_durable_confirmed": bool(
+                        success_terminal_durable_confirmed
+                    ),
+                    "compensation_attempted": False,
+                    "rollback_attempted_after_linearization": False,
+                })
+                return incident_payload
+
+            first_incident_payload = build_incident_payload()
+            path, cancelled, _incident_digest = await persist_phase(
+                "manual_review_required",
+                first_incident_payload,
+            )
+            if (
+                cancelled
+                and first_incident_payload.get("cancellation_requested")
+                is not True
+            ):
+                (
+                    correction_path,
+                    _correction_cancelled,
+                    _correction_digest,
+                ) = await persist_phase(
+                        "manual_review_required",
+                        build_incident_payload(),
+                )
+                return bool(correction_path)
+            return bool(path)
+
         baseline_observer_events = int(
             sealed_observer_audit.get("event_count", 0)
         )
@@ -2622,7 +2887,7 @@ class M110MaintenanceDspResetExecutor:
             prepared
             and result.status in {"applied", "proof_passed"}
         ):
-            pending_path, pending_cancelled = await persist_phase(
+            pending_path, pending_cancelled, _pending_digest = await persist_phase(
                 "verification_pending",
                 terminal_payload(
                     status_override="verification_pending",
@@ -2630,7 +2895,7 @@ class M110MaintenanceDspResetExecutor:
                 ),
             )
             if not pending_path or pending_cancelled:
-                if attempted_addresses:
+                if result.status == "applied" and attempted_addresses:
                     await restore_preimage(
                         "verification_pending_failure"
                     )
@@ -2643,11 +2908,13 @@ class M110MaintenanceDspResetExecutor:
                 )
 
         if (
-            result.status == "applied"
+            result.status in {"applied", "proof_passed"}
             and not forward_authority_current()
         ):
-            restored = await restore_preimage(
-                "final_authority_expired"
+            restored = (
+                await restore_preimage("final_authority_expired")
+                if result.status == "applied"
+                else result.physical_state_restored
             )
             if restored:
                 result.status = "rolled_back"
@@ -2776,60 +3043,13 @@ class M110MaintenanceDspResetExecutor:
             "manual_review_required",
         )
 
-        def install_recovery_gate() -> bool:
-            nonlocal gate
-            replacement = M110MaintenanceMutationGate(
-                self.wing_client,
-                preimage,
-                authority_current=forward_authority_current,
-            )
-            try:
-                replacement.start()
-                replacement.seal()
-            except BaseException as exc:
-                try:
-                    replacement.close()
-                except BaseException:
-                    pass
-                result.events.append(
-                    {
-                        "phase": "recovery_gate_install_failed",
-                        "exception_type": type(exc).__name__,
-                    }
-                )
-                return False
-            gate = replacement
-            result.events.append(
-                {
-                    "phase": "recovery_gate_installed",
-                    "audit": gate.snapshot(),
-                }
-            )
-            return True
-
-        async def close_recovery_gate() -> bool:
-            recovery_before = gate.snapshot()
-            if recovery_before.get("active") is not True:
-                result.mutation_audit = dict(recovery_before)
-                return True
-            recovery_closed = gate.close()
-            result.mutation_audit = dict(recovery_closed)
-            recovery_failed = bool(
-                recovery_closed.get("active") is True
-                or recovery_closed.get("remove_failed") is True
-            )
-            if recovery_failed:
-                mark_manual("m110_mutation_boundary_remove_failed")
-                await persist_manual_terminal()
-            return not recovery_failed
-
         if result.status == "manual_review_required":
             terminal_phase = (
                 "manual_review_required"
                 if await persist_manual_terminal()
                 else "terminal_record_failed"
             )
-        elif prepared:
+        elif prepared and result.status != "blocked":
             candidate_observer_before = (
                 observer.snapshot() if observer is not None else {}
             )
@@ -2838,7 +3058,8 @@ class M110MaintenanceDspResetExecutor:
             candidate_mismatches_before = tuple(
                 result.preservation_mismatches
             )
-            candidate_path, candidate_cancelled = await persist_phase(
+            candidate_path, candidate_cancelled, _candidate_digest = (
+                await persist_phase(
                 "verified_state_pending_cleanup",
                 terminal_payload(
                     status_override="verified_state_pending_cleanup",
@@ -2846,6 +3067,7 @@ class M110MaintenanceDspResetExecutor:
                         "m110_verified_state_waiting_for_guard_cleanup"
                     ),
                 ),
+                )
             )
             if not candidate_path or candidate_cancelled:
                 if result.status == "applied" and attempted_addresses:
@@ -2896,7 +3118,7 @@ class M110MaintenanceDspResetExecutor:
                     != candidate_mismatches_before
                 )
                 candidate_authority_expired = bool(
-                    result.status == "applied"
+                    result.status in {"applied", "proof_passed"}
                     and not forward_authority_current()
                 )
                 if (
@@ -2907,12 +3129,25 @@ class M110MaintenanceDspResetExecutor:
                     or candidate_manifest_changed
                     or candidate_authority_expired
                 ):
-                    if attempted_addresses:
+                    candidate_surface_risk = bool(
+                        not post_candidate_reset_ok
+                        or self._observer_has_unrestored_surface_risk(
+                            candidate_observer_after
+                        )
+                    )
+                    if attempted_addresses and (
+                        result.status == "applied"
+                        or candidate_surface_risk
+                    ):
                         await restore_preimage(
                             "post_candidate_compensation"
                         )
                     mark_manual(
-                        "m110_post_terminal_safety_audit_failed",
+                        (
+                            "m110_write_authority_expired_before_terminal"
+                            if candidate_authority_expired
+                            else "m110_post_terminal_safety_audit_failed"
+                        ),
                         full_surface_unknown=bool(
                             not post_candidate_manifest_ok
                             or candidate_manifest_changed
@@ -2929,228 +3164,16 @@ class M110MaintenanceDspResetExecutor:
                     else "terminal_record_failed"
                 )
 
+        # Keep the delivered-state observer active during the last physical
+        # 64+184 sweep, then detach it while the mutation boundary remains
+        # active and sealed. The attended no-touch contract covers the full
+        # Apply/Proof-to-visible-terminal interval, including the small gap
+        # between observer detach and the success WAL linearization point.
         if prepared and result.status != "manual_review_required":
-            final_phase = phase_by_status.get(
-                result.status,
-                "manual_review_required",
-            )
-            final_observer_before = (
+            observer_before_sweep = (
                 observer.snapshot() if observer is not None else {}
             )
-            final_gate_before = gate.snapshot()
-            final_manifest_before = result.after_manifest_sha256
-            final_mismatches_before = tuple(
-                result.preservation_mismatches
-            )
-            final_path, final_cancelled = await persist_phase(
-                final_phase,
-                terminal_payload(),
-            )
-            post_final_reset_ok = True
-            if attempted_addresses:
-                post_final_expected = (
-                    M110_RESET_TARGETS
-                    if result.status == "applied"
-                    else preimage
-                )
-                post_final_reset_ok = await verify_surface(
-                    expected=post_final_expected,
-                    phase="post_final_terminal_reset_surface_verify",
-                )
-            post_final_manifest_ok = await refresh_manifest(
-                "post_final_terminal_preservation_manifest"
-            )
-            final_observer_after = (
-                observer.snapshot() if observer is not None else {}
-            )
-            final_gate_after = gate.snapshot()
-            result.observer_audits.append(dict(final_observer_after))
-            final_observer_changed = bool(
-                final_observer_after.get("event_count", 0)
-                != final_observer_before.get("event_count", 0)
-            )
-            final_gate_changed = bool(
-                final_gate_after.get("event_count", 0)
-                != final_gate_before.get("event_count", 0)
-                or (
-                    final_gate_after.get("overflow") is True
-                    and final_gate_before.get("overflow") is not True
-                )
-            )
-            final_manifest_changed = bool(
-                result.after_manifest_sha256 != final_manifest_before
-                or tuple(result.preservation_mismatches)
-                != final_mismatches_before
-            )
-            final_authority_expired = bool(
-                result.status == "applied"
-                and not forward_authority_current()
-            )
-            if (
-                not final_path
-                or final_cancelled
-                or not post_final_reset_ok
-                or not post_final_manifest_ok
-                or final_observer_changed
-                or final_gate_changed
-                or final_manifest_changed
-                or final_authority_expired
-            ):
-                if result.status == "applied" and attempted_addresses:
-                    await restore_preimage(
-                        "final_terminal_wal_compensation"
-                    )
-                mark_manual(
-                    (
-                        "m110_reset_cancelled"
-                        if final_cancelled
-                        else "m110_reset_terminal_wal_failed"
-                        if not final_path
-                        else "m110_post_terminal_safety_audit_failed"
-                    ),
-                    full_surface_unknown=bool(
-                        not post_final_manifest_ok
-                        or final_manifest_changed
-                        or self._observer_has_unrestored_surface_risk(
-                            final_observer_after
-                        )
-                    ),
-                )
-                terminal_phase = (
-                    "manual_review_required"
-                    if await persist_manual_terminal()
-                    else "terminal_record_failed"
-                )
-            else:
-                terminal_phase = final_phase
-
-        cleanup_recovery_installed = False
-        gate_observer_before_close = (
-            observer.snapshot() if observer is not None else {}
-        )
-        gate_before_close = gate.snapshot()
-        gate_event_count_before_close = int(
-            gate_before_close.get("event_count", 0)
-        )
-        gate_overflow_before_close = bool(
-            gate_before_close.get("overflow") is True
-        )
-        if gate_before_close.get("active") is True:
-            closed_gate = gate.close()
-        else:
-            closed_gate = gate_before_close
-        result.mutation_audit = dict(closed_gate)
-        gate_remove_failed = bool(
-            closed_gate.get("active") is True
-            or closed_gate.get("remove_failed") is True
-        )
-        gate_close_changed = bool(
-            int(closed_gate.get("event_count", 0))
-            != gate_event_count_before_close
-            or (
-                closed_gate.get("overflow") is True
-                and not gate_overflow_before_close
-            )
-        )
-
-        post_gate_reset_ok = True
-        if attempted_addresses:
-            post_gate_expected = (
-                M110_RESET_TARGETS
-                if result.status == "applied"
-                else preimage
-            )
-            post_gate_reset_ok = await verify_surface(
-                expected=post_gate_expected,
-                phase="post_gate_close_reset_surface_verify",
-            )
-        post_gate_manifest_ok = True
-        if prepared:
-            post_gate_manifest_ok = await refresh_manifest(
-                "post_gate_close_preservation_manifest"
-            )
-        gate_observer_after_close = (
-            observer.snapshot() if observer is not None else {}
-        )
-        result.observer_audits.append(dict(gate_observer_after_close))
-        gate_observer_changed = bool(
-            gate_observer_after_close.get("event_count", 0)
-            != gate_observer_before_close.get("event_count", 0)
-        )
-        gate_close_fault = bool(
-            gate_remove_failed
-            or gate_close_changed
-            or gate_observer_changed
-            or not post_gate_reset_ok
-            or not post_gate_manifest_ok
-        )
-
-        if gate_close_fault:
-            original_close_audit = dict(closed_gate)
-            original_gate_still_active = (
-                closed_gate.get("active") is True
-            )
-            recovery_ready = bool(
-                original_gate_still_active or install_recovery_gate()
-            )
-            cleanup_recovery_installed = bool(
-                recovery_ready and not original_gate_still_active
-            )
-            if (
-                recovery_ready
-                and result.status == "applied"
-                and attempted_addresses
-            ):
-                await restore_preimage(
-                    "mutation_boundary_close_compensation"
-                )
-            mark_manual(
-                (
-                    "m110_mutation_boundary_remove_failed"
-                    if gate_remove_failed
-                    else "m110_mutation_boundary_close_audit_failed"
-                    if gate_close_changed
-                    else "m110_mutation_boundary_close_physical_audit_failed"
-                ),
-                full_surface_unknown=bool(
-                    not recovery_ready
-                    or not post_gate_manifest_ok
-                    or self._observer_has_unrestored_surface_risk(
-                        gate_observer_after_close
-                    )
-                ),
-            )
-            result.events.append(
-                {
-                    "phase": "mutation_boundary_close_fault",
-                    "audit": original_close_audit,
-                    "observer_audit": gate_observer_after_close,
-                    "reset_surface_ok": post_gate_reset_ok,
-                    "preservation_manifest_ok": post_gate_manifest_ok,
-                    "recovery_gate_ready": recovery_ready,
-                }
-            )
-            terminal_phase = (
-                "manual_review_required"
-                if await persist_manual_terminal()
-                else "terminal_record_failed"
-            )
-
-        observer_close_failed = False
-        observer_close_changed = False
-        if observer is not None:
-            observer_before_close = observer.snapshot()
-            observer_closed = observer.close()
-            result.observer_audits.append(dict(observer_closed))
-            observer_close_failed = bool(
-                observer_before_close.get("active") is True
-                and observer_closed.get("unsubscribe_failed") is True
-            )
-            observer_close_changed = bool(
-                observer_closed.get("event_count", 0)
-                != observer_before_close.get("event_count", 0)
-            )
-
+            gate_before_sweep = gate.snapshot()
             detach_reset_ok = True
             if attempted_addresses:
                 detach_expected = (
@@ -3160,47 +3183,83 @@ class M110MaintenanceDspResetExecutor:
                 )
                 detach_reset_ok = await verify_surface(
                     expected=detach_expected,
-                    phase="post_observer_detach_reset_surface_verify",
+                    phase="final_observed_reset_surface_verify",
                 )
-            detach_manifest_ok = True
-            if prepared:
-                detach_manifest_ok = await refresh_manifest(
-                    "post_observer_detach_preservation_manifest"
-                )
-
-            if (
-                observer_close_failed
+            detach_manifest_ok = await refresh_manifest(
+                "final_observed_preservation_manifest"
+            )
+            observer_after_sweep = (
+                observer.snapshot() if observer is not None else {}
+            )
+            observer_closed = (
+                observer.close() if observer is not None else {}
+            )
+            result.observer_audits.append(dict(observer_after_sweep))
+            result.observer_audits.append(dict(observer_closed))
+            observer_sweep_changed = bool(
+                observer_after_sweep.get("event_count", 0)
+                != observer_before_sweep.get("event_count", 0)
+            )
+            observer_close_failed = bool(
+                observer_after_sweep.get("active") is True
+                and observer_closed.get("unsubscribe_failed") is True
+            )
+            observer_close_changed = bool(
+                observer_closed.get("event_count", 0)
+                != observer_after_sweep.get("event_count", 0)
+            )
+            gate_after_detach = gate.snapshot()
+            detach_gate_changed = bool(
+                gate_after_detach.get("event_count", 0)
+                != gate_before_sweep.get("event_count", 0)
+                or gate_after_detach.get("overflow") is True
+                and gate_before_sweep.get("overflow") is not True
+            )
+            detach_authority_expired = bool(
+                result.status in {"applied", "proof_passed"}
+                and not forward_authority_current()
+            )
+            task_cancelled_now = bool(
+                current_task is not None
+                and current_task.cancelling() > initial_cancelling
+            )
+            record_cancellation(task_cancelled_now)
+            detach_cancelled = bool(
+                cancellation_requested
+                and result.status not in {"blocked", "rolled_back"}
+            )
+            detach_fault = bool(
+                self._observer_failed(observer_before_sweep)
+                or self._observer_failed(observer_after_sweep)
+                or self._observer_failed(observer_closed)
+                or observer_sweep_changed
+                or observer_close_failed
                 or observer_close_changed
                 or not detach_reset_ok
                 or not detach_manifest_ok
-            ):
-                gate_is_active = gate.snapshot().get("active") is True
-                recovery_ready = bool(
-                    gate_is_active or install_recovery_gate()
-                )
-                cleanup_recovery_installed = bool(
-                    cleanup_recovery_installed
-                    or (recovery_ready and not gate_is_active)
-                )
-                if (
-                    recovery_ready
-                    and result.status == "applied"
-                    and attempted_addresses
-                ):
+                or detach_gate_changed
+                or detach_authority_expired
+                or detach_cancelled
+                or gate_after_detach.get("active") is not True
+                or gate_after_detach.get("sealed") is not True
+            )
+            if detach_fault:
+                if result.status == "applied" and attempted_addresses:
                     await restore_preimage(
                         "observer_detach_compensation"
                     )
                 mark_manual(
                     (
-                        result.reason
-                        if result.manual_review_required
+                        "m110_write_authority_expired_before_terminal"
+                        if detach_authority_expired
+                        else "m110_reset_cancelled"
+                        if detach_cancelled
                         else "m110_delivered_observer_unsubscribe_failed"
                         if observer_close_failed
                         else "m110_observer_detach_safety_audit_failed"
                     ),
                     full_surface_unknown=bool(
-                        not recovery_ready
-                        or observer_close_failed
+                        observer_close_failed
                         or not detach_manifest_ok
                         or self._observer_has_unrestored_surface_risk(
                             observer_closed
@@ -3212,9 +3271,399 @@ class M110MaintenanceDspResetExecutor:
                     if await persist_manual_terminal()
                     else "terminal_record_failed"
                 )
+            elif attempted_addresses:
+                verification_values = (
+                    M110_RESET_TARGETS
+                    if result.status == "applied"
+                    else preimage
+                )
+                result.verification_cut_epoch = time.time()
+                result.verification_cut_reset_surface_sha256 = _sha256(
+                    _canonical_json_bytes(
+                        [
+                            {
+                                "address": address,
+                                "value": verification_values[address],
+                            }
+                            for address in M110_RESET_ADDRESSES
+                        ]
+                    )
+                )
+                result.verification_cut_preservation_manifest_sha256 = (
+                    result.after_manifest_sha256
+                )
+                result.physical_truth_scope = (
+                    "verified_as_of_m110_verification_cut"
+                )
 
-        if cleanup_recovery_installed:
-            await close_recovery_gate()
+        success_terminal_attempted = False
+        success_terminal_durable_confirmed = False
+        linearized_terminal_phase = ""
+        if prepared and result.status != "manual_review_required":
+            final_phase = phase_by_status.get(
+                result.status,
+                "manual_review_required",
+            )
+            strict_success_terminal = result.status in {
+                "applied",
+                "proof_passed",
+            }
+            final_gate_before = gate.snapshot()
+            final_cancel_precheck = bool(
+                strict_success_terminal
+                and current_task is not None
+                and current_task.cancelling() > initial_cancelling
+            )
+            record_cancellation(final_cancel_precheck)
+            final_authority_precheck_expired = bool(
+                strict_success_terminal
+                and not forward_authority_current()
+            )
+            final_gate_precheck_failed = bool(
+                (
+                    strict_success_terminal
+                    and self._gate_failed(final_gate_before)
+                )
+                or final_gate_before.get("active") is not True
+                or final_gate_before.get("sealed") is not True
+            )
+            final_payload = terminal_payload()
+            observer_audit = final_payload.get(
+                "delivered_observer_audit",
+                {},
+            )
+            mutation_audit = final_payload.get("mutation_audit", {})
+            expected_verification_values = (
+                M110_RESET_TARGETS
+                if result.status == "applied"
+                else preimage
+            )
+            expected_cut_reset_sha256 = _sha256(
+                _canonical_json_bytes(
+                    [
+                        {
+                            "address": address,
+                            "value": expected_verification_values[address],
+                        }
+                        for address in M110_RESET_ADDRESSES
+                    ]
+                )
+            )
+            expected_operation_ids = [
+                str(row["operation_id"])
+                for row in M110_RESET_OPERATION_DEFINITIONS
+            ]
+            before_manifest_payload = final_payload.get("before_manifest")
+            after_manifest_payload = final_payload.get("after_manifest")
+            strict_payload_clean = bool(
+                not strict_success_terminal
+                or (
+                    final_payload.get("cancellation_requested") is False
+                    and final_payload.get("physical_verified") is True
+                    and final_payload.get("audio_recheck_passed") is True
+                    and final_payload.get("manual_review_required") is False
+                    and final_payload.get("write_state_unknown") is False
+                    and final_payload.get("rollback_state_unknown") is False
+                    and isinstance(
+                        final_payload.get("verification_cut_epoch"),
+                        (int, float),
+                    )
+                    and not isinstance(
+                        final_payload.get("verification_cut_epoch"),
+                        bool,
+                    )
+                    and math.isfinite(
+                        float(final_payload["verification_cut_epoch"])
+                    )
+                    and final_payload.get("physical_truth_scope")
+                    == "verified_as_of_m110_verification_cut"
+                    and final_payload.get(
+                        "current_state_guaranteed_at_response"
+                    )
+                    is False
+                    and final_payload.get(
+                        "fresh_readback_required_before_next_stage"
+                    )
+                    is True
+                    and final_payload.get(
+                        "attended_no_touch_required_during_execution"
+                    )
+                    is True
+                    and final_payload.get(
+                        "later_console_event_invalidates_readiness_freshness"
+                    )
+                    is True
+                    and final_payload.get(
+                        "verification_cut_reset_surface_sha256"
+                    )
+                    == expected_cut_reset_sha256
+                    and final_payload.get(
+                        "verification_cut_preservation_manifest_sha256"
+                    )
+                    == final_payload.get("after_manifest_sha256")
+                    and final_payload.get("preservation_mismatches") == []
+                    and final_payload.get(
+                        "no_outside_mutation_attempt_proven"
+                    )
+                    is True
+                    and final_payload.get("delivered_observer_clean") is True
+                    and isinstance(observer_audit, Mapping)
+                    and observer_audit.get("active") is False
+                    and observer_audit.get("unsubscribe_failed") is False
+                    and observer_audit.get("overflow") is False
+                    and not observer_audit.get("unexpected_events")
+                    and isinstance(mutation_audit, Mapping)
+                    and mutation_audit.get("active") is True
+                    and mutation_audit.get("sealed") is True
+                    and mutation_audit.get("remove_failed") is False
+                    and mutation_audit.get("overflow") is False
+                    and not mutation_audit.get("denied_attempts")
+                    and isinstance(before_manifest_payload, Mapping)
+                    and before_manifest_payload.get("row_count") == 184
+                    and final_payload.get("before_manifest_sha256")
+                    == _sha256(
+                        _canonical_json_bytes(before_manifest_payload)
+                    )
+                    and isinstance(after_manifest_payload, Mapping)
+                    and after_manifest_payload.get("row_count") == 184
+                    and final_payload.get("after_manifest_sha256")
+                    == _sha256(
+                        _canonical_json_bytes(after_manifest_payload)
+                    )
+                    and final_payload.get("applied_operation_ids")
+                    == expected_operation_ids
+                    and (
+                        result.status != "proof_passed"
+                        or (
+                            final_payload.get("proof_target_verified") is True
+                            and final_payload.get("physical_state_restored")
+                            is True
+                            and final_payload.get("rollback_attempted") is True
+                            and final_payload.get("rollback_succeeded") is True
+                            and final_payload.get("rollback_operation_ids")
+                            == list(reversed(expected_operation_ids))
+                        )
+                    )
+                )
+            )
+            if (
+                final_gate_precheck_failed
+                or final_cancel_precheck
+                or final_authority_precheck_expired
+                or not strict_payload_clean
+            ):
+                if result.status == "applied" and attempted_addresses:
+                    await restore_preimage(
+                        "pre_terminal_invariant_compensation"
+                    )
+                mark_manual(
+                    (
+                        "m110_reset_cancelled"
+                        if final_cancel_precheck
+                        else "m110_write_authority_expired_before_terminal"
+                        if final_authority_precheck_expired
+                        else "m110_preterminal_success_invariant_failed"
+                    ),
+                )
+                terminal_phase = (
+                    "manual_review_required"
+                    if await persist_manual_terminal()
+                    else "terminal_record_failed"
+                )
+            else:
+                success_terminal_attempted = strict_success_terminal
+                linearized_terminal_phase = (
+                    final_phase if strict_success_terminal else ""
+                )
+                final_payload_for_persist = json.loads(
+                    _canonical_json_bytes(final_payload)
+                )
+                final_payload_digest_before = _sha256(
+                    _canonical_json_bytes(final_payload_for_persist)
+                )
+                (
+                    final_path,
+                    final_cancelled,
+                    final_receipt_digest,
+                ) = await persist_phase(
+                    final_phase,
+                    final_payload_for_persist,
+                )
+                try:
+                    final_payload_mutated = bool(
+                        _sha256(
+                            _canonical_json_bytes(final_payload_for_persist)
+                        )
+                        != final_payload_digest_before
+                    )
+                except BaseException:
+                    final_payload_mutated = True
+                final_receipt_bound = bool(
+                    not strict_success_terminal
+                    or final_receipt_digest
+                    == final_payload_digest_before
+                )
+                success_terminal_durable_confirmed = bool(
+                    strict_success_terminal
+                    and final_path
+                    and final_receipt_bound
+                )
+                post_persist_cancelled = bool(
+                    strict_success_terminal
+                    and current_task is not None
+                    and current_task.cancelling() > initial_cancelling
+                )
+                record_cancellation(post_persist_cancelled)
+                final_cancelled = bool(
+                    final_cancelled or post_persist_cancelled
+                )
+                final_gate_after = gate.snapshot()
+                final_gate_changed = bool(
+                    final_gate_after.get("event_count", 0)
+                    != final_gate_before.get("event_count", 0)
+                    or (
+                        final_gate_after.get("overflow") is True
+                        and final_gate_before.get("overflow") is not True
+                    )
+                )
+                final_authority_expired = bool(
+                    strict_success_terminal
+                    and not forward_authority_current()
+                )
+                post_terminal_fault = bool(
+                    not final_path
+                    or final_cancelled
+                    or final_payload_mutated
+                    or not final_receipt_bound
+                    or final_gate_changed
+                    or (
+                        strict_success_terminal
+                        and self._gate_failed(final_gate_after)
+                    )
+                    or final_authority_expired
+                    or final_gate_after.get("active") is not True
+                    or final_gate_after.get("sealed") is not True
+                )
+                if post_terminal_fault:
+                    incident_reason = (
+                        "m110_reset_cancelled"
+                        if final_cancelled
+                        else "m110_reset_terminal_wal_failed"
+                        if not final_path
+                        else "m110_success_terminal_payload_mutated"
+                        if final_payload_mutated
+                        else "m110_success_terminal_receipt_unbound"
+                        if not final_receipt_bound
+                        else "m110_write_authority_expired_before_terminal"
+                        if final_authority_expired
+                        else "m110_post_terminal_safety_audit_failed"
+                    )
+                    terminal_phase = (
+                        "manual_review_required"
+                        if await persist_no_write_incident(
+                            incident_reason,
+                            linearized_terminal_phase=(
+                                linearized_terminal_phase
+                            ),
+                            success_terminal_attempted=(
+                                success_terminal_attempted
+                            ),
+                            success_terminal_durable_confirmed=(
+                                success_terminal_durable_confirmed
+                            ),
+                        )
+                        else "terminal_record_failed"
+                    )
+                else:
+                    terminal_phase = final_phase
+
+        # A manual path may have skipped the pre-terminal detach. Keep the gate
+        # sealed while removing the observer so no programmatic write can race.
+        if observer is not None and observer.snapshot().get("active") is True:
+            observer_before_close = observer.snapshot()
+            observer_closed = observer.close()
+            result.observer_audits.append(dict(observer_closed))
+            if (
+                observer_closed.get("unsubscribe_failed") is True
+                or observer_closed.get("event_count", 0)
+                != observer_before_close.get("event_count", 0)
+            ):
+                mark_manual(
+                    "m110_delivered_observer_unsubscribe_failed",
+                    full_surface_unknown=self._observer_has_unrestored_surface_risk(
+                        observer_closed
+                    ),
+                )
+                terminal_phase = (
+                    "manual_review_required"
+                    if await persist_manual_terminal()
+                    else "terminal_record_failed"
+                )
+
+        gate_before_close = gate.snapshot()
+        gate_preclose_failed = bool(
+            success_terminal_attempted
+            and result.status != "manual_review_required"
+            and self._gate_failed(gate_before_close)
+        )
+        if gate_before_close.get("active") is True:
+            closed_gate = gate.close()
+        else:
+            closed_gate = gate_before_close
+        result.mutation_audit = dict(closed_gate)
+        gate_remove_failed = bool(
+            closed_gate.get("active") is True
+            or closed_gate.get("remove_failed") is True
+        )
+        gate_close_changed = bool(
+            closed_gate.get("event_count", 0)
+            != gate_before_close.get("event_count", 0)
+            or closed_gate.get("overflow") is True
+            and gate_before_close.get("overflow") is not True
+        )
+        post_close_authority_expired = bool(
+            success_terminal_attempted
+            and result.status != "manual_review_required"
+            and not forward_authority_current()
+        )
+        if (
+            gate_remove_failed
+            or gate_close_changed
+            or gate_preclose_failed
+            or post_close_authority_expired
+        ):
+            close_reason = (
+                "m110_write_authority_expired_after_terminal"
+                if post_close_authority_expired
+                else "m110_mutation_boundary_remove_failed"
+                if gate_remove_failed
+                else "m110_mutation_boundary_close_audit_failed"
+            )
+            result.events.append(
+                {
+                    "phase": "mutation_boundary_close_fault",
+                    "audit": dict(closed_gate),
+                    "gate_left_fail_closed": bool(
+                        closed_gate.get("active") is True
+                        and closed_gate.get("sealed") is True
+                        and closed_gate.get("boundary_state_unknown")
+                        is not True
+                    ),
+                    "compensation_attempted": False,
+                }
+            )
+            terminal_phase = (
+                "manual_review_required"
+                if await persist_no_write_incident(
+                    close_reason,
+                    linearized_terminal_phase=linearized_terminal_phase,
+                    success_terminal_attempted=success_terminal_attempted,
+                    success_terminal_durable_confirmed=(
+                        success_terminal_durable_confirmed
+                    ),
+                )
+                else "terminal_record_failed"
+            )
         result.mutation_audit = dict(gate.snapshot())
         if result.manual_review_required and not emergency_attempted:
             await activate_emergency()

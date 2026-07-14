@@ -480,6 +480,16 @@ class WingClient(MixerClientBase):
                 self._mutation_boundary_token = None
                 return True
 
+    def mutation_boundary_matches(self, token: object) -> bool:
+        """Return whether ``token`` still owns the installed send boundary."""
+
+        with self._osc_send_lock:
+            with self._mutation_boundary_lock:
+                return bool(
+                    self._mutation_boundary is not None
+                    and self._mutation_boundary_token is token
+                )
+
     def query_parameter(
         self,
         address: str,

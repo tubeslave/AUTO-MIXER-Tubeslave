@@ -87,3 +87,15 @@ def test_explicit_disconnect_cannot_be_reopened_by_stale_send_failure(
 
     assert client.connection_state is ConnectionState.DISCONNECTED
     start_reconnect.assert_not_called()
+
+
+@patch("wing_client.WingClient")
+def test_mutation_boundary_match_check_delegates_to_wing_client(wing_client):
+    wing = MagicMock()
+    wing.mutation_boundary_matches.return_value = True
+    wing_client.return_value = wing
+    client = EnhancedOSCClient()
+    token = object()
+
+    assert client.mutation_boundary_matches(token) is True
+    wing.mutation_boundary_matches.assert_called_once_with(token)

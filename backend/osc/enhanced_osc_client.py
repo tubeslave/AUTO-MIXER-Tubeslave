@@ -188,6 +188,9 @@ class EnhancedOSCClient:
     def remove_mutation_boundary(self, token: object) -> bool:
         return self._wing.remove_mutation_boundary(token)
 
+    def mutation_boundary_matches(self, token: object) -> bool:
+        return self._wing.mutation_boundary_matches(token)
+
     def query_parameter(self, address: str, timeout: float = 0.5) -> Dict[str, Any]:
         """Query through the wrapper so send failures trigger reconnect state."""
         return self._wing.query_parameter(

@@ -158,8 +158,11 @@ class TestOSCThrottle:
                 ("/ch/1/eq/on", (0,)),
                 ("/ch/1/fdr", (-12.0,)),
             ]
+            assert client.mutation_boundary_matches(token) is True
+            assert client.mutation_boundary_matches(object()) is False
             assert client.remove_mutation_boundary(object()) is False
             assert client.remove_mutation_boundary(token) is True
+            assert client.mutation_boundary_matches(token) is False
             assert client.remove_mutation_boundary(token) is False
 
     def test_mutation_boundary_is_exclusive_and_released_by_exact_token(self):
@@ -181,7 +184,9 @@ class TestOSCThrottle:
             replacement = client.install_mutation_boundary(
                 lambda _address, _values: True
             )
+            assert client.mutation_boundary_matches(replacement) is True
             assert client.remove_mutation_boundary(replacement) is True
+            assert client.mutation_boundary_matches(replacement) is False
 
 
 class TestStateManagement:

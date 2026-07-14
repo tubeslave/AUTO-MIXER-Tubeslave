@@ -104,6 +104,18 @@ empty. Ordinary Apply remains blocked unless an exact M110 capability is
 atomically consumed. Disarm, disconnect, emergency or route expiry revokes
 every unconsumed grant without changing normal mode.
 
+The literal arm confirmation also acknowledges one operator-visible attended
+no-touch interval for every Apply or Proof: it begins before the runner invokes
+the executor and ends only when the runner displays the durable terminal
+response. Throughout that complete interval the operator must not change any
+console setting and every other OSC controller must remain disconnected. Audio
+signal may continue. The wire result states
+`attended_no_touch_required_during_execution:true`. The process mutation gate
+blocks local writers. A physical change after the recorded verification cut is
+a new concurrent console event, not retroactive evidence that the earlier cut
+was false; it invalidates readiness freshness, and every later capability stage
+must perform its own complete fresh preimage/CAS readback before any send.
+
 The complete arm request is exactly:
 
 ```json
@@ -384,6 +396,14 @@ physical state restored, verified audio, known write/rollback state, no manual
 review/emergency, `accepted:false`, owner review still required, and no live
 authority/readiness change. It is never treated as normal `applied`.
 
+`physical_verified` and `physical_state_restored` are historical truth at the
+recorded `verified_as_of_m110_verification_cut`, not a promise that no later
+physical action occurred before the response was rendered. The terminal binds
+the cut epoch plus reset-surface and preservation-manifest SHA-256 values,
+states `current_state_guaranteed_at_response:false`, and requires a fresh
+readback before the next stage. A proof receipt authorizes only that historical
+proof; it never substitutes for the commit lane's fresh recapture.
+
 The outbound v2 terminal is projected only from the durable result receipt. It
 must report `proposal_status=apply_status=status=proof_passed`, `success:true`,
 `proof_run:true`, `restore_after_verify:true`,
@@ -404,8 +424,10 @@ The first M110 reset scope is channels 1–16 and at most 64 addresses:
 - `/ch/N/dyn/on = 0`
 
 The backend creates the plan from fresh physical readback, captures a complete
-preimage, prepares WAL before a send, double-verifies all writes and rolls the
-whole transaction back in reverse on any failure.
+preimage, prepares WAL before a send and double-verifies all writes. Before the
+success-WAL attempt, a failure that leaves the reset applied restores the whole
+transaction in reverse. The success-WAL attempt is irrevocable: later faults
+never issue compensating console sends.
 
 Preservation has two explicit, non-overclaiming proofs:
 
@@ -420,9 +442,11 @@ Preservation has two explicit, non-overclaiming proofs:
    reset.
 2. The maintenance adapter and send-boundary interceptor allow only the 64
    reset addresses. A temporary wildcard physical observer records only
-   transition events actually delivered by WING; any delivered event outside
-   the reset set blocks and rolls back, but event silence never proves physical
-   equality because not every WING surface is streamed. Sends/FX,
+   transition events actually delivered by WING. Before the verification cut,
+   any delivered event outside the reset set blocks success and restores the
+   reset surface when required. A later event invalidates freshness and cannot
+   trigger compensation after the success-WAL attempt. Event silence never
+   proves physical equality because not every WING surface is streamed. Sends/FX,
    buses/DCA/matrix, other Main values, scenes and names are reported only as
    `no_mutation_attempt_proven` from the send-boundary audit, with delivered
    observer events as supplemental evidence, not falsely as full physical
@@ -431,6 +455,24 @@ Preservation has two explicit, non-overclaiming proofs:
 The before/after manifest bytes and no-mutation-attempt audit are both
 digest-bound to the proposal and receipt. Reset remains a maintenance proposal
 and cannot contribute soundcheck readiness by itself.
+
+The success WAL is the irrevocable transaction terminal. Before it, the
+observer remains active throughout the final 64+184 physical sweep and is
+detached only after that sweep, while the process mutation gate remains active
+and sealed. The success payload must prove that exact clean cut, and the durable
+append must return the SHA-256 of the bytes it actually wrote. The production
+server owns this append and computes the receipt from its own canonical fsynced
+bytes; a callback-supplied or self-attested digest cannot authorize hardware.
+After a success
+attempt, cancellation, authority expiry or gate-release faults create a
+no-write manual incident and emergency latch behind a confirmed sealed gate.
+They never issue compensating sends that could leave durable `committed`
+evidence while physically undoing the reset. If a sealed recovery gate cannot
+be established, all external callbacks are suppressed and the terminal is
+reported failed instead of risking a write. Incidents record the linearized
+phase, `compensation_attempted:false` and require fresh physical reconciliation.
+A failure before the success attempt may still restore the preimage under the
+sealed gate.
 
 ### Processor enable and permanent soundcheck
 

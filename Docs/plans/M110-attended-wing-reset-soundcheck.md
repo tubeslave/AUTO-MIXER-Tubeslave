@@ -6,6 +6,9 @@
 - Normal live allowlist and registry standing authority remain unchanged.
 - Only committed, fully validated source may enter the attended checkpoint.
 - STOP, writer lease, WAL recovery, emergency and headroom rails remain fatal.
+- Arming M110 acknowledges no console-setting changes and no other OSC
+  controller from before each Apply/Proof executor invocation until its
+  durable terminal response is visible to the operator.
 - Generated `reports/master_mix_eval_*` stay outside source commits.
 
 | Checkpoint | Goal | Scope | Required evidence | Hardware |
@@ -22,6 +25,13 @@
 | M110-HW04 | Staged soundcheck | foundation → tonal/dynamics → spatial/FX | exact reviewed child receipts, replans, headroom, no unresolved important corrections | attended real WING |
 | M110-HW05 | Final audit | full readback/reanalysis and operator truth | `safe_core_ready`/`show_mix_ready` or explicit incomplete blockers, score | attended real WING |
 
+CP03 defines and tests the executor contract only; it grants no hardware
+authority. Before CP05 can pass, the production server must own construction of
+the M110 hooks and its durable append must compute the receipt SHA-256 from the
+exact canonical bytes it writes and fsyncs. A caller-supplied/self-attested
+digest is insufficient, and no HW checkpoint may run while that binding is
+absent.
+
 ## Hardware checkpoint order
 
 1. Confirm the backend-owned CP05 marker binds the entire committed Git tree;
@@ -32,7 +42,8 @@
    `arm_m110_attended_control` to enter supervised capability-only mode without
    reconnecting. Any restart/reconnect repeats step 2.
 4. Prepare and review the fixed reset bundle, run its exact restore-only proof,
-   then issue its commit-once grant, apply it and verify preserved state.
+   then perform a new complete physical recapture before issuing its
+   commit-once grant, apply it and verify preserved state.
 5. Run canonical analysis, generate processor and soundcheck bundles, and
    decompose every staged child into separately reviewed single operations.
 6. For each resulting bundle in stage order: review exact bytes, run the
@@ -42,8 +53,9 @@
 7. Bound every local replan, regenerate and re-prove any changed bundle, and
    preserve already verified safe sibling progress unless a global hazard stops
    the run.
-8. Re-read route and affected surfaces twice, remeasure audio and record the
-   honest terminal readiness.
+8. Re-read route and every affected/preserved surface twice after all stages,
+   remeasure audio and record the honest terminal readiness. Historical
+   verification-cut receipts alone cannot satisfy HW05 freshness.
 
 ## Mandatory software commands
 
