@@ -76,7 +76,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
+Latest ledger handoff row: `m113_wing_coreaudio_48x48_gate_validated` at `2026-07-14T21:27:36Z`.
 
 Historical 2026-07-12 ledger checkpoint:
 `local_engineering_95_final_tree_full_suite_no_wing_validation` at

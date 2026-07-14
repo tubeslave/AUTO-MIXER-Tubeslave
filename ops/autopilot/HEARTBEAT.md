@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-14T20:11:13Z
+Last heartbeat UTC: 2026-07-14T21:27:36Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -8,12 +8,12 @@ Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none at the committed validation boundary. The bounded M111
+Writer lease: none at the committed validation boundary. The bounded M113
 implementation lease is released before validation. CP05 is dynamically
 checked against the current non-marker Git tree and must pass before any
 hardware attempt.
 
-## M110 CP05/launch checkpoint and USB blocker — 2026-07-14
+## M113 48x48 identity checkpoint and M110 USB blocker — 2026-07-14
 
 The M001 program shell remains waiting. M110 CP00-CP05 are complete under the
 canonical source-bound marker pair. The clean detached launch-only probe passed
@@ -38,9 +38,9 @@ exact same-console WING Rack serial, the committed replay passes, and a new
 explicit migration-bound M006 decision is verified. Native provenance and
 live authority remain false.
 
-Latest verified full pytest passed with `7160 passed, 3 skipped`.
+Latest verified full pytest passed with `7180 passed, 3 skipped`.
 The validation-source baseline is
-`451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`; 150 WING/static rails and the
+`8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9`; 136 WING/static rails and the
 66/66 no-WING capsule `20260714T195349Z_no_wing_release_check` also passed.
 Exact current-tree identity remains dynamically CP05-bound.
 
@@ -116,7 +116,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
+Latest ledger handoff row: `m113_wing_coreaudio_48x48_gate_validated` at `2026-07-14T21:27:36Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

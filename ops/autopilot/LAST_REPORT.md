@@ -1,6 +1,6 @@
 # Autopilot Last Report
 
-## M111 migration hardened; M110 physical WING USB missing — 2026-07-14
+## M113 CoreAudio 48x48 gate validated; physical WING USB missing — 2026-07-14
 
 - The global M001 status/checkpoint stays unchanged; M110 is
   `STATE.json.active_work`.
@@ -18,10 +18,10 @@
 - M006 restore is fixed at 23/14/14 operations, 33/63/14 scoped addresses and
   19/52/6 changed addresses (77 unique); it preserves state outside the
   archived transaction and is not a factory reset.
-- The latest independent P1 review found the HW05 runner could ignore an
-  interleaved `readiness_invalidated` event. A persistent session latch now
-  rejects the event both before terminal and during terminal grace; the
-  reviewer reran all 97 runner tests with no remaining P0/P1.
+- M113 closes the input-only hardware-identity fail-open. Production collection
+  and independent artifact verification require exact integer 48 input, 48
+  output and 48000 Hz; hash-valid float/missing/wrong evidence is rejected and
+  output-mode refresh failure revokes authority. Final review found no P0/P1/P2.
 - No physical WING/USB stream or live write occurred in this M110 cycle. The
   only backend contact was the verified loopback launch-only probe. Reset and
   correction counts remain zero. M005 behavior is closed; M006 permission is
@@ -34,10 +34,10 @@
   required; native M005 provenance remains false.
 - CP05 is dynamically checked against the current non-marker tree; tracked
   non-marker changes require one marker-only rebind before hardware work.
-- Latest heartbeat: 2026-07-14T20:11:13Z.
-- Latest verified full suite passed with `7160 passed, 3 skipped`.
+- Latest heartbeat: 2026-07-14T21:27:36Z.
+- Latest verified full suite passed with `7180 passed, 3 skipped`.
 - Validation-source baseline:
-  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`; 150 WING/static rails and the
+  `8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9`; 136 WING/static rails and the
   66/66 no-WING capsule `20260714T195349Z_no_wing_release_check` passed.
   The launch-only artifact remains correctly bound to `5c054eb9e`.
 - Two valid 2026-07-13 read-only candidates remain
@@ -117,7 +117,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
+Latest ledger handoff row: `m113_wing_coreaudio_48x48_gate_validated` at `2026-07-14T21:27:36Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

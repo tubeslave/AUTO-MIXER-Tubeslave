@@ -1,8 +1,8 @@
 # Current State
 
-Generated: 2026-07-14T20:11:13Z
+Generated: 2026-07-14T21:27:36Z
 
-## M112 committed validation sync; M110 physical USB blocker — 2026-07-14
+## M113 CoreAudio 48x48 gate; M110 physical USB blocker — 2026-07-14
 
 - Global status remains `WAITING_FOR_EXTERNAL_VALIDATION`, milestone `M001`,
   checkpoint `M001-EXTERNAL-WING-READONLY-ARTIFACT`.
@@ -14,12 +14,13 @@ Generated: 2026-07-14T20:11:13Z
   `status=verified`, `reason=proof_owned_backend_launch_verified`, opened only
   the loopback backend, and opened no WING, OSC/UDP or live-write surface.
 - Validation-source commit
-  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` includes committed M111 and the
-  M005 inventory repair. Its verified baseline is `7160 passed, 3 skipped in
-  416.18s`, with 150 WING/static truth rails. This is a validated
-  product/runtime baseline, not a self-referential claim that it is the future
-  M112 commit; exact current-tree identity is verified by the dynamic CP05
-  source binding.
+  `8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9` closes the M113 CoreAudio
+  identity fail-open. Production collection and independent route-artifact
+  verification now require exact integer 48 input, 48 output and 48000 Hz,
+  bind output channels into the identity digest, and revoke authority after an
+  output-mode refresh failure. Its verified baseline is `7180 passed, 3
+  skipped in 433.98s`, with 136 WING/static truth rails. Exact final-tree
+  identity is verified by the dynamic CP05 source binding.
 - The current-source backend-free no-WING evidence capsule is
   `artifacts/no_wing_release_check/20260714T195349Z_no_wing_release_check`;
   all 66 checks and detached manifest verification passed with
@@ -156,7 +157,7 @@ Current blocker from `STATE.json`: M110 remains blocked before HW01 because pass
 
 Next operator action from `STATE.json`: Do not widen live authority. Connect the physical WING USB audio interface to this Mac and require one CoreAudio device named WING with 48 input and 48 output channels at 48 kHz; Dante Virtual Soundcard is not an accepted substitute. Provide the exact WING Rack serial and confirm it is the same console used for the 2026-07-11 M005 run, then build and reverify the M005 migration packet and record an explicit verified_migration M006 owner decision. After the dynamic CP05 gate passes the current non-marker tree, run M110-HW01-HW05 for route, reset, staged soundcheck, rollback, SHA-bound listening and clean teardown. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m112_current_validation_truth_synced` at `2026-07-14T20:11:13Z`.
+Latest ledger handoff row: `m113_wing_coreaudio_48x48_gate_validated` at `2026-07-14T21:27:36Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -2390,10 +2391,10 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df` passed with
-  `7160 passed, 3 skipped`. The run completed in `416.18s`. The result covers the committed M110/M111
-  control plane and M005 inventory repair at that validated product/runtime
-  baseline. This includes the M005 physical
+- The latest verified full-suite run for `8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9` passed with
+  `7180 passed, 3 skipped`. The run completed in `433.98s`. The result covers the committed M110/M111
+  control plane, M005 inventory repair and M113 48x48 identity gate at that
+  validated product/runtime baseline. This includes the M005 physical
   reconnect-target guard, the M006 owner-decision
   M005 event-log path binding, the M006 owner-decision reconnect-event
   packet-check binding, the M006 packet-verifier
