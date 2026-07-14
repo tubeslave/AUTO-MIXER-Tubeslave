@@ -2158,7 +2158,7 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
     assert "historical exact 2026-07-02 source retains `accepted_decision_ready`" in plan
     assert "failed CH3 fader rollback proof" in plan
     assert "operator captures and reviews a real WING read-only artifact" not in plan
-    assert "M112 committed validation sync; M110 physical USB blocker" in current
+    assert "M113 CoreAudio 48x48 gate; M110 physical USB blocker" in current
     assert "current aggregate ledger is `operator_review_required`" in current
     assert re.search(r"CH3 fader state\s+restoration/verification", current)
     assert "physical WING USB missing" in report

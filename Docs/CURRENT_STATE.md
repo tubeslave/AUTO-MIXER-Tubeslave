@@ -223,11 +223,11 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
 - Checkout: `/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main`
 - Branch at latest inspection: `codex/automixer-autopilot-control-plane`
 - Current inspected M110 runtime checkpoint:
-  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df`. M111, its inventory repair and
-  both intermediate marker rebinds are committed and validated. Exact current
-  tree identity remains owned by the dynamic CP05 marker contract.
+  `8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9`. M111, its inventory repair and
+  M113 CoreAudio 48x48 identity hardening are committed and validated. Exact
+  current-tree identity remains owned by the dynamic CP05 marker contract.
 - Latest verified product/runtime commit:
-  `451d0fdf398fe7f1f4ffd1c37f2e6f2d370506df Rebind M110 CP05 after inventory fix`.
+  `8321a93ac5fdd3a288b78eb1bb5c5e8beab67ca9 Enforce WING CoreAudio 48x48 identity`.
   The clean detached launch-only probe remains historically and correctly
   bound to `5c054eb9e28d29601d974850b8874858b3fe0881`.
 - Latest verified pre-checkpoint autopilot state/evidence commit:
