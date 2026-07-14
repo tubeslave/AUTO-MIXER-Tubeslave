@@ -165,7 +165,10 @@ def _early_validate_source_before_repo_imports(
                 f"m110_bootstrap_untracked_report_invalid:{relative_path}"
             )
     critical_rows: list[dict[str, Any]] = []
-    for relative_path in EARLY_M110_RUNTIME_CRITICAL_PATHS:
+    # The later manifest is path-sorted by contract.  Keep the independent
+    # stdlib-only bootstrap binding in the same canonical order so an
+    # unchanged checkout cannot reject itself before the child log exists.
+    for relative_path in sorted(EARLY_M110_RUNTIME_CRITICAL_PATHS):
         if relative_path not in tracked:
             raise RuntimeError(
                 f"m110_bootstrap_critical_path_untracked:{relative_path}"

@@ -2255,6 +2255,25 @@ def test_early_source_binding_rejects_clean_commit_switch(tmp_path):
         raise AssertionError("clean commit switch must invalidate early binding")
 
 
+def test_early_source_binding_matches_later_manifest_without_source_change(
+    tmp_path,
+):
+    root, _ = _committed_runner_repo(tmp_path)
+    _, early_binding = runner._early_validate_source_before_repo_imports(root)
+    manifest = runner.build_runner_prestart_manifest(
+        root,
+        launch_nonce="d" * 32,
+    )
+
+    runner.assert_manifest_matches_early_source_binding(
+        manifest,
+        early_binding,
+    )
+    assert [item["path"] for item in early_binding["files"]] == sorted(
+        M110_RUNTIME_CRITICAL_PATHS
+    )
+
+
 def test_isolated_bootstrap_can_load_required_external_dependencies(tmp_path):
     root, _ = _committed_runner_repo(tmp_path)
     bootstrap = root / "tools" / "wing_attended_soundcheck_runner.py"
