@@ -46,6 +46,7 @@ module.exports = {
   extraResources: base.extraResources.map(entry => (
     entry.to === 'backend' ? { ...entry, from: backendBundle } : entry
   )),
+  afterSign: 'scripts/after-sign-macos.cjs',
   forceCodeSigning: true,
   directories: {
     ...base.directories,
@@ -60,7 +61,7 @@ module.exports = {
     type: 'distribution',
     identity,
     timestamp: 'http://timestamp.apple.com/ts01',
-    notarize: { teamId },
+    notarize: false,
     gatekeeperAssess: false
   },
   dmg: {

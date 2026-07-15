@@ -592,7 +592,7 @@ export function runReleaseVerificationLifecycle({
       'Initial isolated-output release verification'
     ).value;
     if (
-      initial.schema !== 'automixer.macos_release_manifest.v1'
+      initial.schema !== 'automixer.macos_release_manifest.v2'
       || initial.pathPolicy !== 'artifact_root_relative_and_logical_v1'
       || initial.releaseEligible !== false
       || initial.verification?.mode !== 'isolated_outputs'
@@ -622,7 +622,7 @@ export function runReleaseVerificationLifecycle({
       ...stableFinalManifest.identity
     };
     if (
-      finalManifest.schema !== 'automixer.macos_release_manifest.v1'
+      finalManifest.schema !== 'automixer.macos_release_manifest.v2'
       || finalManifest.pathPolicy !== 'artifact_root_relative_and_logical_v1'
       || finalManifest.releaseEligible !== true
       || finalManifest.verification?.mode !== 'retained_artifacts'
@@ -635,8 +635,14 @@ export function runReleaseVerificationLifecycle({
       || finalManifest.artifacts?.zip?.sha256 !== initial.artifacts?.zip?.sha256
       || finalManifest.runtimeSmoke?.result?.sha256
         !== initial.runtimeSmoke?.result?.sha256
-      || finalManifest.notarization?.evidence?.sha256
-        !== initial.notarization?.evidence?.sha256
+      || finalManifest.notarization?.app?.evidence?.sha256
+        !== initial.notarization?.app?.evidence?.sha256
+      || finalManifest.notarization?.app?.rawAppleLog?.sha256
+        !== initial.notarization?.app?.rawAppleLog?.sha256
+      || finalManifest.notarization?.dmg?.evidence?.sha256
+        !== initial.notarization?.dmg?.evidence?.sha256
+      || finalManifest.notarization?.dmg?.rawAppleLog?.sha256
+        !== initial.notarization?.dmg?.rawAppleLog?.sha256
     ) {
       throw new Error('Final retained-artifact release manifest is not fully bound');
     }

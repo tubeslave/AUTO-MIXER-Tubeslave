@@ -19,6 +19,7 @@ const verifierPath = path.resolve(__dirname, '../../../scripts/verify-macos-rele
 const {
   assertBackendEntitlements,
   assertBuildMetadata,
+  assertAppNotarizationEvidence,
   assertDmgNotarizationEvidence,
   assertDeveloperIdSignature,
   assertExactEntitlements,
@@ -33,6 +34,7 @@ const {
   assertReleaseBuildAttestation,
   machOEntitlementProfile,
   parseCodesignDetails,
+  releasePublicationPolicy,
   runtimeIdentityManifestSha256,
   withMountedDmg
 } = await import(pathToFileURL(verifierPath));
@@ -215,12 +217,16 @@ test('retained verification requires a matching initial isolated-output proof', 
     buildAttestation: identity('2'),
     dmg: identity('c'),
     zip: identity('d'),
+    appNotarizationEvidence: identity('3'),
+    appNotaryLog: identity('4'),
+    dmgNotarizationEvidence: identity('5'),
+    dmgNotaryLog: identity('6'),
     smokeResult: identity('e'),
     artifactRoot: '/tmp'
   };
   const portableIdentity = value => ({ ...value, path: path.basename(value.path) });
   const valid = {
-    schema: 'automixer.macos_release_manifest.v1',
+    schema: 'automixer.macos_release_manifest.v2',
     pathPolicy: 'artifact_root_relative_and_logical_v1',
     releaseEligible: false,
     verification: {
@@ -240,9 +246,35 @@ test('retained verification requires a matching initial isolated-output proof', 
       dmg: portableIdentity(context.dmg),
       zip: portableIdentity(context.zip)
     },
-    runtimeSmoke: { result: portableIdentity(context.smokeResult) }
+    runtimeSmoke: { result: portableIdentity(context.smokeResult) },
+    notarization: {
+      app: {
+        evidence: portableIdentity(context.appNotarizationEvidence),
+        rawAppleLog: portableIdentity(context.appNotaryLog)
+      },
+      dmg: {
+        evidence: portableIdentity(context.dmgNotarizationEvidence),
+        rawAppleLog: portableIdentity(context.dmgNotaryLog)
+      }
+    }
   };
   assert.doesNotThrow(() => assertInitialReleaseVerification(valid, context));
+  const realArtifactIdentityShape = {
+    ...context,
+    buildMetadata: portableIdentity(context.buildMetadata),
+    buildAttestation: portableIdentity(context.buildAttestation),
+    dmg: portableIdentity(context.dmg),
+    zip: portableIdentity(context.zip),
+    appNotarizationEvidence: portableIdentity(context.appNotarizationEvidence),
+    appNotaryLog: portableIdentity(context.appNotaryLog),
+    dmgNotarizationEvidence: portableIdentity(context.dmgNotarizationEvidence),
+    dmgNotaryLog: portableIdentity(context.dmgNotaryLog),
+    smokeResult: portableIdentity(context.smokeResult)
+  };
+  assert.doesNotThrow(() => assertInitialReleaseVerification(
+    valid,
+    realArtifactIdentityShape
+  ));
   const legacy = {
     ...valid,
     pathPolicy: undefined,
@@ -285,6 +317,129 @@ test('retained verification requires a matching initial isolated-output proof', 
   }, context), /Initial isolated-output/);
 });
 
+test('legacy compatibility is inspect-only and can never publish release evidence', () => {
+  assert.deepEqual(releasePublicationPolicy({ allowLegacy: true }), {
+    publishManifest: false,
+    releaseEligible: false,
+    verificationMode: 'legacy_inspection'
+  });
+  assert.throws(() => releasePublicationPolicy({
+    allowLegacy: true,
+    retainedArtifacts: true
+  }), /inspect-only/);
+  assert.deepEqual(releasePublicationPolicy({ retainedArtifacts: true }), {
+    publishManifest: true,
+    releaseEligible: true,
+    verificationMode: 'retained_artifacts'
+  });
+});
+
+test('legacy artifact preflight accepts only the complete pre-v2 sidecar shape', () => {
+  const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-legacy-inputs-'));
+  try {
+    fs.writeFileSync(path.join(artifactRoot, 'release.dmg'), 'dmg');
+    fs.writeFileSync(path.join(artifactRoot, 'release.zip'), 'zip');
+    fs.writeFileSync(path.join(artifactRoot, 'dmg-notarization.json'), '{}');
+
+    const legacy = findReleaseArtifactInputs(artifactRoot, { allowLegacy: true });
+    assert.equal(legacy.appNotarizationEvidencePath, null);
+    assert.equal(legacy.appNotaryLogPath, null);
+    assert.equal(legacy.dmgNotaryLogPath, null);
+    assert.equal(
+      legacy.dmgNotarizationEvidencePath,
+      path.join(artifactRoot, 'dmg-notarization.json')
+    );
+    assert.throws(
+      () => findReleaseArtifactInputs(artifactRoot),
+      /Application notarization evidence/
+    );
+
+    fs.writeFileSync(path.join(artifactRoot, 'app-notarization.json'), '{}');
+    assert.throws(
+      () => findReleaseArtifactInputs(artifactRoot, { allowLegacy: true }),
+      /partial v2 notarization sidecar set/
+    );
+  } finally {
+    fs.rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test('initial release proof accepts real artifactFileIdentity relative paths', () => {
+  const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-initial-proof-'));
+  const appPath = path.join(artifactRoot, 'mac-arm64', 'App.app');
+  const names = [
+    'build-metadata.json',
+    'build-attestation.json',
+    'release.dmg',
+    'release.zip',
+    'app-notarization.json',
+    'app-notary-log.json',
+    'dmg-notarization.json',
+    'dmg-notary-log.json',
+    'smoke-result.json'
+  ];
+  try {
+    fs.mkdirSync(appPath, { recursive: true });
+    for (const name of names) fs.writeFileSync(path.join(artifactRoot, name), name);
+    const identity = name => artifactFileIdentity(
+      artifactRoot,
+      path.join(artifactRoot, name),
+      name
+    );
+    const expectedHead = 'a'.repeat(40);
+    const expectedTree = 'b'.repeat(40);
+    const context = {
+      artifactRoot,
+      expectedHead,
+      expectedTree,
+      buildMetadata: identity('build-metadata.json'),
+      appPath,
+      appTreeSha256: 'c'.repeat(64),
+      buildAttestation: identity('build-attestation.json'),
+      dmg: identity('release.dmg'),
+      zip: identity('release.zip'),
+      appNotarizationEvidence: identity('app-notarization.json'),
+      appNotaryLog: identity('app-notary-log.json'),
+      dmgNotarizationEvidence: identity('dmg-notarization.json'),
+      dmgNotaryLog: identity('dmg-notary-log.json'),
+      smokeResult: identity('smoke-result.json')
+    };
+    const manifest = {
+      schema: 'automixer.macos_release_manifest.v2',
+      pathPolicy: 'artifact_root_relative_and_logical_v1',
+      releaseEligible: false,
+      verification: {
+        mode: 'isolated_outputs',
+        complete: false,
+        eligibleAfterRetainedVerification: true,
+        isolatedOutputsPresent: true
+      },
+      source: { head: expectedHead, tree: expectedTree },
+      build: { metadata: context.buildMetadata },
+      app: {
+        path: 'mac-arm64/App.app',
+        treeSha256: context.appTreeSha256,
+        buildAttestation: context.buildAttestation
+      },
+      artifacts: { dmg: context.dmg, zip: context.zip },
+      runtimeSmoke: { result: context.smokeResult },
+      notarization: {
+        app: {
+          evidence: context.appNotarizationEvidence,
+          rawAppleLog: context.appNotaryLog
+        },
+        dmg: {
+          evidence: context.dmgNotarizationEvidence,
+          rawAppleLog: context.dmgNotaryLog
+        }
+      }
+    };
+    assert.doesNotThrow(() => assertInitialReleaseVerification(manifest, context));
+  } finally {
+    fs.rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
 test('final release manifest serializes no builder, repository, or temp paths', () => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-release-manifest-'));
   const artifactDirectory = path.join(tempRoot, 'artifact');
@@ -303,7 +458,10 @@ test('final release manifest serializes no builder, repository, or temp paths', 
     ),
     dmgPath: path.join(artifactDirectory, 'AUTO MIXER.dmg'),
     zipPath: path.join(artifactDirectory, 'AUTO MIXER.zip'),
-    notarizationEvidencePath: path.join(artifactDirectory, 'dmg-notarization.json'),
+    appNotarizationEvidencePath: path.join(artifactDirectory, 'app-notarization.json'),
+    appNotaryLogPath: path.join(artifactDirectory, 'app-notary-log.json'),
+    dmgNotarizationEvidencePath: path.join(artifactDirectory, 'dmg-notarization.json'),
+    dmgNotaryLogPath: path.join(artifactDirectory, 'dmg-notary-log.json'),
     smokeResultPath: path.join(
       artifactDirectory,
       'runtime-smoke',
@@ -380,8 +538,28 @@ test('final release manifest serializes no builder, repository, or temp paths', 
       dmgPath: paths.dmgPath,
       zipPath: paths.zipPath,
       dmgSignature: { identifier: 'com.automixer.wing.dmg' },
-      notarizationEvidence: { submissionId: '12345678-1234-1234-1234-123456789abc' },
-      notarizationEvidencePath: paths.notarizationEvidencePath,
+      appNotarizationEvidence: {
+        submission: { id: '12345678-1234-1234-1234-123456789abc' },
+        ticket: {
+          path: 'app.zip/AUTO MIXER Tubeslave.app',
+          pathSuffix: 'AUTO MIXER Tubeslave.app',
+          architecture: 'arm64',
+          digestAlgorithm: 'SHA-256',
+          cdhash: '1'.repeat(40)
+        }
+      },
+      appNotarizationEvidencePath: paths.appNotarizationEvidencePath,
+      appNotaryLogPath: paths.appNotaryLogPath,
+      dmgNotarizationEvidence: {
+        submission: { id: '22345678-1234-1234-1234-123456789abc' },
+        ticket: {
+          path: 'AUTO MIXER.dmg',
+          digestAlgorithm: 'SHA-256',
+          cdhash: '2'.repeat(40)
+        }
+      },
+      dmgNotarizationEvidencePath: paths.dmgNotarizationEvidencePath,
+      dmgNotaryLogPath: paths.dmgNotaryLogPath,
       smokeResultPath: paths.smokeResultPath
     });
     const serialized = JSON.stringify(manifest);
@@ -389,6 +567,7 @@ test('final release manifest serializes no builder, repository, or temp paths', 
     assert.equal(manifest.app.path, 'mac-arm64/AUTO MIXER Tubeslave.app');
     assert.equal(manifest.build.metadata.path, 'build-metadata.json');
     assert.equal(manifest.artifacts.dmg.path, 'AUTO MIXER.dmg');
+    assert.equal(manifest.notarization.dmg.ticket.cdhash, '2'.repeat(40));
     assert.equal(
       manifest.runtimeSmoke.result.path,
       'runtime-smoke/run/result.json'
@@ -814,7 +993,10 @@ test('release artifact preflight rejects external DMG ZIP and evidence symlinks 
     fs.writeFileSync(outsideZip, 'zip');
     fs.writeFileSync(outsideEvidence, '{}');
     fs.writeFileSync(path.join(artifactRoot, 'release.zip'), 'zip');
+    fs.writeFileSync(path.join(artifactRoot, 'app-notarization.json'), '{}');
+    fs.writeFileSync(path.join(artifactRoot, 'app-notary-log.json'), '{}');
     fs.writeFileSync(path.join(artifactRoot, 'dmg-notarization.json'), '{}');
+    fs.writeFileSync(path.join(artifactRoot, 'dmg-notary-log.json'), '{}');
     fs.symlinkSync(outsideDmg, path.join(artifactRoot, 'release.dmg'));
 
     assert.throws(preflightThenCommand, /must be a regular file/);
@@ -1174,24 +1356,85 @@ test('application entitlement and DMG notarization allowlists are exact', () => 
 
   const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-notary-evidence-'));
   const dmgPath = path.join(artifactRoot, 'AUTO MIXER.dmg');
+  const rawLogPath = path.join(artifactRoot, 'dmg-notary-log.json');
   try {
     fs.writeFileSync(dmgPath, 'dmg bytes');
-    const dmg = fileIdentity(dmgPath);
-    const evidence = {
-      schema: 'automixer.dmg_notarization.v1',
-      pathPolicy: 'artifact_root_relative_v1',
-      generatedAt: '2026-07-12T00:00:00.000Z',
+    const dmg = artifactFileIdentity(artifactRoot, dmgPath, 'Test DMG');
+    const submissionId = '12345678-1234-1234-1234-123456789abc';
+    const archiveSha256 = 'a'.repeat(64);
+    const dmgCdhash = 'b'.repeat(40);
+    const rawLog = {
+      logFormatVersion: 1,
+      jobId: submissionId,
       status: 'Accepted',
-      submissionId: '12345678-1234-1234-1234-123456789abc',
-      dmg: { ...dmg, path: path.basename(dmg.path) }
+      statusCode: 0,
+      archiveFilename: '.notarize-working.dmg',
+      uploadDate: '2026-07-12T00:00:01.000Z',
+      sha256: archiveSha256,
+      ticketContents: [{
+        path: '.notarize-working.dmg',
+        digestAlgorithm: 'SHA-256',
+        cdhash: dmgCdhash
+      }],
+      issues: null
+    };
+    fs.writeFileSync(rawLogPath, JSON.stringify(rawLog));
+    const rawLogIdentity = artifactFileIdentity(
+      artifactRoot,
+      rawLogPath,
+      'Test DMG Apple log'
+    );
+    const evidence = {
+      schema: 'automixer.dmg_notarization.v2',
+      pathPolicy: 'artifact_root_relative_v1',
+      generatedAt: '2026-07-12T00:00:02.000Z',
+      status: 'Accepted',
+      submission: {
+        id: submissionId,
+        startedAt: '2026-07-12T00:00:00.000Z',
+        completedAt: '2026-07-12T00:00:02.000Z',
+        archiveFilename: rawLog.archiveFilename,
+        archive: { size: 9, sha256: archiveSha256 }
+      },
+      appleLog: {
+        logFormatVersion: 1,
+        jobId: submissionId,
+        status: 'Accepted',
+        statusCode: 0,
+        archiveFilename: rawLog.archiveFilename,
+        uploadDate: rawLog.uploadDate,
+        sha256: archiveSha256,
+        issuesCount: 0,
+        ticketCount: 1
+      },
+      rawLog: rawLogIdentity,
+      ticket: {
+        path: rawLog.archiveFilename,
+        digestAlgorithm: 'SHA-256',
+        cdhash: dmgCdhash
+      },
+      signature: {
+        cdhashBeforeStaple: dmgCdhash,
+        cdhashAfterStaple: dmgCdhash
+      },
+      dmg
     };
     assert.doesNotThrow(() => assertDmgNotarizationEvidence(evidence, dmg, {
-      artifactRoot
+      artifactRoot,
+      rawLog,
+      rawLogIdentity,
+      dmgCdhash
     }));
-    const legacyEvidence = { ...evidence, pathPolicy: undefined, dmg };
+    const legacyEvidence = {
+      schema: 'automixer.dmg_notarization.v1',
+      generatedAt: evidence.generatedAt,
+      status: 'Accepted',
+      submissionId,
+      dmg
+    };
     assert.throws(
-      () => assertDmgNotarizationEvidence(legacyEvidence, dmg),
-      /does not bind/
+      () => assertDmgNotarizationEvidence(legacyEvidence, dmg, { artifactRoot }),
+      /schema mismatch|does not bind/
     );
     assert.doesNotThrow(() => assertDmgNotarizationEvidence(legacyEvidence, dmg, {
       artifactRoot,
@@ -1199,12 +1442,117 @@ test('application entitlement and DMG notarization allowlists are exact', () => 
     }));
     assert.throws(() => assertDmgNotarizationEvidence({
       ...evidence,
-      submissionId: ''
-    }, dmg, { artifactRoot }), /does not bind/);
+      submission: { ...evidence.submission, id: '' }
+    }, dmg, { artifactRoot, rawLog, rawLogIdentity, dmgCdhash }), /does not bind/);
     assert.throws(() => assertDmgNotarizationEvidence({
       ...evidence,
       dmg: { ...evidence.dmg, size: dmg.size + 1 }
-    }, dmg, { artifactRoot }), /does not bind/);
+    }, dmg, { artifactRoot, rawLog, rawLogIdentity, dmgCdhash }), /does not bind/);
+    assert.throws(() => assertDmgNotarizationEvidence(evidence, dmg, {
+      artifactRoot,
+      rawLog: { ...rawLog, ticketContents: [] },
+      rawLogIdentity,
+      dmgCdhash
+    }), /exactly one/);
+    assert.throws(() => assertDmgNotarizationEvidence(evidence, dmg, {
+      artifactRoot,
+      rawLog: {
+        ...rawLog,
+        ticketContents: [{ ...rawLog.ticketContents[0], cdhash: 'c'.repeat(40) }]
+      },
+      rawLogIdentity,
+      dmgCdhash
+    }), /exactly one/);
+  } finally {
+    fs.rmSync(artifactRoot, { recursive: true, force: true });
+  }
+});
+
+test('application notarization evidence binds the retained Apple ticket to codesign CDHash', () => {
+  const artifactRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-app-notary-verify-'));
+  const appPath = path.join(artifactRoot, 'mac-arm64', 'App.app');
+  const rawLogPath = path.join(artifactRoot, 'app-notary-log.json');
+  const cdhash = 'b'.repeat(40);
+  const submissionId = '12345678-1234-1234-1234-123456789abc';
+  const rawLog = {
+    logFormatVersion: 1,
+    jobId: submissionId,
+    status: 'Accepted',
+    statusCode: 0,
+    archiveFilename: 'app.zip',
+    uploadDate: '2026-07-15T09:00:01.000Z',
+    sha256: 'a'.repeat(64),
+    ticketContents: [{
+      path: 'app.zip/App.app',
+      digestAlgorithm: 'SHA-256',
+      arch: 'arm64',
+      cdhash
+    }],
+    issues: null
+  };
+  try {
+    fs.mkdirSync(appPath, { recursive: true });
+    fs.writeFileSync(rawLogPath, JSON.stringify(rawLog));
+    const rawLogIdentity = artifactFileIdentity(
+      artifactRoot,
+      rawLogPath,
+      'Test application Apple log'
+    );
+    const evidence = {
+      schema: 'automixer.app_notarization.v1',
+      pathPolicy: 'artifact_root_relative_v1',
+      generatedAt: '2026-07-15T09:00:02.000Z',
+      status: 'Accepted',
+      submission: {
+        id: submissionId,
+        startedAt: '2026-07-15T09:00:00.000Z',
+        completedAt: '2026-07-15T09:00:02.000Z',
+        archiveFilename: rawLog.archiveFilename,
+        archive: { size: 10, sha256: rawLog.sha256 }
+      },
+      appleLog: {
+        logFormatVersion: 1,
+        jobId: submissionId,
+        status: 'Accepted',
+        statusCode: 0,
+        archiveFilename: rawLog.archiveFilename,
+        uploadDate: rawLog.uploadDate,
+        sha256: rawLog.sha256,
+        issuesCount: 0,
+        ticketCount: 1
+      },
+      rawLog: rawLogIdentity,
+      ticket: {
+        path: 'app.zip/App.app',
+        pathSuffix: 'App.app',
+        architecture: 'arm64',
+        digestAlgorithm: 'SHA-256',
+        cdhash
+      },
+      app: { path: 'mac-arm64/App.app', treeSha256: 'c'.repeat(64) },
+      mainExecutable: {
+        path: 'Contents/MacOS/App',
+        architecture: 'arm64',
+        cdhash
+      }
+    };
+    const context = {
+      artifactRoot,
+      appPath,
+      appTreeSha256: 'c'.repeat(64),
+      executableName: 'App',
+      signatures: {
+        application: { cdhash },
+        'code:Contents/MacOS/App': { cdhash }
+      },
+      rawLog,
+      rawLogIdentity
+    };
+    assert.doesNotThrow(() => assertAppNotarizationEvidence(evidence, context));
+    assert.throws(() => assertAppNotarizationEvidence({
+      ...evidence,
+      mainExecutable: { ...evidence.mainExecutable, cdhash: 'd'.repeat(40) }
+    }, context), /does not bind/);
   } finally {
     fs.rmSync(artifactRoot, { recursive: true, force: true });
   }

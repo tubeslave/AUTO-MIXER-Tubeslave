@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -71,7 +72,7 @@ test('DMG notarization refuses a symlink evidence output before external command
         commands.push([command, ...args]);
         return { status: 0, stdout: '', stderr: '' };
       }
-    }), /evidence already exists/);
+    }), /output already exists/);
 
     assert.deepEqual(commands, []);
     assert.equal(fs.readFileSync(outsideEvidence, 'utf8'), 'DO NOT REPLACE');
@@ -86,7 +87,9 @@ test('DMG notarization commands operate on a private snapshot during input repla
   const dmgPath = path.join(artifactRoot, 'release.dmg');
   const outsideDmg = path.join(tempRoot, 'outside.dmg');
   const commands = [];
+  const dmgCdhash = 'b'.repeat(40);
   let replaced = false;
+  let submittedPath = '';
   try {
     fs.mkdirSync(artifactRoot);
     fs.writeFileSync(dmgPath, 'trusted DMG');
@@ -107,6 +110,7 @@ test('DMG notarization commands operate on a private snapshot during input repla
           fs.symlinkSync(outsideDmg, dmgPath);
         }
         if (args[0] === 'notarytool' && args[1] === 'submit') {
+          submittedPath = args[2];
           return {
             status: 0,
             stdout: JSON.stringify({
@@ -116,17 +120,46 @@ test('DMG notarization commands operate on a private snapshot during input repla
             stderr: ''
           };
         }
+        if (args[0] === 'notarytool' && args[1] === 'log') {
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              logFormatVersion: 1,
+              jobId: '12345678-1234-1234-1234-123456789abc',
+              status: 'Accepted',
+              statusCode: 0,
+              archiveFilename: path.basename(submittedPath),
+              uploadDate: new Date().toISOString(),
+              sha256: crypto.createHash('sha256')
+                .update(fs.readFileSync(submittedPath)).digest('hex'),
+              ticketContents: [{
+                path: path.basename(submittedPath),
+                digestAlgorithm: 'SHA-256',
+                cdhash: dmgCdhash
+              }],
+              issues: null
+            }),
+            stderr: ''
+          };
+        }
+        if (command === '/usr/bin/codesign' && args[0] === '-d') {
+          return { status: 0, stdout: '', stderr: `CDHash=${dmgCdhash}\n` };
+        }
         return { status: 0, stdout: '', stderr: '' };
       }
     }), /existing regular file|changed identity|resolves outside/);
 
-    assert.equal(commands.length, 4);
+    assert.equal(commands.length, 8);
     assert.equal(
       commands.some(command => command.includes(dmgPath) || command.includes(outsideDmg)),
       false
     );
     assert.equal(
-      commands.every(command => command.some(value => String(value).includes('.notarize-working-'))),
+      commands
+        .filter(command => !(command[1] === 'notarytool' && command[2] === 'log'))
+        .every(command => command.some(value => (
+          String(value).includes('.notarize-working-') || value === '/dev/fd/3'
+        ))),
       true
     );
     assert.equal(fs.readFileSync(outsideDmg, 'utf8'), 'outside DMG');
@@ -168,6 +201,110 @@ test('DMG notarization rejects a mutated working snapshot before publication', (
     }), /changed during release verification/);
 
     assert.equal(commandCalls, 1);
+    assert.equal(fs.readFileSync(dmgPath, 'utf8'), 'trusted DMG');
+    assert.equal(fs.existsSync(path.join(artifactRoot, 'dmg-notarization.json')), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('DMG notarization detects restored-byte mutation through file metadata identity', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-notarize-restore-'));
+  const artifactRoot = path.join(tempRoot, 'artifact');
+  const dmgPath = path.join(artifactRoot, 'release.dmg');
+  try {
+    fs.mkdirSync(artifactRoot);
+    fs.writeFileSync(dmgPath, 'trusted DMG');
+    assert.throws(() => notarizeDmg({
+      artifactRoot,
+      dmgPath,
+      environment: {
+        AUTOMIXER_MAC_BUILD_PROFILE: 'release',
+        APPLE_KEYCHAIN_PROFILE: 'unit-test-profile'
+      },
+      runCommand(_command, args) {
+        const workingPath = args.find(value => (
+          String(value).includes('.notarize-working-')
+        ));
+        assert.ok(workingPath);
+        const original = fs.readFileSync(workingPath);
+        fs.writeFileSync(workingPath, 'temporary attacker bytes');
+        fs.writeFileSync(workingPath, original);
+        return { status: 0, stdout: '', stderr: '' };
+      }
+    }), /changed file identity or state/);
+    assert.equal(fs.readFileSync(dmgPath, 'utf8'), 'trusted DMG');
+    assert.equal(fs.existsSync(path.join(artifactRoot, 'dmg-notary-log.json')), false);
+  } finally {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('DMG stapling stays on the pinned descriptor during pathname replacement', () => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-dmg-staple-race-'));
+  const artifactRoot = path.join(tempRoot, 'artifact');
+  const dmgPath = path.join(artifactRoot, 'release.dmg');
+  const outsideDmg = path.join(tempRoot, 'outside.dmg');
+  const cdhash = 'b'.repeat(40);
+  const submissionId = '12345678-1234-1234-1234-123456789abc';
+  let submittedPath = '';
+  let stapleCalls = 0;
+  try {
+    fs.mkdirSync(artifactRoot);
+    fs.writeFileSync(dmgPath, 'trusted DMG');
+    fs.writeFileSync(outsideDmg, 'DO NOT WRITE');
+    assert.throws(() => notarizeDmg({
+      artifactRoot,
+      dmgPath,
+      environment: {
+        AUTOMIXER_MAC_BUILD_PROFILE: 'release',
+        APPLE_KEYCHAIN_PROFILE: 'unit-test-profile'
+      },
+      runCommand(command, args, options = {}) {
+        if (command === '/usr/bin/codesign' && args[0] === '-d') {
+          return { status: 0, stdout: '', stderr: `CDHash=${cdhash}\n` };
+        }
+        if (args[0] === 'notarytool' && args[1] === 'submit') {
+          submittedPath = args[2];
+          return {
+            status: 0,
+            stdout: JSON.stringify({ status: 'Accepted', id: submissionId }),
+            stderr: ''
+          };
+        }
+        if (args[0] === 'notarytool' && args[1] === 'log') {
+          return {
+            status: 0,
+            stdout: JSON.stringify({
+              logFormatVersion: 1,
+              jobId: submissionId,
+              status: 'Accepted',
+              statusCode: 0,
+              archiveFilename: path.basename(submittedPath),
+              uploadDate: new Date().toISOString(),
+              sha256: crypto.createHash('sha256')
+                .update(fs.readFileSync(submittedPath)).digest('hex'),
+              ticketContents: [{
+                path: path.basename(submittedPath),
+                digestAlgorithm: 'SHA-256',
+                cdhash
+              }],
+              issues: null
+            }),
+            stderr: ''
+          };
+        }
+        if (args[0] === 'stapler' && args[1] === 'staple') {
+          stapleCalls += 1;
+          fs.rmSync(options.pinnedInput.path);
+          fs.symlinkSync(outsideDmg, options.pinnedInput.path);
+          fs.writeSync(options.pinnedInput.descriptor, Buffer.from('ticket'));
+        }
+        return { status: 0, stdout: '', stderr: '' };
+      }
+    }), /regular file|symlink|resolves outside|identity/);
+    assert.equal(stapleCalls, 1);
+    assert.equal(fs.readFileSync(outsideDmg, 'utf8'), 'DO NOT WRITE');
     assert.equal(fs.readFileSync(dmgPath, 'utf8'), 'trusted DMG');
     assert.equal(fs.existsSync(path.join(artifactRoot, 'dmg-notarization.json')), false);
   } finally {

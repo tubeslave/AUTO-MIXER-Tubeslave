@@ -46,9 +46,18 @@ electron-builder internal app notarization is disabled. An awaited `afterSign`
 hook explicitly submits a private app ZIP before distributable archives are
 built. App and DMG transactions always fetch accepted raw Apple logs and require
 matching log format, UUID, Accepted/statusCode, archive filename, SHA-256 and
-upload time. The verifier matches the Apple ticket's arm64 main-executable
-cdhash to the final Developer ID application, closing the submitted-to-final
-bridge. Four contained sidecars feed a v2 portable two-pass manifest.
+upload time. The verifier matches the Apple ticket's arm64 app-bundle code item
+(`digestAlgorithm=SHA-256`) to identical final app-bundle and main-executable
+codesign CDHashes, closing the submitted-to-final bridge. Four contained
+sidecars feed a v2 portable two-pass manifest. The DMG transaction likewise
+requires the unique top-level SHA-256 Apple ticket to match unchanged
+pre/post-staple DMG CDHashes. App ZIP creation and both write-capable stapler
+calls use pinned descriptors or a pinned working-directory inode so pathname
+replacement cannot redirect native writes. Notary waits are bounded at 30
+minutes. `--allow-legacy` is inspection-only: it cannot run the retained pass
+or publish any release manifest. The inspection path accepts the complete
+pre-v2 shape without the three new app/raw-log sidecars, while rejecting a
+partial mixture of legacy and v2 sidecars.
 
 ## 4. Why this won
 
@@ -68,6 +77,8 @@ and final-artifact-bound evidence that survives build-workspace deletion.
 - `stapler validate` alone: does not independently bind the submitted private
   ZIP to the final app signature.
 - Retain partial/v1 evidence as v2: violates fail-closed release semantics.
+- Treat `--allow-legacy` as release eligibility: crafted old evidence could be
+  republished under the current schema.
 
 ## 6. Implementation plan
 
@@ -87,7 +98,8 @@ and final-artifact-bound evidence that survives build-workspace deletion.
   UUID/status/statusCode/SHA/name/time mutations.
 - Wrong-app ticket, cdhash/path/arch mutations and swapped app/DMG logs.
 - Root/parent/app symlink, rename/tree races, pre-existing output and output
-  replacement attempts around every native stage.
+  replacement attempts around every native stage, including descriptor-pinned
+  ZIP creation and app/DMG stapling.
 - Four-file stable identity across both verifier passes; final manifest v2 only
   after retained verification.
 

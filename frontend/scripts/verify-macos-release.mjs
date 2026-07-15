@@ -26,6 +26,12 @@ import {
   sha256File,
   verifyPackagedRuntimeSmokeManifest
 } from './release-evidence.mjs';
+import {
+  assertAcceptedNotaryLog,
+  assertDmgTicket,
+  assertMainExecutableTicket,
+  normalizeCdHash
+} from './notarytool-evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const require = createRequire(import.meta.url);
@@ -162,6 +168,7 @@ export function parseCodesignDetails(output) {
     identifier: text.match(/^Identifier=(.+)$/m)?.[1]?.trim() || '',
     authorities: [...text.matchAll(/^Authority=(.+)$/gm)].map(match => match[1].trim()),
     teamId: text.match(/^TeamIdentifier=(.+)$/m)?.[1]?.trim() || '',
+    cdhash: text.match(/^CDHash=([0-9a-f]+)$/mi)?.[1]?.trim().toLowerCase() || '',
     runtime: /flags=.*\(runtime\)/.test(text),
     timestamp: text.match(/^Timestamp=(.+)$/m)?.[1]?.trim() || ''
   };
@@ -204,9 +211,20 @@ export function assertExactEntitlements(actual, expected, label) {
 export function assertDmgNotarizationEvidence(
   evidence,
   expectedDmg,
-  { artifactRoot = path.dirname(expectedDmg?.path || ''), allowLegacy = false } = {}
+  {
+    artifactRoot = path.dirname(expectedDmg?.path || ''),
+    rawLog = null,
+    rawLogIdentity = null,
+    dmgCdhash = '',
+    allowLegacy = false
+  } = {}
 ) {
-  const legacyAllowed = evidence?.pathPolicy == null && allowLegacy === true;
+  const legacyAllowed = evidence?.schema === 'automixer.dmg_notarization.v1'
+    && allowLegacy === true
+    && (
+      evidence?.pathPolicy == null
+      || evidence.pathPolicy === 'artifact_root_relative_v1'
+    );
   const verifiedDmgPath = assertRegularContainedFile(
     artifactRoot,
     expectedDmg?.path,
@@ -218,26 +236,142 @@ export function assertDmgNotarizationEvidence(
       artifactRoot,
       evidence?.dmg?.path,
       'DMG notarization evidence path',
-      { allowLegacyAbsoluteWithinRoot: legacyAllowed, mustExist: true }
+      {
+        allowLegacyAbsoluteWithinRoot: legacyAllowed && evidence?.pathPolicy == null,
+        mustExist: true
+      }
     );
   } catch {
     recordedDmgPath = null;
   }
-  if (evidence?.schema !== 'automixer.dmg_notarization.v1') {
+  if (legacyAllowed) {
+    if (
+      recordedDmgPath !== verifiedDmgPath
+      || evidence.status !== 'Accepted'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        String(evidence.submissionId || '')
+      )
+      || !Number.isFinite(new Date(evidence.generatedAt).getTime())
+      || evidence.dmg?.size !== expectedDmg.size
+      || evidence.dmg?.sha256 !== expectedDmg.sha256
+    ) {
+      throw new Error('Legacy DMG notarization evidence does not bind to the final DMG');
+    }
+    return;
+  }
+  if (evidence?.schema !== 'automixer.dmg_notarization.v2') {
     throw new Error('DMG notarization evidence schema mismatch');
   }
+  const expectedRawLogPath = path.join(path.resolve(artifactRoot), 'dmg-notary-log.json');
+  let recordedRawLogPath = null;
+  try {
+    recordedRawLogPath = resolveArtifactPath(
+      artifactRoot,
+      evidence?.rawLog?.path,
+      'DMG retained Apple notary log',
+      { mustExist: true }
+    );
+  } catch {
+    recordedRawLogPath = null;
+  }
+  const summary = assertAcceptedNotaryLog(rawLog, {
+    submissionId: evidence?.submission?.id,
+    archiveFilename: evidence?.submission?.archiveFilename,
+    archiveSha256: evidence?.submission?.archive?.sha256,
+    startedAt: evidence?.submission?.startedAt,
+    completedAt: evidence?.submission?.completedAt
+  });
+  const verifiedDmgCdhash = normalizeCdHash(
+    dmgCdhash,
+    'Verified final DMG CDHash'
+  );
+  const ticket = assertDmgTicket(rawLog, {
+    expectedPath: evidence?.submission?.archiveFilename,
+    expectedCdHash: verifiedDmgCdhash
+  });
   if (
-    (evidence.pathPolicy !== 'artifact_root_relative_v1' && !legacyAllowed)
+    evidence.pathPolicy !== 'artifact_root_relative_v1'
     || recordedDmgPath !== verifiedDmgPath
+    || recordedRawLogPath !== expectedRawLogPath
     || evidence.status !== 'Accepted'
-    || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      String(evidence.submissionId || '')
-    )
     || !Number.isFinite(new Date(evidence.generatedAt).getTime())
+    || !Number.isSafeInteger(evidence?.submission?.archive?.size)
+    || evidence.submission.archive.size <= 0
     || evidence.dmg?.size !== expectedDmg.size
     || evidence.dmg?.sha256 !== expectedDmg.sha256
+    || normalizeCdHash(evidence?.signature?.cdhashBeforeStaple) !== verifiedDmgCdhash
+    || normalizeCdHash(evidence?.signature?.cdhashAfterStaple) !== verifiedDmgCdhash
+    || !identitiesEqual(evidence.rawLog, rawLogIdentity)
+    || canonicalJson(evidence.appleLog) !== canonicalJson(summary)
+    || canonicalJson(evidence.ticket) !== canonicalJson(ticket)
   ) {
     throw new Error('DMG notarization evidence does not bind to the final DMG');
+  }
+}
+
+export function assertAppNotarizationEvidence(evidence, context) {
+  const artifactRoot = path.resolve(context.artifactRoot);
+  let recordedAppPath = null;
+  let recordedRawLogPath = null;
+  try {
+    recordedAppPath = resolveArtifactPath(
+      artifactRoot,
+      evidence?.app?.path,
+      'Notarized application evidence path',
+      { mustExist: true }
+    );
+    recordedRawLogPath = resolveArtifactPath(
+      artifactRoot,
+      evidence?.rawLog?.path,
+      'Application retained Apple notary log',
+      { mustExist: true }
+    );
+  } catch {
+    recordedAppPath = null;
+    recordedRawLogPath = null;
+  }
+  const executableRelativePath = `Contents/MacOS/${context.executableName}`;
+  const mainSignature = context.signatures?.[`code:${executableRelativePath}`];
+  const mainCdhash = normalizeCdHash(
+    mainSignature?.cdhash,
+    'Verified application main executable CDHash'
+  );
+  const appCdhash = normalizeCdHash(
+    context.signatures?.application?.cdhash,
+    'Verified application bundle CDHash'
+  );
+  const summary = assertAcceptedNotaryLog(context.rawLog, {
+    submissionId: evidence?.submission?.id,
+    archiveFilename: evidence?.submission?.archiveFilename,
+    archiveSha256: evidence?.submission?.archive?.sha256,
+    startedAt: evidence?.submission?.startedAt,
+    completedAt: evidence?.submission?.completedAt
+  });
+  const ticket = assertMainExecutableTicket(context.rawLog, {
+    expectedPathSuffix: path.basename(context.appPath),
+    expectedCdHash: appCdhash,
+    architecture: 'arm64',
+    expectedArchiveFilename: evidence?.submission?.archiveFilename
+  });
+  if (
+    evidence?.schema !== 'automixer.app_notarization.v1'
+    || evidence.pathPolicy !== 'artifact_root_relative_v1'
+    || evidence.status !== 'Accepted'
+    || !Number.isFinite(new Date(evidence.generatedAt).getTime())
+    || recordedAppPath !== path.resolve(context.appPath)
+    || recordedRawLogPath !== path.join(artifactRoot, 'app-notary-log.json')
+    || evidence.app?.treeSha256 !== context.appTreeSha256
+    || evidence.mainExecutable?.path !== executableRelativePath
+    || evidence.mainExecutable?.architecture !== 'arm64'
+    || normalizeCdHash(evidence.mainExecutable?.cdhash) !== mainCdhash
+    || appCdhash !== mainCdhash
+    || !Number.isSafeInteger(evidence?.submission?.archive?.size)
+    || evidence.submission.archive.size <= 0
+    || !identitiesEqual(evidence.rawLog, context.rawLogIdentity)
+    || canonicalJson(evidence.appleLog) !== canonicalJson(summary)
+    || canonicalJson(evidence.ticket) !== canonicalJson(ticket)
+  ) {
+    throw new Error('Application notarization evidence does not bind to the verified app');
   }
 }
 
@@ -610,10 +744,13 @@ export function assertInitialReleaseVerification(manifest, context) {
   const artifactIdentityMatches = (recorded, current, label) => {
     if (!identitiesEqual(recorded, current)) return false;
     try {
+      const currentPath = path.isAbsolute(String(current?.path || ''))
+        ? path.resolve(current.path)
+        : path.resolve(artifactRoot, String(current?.path || ''));
       return resolveArtifactPath(artifactRoot, recorded?.path, label, {
         allowLegacyAbsoluteWithinRoot: legacyAllowed,
         mustExist: false
-      }) === path.resolve(current?.path || '');
+      }) === currentPath;
     } catch {
       return false;
     }
@@ -630,7 +767,7 @@ export function assertInitialReleaseVerification(manifest, context) {
     recordedAppPath = null;
   }
   if (
-    manifest?.schema !== 'automixer.macos_release_manifest.v1'
+    manifest?.schema !== 'automixer.macos_release_manifest.v2'
     || (
       manifest.pathPolicy !== 'artifact_root_relative_and_logical_v1'
       && !legacyAllowed
@@ -669,6 +806,26 @@ export function assertInitialReleaseVerification(manifest, context) {
       context.smokeResult,
       'Initial verification smoke result'
     )
+    || !artifactIdentityMatches(
+      manifest.notarization?.app?.evidence,
+      context.appNotarizationEvidence,
+      'Initial verification application notarization evidence'
+    )
+    || !artifactIdentityMatches(
+      manifest.notarization?.app?.rawAppleLog,
+      context.appNotaryLog,
+      'Initial verification application Apple log'
+    )
+    || !artifactIdentityMatches(
+      manifest.notarization?.dmg?.evidence,
+      context.dmgNotarizationEvidence,
+      'Initial verification DMG notarization evidence'
+    )
+    || !artifactIdentityMatches(
+      manifest.notarization?.dmg?.rawAppleLog,
+      context.dmgNotaryLog,
+      'Initial verification DMG Apple log'
+    )
   ) {
     throw new Error('Initial isolated-output release verification is invalid');
   }
@@ -703,7 +860,10 @@ function exactOne(paths, label) {
 
 export function assertRegularContainedFile(artifactRoot, candidate, label) {
   const resolvedRoot = path.resolve(artifactRoot);
-  const resolvedCandidate = path.resolve(candidate);
+  const candidateText = String(candidate || '');
+  const resolvedCandidate = path.isAbsolute(candidateText)
+    ? path.resolve(candidateText)
+    : path.resolve(resolvedRoot, candidateText);
   const relative = path.relative(resolvedRoot, resolvedCandidate);
   if (
     !relative
@@ -729,6 +889,24 @@ export function assertRegularContainedFile(artifactRoot, candidate, label) {
   return resolvedCandidate;
 }
 
+export function releasePublicationPolicy({
+  allowLegacy = false,
+  retainedArtifacts = false
+} = {}) {
+  if (allowLegacy && retainedArtifacts) {
+    throw new Error('Legacy compatibility is inspect-only and cannot publish retained release evidence');
+  }
+  return {
+    publishManifest: !allowLegacy,
+    releaseEligible: !allowLegacy && retainedArtifacts,
+    verificationMode: allowLegacy
+      ? 'legacy_inspection'
+      : retainedArtifacts
+        ? 'retained_artifacts'
+        : 'isolated_outputs'
+  };
+}
+
 export function findTopLevelArtifact(directory, extension) {
   const candidate = exactOne(
     fs.readdirSync(directory)
@@ -739,14 +917,49 @@ export function findTopLevelArtifact(directory, extension) {
   return assertRegularContainedFile(directory, candidate, `Top-level ${extension} artifact`);
 }
 
-export function findReleaseArtifactInputs(artifactDirectory) {
+export function findReleaseArtifactInputs(
+  artifactDirectory,
+  { allowLegacy = false } = {}
+) {
+  const optionalV2Sidecars = [
+    ['app-notarization.json', 'Application notarization evidence'],
+    ['app-notary-log.json', 'Application retained Apple notary log'],
+    ['dmg-notary-log.json', 'DMG retained Apple notary log']
+  ];
+  const sidecarPresence = optionalV2Sidecars.map(([name]) => Boolean(
+    fs.lstatSync(path.join(artifactDirectory, name), { throwIfNoEntry: false })
+  ));
+  const legacySidecarsAbsent = allowLegacy && sidecarPresence.every(value => !value);
+  if (allowLegacy && !legacySidecarsAbsent && sidecarPresence.some(value => !value)) {
+    throw new Error('Legacy inspection refuses a partial v2 notarization sidecar set');
+  }
+  const optionalSidecar = (name, label) => {
+    if (legacySidecarsAbsent) return null;
+    const candidate = path.join(artifactDirectory, name);
+    if (!fs.lstatSync(candidate, { throwIfNoEntry: false })) {
+      throw new Error(`${label} is missing`);
+    }
+    return assertRegularContainedFile(artifactDirectory, candidate, label);
+  };
   return {
     dmgPath: findTopLevelArtifact(artifactDirectory, '.dmg'),
     zipPath: findTopLevelArtifact(artifactDirectory, '.zip'),
-    notarizationEvidencePath: assertRegularContainedFile(
+    appNotarizationEvidencePath: optionalSidecar(
+      'app-notarization.json',
+      'Application notarization evidence'
+    ),
+    appNotaryLogPath: optionalSidecar(
+      'app-notary-log.json',
+      'Application retained Apple notary log'
+    ),
+    dmgNotarizationEvidencePath: assertRegularContainedFile(
       artifactDirectory,
       path.join(artifactDirectory, 'dmg-notarization.json'),
       'DMG notarization evidence'
+    ),
+    dmgNotaryLogPath: optionalSidecar(
+      'dmg-notary-log.json',
+      'DMG retained Apple notary log'
     )
   };
 }
@@ -1321,8 +1534,12 @@ export function createPortableReleaseManifest({
   dmgPath,
   zipPath,
   dmgSignature,
-  notarizationEvidence,
-  notarizationEvidencePath,
+  appNotarizationEvidence,
+  appNotarizationEvidencePath,
+  appNotaryLogPath,
+  dmgNotarizationEvidence,
+  dmgNotarizationEvidencePath,
+  dmgNotaryLogPath,
   smokeResultPath,
   verifiedIdentities = null
 }) {
@@ -1346,10 +1563,25 @@ export function createPortableReleaseManifest({
     ),
     dmg: artifactFileIdentity(artifactDirectory, dmgPath, 'Release DMG'),
     zip: artifactFileIdentity(artifactDirectory, zipPath, 'Release ZIP'),
-    notarizationEvidence: artifactFileIdentity(
+    appNotarizationEvidence: artifactFileIdentity(
       artifactDirectory,
-      notarizationEvidencePath,
+      appNotarizationEvidencePath,
+      'Application notarization evidence'
+    ),
+    appNotaryLog: artifactFileIdentity(
+      artifactDirectory,
+      appNotaryLogPath,
+      'Application retained Apple notary log'
+    ),
+    dmgNotarizationEvidence: artifactFileIdentity(
+      artifactDirectory,
+      dmgNotarizationEvidencePath,
       'DMG notarization evidence'
+    ),
+    dmgNotaryLog: artifactFileIdentity(
+      artifactDirectory,
+      dmgNotaryLogPath,
+      'DMG retained Apple notary log'
     ),
     smokeResult: artifactFileIdentity(
       artifactDirectory,
@@ -1368,7 +1600,7 @@ export function createPortableReleaseManifest({
     )
   };
   return {
-    schema: 'automixer.macos_release_manifest.v1',
+    schema: 'automixer.macos_release_manifest.v2',
     pathPolicy: 'artifact_root_relative_and_logical_v1',
     generatedAt: new Date().toISOString(),
     profile: 'release',
@@ -1411,8 +1643,18 @@ export function createPortableReleaseManifest({
     notarization: {
       appStapled: true,
       dmgStapled: true,
-      dmgSubmissionId: notarizationEvidence.submissionId,
-      evidence: identities.notarizationEvidence,
+      app: {
+        submissionId: appNotarizationEvidence.submission.id,
+        evidence: identities.appNotarizationEvidence,
+        rawAppleLog: identities.appNotaryLog,
+        ticket: appNotarizationEvidence.ticket
+      },
+      dmg: {
+        submissionId: dmgNotarizationEvidence.submission.id,
+        evidence: identities.dmgNotarizationEvidence,
+        rawAppleLog: identities.dmgNotaryLog,
+        ticket: dmgNotarizationEvidence.ticket
+      },
       gatekeeperSource: 'Notarized Developer ID'
     },
     runtimeSmoke: {
@@ -1442,7 +1684,14 @@ function main() {
     buildMetadataPath,
     allowLegacy = false
   } = options;
-  const releaseArtifactInputs = findReleaseArtifactInputs(artifactDirectory);
+  const publicationPolicy = releasePublicationPolicy({
+    allowLegacy,
+    retainedArtifacts: options.retainedArtifacts === true
+  });
+  const releaseArtifactInputs = findReleaseArtifactInputs(
+    artifactDirectory,
+    { allowLegacy }
+  );
   assertWithinArtifactDirectory(smokeResultPath, artifactDirectory, 'Smoke result');
   assertWithinArtifactDirectory(buildMetadataPath, artifactDirectory, 'Build metadata');
   const expectedSource = { head: expectedHead, tree: expectedTree };
@@ -1509,7 +1758,14 @@ function main() {
 
   const macDirectory = path.join(artifactDirectory, 'mac-arm64');
   const appPath = findApp(macDirectory);
-  const { dmgPath, zipPath, notarizationEvidencePath } = releaseArtifactInputs;
+  const {
+    dmgPath,
+    zipPath,
+    appNotarizationEvidencePath,
+    appNotaryLogPath,
+    dmgNotarizationEvidencePath,
+    dmgNotaryLogPath
+  } = releaseArtifactInputs;
   const dmgBefore = artifactFileIdentity(artifactDirectory, dmgPath, 'Release DMG');
   const zipBefore = artifactFileIdentity(artifactDirectory, zipPath, 'Release ZIP');
   assertFreshArtifact(fs.statSync(dmgPath), notBefore, 'DMG');
@@ -1524,8 +1780,12 @@ function main() {
   let appBefore;
   let smokeEvidence;
   let dmgSignature;
-  let notarizationEvidenceIdentity;
-  let notarizationEvidence;
+  let appNotarizationEvidenceIdentity;
+  let appNotaryLogIdentity;
+  let appNotarizationEvidence;
+  let dmgNotarizationEvidenceIdentity;
+  let dmgNotaryLogIdentity;
+  let dmgNotarizationEvidence;
   let initialVerificationIdentity;
   let zipVerification;
   let dmgVerification;
@@ -1601,6 +1861,48 @@ function main() {
     if (hashTree(appSnapshot.path) !== appBefore.treeSha256) {
       throw new Error('Application snapshot changed during stapler validation');
     }
+    if (appNotaryLogPath && appNotarizationEvidencePath) {
+      const stableAppNotaryLog = readStableJsonFileNoFollow(
+        appNotaryLogPath,
+        'Application retained Apple notary log'
+      );
+      appNotaryLogIdentity = artifactFileIdentity(
+        artifactDirectory,
+        appNotaryLogPath,
+        'Application retained Apple notary log'
+      );
+      assertIdentityUnchanged(
+        stableAppNotaryLog.identity,
+        appNotaryLogIdentity,
+        'application retained Apple notary log stable read'
+      );
+      const stableAppNotarizationEvidence = readStableJsonFileNoFollow(
+        appNotarizationEvidencePath,
+        'Application notarization evidence'
+      );
+      appNotarizationEvidenceIdentity = artifactFileIdentity(
+        artifactDirectory,
+        appNotarizationEvidencePath,
+        'Application notarization evidence'
+      );
+      assertIdentityUnchanged(
+        stableAppNotarizationEvidence.identity,
+        appNotarizationEvidenceIdentity,
+        'application notarization evidence stable read'
+      );
+      appNotarizationEvidence = stableAppNotarizationEvidence.value;
+      assertAppNotarizationEvidence(appNotarizationEvidence, {
+        artifactRoot: artifactDirectory,
+        appPath,
+        appTreeSha256: appBefore.treeSha256,
+        executableName: appBefore.infoPlist.CFBundleExecutable,
+        signatures: appBefore.signatures,
+        rawLog: stableAppNotaryLog.value,
+        rawLogIdentity: appNotaryLogIdentity
+      });
+    } else if (!allowLegacy) {
+      throw new Error('Application notarization v2 evidence is required');
+    }
     smokeEvidence = loadSmokeEvidence({
       smokeResultPath,
       appPath,
@@ -1640,23 +1942,43 @@ function main() {
       'DMG verification snapshot'
     );
 
-    const stableNotarizationEvidence = readStableJsonFileNoFollow(
-      notarizationEvidencePath,
+    let stableDmgNotaryLog = null;
+    if (dmgNotaryLogPath) {
+      stableDmgNotaryLog = readStableJsonFileNoFollow(
+        dmgNotaryLogPath,
+        'DMG retained Apple notary log'
+      );
+      dmgNotaryLogIdentity = artifactFileIdentity(
+        artifactDirectory,
+        dmgNotaryLogPath,
+        'DMG retained Apple notary log'
+      );
+      assertIdentityUnchanged(
+        stableDmgNotaryLog.identity,
+        dmgNotaryLogIdentity,
+        'DMG retained Apple notary log stable read'
+      );
+    }
+    const stableDmgNotarizationEvidence = readStableJsonFileNoFollow(
+      dmgNotarizationEvidencePath,
       'DMG notarization evidence'
     );
-    notarizationEvidenceIdentity = artifactFileIdentity(
+    dmgNotarizationEvidenceIdentity = artifactFileIdentity(
       artifactDirectory,
-      notarizationEvidencePath,
+      dmgNotarizationEvidencePath,
       'DMG notarization evidence'
     );
     assertIdentityUnchanged(
-      stableNotarizationEvidence.identity,
-      notarizationEvidenceIdentity,
-      'notarization evidence stable read'
+      stableDmgNotarizationEvidence.identity,
+      dmgNotarizationEvidenceIdentity,
+      'DMG notarization evidence stable read'
     );
-    notarizationEvidence = stableNotarizationEvidence.value;
-    assertDmgNotarizationEvidence(notarizationEvidence, dmgBefore, {
+    dmgNotarizationEvidence = stableDmgNotarizationEvidence.value;
+    assertDmgNotarizationEvidence(dmgNotarizationEvidence, dmgBefore, {
       artifactRoot: artifactDirectory,
+      rawLog: stableDmgNotaryLog?.value,
+      rawLogIdentity: dmgNotaryLogIdentity,
+      dmgCdhash: dmgSignature.cdhash,
       allowLegacy
     });
 
@@ -1688,6 +2010,10 @@ function main() {
         buildAttestation: appBefore.buildAttestationIdentity,
         dmg: dmgBefore,
         zip: zipBefore,
+        appNotarizationEvidence: appNotarizationEvidenceIdentity,
+        appNotaryLog: appNotaryLogIdentity,
+        dmgNotarizationEvidence: dmgNotarizationEvidenceIdentity,
+        dmgNotaryLog: dmgNotaryLogIdentity,
         smokeResult: smokeEvidence.resultIdentity,
         artifactRoot: artifactDirectory,
         allowLegacy
@@ -1740,11 +2066,19 @@ function main() {
   if (hashTree(appPath) !== appBefore.treeSha256) {
     throw new Error('Application tree changed during release verification');
   }
-  const finalReleaseArtifactInputs = findReleaseArtifactInputs(artifactDirectory);
+  const finalReleaseArtifactInputs = findReleaseArtifactInputs(
+    artifactDirectory,
+    { allowLegacy }
+  );
   if (
     finalReleaseArtifactInputs.dmgPath !== dmgPath
     || finalReleaseArtifactInputs.zipPath !== zipPath
-    || finalReleaseArtifactInputs.notarizationEvidencePath !== notarizationEvidencePath
+    || finalReleaseArtifactInputs.appNotarizationEvidencePath
+      !== appNotarizationEvidencePath
+    || finalReleaseArtifactInputs.appNotaryLogPath !== appNotaryLogPath
+    || finalReleaseArtifactInputs.dmgNotarizationEvidencePath
+      !== dmgNotarizationEvidencePath
+    || finalReleaseArtifactInputs.dmgNotaryLogPath !== dmgNotaryLogPath
   ) {
     throw new Error('Top-level release artifact paths changed during verification');
   }
@@ -1773,11 +2107,32 @@ function main() {
     ),
     dmg: artifactFileIdentity(artifactDirectory, dmgPath, 'Final release DMG'),
     zip: artifactFileIdentity(artifactDirectory, zipPath, 'Final release ZIP'),
-    notarizationEvidence: artifactFileIdentity(
+    appNotarizationEvidence: appNotarizationEvidencePath
+      ? artifactFileIdentity(
+        artifactDirectory,
+        appNotarizationEvidencePath,
+        'Final application notarization evidence'
+      )
+      : null,
+    appNotaryLog: appNotaryLogPath
+      ? artifactFileIdentity(
+        artifactDirectory,
+        appNotaryLogPath,
+        'Final application retained Apple notary log'
+      )
+      : null,
+    dmgNotarizationEvidence: artifactFileIdentity(
       artifactDirectory,
-      notarizationEvidencePath,
+      dmgNotarizationEvidencePath,
       'Final DMG notarization evidence'
     ),
+    dmgNotaryLog: dmgNotaryLogPath
+      ? artifactFileIdentity(
+        artifactDirectory,
+        dmgNotaryLogPath,
+        'Final DMG retained Apple notary log'
+      )
+      : null,
     smokeResult: artifactFileIdentity(
       artifactDirectory,
       smokeResultPath,
@@ -1821,11 +2176,32 @@ function main() {
     verifiedIdentities.smokeMarkdown,
     'runtime smoke Markdown'
   );
+  if (appNotarizationEvidenceIdentity) {
+    assertIdentityUnchanged(
+      appNotarizationEvidenceIdentity,
+      verifiedIdentities.appNotarizationEvidence,
+      'application notarization evidence'
+    );
+  }
+  if (appNotaryLogIdentity) {
+    assertIdentityUnchanged(
+      appNotaryLogIdentity,
+      verifiedIdentities.appNotaryLog,
+      'application retained Apple notary log'
+    );
+  }
   assertIdentityUnchanged(
-    notarizationEvidenceIdentity,
-    verifiedIdentities.notarizationEvidence,
-    'notarization evidence'
+    dmgNotarizationEvidenceIdentity,
+    verifiedIdentities.dmgNotarizationEvidence,
+    'DMG notarization evidence'
   );
+  if (dmgNotaryLogIdentity) {
+    assertIdentityUnchanged(
+      dmgNotaryLogIdentity,
+      verifiedIdentities.dmgNotaryLog,
+      'DMG retained Apple notary log'
+    );
+  }
 
   const revalidateRetainedIdentities = () => {
     const checks = [
@@ -1837,11 +2213,32 @@ function main() {
       ['runtime smoke manifest', verifiedIdentities.smokeManifest, smokeManifestPath],
       ['runtime smoke Markdown', verifiedIdentities.smokeMarkdown, smokeMarkdownPath],
       [
-        'notarization evidence',
-        verifiedIdentities.notarizationEvidence,
-        notarizationEvidencePath
+        'DMG notarization evidence',
+        verifiedIdentities.dmgNotarizationEvidence,
+        dmgNotarizationEvidencePath
       ]
     ];
+    if (appNotarizationEvidencePath) {
+      checks.push([
+        'application notarization evidence',
+        verifiedIdentities.appNotarizationEvidence,
+        appNotarizationEvidencePath
+      ]);
+    }
+    if (appNotaryLogPath) {
+      checks.push([
+        'application retained Apple notary log',
+        verifiedIdentities.appNotaryLog,
+        appNotaryLogPath
+      ]);
+    }
+    if (dmgNotaryLogPath) {
+      checks.push([
+        'DMG retained Apple notary log',
+        verifiedIdentities.dmgNotaryLog,
+        dmgNotaryLogPath
+      ]);
+    }
     if (initialVerificationIdentity) {
       checks.push([
         'initial isolated-output release verification',
@@ -1861,6 +2258,18 @@ function main() {
     }
   };
 
+  if (!publicationPolicy.publishManifest) {
+    assertSourceBinding(expectedSource, sourceSnapshot(), 'legacy inspection completion');
+    revalidateRetainedIdentities();
+    process.stdout.write(`${JSON.stringify({
+      status: 'passed',
+      releaseEligible: false,
+      verificationMode: publicationPolicy.verificationMode,
+      manifestPublished: false
+    })}\n`);
+    return;
+  }
+
   const manifest = createPortableReleaseManifest({
     artifactDirectory,
     retainedArtifacts: options.retainedArtifacts,
@@ -1877,8 +2286,12 @@ function main() {
     dmgPath,
     zipPath,
     dmgSignature,
-    notarizationEvidence,
-    notarizationEvidencePath,
+    appNotarizationEvidence,
+    appNotarizationEvidencePath,
+    appNotaryLogPath,
+    dmgNotarizationEvidence,
+    dmgNotarizationEvidencePath,
+    dmgNotaryLogPath,
     smokeResultPath,
     verifiedIdentities
   });
@@ -1951,8 +2364,9 @@ function main() {
   }
   process.stdout.write(`${JSON.stringify({
     status: 'passed',
-    releaseEligible: options.retainedArtifacts === true,
-    verificationMode: options.retainedArtifacts ? 'retained_artifacts' : 'isolated_outputs'
+    releaseEligible: publicationPolicy.releaseEligible,
+    verificationMode: publicationPolicy.verificationMode,
+    manifestPublished: true
   })}\n`);
 }
 

@@ -119,8 +119,8 @@ test('macOS build profiles are explicit and use non-overlapping unique outputs',
   assert.match(releaseConfig, /type: 'distribution'/);
   assert.match(releaseConfig, /Developer ID Application:/);
   assert.match(releaseConfig, /timestamp\.apple\.com/);
-  assert.match(releaseConfig, /notarize: \{ teamId \}/);
-  assert.doesNotMatch(releaseConfig, /afterSign/);
+  assert.match(releaseConfig, /notarize: false/);
+  assert.match(releaseConfig, /afterSign: 'scripts\/after-sign-macos\.cjs'/);
   assert.doesNotMatch(releaseConfig, /staple-notarized-app/);
   assert.match(releaseConfig, /sign: true/);
   assert.match(releaseConfig, /writeUpdateInfo: false/);
@@ -784,6 +784,44 @@ test('effective local builder configuration uses explicit ad-hoc signing by defa
   });
 });
 
+test('effective release builder delegates app notarization only to awaited afterSign', () => {
+  const probeSource = `
+    const config = require('./electron-builder.release.cjs');
+    process.stdout.write(JSON.stringify({
+      afterSign: config.afterSign,
+      notarize: config.mac.notarize,
+      forceCodeSigning: config.forceCodeSigning,
+      targets: config.mac.target
+    }));
+  `;
+  const probe = spawnSync(process.execPath, ['-e', probeSource], {
+    cwd: frontendRoot,
+    encoding: 'utf8',
+    env: {
+      ...process.env,
+      AUTOMIXER_MAC_BUILD_PROFILE: 'release',
+      AUTOMIXER_MAC_OUTPUT_DIR: '/tmp/automixer-release-config-probe',
+      AUTOMIXER_APPLE_TEAM_ID: 'QZN7ZYVYDZ',
+      AUTOMIXER_DEVELOPER_ID_IDENTITY:
+        'Developer ID Application: Example (QZN7ZYVYDZ)',
+      AUTOMIXER_BACKEND_BUNDLE_PATH: '/tmp/automixer-backend-bundle',
+      AUTOMIXER_BACKEND_SERVER_PATH: '/tmp/automixer-backend-bundle/server',
+      AUTOMIXER_FRONTEND_BUILD_DIR: '/tmp/automixer-frontend-build',
+      APPLE_KEYCHAIN_PROFILE: 'unit-test-profile'
+    }
+  });
+  assert.equal(probe.status, 0, probe.stderr);
+  assert.deepEqual(JSON.parse(probe.stdout), {
+    afterSign: 'scripts/after-sign-macos.cjs',
+    notarize: false,
+    forceCodeSigning: true,
+    targets: [
+      { target: 'dmg', arch: ['arm64'] },
+      { target: 'zip', arch: ['arm64'] }
+    ]
+  });
+});
+
 test('release profile fails closed on credentials and dirty checkout', () => {
   const valid = {
     AUTOMIXER_APPLE_TEAM_ID: 'QZN7ZYVYDZ',
@@ -905,7 +943,7 @@ test('release verification lifecycle behavior cleans before retained eligibility
         fs.writeFileSync(path.join(
           artifactDirectory, 'release-verification-initial.json'
         ), JSON.stringify({
-          schema: 'automixer.macos_release_manifest.v1',
+          schema: 'automixer.macos_release_manifest.v2',
           pathPolicy: 'artifact_root_relative_and_logical_v1',
           releaseEligible: false,
           source: { head: 'a', tree: 'b', cleanCheckout: true },
@@ -915,7 +953,16 @@ test('release verification lifecycle behavior cleans before retained eligibility
             zip: { sha256: '3'.repeat(64) }
           },
           runtimeSmoke: { result: { sha256: '4'.repeat(64) } },
-          notarization: { evidence: { sha256: '5'.repeat(64) } },
+          notarization: {
+            app: {
+              evidence: { sha256: '5'.repeat(64) },
+              rawAppleLog: { sha256: '6'.repeat(64) }
+            },
+            dmg: {
+              evidence: { sha256: '7'.repeat(64) },
+              rawAppleLog: { sha256: '8'.repeat(64) }
+            }
+          },
           verification: {
             mode: 'isolated_outputs',
             complete: false,
@@ -929,7 +976,7 @@ test('release verification lifecycle behavior cleans before retained eligibility
           artifactDirectory, 'release-verification-initial.json'
         )), true);
         fs.writeFileSync(path.join(artifactDirectory, 'release-manifest.json'), JSON.stringify({
-          schema: 'automixer.macos_release_manifest.v1',
+          schema: 'automixer.macos_release_manifest.v2',
           pathPolicy: 'artifact_root_relative_and_logical_v1',
           releaseEligible: true,
           source: { head: 'a', tree: 'b', cleanCheckout: true },
@@ -939,7 +986,16 @@ test('release verification lifecycle behavior cleans before retained eligibility
             zip: { sha256: '3'.repeat(64) }
           },
           runtimeSmoke: { result: { sha256: '4'.repeat(64) } },
-          notarization: { evidence: { sha256: '5'.repeat(64) } },
+          notarization: {
+            app: {
+              evidence: { sha256: '5'.repeat(64) },
+              rawAppleLog: { sha256: '6'.repeat(64) }
+            },
+            dmg: {
+              evidence: { sha256: '7'.repeat(64) },
+              rawAppleLog: { sha256: '8'.repeat(64) }
+            }
+          },
           verification: { mode: 'retained_artifacts', complete: true }
         }));
       }
