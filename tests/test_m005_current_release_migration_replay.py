@@ -282,6 +282,18 @@ async def test_m005_current_release_migration_replay_emits_bound_report(
         )
     monkeypatch.setattr(socket.socket, "sendto", guarded_call("socket_sendto"))
 
+    # urllib3 performs an import-time IPv6 capability probe by constructing
+    # and binding a socket. Preload only that dependency with the capability
+    # probe disabled while every socket guard above is already active, then
+    # restore the real capability before importing any project module.
+    original_has_ipv6 = socket.has_ipv6
+    monkeypatch.setattr(socket, "has_ipv6", False)
+    try:
+        import urllib3.util.connection  # noqa: F401
+    finally:
+        monkeypatch.setattr(socket, "has_ipv6", original_has_ipv6)
+    assert socket.has_ipv6 is original_has_ipv6
+
     try:
         import sounddevice as sounddevice_module
     except (ImportError, OSError):
@@ -419,6 +431,7 @@ async def test_m005_current_release_migration_replay_emits_bound_report(
     )
     assert server._apply_manual_console_write.await_count == 0
     assert all(count == 0 for count in mixer.writer_calls.values())
+    assert all(count == 0 for count in io_guard_call_counts.values())
 
     conftest_module = _find_loaded_module("tests/conftest.py")
     current_test_module = _find_loaded_module(

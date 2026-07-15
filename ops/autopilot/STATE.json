@@ -1,6 +1,6 @@
 {
   "schema": "automixer.autopilot.state.v1",
-  "truth_revision": "m117_operator_diagnostic_truth_contract_strict_live_88_zero_authority_20260715",
+  "truth_revision": "m118_m111_sealed_replay_zero_io_strict_live_88_zero_authority_20260715",
   "current_head_truth_revision": "m115_firmware_validated_m116_hw01_no_signal_m117_truth_contract_20260715",
   "full_release_truth_source": "strict_pre_release_review",
   "external_validation_scope": "M110 reached the real WING/CoreAudio route-capture path, but the machine-recorded route gate failed closed before artifact issuance on master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified; public-release and current-source promotion remain separate external gates",
@@ -10,7 +10,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-07-15T00:54:39Z",
+  "last_heartbeat_utc": "2026-07-15T01:48:55Z",
   "current_writer_lease": null,
   "current_head_validation": {
     "head": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
@@ -39,6 +39,27 @@
     "corrections_applied": 0,
     "live_authority_granted": false,
     "active_plan": "Docs/plans/M110-attended-wing-reset-soundcheck.md"
+  },
+  "m118_source_checkpoint_validation": {
+    "inspected_at_utc": "2026-07-15T01:48:55Z",
+    "status": "pre_cp05_source_checkpoint_passed_pending_commit_rebind",
+    "source_head_before_commit": "716dc04f7d7ee34cd3e762db5e0ab15998607aef",
+    "reproduced_failure": "proof-owned pytest exited zero but the outer verifier rejected socket_inet_construct=1 from urllib3 import-time IPv6 capability probing",
+    "decision": "install all socket guards first, suppress only the urllib3 import-time capability probe, restore the real socket.has_ipv6 value before project imports, and require every I/O counter to be exactly zero",
+    "targeted_migration_validation": "9 passed, 2 skipped in 12.69s",
+    "isolated_replay_test_validation": "1 passed in 3.39s with the direct exact-zero I/O assertion",
+    "pre_cp05_wing_rails_validation": "137 passed, 1 deselected in 3.04s",
+    "pre_cp05_full_suite_validation": "7215 passed, 3 skipped, 1 deselected, 1 warning in 359.33s",
+    "no_wing_manifest_validation": "passed with failed_checks [] and no backend/WING contact or live authority",
+    "memory_lint_validation": "PASS",
+    "existing_m111_challenge_status": "invalidated_by_tracked_source_change_do_not_reuse",
+    "fresh_challenge_required_after_commit_rebind": true,
+    "private_runtime_artifact_root_required": true,
+    "contacts_backend": false,
+    "contacts_wing": false,
+    "audio_device_opened": false,
+    "live_write": false,
+    "live_authority_granted": false
   },
   "m117_source_checkpoint_validation": {
     "inspected_at_utc": "2026-07-15T00:54:39Z",
@@ -877,6 +898,8 @@
     "autopilot_ledger_authority_fail_closed_validation": "Ledger authority rows are typed: ordinary control-plane rows keep hardware/backend/WING contact and live writes false; backend-only rows may contact only the backend; explicitly operator-approved supervised rows may record scoped hardware contact or bounded writes without granting standing authority. The unique M116 attended diagnostic is permanently pinned with hardware/backend/WING contact true, live writes false, operator observations not independently machine-verified, readiness_matrix_update_allowed=false, release_ready_live_family_count=0, safety_coverage_live_allowed_row_count=0, supervised_current_live_write_kind_count=0 and unrestricted_live_or_soundcheck_authority=false.",
     "m117_operator_diagnostic_truth_contract": "M117 preserves the append-only M116 operator-attended contact record, qualifies all current zero-signal summaries as operator-observed and not independently machine-verified, closes stale M116 plan statuses, and keeps strict readiness 88/100 with allowlist and authority at zero.",
     "m117_operator_diagnostic_truth_contract_validation": "The source checkpoint 7267b74ae and clean-tree validation baseline marker 551fa6b4f passed the dynamic CP05 gate, all 138 WING truth rails and the 7216-test repository suite with 3 skipped and 1 warning in 367.57s; canonical no-WING manifest verification, memory lint, JSON/JSONL validation and git diff check also pass without backend, CoreAudio, OSC or WING contact. Current binding completion is always derived from the dynamic CP05 marker after the latest non-marker commit, not from this historical marker SHA.",
+    "m118_m111_sealed_replay_zero_io": "M118 keeps exact-zero socket/audio proof semantics, scopes the urllib3 IPv6 capability-probe suppression to one guarded dependency preload, restores the real capability before project imports, and requires a private runtime artifact root. Existing source-bound M111 challenge evidence is invalid after this tracked change and must not be reused.",
+    "m118_m111_sealed_replay_zero_io_validation": "Migration tests 9 passed with 2 skipped; isolated replay test 1 passed; pre-CP05 WING rails 137 passed with 1 dynamic gate deselected; pre-CP05 full suite 7215 passed with 3 skipped, 1 deselected and 1 warning in 359.33s; no-WING manifest, memory lint, JSON/JSONL and diff checks passed without hardware/backend/audio contact.",
     "full_suite_after_ledger_authority_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4814 passed, 1 skipped, 1 warning in 166.65s; latest ledger authority rail is included in tests/test_wing_mvp_rails.py and does not grant WING live authority",
     "autopilot_operator_report_full_suite_sync_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py::test_autopilot_operator_reports_match_latest_full_suite_evidence tests/test_wing_mvp_rails.py::test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_blocked tests/test_wing_mvp_rails.py::test_autopilot_latest_ledger_timestamp_matches_current_state_surfaces tests/test_wing_mvp_rails.py::test_current_state_doc_matches_autopilot_state_evidence -q: 4 passed; PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/test_wing_mvp_rails.py -q: 126 passed; HEARTBEAT.md and LAST_REPORT.md must display the same latest full-suite result as STATE.json and the latest full-suite RUN_LEDGER row",
     "full_suite_after_operator_report_full_suite_guard_validation": "PYTHONPATH=backend /opt/homebrew/bin/python3 -m pytest tests/ -x --tb=short -q: 4815 passed, 1 skipped, 1 warning in 166.21s; operator-facing heartbeat/report full-suite evidence rail is included in tests/test_wing_mvp_rails.py and does not grant WING live authority",

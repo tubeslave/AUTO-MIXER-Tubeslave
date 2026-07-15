@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-15T00:54:39Z
+Last heartbeat UTC: 2026-07-15T01:48:55Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,6 +12,16 @@ Writer lease: none at the committed validation boundary. The bounded M117
 implementation lease is released before validation. CP05 is dynamically
 checked against the current non-marker Git tree and must pass before any
 hardware attempt.
+
+## M118 M111 sealed replay zero-I/O — 2026-07-15
+
+The bounded replay harness now prevents urllib3's import-time IPv6 probe under
+already-active guards, restores the real IPv6 capability before project imports
+and asserts exact-zero I/O counters. Targeted migration tests passed 9 with 2
+skipped; pre-CP05 rails passed 137 with 1 deselected; the full suite passed 7215
+with 3 skipped, 1 deselected and 1 warning in 359.33s. No backend, CoreAudio,
+OSC or WING contact occurred. The old challenge is invalid; commit/rebind and a
+fresh challenge remain.
 
 ## M117 operator diagnostic truth contract — 2026-07-15
 
@@ -133,7 +143,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
+Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

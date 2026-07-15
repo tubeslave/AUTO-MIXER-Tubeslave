@@ -1,6 +1,23 @@
 # Current State
 
-Generated: 2026-07-15T00:54:39Z
+Generated: 2026-07-15T01:48:55Z
+
+## M118 M111 sealed replay zero-I/O checkpoint — 2026-07-15
+
+- A clean-source M111 diagnostic replay exposed one attempted IPv6 socket
+  construction from urllib3's import-time capability probe. Writer calls,
+  backend/WING contact and audio-device opens remained zero.
+- M118 installs every socket/audio guard first, suppresses only that dependency
+  probe, restores the real `socket.has_ipv6` value before project imports, and
+  now fails inside the replay test unless every I/O counter is exactly zero.
+- Targeted migration validation passed 9 tests with 2 skipped; the isolated
+  replay test passed; pre-CP05 validation passed 137 WING rails with 1 dynamic
+  gate deselected and 7215 repository tests with 3 skipped, 1 deselected and 1
+  warning in 359.33s.
+- The old M111 challenge is invalid after this tracked source change and must
+  not be reused. Commit, CP05 rebind and a fresh challenge are still required.
+- This checkpoint contacted no backend, CoreAudio, OSC or WING endpoint and
+  keeps strict readiness `88/100`, allowlist `0` and authority `false`.
 
 ## M117 operator diagnostic truth contract — 2026-07-15
 
@@ -183,7 +200,7 @@ Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 4
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
+Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

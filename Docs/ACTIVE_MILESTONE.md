@@ -6,6 +6,18 @@ Title: WING read-only preflight evidence gate
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
+## M118 M111 sealed replay zero-I/O rail — 2026-07-15
+
+M118 closes a proof-harness regression without widening live scope. The sealed
+replay now preloads urllib3 under already-active socket guards with only its
+import-time IPv6 probe suppressed, restores the real capability before project
+imports, and asserts all writer/network/audio counters are zero. Pre-CP05
+validation passed 9 migration tests (2 skipped), 137 WING rails (1 dynamic gate
+deselected) and 7215 repository tests (3 skipped, 1 deselected, 1 warning).
+The tracked change invalidates the previous M111 challenge; commit, marker-only
+CP05 rebind and a fresh challenge remain required. No backend, audio or WING
+contact occurred, and strict readiness remains `88/100`.
+
 ## M117 diagnostic provenance rail — 2026-07-15
 
 M117 corrects current truth only. The M116 route-gate failure is
@@ -113,7 +125,7 @@ Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 4
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
+Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`.
 
 ## Earlier superseding status — 2026-07-11
 

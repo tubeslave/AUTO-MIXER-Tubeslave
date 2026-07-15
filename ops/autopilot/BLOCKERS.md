@@ -2,6 +2,15 @@
 
 ## Current blockers
 
+> M118 proof-harness update (2026-07-15): the urllib3 import-time IPv6 socket
+> probe is now suppressed only during a guarded dependency preload, with the
+> real capability restored before project imports and exact-zero I/O asserted.
+> Pre-CP05 validation passed. The previous M111 challenge is invalid after the
+> tracked source change; a committed source, marker-only CP05 rebind, fresh
+> challenge, owner same-console attestation and migration-bound M006 decision
+> remain required. This grants no hardware contact, live write or authority.
+>
+
 > M117 truth-contract note (2026-07-15): the latest offline row does not erase
 > M116's operator-attended WING/backend/CoreAudio contact. The route-gate
 > failure is machine-recorded; extra all-channel capture facts are
@@ -106,7 +115,7 @@ Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 4
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
+Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
