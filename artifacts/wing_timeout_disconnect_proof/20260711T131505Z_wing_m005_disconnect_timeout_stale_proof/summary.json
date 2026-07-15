@@ -1,0 +1,755 @@
+{
+  "address": "/ch/3/fdr",
+  "channel": 3,
+  "completed_m005_evidence": [
+    "physical_baseline_readback",
+    "operator_confirmed_physical_cable_loss",
+    "stale_readback_unavailable",
+    "blocked_write_while_disconnected",
+    "reconnect_recovery_verified"
+  ],
+  "delta_db": -0.25,
+  "direct_live_write_request_sent": false,
+  "disconnect_mode": "physical-cable-loss",
+  "disconnect_request_type": "disconnect_mixer",
+  "events_path": "artifacts/wing_timeout_disconnect_proof/20260711T131505Z_wing_m005_disconnect_timeout_stale_proof/events.jsonl",
+  "execute": true,
+  "fail_closed": true,
+  "forbidden_request_types_sent": [],
+  "initial_operator_mode": {
+    "apply_path": "supervised_manual_gate",
+    "autonomy_tier": 3,
+    "available_modes": [
+      {
+        "autonomy_tier": "1",
+        "intent": "listen_measure_report",
+        "key": "analyze",
+        "label": "Analyze",
+        "project_mode_name": "Analysis Mode",
+        "project_mode_number": "1",
+        "summary": "Measure and explain the mix without creating applyable actions."
+      },
+      {
+        "autonomy_tier": "2",
+        "intent": "listen_measure_suggest",
+        "key": "assist",
+        "label": "Assist",
+        "project_mode_name": "Assisted Mixing Mode",
+        "project_mode_number": "2",
+        "summary": "Analyze the mix and prepare suggestions for the engineer."
+      },
+      {
+        "autonomy_tier": "3",
+        "intent": "approve_then_apply",
+        "key": "supervised",
+        "label": "Supervised",
+        "project_mode_name": "Supervised AutoMix Mode",
+        "project_mode_number": "3",
+        "summary": "Prepare changes and apply only with explicit approval, readback, and rollback."
+      },
+      {
+        "autonomy_tier": "4",
+        "intent": "autonomous_control",
+        "key": "auto",
+        "label": "Auto",
+        "project_mode_name": "Full Autonomous Mixing Mode",
+        "project_mode_number": "4",
+        "summary": "Autonomous console control. Locked on WING deployment until proven safe."
+      }
+    ],
+    "blocked_reasons": [],
+    "capabilities": {
+      "allowed_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "allowed_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader"
+      ],
+      "can_analyze": true,
+      "can_apply_to_console": true,
+      "can_autonomous_apply": false,
+      "can_create_proposals": true,
+      "requires_approval": true
+    },
+    "connection_mode": "wing",
+    "intent": "approve_then_apply",
+    "label": "Supervised",
+    "live_write_policy": "supervised_approval_required",
+    "mode": "supervised",
+    "project_mode": {
+      "autonomy_tier": 3,
+      "current_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "effective_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader"
+      ],
+      "human_gate": "explicit_operator_approval_required",
+      "name": "Supervised AutoMix Mode",
+      "number": 3,
+      "proposal_policy": "proposal_then_supervised_apply",
+      "target_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader",
+        "mute",
+        "pan",
+        "eq",
+        "compressor",
+        "gate",
+        "routing",
+        "dca",
+        "groups",
+        "matrices",
+        "fx",
+        "scenes",
+        "presets"
+      ]
+    },
+    "summary": "Prepare changes and apply only with explicit approval, readback, and rollback.",
+    "type": "operator_mode_status",
+    "warnings": [],
+    "wing_deployment": true
+  },
+  "live_apply_request_sent": true,
+  "live_authority_granted": false,
+  "m005_complete": true,
+  "missing_m005_evidence": [],
+  "old_value": -12.099998474121094,
+  "phases": {
+    "baseline": {
+      "readback": {
+        "address": "/ch/3/fdr",
+        "channel": 3,
+        "error": null,
+        "raw": {
+          "address": "/ch/3/fdr",
+          "args": [
+            "-12.1",
+            0.4737500250339508,
+            -12.099998474121094
+          ],
+          "confirmed_round_trips": 2,
+          "status": "received",
+          "value": -12.099998474121094
+        },
+        "request_id": "20260711T131505Z_wing_m005_disconnect_timeout_stale_proof:baseline",
+        "source": "physical_readback",
+        "status": "verified_from_physical_readback",
+        "type": "mixer_parameter_value",
+        "value": -12.099998474121094,
+        "value_type": "fader"
+      },
+      "status": "passed"
+    },
+    "blocked_write_while_disconnected": {
+      "apply_result": {
+        "apply_result": {
+          "address": "/ch/3/fdr",
+          "cache_freshness": {
+            "address": "/ch/3/fdr",
+            "age_sec": 32.673,
+            "live_write": false,
+            "minimum_updated_at": null,
+            "queries_console": false,
+            "read_only": true,
+            "source": "state_timestamps",
+            "stale_after_sec": 30.0,
+            "status": "stale",
+            "updated_after_minimum": null,
+            "updated_at": "2026-07-11T13:15:05Z"
+          },
+          "channel": 3,
+          "pre_read_source": "mixer_state_cache",
+          "pre_read_status": "verified_from_cache",
+          "pre_read_value": -12.099998474121094,
+          "reason": "pre_read_cache_not_fresh",
+          "requested_change": {
+            "channel": 3,
+            "current_value": -12.099998474121094,
+            "delta_db": -0.25,
+            "proof_direction": "negative_db_move_only",
+            "raw": {
+              "channel": 3,
+              "current_value": -12.099998474121094,
+              "delta_db": -0.25,
+              "proof_direction": "negative_db_move_only",
+              "value": -12.35,
+              "value_type": "fader",
+              "wing_address": "/ch/3/fdr",
+              "wing_surface": "channel_fader"
+            },
+            "value": -12.35,
+            "value_type": "fader",
+            "wing_address": "/ch/3/fdr",
+            "wing_surface": "channel_fader"
+          },
+          "status": "blocked",
+          "value_type": "fader"
+        },
+        "proposal": {
+          "apply_blockers": [],
+          "can_apply": true,
+          "confidence": 1.0,
+          "created_at": "2026-07-11T13:15:05Z",
+          "expired": false,
+          "expires_at": "2026-07-11T13:17:05Z",
+          "id": "wing-m005-disconnect-proof:probe:20260711T131505Z_wing_m005_disconnect_timeout_stale_proof",
+          "kind": "fader",
+          "linked_change_count": 0,
+          "mode_at_creation": "supervised",
+          "raw": {
+            "channel": 3,
+            "confidence": 1.0,
+            "id": "wing-m005-disconnect-proof:probe:20260711T131505Z_wing_m005_disconnect_timeout_stale_proof",
+            "kind": "fader",
+            "proof_direction": "negative_db_move_only",
+            "reason": "m005_disconnect_timeout_stale_state_proof",
+            "requested_change": {
+              "channel": 3,
+              "current_value": -12.099998474121094,
+              "delta_db": -0.25,
+              "proof_direction": "negative_db_move_only",
+              "value": -12.35,
+              "value_type": "fader",
+              "wing_address": "/ch/3/fdr",
+              "wing_surface": "channel_fader"
+            },
+            "severity": "low",
+            "source": "wing_operator_proposal_validation_runner",
+            "target": 3,
+            "title": "WING validation: CH3 fader -12.10 -> -12.35 dB",
+            "value": -12.35,
+            "value_type": "fader",
+            "wing_address": "/ch/3/fdr",
+            "wing_surface": "channel_fader"
+          },
+          "reason": "m005_disconnect_timeout_stale_state_proof",
+          "requested_change": {
+            "channel": 3,
+            "current_value": -12.099998474121094,
+            "delta_db": -0.25,
+            "proof_direction": "negative_db_move_only",
+            "raw": {
+              "channel": 3,
+              "current_value": -12.099998474121094,
+              "delta_db": -0.25,
+              "proof_direction": "negative_db_move_only",
+              "value": -12.35,
+              "value_type": "fader",
+              "wing_address": "/ch/3/fdr",
+              "wing_surface": "channel_fader"
+            },
+            "value": -12.35,
+            "value_type": "fader",
+            "wing_address": "/ch/3/fdr",
+            "wing_surface": "channel_fader"
+          },
+          "requested_changes": null,
+          "requires_approval": true,
+          "result": {
+            "address": "/ch/3/fdr",
+            "cache_freshness": {
+              "address": "/ch/3/fdr",
+              "age_sec": 32.673,
+              "live_write": false,
+              "minimum_updated_at": null,
+              "queries_console": false,
+              "read_only": true,
+              "source": "state_timestamps",
+              "stale_after_sec": 30.0,
+              "status": "stale",
+              "updated_after_minimum": null,
+              "updated_at": "2026-07-11T13:15:05Z"
+            },
+            "channel": 3,
+            "pre_read_source": "mixer_state_cache",
+            "pre_read_status": "verified_from_cache",
+            "pre_read_value": -12.099998474121094,
+            "reason": "pre_read_cache_not_fresh",
+            "requested_change": {
+              "channel": 3,
+              "current_value": -12.099998474121094,
+              "delta_db": -0.25,
+              "proof_direction": "negative_db_move_only",
+              "raw": {
+                "channel": 3,
+                "current_value": -12.099998474121094,
+                "delta_db": -0.25,
+                "proof_direction": "negative_db_move_only",
+                "value": -12.35,
+                "value_type": "fader",
+                "wing_address": "/ch/3/fdr",
+                "wing_surface": "channel_fader"
+              },
+              "value": -12.35,
+              "value_type": "fader",
+              "wing_address": "/ch/3/fdr",
+              "wing_surface": "channel_fader"
+            },
+            "status": "blocked",
+            "value_type": "fader"
+          },
+          "severity": "low",
+          "source": "wing_operator_proposal_validation_runner",
+          "status": "pending",
+          "target": 3,
+          "title": "WING validation: CH3 fader -12.10 -> -12.35 dB",
+          "ttl_seconds": 120,
+          "updated_at": "2026-07-11T13:15:38Z"
+        },
+        "status": "apply_blocked",
+        "success": false,
+        "type": "operator_proposal_apply_blocked"
+      },
+      "block_reason": "pre_read_cache_not_fresh",
+      "status": "passed"
+    },
+    "disconnect": {
+      "confirmation": "WING_CABLE_PULLED_BY_OPERATOR",
+      "operator_gate": true,
+      "status": "operator_confirmed_physical_cable_loss",
+      "wait_sec": 2.0
+    },
+    "reconnect_recovery": {
+      "connection_status": {
+        "connected": true,
+        "ip": "192.168.1.102",
+        "mode": "wing",
+        "observation_only": true,
+        "record_telemetry": false,
+        "state": {
+          "/ch/1/$name": "KICK",
+          "/ch/1/fdr": -3.0999984741210938,
+          "/ch/1/mute": 0,
+          "/ch/1/name": "KICK",
+          "/ch/2/$name": "SNARE T",
+          "/ch/2/fdr": 0.0,
+          "/ch/2/mute": 0,
+          "/ch/2/name": "SNARE T",
+          "/ch/3/$name": "SNARE B",
+          "/ch/3/fdr": -12.099998474121094,
+          "/ch/3/mute": 0,
+          "/ch/3/name": "",
+          "/ch/4/$name": "TOM",
+          "/ch/4/fdr": -1.4999980926513672,
+          "/ch/4/mute": 0,
+          "/ch/4/name": "",
+          "/ch/5/$name": "F TOM",
+          "/ch/5/fdr": -0.6999988555908203,
+          "/ch/5/mute": 0,
+          "/ch/5/name": "",
+          "/ch/6/$name": "OH L",
+          "/ch/6/fdr": -6.200000762939453,
+          "/ch/6/mute": 0,
+          "/ch/6/name": "",
+          "/ch/7/$name": "OH R",
+          "/ch/7/fdr": -6.200000762939453,
+          "/ch/7/mute": 0,
+          "/ch/7/name": "",
+          "/ch/8/$name": "BASS",
+          "/ch/8/fdr": -4.799997329711914,
+          "/ch/8/mute": 0,
+          "/ch/8/name": "",
+          "/main/1/fdr": 0.0,
+          "/main/2/fdr": -144.0,
+          "/main/3/fdr": -144.0,
+          "/main/4/fdr": -144.0
+        },
+        "telemetry_session_label": null,
+        "type": "connection_status"
+      },
+      "readback": {
+        "address": "/ch/3/fdr",
+        "channel": 3,
+        "error": null,
+        "raw": {
+          "address": "/ch/3/fdr",
+          "args": [
+            "-12.1",
+            0.4737500250339508,
+            -12.099998474121094
+          ],
+          "confirmed_round_trips": 2,
+          "status": "received",
+          "value": -12.099998474121094
+        },
+        "request_id": "20260711T131505Z_wing_m005_disconnect_timeout_stale_proof:reconnect",
+        "source": "physical_readback",
+        "status": "verified_from_physical_readback",
+        "type": "mixer_parameter_value",
+        "value": -12.099998474121094,
+        "value_type": "fader"
+      },
+      "status": "passed",
+      "unchanged_from_baseline": true
+    },
+    "stale_readback": {
+      "readback": {
+        "address": "/ch/3/fdr",
+        "channel": 3,
+        "error": null,
+        "raw": {
+          "address": "/ch/3/fdr",
+          "phase": "drain",
+          "status": "timeout",
+          "value": null
+        },
+        "request_id": "20260711T131505Z_wing_m005_disconnect_timeout_stale_proof:stale-probe",
+        "source": "physical_readback",
+        "status": "readback_unavailable",
+        "type": "mixer_parameter_value",
+        "value": null,
+        "value_type": "fader"
+      },
+      "status": "passed"
+    }
+  },
+  "physical_cable_confirmation": "WING_CABLE_PULLED_BY_OPERATOR",
+  "preflight_decision_gate": {
+    "accepted": true,
+    "accepted_record_count": 1,
+    "accepted_source_ids": [
+      "artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json"
+    ],
+    "artifact_root": "artifacts/wing_readonly_preflight",
+    "blocked_by": [
+      "readiness_matrix_update_still_requires_separate_manual_action"
+    ],
+    "decision_record_count": 3,
+    "decision_root": "artifacts/wing_readonly_preflight_review_decisions",
+    "execution_allowed_by_decision": false,
+    "expected_accepted_readonly_source_id": "artifacts/wing_readonly_preflight/20260702T095758Z_wing_readonly_preflight/summary.json",
+    "invalid_record_count": 0,
+    "ledger_status": "operator_review_decision_records_available",
+    "live_authority_granted": false,
+    "manual_readiness_update_candidate_available": true,
+    "next_required_action": "Accepted review decision is ready for the next manual WING MVP step.",
+    "required_for_execute": true,
+    "source_authority_denied": true,
+    "status": "accepted_decision_ready",
+    "unreviewed_candidate_count": 0
+  },
+  "probe_proposal": {
+    "operator_mode": {
+      "apply_path": "supervised_manual_gate",
+      "autonomy_tier": 3,
+      "available_modes": [
+        {
+          "autonomy_tier": "1",
+          "intent": "listen_measure_report",
+          "key": "analyze",
+          "label": "Analyze",
+          "project_mode_name": "Analysis Mode",
+          "project_mode_number": "1",
+          "summary": "Measure and explain the mix without creating applyable actions."
+        },
+        {
+          "autonomy_tier": "2",
+          "intent": "listen_measure_suggest",
+          "key": "assist",
+          "label": "Assist",
+          "project_mode_name": "Assisted Mixing Mode",
+          "project_mode_number": "2",
+          "summary": "Analyze the mix and prepare suggestions for the engineer."
+        },
+        {
+          "autonomy_tier": "3",
+          "intent": "approve_then_apply",
+          "key": "supervised",
+          "label": "Supervised",
+          "project_mode_name": "Supervised AutoMix Mode",
+          "project_mode_number": "3",
+          "summary": "Prepare changes and apply only with explicit approval, readback, and rollback."
+        },
+        {
+          "autonomy_tier": "4",
+          "intent": "autonomous_control",
+          "key": "auto",
+          "label": "Auto",
+          "project_mode_name": "Full Autonomous Mixing Mode",
+          "project_mode_number": "4",
+          "summary": "Autonomous console control. Locked on WING deployment until proven safe."
+        }
+      ],
+      "blocked_reasons": [],
+      "capabilities": {
+        "allowed_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "allowed_live_write_surfaces": [
+          "preamp",
+          "trim",
+          "fader"
+        ],
+        "can_analyze": true,
+        "can_apply_to_console": true,
+        "can_autonomous_apply": false,
+        "can_create_proposals": true,
+        "requires_approval": true
+      },
+      "connection_mode": "wing",
+      "intent": "approve_then_apply",
+      "label": "Supervised",
+      "live_write_policy": "supervised_approval_required",
+      "mode": "supervised",
+      "project_mode": {
+        "autonomy_tier": 3,
+        "current_live_write_kinds": [
+          "fader",
+          "gain"
+        ],
+        "effective_live_write_surfaces": [
+          "preamp",
+          "trim",
+          "fader"
+        ],
+        "human_gate": "explicit_operator_approval_required",
+        "name": "Supervised AutoMix Mode",
+        "number": 3,
+        "proposal_policy": "proposal_then_supervised_apply",
+        "target_live_write_surfaces": [
+          "preamp",
+          "trim",
+          "fader",
+          "mute",
+          "pan",
+          "eq",
+          "compressor",
+          "gate",
+          "routing",
+          "dca",
+          "groups",
+          "matrices",
+          "fx",
+          "scenes",
+          "presets"
+        ]
+      },
+      "summary": "Prepare changes and apply only with explicit approval, readback, and rollback.",
+      "type": "operator_mode_status",
+      "warnings": [],
+      "wing_deployment": true
+    },
+    "proposal": {
+      "apply_blockers": [],
+      "can_apply": true,
+      "confidence": 1.0,
+      "created_at": "2026-07-11T13:15:05Z",
+      "expired": false,
+      "expires_at": "2026-07-11T13:17:05Z",
+      "id": "wing-m005-disconnect-proof:probe:20260711T131505Z_wing_m005_disconnect_timeout_stale_proof",
+      "kind": "fader",
+      "linked_change_count": 0,
+      "mode_at_creation": "supervised",
+      "raw": {
+        "channel": 3,
+        "confidence": 1.0,
+        "id": "wing-m005-disconnect-proof:probe:20260711T131505Z_wing_m005_disconnect_timeout_stale_proof",
+        "kind": "fader",
+        "proof_direction": "negative_db_move_only",
+        "reason": "m005_disconnect_timeout_stale_state_proof",
+        "requested_change": {
+          "channel": 3,
+          "current_value": -12.099998474121094,
+          "delta_db": -0.25,
+          "proof_direction": "negative_db_move_only",
+          "value": -12.35,
+          "value_type": "fader",
+          "wing_address": "/ch/3/fdr",
+          "wing_surface": "channel_fader"
+        },
+        "severity": "low",
+        "source": "wing_operator_proposal_validation_runner",
+        "target": 3,
+        "title": "WING validation: CH3 fader -12.10 -> -12.35 dB",
+        "value": -12.35,
+        "value_type": "fader",
+        "wing_address": "/ch/3/fdr",
+        "wing_surface": "channel_fader"
+      },
+      "reason": "m005_disconnect_timeout_stale_state_proof",
+      "requested_change": {
+        "channel": 3,
+        "current_value": -12.099998474121094,
+        "delta_db": -0.25,
+        "proof_direction": "negative_db_move_only",
+        "raw": {
+          "channel": 3,
+          "current_value": -12.099998474121094,
+          "delta_db": -0.25,
+          "proof_direction": "negative_db_move_only",
+          "value": -12.35,
+          "value_type": "fader",
+          "wing_address": "/ch/3/fdr",
+          "wing_surface": "channel_fader"
+        },
+        "value": -12.35,
+        "value_type": "fader",
+        "wing_address": "/ch/3/fdr",
+        "wing_surface": "channel_fader"
+      },
+      "requested_changes": null,
+      "requires_approval": true,
+      "result": null,
+      "severity": "low",
+      "source": "wing_operator_proposal_validation_runner",
+      "status": "pending",
+      "target": 3,
+      "title": "WING validation: CH3 fader -12.10 -> -12.35 dB",
+      "ttl_seconds": 120,
+      "updated_at": "2026-07-11T13:15:05Z"
+    },
+    "status": "created",
+    "success": true,
+    "type": "operator_proposal_created"
+  },
+  "proof": "wing_m005_disconnect_timeout_stale_protection",
+  "proof_artifact_schema": "wing_timeout_disconnect_proof.v1",
+  "proof_runner": "wing_timeout_disconnect_proof_runner",
+  "proposal_create_request_sent": true,
+  "readiness_closure_allowed": false,
+  "readiness_matrix_update_allowed": false,
+  "reason": "blocked_write_while_disconnected_verified",
+  "remaining_m005_evidence": [],
+  "required_m005_evidence": [
+    "physical_baseline_readback",
+    "operator_confirmed_physical_cable_loss",
+    "stale_readback_unavailable",
+    "blocked_write_while_disconnected",
+    "reconnect_recovery_verified"
+  ],
+  "rollback_request_sent": false,
+  "run_id": "20260711T131505Z_wing_m005_disconnect_timeout_stale_proof",
+  "safety_pre_write_disconnect_verified": true,
+  "safety_pre_write_readback_unavailable": true,
+  "sent_request_types": [
+    "get_operator_mode",
+    "get_state",
+    "query_mixer_parameter",
+    "set_operator_mode",
+    "create_operator_proposal",
+    "query_mixer_parameter",
+    "apply_operator_proposal",
+    "connect_wing",
+    "query_mixer_parameter"
+  ],
+  "started_at": "2026-07-11T13:15:05Z",
+  "status": "passed",
+  "summary_path": "artifacts/wing_timeout_disconnect_proof/20260711T131505Z_wing_m005_disconnect_timeout_stale_proof/summary.json",
+  "supervised_mode": {
+    "apply_path": "supervised_manual_gate",
+    "autonomy_tier": 3,
+    "available_modes": [
+      {
+        "autonomy_tier": "1",
+        "intent": "listen_measure_report",
+        "key": "analyze",
+        "label": "Analyze",
+        "project_mode_name": "Analysis Mode",
+        "project_mode_number": "1",
+        "summary": "Measure and explain the mix without creating applyable actions."
+      },
+      {
+        "autonomy_tier": "2",
+        "intent": "listen_measure_suggest",
+        "key": "assist",
+        "label": "Assist",
+        "project_mode_name": "Assisted Mixing Mode",
+        "project_mode_number": "2",
+        "summary": "Analyze the mix and prepare suggestions for the engineer."
+      },
+      {
+        "autonomy_tier": "3",
+        "intent": "approve_then_apply",
+        "key": "supervised",
+        "label": "Supervised",
+        "project_mode_name": "Supervised AutoMix Mode",
+        "project_mode_number": "3",
+        "summary": "Prepare changes and apply only with explicit approval, readback, and rollback."
+      },
+      {
+        "autonomy_tier": "4",
+        "intent": "autonomous_control",
+        "key": "auto",
+        "label": "Auto",
+        "project_mode_name": "Full Autonomous Mixing Mode",
+        "project_mode_number": "4",
+        "summary": "Autonomous console control. Locked on WING deployment until proven safe."
+      }
+    ],
+    "blocked_reasons": [],
+    "capabilities": {
+      "allowed_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "allowed_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader"
+      ],
+      "can_analyze": true,
+      "can_apply_to_console": true,
+      "can_autonomous_apply": false,
+      "can_create_proposals": true,
+      "requires_approval": true
+    },
+    "connection_mode": "wing",
+    "intent": "approve_then_apply",
+    "label": "Supervised",
+    "live_write_policy": "supervised_approval_required",
+    "mode": "supervised",
+    "previous_mode": "supervised",
+    "project_mode": {
+      "autonomy_tier": 3,
+      "current_live_write_kinds": [
+        "fader",
+        "gain"
+      ],
+      "effective_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader"
+      ],
+      "human_gate": "explicit_operator_approval_required",
+      "name": "Supervised AutoMix Mode",
+      "number": 3,
+      "proposal_policy": "proposal_then_supervised_apply",
+      "target_live_write_surfaces": [
+        "preamp",
+        "trim",
+        "fader",
+        "mute",
+        "pan",
+        "eq",
+        "compressor",
+        "gate",
+        "routing",
+        "dca",
+        "groups",
+        "matrices",
+        "fx",
+        "scenes",
+        "presets"
+      ]
+    },
+    "reason": "m005_disconnect_timeout_stale_state_proof",
+    "requested_mode": "supervised",
+    "summary": "Prepare changes and apply only with explicit approval, readback, and rollback.",
+    "type": "operator_mode_status",
+    "warnings": [],
+    "wing_deployment": true
+  },
+  "target_value": -12.35,
+  "url": "ws://localhost:8765",
+  "value_type": "fader",
+  "write_policy": "blocked_write_attempts_only"
+}

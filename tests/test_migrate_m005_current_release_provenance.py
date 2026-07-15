@@ -4,6 +4,7 @@ import copy
 import hashlib
 import importlib.util
 import json
+import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -204,6 +205,22 @@ def test_legacy_extractor_accepts_exact_bytes_and_rejects_bit_flip(tmp_path: Pat
 
 
 def test_real_historical_artifact_and_owner_decision_match_immutable_hashes() -> None:
+    tracked = subprocess.run(
+        [
+            "/usr/bin/git",
+            "ls-files",
+            "--error-unmatch",
+            "--",
+            migration.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+            migration.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
+        ],
+        cwd=PROJECT_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert tracked.returncode == 0, tracked.stderr
+
     historical = migration.verify_historical_evidence(
         migration.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
         migration.EXPECTED_HISTORICAL_EVENTS_LOGICAL_PATH,
