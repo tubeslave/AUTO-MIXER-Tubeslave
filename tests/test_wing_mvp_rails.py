@@ -1107,6 +1107,201 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
     assert latest_authority["unrestricted_live_or_soundcheck_authority"] is False
 
 
+def test_m116_operator_attended_diagnostic_remains_pinned_after_ledger_advances():
+    ledger_lines = [
+        line
+        for line in AUTOPILOT_RUN_LEDGER.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    ledger_rows = [json.loads(line) for line in ledger_lines]
+    matching_rows = [
+        row
+        for row in ledger_rows
+        if row.get("event") == "supervised_m116_hw01_no_signal_diagnostic_truth_sync"
+    ]
+    matching_lines = [
+        line
+        for line, row in zip(ledger_lines, ledger_rows, strict=True)
+        if row.get("event") == "supervised_m116_hw01_no_signal_diagnostic_truth_sync"
+    ]
+
+    assert len(matching_rows) == 1
+    assert len(matching_lines) == 1
+    assert hashlib.sha256(matching_lines[0].encode("utf-8")).hexdigest() == (
+        "67f2cef97b5b40d2f487dedd57ca2a7871b25357a04c3a59734717e1a79823c3"
+    )
+    diagnostic = matching_rows[0]
+    authority = diagnostic["authority"]
+    evidence = diagnostic["diagnostic_evidence"]
+
+    assert diagnostic["hardware_contacted"] is True
+    assert diagnostic["live_writes"] is False
+    assert authority["operator_approved"] is True
+    assert authority["operator_attended_diagnostic"] is True
+    assert authority["contacts_backend"] is True
+    assert authority["contacts_wing"] is True
+    assert authority["live_write"] is False
+    assert authority["live_authority_granted"] is False
+    assert authority["readiness_closure_allowed"] is False
+    assert authority["readiness_matrix_update_allowed"] is False
+    assert authority["release_ready_live_family_count"] == 0
+    assert authority["safety_coverage_live_allowed_row_count"] == 0
+    assert authority["supervised_current_live_write_kind_count"] == 0
+    assert authority["unrestricted_live_or_soundcheck_authority"] is False
+    assert evidence["runner_summary_sha256"] == (
+        "sha256:3a300561f3a6b31099cf2586f0047d674ff1342abb767f761b856f384ef91273"
+    )
+    assert evidence["backend_log_sha256"] == (
+        "sha256:19d0d41ae6e52321f4ebf55e2dfe822bdbd500b7ad37ecaa68542c87c929e490"
+    )
+    assert evidence["operator_observations_machine_verified"] is False
+    assert any(
+        "operator-observed" in result
+        and "not independently machine-verified" in result
+        for result in diagnostic["results"]
+    )
+
+    expected_preserved = {
+        "event": diagnostic["event"],
+        "hardware_contacted": diagnostic["hardware_contacted"],
+        "contacts_backend": authority["contacts_backend"],
+        "contacts_wing": authority["contacts_wing"],
+        "live_writes": diagnostic["live_writes"],
+        "operator_observations_machine_verified": evidence[
+            "operator_observations_machine_verified"
+        ],
+        "runner_summary_sha256": evidence["runner_summary_sha256"],
+        "backend_log_sha256": evidence["backend_log_sha256"],
+    }
+    latest_preserving_row = next(
+        row
+        for row in reversed(ledger_rows)
+        if row.get("preserved_m116_diagnostic") is not None
+    )
+    assert latest_preserving_row["preserved_m116_diagnostic"] == expected_preserved
+
+
+def test_m117_current_truth_surfaces_preserve_diagnostic_provenance():
+    state = json.loads(AUTOPILOT_STATE.read_text(encoding="utf-8"))
+    provenance = (
+        "operator-observed 3-second and 120-second captures showed exact digital "
+        "zero on all 48 channels; these extra observations are not independently "
+        "machine-verified"
+    )
+
+    def logical_markdown_statements(markdown: str) -> list[str]:
+        statements: list[str] = []
+        current: list[str] = []
+
+        def flush() -> None:
+            if current:
+                statements.append(re.sub(r"\s+", " ", " ".join(current)).strip())
+                current.clear()
+
+        for raw_line in markdown.splitlines():
+            line = re.sub(r"^\s*>\s?", "", raw_line).rstrip()
+            if not line.strip():
+                flush()
+                continue
+            starts_new_statement = bool(
+                re.match(r"^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)", line)
+            )
+            if starts_new_statement:
+                flush()
+            current.append(line.strip())
+        flush()
+        return statements
+
+    assert provenance in state["external_validation_scope"]
+    assert provenance in state["current_blocker"]
+    blocker_mirror_paths = (
+        CURRENT_STATE_DOC,
+        ACTIVE_MILESTONE_DOC,
+        ROADMAP_DOC,
+        M001_PLAN,
+        AUTOPILOT_BLOCKERS,
+        AUTOPILOT_HEARTBEAT,
+        AUTOPILOT_LAST_REPORT,
+        BLOCKERS_DOC,
+        MVP_PROGRESS_REPORT,
+    )
+    current_surface_paths = (
+        *blocker_mirror_paths,
+        M110_PLAN,
+        CURRENT_TASKS,
+    )
+    for surface_path in blocker_mirror_paths:
+        normalized = re.sub(
+            r"\s+",
+            " ",
+            surface_path.read_text(encoding="utf-8"),
+        )
+        assert provenance in normalized
+
+    for surface_path in current_surface_paths:
+        current_prefix = re.split(
+            r"^## Historical",
+            surface_path.read_text(encoding="utf-8"),
+            maxsplit=1,
+            flags=re.MULTILINE,
+        )[0]
+        digital_zero_statements = [
+            statement
+            for statement in logical_markdown_statements(current_prefix)
+            if "digital zero" in statement.lower()
+        ]
+        assert digital_zero_statements
+        for statement in digital_zero_statements:
+            assert "operator-observed" in statement.lower()
+            assert "not independently machine-verified" in statement.lower()
+
+    mutation_fixture = (
+        "- Operator-observed capture showed digital zero and is not independently "
+        "machine-verified.\n"
+        "- Adjacent current capture showed digital zero on all channels."
+    )
+    mutated_digital_zero_statements = [
+        statement
+        for statement in logical_markdown_statements(mutation_fixture)
+        if "digital zero" in statement.lower()
+    ]
+    assert len(mutated_digital_zero_statements) == 2
+    assert any(
+        "operator-observed" not in statement.lower()
+        or "not independently machine-verified" not in statement.lower()
+        for statement in mutated_digital_zero_statements
+    )
+
+    current_state = CURRENT_STATE_DOC.read_text(encoding="utf-8")
+    normalized_current_state = re.sub(r"\s+", " ", current_state)
+    assert "keep hardware contact and live writes false" not in current_state
+    assert "operator-approved diagnostic and supervised rows are typed separately" in (
+        normalized_current_state
+    )
+
+    roadmap = ROADMAP_DOC.read_text(encoding="utf-8")
+    assert "identity fail-open" not in roadmap
+    assert "fail-closed identity gate" in roadmap
+
+    m116_plan = (
+        PROJECT_ROOT
+        / "Docs"
+        / "plans"
+        / "M116-m110-hw01-no-signal-truth-sync-20260715.md"
+    ).read_text(encoding="utf-8")
+    assert (
+        "| M116-CP04 | Validation | JSON/JSONL, focused, rails, full suite, "
+        "frontend, no-WING, lint and review | complete |"
+    ) in m116_plan
+    assert "partial; final clean-tree rail and suite follow CP06" not in m116_plan
+    assert "| M116-CP05 | Source checkpoint | non-marker commit on released lease | complete |" in (
+        m116_plan
+    )
+    assert "| M116-CP06 | CP05 rebind | marker-only commit and clean final verification | complete |" in (
+        m116_plan
+    )
+
+
 def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     dynamic_gate = verify_m110_cp05_hardware_gate(
         repo_root=PROJECT_ROOT,
@@ -1685,7 +1880,7 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         assert score_gate["score_ceiling_reason"] in surface
 
     assert state["truth_revision"] == (
-        "m116_real_wing_hw01_no_signal_diagnostic_strict_live_88_zero_authority_20260715"
+        "m117_operator_diagnostic_truth_contract_strict_live_88_zero_authority_20260715"
     )
     assert state["full_release_truth_source"] == "strict_pre_release_review"
     assert state["full_release_requirements_source"] == (

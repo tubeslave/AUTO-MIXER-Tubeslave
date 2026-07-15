@@ -5,6 +5,14 @@ Status: active dependency-ordered roadmap
 Roadmap выбирается от текущего evidence state. Milestone считается валидным
 только если он finite, independently verifiable и имеет rollback.
 
+## M117 current-truth overlay — 2026-07-15
+
+M117 closes a named control-plane gap: operator-attended diagnostic contact is
+kept distinct from live authority, and non-machine-verified capture observations
+are labelled as such on every current handoff surface. It adds no processing,
+hardware or live-write capability. Strict readiness remains `88/100` and the
+next capability-changing step is still the attended M110 HW01-HW05 sequence.
+
 ## M110 operator-directed overlay — 2026-07-14
 
 The frozen M001-M010 dependency table below is not rewritten. Current active
@@ -12,15 +20,16 @@ work is the separate M110 attended path recorded in `STATE.json.active_work`:
 CP00-CP05 complete under the source-bound marker contract. The clean M115
 checkout reached WING Rack serial `0100Q1V0604AAE`, firmware
 `3.0.5-4-ga4ea833d:release`, and opened CoreAudio `WING` at 48x48/48 kHz.
-Route-only HW01 then failed closed before artifact issuance on
-`master_channel_signal_missing`; short and 120-second diagnostics were exact
-digital zero across all 48 channels. HW01 is incomplete and HW02-HW05 remain
-pending; reset, corrections and writes remain zero.
+The machine-recorded route gate then failed closed before artifact issuance on
+`master_channel_signal_missing`. Operator-observed short and 120-second
+diagnostics showed exact digital zero across all 48 channels; those extra
+observations are not independently machine-verified. HW01 is incomplete and
+HW02-HW05 remain pending; reset, corrections and writes remain zero.
 
 M115 records the committed `cc1a2ca50` validation baseline (`7214 passed, 3
 skipped`, 136 rails, 66/66 no-WING) and preserves the M113 CoreAudio
-identity fail-open: both collection and independent evidence verification now
-require exact integer 48x48/48 kHz metadata. The next finite sequence now
+fail-closed identity gate: both collection and independent evidence verification
+now require exact integer 48x48/48 kHz metadata. The next finite sequence now
 starts only when a confirmed non-silent source reaches Main 47/48; then in one
 operator-attended process prove route, mute/contain outputs, bypass the 64
 CH1-16 processor-enable addresses, restore only the 77 known M006 changed
@@ -79,11 +88,11 @@ No live authority changed: release-ready live correction families remain `0`,
 live-allowed safety rows remain `0`, and current supervised live-write kinds
 remain `0`.
 
-Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream but failed closed before route-artifact issuance with reason master_channel_signal_missing; direct 3-second and 120-second captures observed exact digital zero on all 48 channels. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
+Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream, but the machine-recorded route gate failed closed before artifact issuance with reason master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `supervised_m116_hw01_no_signal_diagnostic_truth_sync` at `2026-07-14T23:19:28Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
 
 The detailed table below is a frozen dependency taxonomy, not the operational
 task selector; its old M002-M006 status labels are historical. Current release

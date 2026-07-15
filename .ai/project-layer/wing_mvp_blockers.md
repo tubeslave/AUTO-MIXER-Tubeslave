@@ -22,9 +22,11 @@ M110/M116 overlay (2026-07-15): the frozen table below remains historical. Activ
 operator-directed work is `STATE.json.active_work`: CP00-CP05 are complete and
 the clean M115 checkout reached WING Rack serial `0100Q1V0604AAE`, firmware
 `3.0.5-4-ga4ea833d:release`, and CoreAudio WING at 48x48/48 kHz. Route-only
-HW01 opened backend/WING/OSC/audio and then failed closed before artifact
-issuance on `master_channel_signal_missing`; short and 120-second diagnostics
-were exact digital zero on all 48 channels. HW01 is incomplete and HW02-HW05
+HW01 opened backend/WING/OSC/audio, then the machine-recorded route gate failed
+closed before artifact issuance on `master_channel_signal_missing`.
+Operator-observed short and 120-second diagnostics showed exact digital zero on
+all 48 channels; those extra observations are not independently
+machine-verified. HW01 is incomplete and HW02-HW05
 remain pending. Live writes, reset and correction counts remain zero.
 M005 behavior is closed; M006 permission is one attended-run input, not
 standing authority. The reset path bypasses 64 CH1-16 processor enables and
@@ -74,11 +76,11 @@ evidence; it does not require another M005 cable pull by default.
 - Exact WING Rack serial and same-console owner attestation for the immutable 2026-07-11 M005 evidence; this is identity-only and grants no live authority
 - Clean committed M005 current-release compatibility replay plus an explicit verified_migration M006 owner decision bound to the recomputed migration and packet-verifier paths
 
-Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream but failed closed before route-artifact issuance with reason master_channel_signal_missing; direct 3-second and 120-second captures observed exact digital zero on all 48 channels. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
+Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream, but the machine-recorded route gate failed closed before artifact issuance with reason master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `supervised_m116_hw01_no_signal_diagnostic_truth_sync` at `2026-07-14T23:19:28Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
 
 Historical 2026-07-12 ledger checkpoint:
 `local_engineering_95_final_tree_full_suite_no_wing_validation` at

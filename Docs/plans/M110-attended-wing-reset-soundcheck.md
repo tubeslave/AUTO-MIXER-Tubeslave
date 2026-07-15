@@ -111,8 +111,9 @@ readback plus WAL recovery before resumption.
 - The M115 attended route-only attempt reached WING Rack serial
   `0100Q1V0604AAE`, firmware `3.0.5-4-ga4ea833d:release`, and opened the real
   CoreAudio `WING` stream with 48 inputs/48 outputs at 48 kHz. HW01 then failed
-  closed before artifact issuance on `master_channel_signal_missing`; short
-  and 120-second diagnostics observed exact digital zero on all 48 channels.
+  closed before artifact issuance on `master_channel_signal_missing`;
+  operator-observed short and 120-second diagnostics showed exact digital zero
+  on all 48 channels and are not independently machine-verified.
   Serial-bound USB identity was not reached. HW01 remains incomplete and
   HW02-HW05 remain pending; reset, corrections and writes remain zero.
 - A pending/stale CP05 marker blocks connect, USB capture, route proof and every

@@ -1,6 +1,24 @@
 # Current State
 
-Generated: 2026-07-14T23:19:28Z
+Generated: 2026-07-15T00:20:35Z
+
+## M117 operator diagnostic truth contract — 2026-07-15
+
+- M116 remains the immutable operator-attended hardware-contact record. Its
+  machine-backed outcome is `master_channel_signal_missing`; the 3-second and
+  120-second all-channel captures are operator-observed and not independently
+  machine-verified.
+- M117 is an offline control-plane checkpoint. It contacted no backend,
+  CoreAudio, OSC or WING endpoint, sent no write, and grants no authority.
+- Pre-CP05 source validation passed 2 focused rails, 137 WING rails with the
+  expected dynamic CP05 rail deselected, and 7215 repository tests with 3
+  skipped and that same rail deselected. Final clean-tree validation remains
+  pending the source commit and marker-only CP05 rebind.
+- Ledger rails now retain the unique M116 evidence class after later rows
+  advance instead of applying one false no-contact rule to every row.
+- Strict readiness remains `88/100`, normal allowlist `0`, HW01 incomplete,
+  HW02-HW05 pending, reset `false`, corrections `0` and standing authority
+  `false`.
 
 ## M116 real WING HW01 no-signal checkpoint — 2026-07-15
 
@@ -152,7 +170,7 @@ Canonical report:
   silence; route readback still showed USB 47/48 = MAIN L/R and Main unmuted at
   0 dB.
 
-Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream but failed closed before route-artifact issuance with reason master_channel_signal_missing; direct 3-second and 120-second captures observed exact digital zero on all 48 channels. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
+Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream, but the machine-recorded route gate failed closed before artifact issuance with reason master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
 ## Current external validation requirements
 
@@ -164,7 +182,7 @@ Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 4
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `supervised_m116_hw01_no_signal_diagnostic_truth_sync` at `2026-07-14T23:19:28Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -2399,9 +2417,12 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
 - The latest verified full-suite run for `cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c` passed with
-  `7214 passed, 3 skipped`. The run completed in `428.23s`. The result covers the committed M110/M111
-  control plane, M005 inventory repair and M113 48x48 identity gate at that
-  validated product/runtime baseline. This includes the M005 physical
+  `7214 passed, 3 skipped`. The run completed in `428.23s`. This is the
+  committed M115 product/runtime baseline; the separate M117 pre-CP05
+  source-checkpoint run passed `7215 passed, 3 skipped, 1 deselected` and does
+  not claim final clean-tree validation. The M115 result covers the committed
+  M110/M111 control plane, M005 inventory repair
+  and M113 48x48 identity gate. This includes the M005 physical
   reconnect-target guard, the M006 owner-decision
   M005 event-log path binding, the M006 owner-decision reconnect-event
   packet-check binding, the M006 packet-verifier
@@ -2428,13 +2449,16 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
   the torch checkpoint weights-only guard, the dLive TLS verification guard,
   the agent-training archive guard, the training dataset discovery path guard, the C++ bridge failed-start cleanup guard, the subprocess probe timeout guard, the selected tool subprocess timeout contract,
   the broader owned subprocess timeout sweep, the vector index secret intake guard, the live soundcheck static acknowledgement contract, the raw OSC send value inventory guard, the WING client bridge write-result guard, the WING client all-write-result guard, the WING FX unsupported-path guard, the AutoFX unsupported-action guard, the FX handler false-write-result guard, the mixer mute/pan false-write-result guard, the voice command write-result guard, the voice command error authority guard, the voice command invalid request guard, the voice command malformed payload guard, the voice command numeric validation guard and the direct mute/pan invalid-value guard in the dirty worktree.
-- The latest `RUN_LEDGER.jsonl` row is now tested as an authority surface, not
-  only as a timestamp surface. While M001 remains
-  `WAITING_FOR_EXTERNAL_VALIDATION`, the latest ledger row must match
-  `STATE.json` authority flags, keep hardware contact and live writes false,
-  keep readiness-matrix update permission false, and keep release-ready live
-  families, live-allowed safety rows and current supervised live-write kinds at
-  `0`.
+- `RUN_LEDGER.jsonl` is tested as a typed authority surface, not only as a
+  timestamp surface. Ordinary control-plane rows match the no-contact
+  `STATE.json.last_validation_summary.authority` flags, backend-only rows may
+  contact only the backend, and operator-approved diagnostic and supervised
+  rows are typed separately so they may record scoped hardware contact or
+  bounded writes without granting standing authority. The unique M116
+  diagnostic remains pinned with hardware/backend/WING contact true and live
+  writes false. Every row still keeps readiness-matrix update permission false,
+  unrestricted authority false, and release-ready live families, live-allowed
+  safety rows and current supervised live-write kinds at `0`.
 - `HEARTBEAT.md` and `LAST_REPORT.md` are now tested against the same latest
   full-suite result from `STATE.json` and `RUN_LEDGER.jsonl`, so
   operator-facing validation text cannot remain on an older full-suite pass

@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-14T23:19:28Z
+Last heartbeat UTC: 2026-07-15T00:20:35Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -8,21 +8,37 @@ Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none at the committed validation boundary. The bounded M116
+Writer lease: none at the committed validation boundary. The bounded M117
 implementation lease is released before validation. CP05 is dynamically
 checked against the current non-marker Git tree and must pass before any
 hardware attempt.
+
+## M117 operator diagnostic truth contract — 2026-07-15
+
+The append-only M116 row remains the real operator-attended contact record;
+M117 is an offline/no-contact truth checkpoint. Current summaries now separate
+the machine-recorded `master_channel_signal_missing` result from
+operator-observed captures that are not independently machine-verified. Two
+durable rails prevent the provenance and typed-authority rules from regressing.
+Strict live remains `88/100`, allowlist `0`, HW01 incomplete and authority
+false.
+
+Pre-CP05 source validation passed 2 focused rails, 137 WING rails with the
+expected dynamic CP05 rail deselected, and 7215 repository tests with 3 skipped
+and that same rail deselected. Final clean-tree validation remains pending the
+source commit and marker-only CP05 rebind.
 
 ## M116 real WING checkpoint and HW01 signal blocker — 2026-07-15
 
 The M001 program shell remains waiting. M110 CP00-CP05 are complete under the
 canonical source-bound marker pair. The clean M115 checkout reached WING Rack
 serial `0100Q1V0604AAE`, firmware `3.0.5-4-ga4ea833d:release`, and opened the
-CoreAudio WING stream at 48x48/48 kHz. Route-only HW01 failed closed before
-artifact issuance on `master_channel_signal_missing`; direct short and
-120-second diagnostics were exact digital zero on all 48 channels. HW01 is
-incomplete and HW02-HW05 remain pending. Reset, corrections and writes are
-zero; serial-bound USB identity was not reached.
+CoreAudio WING stream at 48x48/48 kHz. The machine-recorded route gate failed
+closed before artifact issuance on `master_channel_signal_missing`.
+Operator-observed short and 120-second diagnostics showed exact digital zero on
+all 48 channels; those extra observations are not independently
+machine-verified. HW01 is incomplete and HW02-HW05 remain pending. Reset,
+corrections and writes are zero; serial-bound USB identity was not reached.
 
 M005 behavior is closed. M006 permission is recorded only for the one attended
 CP05-bound run and grants no standing authority. Dante Virtual Soundcard is not
@@ -40,7 +56,7 @@ explicit migration-bound M006 decision is verified. Native provenance and
 live authority remain false.
 
 Latest verified full pytest passed with `7214 passed, 3 skipped`.
-The validation-source baseline is
+The committed M115 product/runtime validation-source baseline is
 `cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c`; 136 WING/static rails and the
 66/66 no-WING capsule `20260714T225611Z_no_wing_release_check` also passed.
 Exact current-tree identity remains dynamically CP05-bound.
@@ -105,7 +121,7 @@ passed. The final `20260712T131015Z` retry correctly blocked on current USB
 silence; route readback remained MAIN L/R on USB 47/48 and Main remained
 unmuted at 0 dB. No live write occurred.
 
-Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream but failed closed before route-artifact issuance with reason master_channel_signal_missing; direct 3-second and 120-second captures observed exact digital zero on all 48 channels. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
+Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 48x48/48 kHz CoreAudio capture, so the missing-device prerequisite is closed. The operator-attended route-only HW01 attempt opened the proof-owned backend, OSC/UDP and 48-channel audio stream, but the machine-recorded route gate failed closed before artifact issuance with reason master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified. Therefore HW01 remains incomplete and HW02-HW05 have not started; reset, corrections and live writes remain 0. The local runtime summary is ephemeral diagnostic evidence only, not accepted physical route proof. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
 
 External validation requirements:
 
@@ -117,7 +133,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `supervised_m116_hw01_no_signal_diagnostic_truth_sync` at `2026-07-14T23:19:28Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -250,12 +266,15 @@ The current no-WING evidence rail now also reloads
 values, runs `verify_no_wing_artifact_manifest`, and checks manifest
 self-consistency plus cross-surface denial fields. This catches stale or
 tampered current evidence instead of trusting the state string alone.
-The latest ledger authority rail now also binds the newest `RUN_LEDGER.jsonl`
-entry to the same fail-closed state while M001 is waiting for external
-validation: `hardware_contacted=false`, `live_writes=false`,
-`readiness_matrix_update_allowed=false`, release-ready live families `0`, live
-allowed safety rows `0`, current supervised live-write kinds `0`, and no
-unrestricted live/soundcheck authority.
+The ledger authority rail now treats rows by evidence class while M001 waits
+for external validation. Ordinary control-plane rows keep no contact or writes;
+backend-only rows may contact only the backend; explicitly operator-approved
+diagnostic/supervised rows may record scoped contact or bounded writes. Every
+class still keeps `readiness_matrix_update_allowed=false`, release-ready live
+families `0`, live-allowed safety rows `0`, current supervised live-write kinds
+`0`, and no unrestricted live/soundcheck authority. The historical M116
+diagnostic is separately pinned with hardware/backend/WING contact true and
+live writes false.
 The operator-report full-suite rail now also binds this heartbeat and
 `LAST_REPORT.md` to the same latest full-suite result recorded in `STATE.json`
 and the newest full-suite `RUN_LEDGER.jsonl` row, so the operator-facing green

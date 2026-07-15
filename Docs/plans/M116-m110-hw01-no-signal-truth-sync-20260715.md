@@ -11,9 +11,9 @@ or correction logic.
 | M116-CP01 | Rebaseline diagnostic | runtime summary/log hashes, current HEAD and teardown | complete |
 | M116-CP02 | Council decision | brief, proposals, reciprocal critiques and ADR | complete |
 | M116-CP03 | Canonical truth sync | STATE, append-only ledger and all current mirrors agree | complete |
-| M116-CP04 | Validation | JSON/JSONL, focused, rails, full suite, frontend, no-WING, lint and review | partial; final clean-tree rail and suite follow CP06 |
-| M116-CP05 | Source checkpoint | non-marker commit on released lease | pending |
-| M116-CP06 | CP05 rebind | marker-only commit and clean final verification | pending |
+| M116-CP04 | Validation | JSON/JSONL, focused, rails, full suite, frontend, no-WING, lint and review | complete |
+| M116-CP05 | Source checkpoint | non-marker commit on released lease | complete |
+| M116-CP06 | CP05 rebind | marker-only commit and clean final verification | complete |
 
 ## Acceptance
 

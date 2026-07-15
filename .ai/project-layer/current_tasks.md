@@ -99,9 +99,10 @@ delete old tasks unless a human explicitly requests pruning.
   `3.0.5-4-ga4ea833d:release`; CoreAudio WING index 1 at 48x48/48 kHz; local
   runner summary SHA-256
   `3a300561f3a6b31099cf2586f0047d674ff1342abb767f761b856f384ef91273`;
-  short and 120-second diagnostics observed all 48 channels at digital zero.
-  The diagnostic is not accepted HW01 evidence and serial-bound USB identity
-  was not reached.
+  operator-observed short and 120-second diagnostics showed all 48 channels at
+  digital zero; those extra observations are not independently
+  machine-verified. The diagnostic is not accepted HW01 evidence and
+  serial-bound USB identity was not reached.
 - Safety: mutation attempts 0, writes 0, reset false, corrections 0, authority
   false, strict score 88/100 and allowlist 0.
 - Next action: physically contain outputs, start and keep a confirmed non-silent
