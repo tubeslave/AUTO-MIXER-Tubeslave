@@ -1835,7 +1835,10 @@ class EQCorrector:
                     corrections.append(EQBand(
                         band_type='peak',
                         frequency=freq,
-                        gain=gain * min(1.0, max_cut / abs(self.min_gain)),
+                        # max_cut в профиле отрицателен (напр. -6). Без abs()
+                        # множитель min(1.0, -0.5) = -0.5 инвертировал знак и
+                        # превращал cut в boost проблемной частоты.
+                        gain=gain * min(1.0, abs(max_cut) / abs(self.min_gain)),
                         q=q
                     ))
         

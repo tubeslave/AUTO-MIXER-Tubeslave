@@ -112,3 +112,51 @@ class TestEQCorrectionGeneration:
         assert result.peak_freq < 300.0, (
             f"Peak should be near 100 Hz, got {result.peak_freq:.1f}"
         )
+
+
+class TestEQCutSign:
+    """A profile 'cut' frequency must produce a cut (negative gain), never a boost."""
+
+    def test_profile_cut_stays_a_cut(self):
+        """Regression: gain * min(1.0, max_cut/abs(min_gain)) inverted the sign.
+
+        max_cut in a profile is negative (e.g. -6 dB). Without abs() the scale
+        factor min(1.0, -0.5) = -0.5 flipped the computed cut into a boost of
+        exactly the resonance the profile meant to attenuate — the frequencies
+        most likely to feed back or muddy the mix, applied automatically in
+        auto mode.
+        """
+        from auto_eq import EQCorrector, InstrumentProfile, SpectralData
+
+        cut_freq = 1000.0
+        freqs = np.linspace(0.0, 24000.0, 1025)
+        spectrum = np.full_like(freqs, 0.02)
+        spectrum += np.exp(-0.5 * ((freqs - cut_freq) / 150.0) ** 2)  # bump=1.0
+
+        spectral_data = SpectralData(
+            spectrum=spectrum,
+            frequencies=freqs,
+            peak_freq=cut_freq,
+            centroid=cut_freq,
+            rolloff=cut_freq,
+            flatness=0.1,
+            bandwidth=300.0,
+            peaks=[(cut_freq, 1.0)],
+        )
+        profile = InstrumentProfile(
+            name="test",
+            description="synthetic resonance",
+            target_curve=[(20.0, 0.0), (cut_freq, -12.0), (20000.0, 0.0)],
+            cut_frequencies=[(cut_freq, -6.0, 2.0)],
+            boost_frequencies=[],
+        )
+
+        bands = EQCorrector().calculate_correction(spectral_data, profile, sensitivity=1.0)
+
+        cut_bands = [b for b in bands if abs(b.frequency - cut_freq) < 1.0]
+        assert cut_bands, "cut branch did not fire; test setup no longer triggers it"
+        for b in cut_bands:
+            assert b.gain < 0.0, (
+                f"profile cut at {b.frequency:.0f} Hz produced gain {b.gain:+.2f} dB "
+                f"(positive = boost); a declared cut must stay negative"
+            )
