@@ -738,7 +738,7 @@ def test_current_state_doc_matches_autopilot_state_evidence():
     assert latest_commit.group(1) == state["last_verified_commit"]
 
     latest_full_suite = re.search(
-        r"latest verified full-suite run for `([0-9a-f]+)` passed with\s*`([^`]+)`",
+        r"committed M115 product/runtime full-suite baseline for `([0-9a-f]+)` passed with\s*`([^`]+)`",
         text,
     )
     assert latest_full_suite is not None
@@ -1917,12 +1917,32 @@ def test_autopilot_operator_reports_match_latest_full_suite_evidence():
     latest_ledger_result = re.sub(r" in [0-9.]+s$", "", ledger_full_suite_results[-1])
     assert latest_ledger_result == expected_result
 
-    assert f"Latest verified full pytest passed with `{expected_result}`." in heartbeat
+    assert (
+        f"Committed M115 product/runtime full pytest baseline passed with "
+        f"`{expected_result}`."
+    ) in heartbeat
     assert re.search(
-        rf"latest verified full suite passed with\s*`{re.escape(expected_result)}`",
+        rf"committed M115 product/runtime full suite baseline passed with\s*"
+        rf"`{re.escape(expected_result)}`",
         report,
         re.IGNORECASE,
     )
+
+    m117 = state["m117_source_checkpoint_validation"]
+    assert m117["status"] == (
+        "clean_tree_validation_baseline_passed_current_binding_dynamic"
+    )
+    assert m117["clean_tree_validation_baseline_marker_commit"] == "551fa6b4f"
+    assert m117["current_cp05_binding_status"] == "derived_from_dynamic_marker"
+    assert "7216 passed, 3 skipped" in m117["full_repository_suite_result"]
+    for surface in (heartbeat, report):
+        normalized_surface = re.sub(r"\s+", " ", surface)
+        assert (
+            "clean-tree validation baseline marker `551fa6b4f`"
+            in normalized_surface
+        )
+        assert "7216 passed" in normalized_surface
+        assert "Current CP05 completion is derived" in normalized_surface
 
 
 def test_goal_transition_fallback_contract_stays_report_only_without_native_goal_tools():

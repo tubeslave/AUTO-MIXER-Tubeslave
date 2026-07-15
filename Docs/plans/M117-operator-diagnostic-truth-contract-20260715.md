@@ -12,9 +12,9 @@ or standing authority change.
 | M117-CP02 | Council decision | brief, proposals, reciprocal critiques and ADR | complete with documented Kimi 402 fallback |
 | M117-CP03 | Truth implementation | STATE, append-only ledger, all current mirrors and M116 plan agree | complete |
 | M117-CP04 | Regression rails | historical M116 event and current provenance wording pinned | complete |
-| M117-CP05 | Validation | 2 focused; 137 rails + 1 expected CP05 deselection; 7215 passed, 3 skipped + same deselection; no-WING/lint/JSON/diff passed | complete |
-| M117-CP06 | Source checkpoint | non-marker commit after verified diff | pending |
-| M117-CP07 | CP05 rebind | released lease, marker-only commit and clean verification | pending |
+| M117-CP05 | Validation | pre-CP05 2 focused/137+1 deselected/7215+3 skipped+1 deselected; baseline tree 138 rails and 7216+3 skipped | complete |
+| M117-CP06 | Source checkpoint | non-marker commit `7267b74ae` after verified diff | complete |
+| M117-CP07 | CP05 rebind | completion is derived from the current marker-only commit and dynamic gate; `551fa6b4f` is the clean validation baseline, not the final binding | dynamic: complete iff current gate verifies |
 
 ## Acceptance
 

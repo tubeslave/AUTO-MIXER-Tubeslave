@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-15T00:20:35Z
+Last heartbeat UTC: 2026-07-15T00:54:39Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -23,10 +23,10 @@ durable rails prevent the provenance and typed-authority rules from regressing.
 Strict live remains `88/100`, allowlist `0`, HW01 incomplete and authority
 false.
 
-Pre-CP05 source validation passed 2 focused rails, 137 WING rails with the
-expected dynamic CP05 rail deselected, and 7215 repository tests with 3 skipped
-and that same rail deselected. Final clean-tree validation remains pending the
-source commit and marker-only CP05 rebind.
+Source commit `7267b74ae` and clean-tree validation baseline marker `551fa6b4f`
+passed the dynamic CP05 gate, all 138 WING rails, and the full repository suite:
+7216 passed, 3 skipped, 1 warning in 367.57s. Current CP05 completion is derived
+from the dynamic marker after the latest non-marker commit.
 
 ## M116 real WING checkpoint and HW01 signal blocker — 2026-07-15
 
@@ -55,8 +55,8 @@ exact same-console WING Rack serial, the committed replay passes, and a new
 explicit migration-bound M006 decision is verified. Native provenance and
 live authority remain false.
 
-Latest verified full pytest passed with `7214 passed, 3 skipped`.
-The committed M115 product/runtime validation-source baseline is
+Committed M115 product/runtime full pytest baseline passed with `7214 passed, 3 skipped`.
+Its validation-source commit is
 `cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c`; 136 WING/static rails and the
 66/66 no-WING capsule `20260714T225611Z_no_wing_release_check` also passed.
 Exact current-tree identity remains dynamically CP05-bound.
@@ -133,7 +133,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

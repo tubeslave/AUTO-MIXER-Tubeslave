@@ -1,6 +1,6 @@
 # Current State
 
-Generated: 2026-07-15T00:20:35Z
+Generated: 2026-07-15T00:54:39Z
 
 ## M117 operator diagnostic truth contract — 2026-07-15
 
@@ -10,10 +10,11 @@ Generated: 2026-07-15T00:20:35Z
   machine-verified.
 - M117 is an offline control-plane checkpoint. It contacted no backend,
   CoreAudio, OSC or WING endpoint, sent no write, and grants no authority.
-- Pre-CP05 source validation passed 2 focused rails, 137 WING rails with the
-  expected dynamic CP05 rail deselected, and 7215 repository tests with 3
-  skipped and that same rail deselected. Final clean-tree validation remains
-  pending the source commit and marker-only CP05 rebind.
+- Source commit `7267b74ae` and clean-tree validation baseline marker
+  `551fa6b4f` passed the dynamic CP05 gate, all 138 WING rails, and the full
+  repository suite: 7216 passed, 3 skipped, 1 warning in 367.57s. Current CP05
+  completion is derived from the dynamic marker after the latest non-marker
+  commit; `551fa6b4f` is not presented as the final binding.
 - Ledger rails now retain the unique M116 evidence class after later rows
   advance instead of applying one false no-contact rule to every row.
 - Strict readiness remains `88/100`, normal allowlist `0`, HW01 incomplete,
@@ -182,7 +183,7 @@ Current blocker from `STATE.json`: M110 now reaches the real WING Rack and its 4
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_source_checkpoint_ready` at `2026-07-15T00:20:35Z`.
+Latest ledger handoff row: `m117_operator_diagnostic_truth_contract_finalization_source_ready` at `2026-07-15T00:54:39Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -2416,7 +2417,7 @@ transaction authority). Score 88/100 reflects verified local hardening: canonica
   review action.
 - Current native Goal transition availability inside future scheduled
   heartbeat wake-ups must be checked at wake-up time.
-- The latest verified full-suite run for `cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c` passed with
+- The committed M115 product/runtime full-suite baseline for `cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c` passed with
   `7214 passed, 3 skipped`. The run completed in `428.23s`. This is the
   committed M115 product/runtime baseline; the separate M117 pre-CP05
   source-checkpoint run passed `7215 passed, 3 skipped, 1 deselected` and does
