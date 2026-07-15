@@ -1,0 +1,48 @@
+#!/bin/sh -p
+
+set -eu
+
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+IFS=$(printf ' \t\n_')
+IFS=${IFS%_}
+umask 077
+unset NODE_OPTIONS NODE_PATH BASH_ENV ENV CDPATH \
+  DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH DYLD_FRAMEWORK_PATH \
+  DYLD_FALLBACK_LIBRARY_PATH DYLD_FALLBACK_FRAMEWORK_PATH
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")" && pwd -P)
+FRONTEND_ROOT=$(/usr/bin/dirname -- "$SCRIPT_DIR")
+if [ "$(pwd -P)" != "$FRONTEND_ROOT" ]; then
+  echo "Public-release evidence launcher must run from the frontend root" >&2
+  exit 1
+fi
+
+NODE_BIN=${AUTOMIXER_NODE_BIN:-}
+case "$NODE_BIN" in
+  /*) ;;
+  *)
+    echo "AUTOMIXER_NODE_BIN must identify an absolute Node executable" >&2
+    exit 1
+    ;;
+esac
+if [ ! -f "$NODE_BIN" ] || [ -L "$NODE_BIN" ]; then
+  echo "AUTOMIXER_NODE_BIN must identify a real Node executable" >&2
+  exit 1
+fi
+if [ "$("$NODE_BIN" --version)" != "v22.22.3" ]; then
+  echo "Public-release evidence requires Node v22.22.3" >&2
+  exit 1
+fi
+
+NODE_DIR=$(/usr/bin/dirname -- "$NODE_BIN")
+TRUSTED_PATH="$NODE_DIR:/usr/bin:/bin:/usr/sbin:/sbin"
+
+exec /usr/bin/env -i \
+  HOME=/var/empty \
+  TMPDIR=/tmp \
+  LANG=C \
+  LC_ALL=C \
+  PATH="$TRUSTED_PATH" \
+  AUTOMIXER_PUBLIC_RELEASE_EVIDENCE_CLEAN_ENV=1 \
+  "$NODE_BIN" "$SCRIPT_DIR/public-release-evidence-bundle.mjs" "$@"

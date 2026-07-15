@@ -252,6 +252,31 @@ def m110_m006_restore_stage_operations() -> dict[str, tuple[dict[str, Any], ...]
     return result
 
 
+def m110_m006_restore_stage_scope(stage: str) -> tuple[str, ...]:
+    """Return the exact server canonical-bundle write order for one stage."""
+
+    if stage not in M110_M006_RESTORE_STAGES:
+        raise ValueError("m110_m006_restore_stage_invalid")
+    addresses: list[str] = []
+    seen: set[str] = set()
+    for raw in m110_m006_restore_stage_operations()[stage]:
+        operation = ConsoleTransactionOperation(
+            operation_id=str(raw["operation_id"]),
+            family_id=str(raw["family_id"]),
+            write_kind=str(raw["write_kind"]),
+            target_value=raw["target_value"],
+            channel=int(raw["channel"]),
+            parameter=str(raw["parameter"]),
+            metadata=dict(raw.get("metadata") or {}),
+        )
+        for write in parameter_writes_for_operation(operation):
+            if write.address in seen:
+                raise ValueError("m110_m006_restore_stage_scope_duplicate")
+            seen.add(write.address)
+            addresses.append(write.address)
+    return tuple(addresses)
+
+
 def build_m110_m006_restore_plan(
     *,
     stage: str,

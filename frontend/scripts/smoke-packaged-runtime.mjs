@@ -18,6 +18,7 @@ import {
   hashTree,
   readStableJsonFileNoFollow,
   resolveArtifactPath,
+  runReleaseEvidenceGit,
   verifyPackagedRuntimeSmokeManifest
 } from './release-evidence.mjs';
 
@@ -733,6 +734,7 @@ async function writeArtifact(result, artifactRoot, runId) {
       releaseEligible: result.buildProfile?.releaseEligible,
       path: result.buildProfile?.path,
       pathBase: 'packaged_build_artifact_root',
+      size: result.buildProfile?.size,
       sha256: result.buildProfile?.sha256,
       bindingValid: result.buildProfile?.bindingValid,
       appTreeMatches: result.buildProfile?.appTreeMatches
@@ -881,12 +883,16 @@ async function main() {
     throw new Error('Packaged runtime smoke build profile does not bind to the app tree');
   }
 
-  const head = run('/usr/bin/git', ['rev-parse', 'HEAD']).stdout.trim();
-  const status = run('/usr/bin/git', ['status', '--porcelain=v1', '-uall']).stdout;
-  const trackedDiff = run('/usr/bin/git', ['diff', '--binary']).stdout;
+  const head = runReleaseEvidenceGit(repoRoot, ['rev-parse', 'HEAD'])
+    .toString('utf8').trim();
+  const status = runReleaseEvidenceGit(repoRoot, ['status', '--porcelain=v1', '-uall'])
+    .toString('utf8');
+  const trackedDiff = runReleaseEvidenceGit(repoRoot, ['diff', '--binary'])
+    .toString('utf8');
   result.provenance = {
     head,
-    tree: run('/usr/bin/git', ['rev-parse', 'HEAD^{tree}']).stdout.trim(),
+    tree: runReleaseEvidenceGit(repoRoot, ['rev-parse', 'HEAD^{tree}'])
+      .toString('utf8').trim(),
     worktreeDirty: Boolean(status.trim()),
     statusSha256: sha256Buffer(status),
     trackedDiffSha256: sha256Buffer(trackedDiff),

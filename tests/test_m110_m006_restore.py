@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from m110_m006_restore import (
     build_m110_m006_restore_plan,
     load_m110_m006_fixture,
     m110_m006_restore_stage_operations,
+    m110_m006_restore_stage_scope,
 )
 from supervised_console_transaction import (
     AdapterStepResult,
@@ -125,6 +127,7 @@ def test_m006_stages_have_exact_finite_scope_and_changed_address_counts():
     stages = m110_m006_restore_stage_operations()
     assert tuple(stages) == M110_M006_RESTORE_STAGES
     total_changed = set()
+    scope_hashes = {}
     for stage, (operation_count, scope_count, changed_count) in expected.items():
         operations = [_operation(raw) for raw in stages[stage]]
         adapters = build_wing_supervised_family_adapters(
@@ -151,6 +154,14 @@ def test_m006_stages_have_exact_finite_scope_and_changed_address_counts():
             safety_binding=_safety_binding(),
         )
         scope, _targets = canonical_bundle_scope(bundle)
+        assert scope == m110_m006_restore_stage_scope(stage)
+        scope_hashes[stage] = hashlib.sha256(
+            json.dumps(
+                list(scope),
+                ensure_ascii=False,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()
         changed = {
             address
             for operation in operations
@@ -162,6 +173,17 @@ def test_m006_stages_have_exact_finite_scope_and_changed_address_counts():
         assert "/main/1/mute" not in scope
         total_changed.update(changed)
     assert len(total_changed) == 77
+    assert scope_hashes == {
+        "foundation_level": (
+            "cb3100f4d4014fefceeb7798083d736522e584642ae4fb3cf4d625c6f743d6af"
+        ),
+        "tonal_dynamics": (
+            "b4b254b1b697fbf685b948b9b829044af88afe6de1944e2c39ee1bc4f3f4e306"
+        ),
+        "spatial_balance": (
+            "4420997eb9f16995897d3a0fb97a6c55af06d6f30c18ea630d6200a8f6e4718f"
+        ),
+    }
 
 
 def test_m006_plan_role_changes_identity_but_not_reviewed_operations():

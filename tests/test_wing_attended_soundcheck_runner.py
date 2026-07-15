@@ -438,6 +438,76 @@ def test_soundcheck_lane_created_terminal_rejects_provenance_or_role_drift(
         )
 
 
+@pytest.mark.parametrize("stage", runner.M110_M006_RESTORE_STAGES)
+@pytest.mark.parametrize("role", ["proof", "commit"])
+def test_m006_restore_created_terminal_retains_source_operation_ids(
+    stage,
+    role,
+):
+    operations = [
+        dict(item)
+        for item in runner.m110_m006_restore_stage_operations()[stage]
+    ]
+    scope_addresses = list(runner.m110_m006_restore_stage_scope(stage))
+    operation_ids = [str(item["operation_id"]) for item in operations]
+    terminal = {
+        "type": "m110_m006_restore_proposal_result",
+        "status": "created",
+        "success": True,
+        "reason": "m110_m006_restore_proposal_created",
+        "proposal_id": f"m110-m006-restore-{stage}-{role}-" + "a" * 32,
+        "stage": stage,
+        "review_contract_version": 2,
+        "review_content_digest": "sha256:" + "b" * 64,
+        "operation_digest": "sha256:" + "c" * 64,
+        "review_preimage_sha256": "",
+        "required_capability_kind": (
+            "restore_only_proof"
+            if role == "proof"
+            else "maintenance_dsp_reset_commit_once"
+        ),
+        "bundle_kind": runner.M110_M006_RESTORE_BUNDLE_KIND,
+        "operation_count": len(operations),
+        "scope_addresses": scope_addresses,
+        "review_operations": operations,
+        "snapshot_summaries": [
+            {"operation_id": operation_id, "physical_verified": True}
+            for operation_id in operation_ids
+        ],
+        "already_restored_address_count": 0,
+        "postimage_address_count": len(scope_addresses),
+        "matching_restored_proof_receipt": role == "commit",
+        "token_issued": False,
+        "live_authority_granted": False,
+        "readiness_closure_allowed": False,
+    }
+
+    created = (
+        runner.ProofOwnedBackendSession
+        ._validate_m006_restore_proposal_terminal(
+            terminal,
+            stage=stage,
+            role=role,
+        )
+    )
+
+    assert created["source_operation_ids"] == [
+        str(item["metadata"]["m110_source_operation_id"])
+        for item in operations
+    ]
+    reordered = deepcopy(terminal)
+    reordered["scope_addresses"] = list(reversed(scope_addresses))
+    with pytest.raises(RuntimeError, match="m110_m006_restore_proposal_invalid"):
+        (
+            runner.ProofOwnedBackendSession
+            ._validate_m006_restore_proposal_terminal(
+                reordered,
+                stage=stage,
+                role=role,
+            )
+        )
+
+
 def _lane_apply_terminal(created, capability_kind):
     proof_run = capability_kind == "restore_only_proof"
     status = "proof_passed" if proof_run else "applied"
@@ -1235,6 +1305,21 @@ async def test_real_lane_step_executes_proof_and_commit_capabilities(
         if lane == "processor"
         else "soundcheck_child_commit_once"
     )
+    for role in ("proof", "commit"):
+        receipt = result[role]
+        created = created_by_role[role]
+        assert receipt["review_contract_version"] == 2
+        assert receipt["review_content_digest"] == created[
+            "review_content_digest"
+        ]
+        assert receipt["operation_count"] == created["operation_count"]
+        assert receipt["scope_addresses"] == created["scope_addresses"]
+        assert receipt["review_operation_ids"] == [
+            item["operation_id"] for item in created["review_operations"]
+        ]
+        assert receipt["source_operation_ids"] == created[
+            "source_operation_ids"
+        ]
     assert sum(
         event.get("event") == "m110_operator_bundle_review_required"
         for event in review_events
@@ -4091,6 +4176,25 @@ def test_same_session_fixed_reset_proof_receipt_commit_without_client_plan(
         assert reset["reset_applied"] is True
         assert reset["proof"]["terminal"]["wal_terminal"] == "proof_restored"
         assert reset["commit"]["terminal"]["wal_terminal"] == "committed"
+        expected_operation_ids = [
+            str(item["operation_id"])
+            for item in runner.M110_RESET_OPERATION_DEFINITIONS
+        ]
+        for receipt, created in (
+            (reset["proof"], proof_created),
+            (reset["commit"], commit_created),
+        ):
+            assert receipt["review_contract_version"] == 2
+            assert (
+                receipt["review_content_digest"]
+                == created["review_content_digest"]
+            )
+            assert receipt["bundle_kind"] == "maintenance_dsp_reset_bundle"
+            assert receipt["operation_count"] == 64
+            assert receipt["scope_addresses"] == list(
+                runner.M110_RESET_ADDRESSES
+            )
+            assert receipt["review_operation_ids"] == expected_operation_ids
         assert reset["token_retained"] is False
         durable = json.dumps(reset, sort_keys=True) + repr(session)
         assert proof_token not in durable

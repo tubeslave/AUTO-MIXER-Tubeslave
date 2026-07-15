@@ -22,6 +22,268 @@ const stableFileIdentityHelper = fileURLToPath(
 const stableJsonReaderHelper = fileURLToPath(
   new URL('./stable-json-reader-helper.mjs', import.meta.url)
 );
+const stableTreeIdentityHelper = fileURLToPath(
+  new URL('./stable-tree-identity-helper.mjs', import.meta.url)
+);
+
+const helperSourcesByPath = new Map([
+  ['frontend/scripts/write-new-artifact-helper.mjs', artifactWriterHelper],
+  ['frontend/scripts/publish-new-artifact-helper.mjs', artifactPublisherHelper],
+  ['frontend/scripts/remove-artifact-helper.mjs', artifactRemovalHelper],
+  ['frontend/scripts/replace-artifact-helper.mjs', artifactReplacementHelper],
+  ['frontend/scripts/stable-file-identity-helper.mjs', stableFileIdentityHelper],
+  ['frontend/scripts/stable-json-reader-helper.mjs', stableJsonReaderHelper],
+  ['frontend/scripts/stable-tree-identity-helper.mjs', stableTreeIdentityHelper]
+]);
+const helperSourcePathByExecutable = new Map(
+  [...helperSourcesByPath.entries()].map(([sourcePath, executablePath]) => [
+    path.resolve(executablePath),
+    sourcePath
+  ])
+);
+export const RELEASE_EVIDENCE_HELPER_SOURCE_PATHS = Object.freeze(
+  [...helperSourcesByPath.keys()].sort()
+);
+let pinnedHelperSources = null;
+let pinnedHelperRuntime = null;
+
+function fixedEvidenceGitEnvironment() {
+  return {
+    HOME: '/var/empty',
+    TMPDIR: '/tmp',
+    LANG: 'C',
+    LC_ALL: 'C',
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+    GIT_ATTR_NOSYSTEM: '1',
+    GIT_CONFIG_GLOBAL: '/dev/null',
+    GIT_CONFIG_NOSYSTEM: '1',
+    GIT_NO_LAZY_FETCH: '1',
+    GIT_NO_REPLACE_OBJECTS: '1',
+    GIT_OPTIONAL_LOCKS: '0',
+    GIT_TERMINAL_PROMPT: '0'
+  };
+}
+
+function assertSafeEvidenceGitConfiguration(repoRoot) {
+  const completed = spawnSync('/usr/bin/git', [
+    'config', '--null', '--list', '--show-origin', '--includes'
+  ], {
+    cwd: repoRoot,
+    encoding: null,
+    env: fixedEvidenceGitEnvironment(),
+    maxBuffer: 4 * 1024 * 1024
+  });
+  if (completed.error) throw completed.error;
+  if (completed.status !== 0) {
+    throw new Error(
+      `Git configuration audit failed: ${Buffer.from(completed.stderr || '')
+        .toString('utf8').trim() || 'unknown error'}`
+    );
+  }
+  const decoded = new TextDecoder('utf-8', { fatal: true }).decode(
+    Buffer.from(completed.stdout || '')
+  );
+  const fields = decoded.split('\0');
+  if (fields.pop() !== '' || fields.length % 2 !== 0) {
+    throw new Error('Git configuration audit fields are malformed');
+  }
+  const safeExactKeys = new Set([
+    'commit.gpgsign',
+    'core.bare',
+    'core.filemode',
+    'core.ignorecase',
+    'core.logallrefupdates',
+    'core.precomposeunicode',
+    'core.repositoryformatversion',
+    'extensions.objectformat',
+    'extensions.worktreeconfig',
+    'gpg.format',
+    'lfs.repositoryformatversion',
+    'user.email',
+    'user.name',
+    'user.signingkey'
+  ]);
+  const safeKeyPatterns = [
+    /^branch\..+\.(?:merge|remote|vscode-merge-base)$/,
+    /^remote\..+\.(?:fetch|url)$/
+  ];
+  for (let index = 0; index < fields.length; index += 2) {
+    const origin = fields[index];
+    const keyValue = fields[index + 1];
+    const separator = keyValue.indexOf('\n');
+    if (separator <= 0 || !origin) {
+      throw new Error('Git configuration audit entry is malformed');
+    }
+    const key = keyValue.slice(0, separator).toLowerCase();
+    const value = keyValue.slice(separator + 1);
+    if (!safeExactKeys.has(key) && !safeKeyPatterns.some(pattern => pattern.test(key))) {
+      throw new Error(`Repository Git configuration is unsafe for evidence reads: ${key}`);
+    }
+    if (
+      (key === 'core.bare' && value !== 'false')
+      || (key === 'core.filemode' && value !== 'true')
+      || (key === 'core.repositoryformatversion' && value !== '0')
+      || (key === 'extensions.worktreeconfig' && value !== 'true')
+    ) {
+      throw new Error(`Repository Git configuration has an unsafe value: ${key}`);
+    }
+  }
+}
+
+export function runReleaseEvidenceGit(
+  repoRoot,
+  args,
+  { maxBuffer = 16 * 1024 * 1024 } = {}
+) {
+  const resolvedRepository = path.resolve(repoRoot);
+  assertSafeEvidenceGitConfiguration(resolvedRepository);
+  const completed = spawnSync('/usr/bin/git', [
+    '-c', `core.worktree=${resolvedRepository}`,
+    '-c', 'core.fsmonitor=false',
+    '-c', 'core.hooksPath=/dev/null',
+    '-c', 'core.untrackedCache=false',
+    '-c', 'core.attributesFile=/dev/null',
+    '-c', 'core.excludesFile=/dev/null',
+    '-c', 'core.filemode=true',
+    '-c', 'core.ignorecase=false',
+    '-c', 'core.precomposeunicode=false',
+    ...args
+  ], {
+    cwd: resolvedRepository,
+    encoding: null,
+    env: fixedEvidenceGitEnvironment(),
+    maxBuffer
+  });
+  if (completed.error) throw completed.error;
+  if (completed.status !== 0) {
+    throw new Error(
+      `git ${args[0]} failed: `
+      + `${Buffer.from(completed.stderr || '').toString('utf8').trim() || 'unknown error'}`
+    );
+  }
+  return Buffer.from(completed.stdout || '');
+}
+
+function helperRuntimeIdentity() {
+  const runtimePath = path.resolve(process.execPath || '');
+  const before = fs.lstatSync(runtimePath, { bigint: true });
+  const realPath = fs.realpathSync(runtimePath);
+  const after = fs.lstatSync(runtimePath, { bigint: true });
+  const identity = stat => ({
+    dev: stat.dev.toString(),
+    ino: stat.ino.toString(),
+    mode: stat.mode.toString(),
+    nlink: stat.nlink.toString(),
+    size: stat.size.toString(),
+    mtimeNs: stat.mtimeNs.toString(),
+    ctimeNs: stat.ctimeNs.toString()
+  });
+  const beforeIdentity = identity(before);
+  const afterIdentity = identity(after);
+  if (
+    before.isSymbolicLink()
+    || !before.isFile()
+    || before.nlink !== 1n
+    || JSON.stringify(beforeIdentity) !== JSON.stringify(afterIdentity)
+  ) {
+    throw new Error('Release-evidence helper runtime must be a stable single-link real file');
+  }
+  return { path: runtimePath, realPath, identity: afterIdentity };
+}
+
+function assertPinnedHelperRuntime(stage) {
+  const current = helperRuntimeIdentity();
+  if (
+    !pinnedHelperRuntime
+    || JSON.stringify(current) !== JSON.stringify(pinnedHelperRuntime)
+  ) {
+    throw new Error(`Release-evidence helper runtime changed ${stage}`);
+  }
+  return current.path;
+}
+
+export function pinReleaseEvidenceHelperRuntime() {
+  const currentRuntime = helperRuntimeIdentity();
+  if (pinnedHelperRuntime) {
+    if (JSON.stringify(currentRuntime) !== JSON.stringify(pinnedHelperRuntime)) {
+      throw new Error('Release-evidence helper runtime cannot change within one process');
+    }
+  } else {
+    pinnedHelperRuntime = currentRuntime;
+  }
+  return Object.freeze({
+    path: pinnedHelperRuntime.path,
+    realPath: pinnedHelperRuntime.realPath,
+    ...pinnedHelperRuntime.identity
+  });
+}
+
+export function pinReleaseEvidenceHelperSources(sources) {
+  if (!sources || typeof sources !== 'object' || Array.isArray(sources)) {
+    throw new Error('Pinned release-evidence helper sources are required');
+  }
+  const suppliedPaths = Object.keys(sources).sort();
+  if (
+    suppliedPaths.length !== RELEASE_EVIDENCE_HELPER_SOURCE_PATHS.length
+    || suppliedPaths.some((value, index) => (
+      value !== RELEASE_EVIDENCE_HELPER_SOURCE_PATHS[index]
+    ))
+  ) {
+    throw new Error('Pinned release-evidence helper source set is not exact');
+  }
+  const next = new Map();
+  for (const sourcePath of RELEASE_EVIDENCE_HELPER_SOURCE_PATHS) {
+    if (!Buffer.isBuffer(sources[sourcePath]) || sources[sourcePath].length === 0) {
+      throw new Error(`Pinned release-evidence helper bytes are invalid: ${sourcePath}`);
+    }
+    const bytes = Buffer.from(sources[sourcePath]);
+    const source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+    if (source.includes('\0')) {
+      throw new Error(`Pinned release-evidence helper contains NUL: ${sourcePath}`);
+    }
+    next.set(sourcePath, { bytes, source });
+  }
+  if (pinnedHelperSources) {
+    for (const sourcePath of RELEASE_EVIDENCE_HELPER_SOURCE_PATHS) {
+      if (!pinnedHelperSources.get(sourcePath).bytes.equals(next.get(sourcePath).bytes)) {
+        throw new Error('Release-evidence helper authority cannot change within one process');
+      }
+    }
+  } else {
+    pinnedHelperSources = next;
+  }
+  pinReleaseEvidenceHelperRuntime();
+  return Object.freeze(Object.fromEntries(
+    RELEASE_EVIDENCE_HELPER_SOURCE_PATHS.map(sourcePath => [
+      sourcePath,
+      Object.freeze({
+        size: pinnedHelperSources.get(sourcePath).bytes.length,
+        sha256: crypto.createHash('sha256')
+          .update(pinnedHelperSources.get(sourcePath).bytes)
+          .digest('hex')
+      })
+    ])
+  ));
+}
+
+function spawnReleaseEvidenceHelper(executablePath, args, options) {
+  const sourcePath = helperSourcePathByExecutable.get(path.resolve(executablePath));
+  if (!sourcePath) throw new Error('Unknown release-evidence helper executable');
+  const pinned = pinnedHelperSources?.get(sourcePath);
+  if (!pinned) {
+    return spawnSync(process.execPath, [executablePath, ...args], options);
+  }
+  const runtimePath = assertPinnedHelperRuntime('before helper spawn');
+  const completed = spawnSync(runtimePath, [
+    '--input-type=module',
+    '--eval',
+    pinned.source,
+    'automixer-pinned-release-evidence-helper',
+    ...args
+  ], options);
+  assertPinnedHelperRuntime('during helper spawn');
+  return completed;
+}
 
 export function sha256File(filePath) {
   return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
@@ -95,9 +357,9 @@ function pinnedHelperArguments(context, label) {
 
 function regularFileIdentityNoFollow(filePath, label, containmentRoot = null) {
   const context = pinnedReadContext(filePath, containmentRoot, label);
-  const completed = spawnSync(
-    process.execPath,
-    [stableFileIdentityHelper, ...pinnedHelperArguments(context, label)],
+  const completed = spawnReleaseEvidenceHelper(
+    stableFileIdentityHelper,
+    pinnedHelperArguments(context, label),
     {
       cwd: context.parentPath,
       encoding: 'utf8',
@@ -137,6 +399,18 @@ function stableStatEqual(left, right) {
   );
 }
 
+function stableStatIdentity(stat) {
+  return Object.fromEntries([
+    'dev',
+    'ino',
+    'size',
+    'mode',
+    'nlink',
+    'mtimeNs',
+    'ctimeNs'
+  ].map(name => [name, stat[name].toString()]));
+}
+
 function hashDescriptor(descriptor) {
   const hash = crypto.createHash('sha256');
   const buffer = Buffer.allocUnsafe(1024 * 1024);
@@ -162,9 +436,9 @@ export function readStableJsonFileNoFollow(
   { containmentRoot = null } = {}
 ) {
   const context = pinnedReadContext(filePath, containmentRoot, label);
-  const completed = spawnSync(
-    process.execPath,
-    [stableJsonReaderHelper, ...pinnedHelperArguments(context, label)],
+  const completed = spawnReleaseEvidenceHelper(
+    stableJsonReaderHelper,
+    pinnedHelperArguments(context, label),
     {
       cwd: context.parentPath,
       encoding: null,
@@ -360,8 +634,7 @@ export function writeNewArtifactFileNoFollow(
     size: intendedBytes.length,
     sha256: crypto.createHash('sha256').update(intendedBytes).digest('hex')
   };
-  const completed = spawnSync(process.execPath, [
-    artifactWriterHelper,
+  const completed = spawnReleaseEvidenceHelper(artifactWriterHelper, [
     basename,
     resolvedRoot,
     resolvedParent,
@@ -454,8 +727,7 @@ export function publishNewArtifactFileNoFollow(
   ) {
     throw new Error(`${label} candidate bytes changed before publication`);
   }
-  const completed = spawnSync(process.execPath, [
-    artifactPublisherHelper,
+  const completed = spawnReleaseEvidenceHelper(artifactPublisherHelper, [
     path.basename(resolvedCandidate),
     path.basename(resolvedTarget),
     resolvedRoot,
@@ -526,8 +798,7 @@ export function removeArtifactFileNoFollow(
   const rootStat = fs.lstatSync(resolvedRoot, { bigint: true });
   const parentStat = fs.lstatSync(parentPath, { bigint: true });
   const targetStat = fs.lstatSync(resolvedTarget, { bigint: true });
-  const completed = spawnSync(process.execPath, [
-    artifactRemovalHelper,
+  const completed = spawnReleaseEvidenceHelper(artifactRemovalHelper, [
     path.basename(resolvedTarget),
     resolvedRoot,
     parentPath,
@@ -599,8 +870,7 @@ export function replaceArtifactFileNoFollow(
   const sourceStat = fs.lstatSync(resolvedSource, { bigint: true });
   const targetStat = fs.lstatSync(resolvedTarget, { bigint: true });
   const relativeSource = path.relative(resolvedRoot, resolvedSource);
-  const completed = spawnSync(process.execPath, [
-    artifactReplacementHelper,
+  const completed = spawnReleaseEvidenceHelper(artifactReplacementHelper, [
     relativeSource,
     path.basename(resolvedTarget),
     resolvedRoot,
@@ -718,10 +988,11 @@ export function resolveBuildProfileAppPath(
 ) {
   const resolvedProfilePath = path.resolve(buildProfilePath);
   const artifactRoot = path.dirname(resolvedProfilePath);
-  const { value: profile } = readStableJsonFileNoFollow(
+  const stableProfile = readStableJsonFileNoFollow(
     resolvedProfilePath,
     'Build profile'
   );
+  const profile = stableProfile.value;
   const legacy = profile.pathPolicy == null && allowLegacy === true;
   if (
     profile.schema !== 'automixer.macos_build_profile.v1'
@@ -746,6 +1017,7 @@ export function resolveBuildProfileAppPath(
     appPath,
     artifactRoot,
     profile,
+    profileIdentity: stableProfile.identity,
     profilePath: resolvedProfilePath
   };
 }
@@ -797,6 +1069,13 @@ export function verifyPackagedRuntimeSmokeManifest(
     || manifest.liveAuthorityGranted !== false
     || !['local', 'release'].includes(manifest.buildProfile?.profile)
     || manifest.buildProfile?.releaseEligible !== false
+    || (
+      !legacyPaths
+      && (
+        !Number.isSafeInteger(manifest.buildProfile?.size)
+        || manifest.buildProfile.size < 0
+      )
+    )
     || manifest.buildProfile?.bindingValid !== true
     || manifest.buildProfile?.appTreeMatches !== true
   ) {
@@ -843,6 +1122,10 @@ export function verifyPackagedRuntimeSmokeManifest(
     || result.buildProfile?.profile !== manifest.buildProfile?.profile
     || result.buildProfile?.releaseEligible !== manifest.buildProfile?.releaseEligible
     || result.buildProfile?.path !== manifest.buildProfile?.path
+    || (
+      !legacyPaths
+      && result.buildProfile?.size !== manifest.buildProfile?.size
+    )
     || result.buildProfile?.sha256 !== manifest.buildProfile?.sha256
     || result.buildProfile?.bindingValid !== manifest.buildProfile?.bindingValid
     || result.buildProfile?.appTreeMatches !== manifest.buildProfile?.appTreeMatches
@@ -906,4 +1189,119 @@ export function hashTree(root) {
   }
   visit(root, '');
   return crypto.createHash('sha256').update(rows.join('\n')).digest('hex');
+}
+
+/**
+ * Hash regular files through pinned no-follow descriptors, guard directory and
+ * symlink identities, and require two identical complete walks. This detached
+ * evidence reader never executes anything in the tree.
+ */
+function runStableTreeIdentityHelper(
+  root,
+  label,
+  { expectedRoot = null, outputMode = 'summary' } = {}
+) {
+  const resolvedRoot = path.resolve(root);
+  const rootStat = fs.lstatSync(resolvedRoot, { bigint: true });
+  const rootIdentity = stableStatIdentity(rootStat);
+  const expectedIdentity = expectedRoot?.stat || rootIdentity;
+  const realRoot = expectedRoot?.realPath || fs.realpathSync(resolvedRoot);
+  if (
+    rootStat.isSymbolicLink()
+    || !rootStat.isDirectory()
+    || JSON.stringify(rootIdentity) !== JSON.stringify(expectedIdentity)
+    || fs.realpathSync(resolvedRoot) !== realRoot
+    || !['summary', 'flat-files'].includes(outputMode)
+  ) {
+    throw new Error(`${label} root must remain the selected real directory`);
+  }
+  const completed = spawnReleaseEvidenceHelper(stableTreeIdentityHelper, [
+    outputMode,
+    rootStat.dev.toString(),
+    rootStat.ino.toString(),
+    realRoot,
+    label
+  ], {
+    // The child process cwd is an OS-pinned reference to the selected root.
+    // Walking `.` prevents an ancestor rename from redirecting both guarded
+    // walks to a replacement tree at the former absolute pathname.
+    cwd: resolvedRoot,
+    encoding: 'utf8',
+    maxBuffer: 1024 * 1024
+  });
+  if (completed.error) throw completed.error;
+  if (completed.status !== 0) {
+    throw new Error(
+      `${label} stable tree read failed: `
+      + `${String(completed.stderr || '').trim() || 'tree reader rejected input'}`
+    );
+  }
+  const identity = JSON.parse(String(completed.stdout || '').trim());
+  const finalRootStat = fs.lstatSync(resolvedRoot, { bigint: true });
+  if (
+    JSON.stringify(stableStatIdentity(finalRootStat)) !== JSON.stringify(expectedIdentity)
+    || fs.realpathSync(resolvedRoot) !== realRoot
+    || !/^[0-9a-f]{64}$/.test(String(identity.sha256 || ''))
+    || !/^[0-9a-f]{64}$/.test(String(identity.guardSha256 || ''))
+    || !Number.isSafeInteger(identity.entryCount)
+    || identity.entryCount < 1
+  ) {
+    throw new Error(`${label} changed around stable tree helper execution`);
+  }
+  return identity;
+}
+
+export function stableTreeIdentityNoFollow(root, label = 'Stable tree') {
+  const identity = runStableTreeIdentityHelper(root, label);
+  return {
+    sha256: identity.sha256,
+    guardSha256: identity.guardSha256,
+    entryCount: identity.entryCount
+  };
+}
+
+export function stableFlatDirectoryFileIdentitiesNoFollow(
+  root,
+  expectedRoot,
+  expectedNames,
+  label = 'Stable flat directory'
+) {
+  if (
+    !expectedRoot
+    || typeof expectedRoot !== 'object'
+    || !expectedRoot.stat
+    || typeof expectedRoot.realPath !== 'string'
+    || !Array.isArray(expectedNames)
+    || expectedNames.length === 0
+    || new Set(expectedNames).size !== expectedNames.length
+    || expectedNames.some(name => path.basename(name) !== name || /[\r\n\0]/.test(name))
+  ) {
+    throw new Error(`${label} expected root and canonical basenames are required`);
+  }
+  const canonicalNames = [...expectedNames].sort();
+  const identity = runStableTreeIdentityHelper(root, label, {
+    expectedRoot,
+    outputMode: 'flat-files'
+  });
+  const files = Array.isArray(identity.files) ? identity.files : [];
+  if (
+    identity.entryCount !== canonicalNames.length + 1
+    || files.length !== canonicalNames.length
+    || JSON.stringify(files.map(file => file.relative)) !== JSON.stringify(canonicalNames)
+    || files.some(file => (
+      !Number.isSafeInteger(file.size)
+      || file.size < 0
+      || !/^[0-9a-f]{64}$/.test(String(file.sha256 || ''))
+      || !/^\d+$/.test(String(file.mode || ''))
+      || !/^\d+$/.test(String(file.nlink || ''))
+      || (BigInt(file.mode) & 0o777n) !== 0o600n
+      || BigInt(file.nlink) !== 1n
+    ))
+  ) {
+    throw new Error(`${label} is not the exact canonical private 0600 file set`);
+  }
+  return Object.fromEntries(files.map(file => [file.relative, {
+    size: file.size,
+    sha256: file.sha256
+  }]));
 }

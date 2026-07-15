@@ -48,10 +48,12 @@ const {
 test('macOS build profiles are explicit and use non-overlapping unique outputs', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(frontendRoot, 'package.json'), 'utf8'));
   const buildSource = fs.readFileSync(buildScriptPath, 'utf8');
+  const smokeSource = fs.readFileSync(smokeScriptPath, 'utf8');
   const releaseVerifierSource = fs.readFileSync(
     path.join(frontendRoot, 'scripts', 'verify-macos-release.mjs'),
     'utf8'
   );
+  const releaseEvidenceSource = fs.readFileSync(releaseEvidencePath, 'utf8');
   const notarizeSource = fs.readFileSync(
     path.join(frontendRoot, 'scripts', 'notarize-dmg.mjs'),
     'utf8'
@@ -62,7 +64,16 @@ test('macOS build profiles are explicit and use non-overlapping unique outputs',
   const backendBuild = fs.readFileSync(path.join(frontendRoot, '..', 'build_backend.sh'), 'utf8');
 
   assert.equal(packageJson.scripts['mac:local'], 'node scripts/build-macos.mjs --profile local');
+  assert.match(smokeSource, /size: result\.buildProfile\?\.size/);
   assert.equal(Object.hasOwn(packageJson.scripts, 'mac:release'), false);
+  for (const source of [buildSource, smokeSource, releaseVerifierSource]) {
+    assert.match(source, /runReleaseEvidenceGit/);
+    assert.doesNotMatch(source, /run\(['"]\/usr\/bin\/git['"]|spawnSync\(['"]\/usr\/bin\/git['"]/);
+  }
+  assert.match(releaseEvidenceSource, /GIT_CONFIG_NOSYSTEM: '1'/);
+  assert.match(releaseEvidenceSource, /core\.attributesFile=\/dev\/null/);
+  assert.match(releaseEvidenceSource, /core\.filemode=true/);
+  assert.match(releaseEvidenceSource, /Repository Git configuration is unsafe for evidence reads/);
   assert.equal(
     fs.existsSync(path.join(frontendRoot, 'scripts', 'run-macos-release.mjs')),
     true
@@ -396,12 +407,14 @@ test('local packaged build profile records only artifact-root-relative paths', (
       'mac-arm64/AUTO MIXER Tubeslave.app/Contents/Resources/local-build-attestation.json'
     );
     assert.equal(profile.artifacts.zip.path, 'AUTO MIXER Tubeslave.zip');
-    assert.equal(
-      resolveBuildProfileAppPath(
-        path.join(outputDirectory, 'build-profile.json')
-      ).appPath,
-      appPath
-    );
+    const profilePath = path.join(outputDirectory, 'build-profile.json');
+    const resolvedProfile = resolveBuildProfileAppPath(profilePath);
+    const profileBytes = fs.readFileSync(profilePath);
+    assert.equal(resolvedProfile.appPath, appPath);
+    assert.deepEqual(resolvedProfile.profileIdentity, {
+      size: profileBytes.length,
+      sha256: crypto.createHash('sha256').update(profileBytes).digest('hex')
+    });
     assert.doesNotMatch(JSON.stringify(profile), new RegExp(outputDirectory));
   } finally {
     fs.rmSync(outputDirectory, { recursive: true, force: true });
@@ -552,6 +565,7 @@ test('detached packaged smoke manifest survives relocation and rejects path esca
         profile: 'local',
         releaseEligible: false,
         path: 'build-profile.json',
+        size: 512,
         sha256: 'a'.repeat(64),
         bindingValid: true,
         appTreeMatches: true
@@ -588,6 +602,22 @@ test('detached packaged smoke manifest survives relocation and rejects path esca
     );
     assert.equal(detachedCli.status, 0, detachedCli.stderr);
     assert.equal(JSON.parse(detachedCli.stdout).status, 'passed');
+
+    const missingProfileSize = structuredClone(manifest);
+    delete missingProfileSize.buildProfile.size;
+    fs.writeFileSync(relocatedManifest, JSON.stringify(missingProfileSize));
+    assert.throws(
+      () => verifyPackagedRuntimeSmokeManifest(relocatedManifest),
+      /manifest contract mismatch/
+    );
+    const mismatchedProfileSize = structuredClone(manifest);
+    mismatchedProfileSize.buildProfile.size += 1;
+    fs.writeFileSync(relocatedManifest, JSON.stringify(mismatchedProfileSize));
+    assert.throws(
+      () => verifyPackagedRuntimeSmokeManifest(relocatedManifest),
+      /manifest\/result binding mismatch/
+    );
+    fs.writeFileSync(relocatedManifest, JSON.stringify(manifest));
 
     const legacyRoot = path.join(tempRoot, 'legacy');
     fs.cpSync(runRoot, legacyRoot, { recursive: true });
@@ -680,6 +710,34 @@ test('release stage guard rejects source HEAD, tree, and dirty-status drift', ()
     expectedSource: expected,
     readSource: () => (++reads === 1 ? expected : { ...expected, status: ' M source' })
   }), /after mutating stage/);
+});
+
+test('authoritative source snapshot ignores hostile inherited Git config', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'automixer-release-git-home-'));
+  const home = path.join(root, 'home');
+  const hookPath = path.join(root, 'fsmonitor-hook');
+  const markerPath = path.join(root, 'hook-executed');
+  const previousHome = process.env.HOME;
+  fs.mkdirSync(home);
+  try {
+    fs.writeFileSync(
+      hookPath,
+      `#!/bin/sh\n/usr/bin/touch ${JSON.stringify(markerPath)}\nexit 0\n`
+    );
+    fs.chmodSync(hookPath, 0o755);
+    fs.writeFileSync(
+      path.join(home, '.gitconfig'),
+      `[core]\n\tfsmonitor = ${hookPath}\n`
+    );
+    process.env.HOME = home;
+    const snapshot = captureSourceSnapshot();
+    assert.match(snapshot.head, /^[0-9a-f]{40,64}$/);
+    assert.equal(fs.existsSync(markerPath), false);
+  } finally {
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('dirty local source snapshot binds changed and untracked source file bytes', () => {

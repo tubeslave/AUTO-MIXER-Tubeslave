@@ -21,7 +21,10 @@ import {
   publishNewArtifactFileNoFollow,
   readStableJsonFileNoFollow,
   removeArtifactFileNoFollow,
+  resolveBuildProfileAppPath,
   resolveArtifactPath,
+  runReleaseEvidenceGit,
+  stableTreeIdentityNoFollow,
   writeNewArtifactFileNoFollow,
   sha256File,
   verifyPackagedRuntimeSmokeManifest
@@ -35,7 +38,6 @@ import {
 
 const scriptPath = fileURLToPath(import.meta.url);
 const require = createRequire(import.meta.url);
-const { extractAll: extractAsar } = require('@electron/asar');
 const {
   BACKEND_NETWORK_SANDBOX_PROBES,
   BACKEND_SANDBOX_PROFILE_SHA256
@@ -964,6 +966,521 @@ export function findReleaseArtifactInputs(
   };
 }
 
+function retainedManifestArtifact(artifactRoot, recorded, label) {
+  const resolved = resolveArtifactPath(
+    artifactRoot,
+    recorded?.path,
+    label,
+    { mustExist: true }
+  );
+  const current = artifactFileIdentity(artifactRoot, resolved, label);
+  if (!identitiesEqual(recorded, current)) {
+    throw new Error(`${label} identity does not match retained bytes`);
+  }
+  return { path: resolved, identity: current };
+}
+
+function retainedJsonArtifact(artifactRoot, recorded, label) {
+  const artifact = retainedManifestArtifact(artifactRoot, recorded, label);
+  const stable = readStableJsonFileNoFollow(artifact.path, label, {
+    containmentRoot: artifactRoot
+  });
+  assertIdentityUnchanged(stable.identity, artifact.identity, `${label} stable read`);
+  return { ...artifact, value: stable.value };
+}
+
+/**
+ * Replay the portable, detached part of one retained v2 release proof without
+ * running codesign, Gatekeeper, Apple services, or an application/backend
+ * process. This function structurally binds recorded native-trust claims to
+ * unchanged bytes; without an authenticated external trust anchor it does not
+ * establish their authenticity and never upgrades legacy or initial-pass
+ * evidence.
+ */
+export function verifyRetainedReleaseManifestEvidence(
+  artifactDirectory,
+  manifestPath = path.join(artifactDirectory, 'release-manifest.json')
+) {
+  const artifactRoot = path.resolve(artifactDirectory);
+  const resolvedManifest = assertRegularContainedFile(
+    artifactRoot,
+    manifestPath,
+    'Retained release manifest'
+  );
+  const stableManifest = readStableJsonFileNoFollow(
+    resolvedManifest,
+    'Retained release manifest',
+    { containmentRoot: artifactRoot }
+  );
+  const manifestIdentity = artifactFileIdentity(
+    artifactRoot,
+    resolvedManifest,
+    'Retained release manifest'
+  );
+  assertIdentityUnchanged(
+    stableManifest.identity,
+    manifestIdentity,
+    'retained release manifest stable read'
+  );
+  const manifest = stableManifest.value;
+  if (!stableManifest.bytes.equals(
+    Buffer.from(`${JSON.stringify(manifest, null, 2)}\n`, 'utf8')
+  )) {
+    throw new Error('Retained release manifest is not the exact canonical serialized bytes');
+  }
+  const generatedAt = String(manifest?.generatedAt || '');
+  const generatedEpoch = Date.parse(generatedAt);
+  if (
+    manifest?.schema !== 'automixer.macos_release_manifest.v2'
+    || manifest.pathPolicy !== 'artifact_root_relative_and_logical_v1'
+    || manifest.profile !== 'release'
+    || manifest.releaseEligible !== true
+    || manifest.verification?.mode !== 'retained_artifacts'
+    || manifest.verification?.complete !== true
+    || manifest.verification?.eligibleAfterRetainedVerification !== false
+    || !Number.isFinite(generatedEpoch)
+    || new Date(generatedEpoch).toISOString() !== generatedAt
+    || !/^[0-9a-f]{40,64}$/.test(String(manifest.source?.head || ''))
+    || !/^[0-9a-f]{40,64}$/.test(String(manifest.source?.tree || ''))
+    || manifest.source?.cleanCheckout !== true
+    || manifest.app?.bundleId !== 'com.automixer.wing'
+    || manifest.app?.architecture !== 'arm64'
+    || !/^[0-9a-f]{64}$/.test(String(manifest.app?.treeSha256 || ''))
+    || manifest.archives?.zipAppTreeSha256 !== manifest.app.treeSha256
+    || manifest.archives?.dmgAppTreeSha256 !== manifest.app.treeSha256
+    || manifest.notarization?.appStapled !== true
+    || manifest.notarization?.dmgStapled !== true
+    || manifest.notarization?.gatekeeperSource !== 'Notarized Developer ID'
+    || manifest.runtimeSmoke?.readOnly !== true
+    || manifest.runtimeSmoke?.contactsWing !== false
+    || manifest.runtimeSmoke?.liveAuthorityGranted !== false
+    || manifest.runtimeSmoke?.pass !== true
+  ) {
+    throw new Error('Retained release manifest is not structurally complete retained v2 evidence');
+  }
+
+  const releaseInputs = findReleaseArtifactInputs(artifactRoot, { allowLegacy: false });
+  const appPath = resolveArtifactPath(
+    artifactRoot,
+    manifest.app.path,
+    'Retained release application',
+    { mustExist: true }
+  );
+  const appStat = fs.lstatSync(appPath);
+  if (appStat.isSymbolicLink() || !appStat.isDirectory()) {
+    throw new Error('Retained release application must be a real directory');
+  }
+  const macDirectory = path.join(artifactRoot, 'mac-arm64');
+  if (findApp(macDirectory) !== appPath) {
+    throw new Error('Retained release application is not the canonical mac-arm64 bundle');
+  }
+  const appTree = stableTreeIdentityNoFollow(
+    appPath,
+    'Retained release application tree'
+  );
+  const appTreeSha256 = appTree.sha256;
+  if (appTreeSha256 !== manifest.app.treeSha256) {
+    throw new Error('Retained release application tree does not match the manifest');
+  }
+
+  const buildMetadata = retainedJsonArtifact(
+    artifactRoot,
+    manifest.build?.metadata,
+    'Retained release build metadata'
+  );
+  const buildAttestation = retainedJsonArtifact(
+    artifactRoot,
+    manifest.app?.buildAttestation,
+    'Retained signed build attestation'
+  );
+  const dmg = retainedManifestArtifact(
+    artifactRoot,
+    manifest.artifacts?.dmg,
+    'Retained release DMG'
+  );
+  const zip = retainedManifestArtifact(
+    artifactRoot,
+    manifest.artifacts?.zip,
+    'Retained release ZIP'
+  );
+  const appEvidence = retainedJsonArtifact(
+    artifactRoot,
+    manifest.notarization?.app?.evidence,
+    'Retained application notarization evidence'
+  );
+  const appLog = retainedJsonArtifact(
+    artifactRoot,
+    manifest.notarization?.app?.rawAppleLog,
+    'Retained application Apple log'
+  );
+  const dmgEvidence = retainedJsonArtifact(
+    artifactRoot,
+    manifest.notarization?.dmg?.evidence,
+    'Retained DMG notarization evidence'
+  );
+  const dmgLog = retainedJsonArtifact(
+    artifactRoot,
+    manifest.notarization?.dmg?.rawAppleLog,
+    'Retained DMG Apple log'
+  );
+  const smokeResult = retainedManifestArtifact(
+    artifactRoot,
+    manifest.runtimeSmoke?.result,
+    'Retained packaged smoke result'
+  );
+  const smokeManifest = retainedManifestArtifact(
+    artifactRoot,
+    manifest.runtimeSmoke?.manifest,
+    'Retained packaged smoke manifest'
+  );
+  const smokeMarkdown = retainedManifestArtifact(
+    artifactRoot,
+    manifest.runtimeSmoke?.markdown,
+    'Retained packaged smoke Markdown'
+  );
+  const initialVerification = retainedManifestArtifact(
+    artifactRoot,
+    manifest.verification?.initialIsolatedVerification,
+    'Initial isolated release verification'
+  );
+
+  if (
+    buildMetadata.path !== path.join(artifactRoot, 'build-metadata.json')
+    || buildAttestation.path !== path.join(
+      appPath,
+      'Contents',
+      'Resources',
+      'release-build-attestation.json'
+    )
+    || initialVerification.path !== path.join(
+      artifactRoot,
+      'release-verification-initial.json'
+    )
+    ||
+    dmg.path !== releaseInputs.dmgPath
+    || zip.path !== releaseInputs.zipPath
+    || appEvidence.path !== releaseInputs.appNotarizationEvidencePath
+    || appLog.path !== releaseInputs.appNotaryLogPath
+    || dmgEvidence.path !== releaseInputs.dmgNotarizationEvidencePath
+    || dmgLog.path !== releaseInputs.dmgNotaryLogPath
+  ) {
+    throw new Error('Retained release manifest does not bind the canonical release inputs');
+  }
+
+  const metadata = buildMetadata.value;
+  const buildStartedAt = String(metadata?.startedAt || '');
+  const buildGeneratedAt = String(metadata?.generatedAt || '');
+  const buildStartedEpoch = Date.parse(buildStartedAt);
+  const buildGeneratedEpoch = Date.parse(buildGeneratedAt);
+  if (
+    !Number.isFinite(buildStartedEpoch)
+    || new Date(buildStartedEpoch).toISOString() !== buildStartedAt
+    || !Number.isFinite(buildGeneratedEpoch)
+    || new Date(buildGeneratedEpoch).toISOString() !== buildGeneratedAt
+    || buildGeneratedEpoch < buildStartedEpoch
+    || generatedEpoch < buildGeneratedEpoch
+  ) {
+    throw new Error('Retained release build timestamps are invalid');
+  }
+  if (
+    canonicalJson(manifest.build?.locks) !== canonicalJson(metadata?.locks)
+    || canonicalJson(manifest.build?.tools) !== canonicalJson(metadata?.tools)
+    || canonicalJson(manifest.build?.toolchainInputs)
+      !== canonicalJson(metadata?.toolchainInputs)
+  ) {
+    throw new Error('Retained release manifest build inputs drifted from build metadata');
+  }
+  const backendServerPath = path.join(
+    appPath,
+    'Contents',
+    'Resources',
+    'backend',
+    'server'
+  );
+  const backendServer = artifactFileIdentity(
+    artifactRoot,
+    backendServerPath,
+    'Retained packaged backend server'
+  );
+  const backendBundle = stableTreeIdentityNoFollow(
+    path.dirname(backendServerPath),
+    'Retained packaged backend bundle'
+  );
+  assertBuildMetadata(metadata, {
+    expectedHead: manifest.source.head,
+    expectedTree: manifest.source.tree,
+    frontendPackageLock: manifest.build.locks?.frontendPackageLock,
+    backendRequirementsLock: manifest.build.locks?.backendRequirementsLock,
+    backendBuildRequirementsLock: manifest.build.locks?.backendBuildRequirementsLock,
+    pythonExecutable: manifest.build.toolchainInputs?.pythonExecutable,
+    backendServer,
+    backendBundleTreeSha256: backendBundle.sha256,
+    frontendTreeSha256: manifest.packagedInputs?.frontendTreeSha256,
+    artifactRoot,
+    allowLegacy: false
+  });
+  assertReleaseBuildAttestation(buildAttestation.value, {
+    expectedHead: manifest.source.head,
+    expectedTree: manifest.source.tree,
+    backendSha256: backendServer.sha256,
+    backendBundleTreeSha256: backendBundle.sha256,
+    frontendTreeSha256: manifest.packagedInputs?.frontendTreeSha256
+  });
+  if (
+    !identitiesEqual(backendServer, metadata.buildOutputs.backendServer)
+    || backendBundle.sha256 !== metadata.buildOutputs.backendBundleTreeSha256
+    || manifest.packagedInputs?.frontendTreeSha256
+      !== metadata.buildOutputs.frontendTreeSha256
+  ) {
+    throw new Error('Retained packaged build outputs do not match build metadata');
+  }
+
+  const detachedSmoke = verifyPackagedRuntimeSmokeManifest(smokeManifest.path, {
+    allowLegacy: false
+  });
+  if (
+    !identitiesEqual(detachedSmoke.manifestIdentity, smokeManifest.identity)
+    || !identitiesEqual(detachedSmoke.identities['result.json'], smokeResult.identity)
+    || !identitiesEqual(detachedSmoke.identities['result.md'], smokeMarkdown.identity)
+  ) {
+    throw new Error('Retained packaged smoke manifest identities drifted');
+  }
+  const buildProfilePath = resolveArtifactPath(
+    artifactRoot,
+    detachedSmoke.result?.buildProfile?.path,
+    'Retained packaged smoke build profile',
+    { mustExist: true }
+  );
+  const buildProfileIdentity = artifactFileIdentity(
+    artifactRoot,
+    buildProfilePath,
+    'Retained packaged smoke build profile'
+  );
+  const resolvedBuildProfile = resolveBuildProfileAppPath(buildProfilePath, {
+    allowLegacy: false
+  });
+  const buildProfile = resolvedBuildProfile.profile;
+  if (
+    !identitiesEqual(buildProfileIdentity, resolvedBuildProfile.profileIdentity)
+    || resolvedBuildProfile.appPath !== appPath
+    || buildProfile.profile !== 'release'
+    || buildProfile.releaseEligible !== false
+    || buildProfile.source?.head !== manifest.source.head
+    || buildProfile.source?.tree !== manifest.source.tree
+    || buildProfile.source?.worktreeDirty !== false
+    || buildProfile.app?.treeSha256 !== appTreeSha256
+    || canonicalJson(buildProfile.embeddedAttestation)
+      !== canonicalJson(buildAttestation.identity)
+    || !identitiesEqual(detachedSmoke.result?.buildProfile, buildProfileIdentity)
+    || !identitiesEqual(detachedSmoke.manifest?.buildProfile, buildProfileIdentity)
+  ) {
+    throw new Error('Retained release build profile binding is invalid');
+  }
+  assertPassingSmokeEvidence(detachedSmoke.result, {
+    artifactRoot,
+    appPath,
+    expectedHead: manifest.source.head,
+    expectedTree: manifest.source.tree,
+    appTreeSha256,
+    backendBundleTreeSha256: backendBundle.sha256,
+    buildProfile: {
+      path: buildProfilePath,
+      size: buildProfileIdentity.size,
+      sha256: buildProfileIdentity.sha256
+    },
+    allowLegacy: false
+  });
+  const loadedSmoke = loadSmokeEvidence({
+    smokeResultPath: smokeResult.path,
+    appPath,
+    expectedHead: manifest.source.head,
+    expectedTree: manifest.source.tree,
+    appTreeSha256,
+    backendBundleTreeSha256: backendBundle.sha256,
+    buildProfilePath,
+    allowLegacy: false
+  });
+  if (
+    canonicalJson(loadedSmoke.result) !== canonicalJson(detachedSmoke.result)
+    || !identitiesEqual(loadedSmoke.resultIdentity, smokeResult.identity)
+    || !identitiesEqual(loadedSmoke.manifest, smokeManifest.identity)
+    || !identitiesEqual(loadedSmoke.markdown, smokeMarkdown.identity)
+  ) {
+    throw new Error('Retained packaged smoke replay changed between stable reads');
+  }
+
+  const executablePath = String(appEvidence.value?.mainExecutable?.path || '');
+  const executablePrefix = 'Contents/MacOS/';
+  const executableName = executablePath.startsWith(executablePrefix)
+    ? executablePath.slice(executablePrefix.length)
+    : '';
+  if (!executableName || path.basename(executableName) !== executableName) {
+    throw new Error('Retained application notarization executable path is invalid');
+  }
+  assertAppNotarizationEvidence(appEvidence.value, {
+    artifactRoot,
+    appPath,
+    appTreeSha256,
+    executableName,
+    signatures: manifest.signatures,
+    rawLog: appLog.value,
+    rawLogIdentity: appLog.identity
+  });
+  assertDmgNotarizationEvidence(dmgEvidence.value, dmg.identity, {
+    artifactRoot,
+    rawLog: dmgLog.value,
+    rawLogIdentity: dmgLog.identity,
+    dmgCdhash: manifest.dmgSignature?.cdhash,
+    allowLegacy: false
+  });
+  if (
+    manifest.notarization.app.submissionId !== appEvidence.value?.submission?.id
+    || manifest.notarization.dmg.submissionId !== dmgEvidence.value?.submission?.id
+    || canonicalJson(manifest.notarization.app.ticket)
+      !== canonicalJson(appEvidence.value?.ticket)
+    || canonicalJson(manifest.notarization.dmg.ticket)
+      !== canonicalJson(dmgEvidence.value?.ticket)
+  ) {
+    throw new Error('Retained release manifest notarization summary drifted');
+  }
+
+  const stableInitialVerification = readStableJsonFileNoFollow(
+    initialVerification.path,
+    'Initial isolated release verification',
+    { containmentRoot: artifactRoot }
+  );
+  assertIdentityUnchanged(
+    stableInitialVerification.identity,
+    initialVerification.identity,
+    'initial isolated release verification stable read'
+  );
+  assertInitialReleaseVerification(stableInitialVerification.value, {
+    expectedHead: manifest.source.head,
+    expectedTree: manifest.source.tree,
+    buildMetadata: buildMetadata.identity,
+    appPath,
+    appTreeSha256,
+    buildAttestation: buildAttestation.identity,
+    dmg: dmg.identity,
+    zip: zip.identity,
+    appNotarizationEvidence: appEvidence.identity,
+    appNotaryLog: appLog.identity,
+    dmgNotarizationEvidence: dmgEvidence.identity,
+    dmgNotaryLog: dmgLog.identity,
+    smokeResult: smokeResult.identity,
+    artifactRoot,
+    allowLegacy: false
+  });
+
+  const finalReleaseInputs = findReleaseArtifactInputs(artifactRoot, {
+    allowLegacy: false
+  });
+  if (canonicalJson(finalReleaseInputs) !== canonicalJson(releaseInputs)) {
+    throw new Error('Retained canonical release inputs changed during detached replay');
+  }
+  const stableArtifacts = [
+    buildMetadata,
+    buildAttestation,
+    dmg,
+    zip,
+    appEvidence,
+    appLog,
+    dmgEvidence,
+    dmgLog,
+    smokeResult,
+    smokeManifest,
+    smokeMarkdown,
+    initialVerification,
+    { path: buildProfilePath, identity: buildProfileIdentity },
+    { path: backendServerPath, identity: backendServer }
+  ];
+  for (const [index, artifact] of stableArtifacts.entries()) {
+    const finalIdentity = artifactFileIdentity(
+      artifactRoot,
+      artifact.path,
+      `Final retained detached input ${index + 1}`
+    );
+    assertIdentityUnchanged(
+      artifact.identity,
+      finalIdentity,
+      `retained detached input ${index + 1}`
+    );
+  }
+  const finalAppTree = stableTreeIdentityNoFollow(
+    appPath,
+    'Final retained release application tree'
+  );
+  if (
+    finalAppTree.sha256 !== appTreeSha256
+    || finalAppTree.guardSha256 !== appTree.guardSha256
+  ) {
+    throw new Error('Retained release application tree changed during detached replay');
+  }
+  const finalBackendBundle = stableTreeIdentityNoFollow(
+    path.dirname(backendServerPath),
+    'Final retained packaged backend bundle'
+  );
+  if (
+    finalBackendBundle.sha256 !== backendBundle.sha256
+    || finalBackendBundle.guardSha256 !== backendBundle.guardSha256
+  ) {
+    throw new Error('Retained packaged backend bundle changed during detached replay');
+  }
+
+  const finalManifestIdentity = artifactFileIdentity(
+    artifactRoot,
+    resolvedManifest,
+    'Final retained release manifest'
+  );
+  assertIdentityUnchanged(
+    manifestIdentity,
+    finalManifestIdentity,
+    'retained release manifest final identity'
+  );
+  return {
+    detachedEvidenceReplayComplete: true,
+    packageReleaseEligibleEvidence: false,
+    packageReleaseStructuralConsistencyVerified: true,
+    externalAuthenticityVerified: false,
+    externalAuthenticatedAttestationRequired: true,
+    readinessClosureAllowed: false,
+    nativeTrustReexecuted: false,
+    gatekeeperReexecuted: false,
+    archiveContentsReexecuted: false,
+    helperProcessesUsed: true,
+    applicationProcessStarted: false,
+    backendProcessStarted: false,
+    networkContacted: false,
+    liveAuthorityGranted: false,
+    manifest,
+    manifestIdentity: finalManifestIdentity,
+    generatedAt,
+    buildStartedAt,
+    buildGeneratedAt,
+    source: { ...manifest.source },
+    appTreeSha256,
+    backendServerSha256: metadata.buildOutputs.backendServer.sha256,
+    backendBundleTreeSha256: metadata.buildOutputs.backendBundleTreeSha256,
+    frontendTreeSha256: metadata.buildOutputs.frontendTreeSha256,
+    artifacts: {
+      dmg: dmg.identity,
+      zip: zip.identity,
+      buildMetadata: buildMetadata.identity,
+      buildAttestation: buildAttestation.identity,
+      appEvidence: appEvidence.identity,
+      appLog: appLog.identity,
+      dmgEvidence: dmgEvidence.identity,
+      dmgLog: dmgLog.identity,
+      smokeResult: smokeResult.identity,
+      smokeManifest: smokeManifest.identity,
+      smokeMarkdown: smokeMarkdown.identity,
+      initialVerification: initialVerification.identity,
+      buildProfile: buildProfileIdentity,
+      backendServer
+    }
+  };
+}
+
 function findApp(directory) {
   return exactOne(
     fs.readdirSync(directory, { withFileTypes: true })
@@ -1103,9 +1620,11 @@ function assertWithinArtifactDirectory(candidate, artifactDirectory, label) {
 
 function sourceSnapshot() {
   return {
-    head: run('/usr/bin/git', ['rev-parse', 'HEAD'], { cwd: repoRoot }).stdout.trim(),
-    tree: run('/usr/bin/git', ['rev-parse', 'HEAD^{tree}'], { cwd: repoRoot }).stdout.trim(),
-    status: run('/usr/bin/git', ['status', '--porcelain=v1', '-uall'], { cwd: repoRoot }).stdout.trim()
+    head: runReleaseEvidenceGit(repoRoot, ['rev-parse', 'HEAD']).toString('utf8').trim(),
+    tree: runReleaseEvidenceGit(repoRoot, ['rev-parse', 'HEAD^{tree}'])
+      .toString('utf8').trim(),
+    status: runReleaseEvidenceGit(repoRoot, ['status', '--porcelain=v1', '-uall'])
+      .toString('utf8').trim()
   };
 }
 
@@ -1162,6 +1681,11 @@ function verifyPackagedInputs(appPath, tempRoot, expectedTreeSha256, artifactRoo
   const archivePath = path.join(appPath, 'Contents', 'Resources', 'app.asar');
   const destination = path.join(tempRoot, 'asar');
   fs.mkdirSync(destination);
+  // Detached retained-evidence replay must remain importable from a clean
+  // checkout without executing ignored node_modules code.  The ASAR library is
+  // needed only by the native release-verification path that actually extracts
+  // app.asar, so load it at that boundary instead of at module import time.
+  const { extractAll: extractAsar } = require('@electron/asar');
   extractAsar(archivePath, destination);
   const packagedBuild = path.join(destination, 'build');
   if (!fs.existsSync(packagedBuild)) {

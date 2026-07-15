@@ -374,6 +374,7 @@ from m110_m006_restore import (  # noqa: E402
     M110_M006_SOURCE_EVENT_SHA256,
     M110_M006_SOURCE_TRANSACTION_ID,
     m110_m006_restore_bundle_selector,
+    m110_m006_restore_stage_scope,
     m110_m006_restore_stage_operations,
 )
 from maintenance_dsp_reset import (  # noqa: E402
@@ -2874,13 +2875,7 @@ class ProofOwnedBackendSession:
             dict(item)
             for item in m110_m006_restore_stage_operations()[stage]
         ]
-        expected_scope = {
-            str(address)
-            for operation in expected_operations
-            for address in dict(
-                operation["metadata"]["m110_expected_current_values"]
-            )
-        }
+        expected_scope = list(m110_m006_restore_stage_scope(stage))
         proposal_id = terminal.get("proposal_id")
         review_digest = cls._require_sha256(
             terminal.get("review_content_digest"),
@@ -2925,7 +2920,7 @@ class ProofOwnedBackendSession:
             and isinstance(scope_addresses, list)
             and len(scope_addresses) == len(expected_scope)
             and len(scope_addresses) == len(set(scope_addresses))
-            and set(scope_addresses) == expected_scope
+            and scope_addresses == expected_scope
             and isinstance(snapshots, list)
             and [item.get("operation_id") for item in snapshots]
             == expected_operation_ids
@@ -2967,6 +2962,10 @@ class ProofOwnedBackendSession:
             "operation_count": len(expected_operations),
             "scope_addresses": list(scope_addresses),
             "review_operations": expected_operations,
+            "source_operation_ids": [
+                str(item["metadata"]["m110_source_operation_id"])
+                for item in expected_operations
+            ],
             "source_transaction_id": M110_M006_SOURCE_TRANSACTION_ID,
             "source_event_sha256": M110_M006_SOURCE_EVENT_SHA256,
         }
@@ -3233,9 +3232,19 @@ class ProofOwnedBackendSession:
             "verified": True,
             "proposal_id": proposal_id,
             "capability_kind": capability_kind,
+            "review_contract_version": 2,
+            "review_content_digest": created[
+                "review_content_digest"
+            ],
             "operation_digest": created["operation_digest"],
             "review_preimage_sha256": created["review_preimage_sha256"],
+            "bundle_kind": M110_RESET_BUNDLE_KIND,
+            "operation_count": len(M110_RESET_OPERATION_DEFINITIONS),
             "scope_addresses": list(M110_RESET_ADDRESSES),
+            "review_operation_ids": [
+                str(item["operation_id"])
+                for item in M110_RESET_OPERATION_DEFINITIONS
+            ],
             "terminal": terminal,
             "operator_checkpoint": operator_checkpoint,
             "token_retained": False,
@@ -3378,6 +3387,8 @@ class ProofOwnedBackendSession:
                     == proof_created.get("scope_addresses")
                     and commit_created.get("review_operations")
                     == proof_created.get("review_operations")
+                    and commit_created.get("source_operation_ids")
+                    == proof_created.get("source_operation_ids")
                     and commit_created.get("source_transaction_id")
                     == proof_created.get("source_transaction_id")
                     and commit_created.get("source_event_sha256")
@@ -4374,8 +4385,24 @@ class ProofOwnedBackendSession:
             "verified": True,
             "proposal_id": proposal_id,
             "capability_kind": capability_kind,
+            "review_contract_version": 2,
+            "review_content_digest": created[
+                "review_content_digest"
+            ],
             "operation_digest": created["operation_digest"],
+            "review_preimage_sha256": created.get(
+                "review_preimage_sha256"
+            ) or "",
             "bundle_kind": created["bundle_kind"],
+            "operation_count": created["operation_count"],
+            "scope_addresses": list(created["scope_addresses"]),
+            "review_operation_ids": [
+                str(item["operation_id"])
+                for item in created["review_operations"]
+            ],
+            "source_operation_ids": list(
+                created.get("source_operation_ids") or []
+            ),
             "terminal": terminal,
             "operator_checkpoint": operator_checkpoint,
             "token_retained": False,

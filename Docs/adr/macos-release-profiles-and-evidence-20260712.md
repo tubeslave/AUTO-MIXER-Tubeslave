@@ -1,6 +1,11 @@
 # ADR: macOS local and public-release evidence profiles
 
-Status: accepted for implementation during the 2026-07-12 readiness audit
+Status: superseded on 2026-07-15 by
+`m121-macos-release-evidence-hardening-20260715.md`
+
+The M121 decision removes the npm `mac:release` success surface. The supported
+public-release lane is now the fixed system-shell launcher documented by M121;
+the `mac:release` command below is retained only as historical context.
 
 ## 1. Context
 

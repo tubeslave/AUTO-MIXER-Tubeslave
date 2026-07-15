@@ -16,6 +16,7 @@ import {
   readStableJsonFileNoFollow,
   removeArtifactFileNoFollow,
   resolveArtifactPath,
+  runReleaseEvidenceGit,
   writeNewArtifactFileNoFollow
 } from './release-evidence.mjs';
 
@@ -52,7 +53,7 @@ function run(command, args, options = {}) {
 }
 
 function gitOutput(args) {
-  return run('/usr/bin/git', args, { cwd: repoRoot, stdio: 'pipe' }).stdout.trim();
+  return runReleaseEvidenceGit(repoRoot, args).toString('utf8').trim();
 }
 
 function sha256FileStreaming(filePath) {
