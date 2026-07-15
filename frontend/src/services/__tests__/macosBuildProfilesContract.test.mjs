@@ -62,7 +62,15 @@ test('macOS build profiles are explicit and use non-overlapping unique outputs',
   const backendBuild = fs.readFileSync(path.join(frontendRoot, '..', 'build_backend.sh'), 'utf8');
 
   assert.equal(packageJson.scripts['mac:local'], 'node scripts/build-macos.mjs --profile local');
-  assert.equal(packageJson.scripts['mac:release'], 'node scripts/build-macos.mjs --profile release');
+  assert.equal(Object.hasOwn(packageJson.scripts, 'mac:release'), false);
+  assert.equal(
+    fs.existsSync(path.join(frontendRoot, 'scripts', 'run-macos-release.mjs')),
+    true
+  );
+  assert.equal(
+    fs.existsSync(path.join(frontendRoot, 'scripts', 'run-macos-release')),
+    true
+  );
   assert.equal(packageJson.build.afterPack, 'scripts/after-pack-macos.cjs');
   assert.equal(packageJson.devDependencies.electron, '43.1.0');
   assert.equal(packageJson.devDependencies['electron-builder'], '24.13.3');

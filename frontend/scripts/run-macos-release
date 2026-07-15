@@ -1,0 +1,73 @@
+#!/bin/sh -p
+
+set -eu
+
+# Establish the first trusted execution environment using shell builtins only.
+PATH=/usr/bin:/bin:/usr/sbin:/sbin
+export PATH
+IFS=$(printf ' \t\n_')
+IFS=${IFS%_}
+umask 077
+unset NODE_OPTIONS NODE_PATH BASH_ENV ENV CDPATH \
+  DYLD_INSERT_LIBRARIES DYLD_LIBRARY_PATH DYLD_FRAMEWORK_PATH \
+  DYLD_FALLBACK_LIBRARY_PATH DYLD_FALLBACK_FRAMEWORK_PATH
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(/usr/bin/dirname -- "$0")" && pwd -P)
+FRONTEND_ROOT=$(/usr/bin/dirname -- "$SCRIPT_DIR")
+if [ "$(pwd -P)" != "$FRONTEND_ROOT" ]; then
+  echo "Authoritative macOS release launcher must run from the frontend root" >&2
+  exit 1
+fi
+
+NODE_BIN=${AUTOMIXER_NODE_BIN:-}
+if [ -z "$NODE_BIN" ]; then
+  echo "AUTOMIXER_NODE_BIN is required for the authoritative release launcher" >&2
+  exit 1
+fi
+case "$NODE_BIN" in
+  /*) ;;
+  *)
+    echo "AUTOMIXER_NODE_BIN must resolve to an absolute Node executable" >&2
+    exit 1
+    ;;
+esac
+if [ ! -f "$NODE_BIN" ] || [ -L "$NODE_BIN" ]; then
+  echo "AUTOMIXER_NODE_BIN must identify a real Node executable" >&2
+  exit 1
+fi
+
+if [ "$("$NODE_BIN" --version)" != "v22.22.3" ]; then
+  echo "Authoritative macOS release requires Node v22.22.3" >&2
+  exit 1
+fi
+NODE_DIR=$(/usr/bin/dirname -- "$NODE_BIN")
+NODE_PREFIX=$(/usr/bin/dirname -- "$NODE_DIR")
+NPM_CLI="$NODE_PREFIX/lib/node_modules/npm/bin/npm-cli.js"
+if [ ! -f "$NPM_CLI" ] || [ -L "$NPM_CLI" ]; then
+  echo "Authoritative macOS release requires a real npm CLI beside Node" >&2
+  exit 1
+fi
+if [ "$("$NODE_BIN" "$NPM_CLI" --version)" != "10.9.8" ]; then
+  echo "Authoritative macOS release requires npm 10.9.8 beside Node" >&2
+  exit 1
+fi
+
+TRUSTED_PATH="$NODE_DIR:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+exec /usr/bin/env -i \
+  HOME="${HOME:-}" \
+  TMPDIR="${TMPDIR:-/tmp}" \
+  LANG="${LANG:-C}" \
+  LC_ALL="${LC_ALL:-}" \
+  USER="${USER:-}" \
+  LOGNAME="${LOGNAME:-}" \
+  SHELL="/bin/sh" \
+  SSH_AUTH_SOCK="${SSH_AUTH_SOCK:-}" \
+  PATH="$TRUSTED_PATH" \
+  AUTOMIXER_RELEASE_CLEAN_ENV=1 \
+  AUTOMIXER_APPLE_TEAM_ID="${AUTOMIXER_APPLE_TEAM_ID:-}" \
+  AUTOMIXER_DEVELOPER_ID_IDENTITY="${AUTOMIXER_DEVELOPER_ID_IDENTITY:-}" \
+  APPLE_KEYCHAIN_PROFILE="${APPLE_KEYCHAIN_PROFILE:-}" \
+  APPLE_KEYCHAIN="${APPLE_KEYCHAIN:-}" \
+  AUTOMIXER_PYTHON_BIN="${AUTOMIXER_PYTHON_BIN:-}" \
+  "$NODE_BIN" "$SCRIPT_DIR/run-macos-release.mjs"
