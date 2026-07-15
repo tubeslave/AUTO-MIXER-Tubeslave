@@ -1540,6 +1540,90 @@ class ProofOwnedBackendSession:
             )
 
     @staticmethod
+    def _is_expected_disconnect_readiness_invalidation(
+        payload: Mapping[str, Any],
+    ) -> bool:
+        terminal_error = payload.get("error")
+        return bool(
+            payload.get("type") == "auto_soundcheck_status"
+            and payload.get("status") == "readiness_invalidated"
+            and payload.get("running") is False
+            and payload.get("is_running") is False
+            and payload.get("message")
+            == "Mixer disconnected; soundcheck readiness invalidated."
+            and isinstance(payload.get("soundcheck_readiness"), Mapping)
+            and payload.get("success") is not False
+            and (terminal_error is None or terminal_error == "")
+        )
+
+    async def _receive_disconnect_terminal(
+        self,
+        *,
+        timeout_seconds: float,
+    ) -> tuple[dict[str, Any], bool]:
+        """Receive one disconnect ack and its optional exact invalidation."""
+
+        deadline = time.monotonic() + timeout_seconds
+        disconnect: dict[str, Any] | None = None
+        invalidation_observed = False
+        grace_deadline: float | None = None
+        while True:
+            active_deadline = (
+                grace_deadline if grace_deadline is not None else deadline
+            )
+            remaining = active_deadline - time.monotonic()
+            if remaining <= 0:
+                if disconnect is not None:
+                    return disconnect, invalidation_observed
+                raise asyncio.TimeoutError
+            try:
+                payload = await self._recv_object(remaining)
+            except asyncio.TimeoutError:
+                if disconnect is not None:
+                    return disconnect, invalidation_observed
+                raise
+
+            if (
+                disconnect is not None
+                and self._is_expected_disconnect_readiness_invalidation(payload)
+            ):
+                if invalidation_observed:
+                    raise RuntimeError(
+                        "duplicate_disconnect_readiness_invalidation"
+                    )
+                invalidation_observed = True
+                self._readiness_invalidation_latched = True
+                continue
+
+            if payload.get("type") == "connection_status":
+                if disconnect is not None:
+                    raise RuntimeError(
+                        "duplicate_control_terminal:connection_status"
+                    )
+                terminal_error = payload.get("error")
+                if not (
+                    payload.get("connected") is False
+                    and payload.get("status") != "blocked"
+                    and payload.get("success") is not False
+                    and (terminal_error is None or terminal_error == "")
+                ):
+                    raise RuntimeError(
+                        "m110_disconnect_terminal_not_disconnected"
+                    )
+                disconnect = dict(payload)
+                grace_deadline = min(
+                    deadline,
+                    time.monotonic()
+                    + M110_TERMINAL_DUPLICATE_GRACE_SECONDS,
+                )
+                continue
+
+            self._reject_unexpected_terminal(
+                payload,
+                expected_type="connection_status",
+            )
+
+    @staticmethod
     def _bounded_terminal_failure_context(payload: Mapping[str, Any]) -> str:
         values: list[str] = []
         reason = payload.get("reason")
@@ -4996,6 +5080,10 @@ class ProofOwnedBackendSession:
         if self.closed:
             return dict(self.teardown_result or {})
         errors: list[str] = []
+        prior_readiness_invalidation_latched = bool(
+            self._readiness_invalidation_latched
+        )
+        disconnect_invalidation_observed = False
         capture_stopped = not self.capture_started
         mixer_disconnected = not self.wing_connected
         backend_shutdown: dict[str, Any] | None = None
@@ -5041,8 +5129,10 @@ class ProofOwnedBackendSession:
             if self.wing_connected:
                 try:
                     await self._send_json({"type": "disconnect_wing"})
-                    disconnected = await self._receive_terminal(
-                        "connection_status",
+                    (
+                        disconnected,
+                        disconnect_invalidation_observed,
+                    ) = await self._receive_disconnect_terminal(
                         timeout_seconds=3.0,
                     )
                     mixer_disconnected = disconnected.get("connected") is False
@@ -5085,6 +5175,12 @@ class ProofOwnedBackendSession:
             "backend_process_terminated": backend_terminated,
             "backend_shutdown": dict(backend_shutdown or {}),
             "route_authority_retained": False,
+            "readiness_invalidation_observed": (
+                disconnect_invalidation_observed
+            ),
+            "prior_readiness_invalidation_latched": (
+                prior_readiness_invalidation_latched
+            ),
             "errors": errors,
         }
         return dict(self.teardown_result)

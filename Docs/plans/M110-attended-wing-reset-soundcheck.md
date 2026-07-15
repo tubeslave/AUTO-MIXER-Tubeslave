@@ -116,6 +116,18 @@ readback plus WAL recovery before resumption.
   on all 48 channels and are not independently machine-verified.
   Serial-bound USB identity was not reached. HW01 remains incomplete and
   HW02-HW05 remain pending; reset, corrections and writes remain zero.
+- M120 supersedes the current no-signal blocker without rewriting that M115/
+  M116 history. Clean source `45e2a2ae66853dc79a8db693f8ccfe15cbc67cc8`
+  issued accepted artifact `4937d06623084a2d98e7bc3f9b8f8a17`, verifying
+  serial-bound WING USB/CoreAudio 48x48/48 kHz identity, two complete Main
+  47/48 passes, fresh signal at conservative `-12.318 dBTP`, and zero console
+  mutation writes. The runner remained blocked only by
+  `proof_owned_master_route_teardown_failed:wing_disconnect_failed:RuntimeError`
+  after the backend's expected disconnect-readiness invalidation. M120's
+  teardown-only exact receiver passed 142 tests and independent rereview
+  `ACCEPT`. HW01 still requires a fresh clean committed M120/CP05-bound repeat
+  with verified capture stop, disconnect, route revocation and clean backend
+  termination before HW02-HW05 may start.
 - A pending/stale CP05 marker blocks connect, USB capture, route proof and every
   discovery/alternate-mixer ingress before resource construction; cleanup and
   emergency messages remain available.

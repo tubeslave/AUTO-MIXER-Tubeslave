@@ -8,15 +8,22 @@ Paperclip, ADRs, tests, or git history.
 ## Active Tasks
 
 - M110 attended WING reset and staged soundcheck is the current
-  operator-directed task. CP05 and clean detached launch-only are verified.
-  The real WING and 48x48/48 kHz CoreAudio stream are now reached, but HW01 is
-  blocked before route-artifact issuance on `master_channel_signal_missing`.
-  CP05 is dynamically checked against the current non-marker tree; repeat HW01
-  in one proof-owned attended session only after a confirmed non-silent Main
-  47/48 source, then continue HW02-HW05 in order.
+  operator-directed task. Clean source `45e2a2ae6` issued accepted route proof
+  `4937d06623084a2d98e7bc3f9b8f8a17`, including serial-bound USB/CoreAudio
+  48x48/48 kHz identity, two Main 47/48 passes, fresh signal and zero console
+  mutation writes. The runner blocked only on
+  `proof_owned_master_route_teardown_failed` after the backend had disconnected.
+  M120 repairs that teardown-only receiver; commit, rebind CP05 once and repeat
+  HW01 from clean source before continuing HW02-HW05 in order.
   Do not claim 95/100 before the repeated final audit and SHA-bound listening
   prove `show_mix_ready`; do not convert the one-run M006 permission into
   standing authority.
+
+- 2026-07-15, Codex, M120 source checkpoint in progress: teardown fix passed
+  142 runner tests, route/static WING validation and independent rereview
+  `ACCEPT`. The accepted pre-fix artifact is bug-reproduction evidence only;
+  it does not close HW01 or grant authority until a fresh committed repeat
+  verifies teardown.
 
 - Use `Docs/MVP_WING_SUPERVISED.md` and
   `.ai/project-layer/wing_mvp_blockers.md` as the current execution rail.

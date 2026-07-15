@@ -1213,32 +1213,28 @@ def test_m117_current_truth_surfaces_preserve_diagnostic_provenance():
         return statements
 
     assert provenance in state["external_validation_scope"]
-    assert provenance in state["current_blocker"]
-    blocker_mirror_paths = (
+    assert "no longer blocked by digital silence" in state["current_blocker"]
+    diagnostic_history_paths = (
         CURRENT_STATE_DOC,
         ACTIVE_MILESTONE_DOC,
         ROADMAP_DOC,
-        M001_PLAN,
         AUTOPILOT_BLOCKERS,
         AUTOPILOT_HEARTBEAT,
         AUTOPILOT_LAST_REPORT,
         BLOCKERS_DOC,
-        MVP_PROGRESS_REPORT,
-    )
-    current_surface_paths = (
-        *blocker_mirror_paths,
         M110_PLAN,
-        CURRENT_TASKS,
     )
-    for surface_path in blocker_mirror_paths:
+    for surface_path in diagnostic_history_paths:
         normalized = re.sub(
             r"\s+",
             " ",
             surface_path.read_text(encoding="utf-8"),
         )
-        assert provenance in normalized
+        assert "master_channel_signal_missing" in normalized
+        assert "operator-observed" in normalized.lower()
+        assert "not independently machine-verified" in normalized.lower()
 
-    for surface_path in current_surface_paths:
+    for surface_path in diagnostic_history_paths:
         current_prefix = re.split(
             r"^## Historical",
             surface_path.read_text(encoding="utf-8"),
@@ -1302,7 +1298,7 @@ def test_m117_current_truth_surfaces_preserve_diagnostic_provenance():
     )
 
 
-def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
+def test_m120_current_truth_tracks_accepted_route_and_teardown_repeat_blocker():
     dynamic_gate = verify_m110_cp05_hardware_gate(
         repo_root=PROJECT_ROOT,
         critical_paths=M110_RUNTIME_CRITICAL_PATHS,
@@ -1319,7 +1315,8 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
         "complete_current_markers_verified"
     )
     assert work["hardware_checkpoints"]["M110-HW01"] == (
-        "attempted_blocked_master_channel_signal_missing_no_issued_artifact"
+        "attempted_route_artifact_accepted_runner_blocked_teardown_"
+        "fresh_m120_repeat_required"
     )
     assert all(
         work["hardware_checkpoints"][checkpoint] == "pending"
@@ -1340,13 +1337,15 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     assert launch["live_write"] is False
 
     capture = work["physical_capture_prerequisite"]
-    assert capture["evidence_class"] == "ephemeral_operator_attended_diagnostic"
+    assert capture["evidence_class"] == (
+        "accepted_physical_route_proof_bug_reproduction_not_checkpoint_completion"
+    )
     assert capture["reason"] == (
-        "coreaudio_capture_prerequisite_satisfied_usb_identity_not_reached"
+        "coreaudio_and_serial_bound_usb_identity_verified_with_non_silent_route_proof"
     )
     assert capture["exact_name_candidate_count"] == 1
     assert capture["matching_wing_coreaudio_device_count"] == 1
-    assert capture["matching_wing_usb_device_count"] is None
+    assert capture["matching_wing_usb_device_count"] == 1
     assert capture["selected_device_name"] == "WING"
     assert capture["selected_input_channels"] == 48
     assert capture["selected_output_channels"] == 48
@@ -1354,7 +1353,7 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     assert capture["console_serial"] == "0100Q1V0604AAE"
     assert capture["console_product"] == "wing-rack"
     assert capture["console_firmware"] == "3.0.5-4-ga4ea833d:release"
-    assert capture["serial_bound_usb_identity_verified"] is False
+    assert capture["serial_bound_usb_identity_verified"] is True
     assert capture["dante_virtual_soundcard_seen"] is True
     assert capture["dante_virtual_soundcard_accepted_as_substitute"] is False
     assert capture["audio_stream_opened"] is True
@@ -1390,6 +1389,46 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
     assert attempt["readiness_closure_allowed"] is False
     assert attempt["live_authority_granted"] is False
     assert attempt["clean_teardown_observed"] is True
+
+    m120 = work["m120_hw01_teardown_bug_reproduction"]
+    assert m120["status"] == (
+        "route_artifact_accepted_runner_blocked_teardown_classification"
+    )
+    assert m120["reason"] == (
+        "proof_owned_master_route_teardown_failed:"
+        "wing_disconnect_failed:RuntimeError"
+    )
+    assert m120["checkpoint_completed"] is False
+    assert m120["route_artifact_issued"] is True
+    assert m120["route_artifact_accepted"] is True
+    assert m120["proof_id"] == "4937d06623084a2d98e7bc3f9b8f8a17"
+    assert m120["proof_grants_current_authority"] is False
+    assert m120["source_head"] == (
+        "45e2a2ae66853dc79a8db693f8ccfe15cbc67cc8"
+    )
+    assert m120["source_tree"] == (
+        "ff9c2bd91a34ea91fa2530a5de4361f13d1b6595"
+    )
+    assert m120["console_serial"] == "0100Q1V0604AAE"
+    assert m120["console_firmware"] == "3.0.5-4-ga4ea833d:release"
+    assert m120["serial_bound_usb_identity_verified"] is True
+    assert m120["complete_route_pass_count"] == 2
+    assert m120["master_channels"] == [47, 48]
+    assert m120["conservative_true_peak_dbtp"] == pytest.approx(
+        -12.318173311906147
+    )
+    assert m120["console_mutation_write_attempt_count"] == 0
+    assert m120["capture_stop_observed_in_backend_log"] is True
+    assert m120["route_authority_revoked_in_backend_log"] is True
+    assert m120["mixer_disconnect_observed_in_backend_log"] is True
+    assert m120["backend_clean_shutdown_observed_in_backend_log"] is True
+    assert m120["runner_teardown_verified"] is False
+    assert m120["fresh_m120_cp05_bound_repeat_required"] is True
+    assert m120["live_write"] is False
+    assert m120["reset_applied"] is False
+    assert m120["corrections_applied"] == 0
+    assert m120["readiness_closure_allowed"] is False
+    assert m120["live_authority_granted"] is False
 
     assert work["backend_contacted_this_cycle"] is True
     assert work["hardware_contacted_this_cycle"] is True
@@ -1429,7 +1468,8 @@ def test_m116_current_truth_surfaces_track_real_hw01_no_signal_blocker():
         surface = surface_path.read_text(encoding="utf-8")
         assert "CP05" in surface
         assert "WING Rack" in surface
-        assert "master_channel_signal_missing" in surface
+        assert "proof_owned_master_route_teardown_failed" in surface
+        assert "4937d06623084a2d98e7bc3f9b8f8a17" in surface
         assert "HW01" in surface
         assert "HW05" in surface
         assert "48x48/48 kHz" in surface or "48 inputs/48 outputs at 48 kHz" in surface
@@ -1880,7 +1920,8 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         assert score_gate["score_ceiling_reason"] in surface
 
     assert state["truth_revision"] == (
-        "m119_private_artifact_root_verifier_cli_strict_live_88_zero_authority_20260715"
+        "m120_hw01_accepted_route_teardown_repair_"
+        "strict_live_88_zero_authority_20260715"
     )
     assert state["full_release_truth_source"] == "strict_pre_release_review"
     assert state["full_release_requirements_source"] == (
@@ -2384,7 +2425,7 @@ def test_m002_physical_readback_waits_for_accepted_real_wing_review():
             "ops/autopilot/M001_CP04_wing_readonly_preflight_plan.json."
         )
     for marker in (
-        "Confirmed non-silent source reaches the physical WING",
+        "Repeat M110-HW01 from the clean committed M120 source",
         "M110-HW01 through M110-HW05",
         "two valid 2026-07-13 read-only preflight candidates",
         "Exact WING Rack serial and same-console owner attestation",

@@ -700,6 +700,21 @@ def _valid_final_audit_terminal(**overrides):
     return terminal
 
 
+def _disconnect_readiness_invalidation(**overrides):
+    terminal = {
+        "type": "auto_soundcheck_status",
+        "status": "readiness_invalidated",
+        "running": False,
+        "is_running": False,
+        "message": "Mixer disconnected; soundcheck readiness invalidated.",
+        "soundcheck_readiness": {
+            "mix_readiness": "soundcheck_incomplete",
+        },
+    }
+    terminal.update(overrides)
+    return terminal
+
+
 def test_final_audit_terminal_requires_read_only_two_pass_show_mix_truth():
     validator = (
         runner.ProofOwnedBackendSession
@@ -2703,7 +2718,10 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
                     }
                 ]
             if payload["type"] == "disconnect_wing":
-                return [{"type": "connection_status", "connected": False}]
+                return [
+                    {"type": "connection_status", "connected": False},
+                    _disconnect_readiness_invalidation(),
+                ]
             return []
 
         backend = _fake_backend(repo)
@@ -2737,6 +2755,7 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
         teardown = await session.close()
         assert teardown["verified"] is True
         assert teardown["route_authority_retained"] is False
+        assert teardown["readiness_invalidation_observed"] is True
         assert backend.process.poll() is not None
         assert websocket.closed is True
         assert [item["type"] for item in websocket.sent][-2:] == [
@@ -2745,6 +2764,246 @@ def test_persistent_route_session_uses_one_websocket_until_verified_teardown(
         ]
 
     asyncio.run(scenario())
+
+
+@pytest.mark.asyncio
+async def test_disconnect_receiver_accepts_exact_readiness_invalidation(
+    tmp_path,
+):
+    websocket = _FakeWebSocket()
+    for response in (
+        {"type": "connection_status", "connected": False},
+        _disconnect_readiness_invalidation(),
+    ):
+        await websocket.responses.put(json.dumps(response))
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    disconnected, invalidation_observed = (
+        await session._receive_disconnect_terminal(timeout_seconds=0.1)
+    )
+
+    assert disconnected == {"type": "connection_status", "connected": False}
+    assert invalidation_observed is True
+    assert session._readiness_invalidation_latched is True
+    session.backend.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_receiver_rejects_invalidation_before_ack(tmp_path):
+    websocket = _FakeWebSocket()
+    await websocket.responses.put(
+        json.dumps(_disconnect_readiness_invalidation())
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="m110_soundcheck_readiness_invalidated",
+    ):
+        await session._receive_disconnect_terminal(timeout_seconds=0.01)
+
+    assert session._readiness_invalidation_latched is True
+    session.backend.close()
+
+
+@pytest.mark.asyncio
+async def test_disconnect_receiver_runs_after_prior_readiness_latch(tmp_path):
+    websocket = _FakeWebSocket()
+    await websocket.responses.put(
+        json.dumps({"type": "connection_status", "connected": False})
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+    session._readiness_invalidation_latched = True
+
+    disconnected, invalidation_observed = (
+        await session._receive_disconnect_terminal(timeout_seconds=0.1)
+    )
+
+    assert disconnected["connected"] is False
+    assert invalidation_observed is False
+    assert session._readiness_invalidation_latched is True
+    session.backend.close()
+
+
+@pytest.mark.asyncio
+async def test_close_does_not_relabel_prior_latch_as_disconnect_evidence(
+    tmp_path,
+):
+    websocket = _FakeWebSocket(
+        lambda payload: (
+            [{"type": "connection_status", "connected": False}]
+            if payload["type"] == "disconnect_wing"
+            else []
+        )
+    )
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+    session.wing_connected = True
+    session._readiness_invalidation_latched = True
+
+    teardown = await session.close()
+
+    assert teardown["verified"] is True
+    assert teardown["readiness_invalidation_observed"] is False
+    assert teardown["prior_readiness_invalidation_latched"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("responses", "expected_error"),
+    [
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                {"type": "connection_status", "connected": False},
+            ],
+            "duplicate_control_terminal:connection_status",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(),
+                _disconnect_readiness_invalidation(),
+            ],
+            "duplicate_disconnect_readiness_invalidation",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                {
+                    "type": "auto_soundcheck_status",
+                    "status": "readiness_invalidated",
+                    "running": True,
+                    "is_running": False,
+                    "message": (
+                        "Mixer disconnected; soundcheck readiness invalidated."
+                    ),
+                    "soundcheck_readiness": {},
+                },
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(
+                    message=(
+                        "Emergency stop active; soundcheck readiness "
+                        "invalidated."
+                    )
+                ),
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(
+                    message=(
+                        "Soundcheck readiness watchdog failed; readiness is "
+                        "fail-closed until a fresh check."
+                    )
+                ),
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(
+                    message=(
+                        "Soundcheck readiness invalidated by a physical "
+                        "console change at /ch/1/fdr."
+                    )
+                ),
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(success=False),
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [
+                {"type": "connection_status", "connected": False},
+                _disconnect_readiness_invalidation(error="watchdog_failed"),
+            ],
+            "m110_soundcheck_readiness_invalidated",
+        ),
+        (
+            [{"type": "connection_status", "connected": True}],
+            "m110_disconnect_terminal_not_disconnected",
+        ),
+        (
+            [
+                {
+                    "type": "connection_status",
+                    "connected": False,
+                    "error": [],
+                }
+            ],
+            "m110_disconnect_terminal_not_disconnected",
+        ),
+        (
+            [
+                {
+                    "type": "wing_master_route_proof_result",
+                    "status": "blocked",
+                }
+            ],
+            "unexpected_control_terminal:wing_master_route_proof_result",
+        ),
+    ],
+    ids=(
+        "duplicate_ack",
+        "duplicate_invalidation",
+        "malformed_invalidation",
+        "emergency_stop_invalidation",
+        "watchdog_invalidation",
+        "console_change_invalidation",
+        "failed_invalidation",
+        "errored_invalidation",
+        "still_connected",
+        "malformed_error",
+        "unexpected_control_terminal",
+    ),
+)
+async def test_disconnect_receiver_rejects_unsafe_terminals(
+    tmp_path,
+    responses,
+    expected_error,
+):
+    websocket = _FakeWebSocket()
+    for response in responses:
+        await websocket.responses.put(json.dumps(response))
+    session = runner.ProofOwnedBackendSession(
+        backend=_fake_backend(tmp_path),
+        websocket=websocket,
+        identity_result=_identity_result(),
+    )
+
+    with pytest.raises(RuntimeError, match=expected_error):
+        await session._receive_disconnect_terminal(timeout_seconds=0.1)
+
+    session.backend.close()
 
 
 def test_route_waits_for_same_capture_first_callback_before_proof(
