@@ -5,6 +5,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 from backend.autonomy_promotion_readiness import build_autonomy_promotion_readiness_snapshot
 from backend.evaluation_integration_bundle_contract import (
     REQUIRED_INTEGRATION_CHECKS,
