@@ -17057,7 +17057,9 @@ class AutoMixerServer:
                 ),
                 master_channels=(47, 48),
                 artifact_path=artifact["path"],
-                artifact_sha256=artifact["sha256"],
+                artifact_sha256=self._m110_prefixed_sha256(
+                    artifact["sha256"]
+                ),
                 evidence_sha256=artifact["evidence_sha256"],
                 _transport_ref=self.mixer_client,
                 _capture_ref=self.audio_capture,

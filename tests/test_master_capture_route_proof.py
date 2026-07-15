@@ -414,7 +414,11 @@ async def test_fixed_route_capture_issues_only_process_private_authority(
     assert verified["live_authority_source"] == (
         "same_process_non_serializable_object"
     )
-    assert Path(result["artifact"]["path"]).is_file()
+    artifact_path = Path(result["artifact"]["path"])
+    persisted_sha256 = result["artifact"]["sha256"]
+    assert artifact_path.is_file()
+    assert persisted_sha256 == hashlib.sha256(artifact_path.read_bytes()).hexdigest()
+    assert verified["sha256"] == f"sha256:{persisted_sha256}"
     client._transport_generation += 1
     revoked = server._verified_master_capture_route_proof()
     assert revoked["verified"] is False
