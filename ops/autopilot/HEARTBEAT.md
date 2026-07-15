@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-15T01:48:55Z
+Last heartbeat UTC: 2026-07-15T02:52:38Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -8,10 +8,24 @@ Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none at the committed validation boundary. The bounded M117
-implementation lease is released before validation. CP05 is dynamically
+Writer lease: none at the committed validation boundary. The bounded M119
+implementation lease is released before validation and commit. CP05 is dynamically
 checked against the current non-marker Git tree and must pass before any
 hardware attempt.
+
+## M119 private artifact-root verifier CLI — 2026-07-15
+
+The M111 verifier CLI now honors its explicit private artifact root while
+requiring a real non-symlink root and lexical direct-child run directory.
+Broad ancestors, root/parent/run/summary symlinks and dangling run redirects
+fail closed before evidence acceptance; downstream M006 still uses only its
+canonical default root. Focused M111/M119/M006 validation passed 87 with 2
+clean-source skips, the pre-CP05 WING rails passed 137 with 1 binding test
+deselected, and the pre-CP05 full suite passed 7228 with 3 skipped, 1 deselected
+and 1 warning in 385.48s. Independent review accepted the final diff. No
+backend, CoreAudio, OSC or WING contact occurred and authority remains false.
+The previous M111 challenge is invalid; source commit, marker-only CP05 rebind,
+a fresh challenge and clean-source replay remain.
 
 ## M118 M111 sealed replay zero-I/O — 2026-07-15
 
@@ -143,7 +157,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Physically contain PA and monitor outputs; in Ableton select WING as the Audio Output Device, route the source to WING USB 1-16, start playback, verify a non-silent Main 47/48 feed and leave playback running. Then, with the operator present and a clean dynamic-CP05-bound checkout, repeat M110-HW01 and proceed to HW02-HW05 only after an issued route artifact. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed migration replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`.
+Latest ledger handoff row: `m119_private_artifact_root_verifier_cli_source_checkpoint_ready` at `2026-07-15T02:52:38Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

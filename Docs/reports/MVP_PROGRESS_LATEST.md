@@ -1,6 +1,6 @@
 # MVP Progress Latest
 
-Generated: `2026-07-15T01:48:55Z`
+Generated: `2026-07-15T02:52:38Z`
 
 > Full-project release truth comes from `ops/autopilot/STATE.json.strict_pre_release_review`. The blocker inventory below is a frozen legacy M001 packet contract, not a current count of unfinished full-project work.
 
@@ -51,7 +51,7 @@ Supervised WING Rack proof.
   - real current-tree arm64 packaged-app launch smoke replay from a clean checkout, operator-accessible remote-client token provisioning and invalid or expired-token recovery without persistence or disclosure, Developer ID signing, notarization, stapling and Gatekeeper acceptance
   - operator-present room and PA listening with audible rollback, stereo master 47/48 route and true-peak verification, and emergency-stop validation
   - clean-checkout full suite plus reproduction of the final five-store no-WING, hashed-dependency and arm64 package evidence after writer-lease release, preserving all five canonical hashes and excluding documented synthetic and legacy-unbound audit rows from physical evidence
-- Latest ledger handoff row: `m118_m111_sealed_replay_zero_io_source_checkpoint_ready` at `2026-07-15T01:48:55Z`
+- Latest ledger handoff row: `m119_private_artifact_root_verifier_cli_source_checkpoint_ready` at `2026-07-15T02:52:38Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 

@@ -1,6 +1,6 @@
 {
   "schema": "automixer.autopilot.state.v1",
-  "truth_revision": "m118_m111_sealed_replay_zero_io_strict_live_88_zero_authority_20260715",
+  "truth_revision": "m119_private_artifact_root_verifier_cli_strict_live_88_zero_authority_20260715",
   "current_head_truth_revision": "m115_firmware_validated_m116_hw01_no_signal_m117_truth_contract_20260715",
   "full_release_truth_source": "strict_pre_release_review",
   "external_validation_scope": "M110 reached the real WING/CoreAudio route-capture path, but the machine-recorded route gate failed closed before artifact issuance on master_channel_signal_missing; operator-observed 3-second and 120-second captures showed exact digital zero on all 48 channels; these extra observations are not independently machine-verified; public-release and current-source promotion remain separate external gates",
@@ -10,7 +10,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-07-15T01:48:55Z",
+  "last_heartbeat_utc": "2026-07-15T02:52:38Z",
   "current_writer_lease": null,
   "current_head_validation": {
     "head": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
@@ -39,6 +39,28 @@
     "corrections_applied": 0,
     "live_authority_granted": false,
     "active_plan": "Docs/plans/M110-attended-wing-reset-soundcheck.md"
+  },
+  "m119_source_checkpoint_validation": {
+    "inspected_at_utc": "2026-07-15T02:52:38Z",
+    "status": "pre_cp05_source_checkpoint_passed_pending_commit_rebind",
+    "source_head_before_commit": "f093d8c87519535417c88c7c4951cd7abcd4c06c",
+    "source_tree_before_commit": "019e121eaf80a9c29afd18fe0ee94e32893e5c09",
+    "reproduced_failure": "the --verify-summary CLI parsed but discarded --artifact-root, so a valid private-root M111 summary was falsely checked against the repository-default root",
+    "decision": "forward the explicit trust root, require a real non-symlink root and lexical run path, create only a direct child, revalidate the real directory chain, and keep downstream M006 on its canonical default root",
+    "focused_m111_m119_m006_validation": "87 passed, 2 skipped in 106.91s",
+    "focused_symlink_and_downstream_boundary_validation": "6 passed in 8.72s",
+    "pre_cp05_wing_rails_validation": "137 passed, 1 deselected in 2.97s",
+    "pre_cp05_full_suite_validation": "7228 passed, 3 skipped, 1 deselected, 1 warning in 385.48s",
+    "independent_review": "ACCEPT with no blocking findings after dangling-run symlink closure",
+    "existing_m111_challenge_status": "invalidated_by_tracked_source_change_do_not_reuse",
+    "fresh_challenge_required_after_commit_rebind": true,
+    "private_runtime_artifact_root_required": true,
+    "downstream_m006_custom_root_allowed": false,
+    "contacts_backend": false,
+    "contacts_wing": false,
+    "audio_device_opened": false,
+    "live_write": false,
+    "live_authority_granted": false
   },
   "m118_source_checkpoint_validation": {
     "inspected_at_utc": "2026-07-15T01:48:55Z",

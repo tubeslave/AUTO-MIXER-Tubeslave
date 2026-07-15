@@ -624,6 +624,58 @@ def test_verified_m005_migration_allows_owner_review_without_native_claims() -> 
     assert result["m005_native_failed_checks"]
 
 
+def test_private_migration_root_cannot_enter_canonical_m006_packet_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_summary = tmp_path / "private" / "unit-migration" / "summary.json"
+    private_summary.parent.mkdir(parents=True)
+    private_summary.write_text("{}\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+    verify_migration_paths = verifier.verify_migration_paths
+
+    def capture_default_root_verification(path: Path, **kwargs: object) -> dict:
+        captured["kwargs"] = kwargs
+        verification = verify_migration_paths(path, **kwargs)
+        captured["verification"] = verification
+        return verification
+
+    monkeypatch.setattr(
+        verifier,
+        "verify_migration_paths",
+        capture_default_root_verification,
+    )
+
+    result = verifier.verify_packet_paths(
+        PACKET_SUMMARY,
+        m005_migration_summary=private_summary,
+    )
+    migration_verification = captured["verification"]
+    assert isinstance(migration_verification, dict)
+
+    assert result["status"] == "blocked"
+    assert result["owner_review_input_ready"] is False
+    assert result["m005_m006_input_accepted"] is False
+    assert result["m005_acceptance_route"] is None
+    assert captured["kwargs"] == {}
+    assert (
+        migration_verification["checks"]["migration_summary_regular_confined_file"]
+        is False
+    )
+    assert (
+        result["m005_migration_checks"]["m005_migration_ready_true"] is False
+    )
+    for flag in (
+        "live_authority_granted",
+        "readiness_closure_allowed",
+        "readiness_matrix_update_allowed",
+        "contacts_wing",
+        "contacts_backend",
+        "live_write",
+    ):
+        assert result[flag] is False
+
+
 def test_verified_migration_rejects_noncanonical_legacy_paths() -> None:
     result = verifier.verify_packet(
         load_packet(),

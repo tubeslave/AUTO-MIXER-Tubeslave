@@ -330,6 +330,68 @@ def test_build_rejects_unsafe_run_id_before_writing(
     assert not (tmp_path / "runs").exists()
 
 
+@pytest.mark.parametrize(
+    "boundary",
+    (
+        "root_symlink",
+        "parent_symlink",
+        "run_symlink",
+        "dangling_run_symlink",
+    ),
+)
+def test_build_rejects_symlinked_artifact_boundaries_before_writing(
+    tmp_path: Path,
+    boundary: str,
+) -> None:
+    real_root = tmp_path / "real-root"
+    real_root.mkdir()
+    run_id = "unit_m005_symlink_boundary"
+
+    if boundary == "root_symlink":
+        artifact_root = tmp_path / "linked-root"
+        artifact_root.symlink_to(real_root, target_is_directory=True)
+    elif boundary == "parent_symlink":
+        real_parent = tmp_path / "real-parent"
+        real_parent.mkdir()
+        linked_parent = tmp_path / "linked-parent"
+        linked_parent.symlink_to(real_parent, target_is_directory=True)
+        artifact_root = linked_parent / "missing-root"
+    elif boundary == "run_symlink":
+        artifact_root = real_root
+        outside_run = tmp_path / "outside-run"
+        outside_run.mkdir()
+        (artifact_root / run_id).symlink_to(
+            outside_run,
+            target_is_directory=True,
+        )
+    else:
+        artifact_root = real_root
+        (artifact_root / run_id).symlink_to(
+            artifact_root / "redirected-run",
+            target_is_directory=True,
+        )
+
+    with pytest.raises((ValueError, FileExistsError)):
+        migration.build_migration_artifact(
+            historical_summary=migration.EXPECTED_HISTORICAL_SUMMARY_LOGICAL_PATH,
+            owner_decision=migration.EXPECTED_OWNER_DECISION_LOGICAL_PATH,
+            console_attestation=None,
+            console_attestation_challenge=None,
+            artifact_root=artifact_root,
+            run_id=run_id,
+            execute_replay=False,
+            source_override=migration.capture_current_source(),
+        )
+
+    assert not (real_root / run_id / "summary.json").exists()
+    if boundary == "parent_symlink":
+        assert not (real_parent / "missing-root").exists()
+    if boundary == "run_symlink":
+        assert list((tmp_path / "outside-run").iterdir()) == []
+    if boundary == "dangling_run_symlink":
+        assert not (artifact_root / "redirected-run").exists()
+
+
 def test_build_and_verify_paths_round_trip_and_reject_mutations(
     tmp_path: Path,
 ) -> None:
@@ -424,6 +486,220 @@ def test_build_and_verify_paths_round_trip_and_reject_mutations(
     )
     assert invocation_result["migration_ready"] is False
     invocation_path.write_bytes(original_invocation)
+
+
+def test_verify_summary_cli_forwards_explicit_artifact_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary_path = tmp_path / "private" / "run" / "summary.json"
+    artifact_root = tmp_path / "private"
+    captured: dict[str, object] = {}
+
+    def fake_verify(
+        summary: str | Path,
+        *,
+        artifact_root: str | Path = migration.DEFAULT_ARTIFACT_ROOT,
+    ) -> dict[str, object]:
+        captured["summary"] = summary
+        captured["artifact_root"] = artifact_root
+        return {"status": "blocked"}
+
+    monkeypatch.setattr(migration, "verify_migration_paths", fake_verify)
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(artifact_root),
+        ]
+    )
+
+    assert result == 2
+    assert captured == {
+        "summary": str(summary_path),
+        "artifact_root": str(artifact_root),
+    }
+    assert json.loads(capsys.readouterr().out) == {"status": "blocked"}
+
+
+def test_verify_summary_cli_accepts_explicit_confinement_root(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact_root = tmp_path / "private"
+    summary_path = artifact_root / "unit_private" / "summary.json"
+    _write_json(summary_path, {})
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(artifact_root),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert verified["checks"]["migration_artifact_root_real_directory"] is True
+    assert (
+        verified["checks"]["migration_run_directory_real_direct_child"] is True
+    )
+    assert verified["checks"]["migration_summary_regular_confined_file"] is True
+    assert "migration_summary_regular_confined_file" not in verified["failed_checks"]
+    for flag in (
+        "contacts_backend",
+        "contacts_wing",
+        "live_authority_granted",
+        "readiness_closure_allowed",
+        "readiness_matrix_update_allowed",
+        "live_write",
+    ):
+        assert verified[flag] is False
+
+
+def test_verify_summary_cli_rejects_summary_outside_explicit_root(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary_path = tmp_path / "private" / "unit_private" / "summary.json"
+    _write_json(summary_path, {})
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(tmp_path / "different-root"),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert verified["checks"]["migration_summary_regular_confined_file"] is False
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
+
+
+def test_verify_summary_cli_rejects_broad_ancestor_root(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact_root = tmp_path / "private"
+    summary_path = artifact_root / "unit_private" / "summary.json"
+    _write_json(summary_path, {})
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(tmp_path),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert (
+        verified["checks"]["migration_run_directory_real_direct_child"] is False
+    )
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
+
+
+def test_verify_summary_cli_rejects_symlink_artifact_root(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    real_root = tmp_path / "real-root"
+    summary_path = real_root / "unit_private" / "summary.json"
+    _write_json(summary_path, {})
+    linked_root = tmp_path / "linked-root"
+    linked_root.symlink_to(real_root, target_is_directory=True)
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(linked_root),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert verified["checks"]["migration_artifact_root_real_directory"] is False
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
+
+
+def test_verify_summary_cli_rejects_symlink_run_directory(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact_root = tmp_path / "private"
+    real_run = artifact_root / "real-run"
+    _write_json(real_run / "summary.json", {})
+    linked_run = artifact_root / "linked-run"
+    linked_run.symlink_to(real_run, target_is_directory=True)
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(linked_run / "summary.json"),
+            "--artifact-root",
+            str(artifact_root),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert (
+        verified["checks"]["migration_run_directory_real_direct_child"] is False
+    )
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
+
+
+def test_verify_summary_cli_rejects_symlink_summary_file(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    artifact_root = tmp_path / "private"
+    run_dir = artifact_root / "unit_private"
+    run_dir.mkdir(parents=True)
+    real_summary = tmp_path / "real-summary.json"
+    _write_json(real_summary, {})
+    summary_path = run_dir / "summary.json"
+    summary_path.symlink_to(real_summary)
+
+    result = migration.main(
+        [
+            "--verify-summary",
+            str(summary_path),
+            "--artifact-root",
+            str(artifact_root),
+        ]
+    )
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert verified["checks"]["migration_summary_regular_confined_file"] is False
+    assert verified["migration_ready"] is False
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
+
+
+def test_verify_summary_cli_default_root_rejects_private_summary(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    summary_path = tmp_path / "private" / "unit_private" / "summary.json"
+    _write_json(summary_path, {})
+
+    result = migration.main(["--verify-summary", str(summary_path)])
+    verified = json.loads(capsys.readouterr().out)
+
+    assert result == 2
+    assert verified["checks"]["migration_summary_regular_confined_file"] is False
+    assert "migration_summary_regular_confined_file" in verified["failed_checks"]
 
 
 def test_replay_verifier_rejects_writer_call_mutation(tmp_path: Path) -> None:

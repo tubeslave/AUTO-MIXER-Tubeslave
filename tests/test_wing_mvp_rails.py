@@ -1880,7 +1880,7 @@ def test_strict_pre_release_score_gate_is_state_backed_and_fail_closed():
         assert score_gate["score_ceiling_reason"] in surface
 
     assert state["truth_revision"] == (
-        "m118_m111_sealed_replay_zero_io_strict_live_88_zero_authority_20260715"
+        "m119_private_artifact_root_verifier_cli_strict_live_88_zero_authority_20260715"
     )
     assert state["full_release_truth_source"] == "strict_pre_release_review"
     assert state["full_release_requirements_source"] == (

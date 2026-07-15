@@ -1457,6 +1457,19 @@ def _merge_checks(
         destination[f"{prefix}_{name}"] = passed is True
 
 
+def _directory_chain_is_real(path: Path) -> bool:
+    """Require one existing directory path with no symlink component."""
+
+    candidate = path.absolute()
+    for component in (*reversed(candidate.parents), candidate):
+        try:
+            if component.is_symlink() or not component.is_dir():
+                return False
+        except OSError:
+            return False
+    return True
+
+
 def build_migration_artifact(
     *,
     historical_summary: str | Path,
@@ -1501,12 +1514,26 @@ def build_migration_artifact(
         or (challenge_run_id if isinstance(challenge_run_id, str) else "")
         or f"{_utc_stamp()}_{uuid.uuid4()}_m005_current_release_migration"
     )
-    root = _resolve(artifact_root).resolve()
-    run_dir = (root / effective_run_id).resolve()
+    root_path = _resolve(artifact_root).absolute()
+    if root_path.exists():
+        if not _directory_chain_is_real(root_path):
+            raise ValueError("artifact_root must be a real non-symlink directory")
+    else:
+        if not _directory_chain_is_real(root_path.parent):
+            raise ValueError("artifact_root parent must be a real directory")
+        root_path.mkdir(exist_ok=False)
+    if not _directory_chain_is_real(root_path):
+        raise ValueError("artifact_root must remain a real non-symlink directory")
+    root = root_path.resolve()
+    run_path = root / effective_run_id
+    if run_path.exists() or run_path.is_symlink():
+        raise FileExistsError(f"migration run path already exists: {run_path}")
+    run_path.mkdir(parents=False, exist_ok=False)
+    if not _directory_chain_is_real(run_path):
+        raise ValueError("migration run directory must be a real directory")
+    run_dir = run_path.resolve()
     if run_dir.parent != root:
         raise ValueError("migration run directory must remain inside artifact_root")
-    root.mkdir(parents=True, exist_ok=True)
-    run_dir.mkdir(parents=True, exist_ok=False)
     generated_at_utc = _iso_now()
     generated_at = _parse_utc_z(generated_at_utc)
     if generated_at is None:
@@ -1724,15 +1751,29 @@ def verify_migration_paths(
     artifact_root: str | Path = DEFAULT_ARTIFACT_ROOT,
 ) -> dict[str, Any]:
     checks: dict[str, bool] = {}
-    summary_file = _resolve(summary_path)
+    summary_file = _resolve(summary_path).absolute()
     resolved_summary = summary_file.resolve()
-    run_dir = resolved_summary.parent
-    artifact_root = _resolve(artifact_root).resolve()
-    try:
-        run_dir.relative_to(artifact_root)
-        run_dir_confined = True
-    except ValueError:
-        run_dir_confined = False
+    run_dir = summary_file.parent
+    artifact_root_path = _resolve(artifact_root).absolute()
+    resolved_artifact_root = artifact_root_path.resolve()
+    resolved_run_dir = run_dir.resolve()
+    artifact_root_real = _directory_chain_is_real(artifact_root_path)
+    run_dir_real = _directory_chain_is_real(run_dir)
+    run_dir_confined = (
+        artifact_root_real
+        and run_dir_real
+        and resolved_run_dir.parent == resolved_artifact_root
+    )
+    _record(
+        checks,
+        "migration_artifact_root_real_directory",
+        artifact_root_real,
+    )
+    _record(
+        checks,
+        "migration_run_directory_real_direct_child",
+        run_dir_real and resolved_run_dir.parent == resolved_artifact_root,
+    )
     _record(
         checks,
         "migration_summary_regular_confined_file",
@@ -2085,7 +2126,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             migration_run_id=args.run_id,
         )
     elif args.verify_summary:
-        result = verify_migration_paths(args.verify_summary)
+        result = verify_migration_paths(
+            args.verify_summary,
+            artifact_root=args.artifact_root,
+        )
     else:
         result = build_migration_artifact(
             historical_summary=args.historical_summary,
