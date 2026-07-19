@@ -993,3 +993,75 @@ class TestAutoSoundcheckBridge:
             assert client.commanded_state["/ch/2/flt/lcf"] == 90.0
             assert client.commanded_state["/ch/2/in/set/inv"] == 1
             assert client.commanded_state["/ch/2/in/set/dlyon"] == 0
+
+
+class TestWingClientFaderCeiling:
+    """Defence-in-depth: software fader ceiling at the transport boundary.
+
+    Upper layers cap faders at 0 dBFS, but a raw caller could previously
+    write up to the hardware maximum (+10 dB). The client now clamps writes
+    above fader_ceiling_db (default 0.0) with a warning; explicit operator
+    opt-in via constructor param or AUTOMIXER_FADER_CEILING_DB.
+    """
+
+    @staticmethod
+    def _make_client(**kwargs):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223, **kwargs)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+            return client
+
+    def test_ceiling_clamps_above_unity_by_default(self, caplog):
+        import logging
+        client = self._make_client()
+        with caplog.at_level(logging.WARNING):
+            assert client.set_channel_fader(1, 5.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 0.0
+        assert any("Fader ceiling enforced" in r.message for r in caplog.records)
+
+    def test_below_ceiling_passes_unchanged(self):
+        client = self._make_client()
+        assert client.set_channel_fader(1, -6.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == -6.0
+        assert client.set_channel_fader(1, 0.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 0.0
+
+    def test_explicit_param_ceiling_allows_above_unity(self):
+        client = self._make_client(fader_ceiling_db=10.0)
+        assert client.set_channel_fader(1, 5.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 5.0
+        # Hardware clamp still applies above +10 dB
+        assert client.set_channel_fader(1, 15.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 10.0
+
+    def test_env_var_sets_ceiling(self, monkeypatch):
+        monkeypatch.setenv("AUTOMIXER_FADER_CEILING_DB", "3.0")
+        client = self._make_client()
+        assert client.set_channel_fader(1, 5.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 3.0
+
+    def test_param_overrides_env(self, monkeypatch):
+        monkeypatch.setenv("AUTOMIXER_FADER_CEILING_DB", "3.0")
+        client = self._make_client(fader_ceiling_db=6.0)
+        assert client.set_channel_fader(1, 5.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 5.0
+
+    def test_invalid_env_falls_back_to_zero(self, monkeypatch):
+        monkeypatch.setenv("AUTOMIXER_FADER_CEILING_DB", "not-a-number")
+        client = self._make_client()
+        assert client.set_channel_fader(1, 5.0) is True
+        assert client.commanded_state.get("/ch/1/fdr") == 0.0
+
+    def test_ceiling_param_is_clamped_to_hardware_range(self):
+        client = self._make_client(fader_ceiling_db=42.0)
+        assert client._fader_ceiling_db == 10.0
