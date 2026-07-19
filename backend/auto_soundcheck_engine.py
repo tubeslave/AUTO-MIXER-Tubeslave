@@ -800,6 +800,7 @@ class AutoSoundcheckEngine:
         self._derivation_in_progress = False
         self._derivation_lock = threading.RLock()
         self._monitor_iteration_lock = threading.RLock()
+        self._monitor_consecutive_errors = 0
         self._derivation_channel_stage_coverage: Dict[int, Dict[str, str]] = {}
         self._derivation_readiness_residuals: List[Dict[str, Any]] = []
         self._derivation_captured_at_epoch: Optional[float] = None
@@ -8623,8 +8624,19 @@ class AutoSoundcheckEngine:
                     self._evaluate_pending_actions()
                     self._run_autofoh_monitor_analysis()
 
-            except Exception as e:
-                logger.debug(f"Monitor loop error: {e}")
+            except Exception:
+                self._monitor_consecutive_errors += 1
+                logger.exception(
+                    "Monitor loop error (%s consecutive)",
+                    self._monitor_consecutive_errors,
+                )
+                if self._monitor_consecutive_errors == 10:
+                    logger.critical(
+                        "Monitor loop failing persistently: feedback monitoring "
+                        "degraded, operator attention required"
+                    )
+            else:
+                self._monitor_consecutive_errors = 0
 
             time.sleep(0.1)
 
@@ -8784,33 +8796,63 @@ class AutoSoundcheckEngine:
                 if decision and (decision.sent or getattr(decision, "blocked", False)):
                     self._record_feedback_action_sent(ch)
             except Exception:
-                pass
-        elif event.action == "fader_reduce":
-            if not (
-                self._control_allowed(info, "emergency_fader")
-                or self._control_allowed(info, "fader")
-            ):
-                self._log_processing_skip(ch, info, "feedback fader reduction")
-                return
-            try:
-                current = info.fader_db
-                new_fader = max(-144.0, current - 3.0)
-                decision = self._execute_action(
-                    ChannelFaderMove(
-                        channel_id=ch,
-                        target_db=new_fader,
-                        is_lead=info.source_role == "lead_vocal",
-                        reason="Emergency feedback fader reduction",
-                    ),
-                    runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
+                logger.exception(
+                    "FEEDBACK Ch %s: emergency notch failed at %.0fHz; "
+                    "attempting bounded fader fallback",
+                    ch,
+                    event.frequency_hz,
                 )
-                if decision and decision.sent:
-                    actual_fader = getattr(decision.action, "target_db", new_fader)
-                    info.fader_db = actual_fader
-                    self._record_feedback_action_sent(ch)
-                    logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {actual_fader:.1f}dB")
-            except Exception:
-                pass
+                self._apply_feedback_fader_fallback(
+                    ch,
+                    info,
+                    reason="Emergency feedback fader fallback after notch failure",
+                )
+        elif event.action == "fader_reduce":
+            self._apply_feedback_fader_fallback(
+                ch,
+                info,
+                reason="Emergency feedback fader reduction",
+            )
+
+    def _apply_feedback_fader_fallback(
+        self, ch: int, info: ChannelInfo, reason: str
+    ) -> bool:
+        """Bounded emergency fader reduction (-3 dB, floor -144 dB).
+
+        Canonical fail-safe for feedback events: when in doubt, reduce.
+        Returns True when a fader move was confirmed sent.
+        """
+        if not (
+            self._control_allowed(info, "emergency_fader")
+            or self._control_allowed(info, "fader")
+        ):
+            self._log_processing_skip(ch, info, "feedback fader reduction")
+            return False
+        try:
+            current = info.fader_db
+            new_fader = max(-144.0, current - 3.0)
+            decision = self._execute_action(
+                ChannelFaderMove(
+                    channel_id=ch,
+                    target_db=new_fader,
+                    is_lead=info.source_role == "lead_vocal",
+                    reason=reason,
+                ),
+                runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
+            )
+            if decision and decision.sent:
+                actual_fader = getattr(decision.action, "target_db", new_fader)
+                info.fader_db = actual_fader
+                self._record_feedback_action_sent(ch)
+                logger.warning(f"FEEDBACK: Ch {ch} fader reduced to {actual_fader:.1f}dB")
+                return True
+        except Exception:
+            logger.exception(
+                "FEEDBACK Ch %s: emergency fader reduction failed; channel "
+                "remains live with unsuppressed feedback — operator must pull it down",
+                ch,
+            )
+        return False
 
     def _apply_direct_feedback_emergency_notch(
         self,
