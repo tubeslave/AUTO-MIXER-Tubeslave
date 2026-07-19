@@ -108,6 +108,8 @@ Docs/                    — PDF документация WING, техничес
 - ScenarioDetector — кэшировать экземпляр, НЕ создавать на каждый аудиоблок
 - server.py — координатор. Логика в handlers/. НЕ добавлять новые маршруты в server.py напрямую
 - ML classifier — использовать полноценный из backend/ml/channel_classifier.py (25 классов), НЕ заглушку
+- Fader ceiling — потолок enforced на транспортной границе: `WingClient` клампит записи фейдера выше `fader_ceiling_db` (default 0.0 dBFS) с warning; опт-ин оператора через `AUTOMIXER_FADER_CEILING_DB`. Upper layers больше не единственная защита (defence-in-depth, ADR p1-fader-ceiling-defence-in-depth)
+- Feedback live monitor — always-on детекция feedback вне саундчека: `backend/feedback_live_monitor.py`, конфиг `feedback_live:` в automixer.yaml, только детекция + алерты оператору, без записей в пульт (ADR c3-always-on-feedback-detection)
 
 ### DSP стандарты
 - LUFS: ITU-R BS.1770-4, double gating (absolute -70 LUFS + relative -10 LU)
