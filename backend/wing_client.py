@@ -4,6 +4,7 @@ from pythonosc.osc_message import OscMessage
 import socket
 import threading
 import logging
+import os
 import time
 from typing import Callable, Dict, Any, Optional
 
@@ -16,16 +17,30 @@ logger = logging.getLogger(__name__)
 class WingClient(MixerClientBase):
     """OSC client for Behringer Wing mixer - uses correct Wing OSC address format"""
     
-    def __init__(self, ip: str = "192.168.1.102", port: int = 2223):
+    def __init__(self, ip: str = "192.168.1.102", port: int = 2223, *, fader_ceiling_db: Optional[float] = None):
         """
         Initialize Wing client
-        
+
         Args:
             ip: Wing mixer IP address
             port: Wing OSC port (default 2223)
+            fader_ceiling_db: software fader ceiling in dB (default 0.0).
+                Resolution order: this argument, then the
+                AUTOMIXER_FADER_CEILING_DB env var, then 0.0. Writes above
+                the ceiling are clamped with a warning; the hardware range
+                (-144..+10 dB) still applies after the ceiling.
         """
         self.ip = ip
         self.port = port
+
+        if fader_ceiling_db is None:
+            try:
+                fader_ceiling_db = float(os.getenv("AUTOMIXER_FADER_CEILING_DB", "") or 0.0)
+            except ValueError:
+                fader_ceiling_db = 0.0
+        # Defence-in-depth: fader > 0 dBFS requires an explicit operator-level
+        # opt-in, even if an upper layer fails to clamp (CLAUDE.md rule).
+        self._fader_ceiling_db = max(-144.0, min(10.0, float(fader_ceiling_db)))
         
         self.sock = None
         self.receiver_thread = None
@@ -720,11 +735,15 @@ class WingClient(MixerClientBase):
     def set_channel_fader(self, channel: int, value: float):
         """
         Set channel fader value.
-        
+
         According to Wing Remote Protocols v3.0.5 documentation:
         /ch/{ch}/fdr accepts dB values in range -144..10
-        
+
         This method accepts dB values directly and sends them to the mixer.
+        Values above the software fader ceiling (self._fader_ceiling_db,
+        default 0.0 dBFS) are clamped with a warning — defence-in-depth so
+        no programmatic caller can raise a live channel above unity without
+        an explicit operator-level opt-in (AUTOMIXER_FADER_CEILING_DB).
         """
         address = f"/ch/{channel}/fdr"
         # Wing expects dB values directly (-144..10)
@@ -734,7 +753,14 @@ class WingClient(MixerClientBase):
             db_value = -144.0
         elif db_value > 10.0:
             db_value = 10.0
-        
+        if db_value > self._fader_ceiling_db:
+            logger.warning(
+                f"Fader ceiling enforced: /ch/{channel}/fdr requested "
+                f"{db_value:.2f} dB > ceiling {self._fader_ceiling_db:.2f} dB; "
+                f"clamping (operator opt-in: AUTOMIXER_FADER_CEILING_DB)"
+            )
+            db_value = self._fader_ceiling_db
+
         logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
         return self.send(address, db_value)
 
