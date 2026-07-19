@@ -70,6 +70,23 @@ safety:
   true_peak_limit: -1.0
   max_notch_filters: 8
   max_notch_depth_db: -12.0
+# Always-on feedback detection + operator alerts (no console writes;
+# see Docs/adr/c3-always-on-feedback-detection.md)
+feedback_live:
+  enabled: true
+  signal_threshold_db: -50.0
+  poll_interval_sec: 0.1
+  idle_interval_sec: 1.0
+  fft_size: 2048
+  persistence_frames: 12
+  min_confidence: 0.75
+  peak_height_db: -12.0
+  peak_prominence_db: 10.0
+  alert_freq_bucket_hz: 50.0
+  alert_min_interval_sec: 5.0
+  max_alerts_per_minute: 30
+  exclude_channels: []
+  auto_apply: false  # reserved; detection + alert only in v1
 autofoh:
   classifier:
     name_overrides:

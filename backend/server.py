@@ -85,6 +85,7 @@ from audio_capture import (
     LIVE_CAPTURE_MAX_CHANNELS, validate_live_capture_dimensions,
 )
 from feedback_detector import FeedbackDetector, FeedbackDetectorConfig
+from feedback_live_monitor import FeedbackLiveMonitor, FeedbackLiveMonitorConfig
 from auto_soundcheck_engine import AutoSoundcheckEngine
 from observation_mixer import ObservationMixerClient
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
@@ -975,6 +976,9 @@ class AutoMixerServer:
 
         # Feedback detector
         self.feedback_detector: Optional[FeedbackDetector] = None
+
+        # Always-on feedback detection + operator alerts (owns its detector)
+        self.feedback_live_monitor: Optional[FeedbackLiveMonitor] = None
 
         # Auto soundcheck engine (headless auto-mixing)
         self.auto_soundcheck_engine: Optional[AutoSoundcheckEngine] = None
@@ -11528,6 +11532,9 @@ class AutoMixerServer:
             else:
                 self.auto_compressor_controller = None
 
+        # Stop feedback live monitor before tearing down audio capture
+        self._stop_feedback_live_monitor()
+
         # Stop audio capture
         if self.audio_capture:
             capture = self.audio_capture
@@ -11834,14 +11841,14 @@ class AutoMixerServer:
                 yml = yaml.safe_load(f)
             if not isinstance(yml, dict):
                 return config
-            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety", "training", "muq_eval"):
+            for key in ("ai", "agent", "audio", "mixer", "websocket", "safety", "training", "muq_eval", "feedback_live"):
                 if key not in yml or not isinstance(yml[key], dict):
                     continue
                 if key not in config or not isinstance(config[key], dict):
                     config[key] = {}
                 config[key].update(yml[key])
             logger.info(
-                "Merged settings from %s (ai/agent/audio/mixer/websocket/safety/training/muq_eval)",
+                "Merged settings from %s (ai/agent/audio/mixer/websocket/safety/training/muq_eval/feedback_live)",
                 yaml_path,
             )
         except Exception as e:
@@ -12286,6 +12293,51 @@ class AutoMixerServer:
             if client in self.connected_clients:
                 self.connected_clients.discard(client)
                 logger.info("Removed disconnected client from broadcast list. Total clients: %s", len(self.connected_clients))
+
+    def _start_feedback_live_monitor(self) -> None:
+        """Start the always-on feedback detection + alert service.
+
+        Detection + operator alerting only; the service performs no console
+        writes (Docs/adr/c3-always-on-feedback-detection.md).
+        """
+        if self.feedback_live_monitor is not None:
+            return
+        try:
+            section = self.config.get("feedback_live", {})
+            if not isinstance(section, dict):
+                section = {}
+            monitor_config = FeedbackLiveMonitorConfig.from_dict(section)
+            if not monitor_config.enabled:
+                logger.info("Feedback live monitor disabled by config (feedback_live.enabled=false)")
+                return
+            loop = asyncio.get_running_loop()
+
+            def _alert_sink(message: Dict[str, Any]) -> None:
+                loop.call_soon_threadsafe(
+                    lambda: asyncio.create_task(self.broadcast(message))
+                )
+
+            self.feedback_live_monitor = FeedbackLiveMonitor(
+                audio_capture_provider=lambda: self.audio_capture,
+                config=monitor_config,
+                alert_sink=_alert_sink,
+            )
+            self.feedback_live_monitor.start()
+        except Exception as e:
+            logger.error(f"Feedback live monitor failed to start: {e}")
+            self.feedback_live_monitor = None
+
+    def _stop_feedback_live_monitor(self) -> None:
+        monitor = self.feedback_live_monitor
+        if monitor is None:
+            return
+        try:
+            monitor.stop()
+            logger.info("Feedback live monitor stopped")
+        except Exception as e:
+            logger.error(f"Error stopping feedback live monitor: {e}")
+        finally:
+            self.feedback_live_monitor = None
 
     def _rebind_controller_mixer_clients(self, client):
         """Point long-lived controllers at the active mixer client."""
@@ -29241,6 +29293,9 @@ class AutoMixerServer:
 
             if self.agent_training_service:
                 await self.agent_training_service.start_scheduler()
+
+            # Always-on feedback detection + operator alerts (read-only)
+            self._start_feedback_live_monitor()
 
             # Wait for shutdown signal
             await self._shutdown_event.wait()
