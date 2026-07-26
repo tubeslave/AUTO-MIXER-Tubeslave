@@ -74,16 +74,17 @@ extracted_text.txt
 output.txt
 models/training_datasets/
 artifacts/runs/
-.claude/
+# .claude: локальное (settings.local.json, worktrees) игнорируем,
+# общие конфиги проекта (hooks, commands, agents, evals) — в git
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/commands/
+!.claude/agents/
+!.claude/evals/
 GitHub/
 backend/models/
 frontend/dist/
 frontend/node_modules/
 backend/venv/
-backend/models/
-frontend/dist/
-frontend/node_modules/
-backend/venv/
-.claude/
-GitHub/
 sessions/test_*.json
