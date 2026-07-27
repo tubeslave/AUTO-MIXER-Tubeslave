@@ -1,6 +1,6 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-15T06:03:06Z
+Last heartbeat UTC: 2026-07-27T08:53:31Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
@@ -12,6 +12,21 @@ Writer lease: none at the committed validation boundary. The bounded M119
 implementation lease is released before validation and commit. CP05 is dynamically
 checked against the current non-marker Git tree and must pass before any
 hardware attempt.
+
+## System Inspector iteration 001 — 2026-07-27
+
+Phase 0 offline replay is implemented with a fail-closed read-only boundary,
+versioned macOS/WING/Dante/baseline fixtures, normalized topology,
+evidence-backed findings, visible unknowns and deterministic CLI/JSON output.
+No WING, Dante, network or audio-capture contact occurred and no authority was
+granted. Focused validation passed 26 tests; the broad suite passed
+7284 tests with the one current-tree CP05 test explicitly deselected. The
+unmodified suite's only failure is the pre-existing tracked-tree dirt in
+`frontend/package.json` and `reports/loop_soundcheck_pipeline.jsonl`.
+
+The existing M001 external WING checkpoint remains unchanged. Next Inspector
+work is offline fixture/schema expansion, then the macOS collector behind its
+manual first-live-collection checkpoint.
 
 ## M120 accepted route and teardown repair — 2026-07-15
 

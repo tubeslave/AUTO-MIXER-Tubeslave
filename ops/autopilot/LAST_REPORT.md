@@ -1,5 +1,20 @@
 # Autopilot Last Report
 
+## System Inspector iteration 001 — 2026-07-27
+
+- Implemented the Phase 0 Snapshot Replay vertical without hardware, network,
+  Dante Controller or live audio contact.
+- Added the isolated read-only model, bounded snapshot/profile loaders,
+  imported Dante provider, route detectors, coverage-aware readiness and
+  deterministic CLI/JSON reporting.
+- Focused Inspector and write-boundary validation passed 26 tests. The broad
+  suite passed 7284 tests with one CP05 current-tree test deselected.
+- The unmodified suite's only failure is
+  `m110_cp05_tracked_tree_not_clean`, caused by the pre-existing tracked changes
+  in `frontend/package.json` and `reports/loop_soundcheck_pipeline.jsonl`.
+- No live authority or readiness claim changed. The full report is
+  `.paperclip/reports/inspector-iteration-001.md`.
+
 ## M120 accepted route and teardown repair — 2026-07-15
 
 - Latest heartbeat: 2026-07-15T06:03:06Z.

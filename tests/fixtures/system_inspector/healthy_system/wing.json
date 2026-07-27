@@ -1,0 +1,90 @@
+{
+  "schema_version": "automixer.inspector.wing.v1",
+  "captured_at": "2026-07-27T08:00:00Z",
+  "collector": "simulator",
+  "device": {
+    "id": "wing-rack-console",
+    "display_name": "WING Rack",
+    "vendor": "Behringer",
+    "model": "WING Rack",
+    "firmware": "fixture-fw",
+    "sample_rate": 48000,
+    "protocol": "OSC snapshot",
+    "availability": "ONLINE",
+    "last_seen": "2026-07-27T08:00:00Z",
+    "source": "wing_simulator",
+    "confidence": 1.0,
+    "capabilities": ["patch_snapshot", "channel_snapshot"]
+  },
+  "clock": {"source": "DANTE", "status": "SYNCED", "confidence": 1.0},
+  "console_inputs": [
+    {
+      "id": "wing-input-17",
+      "display_name": "Playback L",
+      "console_device_id": "wing-rack-console",
+      "console_channel": "CH17",
+      "source_endpoint_id": "wing-rx-17",
+      "main_assignments": ["MAIN-L", "MAIN-R"],
+      "buses": [],
+      "stereo_linked_to": "CH18",
+      "availability": "ONLINE",
+      "source": "wing_simulator",
+      "confidence": 1.0,
+      "capabilities": ["patch", "main_assignment"]
+    },
+    {
+      "id": "wing-input-18",
+      "display_name": "Playback R",
+      "console_device_id": "wing-rack-console",
+      "console_channel": "CH18",
+      "source_endpoint_id": "wing-rx-18",
+      "main_assignments": ["MAIN-L", "MAIN-R"],
+      "buses": [],
+      "stereo_linked_to": "CH17",
+      "availability": "ONLINE",
+      "source": "wing_simulator",
+      "confidence": 1.0,
+      "capabilities": ["patch", "main_assignment"]
+    },
+    {
+      "id": "wing-input-19",
+      "display_name": "Bass",
+      "console_device_id": "wing-rack-console",
+      "console_channel": "CH19",
+      "source_endpoint_id": "wing-rx-19",
+      "main_assignments": ["MAIN-L", "MAIN-R"],
+      "buses": [],
+      "availability": "ONLINE",
+      "source": "wing_simulator",
+      "confidence": 1.0,
+      "capabilities": ["patch", "main_assignment"]
+    },
+    {
+      "id": "wing-input-20",
+      "display_name": "Click",
+      "console_device_id": "wing-rack-console",
+      "console_channel": "CH20",
+      "source_endpoint_id": "wing-rx-20",
+      "main_assignments": [],
+      "buses": ["MONITOR"],
+      "availability": "ONLINE",
+      "source": "wing_simulator",
+      "confidence": 1.0,
+      "capabilities": ["patch", "main_assignment", "bus_assignment"]
+    },
+    {
+      "id": "wing-input-21",
+      "display_name": "Cues",
+      "console_device_id": "wing-rack-console",
+      "console_channel": "CH21",
+      "source_endpoint_id": "wing-rx-21",
+      "main_assignments": [],
+      "buses": ["MONITOR"],
+      "availability": "ONLINE",
+      "source": "wing_simulator",
+      "confidence": 1.0,
+      "capabilities": ["patch", "main_assignment", "bus_assignment"]
+    }
+  ]
+}
+

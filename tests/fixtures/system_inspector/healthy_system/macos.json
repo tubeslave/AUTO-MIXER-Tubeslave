@@ -1,0 +1,82 @@
+{
+  "schema_version": "automixer.inspector.macos.v1",
+  "captured_at": "2026-07-27T08:00:00Z",
+  "collector": "simulator",
+  "computer": {
+    "id": "playback-mac",
+    "display_name": "Playback MacBook",
+    "vendor": "Apple",
+    "model": "MacBook",
+    "protocol": "local_snapshot",
+    "availability": "ONLINE",
+    "last_seen": "2026-07-27T08:00:00Z",
+    "source": "macos_simulator",
+    "confidence": 1.0,
+    "capabilities": ["network_snapshot", "coreaudio_snapshot"]
+  },
+  "network_interfaces": [
+    {
+      "id": "macos-if-en0",
+      "display_name": "Wi-Fi",
+      "bsd_name": "en0",
+      "friendly_name": "Wi-Fi",
+      "protocol": "wifi",
+      "availability": "ONLINE",
+      "last_seen": "2026-07-27T08:00:00Z",
+      "source": "macos_simulator",
+      "confidence": 1.0,
+      "capabilities": ["ipv4", "default_route"],
+      "mac_address": "02:00:00:00:00:01",
+      "ipv4": ["203.0.113.10"],
+      "ipv6": [],
+      "subnets": ["203.0.113.0/24"],
+      "link_status": "UP",
+      "speed_mbps": null,
+      "service_order": 1,
+      "default_route": true,
+      "roles": ["control", "internet"]
+    },
+    {
+      "id": "macos-if-en10",
+      "display_name": "USB Ethernet",
+      "bsd_name": "en10",
+      "friendly_name": "USB Ethernet",
+      "protocol": "ethernet",
+      "availability": "ONLINE",
+      "last_seen": "2026-07-27T08:00:00Z",
+      "source": "macos_simulator",
+      "confidence": 1.0,
+      "capabilities": ["ipv4", "wired"],
+      "mac_address": "02:00:00:00:00:10",
+      "ipv4": ["198.51.100.10"],
+      "ipv6": [],
+      "subnets": ["198.51.100.0/24"],
+      "link_status": "UP",
+      "speed_mbps": 1000,
+      "service_order": 2,
+      "default_route": false,
+      "roles": ["dante"]
+    }
+  ],
+  "default_routes": [{"interface": "en0", "gateway": "203.0.113.1"}],
+  "dns": ["203.0.113.53"],
+  "processes": [
+    {"name": "Ableton Live", "running": true},
+    {"name": "Dante Virtual Soundcard", "running": true}
+  ],
+  "coreaudio_devices": [
+    {
+      "id": "coreaudio-dvs",
+      "name": "Dante Virtual Soundcard",
+      "sample_rate": 48000,
+      "selected_for_playback": true,
+      "confidence": 1.0
+    }
+  ],
+  "network_health": {
+    "status": "STABLE",
+    "measurement": "simulated_snapshot_only",
+    "confidence": 1.0
+  }
+}
+

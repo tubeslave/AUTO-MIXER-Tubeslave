@@ -10,7 +10,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-07-15T06:03:06Z",
+  "last_heartbeat_utc": "2026-07-27T08:53:31Z",
   "current_writer_lease": null,
   "current_head_validation": {
     "head": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
@@ -1672,5 +1672,20 @@
     "live_authority_granted": false,
     "readiness_closure_allowed": false,
     "readiness_matrix_update_allowed": false
+  },
+  "system_inspector_iteration_001": {
+    "recorded_at_utc": "2026-07-27T08:53:31Z",
+    "scope": "phase_0_offline_snapshot_replay",
+    "status": "implemented_with_external_current_tree_gate_unchanged",
+    "hardware_contacted": false,
+    "network_scanning_performed": false,
+    "live_audio_captured": false,
+    "live_writes": false,
+    "authority_granted": false,
+    "focused_validation": "26 passed",
+    "broad_validation": "7284 passed, 3 skipped, 1 deselected",
+    "standard_suite": "1 failed, 6761 passed, 3 skipped",
+    "standard_suite_blocker": "m110_cp05_tracked_tree_not_clean from pre-existing frontend/package.json and reports/loop_soundcheck_pipeline.jsonl changes",
+    "report": ".paperclip/reports/inspector-iteration-001.md"
   }
 }

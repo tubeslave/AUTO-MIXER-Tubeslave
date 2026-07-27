@@ -1,0 +1,53 @@
+profile:
+  name: "Хулиганы — fixture healthy system"
+  sample_rate: 48000
+devices:
+  required:
+    - id: wing-rack-console
+      type: console
+      name: "WING Rack"
+    - id: playback-mac
+      type: computer
+      name: "Playback MacBook"
+    - id: wing-dante-card
+      type: dante_interface
+      name: "WING Dante"
+roles:
+  playback_l:
+    expected_source: playback-l-tx
+    expected_destination: wing-rx-17
+    expected_console_channel: CH17
+  playback_r:
+    expected_source: playback-r-tx
+    expected_destination: wing-rx-18
+    expected_console_channel: CH18
+  bass:
+    expected_source: bass-tx
+    expected_destination: wing-rx-19
+    expected_console_channel: CH19
+  click:
+    expected_source: click-tx
+    expected_destination: wing-rx-20
+    expected_console_channel: CH20
+    forbidden_destinations: [MAIN-L, MAIN-R]
+  cues:
+    expected_source: cues-tx
+    expected_destination: wing-rx-21
+    expected_console_channel: CH21
+    forbidden_destinations: [MAIN-L, MAIN-R]
+network:
+  dante:
+    expected_interface: en10
+    require_wired: true
+    allowed_subnets: [198.51.100.0/24]
+  control:
+    expected_interface: en0
+safety:
+  forbidden_routes:
+    - source_role: click
+      destination_role: main
+    - source_role: cues
+      destination_role: main
+  maximum_main_fader_db: 0
+  minimum_headroom_db: 12
+

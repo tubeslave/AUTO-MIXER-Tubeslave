@@ -1,0 +1,66 @@
+{
+  "schema_version": "automixer.inspector.dante-import.v1",
+  "captured_at": "2026-07-27T08:00:00Z",
+  "provider": "DanteSnapshotFileProvider",
+  "evidence_level": "SUBSCRIPTION_PRESENT",
+  "devices": [
+    {
+      "id": "dvs-playback",
+      "display_name": "Playback DVS",
+      "vendor": "Audinate",
+      "model": "Dante Virtual Soundcard",
+      "kind": "dante_interface",
+      "protocol": "Dante imported snapshot",
+      "availability": "ONLINE",
+      "last_seen": "2026-07-27T08:00:00Z",
+      "source": "dante_fixture_import",
+      "confidence": 0.9,
+      "capabilities": ["transmit_channels"]
+    },
+    {
+      "id": "wing-dante-card",
+      "display_name": "WING Dante",
+      "vendor": "Behringer",
+      "model": "WING-DANTE",
+      "kind": "dante_interface",
+      "protocol": "Dante imported snapshot",
+      "availability": "ONLINE",
+      "last_seen": "2026-07-27T08:00:00Z",
+      "source": "dante_fixture_import",
+      "confidence": 0.9,
+      "capabilities": ["receive_channels"]
+    }
+  ],
+  "endpoints": [
+    {"id": "playback-l-tx", "display_name": "Playback-L", "device_id": "dvs-playback", "direction": "TX", "channel_name": "Playback-L", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["transmit"]},
+    {"id": "playback-r-tx", "display_name": "Playback-R", "device_id": "dvs-playback", "direction": "TX", "channel_name": "Playback-R", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["transmit"]},
+    {"id": "bass-tx", "display_name": "Bass", "device_id": "dvs-playback", "direction": "TX", "channel_name": "Bass", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["transmit"]},
+    {"id": "click-tx", "display_name": "Click", "device_id": "dvs-playback", "direction": "TX", "channel_name": "Click", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["transmit"]},
+    {"id": "cues-tx", "display_name": "Cues", "device_id": "dvs-playback", "direction": "TX", "channel_name": "Cues", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["transmit"]},
+    {"id": "wing-rx-17", "display_name": "WING Rx 17", "device_id": "wing-dante-card", "direction": "RX", "channel_name": "Dante-RX-17", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["receive"]},
+    {"id": "wing-rx-18", "display_name": "WING Rx 18", "device_id": "wing-dante-card", "direction": "RX", "channel_name": "Dante-RX-18", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["receive"]},
+    {"id": "wing-rx-19", "display_name": "WING Rx 19", "device_id": "wing-dante-card", "direction": "RX", "channel_name": "Dante-RX-19", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["receive"]},
+    {"id": "wing-rx-20", "display_name": "WING Rx 20", "device_id": "wing-dante-card", "direction": "RX", "channel_name": "Dante-RX-20", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["receive"]},
+    {"id": "wing-rx-21", "display_name": "WING Rx 21", "device_id": "wing-dante-card", "direction": "RX", "channel_name": "Dante-RX-21", "sample_rate": 48000, "protocol": "Dante", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["receive"]}
+  ],
+  "subscriptions": [
+    {"id": "sub-playback-l", "role": "playback_l", "source_endpoint_id": "playback-l-tx", "destination_endpoint_id": "wing-rx-17", "status": "PRESENT", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["imported_subscription"]},
+    {"id": "sub-playback-r", "role": "playback_r", "source_endpoint_id": "playback-r-tx", "destination_endpoint_id": "wing-rx-18", "status": "PRESENT", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["imported_subscription"]},
+    {"id": "sub-bass", "role": "bass", "source_endpoint_id": "bass-tx", "destination_endpoint_id": "wing-rx-19", "status": "PRESENT", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["imported_subscription"]},
+    {"id": "sub-click", "role": "click", "source_endpoint_id": "click-tx", "destination_endpoint_id": "wing-rx-20", "status": "PRESENT", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["imported_subscription"]},
+    {"id": "sub-cues", "role": "cues", "source_endpoint_id": "cues-tx", "destination_endpoint_id": "wing-rx-21", "status": "PRESENT", "availability": "ONLINE", "source": "dante_fixture_import", "confidence": 0.9, "capabilities": ["imported_subscription"]}
+  ],
+  "clock": {
+    "status": "IMPORTED",
+    "sample_rate": 48000,
+    "master_device_id": "wing-dante-card",
+    "confidence": 0.8,
+    "limitation": "Imported state is not a live clock-sync proof."
+  },
+  "health": {
+    "status": "UNKNOWN",
+    "confidence": 0.0,
+    "limitation": "No live Dante health API or audio-flow evidence used."
+  }
+}
+
