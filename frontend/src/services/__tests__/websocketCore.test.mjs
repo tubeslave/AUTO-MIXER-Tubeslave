@@ -113,6 +113,59 @@ test('disconnect() disables scheduled reconnect after close', async () => {
   assert.equal(FakeWebSocket.instances.length, 1);
 });
 
+test('connect() after disconnect() dials a fresh socket with reconnect re-enabled (StrictMode double mount)', async () => {
+  const transport = createTransport();
+
+  // Mount #1: dial starts, socket stays CONNECTING
+  const firstConnect = transport.connect();
+  // StrictMode cleanup: disconnect while still CONNECTING
+  transport.disconnect();
+  // Mount #2: must create a brand-new socket, not reuse the aborted dial
+  const secondConnect = transport.connect();
+
+  assert.notEqual(secondConnect, firstConnect);
+  assert.equal(FakeWebSocket.instances.length, 2);
+  assert.equal(transport.shouldReconnect, true);
+
+  // The aborted dial settles (rejects) instead of hanging forever
+  await assert.rejects(firstConnect);
+
+  const secondSocket = FakeWebSocket.instances[1];
+  secondSocket.open();
+  await secondConnect;
+
+  assert.equal(transport.ws, secondSocket);
+  assert.equal(transport.connectPromise, null);
+
+  transport.send({ type: 'ping' });
+  assert.deepEqual(secondSocket.sentMessages, ['{"type":"ping"}']);
+});
+
+test('a stale socket close event does not clobber a newer socket', async () => {
+  const transport = createTransport();
+
+  const firstConnect = transport.connect();
+  firstConnect.catch(() => {});
+  const staleSocket = FakeWebSocket.instances[0];
+  transport.disconnect();
+
+  const secondConnect = transport.connect();
+  const liveSocket = FakeWebSocket.instances[1];
+  liveSocket.open();
+  await secondConnect;
+
+  // Old socket emits a late close (a real WebSocket closes asynchronously)
+  staleSocket.readyState = FakeWebSocket.CLOSED;
+  staleSocket.onclose();
+
+  assert.equal(transport.ws, liveSocket);
+  transport.send({ type: 'ping' });
+  assert.deepEqual(liveSocket.sentMessages, ['{"type":"ping"}']);
+
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.equal(FakeWebSocket.instances.length, 2);
+});
+
 test('send() serializes messages when socket is open', async () => {
   const transport = createTransport();
   const connectPromise = transport.connect();

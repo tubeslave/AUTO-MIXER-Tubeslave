@@ -7,6 +7,8 @@ function PhaseAlignmentTab({ selectedChannels, availableChannels, selectedDevice
   const [running, setRunning] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [measurements, setMeasurements] = useState({});
+  const [corrections, setCorrections] = useState({});
+  const [busy, setBusy] = useState(null); // 'apply' | 'reset' | null
   const [referenceChannel, setReferenceChannel] = useState(selectedChannels?.[0] || 1);
   const [showSettings, setShowSettings] = useState(false);
   const [settings, setSettings] = useState({
@@ -14,15 +16,41 @@ function PhaseAlignmentTab({ selectedChannels, availableChannels, selectedDevice
   });
 
   useEffect(() => {
-    const handle = (data) => {
-      if (data.running !== undefined || data.active !== undefined) setRunning(data.running ?? data.active);
+    const handleStatus = (data) => {
+      if (data.active !== undefined) setRunning(Boolean(data.active));
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
+      if (data.corrections) setCorrections(data.corrections);
+    };
+    // Измерения приходят отдельным типом phase_alignment_measurements
+    const handleMeasurements = (data) => {
       if (data.measurements) setMeasurements(data.measurements);
     };
-    websocketService.on('phase_alignment_status', handle);
+    const handleApplyResult = (data) => {
+      setBusy(null);
+      if (data.corrections) setCorrections(data.corrections);
+      setStatusMessage(data.success
+        ? (data.message || 'Коррекции применены')
+        : `Ошибка: ${data.error || data.message || 'не удалось применить коррекции'}`);
+    };
+    const handleResetResult = (data) => {
+      setBusy(null);
+      if (data.success) setCorrections({});
+      setStatusMessage(data.success
+        ? (data.message || 'Phase/Delay сброшен')
+        : `Ошибка: ${data.error || 'не удалось сбросить Phase/Delay'}`);
+    };
+    websocketService.on('phase_alignment_status', handleStatus);
+    websocketService.on('phase_alignment_measurements', handleMeasurements);
+    websocketService.on('phase_alignment_apply_result', handleApplyResult);
+    websocketService.on('phase_alignment_reset_result', handleResetResult);
     websocketService.getPhaseAlignmentStatus();
-    return () => websocketService.off('phase_alignment_status', handle);
+    return () => {
+      websocketService.off('phase_alignment_status', handleStatus);
+      websocketService.off('phase_alignment_measurements', handleMeasurements);
+      websocketService.off('phase_alignment_apply_result', handleApplyResult);
+      websocketService.off('phase_alignment_reset_result', handleResetResult);
+    };
   }, []);
 
   const handleStart = () => {
@@ -30,10 +58,19 @@ function PhaseAlignmentTab({ selectedChannels, availableChannels, selectedDevice
     websocketService.startPhaseAlignment(selectedDevice, referenceChannel, selectedChannels);
   };
   const handleStop = () => websocketService.stopPhaseAlignment();
-  const handleApply = () => websocketService.applyPhaseCorrections(measurements);
+  const handleApply = () => {
+    setBusy('apply');
+    websocketService.applyPhaseCorrections(measurements);
+  };
   const handleReset = () => {
+    setBusy('reset');
     websocketService.resetPhaseDelay(selectedChannels);
-    setStatusMessage('Phase/Delay сброшен');
+  };
+
+  // Ключ измерения — пара "(ref_ch, ch)"; канал коррекции — второй номер
+  const parsePairChannel = (pairKey) => {
+    const match = /\((\d+),\s*(\d+)\)/.exec(pairKey);
+    return match ? parseInt(match[2]) : parseInt(pairKey);
   };
 
   const channels = selectedChannels || [];
@@ -50,12 +87,12 @@ function PhaseAlignmentTab({ selectedChannels, availableChannels, selectedDevice
             {running ? 'Стоп' : 'Анализ'}
           </button>
           <button className="btn-sm" onClick={handleApply}
-            disabled={Object.keys(measurements).length === 0}>
-            Применить
+            disabled={busy !== null || Object.keys(measurements).length === 0}>
+            {busy === 'apply' ? 'Применение…' : 'Применить'}
           </button>
           <button className="btn-sm" onClick={handleReset}
-            disabled={!channels.length}>
-            Сброс
+            disabled={busy !== null || !channels.length}>
+            {busy === 'reset' ? 'Сброс…' : 'Сброс'}
           </button>
           <div className="ref-select">
             <label>Ref:</label>
@@ -97,18 +134,29 @@ function PhaseAlignmentTab({ selectedChannels, availableChannels, selectedDevice
           )}
         </div>
 
+        {Object.keys(corrections).length > 0 && (
+          <div className="module-status">
+            Применённые коррекции: {Object.entries(corrections).map(([ch, c]) =>
+              `Ch ${ch}: ${(c?.delay_ms ?? 0).toFixed(1)} ms${c?.phase_invert ? ', инверсия' : ''}`).join('; ')}
+          </div>
+        )}
+
         {Object.keys(measurements).length > 0 && (
           <table className="data-table">
             <thead><tr><th>Канал</th><th>Delay</th><th>Phase</th><th>Coherence</th></tr></thead>
             <tbody>
-              {Object.entries(measurements).map(([chId, m]) => {
-                const name = availableChannels?.find(c => c.id === parseInt(chId))?.name || `Ch ${chId}`;
+              {Object.entries(measurements).map(([pairKey, m]) => {
+                const chNum = parsePairChannel(pairKey);
+                const name = availableChannels?.find(c => c.id === chNum)?.name
+                  || `Ch ${Number.isNaN(chNum) ? pairKey : chNum}`;
+                const delayMs = m?.optimal_delay_ms ?? m?.delay_gcc_ms;
+                const invert = m?.phase_invert === 1;
                 return (
-                  <tr key={chId}>
+                  <tr key={pairKey}>
                     <td>{name}</td>
-                    <td>{m.delay_ms?.toFixed(2) || '--'} ms</td>
-                    <td className={m.invert_phase ? 'phase-inv' : ''}>{m.invert_phase ? '⟳ Invert' : '✓ OK'}</td>
-                    <td>{m.coherence?.toFixed(2) || '--'}</td>
+                    <td>{delayMs?.toFixed(2) ?? '--'} ms</td>
+                    <td className={invert ? 'phase-inv' : ''}>{invert ? '⟳ Invert' : '✓ OK'}</td>
+                    <td>{m?.coherence?.toFixed(2) ?? '--'}</td>
                   </tr>
                 );
               })}

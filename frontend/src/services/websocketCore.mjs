@@ -69,11 +69,19 @@ export class BaseWebSocketTransport {
   }
 
   connect() {
-    if (this.ws && this.ws.readyState === this.WebSocketImpl.OPEN) {
+    // Re-enable reconnect FIRST: a connect() after disconnect() must always
+    // yield a live connection attempt (React StrictMode mounts twice in dev).
+    this.shouldReconnect = true;
+
+    if (this.ws && this.ws.readyState === this.WebSocketImpl?.OPEN) {
       return Promise.resolve();
     }
 
-    if (this.connectPromise) {
+    // Reuse the pending promise only if its socket is still alive (CONNECTING).
+    // After disconnect() this.ws is null, so a stale promise is discarded and
+    // a fresh socket is dialed instead.
+    if (this.connectPromise && this.ws &&
+        this.ws.readyState === this.WebSocketImpl.CONNECTING) {
       return this.connectPromise;
     }
 
@@ -81,15 +89,16 @@ export class BaseWebSocketTransport {
       return Promise.reject(new Error('WebSocket API is not available'));
     }
 
-    this.shouldReconnect = true;
     this.connectPromise = new Promise((resolve, reject) => {
       let settled = false;
 
       try {
-        this.ws = new this.WebSocketImpl(this.url);
+        const socket = new this.WebSocketImpl(this.url);
+        this.ws = socket;
 
-        this.ws.onopen = () => {
+        socket.onopen = () => {
           console.log('WebSocket connected');
+          if (this.ws !== socket) return;
           if (this.reconnectTimer) {
             clearTimeout(this.reconnectTimer);
             this.reconnectTimer = null;
@@ -99,7 +108,8 @@ export class BaseWebSocketTransport {
           resolve();
         };
 
-        this.ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
+          if (this.ws !== socket) return;
           try {
             const data = JSON.parse(event.data);
             console.log('WebSocket message received:', data.type, data);
@@ -109,17 +119,25 @@ export class BaseWebSocketTransport {
           }
         };
 
-        this.ws.onerror = (error) => {
+        socket.onerror = (error) => {
           console.error('WebSocket error:', error);
           if (!settled) {
-            this.connectPromise = null;
             settled = true;
+            if (this.ws === socket) {
+              this.connectPromise = null;
+            }
             reject(error);
           }
         };
 
-        this.ws.onclose = () => {
+        socket.onclose = () => {
           console.log('WebSocket disconnected');
+          if (!settled) {
+            settled = true;
+            reject(new Error('WebSocket closed before connection was established'));
+          }
+          // A stale socket's close must not clobber a newer socket.
+          if (this.ws !== socket) return;
           this.ws = null;
           this.connectPromise = null;
           this.notifyListeners('disconnected', {});
@@ -160,6 +178,9 @@ export class BaseWebSocketTransport {
       this.ws.close();
       this.ws = null;
     }
+    // Drop any pending connect promise so the next connect() dials fresh
+    // (the aborted socket's onclose settles the old promise by rejection).
+    this.connectPromise = null;
   }
 
   send(message) {

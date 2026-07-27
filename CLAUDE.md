@@ -68,6 +68,10 @@ Docs/                    — PDF документация WING, техничес
 - WING EQ bands — существующая полоса может быть feedback-notch/ручной полосой, а не “band 2 = low-mid”. При EQ-коррекции проверять частотное совпадение или перестраивать полосу, и включать `eq/on`, чтобы оператор слышал результат.
 - Master-reference Dante channels — каналы, заведённые как master/reference feed, не являются обычными source channels и должны исключаться из source gain/EQ/FX correction.
 - Compressor makeup — при сжатии компенсировать потерянный уровень через bounded `dyn/gain`, ориентируясь на GR и true-peak headroom; не использовать makeup как обход headroom, feedback или bleed safety.
+- OSC throttle — НЕ дропать молча троттлированные записи: очередь trailing-edge (последнее значение побеждает) + flush по таймеру. Сеттеры клиентов ОБЯЗАНЫ возвращать bool из send()/_send_raw — `sent=True` на потерянном пакете даёт ложные rollback_not_applied.
+- AudioCapture silence fallback — если InputStream не открылся, capture молча деградирует в генератор тишины. Проверять `capture.silence_fallback` после start(); саундчек на тишине обязан завершаться ERROR, а не успехом.
+- AutoFOH per-step клампы (±1 dB/шаг) + однократный вызов `_apply_fader`/`_apply_eq` физически не достигают вычисленной цели. В SNAPSHOT_LOCK использовать `_execute_action_stepped` (bounded-шаги до цели, rate-limit exempt), потолки и total-cap сохраняются.
+- device_id из фронтенда — это PyAudio-индекс; движок матчит устройства по имени (sounddevice). Резолвить индекс→имя через `audio_devices.get_device_by_id` до передачи в engine. `channel_mapping` (console→capture) обязателен при WING USB/Dante-тапах — см. ChannelMappedCapture.
 - Ayaic gain staging/balance — при offline сведении, саундчеках и live-режимах
   использовать Ayaic Mix Monolith уровни как дефолтные плоскости для отдельных
   источников и для стемов/групп одновременно. Не балансировать только

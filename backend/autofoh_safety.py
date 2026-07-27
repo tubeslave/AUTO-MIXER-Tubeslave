@@ -457,7 +457,11 @@ class AutoFOHSafetyController:
         decision.action = bounded_action
         decision.bounded = bounded
 
-        if runtime_state != RuntimeState.ROLLBACK and self._is_rate_limited(bounded_action):
+        # ROLLBACK must never wait; SNAPSHOT_LOCK is the initial soundcheck
+        # apply pass, where bounded steps may repeat quickly to converge on
+        # the computed target (per-step and total caps still apply)
+        rate_limit_exempt = runtime_state in (RuntimeState.ROLLBACK, RuntimeState.SNAPSHOT_LOCK)
+        if not rate_limit_exempt and self._is_rate_limited(bounded_action):
             decision.allowed = False
             decision.rate_limited = True
             decision.message = "rate limited"

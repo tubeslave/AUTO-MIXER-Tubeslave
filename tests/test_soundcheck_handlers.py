@@ -136,3 +136,101 @@ async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
 
     assert {"type": "auto_engine_state", "state": "running", "message": "Engine started"} in server.broadcast_messages
     assert {"type": "auto_engine_channel", "channel": 3, "data": {"preset": "kick"}} in server.broadcast_messages
+
+
+@pytest.mark.asyncio
+async def test_start_auto_soundcheck_resolves_device_id_and_passes_mapping(monkeypatch):
+    server = DummyServer()
+    handlers = register_handlers(server)
+    created = {}
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+            self.state = type("State", (), {"value": "idle"})()
+
+        def start_async(self):
+            self.started = True
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+    import audio_devices
+    monkeypatch.setattr(
+        audio_devices, "get_device_by_id",
+        lambda device_id: {"id": device_id, "name": "Dante Virtual Soundcard"}
+        if device_id == "3" else None,
+    )
+
+    await handlers["start_auto_soundcheck"]("ws", {
+        "device_id": "3",
+        "channels": [1, 2],
+        "channel_mapping": {"1": 25, "2": 26},
+        "observe_only": True,
+    })
+
+    assert created["audio_device_name"] == "Dante Virtual Soundcard"
+    assert created["channel_mapping"] == {1: 25, 2: 26}
+
+
+@pytest.mark.asyncio
+async def test_start_per_channel_soundcheck_forces_mode(monkeypatch):
+    server = DummyServer()
+    handlers = register_handlers(server)
+    created = {}
+
+    class FakeEngine:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+            self.state = type("State", (), {"value": "idle"})()
+
+        def start_async(self):
+            self.started = True
+
+    monkeypatch.setattr("handlers.soundcheck_handlers.AutoSoundcheckEngine", FakeEngine)
+
+    await handlers["start_per_channel_soundcheck"]("ws", {
+        "channels": [1, 2],
+        "observe_only": True,
+    })
+
+    assert created["mode"] == "per_channel"
+    _, payload = server.sent_messages[-1]
+    assert payload["mode"] == "per_channel"
+
+
+@pytest.mark.asyncio
+async def test_soundcheck_channel_commands_reach_engine():
+    server = DummyServer()
+    handlers = register_handlers(server)
+    commands = []
+
+    class FakeEngine:
+        def per_channel_command(self, command):
+            commands.append(command)
+            return True
+
+        def get_status(self):
+            return {"current_channel": 2, "channel_index": 2, "channel_total": 4}
+
+    server.auto_soundcheck_engine = FakeEngine()
+
+    await handlers["soundcheck_next_channel"]("ws", {})
+    await handlers["soundcheck_skip_channel"]("ws", {})
+    await handlers["soundcheck_repeat_channel"]("ws", {})
+
+    assert commands == ["next", "skip", "repeat"]
+    _, payload = server.sent_messages[-1]
+    assert payload["type"] == "soundcheck_channel_command_result"
+    assert payload["accepted"] is True
+    assert payload["current_channel"] == 2
+
+
+@pytest.mark.asyncio
+async def test_soundcheck_channel_command_without_engine_reports_error():
+    server = DummyServer()
+    handlers = register_handlers(server)
+
+    await handlers["soundcheck_next_channel"]("ws", {})
+
+    _, payload = server.sent_messages[-1]
+    assert payload["accepted"] is False
+    assert "error" in payload

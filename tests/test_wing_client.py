@@ -55,8 +55,8 @@ class TestOSCThrottle:
             assert client._osc_throttle_enabled is True
             assert client._osc_throttle_hz == 5.0
 
-    def test_osc_throttle_blocks_rapid_sends(self):
-        """Rapid sends to the same address should be throttled."""
+    def test_osc_throttle_queues_rapid_sends(self):
+        """Rapid sends to the same address are queued, not dropped."""
         with patch.dict("sys.modules", {
             "pythonosc": MagicMock(),
             "pythonosc.udp_client": MagicMock(),
@@ -71,14 +71,71 @@ class TestOSCThrottle:
             client.sock = MagicMock()
             client.set_osc_throttle(enabled=True, hz=10.0)
 
-            # First send should succeed
             result1 = client.send("/ch/1/fdr", 0.5)
-            # Immediate second send to same address should be throttled
+            # Immediate second send is queued as trailing edge, reported success
             result2 = client.send("/ch/1/fdr", 0.6)
 
-            assert result1 is not False or result1 is None  # First send goes through
-            # Second send is likely throttled (returns False)
-            # Note: exact behavior depends on timing, but we test the mechanism
+            assert result1 is True
+            assert result2 is True
+            assert client._osc_pending_sends.get("/ch/1/fdr") == (0.6,)
+            client.disconnect()
+
+    def test_osc_throttle_trailing_edge_flushes_last_value(self):
+        """The latest throttled value must reach the socket after the window."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client.set_osc_throttle(enabled=True, hz=20.0)  # 50 ms window
+
+            client.send("/ch/1/fdr", -10.0)
+            client.send("/ch/1/fdr", -8.0)
+            client.send("/ch/1/fdr", -6.0)  # latest value wins
+
+            # Only the first send hits the socket immediately
+            assert client.sock.sendto.call_count == 1
+
+            deadline = time.time() + 1.0
+            while client.sock.sendto.call_count < 2 and time.time() < deadline:
+                time.sleep(0.01)
+
+            assert client.sock.sendto.call_count == 2
+            assert client.state["/ch/1/fdr"] == -6.0
+            assert client._osc_pending_sends == {}
+            client.disconnect()
+
+    def test_disconnect_cancels_pending_flush(self):
+        """disconnect() must cancel queued trailing-edge sends."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            sock = client.sock
+            client.set_osc_throttle(enabled=True, hz=20.0)
+
+            client.send("/ch/1/fdr", -10.0)
+            client.send("/ch/1/fdr", -6.0)
+            client.disconnect()
+            time.sleep(0.1)
+
+            assert sock.sendto.call_count == 1
+            assert client._osc_pending_sends == {}
 
     def test_osc_throttle_allows_queries(self):
         """Queries (sends without values) should not be throttled."""
@@ -347,6 +404,48 @@ class TestConnectionLifecycle:
 
             result = client.send("/ch/1/fdr", 0.5)
             assert result is False
+
+    def test_setters_report_failure_when_disconnected(self):
+        """Setters must propagate send() failure instead of returning None."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = False
+
+            assert client.set_channel_fader(1, -6.0) is False
+            assert client.set_fader(1, -6.0) is False
+            assert client.set_eq_band(1, 2, freq=1000.0, gain=-3.0, q=2.0) is False
+            assert client.set_main_fader(1, -3.0) is False
+            assert client.set_bus_fader(1, -3.0) is False
+            assert client.set_dca_fader(1, -3.0) is False
+
+    def test_main_fader_clamped_to_hardware_range(self):
+        """set_main_fader must clamp to the WING -144..10 dB range."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+
+            assert client.set_main_fader(1, 99.0) is True
+            assert client.state["/main/1/fdr"] == 10.0
+            assert client.set_main_fader(1, -500.0) is True
+            assert client.state["/main/1/fdr"] == -144.0
 
     def test_send_updates_local_state(self):
         """Sending a value should update the local state cache."""

@@ -40,6 +40,11 @@ class WingClient(MixerClientBase):
         self._osc_throttle_enabled = True
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
+        # Trailing-edge flush: latest throttled value per address is queued
+        # and sent when the throttle window elapses (latest value wins)
+        self._osc_pending_sends: Dict[str, tuple] = {}
+        self._osc_flush_timers: Dict[str, threading.Timer] = {}
+        self._osc_throttle_lock = threading.Lock()
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
@@ -199,6 +204,12 @@ class WingClient(MixerClientBase):
         """Disconnect from Wing"""
         self._stop_receiver = True
         self.is_connected = False
+        with self._osc_throttle_lock:
+            timers = list(self._osc_flush_timers.values())
+            self._osc_flush_timers.clear()
+            self._osc_pending_sends.clear()
+        for timer in timers:
+            timer.cancel()
         if self.sock:
             try:
                 self.sock.close()
@@ -283,7 +294,34 @@ class WingClient(MixerClientBase):
         self._osc_throttle_enabled = enabled
         self._osc_throttle_hz = hz
         logger.info(f"OSC throttle: {'enabled' if enabled else 'disabled'}, {hz} Hz")
-    
+
+    def _queue_trailing_send(self, address: str, values: tuple, delay: float):
+        """Queue the latest throttled value; a timer flushes it after the window."""
+        with self._osc_throttle_lock:
+            self._osc_pending_sends[address] = values
+            if address in self._osc_flush_timers:
+                return
+            timer = threading.Timer(max(delay, 0.001), self._flush_pending_send, args=(address,))
+            timer.daemon = True
+            self._osc_flush_timers[address] = timer
+            timer.start()
+
+    def _flush_pending_send(self, address: str):
+        with self._osc_throttle_lock:
+            self._osc_flush_timers.pop(address, None)
+            values = self._osc_pending_sends.pop(address, None)
+        if values is None:
+            return
+        self.send(address, *values)
+
+    def _cancel_pending_send(self, address: str):
+        with self._osc_throttle_lock:
+            self._osc_pending_sends.pop(address, None)
+            timer = self._osc_flush_timers.pop(address, None)
+        if timer is not None:
+            timer.cancel()
+
+
     def send(self, address: str, *values):
         """
         Send OSC message to Wing
@@ -309,10 +347,11 @@ class WingClient(MixerClientBase):
             if address in self._osc_last_send_time:
                 time_since_last = current_time - self._osc_last_send_time[address]
                 if time_since_last < min_interval:
-                    # Skip this command - too soon
-                    logger.debug(f"OSC throttle: skipping {address} (last sent {time_since_last*1000:.1f}ms ago, min {min_interval*1000:.1f}ms)")
-                    return False
-            
+                    # Too soon: queue as trailing edge instead of dropping
+                    logger.debug(f"OSC throttle: queueing {address} (last sent {time_since_last*1000:.1f}ms ago, min {min_interval*1000:.1f}ms)")
+                    self._queue_trailing_send(address, values, min_interval - time_since_last)
+                    return True
+
             self._osc_last_send_time[address] = current_time
             
         try:
@@ -328,6 +367,8 @@ class WingClient(MixerClientBase):
                     self.state[address] = values[0]
                 else:
                     self.state[address] = values
+                # A direct send supersedes any queued trailing value
+                self._cancel_pending_send(address)
             return True
         except OSError as e:
             # Socket error - mark as disconnected
@@ -509,7 +550,7 @@ class WingClient(MixerClientBase):
             db_value = 10.0
         
         logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
-        self.send(address, db_value)
+        return self.send(address, db_value)
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -546,21 +587,22 @@ class WingClient(MixerClientBase):
     
     def set_channel_phase_invert(self, channel: int, value: int):
         """Set channel phase invert (0=normal, 1=inverted)"""
-        self.send(f"/ch/{channel}/in/set/inv", value)
+        return self.send(f"/ch/{channel}/in/set/inv", value)
     
     def set_channel_delay(self, channel: int, value: float, mode: str = "MS"):
         """
         Set channel input delay
-        
+
         Args:
             channel: Channel number (1-40)
             value: Delay value (depends on mode)
-            mode: Delay mode - "M" (meters 0..150), "FT" (feet 0.5..500), 
+            mode: Delay mode - "M" (meters 0..150), "FT" (feet 0.5..500),
                   "MS" (milliseconds 0.5..500), "SMP" (samples 16..500)
         """
-        self.send(f"/ch/{channel}/in/set/dlymode", mode)
-        self.send(f"/ch/{channel}/in/set/dly", value)
-        self.send(f"/ch/{channel}/in/set/dlyon", 1)
+        ok = self.send(f"/ch/{channel}/in/set/dlymode", mode)
+        ok = self.send(f"/ch/{channel}/in/set/dly", value) and ok
+        ok = self.send(f"/ch/{channel}/in/set/dlyon", 1) and ok
+        return ok
 
     def get_channel_pan(self, channel: int) -> Optional[float]:
         """Get channel pan"""
@@ -570,7 +612,7 @@ class WingClient(MixerClientBase):
     def set_channel_pan(self, channel: int, value: float):
         """Set channel pan (-100=left, 0=center, 100=right)"""
         address = f"/ch/{channel}/pan"
-        self.send(address, value)
+        return self.send(address, value)
     
     # ========== EQ Methods ==========
     
@@ -661,7 +703,7 @@ class WingClient(MixerClientBase):
     
     def set_compressor_gain(self, channel: int, gain: float):
         """Set compressor make-up gain (dB, range: -6..12)"""
-        self.send(f"/ch/{channel}/dyn/gain", gain)
+        return self.send(f"/ch/{channel}/dyn/gain", gain)
     
     def get_compressor_gain(self, channel: int) -> Optional[float]:
         """Get compressor make-up gain"""
@@ -787,11 +829,12 @@ class WingClient(MixerClientBase):
             frequency: Frequency in Hz (20..2000)
             slope: Slope "6", "12", "18", or "24"
         """
-        self.send(f"/ch/{channel}/flt/lc", enabled)
+        ok = self.send(f"/ch/{channel}/flt/lc", enabled)
         if frequency is not None:
-            self.send(f"/ch/{channel}/flt/lcf", frequency)
+            ok = self.send(f"/ch/{channel}/flt/lcf", frequency) and ok
         if slope is not None:
-            self.send(f"/ch/{channel}/flt/lcs", slope)
+            ok = self.send(f"/ch/{channel}/flt/lcs", slope) and ok
+        return ok
     
     def set_high_cut(self, channel: int, enabled: int, frequency: float = None, slope: str = None):
         """
@@ -847,12 +890,14 @@ class WingClient(MixerClientBase):
         """
         if band < 1 or band > 4:
             raise ValueError("Band must be 1-4")
+        ok = True
         if freq is not None:
-            self.send(f"/ch/{channel}/eq/{band}f", freq)
+            ok = self.send(f"/ch/{channel}/eq/{band}f", freq) and ok
         if gain is not None:
-            self.send(f"/ch/{channel}/eq/{band}g", gain)
+            ok = self.send(f"/ch/{channel}/eq/{band}g", gain) and ok
         if q is not None:
-            self.send(f"/ch/{channel}/eq/{band}q", q)
+            ok = self.send(f"/ch/{channel}/eq/{band}q", q) and ok
+        return ok
     
     def set_eq_high_shelf(self, channel: int, gain: float = None, freq: float = None, q: float = None, eq_type: str = None):
         """Set EQ high shelf parameters"""
@@ -897,8 +942,9 @@ class WingClient(MixerClientBase):
             auto: Auto switch (0/1)
         """
         base = f"/ch/{channel}/dyn"
+        ok = True
         if enabled is not None:
-            self.send(f"{base}/on", 1 if enabled else 0)
+            ok = self.send(f"{base}/on", 1 if enabled else 0) and ok
             time.sleep(0.01)
         if threshold is None:
             threshold = threshold_db
@@ -912,38 +958,39 @@ class WingClient(MixerClientBase):
             ratio = f"{float(ratio):.1f}"
         # Small delay between OSC commands to ensure mixer processes them
         if threshold is not None:
-            self.send(f"{base}/thr26", threshold)
+            ok = self.send(f"{base}/thr26", threshold) and ok
             time.sleep(0.01)
         if ratio is not None:
-            self.send(f"{base}/ratio", ratio)
+            ok = self.send(f"{base}/ratio", ratio) and ok
             time.sleep(0.01)
         if knee is not None:
-            self.send(f"{base}/knee", knee)
+            ok = self.send(f"{base}/knee", knee) and ok
             time.sleep(0.01)
         if attack is not None:
-            self.send(f"{base}/att", attack)
+            ok = self.send(f"{base}/att", attack) and ok
             time.sleep(0.01)
         if hold is not None:
-            self.send(f"{base}/hld", hold)
+            ok = self.send(f"{base}/hld", hold) and ok
             time.sleep(0.01)
         if release is not None:
-            self.send(f"{base}/rel", release)
+            ok = self.send(f"{base}/rel", release) and ok
             time.sleep(0.01)
         if gain is not None:
-            self.send(f"{base}/gain", gain)
+            ok = self.send(f"{base}/gain", gain) and ok
             time.sleep(0.01)
         if mix is not None:
-            self.send(f"{base}/mix", mix)
+            ok = self.send(f"{base}/mix", mix) and ok
             time.sleep(0.01)
         if det is not None:
-            self.send(f"{base}/det", det)
+            ok = self.send(f"{base}/det", det) and ok
             time.sleep(0.01)
         if env is not None:
-            self.send(f"{base}/env", env)
+            ok = self.send(f"{base}/env", env) and ok
             time.sleep(0.01)
         if auto is not None:
-            self.send(f"{base}/auto", auto)
+            ok = self.send(f"{base}/auto", auto) and ok
             time.sleep(0.01)
+        return ok
     
     def set_compressor_model(self, channel: int, model: str):
         """Set compressor model: COMP, EXP, B160, B560, D241, ECL33, 9000C, SBUS, 
@@ -952,7 +999,7 @@ class WingClient(MixerClientBase):
 
     def set_gate_on(self, channel: int, on: int):
         """Enable/disable gate"""
-        self.send(f"/ch/{channel}/gate/on", on)
+        return self.send(f"/ch/{channel}/gate/on", on)
 
     def set_gate(self, channel: int, threshold: float = None, range_db: float = None, 
                  attack: float = None, hold: float = None, release: float = None,
@@ -971,20 +1018,22 @@ class WingClient(MixerClientBase):
             ratio: Ratio string: "1:1.5", "1:2", "1:3", "1:4", "GATE"
         """
         base = f"/ch/{channel}/gate"
+        ok = True
         if threshold is not None:
-            self.send(f"{base}/thr", threshold)
+            ok = self.send(f"{base}/thr", threshold) and ok
         if range_db is not None:
-            self.send(f"{base}/range", range_db)
+            ok = self.send(f"{base}/range", range_db) and ok
         if attack is not None:
-            self.send(f"{base}/att", attack)
+            ok = self.send(f"{base}/att", attack) and ok
         if hold is not None:
-            self.send(f"{base}/hld", hold)
+            ok = self.send(f"{base}/hld", hold) and ok
         if release is not None:
-            self.send(f"{base}/rel", release)
+            ok = self.send(f"{base}/rel", release) and ok
         if accent is not None:
-            self.send(f"{base}/acc", accent)
+            ok = self.send(f"{base}/acc", accent) and ok
         if ratio is not None:
-            self.send(f"{base}/ratio", ratio)
+            ok = self.send(f"{base}/ratio", ratio) and ok
+        return ok
     
     def set_gate_model(self, channel: int, model: str):
         """Set gate model: GATE, DUCK, E88, 9000G, D241, DS902, WAVE, DEQ, WARM, 76LA, LA, RIDE, PSE, CMB"""
@@ -1001,8 +1050,9 @@ class WingClient(MixerClientBase):
         return self.state.get(address)
 
     def set_main_fader(self, main: int, value: float):
-        """Set main fader value"""
-        self.send(f"/main/{main}/fdr", value)
+        """Set main fader value (dB, -144..10)"""
+        db_value = max(-144.0, min(10.0, float(value)))
+        return self.send(f"/main/{main}/fdr", db_value)
 
     def get_dca_fader(self, dca: int) -> Optional[float]:
         """Get DCA fader value"""
@@ -1016,7 +1066,7 @@ class WingClient(MixerClientBase):
     def set_dca_fader(self, dca: int, value: float):
         """Set DCA fader value"""
         db_value = max(-144.0, min(10.0, float(value)))
-        self.send(f"/dca/{dca}/fdr", db_value)
+        return self.send(f"/dca/{dca}/fdr", db_value)
 
     def set_dca_level(self, dca: int, value: float):
         """Compatibility wrapper for safety actions controlling DCA level."""
@@ -1031,7 +1081,7 @@ class WingClient(MixerClientBase):
     def set_bus_fader(self, bus: int, value: float):
         """Set bus fader value (dB, -144..10)"""
         db_value = max(-144.0, min(10.0, float(value)))
-        self.send(f"/bus/{bus}/fdr", db_value)
+        return self.send(f"/bus/{bus}/fdr", db_value)
 
     def get_bus_fader(self, bus: int) -> Optional[float]:
         """Get bus fader value."""
@@ -1076,12 +1126,14 @@ class WingClient(MixerClientBase):
         """Set bus EQ band (1-8) parameters"""
         if band < 1 or band > 8:
             raise ValueError("Bus EQ band must be 1-8")
+        ok = True
         if freq is not None:
-            self.send(f"/bus/{bus}/eq/{band}f", freq)
+            ok = self.send(f"/bus/{bus}/eq/{band}f", freq) and ok
         if gain is not None:
-            self.send(f"/bus/{bus}/eq/{band}g", gain)
+            ok = self.send(f"/bus/{bus}/eq/{band}g", gain) and ok
         if q is not None:
-            self.send(f"/bus/{bus}/eq/{band}q", q)
+            ok = self.send(f"/bus/{bus}/eq/{band}q", q) and ok
+        return ok
 
     def set_bus_compressor(
         self,
@@ -1095,29 +1147,31 @@ class WingClient(MixerClientBase):
     ):
         """Set bus dynamics parameters with WING bus threshold address."""
         base = f"/bus/{bus}/dyn"
+        ok = True
         if enabled is not None:
-            self.send(f"{base}/on", 1 if enabled else 0)
+            ok = self.send(f"{base}/on", 1 if enabled else 0) and ok
             time.sleep(0.01)
         if threshold_db is not None:
-            self.send(f"{base}/thr37", threshold_db)
+            ok = self.send(f"{base}/thr37", threshold_db) and ok
             time.sleep(0.01)
         if ratio is not None:
             ratio_value = f"{float(ratio):.1f}" if isinstance(ratio, (int, float)) else str(ratio)
-            self.send(f"{base}/ratio", ratio_value)
+            ok = self.send(f"{base}/ratio", ratio_value) and ok
             time.sleep(0.01)
         if attack_ms is not None:
-            self.send(f"{base}/att", attack_ms)
+            ok = self.send(f"{base}/att", attack_ms) and ok
             time.sleep(0.01)
         if release_ms is not None:
-            self.send(f"{base}/rel", release_ms)
+            ok = self.send(f"{base}/rel", release_ms) and ok
             time.sleep(0.01)
         if makeup_db is not None:
-            self.send(f"{base}/gain", makeup_db)
+            ok = self.send(f"{base}/gain", makeup_db) and ok
             time.sleep(0.01)
+        return ok
 
     def set_bus_compressor_gain(self, bus: int, gain: float):
         """Set bus compressor make-up gain."""
-        self.send(f"/bus/{bus}/dyn/gain", gain)
+        return self.send(f"/bus/{bus}/dyn/gain", gain)
     
     # ========== Main Methods ==========
     
@@ -1341,14 +1395,16 @@ class WingClient(MixerClientBase):
             pan: Send pan (-100..100)
         """
         base = f"/ch/{channel}/send/{send}"
+        ok = True
         if level is not None:
-            self.send(f"{base}/lvl", level)
+            ok = self.send(f"{base}/lvl", level) and ok
         if on is not None:
-            self.send(f"{base}/on", on)
+            ok = self.send(f"{base}/on", on) and ok
         if mode is not None:
-            self.send(f"{base}/mode", mode)
+            ok = self.send(f"{base}/mode", mode) and ok
         if pan is not None:
-            self.send(f"{base}/pan", pan)
+            ok = self.send(f"{base}/pan", pan) and ok
+        return ok
     
     def set_channel_main_send(self, channel: int, main: int, level: float = None, on: int = None, pre: int = None):
         """
@@ -1855,7 +1911,7 @@ class WingClient(MixerClientBase):
 
     # ── MixerClientBase ABC bridge methods ──────────────────────
     def set_fader(self, channel: int, value_db: float):
-        self.set_channel_fader(channel, value_db)
+        return self.set_channel_fader(channel, value_db)
 
     def get_fader(self, channel: int) -> float:
         address = f"/ch/{channel}/fdr"
@@ -1870,16 +1926,16 @@ class WingClient(MixerClientBase):
         return bool(val) if val is not None else False
 
     def set_gain(self, channel: int, value_db: float):
-        self.set_channel_gain(channel, value_db)
+        return self.set_channel_gain(channel, value_db)
 
     def set_hpf(self, channel: int, freq: float, enabled: bool = True):
-        self.set_low_cut(channel, enabled=1 if enabled else 0, frequency=freq)
+        return self.set_low_cut(channel, enabled=1 if enabled else 0, frequency=freq)
 
     def set_pan(self, channel: int, pan: float):
-        self.set_channel_pan(channel, pan)
+        return self.set_channel_pan(channel, pan)
 
     def set_polarity(self, channel: int, inverted: bool):
-        self.set_channel_phase_invert(channel, 1 if inverted else 0)
+        return self.set_channel_phase_invert(channel, 1 if inverted else 0)
 
     def get_polarity(self, channel: int) -> bool:
         address = f"/ch/{channel}/in/set/inv"
@@ -1890,9 +1946,8 @@ class WingClient(MixerClientBase):
 
     def set_delay(self, channel: int, delay_ms: float, enabled: bool = True):
         if enabled:
-            self.set_channel_delay(channel, delay_ms, mode="MS")
-        else:
-            self.send(f"/ch/{channel}/in/set/dlyon", 0)
+            return self.set_channel_delay(channel, delay_ms, mode="MS")
+        return self.send(f"/ch/{channel}/in/set/dlyon", 0)
 
     def get_delay(self, channel: int) -> float:
         address = f"/ch/{channel}/in/set/dly"
@@ -1903,7 +1958,7 @@ class WingClient(MixerClientBase):
         return float(value) if value is not None else 0.0
 
     def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
-        self.set_channel_send(channel, send_bus, level=level_db)
+        return self.set_channel_send(channel, send_bus, level=level_db)
 
     def reset_channel_eq(self, channel: int):
         self.set_eq_on(channel, 0)

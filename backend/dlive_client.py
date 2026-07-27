@@ -342,15 +342,17 @@ class DLiveClient(MixerClientBase):
 
     # ── Send raw bytes (thread-safe) ───────────────────────────
 
-    def _send_raw(self, data: bytes):
+    def _send_raw(self, data: bytes) -> bool:
         with self._lock:
             if not self.is_connected or not self._sock:
-                return
+                return False
             try:
                 self._sock.sendall(data)
+                return True
             except Exception as e:
                 logger.error(f"dLive send error: {e}")
                 self.is_connected = False
+                return False
 
     # ── Receiver loop ──────────────────────────────────────────
 
@@ -485,7 +487,7 @@ class DLiveClient(MixerClientBase):
     def send(self, address: str, *args):
         """Generic send — for dLive we accept raw bytes in args[0]."""
         if args and isinstance(args[0], (bytes, bytearray)):
-            self._send_raw(args[0])
+            return self._send_raw(args[0])
 
     def subscribe(self, address: str, callback: Callable):
         self.callbacks.setdefault(address, []).append(callback)
@@ -502,7 +504,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel(channel_type)
         fader_val = db_to_fader_value(value_db)
         msg = build_nrpn(midi_ch, 0x00, channel - 1, fader_val)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     def get_fader(self, channel: int) -> float:
         key = f"fader/{channel}"
@@ -518,7 +520,7 @@ class DLiveClient(MixerClientBase):
         note = channel - 1
         velocity = 0x7F if muted else 0x3F
         msg = build_note_on(midi_ch, note, velocity) + build_note_on(midi_ch, note, 0x00)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     def get_mute(self, channel: int) -> bool:
         key = f"note/{self._midi_channel()}/{channel - 1}"
@@ -531,7 +533,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel("input")
         gain_val = db_to_gain_value(value_db)
         msg = build_pitchbend(midi_ch, gain_val)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Phantom 48V (SysEx) ────────────────────────────────────
 
@@ -564,7 +566,7 @@ class DLiveClient(MixerClientBase):
         msgs += build_nrpn(midi_ch, params["freq"], ch_idx, freq_to_nrpn(freq))
         msgs += build_nrpn(midi_ch, params["gain"], ch_idx, db_to_eq_gain(gain))
         msgs += build_nrpn(midi_ch, params["q"], ch_idx, q_to_nrpn(q))
-        self._send_raw(msgs)
+        return self._send_raw(msgs)
 
     # ── HPF (NRPN) ─────────────────────────────────────────────
 
@@ -574,7 +576,7 @@ class DLiveClient(MixerClientBase):
         msgs = build_nrpn(midi_ch, HPF_FREQ_MSB, ch_idx, freq_to_nrpn(freq))
         on_val = FADER_MAX if enabled else 0
         msgs += build_nrpn(midi_ch, HPF_ON_MSB, ch_idx, on_val)
-        self._send_raw(msgs)
+        return self._send_raw(msgs)
 
     # ── Scene Recall (Program Change) ──────────────────────────
 
@@ -584,7 +586,7 @@ class DLiveClient(MixerClientBase):
         bank = scene_number // 128
         program = scene_number % 128
         msg = build_program_change(midi_ch, 0, bank, program)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Channel Name (SysEx) ───────────────────────────────────
 
@@ -631,7 +633,7 @@ class DLiveClient(MixerClientBase):
         """Set pan position. pan: -100 (L) .. 0 (C) .. +100 (R)."""
         midi_ch = self._midi_channel(channel_type)
         msg = build_nrpn(midi_ch, PAN_MSB, channel - 1, pan_to_nrpn(pan))
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Polarity / Phase Invert (NRPN) ────────────────────────
 
@@ -640,7 +642,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel("input")
         val = FADER_MAX if inverted else 0
         msg = build_nrpn(midi_ch, POLARITY_MSB, channel - 1, val)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Input Delay (NRPN) ────────────────────────────────────
 
@@ -651,7 +653,7 @@ class DLiveClient(MixerClientBase):
                           ms_to_delay_nrpn(delay_ms))
         on_val = FADER_MAX if enabled else 0
         msgs += build_nrpn(midi_ch, DELAY_ON_MSB, channel - 1, on_val)
-        self._send_raw(msgs)
+        return self._send_raw(msgs)
 
     # ── Compressor / Dynamics (NRPN) ──────────────────────────
 
@@ -680,17 +682,18 @@ class DLiveClient(MixerClientBase):
                            comp_time_to_nrpn(release_ms, 2000.0))
         msgs += build_nrpn(midi_ch, COMP_MAKEUP_MSB, ch_idx,
                            db_to_eq_gain(max(-15.0, min(15.0, makeup_db))))
-        self._send_raw(msgs)
+        result = self._send_raw(msgs)
         logger.debug(
             f"Ch {channel}: comp thr={threshold_db:.0f}dB ratio={ratio:.1f}:1 "
             f"atk={attack_ms:.0f}ms rel={release_ms:.0f}ms makeup={makeup_db:.1f}dB"
         )
+        return result
 
     def set_compressor_on(self, channel: int, enabled: bool):
         midi_ch = self._midi_channel("input")
         msg = build_nrpn(midi_ch, COMP_ON_MSB, channel - 1,
                          FADER_MAX if enabled else 0)
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Gate (NRPN) ───────────────────────────────────────────
 
@@ -702,7 +705,7 @@ class DLiveClient(MixerClientBase):
                           FADER_MAX if enabled else 0)
         msgs += build_nrpn(midi_ch, GATE_THRESHOLD_MSB, ch_idx,
                            comp_threshold_to_nrpn(threshold_db))
-        self._send_raw(msgs)
+        return self._send_raw(msgs)
 
     # ── FX / Aux Sends (NRPN) ────────────────────────────────
 
@@ -716,7 +719,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel(channel_type)
         msb = FX_SEND_BASE_MSB + (send_bus - 1)
         msg = build_nrpn(midi_ch, msb, channel - 1, db_to_fader_value(level_db))
-        self._send_raw(msg)
+        return self._send_raw(msg)
 
     # ── Channel reset (set processing to neutral) ────────────────
 
