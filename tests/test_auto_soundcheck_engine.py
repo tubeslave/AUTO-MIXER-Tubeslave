@@ -3774,3 +3774,277 @@ def test_master_mix_eval_falls_back_to_prefader_tap_when_master_muted():
     assert payload is not None
     assert payload["source"] == "main_prefader_muted_master"
     assert payload["status"] != "NO_SIGNAL"
+
+
+def test_channel_mapped_capture_translates_reads():
+    """Console channel reads must hit the mapped capture channel."""
+    from auto_soundcheck_engine import ChannelMappedCapture
+
+    class RecordingCapture:
+        def __init__(self):
+            self.reads = []
+
+        def get_peak(self, channel, num_samples):
+            self.reads.append(("peak", channel, num_samples))
+            return -20.0
+
+        def get_lufs(self, channel, window_seconds=0.4):
+            self.reads.append(("lufs", channel))
+            return -23.0
+
+        def stop(self):
+            self.reads.append(("stop",))
+
+    inner = RecordingCapture()
+    capture = ChannelMappedCapture(inner, {1: 25, 2: 26})
+
+    capture.get_peak(1, 4096)
+    capture.get_lufs(2)
+    capture.get_peak(7, 4096)  # unmapped passes through
+    capture.stop()  # non-channel methods pass through
+
+    assert ("peak", 25, 4096) in inner.reads
+    assert ("lufs", 26) in inner.reads
+    assert ("peak", 7, 4096) in inner.reads
+    assert ("stop",) in inner.reads
+
+
+class _PerChannelCapture:
+    """Fake capture with controllable per-channel peaks."""
+
+    def __init__(self, peaks):
+        self.peaks = peaks
+
+    def get_peak(self, ch, num_samples):
+        return self.peaks.get(ch, -80.0)
+
+    def get_rms(self, ch, num_samples):
+        return -30.0
+
+    def get_lufs(self, ch, window_seconds=0.4):
+        return -23.0
+
+
+def _make_per_channel_engine(peaks, channels):
+    engine = AutoSoundcheckEngine(
+        num_channels=max(channels),
+        selected_channels=list(channels),
+        auto_discover=False,
+        mode="per_channel",
+        per_channel_wait_timeout_sec=5.0,
+    )
+    engine.audio_capture = _PerChannelCapture(peaks)
+    engine.channels = {
+        ch: ChannelInfo(
+            channel=ch, name=f"Ch{ch}", recognized=True,
+            auto_corrections_enabled=True,
+        )
+        for ch in channels
+    }
+    return engine
+
+
+def test_per_channel_soundcheck_walks_channels_and_honors_skip(monkeypatch):
+    import threading
+    import time as time_module
+
+    peaks = {1: -20.0, 2: -80.0, 3: -20.0}
+    engine = _make_per_channel_engine(peaks, [1, 2, 3])
+    applied = []
+
+    def fake_apply(ch, analysis_seconds=1.5):
+        applied.append(ch)
+        engine._applied_channels.add(ch)
+
+    monkeypatch.setattr(engine, "_apply_corrections_single", fake_apply)
+
+    def skip_channel_two():
+        deadline = time_module.time() + 5.0
+        while engine._pc_current_channel != 2 and time_module.time() < deadline:
+            time_module.sleep(0.05)
+        engine.per_channel_command("skip")
+
+    threading.Thread(target=skip_channel_two, daemon=True).start()
+    engine._run_per_channel_soundcheck()
+
+    assert applied == [1, 3]
+    assert engine._pc_results[1] == "corrected"
+    assert engine._pc_results[2] == "skipped"
+    assert engine._pc_results[3] == "corrected"
+    assert engine._pc_total == 3
+
+
+def test_per_channel_soundcheck_repeat_reruns_previous_channel(monkeypatch):
+    import threading
+    import time as time_module
+
+    peaks = {1: -20.0, 2: -80.0}
+    engine = _make_per_channel_engine(peaks, [1, 2])
+    applied = []
+
+    def fake_apply(ch, analysis_seconds=1.5):
+        applied.append(ch)
+        engine._applied_channels.add(ch)
+
+    monkeypatch.setattr(engine, "_apply_corrections_single", fake_apply)
+
+    def repeat_then_unmute():
+        deadline = time_module.time() + 5.0
+        while engine._pc_current_channel != 2 and time_module.time() < deadline:
+            time_module.sleep(0.05)
+        engine.per_channel_command("repeat")
+        peaks[2] = -20.0
+
+    threading.Thread(target=repeat_then_unmute, daemon=True).start()
+    engine._run_per_channel_soundcheck()
+
+    assert applied == [1, 1, 2]
+
+
+def test_per_channel_command_rejected_outside_mode():
+    engine = AutoSoundcheckEngine(num_channels=2, auto_discover=False)
+    assert engine.per_channel_command("skip") is False
+
+    engine_pc = AutoSoundcheckEngine(
+        num_channels=2, auto_discover=False, mode="per_channel"
+    )
+    assert engine_pc.per_channel_command("skip") is True
+    assert engine_pc.per_channel_command("bogus") is False
+
+
+def test_start_audio_fails_loudly_on_silence_fallback(monkeypatch):
+    """A capture that degraded to the silence generator must fail _start_audio."""
+    import auto_soundcheck_engine as engine_module
+
+    engine = AutoSoundcheckEngine(auto_discover=False, num_channels=2)
+
+    class FakeCapture:
+        silence_fallback = True
+        silence_fallback_reason = "device busy"
+        stopped = False
+
+        def __init__(self, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+        def stop(self):
+            FakeCapture.stopped = True
+
+    monkeypatch.setattr(engine_module, "scan_audio_devices", lambda: [])
+    monkeypatch.setattr(engine_module, "select_best_device", lambda *a, **kw: None)
+    monkeypatch.setattr(engine_module, "AudioCapture", FakeCapture)
+
+    assert engine._start_audio() is False
+    assert FakeCapture.stopped is True
+
+
+def test_run_errors_when_no_channel_has_signal(monkeypatch):
+    """A soundcheck that heard nothing must end in ERROR, not success."""
+    from auto_soundcheck_engine import EngineState
+
+    messages = []
+    engine = AutoSoundcheckEngine(
+        auto_discover=False,
+        num_channels=2,
+        on_state_change=lambda state, message: messages.append((state, message)),
+    )
+    monkeypatch.setattr(engine, "_connect_mixer", lambda: True)
+    monkeypatch.setattr(engine, "_start_audio", lambda: True)
+    monkeypatch.setattr(engine, "_scan_channels", lambda: None)
+    monkeypatch.setattr(engine, "_read_channel_state", lambda: None)
+    monkeypatch.setattr(engine, "_reset_channels", lambda: None)
+    monkeypatch.setattr(engine, "_wait_and_analyze", lambda: None)
+    engine.channels = {
+        1: ChannelInfo(channel=1, name="Kick"),
+        2: ChannelInfo(channel=2, name="Vox"),
+    }
+
+    assert engine.run() is False
+    assert engine.state == EngineState.ERROR
+    assert any("No signal" in message for _state, message in messages)
+
+
+def test_stepped_fader_apply_converges_on_target():
+    """The soundcheck pass must reach a far fader target via bounded steps."""
+    from autofoh_safety import ChannelFaderMove
+
+    class FaderMixer(DetectorMixer):
+        def set_fader(self, channel, value_db):
+            self.fader[channel] = value_db
+            self.calls.append(("set_fader", channel, value_db))
+            return True
+
+    mixer = FaderMixer()
+    mixer.fader[1] = -12.0
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+
+    decision = engine._execute_action_stepped(
+        ChannelFaderMove(channel_id=1, target_db=-5.0, reason="test")
+    )
+
+    assert decision is not None and decision.sent
+    assert mixer.fader[1] == pytest.approx(-5.0, abs=0.05)
+    fader_moves = [c for c in mixer.calls if c[0] == "set_fader"]
+    # per-step clamp forces at least one bounded re-issue on a 7 dB move
+    assert len(fader_moves) >= 2
+
+
+def test_stepped_fader_apply_still_respects_ceiling():
+    """Stepping must stop at the 0 dBFS ceiling, not loop forever."""
+    from autofoh_safety import ChannelFaderMove
+
+    class FaderMixer(DetectorMixer):
+        def set_fader(self, channel, value_db):
+            self.fader[channel] = value_db
+            self.calls.append(("set_fader", channel, value_db))
+            return True
+
+    mixer = FaderMixer()
+    mixer.fader[1] = -2.0
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+
+    engine._execute_action_stepped(
+        ChannelFaderMove(channel_id=1, target_db=6.0, reason="test")
+    )
+
+    assert mixer.fader[1] == pytest.approx(0.0, abs=1e-6)
+    fader_moves = [c for c in mixer.calls if c[0] == "set_fader"]
+    assert len(fader_moves) <= 5  # reaches ceiling quickly, then stops
+
+
+def test_stepped_eq_apply_converges_within_total_cap():
+    """EQ stepping converges on the requested gain, bounded by the total cap.
+
+    ChannelEQMove is quarantined by the proposal-only policy unless promoted,
+    so the test promotes it explicitly (operator opt-in surface)."""
+    from autofoh_safety import AutoFOHSafetyConfig
+
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(
+        mixer,
+        config=AutoFOHSafetyConfig(
+            promoted_direct_write_action_types=("ChannelEQMove",),
+        ),
+    )
+    engine.runtime_state = RuntimeState.SNAPSHOT_LOCK
+
+    decision = engine._execute_action_stepped(
+        ChannelEQMove(
+            channel_id=1, band=2, freq_hz=300.0, gain_db=-2.5, q=2.0, reason="test"
+        )
+    )
+
+    assert decision is not None and decision.sent
+    assert mixer.eq_gain[(1, 2)] == pytest.approx(-2.5, abs=0.05)
+    eq_moves = [c for c in mixer.calls if c[0] == "set_eq_band"]
+    assert len(eq_moves) >= 1

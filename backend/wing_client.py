@@ -1311,8 +1311,9 @@ class WingClient(MixerClientBase):
         return self.state.get(address)
 
     def set_main_fader(self, main: int, value: float):
-        """Set main fader value"""
-        return self.send(f"/main/{main}/fdr", value)
+        """Set main fader value (dB, -144..10)"""
+        db_value = max(-144.0, min(10.0, float(value)))
+        return self.send(f"/main/{main}/fdr", db_value)
 
     def get_dca_fader(self, dca: int) -> Optional[float]:
         """Get DCA fader value"""

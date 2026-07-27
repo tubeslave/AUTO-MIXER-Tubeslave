@@ -1065,3 +1065,48 @@ class TestWingClientFaderCeiling:
     def test_ceiling_param_is_clamped_to_hardware_range(self):
         client = self._make_client(fader_ceiling_db=42.0)
         assert client._fader_ceiling_db == 10.0
+
+
+class TestSetterResultPropagation:
+    """Setters must propagate transport failure instead of returning None."""
+
+    def test_setters_report_failure_when_disconnected(self):
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = False
+
+            assert client.set_channel_fader(1, -6.0) is False
+            assert client.set_fader(1, -6.0) is False
+            assert client.set_eq_band(1, 2, freq=1000.0, gain=-3.0, q=2.0) is False
+            assert client.set_main_fader(1, -3.0) is False
+            assert client.set_bus_fader(1, -3.0) is False
+            assert client.set_dca_fader(1, -3.0) is False
+
+    def test_main_fader_clamped_to_hardware_range(self):
+        """set_main_fader must clamp to the WING -144..10 dB range."""
+        with patch.dict("sys.modules", {
+            "pythonosc": MagicMock(),
+            "pythonosc.udp_client": MagicMock(),
+            "pythonosc.dispatcher": MagicMock(),
+            "pythonosc.osc_server": MagicMock(),
+            "pythonosc.osc_message_builder": MagicMock(),
+            "pythonosc.osc_message": MagicMock(),
+        }):
+            from wing_client import WingClient
+            client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = MagicMock()
+            client._osc_throttle_enabled = False
+
+            assert client.set_main_fader(1, 99.0) is True
+            assert client.commanded_state["/main/1/fdr"] == 10.0
+            assert client.set_main_fader(1, -500.0) is True
+            assert client.commanded_state["/main/1/fdr"] == -144.0

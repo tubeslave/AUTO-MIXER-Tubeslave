@@ -318,6 +318,10 @@ class AudioCapture:
         self._last_callback_monotonic: Optional[float] = None
         self._captured_sample_count = 0
         self._test_phase: Dict[int, float] = {ch: 0.0 for ch in range(1, num_channels + 1)}
+        # Set when a real-input source silently degraded to the silence generator,
+        # so consumers can distinguish "capturing silence" from "capturing audio"
+        self.silence_fallback = False
+        self.silence_fallback_reason: Optional[str] = None
 
         logger.info(
             f"AudioCapture initialized: {num_channels}ch, {sample_rate}Hz, "
@@ -330,6 +334,8 @@ class AudioCapture:
             return
         self._running = True
 
+        self.silence_fallback = False
+        self.silence_fallback_reason = None
         if self.source_type in (AudioSourceType.DANTE, AudioSourceType.SOUNDDEVICE, AudioSourceType.SOUNDGRID):
             if HAS_SOUNDDEVICE:
                 self._start_sounddevice()
@@ -341,6 +347,8 @@ class AudioCapture:
                     )
                 logger.warning("sounddevice not available, falling back to silence")
                 self.source_type = AudioSourceType.SILENCE
+                self.silence_fallback = True
+                self.silence_fallback_reason = "sounddevice not available"
                 self._start_test_generator()
         else:
             self._start_test_generator()
@@ -458,6 +466,8 @@ class AudioCapture:
                     "real audio input failed; refusing synthetic silence fallback"
                 ) from e
             self.source_type = AudioSourceType.SILENCE
+            self.silence_fallback = True
+            self.silence_fallback_reason = str(e)
             self._start_test_generator()
 
     def _audio_callback(self, indata, frames, time_info, status):

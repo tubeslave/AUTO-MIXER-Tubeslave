@@ -17,9 +17,20 @@ const CYCLE_STEPS = [
   { id: 'master', label: 'Master' },
 ];
 
+const PC_STATUS_LABELS = {
+  waiting: 'играйте сейчас',
+  analyzing: 'анализ...',
+  corrected: 'готово',
+  skipped: 'пропущен',
+  timeout: 'нет сигнала',
+  skipped_no_auto_corrections: 'пропущен (канал не распознан)',
+};
+
 function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice, audioDevices, globalMode }) {
   const [running, setRunning] = useState(false);
   const [observeOnly, setObserveOnly] = useState(true);
+  const [mode, setMode] = useState('full_band');
+  const [pcInfo, setPcInfo] = useState(null);
   const [statusMessage, setStatusMessage] = useState('');
   const [currentStep, setCurrentStep] = useState('');
   const [progress, setProgress] = useState(0);
@@ -61,12 +72,26 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
         || (data.operation?.type === 'muq_stem_drift' ? data.operation : null);
       if (drift) setStemDrift(drift);
     };
+    const handleChannelUpdate = (payload) => {
+      const d = payload.data || {};
+      if (d.per_channel_status) {
+        setPcInfo({
+          channel: payload.channel,
+          status: d.per_channel_status,
+          index: d.index,
+          total: d.total,
+          name: d.name,
+        });
+      }
+    };
     websocketService.on('auto_soundcheck_status', handle);
     websocketService.on('auto_soundcheck_observation', handleObservation);
+    websocketService.on('auto_soundcheck_channel_update', handleChannelUpdate);
     websocketService.getAutoSoundcheckStatus();
     return () => {
       websocketService.off('auto_soundcheck_status', handle);
       websocketService.off('auto_soundcheck_observation', handleObservation);
+      websocketService.off('auto_soundcheck_channel_update', handleChannelUpdate);
     };
   }, []);
 
@@ -83,16 +108,20 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
     setLog([]);
     setShowSessionDetails(false);
     setSessionStatus({});
+    setPcInfo(null);
     websocketService.startAutoSoundcheck(
       selectedDevice,
       selectedChannels,
       chSettings,
       mapping,
       backendTimings,
-      observeOnly
+      observeOnly,
+      mode
     );
   };
   const handleStop = () => websocketService.stopAutoSoundcheck();
+  const handleSkipChannel = () => websocketService.skipSoundcheckChannel();
+  const handleRepeatChannel = () => websocketService.repeatSoundcheckChannel();
 
   const channels = selectedChannels || [];
   const sessionSummary = buildAutofohSessionSummary(sessionStatus);
@@ -116,6 +145,13 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
               disabled={running}
               onChange={e => setObserveOnly(e.target.checked)}
             />
+          </label>
+          <label className="settings-toggle" style={{ cursor: running ? 'default' : 'pointer' }}>
+            <span>Режим</span>
+            <select value={mode} disabled={running} onChange={e => setMode(e.target.value)}>
+              <option value="full_band">Вся группа</option>
+              <option value="per_channel">По каналам</option>
+            </select>
           </label>
           <button className={`btn-start ${running ? 'stop' : 'go'}`}
             onClick={running ? handleStop : handleStart}
@@ -209,7 +245,21 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
           </div>
         )}
 
-        {running && (
+        {running && mode === 'per_channel' && (
+          <div className="progress-section">
+            <div className="module-status">
+              {pcInfo
+                ? `Канал ${pcInfo.index}/${pcInfo.total}: ${pcInfo.name || pcInfo.channel} — ${PC_STATUS_LABELS[pcInfo.status] || pcInfo.status}`
+                : 'Ожидание первого канала...'}
+            </div>
+            <div className="module-actions">
+              <button className="btn-start" onClick={handleSkipChannel}>Пропустить канал</button>
+              <button className="btn-start" onClick={handleRepeatChannel}>Повторить предыдущий</button>
+            </div>
+          </div>
+        )}
+
+        {running && mode !== 'per_channel' && (
           <div className="progress-section">
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress * 100}%` }} />

@@ -16,6 +16,7 @@ import json
 import logging
 import time
 import threading
+from collections import deque
 from pathlib import Path
 import numpy as np
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -503,6 +504,41 @@ SIGNAL_ANALYSIS_SECONDS = 3.0
 GAIN_CORRECTION_MAX_DB = 12.0
 
 
+class ChannelMappedCapture:
+    """Translates console channel numbers to capture channel indices.
+
+    The console channel an operator mixes on is not always the channel the
+    audio interface exposes (e.g. WING USB taps on Dante 25-48 for console
+    channels 1-24). All channel-based reads go through the mapping; unmapped
+    channels pass through unchanged.
+    """
+
+    def __init__(self, capture: AudioCapture, mapping: Dict[int, int]):
+        self._capture = capture
+        self._mapping = {int(k): int(v) for k, v in mapping.items()}
+
+    def _map(self, channel: int) -> int:
+        return self._mapping.get(int(channel), int(channel))
+
+    def get_buffer(self, channel, *args, **kwargs):
+        return self._capture.get_buffer(self._map(channel), *args, **kwargs)
+
+    def get_peak(self, channel, *args, **kwargs):
+        return self._capture.get_peak(self._map(channel), *args, **kwargs)
+
+    def get_rms(self, channel, *args, **kwargs):
+        return self._capture.get_rms(self._map(channel), *args, **kwargs)
+
+    def get_lufs(self, channel, *args, **kwargs):
+        return self._capture.get_lufs(self._map(channel), *args, **kwargs)
+
+    def get_spectrum(self, channel, *args, **kwargs):
+        return self._capture.get_spectrum(self._map(channel), *args, **kwargs)
+
+    def __getattr__(self, name):
+        return getattr(self._capture, name)
+
+
 class AutoSoundcheckEngine:
     """
     Proposal-first automatic soundcheck engine.
@@ -548,6 +584,10 @@ class AutoSoundcheckEngine:
         config_path: Optional[str] = None,
         mixer_client: Optional[Any] = None,
         audio_capture: Optional[Any] = None,
+        soundcheck_apply_max_steps: int = 12,
+        channel_mapping: Optional[Dict[int, int]] = None,
+        mode: str = "full_band",
+        per_channel_wait_timeout_sec: float = 90.0,
     ):
         self.mixer_type = mixer_type
         self.mixer_ip = mixer_ip
@@ -580,6 +620,19 @@ class AutoSoundcheckEngine:
         self.decision_engine_dry_run = bool(decision_engine_dry_run)
         self.auto_discover = auto_discover
         self.scan_subnet = scan_subnet
+        self.soundcheck_apply_max_steps = max(1, int(soundcheck_apply_max_steps))
+        self.channel_mapping: Dict[int, int] = {
+            int(k): int(v) for k, v in (channel_mapping or {}).items()
+            if int(k) > 0 and int(v) > 0
+        }
+        self.mode = mode if mode in ("full_band", "per_channel") else "full_band"
+        self.per_channel_wait_timeout_sec = max(5.0, float(per_channel_wait_timeout_sec))
+        self._pc_lock = threading.Lock()
+        self._pc_command: Optional[str] = None
+        self._pc_current_channel: Optional[int] = None
+        self._pc_index = 0
+        self._pc_total = 0
+        self._pc_results: Dict[int, str] = {}
         self.selected_channels = sorted({
             int(ch) for ch in (selected_channels or [])
             if int(ch) > 0
@@ -3359,9 +3412,20 @@ class AutoSoundcheckEngine:
                     f"{dev.protocol.value} | score={dev.score}{marker}"
                 )
 
-        # Step 3: Create AudioCapture and start
+        # Step 3: Create AudioCapture and start.
+        # With a channel mapping, capture must cover the mapped indices too
+        capture_channels = self.num_channels
+        if self.channel_mapping:
+            capture_channels = max(capture_channels, max(self.channel_mapping.values()))
+            if best and capture_channels > best.max_input_channels:
+                logger.warning(
+                    "Channel mapping needs %s capture channels but device '%s' has %s",
+                    capture_channels, best.name, best.max_input_channels,
+                )
+                capture_channels = best.max_input_channels
+
         self.audio_capture = AudioCapture(
-            num_channels=self.num_channels,
+            num_channels=capture_channels,
             sample_rate=self.sample_rate,
             buffer_seconds=self.buffer_seconds,
             block_size=self.block_size,
@@ -3369,9 +3433,18 @@ class AutoSoundcheckEngine:
             device_name=device_index,
         )
         self.audio_capture.allow_silence_fallback = False
+        if self.channel_mapping:
+            self.audio_capture = ChannelMappedCapture(self.audio_capture, self.channel_mapping)
 
         try:
             self.audio_capture.start()
+            if getattr(self.audio_capture, "silence_fallback", False):
+                # The stream could not open and we would be "analyzing" pure
+                # silence while reporting success — fail loudly instead
+                reason = self.audio_capture.silence_fallback_reason or "unknown error"
+                logger.error(f"Audio capture degraded to silence generator: {reason}")
+                self.audio_capture.stop()
+                return False
             dev_name = best.name if best else "system default"
             logger.info(
                 f"Audio capture started: '{dev_name}', "
@@ -6537,6 +6610,42 @@ class AutoSoundcheckEngine:
             logger.exception("balance_v3 solve failed; falling back to preset faders")
             return None
 
+    def _execute_action_stepped(
+        self,
+        action,
+        *,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ):
+        """Repeat a bounded action until it converges on the requested target.
+
+        The safety layer clamps every move to its per-step limit, so a single
+        execution of a large correction only travels one step. During the
+        soundcheck apply pass we re-issue the same target: each step starts
+        from the new current value, still honoring per-step limits, ceilings
+        and total-from-snapshot caps. The loop stops when the target is
+        reached, a step is rejected, or a cap prevents further progress.
+        """
+        decision = None
+        last_applied: Optional[float] = None
+        for _ in range(self.soundcheck_apply_max_steps):
+            decision = self._execute_action(
+                action, phase_guard_context=phase_guard_context
+            )
+            if decision is None or not decision.sent:
+                break
+            if not decision.bounded:
+                break
+            applied = getattr(decision.action, "target_db", None)
+            if applied is None:
+                applied = getattr(decision.action, "gain_db", None)
+            if applied is None:
+                break
+            if last_applied is not None and abs(float(applied) - last_applied) < 0.05:
+                # Clamped by a ceiling or total cap — no further progress
+                break
+            last_applied = float(applied)
+        return decision
+
     def _apply_eq(
         self,
         ch: int,
@@ -6675,7 +6784,7 @@ class AutoSoundcheckEngine:
                                 f"retuned from {existing_freq:.0f}Hz to {freq:.0f}Hz "
                                 "because the existing band does not match the requested problem range"
                             )
-                decision = self._execute_action(
+                decision = self._execute_action_stepped(
                     ChannelEQMove(
                         channel_id=ch,
                         band=band_idx,
@@ -6733,7 +6842,7 @@ class AutoSoundcheckEngine:
             true_peak = m.level.true_peak_dbtp
             lra = 0.0
         else:
-            current_lufs = self.audio_capture.get_lufs(ch, 48000)
+            current_lufs = self.audio_capture.get_lufs(ch, 1.0)
             true_peak = info.peak_db
             lra = 0.0
 
@@ -6900,7 +7009,7 @@ class AutoSoundcheckEngine:
         previous_fader_db = current_fader
 
         try:
-            decision = self._execute_action(
+            decision = self._execute_action_stepped(
                 ChannelFaderMove(
                     channel_id=ch,
                     target_db=fader_db,
@@ -8585,6 +8694,137 @@ class AutoSoundcheckEngine:
 
     # ── 6. Continuous monitoring ─────────────────────────────────
 
+    # ── Per-channel step-through soundcheck ──────────────────────
+
+    def per_channel_command(self, command: str) -> bool:
+        """Operator control for per-channel mode: 'next', 'skip' or 'repeat'.
+
+        'skip'/'next' advance past the channel currently being waited on;
+        'repeat' re-runs the previously completed channel before continuing.
+        Returns False when the engine is not in per-channel mode or the
+        command is unknown.
+        """
+        if self.mode != "per_channel":
+            return False
+        command = str(command).lower().strip()
+        if command not in ("next", "skip", "repeat"):
+            return False
+        with self._pc_lock:
+            self._pc_command = command
+        return True
+
+    def _consume_pc_command(self) -> Optional[str]:
+        with self._pc_lock:
+            command = self._pc_command
+            self._pc_command = None
+        return command
+
+    def _emit_pc_status(self, ch: int, info: ChannelInfo, status: str):
+        self._pc_results[ch] = status
+        if self.on_channel_update:
+            try:
+                self.on_channel_update(ch, {
+                    "per_channel_status": status,
+                    "index": self._pc_index,
+                    "total": self._pc_total,
+                    "name": info.name,
+                    "preset": info.preset,
+                    "has_signal": info.has_signal,
+                    "peak_db": round(info.peak_db, 1),
+                })
+            except Exception:
+                pass
+
+    def _wait_for_channel_signal(self, ch: int, info: ChannelInfo) -> str:
+        """Wait for signal on one channel, honoring operator commands."""
+        start = time.time()
+        while not self._stop_event.is_set():
+            command = self._consume_pc_command()
+            if command in ("skip", "next"):
+                return "skipped"
+            if command == "repeat":
+                return "repeat_prev"
+            peak = self.audio_capture.get_peak(ch, self.block_size * 4)
+            if peak > SIGNAL_THRESHOLD_DB:
+                info.has_signal = True
+                info.peak_db = peak
+                info.rms_db = self.audio_capture.get_rms(ch, self.block_size * 4)
+                info.lufs = self.audio_capture.get_lufs(ch, 0.4)
+                return "signal"
+            if time.time() - start > self.per_channel_wait_timeout_sec:
+                return "timeout"
+            time.sleep(0.2)
+        return "stopped"
+
+    def _run_per_channel_soundcheck(self):
+        """Walk the selected channels one at a time: wait → analyze → apply.
+
+        Each channel gets its own signal wait (with operator skip/next),
+        a full analysis window, and the same bounded per-channel correction
+        chain used by the monitor pickup path — all through the safety layer.
+        """
+        order = self._iter_channels() or sorted(self.channels.keys())
+        order = [ch for ch in order if ch in self.channels]
+        self._pc_total = len(order)
+        queue = deque(order)
+        prev_ch: Optional[int] = None
+
+        while queue and not self._stop_event.is_set():
+            ch = queue.popleft()
+            info = self.channels.get(ch)
+            if info is None:
+                continue
+            self._pc_index = order.index(ch) + 1
+            self._pc_current_channel = ch
+
+            self._set_state(
+                EngineState.WAITING_FOR_SIGNAL,
+                f"Soundcheck {self._pc_index}/{self._pc_total}: "
+                f"ch {ch} '{info.name}' — play now",
+            )
+            self._emit_pc_status(ch, info, "waiting")
+
+            outcome = self._wait_for_channel_signal(ch, info)
+            if outcome == "stopped":
+                return
+            if outcome == "repeat_prev":
+                queue.appendleft(ch)
+                if prev_ch is not None:
+                    self._applied_channels.discard(prev_ch)
+                    queue.appendleft(prev_ch)
+                continue
+            if outcome in ("skipped", "timeout"):
+                self._emit_pc_status(ch, info, outcome)
+                prev_ch = ch
+                continue
+
+            self._set_state(
+                EngineState.ANALYZING,
+                f"Soundcheck {self._pc_index}/{self._pc_total}: "
+                f"ch {ch} '{info.name}' — analyzing",
+            )
+            self._emit_pc_status(ch, info, "analyzing")
+            if not info.recognized:
+                self._classify_by_spectrum(ch, info)
+
+            self._set_state(
+                EngineState.APPLYING,
+                f"Soundcheck {self._pc_index}/{self._pc_total}: "
+                f"ch {ch} '{info.name}' — applying corrections",
+            )
+            self._applied_channels.discard(ch)
+            self._apply_corrections_single(
+                ch, analysis_seconds=SIGNAL_ANALYSIS_SECONDS
+            )
+            done_status = (
+                "corrected" if ch in self._applied_channels
+                else "skipped_no_auto_corrections"
+            )
+            self._emit_pc_status(ch, info, done_status)
+            prev_ch = ch
+
+        self._pc_current_channel = None
+
     def _monitor_loop(self):
         """Continuous monitoring: feedback detection + cautious mix cleanup."""
         self.feedback_detector = FeedbackDetector(
@@ -8640,7 +8880,7 @@ class AutoSoundcheckEngine:
 
             time.sleep(0.1)
 
-    def _apply_corrections_single(self, ch: int):
+    def _apply_corrections_single(self, ch: int, analysis_seconds: float = 1.5):
         """Apply bounded processing corrections for a newly detected channel.
 
         Reads the current channel state first, then runs a short analysis pass
@@ -8676,9 +8916,9 @@ class AutoSoundcheckEngine:
             info.was_reset = False
             self._read_group_state_for_channels([ch])
 
-            # Quick analysis pass (1.5s) for fresh metrics
+            # Quick analysis pass for fresh metrics
             analyzer = SignalAnalyzer(ch, self.sample_rate, self.block_size)
-            analysis_blocks = int(1.5 * self.sample_rate / self.block_size)
+            analysis_blocks = int(analysis_seconds * self.sample_rate / self.block_size)
             interval = self.block_size / self.sample_rate
             for _ in range(analysis_blocks):
                 samples = self.audio_capture.get_buffer(ch, self.block_size)
@@ -9022,9 +9262,28 @@ class AutoSoundcheckEngine:
             self._scan_channels()
             self._read_channel_state()
             self._reset_channels()
-            self._wait_and_analyze()
 
-            if self.auto_apply:
+            # Full-band waits for all channels then applies in one pass;
+            # per-channel walks the selected channels one at a time
+            if self.mode == "per_channel":
+                self._run_per_channel_soundcheck()
+            else:
+                self._wait_and_analyze()
+
+            # A soundcheck that heard nothing must not report success: it
+            # usually means a wrong capture device or broken routing
+            if not self._stop_event.is_set() and not any(
+                info.has_signal for info in self.channels.values()
+            ):
+                self._set_state(
+                    EngineState.ERROR,
+                    "No signal detected on any channel — check audio device and routing",
+                )
+                return False
+
+            if self.mode == "per_channel":
+                pass  # corrections already applied channel by channel
+            elif self.auto_apply:
                 self._apply_corrections()
             elif self.observe_only:
                 self._derive_corrections()
@@ -9347,6 +9606,11 @@ class AutoSoundcheckEngine:
         return {
             "state": self.state.value,
             "runtime_state": self.runtime_state.value,
+            "mode": self.mode,
+            "current_channel": self._pc_current_channel,
+            "channel_index": self._pc_index,
+            "channel_total": self._pc_total,
+            "per_channel_results": dict(self._pc_results),
             "mixer_type": self.mixer_type,
             "mixer_ip": self.mixer_ip,
             "mixer_connected": self.mixer_client.is_connected if self.mixer_client else False,

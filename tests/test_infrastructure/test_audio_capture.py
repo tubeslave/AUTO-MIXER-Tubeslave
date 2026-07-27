@@ -157,3 +157,56 @@ class TestAudioCapture:
     def test_silence_generator(self):
         cfg = TestGeneratorConfig(generator_type="silence")
         assert cfg.generator_type == "silence"
+
+
+# ---------------------------------------------------------------------------
+# Silence fallback detection
+# ---------------------------------------------------------------------------
+
+class TestSilenceFallback:
+    """A real-input source degrading to silence must be visible to consumers."""
+
+    def test_fallback_flag_when_stream_fails(self, monkeypatch):
+        import audio_capture as audio_capture_module
+        from audio_capture import AudioSourceType
+
+        class FailingStream:
+            def __init__(self, **kwargs):
+                raise RuntimeError("device busy")
+
+        fake_sd = type("FakeSD", (), {"InputStream": FailingStream})
+        monkeypatch.setattr(audio_capture_module, "HAS_SOUNDDEVICE", True)
+        monkeypatch.setattr(audio_capture_module, "sd", fake_sd, raising=False)
+
+        capture = AudioCapture(
+            channels=2, source_type=AudioSourceType.DANTE, device_name="Fake"
+        )
+        capture.start()
+        try:
+            assert capture.silence_fallback is True
+            assert "device busy" in capture.silence_fallback_reason
+            assert capture.source_type == AudioSourceType.SILENCE
+        finally:
+            capture.stop()
+
+    def test_fallback_flag_when_sounddevice_missing(self, monkeypatch):
+        import audio_capture as audio_capture_module
+        from audio_capture import AudioSourceType
+
+        monkeypatch.setattr(audio_capture_module, "HAS_SOUNDDEVICE", False)
+
+        capture = AudioCapture(channels=2, source_type=AudioSourceType.DANTE)
+        capture.start()
+        try:
+            assert capture.silence_fallback is True
+        finally:
+            capture.stop()
+
+    def test_no_fallback_flag_for_intended_generator(self):
+        capture = AudioCapture(channels=2)  # default SILENCE source
+        capture.start()
+        try:
+            assert capture.silence_fallback is False
+            assert capture.silence_fallback_reason is None
+        finally:
+            capture.stop()

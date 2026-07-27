@@ -15,10 +15,13 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
 
   useEffect(() => {
     const handle = (data) => {
-      if (data.running !== undefined) setRunning(data.running);
+      // Backend шлёт {active, realtime_enabled}, а не {running}
+      if (data.realtime_enabled !== undefined) setRunning(Boolean(data.realtime_enabled));
+      else if (data.active !== undefined) setRunning(Boolean(data.active));
       if (data.message) setStatusMessage(data.message);
       if (data.error) setStatusMessage(`Ошибка: ${data.error}`);
-      if (data.levels) setChannelLevels(data.levels);
+      // Уровни приходят как status_type=levels_update с полем channels
+      if (data.status_type === 'levels_update' && data.channels) setChannelLevels(data.channels);
     };
     const handleLoaded = (data) => {
       if (data.settings?.autoFader) setSettings(s => ({ ...s, ...data.settings.autoFader }));
@@ -95,7 +98,7 @@ function AutoFaderTab({ selectedChannels, availableChannels, selectedDevice, aud
                 <tr key={ch}>
                   <td>{name}</td>
                   <td>{level?.lufs?.toFixed(1) || '--'} LUFS</td>
-                  <td>{level?.fader?.toFixed(1) || '--'} dB</td>
+                  <td>{level?.current_fader?.toFixed(1) ?? level?.target_fader?.toFixed(1) ?? '--'} dB</td>
                 </tr>
               );
             })}

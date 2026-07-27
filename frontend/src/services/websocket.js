@@ -982,8 +982,8 @@ class WebSocketService extends BaseWebSocketTransport {
 
   // ========== Auto Soundcheck Commands ==========
 
-  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = true) {
-    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings, observeOnly });
+  startAutoSoundcheck(deviceId, channels, channelSettings, channelMapping, timings, observeOnly = true, mode = 'full_band') {
+    console.log('startAutoSoundcheck called with:', { deviceId, channels, timings, observeOnly, mode });
     this.send({
       type: 'start_auto_soundcheck',
       device_id: deviceId,
@@ -991,8 +991,21 @@ class WebSocketService extends BaseWebSocketTransport {
       channel_settings: channelSettings,
       channel_mapping: channelMapping,
       timings: timings,
-      observe_only: observeOnly
+      observe_only: observeOnly,
+      mode: mode
     });
+  }
+
+  nextSoundcheckChannel() {
+    this.send({ type: 'soundcheck_next_channel' });
+  }
+
+  skipSoundcheckChannel() {
+    this.send({ type: 'soundcheck_skip_channel' });
+  }
+
+  repeatSoundcheckChannel() {
+    this.send({ type: 'soundcheck_repeat_channel' });
   }
 
   stopAutoSoundcheck() {
