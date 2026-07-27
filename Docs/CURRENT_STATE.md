@@ -1,6 +1,17 @@
 # Current State
 
-Generated: 2026-07-15T06:03:06Z
+Generated: 2026-07-27T20:46:42Z
+
+## System Inspector iteration 001 — 2026-07-27
+
+- The Phase 0 offline Snapshot Replay vertical is implemented in
+  `backend/system_inspector/` with a fail-closed read-only boundary,
+  versioned macOS/WING/Dante/baseline fixtures, evidence-backed findings,
+  visible unknowns and deterministic CLI/JSON output. No WING, Dante,
+  network or audio-capture contact occurred and no authority changed.
+- The source checkpoint is committed and operator truth surfaces are
+  synchronized to the latest ledger row. The full report is
+  `.paperclip/reports/inspector-iteration-001.md`.
 
 ## M120 accepted WING route and teardown repair — 2026-07-15
 
@@ -228,7 +239,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `m120_hw01_accepted_route_teardown_repair_source_checkpoint_ready` at `2026-07-15T06:03:06Z`.
+Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

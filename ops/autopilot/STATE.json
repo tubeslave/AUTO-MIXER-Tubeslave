@@ -10,7 +10,7 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-07-27T08:53:31Z",
+  "last_heartbeat_utc": "2026-07-27T20:46:42Z",
   "current_writer_lease": null,
   "current_head_validation": {
     "head": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
@@ -265,12 +265,36 @@
       "would_execute_before_decomposition": 0
     },
     "historical_bounded_write_kinds": [
-      "fader", "gain", "trim", "mute", "pan", "polarity", "delay",
-      "hpf", "eq", "gate", "compressor", "send", "bus", "dca", "master"
+      "fader",
+      "gain",
+      "trim",
+      "mute",
+      "pan",
+      "polarity",
+      "delay",
+      "hpf",
+      "eq",
+      "gate",
+      "compressor",
+      "send",
+      "bus",
+      "dca",
+      "master"
     ],
     "proposal_only_write_kinds": [
-      "expander", "dynamics", "deesser", "fx", "insert", "return",
-      "group", "matrix", "output", "routing", "scene", "snapshot", "preset"
+      "expander",
+      "dynamics",
+      "deesser",
+      "fx",
+      "insert",
+      "return",
+      "group",
+      "matrix",
+      "output",
+      "routing",
+      "scene",
+      "snapshot",
+      "preset"
     ],
     "frontend_screenshot": "artifacts/frontend_qa/20260711_m006_full/soundcheck-live-applied-desktop.png"
   },
@@ -1343,9 +1367,21 @@
     "reset_contract": {
       "factory_reset": false,
       "processor_bypass_address_count": 64,
-      "m006_restore_operation_counts": [23, 14, 14],
-      "m006_restore_scope_address_counts": [33, 63, 14],
-      "m006_restore_changed_address_counts": [19, 52, 6],
+      "m006_restore_operation_counts": [
+        23,
+        14,
+        14
+      ],
+      "m006_restore_scope_address_counts": [
+        33,
+        63,
+        14
+      ],
+      "m006_restore_changed_address_counts": [
+        19,
+        52,
+        6
+      ],
       "m006_restore_unique_changed_address_count": 77,
       "preserves_surfaces_outside_archived_m006_transaction": true
     },
@@ -1460,7 +1496,10 @@
       "serial_bound_usb_identity_verified": true,
       "capture_channel_count": 48,
       "capture_sample_rate_hz": 48000,
-      "master_channels": [47, 48],
+      "master_channels": [
+        47,
+        48
+      ],
       "complete_route_pass_count": 2,
       "conservative_true_peak_dbtp": -12.318173311906147,
       "console_mutation_write_attempt_count": 0,
@@ -1686,6 +1725,8 @@
     "broad_validation": "7284 passed, 3 skipped, 1 deselected",
     "standard_suite": "1 failed, 6761 passed, 3 skipped",
     "standard_suite_blocker": "m110_cp05_tracked_tree_not_clean from pre-existing frontend/package.json and reports/loop_soundcheck_pipeline.jsonl changes",
-    "report": ".paperclip/reports/inspector-iteration-001.md"
+    "report": ".paperclip/reports/inspector-iteration-001.md",
+    "source_checkpoint_status": "committed_and_truth_surfaces_synchronized",
+    "truth_surface_sync_recorded_at_utc": "2026-07-27T20:46:42Z"
   }
 }
