@@ -9,3 +9,5 @@
 {"ts": "20260709T184720", "iter": 9, "main_fdr": 0.0, "master_status": "OK", "lufs": -25.02, "true_peak_dbtp": -5.14, "tilt_db": 3.0, "corr": 0.954, "issues": 0, "code_fixes": 0, "console": "changed", "audio": "none"}
 {"ts": "20260710T004924", "iter": 10, "main_fdr": 0.0, "master_status": "OK", "lufs": -25.95, "true_peak_dbtp": -7.1, "tilt_db": 1.6, "corr": 0.995, "issues": 0, "code_fixes": 0, "console": "changed", "audio": "none"}
 {"ts": "20260710T005740", "iter": 11, "main_fdr": 0.0, "master_status": "ISSUES", "lufs": -16.1, "true_peak_dbtp": -0.7, "tilt_db": 3.18, "corr": 1.0, "issues": 1, "code_fixes": 0, "console": "RESET_FLAT", "audio": "none"}
+{"ts": "20260715T120401", "iter": 12, "main_fdr": 0.0, "master_status": "ISSUES", "lufs": -29.41, "true_peak_dbtp": -10.05, "tilt_db": 3.64, "corr": 0.996, "issues": 1, "code_fixes": 0, "console": "REMIXED_after_reset", "audio": "none"}
+{"ts": "20260715T120906", "iter": 13, "master_status": "OFFLINE", "lufs": null, "true_peak_dbtp": null, "issues": 0, "code_fixes": 0, "console": "MIXER_OFFLINE", "audio": "none"}
