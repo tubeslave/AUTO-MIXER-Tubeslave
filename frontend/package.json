@@ -33,6 +33,7 @@
     "wait-on": "^7.2.0"
   },
   "scripts": {
+    "dev": "vite --host 127.0.0.1",
     "start": "vite --host 127.0.0.1",
     "build": "vite build",
     "test": "node --test src/services/__tests__/decisionQueueV2.test.mjs src/services/__tests__/websocketCore.test.mjs src/services/__tests__/remoteAuthPolicy.test.mjs src/services/__tests__/electronSecurityContract.test.mjs src/services/__tests__/macosSigningContract.test.mjs src/services/__tests__/macosBuildProfilesContract.test.mjs src/services/__tests__/macosReleaseEntrypoint.test.mjs src/services/__tests__/macosReleaseVerifier.test.mjs src/services/__tests__/notarytoolEvidence.test.mjs src/services/__tests__/publicReleaseEvidenceBundle.test.mjs src/services/__tests__/packagingArchitecture.test.mjs src/services/__tests__/operatorStatusTone.test.mjs src/components/__tests__/autoSoundcheckSummary.test.mjs src/components/__tests__/dashboardReadOnlyContract.test.mjs src/components/__tests__/frontendTruthContract.regression-1.test.mjs src/components/__tests__/soundcheckCockpitContract.test.mjs src/services/__tests__/operatorAdaptersContract.test.mjs",
