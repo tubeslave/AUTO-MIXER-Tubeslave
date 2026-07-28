@@ -36,6 +36,22 @@ Read targeted source files only after the active checkpoint identifies them.
 9. At milestone boundary, run the milestone validation contract and independent
    safety/regression review.
 
+## Truth and validation ordering
+
+1. Write `STATE.json`, `HEARTBEAT.md`, `LAST_REPORT.md`, `RUN_LEDGER.jsonl`
+   and every operator handoff surface first; run rails and the full suite
+   after the final truth write. Validation that predates a truth edit is
+   void.
+2. New `RUN_LEDGER.jsonl` rows use the complete handoff schema: `authority`,
+   `decision_ledger`, `current_blocker`, `next_operator_action`,
+   `external_validation_requirements`, `hardware_contacted`, `live_writes`.
+3. Never deselect failing rails to make a run pass. A red dynamic CP05 test
+   on a dirty mid-iteration tree is resolved only by the source commit plus
+   exactly one marker-only CP05 rebind.
+4. Prefix any new full-suite result string in ledger `results`; the bare
+   `N passed, M skipped` format is bound to the committed M115 baseline.
+5. Before reporting, verify every declared deliverable is tracked by git.
+
 ## Safety
 
 Never run real-console control during unattended automation. Never send live OSC
