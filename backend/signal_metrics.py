@@ -169,6 +169,9 @@ class SignalAnalyzer:
         # LUFS meters
         self._lufs_meter = LUFSMeter(sample_rate) if HAS_LUFS_METERS else None
         self._tp_meter = TruePeakMeter(sample_rate) if HAS_LUFS_METERS else None
+        # Персистентный K-фильтр: пересоздание на каждый блок обнуляет
+        # состояние HPF 38 Гц каждые ~21 мс → −0.5 дБ на kick/bass
+        self._k_filter = KWeightingFilter(sample_rate) if HAS_LUFS_METERS else None
 
         # Buffers for integrated/short-term LUFS
         self._momentary_window = int(sample_rate * 0.4)  # 400ms
@@ -276,8 +279,12 @@ class SignalAnalyzer:
         if lufs_m > -70.0:
             self._integrated_blocks.append(lufs_m)
 
-        # K-weighted samples for short-term LUFS
-        k_samples = _k_weight(samples, self.sample_rate)
+        # K-weighted samples for short-term LUFS (персистентный фильтр —
+        # состояние между блоками сохраняется)
+        if self._k_filter is not None:
+            k_samples = self._k_filter.process(samples)
+        else:
+            k_samples = _k_weight(samples, self.sample_rate)
         self._k_buffer.extend(k_samples.tolist())
 
         # ── Envelope / ADSR ──────────────────────────────────

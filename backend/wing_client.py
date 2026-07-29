@@ -13,6 +13,29 @@ from mixer_client_base import MixerClientBase
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# WING compressor ratio — дискретный enum. Невалидные токены ("10.0", "4.3")
+# пульт отвергает МОЛЧА (задокументированный паттерн отказа), поэтому
+# конверсия к ближайшему валидному токену обязана жить на транспортной границе.
+WING_RATIO_STRINGS = ["1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0",
+                      "3.5", "4.0", "5.0", "6.0", "8.0", "10", "20", "50", "100"]
+WING_RATIO_VALUES = [1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0,
+                     3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0, 50.0, 100.0]
+
+
+def ratio_to_wing_token(ratio) -> str:
+    """Nearest valid WING ratio token for a float/str ratio."""
+    if isinstance(ratio, str) and ratio in WING_RATIO_STRINGS:
+        return ratio
+    try:
+        value = float(ratio)
+    except (TypeError, ValueError):
+        return "1.1"
+    if value <= 0:
+        return "1.1"
+    best_idx = min(range(len(WING_RATIO_VALUES)),
+                   key=lambda i: abs(WING_RATIO_VALUES[i] - value))
+    return WING_RATIO_STRINGS[best_idx]
+
 
 class WingClient(MixerClientBase):
     """OSC client for Behringer Wing mixer - uses correct Wing OSC address format"""
@@ -942,10 +965,10 @@ class WingClient(MixerClientBase):
         
         Args:
             channel: Channel number (1-40)
-            ratio: Ratio string - "1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0", 
+            ratio: Ratio string - "1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0",
                    "3.5", "4.0", "5.0", "6.0", "8.0", "10", "20", "50", "100"
         """
-        return self.send(f"/ch/{channel}/dyn/ratio", ratio)
+        return self.send(f"/ch/{channel}/dyn/ratio", ratio_to_wing_token(ratio))
     
     def get_compressor_ratio(self, channel: int) -> Optional[str]:
         """Get compressor ratio"""
@@ -1212,8 +1235,8 @@ class WingClient(MixerClientBase):
             release = release_ms
         if gain is None:
             gain = makeup_db
-        if isinstance(ratio, (int, float)):
-            ratio = f"{float(ratio):.1f}"
+        if ratio is not None:
+            ratio = ratio_to_wing_token(ratio)
         # Small delay between OSC commands to ensure mixer processes them
         if threshold is not None:
             # Адрес порога зависит от модели динамики (COMP -> thr,

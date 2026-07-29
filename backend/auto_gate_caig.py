@@ -715,8 +715,12 @@ class AutoGateController:
                 ch, instrument, threshold, decisions
             )
             
-            # Process gate
-            decision = self.processors[ch].process(feat, threshold, settings)
+            # Process gate. frame_samples обязателен: default 1 считает
+            # attack/hold/release в «кадрах» — баллистика в len(audio) раз
+            # медленнее заявленной (hold 100 мс превращался в ~6.4 с)
+            decision = self.processors[ch].process(
+                feat, threshold, settings, frame_samples=len(audio)
+            )
             decision.channel_id = ch
             decision.group_influence = group_influence
             
