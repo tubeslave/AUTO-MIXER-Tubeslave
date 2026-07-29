@@ -875,6 +875,9 @@ class AutoSoundcheckEngine:
         self._last_feedback_global_action_at: float = 0.0
         self._feedback_actions_sent_by_channel: Dict[int, int] = {}
         self._feedback_actions_sent_total: int = 0
+        # Активные emergency-notch: (ch, band) -> {freq_hz, q, expires_at}
+        # для TTL-ревёрта и бюджетов DEC-0005 (≤2/канал, ≤4 системно)
+        self._active_emergency_notches: Dict[Tuple[int, int], Dict[str, float]] = {}
         self.safety_controller: Optional[AutoFOHSafetyController] = None
         self.correction_executor: Optional[GatedCorrectionActionExecutor] = None
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
@@ -8927,6 +8930,7 @@ class AutoSoundcheckEngine:
                             for evt in events:
                                 self._handle_feedback_event(ch, evt)
 
+                    self._revert_expired_emergency_notches()
                     self._evaluate_pending_actions()
                     self._run_autofoh_monitor_analysis()
 
@@ -9066,6 +9070,43 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.error(f"Ch {ch}: single-channel correction error: {e}")
 
+    def _revert_expired_emergency_notches(self) -> None:
+        """TTL-ревёрт emergency-notch (DEC-0005): истёкший notch снимается
+        (gain 0 на той же полосе) — заводка, ушедшая после нотча, не должна
+        оставлять дыру в тембре навсегда. Повторный звон на той же частоте
+        поставит notch заново через обычный цикл детекции."""
+        if not self._active_emergency_notches:
+            return
+        now = time.time()
+        expired = [
+            key for key, meta in self._active_emergency_notches.items()
+            if now >= float(meta.get("expires_at", 0.0))
+        ]
+        for (ch, band) in expired:
+            meta = self._active_emergency_notches.pop((ch, band), None) or {}
+            try:
+                decision = self._execute_action(
+                    EmergencyFeedbackNotch(
+                        channel_id=ch,
+                        band=band,
+                        freq_hz=float(meta.get("freq_hz", 1000.0)),
+                        q=float(meta.get("q", 10.0)),
+                        gain_db=0.0,
+                        reason="Feedback notch TTL expired — revert to neutral",
+                    ),
+                    runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
+                )
+                if decision and decision.sent:
+                    logger.info(
+                        f"FEEDBACK Ch {ch}: notch band {band} снят по TTL "
+                        f"({meta.get('freq_hz', 0):.0f}Hz)"
+                    )
+            except Exception:
+                logger.exception(
+                    "FEEDBACK Ch %s: TTL-ревёрт notch band %s не удался — "
+                    "полоса остаётся срезанной, нужен оператор", ch, band,
+                )
+
     def _handle_feedback_event(self, ch: int, event: FeedbackEvent):
         """React to a feedback event by applying notch or reducing fader."""
         info = self.channels.get(ch)
@@ -9086,6 +9127,28 @@ class AutoSoundcheckEngine:
             if not self._control_allowed(info, "feedback_notch"):
                 self._log_processing_skip(ch, info, "feedback notch")
                 return
+            # Бюджеты DEC-0005: ≤2 активных notch/канал → эскалация в
+            # fader-dip; ≤4 системно → только алерт (не эскалация)
+            active_ch = sum(
+                1 for (nch, _b) in self._active_emergency_notches if nch == ch
+            )
+            if active_ch >= 2:
+                logger.warning(
+                    f"FEEDBACK Ch {ch}: notch-бюджет канала исчерпан "
+                    f"({active_ch}/2) — эскалация в fader-dip"
+                )
+                self._apply_feedback_fader_fallback(
+                    ch, info,
+                    reason="Feedback notch budget exhausted, fader dip",
+                )
+                return
+            if len(self._active_emergency_notches) >= 4:
+                logger.warning(
+                    "FEEDBACK: системный notch-бюджет исчерпан (4/4) — "
+                    f"алерт оператору, Ch {ch} {event.frequency_hz:.0f}Hz "
+                    "без автоматического действия"
+                )
+                return
             try:
                 notch_band = self._select_feedback_notch_band(info)
                 decision = self._execute_action(
@@ -9099,6 +9162,16 @@ class AutoSoundcheckEngine:
                     ),
                     runtime_state=RuntimeState.EMERGENCY_FEEDBACK,
                 )
+                if decision and decision.sent:
+                    ttl = float(
+                        getattr(self.action_safety_config,
+                                "feedback_notch_ttl_sec", 120.0)
+                    )
+                    self._active_emergency_notches[(ch, notch_band)] = {
+                        "freq_hz": float(event.frequency_hz),
+                        "q": 10.0,
+                        "expires_at": time.time() + ttl,
+                    }
                 if decision and (decision.sent or getattr(decision, "blocked", False)):
                     self._record_feedback_action_sent(ch)
             except Exception:

@@ -4123,3 +4123,48 @@ def test_fallback_fader_target_is_absolute_across_reruns():
     assert first == pytest.approx(second, abs=1e-6), (
         f"повторный прогон изменил цель {first} -> {second} — храповик вернулся"
     )
+
+
+def test_expired_emergency_notch_reverted_by_ttl():
+    """DEC-0005: истёкший notch снимается (gain 0) — дыра в тембре не
+    остаётся навсегда после ушедшей заводки."""
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine._active_emergency_notches[(1, 3)] = {
+        "freq_hz": 3150.0, "q": 10.0, "expires_at": 0.0,  # уже истёк
+    }
+    engine._revert_expired_emergency_notches()
+    assert (1, 3) not in engine._active_emergency_notches
+    reverts = [
+        d for d in engine.safety_controller.history
+        if getattr(d.action, "action_type", "") == "EmergencyFeedbackNotch"
+        and getattr(d.action, "gain_db", -1) == 0.0
+    ]
+    assert reverts, "TTL-ревёрт не дошёл до safety-слоя"
+
+
+def test_channel_notch_budget_escalates_to_fader_dip():
+    """DEC-0005: ≥2 активных notch на канале — эскалация в fader-dip."""
+    from feedback_detector import FeedbackEvent
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    info = ChannelInfo(channel=1, name="VOX", preset="leadVocal",
+                       has_signal=True, fader_db=-6.0)
+    engine.channels = {1: info}
+    engine._control_allowed = lambda _info, _ctrl: True
+    engine._active_emergency_notches = {
+        (1, 2): {"freq_hz": 800.0, "q": 10.0, "expires_at": 9e12},
+        (1, 3): {"freq_hz": 2500.0, "q": 10.0, "expires_at": 9e12},
+    }
+    event = FeedbackEvent(channel=1, frequency_hz=5000.0, magnitude_db=-10.0,
+                          action="notch", confidence=0.9, timestamp=0.0)
+    engine._handle_feedback_event(1, event)
+    dips = [
+        d for d in engine.safety_controller.history
+        if getattr(d.action, "action_type", "") == "EmergencyChannelFaderMove"
+    ]
+    assert dips, "исчерпанный бюджет notch не эскалировал в fader-dip"
