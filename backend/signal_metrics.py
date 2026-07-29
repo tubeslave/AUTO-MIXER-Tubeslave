@@ -566,29 +566,54 @@ def compare_channels(
     peak_val = float(search_region[peak_idx])
     delay = peak_idx - (center - search_start)
 
-    result.cross_correlation = peak_val
+    # Нормированный r НА ЗАМЕРЕННОМ ЛАГЕ (правило проекта: полярность —
+    # только после выравнивания; сырой PHAT-пик ~0.001 даже при идеальном
+    # совпадении и не годится ни как порог, ни как признак инверсии)
+    def _r_aligned(x: np.ndarray, y: np.ndarray, lag: int) -> float:
+        if lag > 0:
+            x2, y2 = x[lag:], y[:len(y) - lag]
+        elif lag < 0:
+            x2, y2 = x[:len(x) + lag], y[-lag:]
+        else:
+            x2, y2 = x, y
+        if len(x2) < 256:
+            return 0.0
+        sx = float(np.std(x2))
+        sy = float(np.std(y2))
+        if sx < 1e-9 or sy < 1e-9:
+            return 0.0
+        return float(np.mean((x2 - np.mean(x2)) * (y2 - np.mean(y2))) / (sx * sy))
+
+    r_pos = _r_aligned(a, b, delay)
+    r_neg = _r_aligned(a, b, -delay)
+    r_at_lag = r_pos if abs(r_pos) >= abs(r_neg) else r_neg
+
+    result.cross_correlation = r_at_lag
     result.delay_samples = delay
     result.delay_ms = abs(delay) / sample_rate * 1000
-    result.phase_inverted = peak_val < -0.3
+    result.phase_inverted = r_at_lag <= -0.4
 
-    # Magnitude-squared coherence (averaged)
+    # Magnitude-squared coherence — Welch: усреднение спектров ПО БЛОКАМ,
+    # затем когерентность. Однокадровая версия тождественно равна 1.0
+    # по построению (два независимых шума давали coherence=1.0000)
     block = 2048
-    n_blocks = max(1, min_len // block)
-    coherence_sum = 0.0
-    for i in range(n_blocks):
-        s = i * block
-        ba = a[s:s + block]
-        bb = b[s:s + block]
-        if len(ba) < block:
-            break
-        Fa = np.fft.rfft(ba)
-        Fb = np.fft.rfft(bb)
-        Pab = Fa * np.conj(Fb)
-        Paa = np.abs(Fa) ** 2 + 1e-10
-        Pbb = np.abs(Fb) ** 2 + 1e-10
-        coh = np.abs(Pab) ** 2 / (Paa * Pbb)
-        coherence_sum += float(np.mean(coh))
-    result.coherence = coherence_sum / max(1, n_blocks)
+    n_blocks = min_len // block
+    if n_blocks >= 2:
+        Paa = np.zeros(block // 2 + 1)
+        Pbb = np.zeros(block // 2 + 1)
+        Pab = np.zeros(block // 2 + 1, dtype=complex)
+        win = np.hanning(block)
+        for i in range(n_blocks):
+            s = i * block
+            Fa = np.fft.rfft(a[s:s + block] * win)
+            Fb = np.fft.rfft(b[s:s + block] * win)
+            Paa += np.abs(Fa) ** 2
+            Pbb += np.abs(Fb) ** 2
+            Pab += Fa * np.conj(Fb)
+        coh = np.abs(Pab) ** 2 / (Paa * Pbb + 1e-20)
+        result.coherence = float(np.mean(coh))
+    else:
+        result.coherence = 0.0
 
     # Spectral similarity (cosine)
     Sa = np.abs(np.fft.rfft(a))

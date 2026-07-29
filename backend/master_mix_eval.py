@@ -80,16 +80,7 @@ def _r(value: Optional[float], nd: int = 2) -> Optional[float]:
     return None if value is None else round(float(value), nd)
 
 
-def _integrated_lufs(mono: np.ndarray, sample_rate: int) -> float:
-    """BS.1770: K-weighting + абсолютный гейт −70 LUFS + относительный −10 LU."""
-    kf = KWeightingFilter(sample_rate)
-    weighted = kf.process(mono.astype(np.float64))
-    block = int(0.4 * sample_rate)
-    hop = block // 4
-    loudness: List[float] = []
-    for i in range(0, len(weighted) - block, hop):
-        ms = float(np.mean(weighted[i:i + block] ** 2))
-        loudness.append(-0.691 + 10.0 * np.log10(ms + 1e-12))
+def _gated_lufs_from_blocks(loudness: List[float]) -> float:
     if not loudness:
         return -120.0
     blocks = np.asarray(loudness)
@@ -101,6 +92,36 @@ def _integrated_lufs(mono: np.ndarray, sample_rate: int) -> float:
     if gated.size == 0:
         return -120.0
     return float(10.0 * np.log10(np.mean(10.0 ** (gated / 10.0))))
+
+
+def _integrated_lufs(mono: np.ndarray, sample_rate: int) -> float:
+    """BS.1770: K-weighting + абсолютный гейт −70 LUFS + относительный −10 LU."""
+    kf = KWeightingFilter(sample_rate)
+    weighted = kf.process(mono.astype(np.float64))
+    block = int(0.4 * sample_rate)
+    hop = block // 4
+    loudness: List[float] = []
+    for i in range(0, len(weighted) - block, hop):
+        ms = float(np.mean(weighted[i:i + block] ** 2))
+        loudness.append(-0.691 + 10.0 * np.log10(ms + 1e-12))
+    return _gated_lufs_from_blocks(loudness)
+
+
+def _integrated_lufs_stereo(left: np.ndarray, right: np.ndarray,
+                            sample_rate: int) -> float:
+    """BS.1770-4 для стерео: сумма МОЩНОСТЕЙ K-взвешенных каналов
+    (−0.691 + 10·log10(z_L + z_R)), не mono-downmix — downmix занижает
+    integrated на 3–6 дБ (ревью P1-4, совет 2026-07-29)."""
+    wl = KWeightingFilter(sample_rate).process(left.astype(np.float64))
+    wr = KWeightingFilter(sample_rate).process(right.astype(np.float64))
+    block = int(0.4 * sample_rate)
+    hop = block // 4
+    loudness: List[float] = []
+    for i in range(0, min(len(wl), len(wr)) - block, hop):
+        z = (float(np.mean(wl[i:i + block] ** 2))
+             + float(np.mean(wr[i:i + block] ** 2)))
+        loudness.append(-0.691 + 10.0 * np.log10(z + 1e-12))
+    return _gated_lufs_from_blocks(loudness)
 
 
 def evaluate_master_mix(
@@ -132,9 +153,10 @@ def evaluate_master_mix(
     mono = 0.5 * (left + right)
     issues: List[str] = []
 
-    lufs = _integrated_lufs(mono, sample_rate)
-    tp_meter = TruePeakMeter(sample_rate)
-    tp = float(max(tp_meter.process(left), tp_meter.process(right)))
+    lufs = _integrated_lufs_stereo(left, right, sample_rate)
+    # отдельный метр на канал: общий переносил состояние фильтра L → R
+    tp = float(max(TruePeakMeter(sample_rate).process(left),
+                   TruePeakMeter(sample_rate).process(right)))
     peak_db = 20.0 * np.log10(float(np.max(np.abs(mono))) + 1e-12)
     crest = peak_db - 20.0 * np.log10(float(np.sqrt(np.mean(mono ** 2))) + 1e-12)
 
@@ -145,10 +167,14 @@ def evaluate_master_mix(
     e_lr = float(np.mean(left ** 2) + np.mean(right ** 2))
     mono_fold = float(np.mean((left + right) ** 2) / (2.0 * e_lr + 1e-12))
 
-    spec = np.abs(np.fft.rfft(mono * np.hanning(n)))
-    freqs = np.fft.rfftfreq(n, 1.0 / sample_rate)
+    # Welch-усреднение вместо одного Hann-кадра всей записи: σ одиночного
+    # бина ~5.6 дБ ломала tilt/vocal-метрики (ревью, совет 2026-07-29)
+    from scipy import signal as _sig
+    nperseg = min(8192, n)
+    freqs, psd = _sig.welch(mono, fs=sample_rate, window="hann",
+                            nperseg=nperseg, noverlap=nperseg // 2)
     band = (freqs >= 40.0) & (freqs <= 16000.0)
-    mag_db = 20.0 * np.log10(spec[band] + 1e-12)
+    mag_db = 10.0 * np.log10(psd[band] + 1e-24)
     f_band = freqs[band]
     target = target_curve_db(f_band, target_curve)
     deviation = (mag_db - float(np.median(mag_db))) - (target - float(np.median(target)))

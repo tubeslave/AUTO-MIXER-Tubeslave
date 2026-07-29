@@ -137,3 +137,75 @@ class TestPersistentKFilter:
             f"short-term {measured:.2f} vs эталон {expected:.2f} LUFS — "
             "состояние K-фильтра снова сбрасывается на границах блоков"
         )
+
+
+class TestStereoIntegratedLufs:
+    """Ревью P1-4: mono-downmix занижал integrated на 3–6 дБ."""
+
+    def test_decorrelated_noise_not_understated(self):
+        from master_mix_eval import _integrated_lufs_stereo, _integrated_lufs
+        fs = 48000
+        rng = np.random.default_rng(7)
+        left = 0.1 * rng.standard_normal(fs * 4)
+        right = 0.1 * rng.standard_normal(fs * 4)
+        stereo = _integrated_lufs_stereo(left, right, fs)
+        mono = _integrated_lufs(0.5 * (left + right), fs)
+        # декоррелированный материал: downmix теряет ~6 дБ
+        assert stereo - mono > 4.0, f"stereo {stereo:.1f} vs mono {mono:.1f}"
+
+    def test_correlated_signal_matches_bs1770(self):
+        from master_mix_eval import _integrated_lufs_stereo
+        from lufs_gain_staging import KWeightingFilter
+        fs = 48000
+        t = np.arange(fs * 4) / fs
+        x = 0.1 * np.sin(2 * np.pi * 997 * t)
+        # идентичные каналы: z_L+z_R = 2·z → +3.01 дБ к одноканальному
+        got = _integrated_lufs_stereo(x, x, fs)
+        k = KWeightingFilter(fs).process(x)
+        expected = -0.691 + 10 * np.log10(2 * np.mean(k[fs:] ** 2))
+        assert abs(got - expected) < 0.2, f"{got:.2f} vs {expected:.2f}"
+
+
+class TestWelchCoherence:
+    """Ревью C1: однокадровая когерентность ≡ 1.0 — фазовый гейт был фиктивным."""
+
+    def test_independent_noise_low_coherence(self):
+        from signal_metrics import compare_channels
+        fs = 48000
+        rng = np.random.default_rng(3)
+        a = rng.standard_normal(fs * 2).astype(np.float32)
+        b = rng.standard_normal(fs * 2).astype(np.float32)
+        icm = compare_channels(a, b, fs, 0, 1)
+        assert icm.coherence < 0.2, f"независимые шумы: coherence={icm.coherence:.3f}"
+        assert abs(icm.cross_correlation) < 0.2, (
+            f"r на лаге для независимых шумов: {icm.cross_correlation:.3f}"
+        )
+
+    def test_delayed_copy_high_coherence_and_r(self):
+        from signal_metrics import compare_channels
+        fs = 48000
+        rng = np.random.default_rng(4)
+        src = rng.standard_normal(fs * 2).astype(np.float32)
+        lag = 48  # 1 мс
+        a = src[lag:]
+        b = src[:-lag]
+        icm = compare_channels(a, b, fs, 0, 1)
+        assert icm.coherence > 0.8, f"coherence={icm.coherence:.3f}"
+        assert icm.cross_correlation > 0.8
+        assert abs(icm.delay_ms - 1.0) < 0.1
+        assert not icm.phase_inverted
+
+    def test_inverted_delayed_copy_detected(self):
+        from signal_metrics import compare_channels
+        fs = 48000
+        rng = np.random.default_rng(5)
+        src = rng.standard_normal(fs * 2).astype(np.float32)
+        lag = 28  # 0.58 мс — кейс из зафиксированного правила
+        a = src[lag:]
+        b = -src[:-lag]
+        icm = compare_channels(a, b, fs, 0, 1)
+        assert icm.cross_correlation < -0.8
+        assert icm.phase_inverted, (
+            "инверсия при сдвиге 0.58 мс не детектирована — r снова "
+            "считается на нулевом лаге"
+        )
