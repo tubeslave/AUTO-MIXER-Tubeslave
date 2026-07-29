@@ -2109,10 +2109,12 @@ class EQCorrector:
                 if local_deviation < -self.peak_prominence:
                     gain = max(self.min_gain, local_deviation * sensitivity)
                     gain = min(0, gain)  # Only cuts
+                    # max_cut в профилях отрицательный: масштаб берётся по
+                    # модулю, иначе срез меняет знак и превращается в буст
                     corrections.append(EQBand(
                         band_type='peak',
                         frequency=freq,
-                        gain=gain * min(1.0, max_cut / abs(self.min_gain)),
+                        gain=gain * min(1.0, abs(max_cut) / abs(self.min_gain)),
                         q=q
                     ))
         
@@ -2167,12 +2169,9 @@ class EQCorrector:
             corrections = corrections[:6]
             corrections.sort(key=lambda x: x.frequency)
         
-        # Assign band types based on position
-        if corrections:
-            corrections[0].band_type = 'low_shelf'
-            if len(corrections) > 1:
-                corrections[-1].band_type = 'high_shelf'
-        
+        # Полосы остаются параметрическими: позиционная конвертация крайних
+        # полос в shelf запрещена — узкий срез 250 Гц как low-shelf выпиливает
+        # весь фундамент источника (совет 2026-07-29, ревью D3)
         return corrections
     
     def _calculate_q_from_peak(self, spectrum: np.ndarray, freqs: np.ndarray, peak_idx: int) -> float:

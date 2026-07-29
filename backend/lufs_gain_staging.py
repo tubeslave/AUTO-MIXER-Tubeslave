@@ -4636,9 +4636,12 @@ class TruePeakMeter:
     
     def _design_interpolation_filter(self):
         """Проектирование low-pass фильтра для интерполяции."""
-        # FIR фильтр для 4x oversampling
-        num_taps = 49
-        cutoff = 0.5 / self.oversample_factor
+        # FIR фильтр для 4x oversampling.
+        # cutoff задаётся в долях Найквиста АПСЕМПЛИРОВАННОГО потока (4*fs):
+        # полоса пропускания обязана доходить до fs/2 = 1/oversample_factor,
+        # иначе ВЧ-пики (тарелки, air) систематически занижаются.
+        num_taps = 97
+        cutoff = 1.0 / self.oversample_factor
         self.interp_filter = signal.firwin(num_taps, cutoff)
         self.filter_delay = (num_taps - 1) // 2
     
@@ -4664,9 +4667,11 @@ class TruePeakMeter:
             zi=self._filter_zi,
         )
         interpolated *= self.oversample_factor  # Компенсация амплитуды
-        
-        # Находим максимальный пик
-        peak_linear = np.max(np.abs(interpolated))
+
+        # Находим максимальный пик. True peak не может быть ниже sample peak —
+        # страховка от занижения на переходной полосе интерполятора.
+        sample_peak = float(np.max(np.abs(samples))) if len(samples) else 0.0
+        peak_linear = max(float(np.max(np.abs(interpolated))), sample_peak)
         self._current_peak = peak_linear
         self._max_peak = max(self._max_peak, peak_linear)
         

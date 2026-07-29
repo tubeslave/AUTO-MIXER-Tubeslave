@@ -1101,7 +1101,9 @@ class TestSetterResultPropagation:
             "pythonosc.osc_message": MagicMock(),
         }):
             from wing_client import WingClient
-            client = WingClient(ip="127.0.0.1", port=2223)
+            # Ceiling now applies to main fader too (council 2026-07-29);
+            # hardware clamp is verified with an explicit opt-in ceiling.
+            client = WingClient(ip="127.0.0.1", port=2223, fader_ceiling_db=10.0)
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
@@ -1110,3 +1112,10 @@ class TestSetterResultPropagation:
             assert client.commanded_state["/main/1/fdr"] == 10.0
             assert client.set_main_fader(1, -500.0) is True
             assert client.commanded_state["/main/1/fdr"] == -144.0
+
+            default_client = WingClient(ip="127.0.0.1", port=2223)
+            default_client.is_connected = True
+            default_client.sock = MagicMock()
+            default_client._osc_throttle_enabled = False
+            assert default_client.set_main_fader(1, 5.0) is True
+            assert default_client.commanded_state["/main/1/fdr"] == 0.0

@@ -746,23 +746,24 @@ class WingClient(MixerClientBase):
         an explicit operator-level opt-in (AUTOMIXER_FADER_CEILING_DB).
         """
         address = f"/ch/{channel}/fdr"
-        # Wing expects dB values directly (-144..10)
-        # Ensure value is within valid range
-        db_value = float(value)
-        if db_value < -144.0:
-            db_value = -144.0
-        elif db_value > 10.0:
-            db_value = 10.0
+        db_value = self._clamp_fader_db(address, value)
+        logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
+        return self.send(address, db_value)
+
+    def _clamp_fader_db(self, address: str, value: float) -> float:
+        """Clamp any level-type write (fader/send lvl) to hardware range and
+        the software fader ceiling. Ceiling applies to EVERY level surface
+        (ch/bus/dca/main/fx-return/sends): a DCA or bus above unity defeats
+        the per-channel ceiling (defence-in-depth, council 2026-07-29)."""
+        db_value = max(-144.0, min(10.0, float(value)))
         if db_value > self._fader_ceiling_db:
             logger.warning(
-                f"Fader ceiling enforced: /ch/{channel}/fdr requested "
+                f"Fader ceiling enforced: {address} requested "
                 f"{db_value:.2f} dB > ceiling {self._fader_ceiling_db:.2f} dB; "
                 f"clamping (operator opt-in: AUTOMIXER_FADER_CEILING_DB)"
             )
             db_value = self._fader_ceiling_db
-
-        logger.info(f"Setting fader /ch/{channel}/fdr = {db_value:.2f} dB")
-        return self.send(address, db_value)
+        return db_value
 
     def get_channel_mute(self, channel: int) -> Optional[int]:
         """Get channel mute state"""
@@ -1311,9 +1312,9 @@ class WingClient(MixerClientBase):
         return self.state.get(address)
 
     def set_main_fader(self, main: int, value: float):
-        """Set main fader value (dB, -144..10)"""
-        db_value = max(-144.0, min(10.0, float(value)))
-        return self.send(f"/main/{main}/fdr", db_value)
+        """Set main fader value (dB, -144..10; ceiling-clamped)"""
+        address = f"/main/{main}/fdr"
+        return self.send(address, self._clamp_fader_db(address, value))
 
     def get_dca_fader(self, dca: int) -> Optional[float]:
         """Get DCA fader value"""
@@ -1325,9 +1326,9 @@ class WingClient(MixerClientBase):
         return float(value) if value is not None else None
 
     def set_dca_fader(self, dca: int, value: float):
-        """Set DCA fader value"""
-        db_value = max(-144.0, min(10.0, float(value)))
-        return self.send(f"/dca/{dca}/fdr", db_value)
+        """Set DCA fader value (ceiling-clamped)"""
+        address = f"/dca/{dca}/fdr"
+        return self.send(address, self._clamp_fader_db(address, value))
 
     def set_dca_level(self, dca: int, value: float):
         """Compatibility wrapper for safety actions controlling DCA level."""
@@ -1340,9 +1341,9 @@ class WingClient(MixerClientBase):
     # ========== Bus Methods ==========
     
     def set_bus_fader(self, bus: int, value: float):
-        """Set bus fader value (dB, -144..10)"""
-        db_value = max(-144.0, min(10.0, float(value)))
-        return self.send(f"/bus/{bus}/fdr", db_value)
+        """Set bus fader value (dB, -144..10; ceiling-clamped)"""
+        address = f"/bus/{bus}/fdr"
+        return self.send(address, self._clamp_fader_db(address, value))
 
     def get_bus_fader(self, bus: int) -> Optional[float]:
         """Get bus fader value."""
@@ -1623,7 +1624,8 @@ class WingClient(MixerClientBase):
 
     def set_fx_return_level(self, bus: int, level_db: float):
         """Set an FX return bus level in dB when returns are mapped to buses."""
-        return self.send(f"/bus/{bus}/fdr", level_db)
+        address = f"/bus/{bus}/fdr"
+        return self.send(address, self._clamp_fader_db(address, level_db))
 
     def set_reverb_send(self, channel: int, level_db: float, send_bus: int = 13):
         """Compatibility wrapper used by AutoReverb/AutoFX planners."""
@@ -1676,7 +1678,7 @@ class WingClient(MixerClientBase):
         base = f"/ch/{channel}/send/{send}"
         results = []
         if level is not None:
-            results.append(self.send(f"{base}/lvl", level))
+            results.append(self.send(f"{base}/lvl", self._clamp_fader_db(f"{base}/lvl", level)))
         if on is not None:
             results.append(self.send(f"{base}/on", on))
         if mode is not None:
@@ -1698,7 +1700,8 @@ class WingClient(MixerClientBase):
         """
         results = []
         if level is not None:
-            results.append(self.send(f"/ch/{channel}/main/{main}/lvl", level))
+            addr = f"/ch/{channel}/main/{main}/lvl"
+            results.append(self.send(addr, self._clamp_fader_db(addr, level)))
         if on is not None:
             results.append(self.send(f"/ch/{channel}/main/{main}/on", on))
         if pre is not None:

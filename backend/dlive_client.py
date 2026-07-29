@@ -9,6 +9,7 @@ Default port: 51328 (plain TCP) or 51329 (TLS).
 
 import logging
 import math
+import os
 import socket
 import ssl
 import struct
@@ -287,6 +288,14 @@ class DLiveClient(MixerClientBase):
         self._channel_names: Dict[int, str] = {}
         self._parse_buffer = bytearray()
 
+        # Defence-in-depth: fader ceiling on the transport boundary, same
+        # opt-in as WingClient (AUTOMIXER_FADER_CEILING_DB), default 0 dBFS.
+        try:
+            ceiling = float(os.getenv("AUTOMIXER_FADER_CEILING_DB", "") or 0.0)
+        except ValueError:
+            ceiling = 0.0
+        self._fader_ceiling_db = max(-144.0, min(10.0, ceiling))
+
         logger.info(
             "DLiveClient initialized for %s:%s (TLS=%s, tls_ca_file=%s, "
             "tls_server_hostname=%s, base_ch=%s)",
@@ -534,6 +543,13 @@ class DLiveClient(MixerClientBase):
         return (self.midi_base_channel + CHANNEL_TYPE_OFFSET.get(channel_type, 0)) & 0x0F
 
     def set_fader(self, channel: int, value_db: float, channel_type: str = "input"):
+        value_db = float(value_db)
+        if value_db > self._fader_ceiling_db:
+            logger.warning(
+                f"Fader ceiling enforced: dLive {channel_type} ch{channel} requested "
+                f"{value_db:.2f} dB > ceiling {self._fader_ceiling_db:.2f} dB; clamping"
+            )
+            value_db = self._fader_ceiling_db
         midi_ch = self._midi_channel(channel_type)
         fader_val = db_to_fader_value(value_db)
         msg = build_nrpn(midi_ch, 0x00, channel - 1, fader_val)
@@ -610,7 +626,9 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel("input")
         val = 0x7F if enabled else 0x00
         payload = bytes([midi_ch, 0x0B, channel - 1, val])
-        self._send_raw(build_sysex(payload))
+        # Возврат результата обязателен: None здесь читался gate'ом как
+        # «applied» — ложное подтверждение 48V на концерте
+        return self._send_raw(build_sysex(payload))
 
     # ── Pad (SysEx) ────────────────────────────────────────────
 
@@ -618,7 +636,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel("input")
         val = 0x7F if enabled else 0x00
         payload = bytes([midi_ch, 0x0A, channel - 1, val])
-        self._send_raw(build_sysex(payload))
+        return self._send_raw(build_sysex(payload))
 
     # ── PEQ (NRPN) ────────────────────────────────────────────
 
@@ -626,7 +644,7 @@ class DLiveClient(MixerClientBase):
         """Set PEQ band parameters (band 1-4)."""
         if band not in PEQ_BANDS:
             logger.warning(f"Invalid PEQ band {band}, must be 1-4")
-            return
+            return False
         midi_ch = self._midi_channel("input")
         ch_idx = channel - 1
         params = PEQ_BANDS[band]
@@ -663,7 +681,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel(channel_type)
         name_bytes = name.encode("ascii", errors="replace")[:8]
         payload = bytes([midi_ch, 0x03, channel - 1]) + name_bytes
-        self._send_raw(build_sysex(payload))
+        return self._send_raw(build_sysex(payload))
 
     def get_channel_name(self, channel: int) -> str:
         """Get cached channel name, or request it from dLive."""
@@ -694,7 +712,7 @@ class DLiveClient(MixerClientBase):
         midi_ch = self._midi_channel(channel_type)
         col_val = COLOURS.get(colour, 0x00)
         payload = bytes([midi_ch, 0x05, channel - 1, col_val])
-        self._send_raw(build_sysex(payload))
+        return self._send_raw(build_sysex(payload))
 
     # ── Pan / Balance (NRPN) ─────────────────────────────────────
 
