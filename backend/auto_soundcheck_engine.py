@@ -5478,8 +5478,13 @@ class AutoSoundcheckEngine:
             self._mark_derivation_stage_complete(channel, "group_balance")
 
         # 13. Оценка результата сведения по ЗВУЧАНИЮ мастер-суммы
-        # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06)
-        self._evaluate_master_mix()
+        # (замкнутый контур: Main LR -> USB 47/48; директива 2026-07-06).
+        # K5 — единственная законно итеративная стадия (совет 2026-07-29,
+        # WORKING_ALGORITHM §3.1 п.8): абсолютные цели, лимит проходов,
+        # anti-oscillation
+        self._run_master_convergence_loop(
+            phase_guard_context=phase_guard_context
+        )
 
         # 14. Чек-лист: каналы без сигнала — незакрытые пункты; саундчек
         # продолжается конвергентным циклом, пока задача не закрыта
@@ -6078,6 +6083,66 @@ class AutoSoundcheckEngine:
                             required_for="show_mix",
                             channel=channel,
                         )
+
+    def _run_master_convergence_loop(
+        self,
+        *,
+        max_passes: int = 3,
+        phase_guard_context: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """Итеративный мастер-цикл K5 (стадия 8 целевого алгоритма).
+
+        Единственный замкнутый контур, слышащий ВСЕ коррекции, поэтому
+        единственная стадия, где итерация легальна. Правила:
+        - коррекция между проходами — только существующий bounded-механизм
+          абсолютных целей (_apply_dca_group_balance, cuts-only, потолок 0);
+        - anti-oscillation: проход без изменения набора issues = стоп
+          (иначе цикл гоняет одни и те же полумеры);
+        - жёсткий лимит проходов; журнал дельт — в отчёт.
+        """
+        journal: List[Dict[str, Any]] = []
+        prev_issues: Optional[Tuple[str, ...]] = None
+        payload: Optional[Dict[str, Any]] = None
+        for pass_no in range(1, max_passes + 1):
+            payload = self._evaluate_master_mix()
+            if payload is None:
+                break
+            issues = tuple(sorted(payload.get("issues") or ()))
+            journal.append({
+                "pass": pass_no,
+                "status": payload.get("status"),
+                "lufs_integrated": payload.get("lufs_integrated"),
+                "true_peak_dbtp": payload.get("true_peak_dbtp"),
+                "issues": list(issues),
+            })
+            if payload.get("status") != "ISSUES":
+                break
+            if issues == prev_issues:
+                logger.info(
+                    "Master loop: проход %d без дельты issues — "
+                    "anti-oscillation стоп, residual оператору", pass_no
+                )
+                break
+            prev_issues = issues
+            if pass_no == max_passes:
+                break
+            # bounded-коррекция к абсолютным Ayaic-плоскостям и новый замер
+            logger.info(
+                "Master loop: проход %d, issues=%d — повторный bounded "
+                "групповой баланс", pass_no, len(issues)
+            )
+            try:
+                self._apply_dca_group_balance(
+                    phase_guard_context=phase_guard_context
+                )
+            except Exception:
+                logger.exception("Master loop: групповой баланс не прошёл")
+                break
+        if journal:
+            self._master_loop_journal = journal
+            if payload is not None:
+                payload["convergence_journal"] = journal
+        return payload
 
     def _evaluate_master_mix(self) -> Optional[Dict[str, Any]]:
         """Захват мастер-петли и оценка микса; вердикт в лог и reports/."""

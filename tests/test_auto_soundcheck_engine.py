@@ -4168,3 +4168,52 @@ def test_channel_notch_budget_escalates_to_fader_dip():
         if getattr(d.action, "action_type", "") == "EmergencyChannelFaderMove"
     ]
     assert dips, "исчерпанный бюджет notch не эскалировал в fader-dip"
+
+
+def _master_loop_engine(verdicts):
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    seq = list(verdicts)
+    engine._evaluate_master_mix = lambda: (seq.pop(0) if seq else None)
+    engine._dca_runs = 0
+
+    def _dca(**_kw):
+        engine._dca_runs += 1
+    engine._apply_dca_group_balance = _dca
+    return engine
+
+
+def test_master_loop_stops_on_ok():
+    """K5-цикл: ISSUES → коррекция → OK; журнал несёт оба прохода."""
+    engine = _master_loop_engine([
+        {"status": "ISSUES", "issues": ["громкость вне цели"],
+         "lufs_integrated": -14.0, "true_peak_dbtp": -2.0},
+        {"status": "OK", "issues": [],
+         "lufs_integrated": -18.0, "true_peak_dbtp": -8.0},
+    ])
+    payload = engine._run_master_convergence_loop()
+    assert payload["status"] == "OK"
+    assert engine._dca_runs == 1
+    assert [j["pass"] for j in payload["convergence_journal"]] == [1, 2]
+
+
+def test_master_loop_anti_oscillation_stops_on_static_issues():
+    """Проход без дельты issues — стоп (полумеры не гоняются по кругу)."""
+    same = {"status": "ISSUES", "issues": ["зона вокала маскируется"],
+            "lufs_integrated": -20.0, "true_peak_dbtp": -6.0}
+    engine = _master_loop_engine([dict(same), dict(same), dict(same)])
+    payload = engine._run_master_convergence_loop()
+    assert engine._dca_runs == 1  # после 2-го прохода без дельты — стоп
+    assert len(payload["convergence_journal"]) == 2
+
+
+def test_master_loop_hard_pass_limit():
+    """Лимит проходов держится даже при постоянно меняющихся issues."""
+    verdicts = [
+        {"status": "ISSUES", "issues": [f"issue-{i}"],
+         "lufs_integrated": -20.0, "true_peak_dbtp": -6.0}
+        for i in range(6)
+    ]
+    engine = _master_loop_engine(verdicts)
+    payload = engine._run_master_convergence_loop(max_passes=3)
+    assert len(payload["convergence_journal"]) == 3
+    assert engine._dca_runs == 2  # между проходами 1-2 и 2-3
