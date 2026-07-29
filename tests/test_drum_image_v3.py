@@ -119,3 +119,33 @@ def test_plan_rejects_implausible_oh_internal_delay():
 def test_plan_without_snare_does_nothing():
     plan = plan_drum_image({}, SR, oh_pair=(6, 7), snare_t=None)
     assert not plan.delays_ms and not plan.polarity_flip
+
+
+def test_implausible_snare_tb_lag_skips_polarity_too():
+    """Правило CLAUDE.md («9.90 мс» live 2026-07-06): лаг T↔B за пределами
+    физики пары — периодическая неоднозначность GCC-PHAT; знак r на таком
+    лаге мусор. Ревью C3: флип полярности уезжал ДО этой проверки —
+    теперь пара пропускается ЦЕЛИКОМ, включая polarity."""
+    snare_t = _click_train()
+    oh_l = _click_train(lag_ms=3.0, gain_db=-12.0)
+    oh_r = _click_train(lag_ms=3.5, gain_db=-12.0)
+    # нижний снейр: ИНВЕРТИРОВАН и «замерен» с неправдоподобным лагом 9.9 мс
+    snare_b = -_click_train(lag_ms=9.9, gain_db=-3.0)
+    buffers = {2: snare_t, 3: snare_b, 6: oh_l, 7: oh_r}
+    plan = plan_drum_image(buffers, SR, oh_pair=(6, 7), snare_t=2, snare_b=3)
+    assert 3 not in plan.polarity_flip, (
+        "полярность применена по знаку r на неоднозначном лаге"
+    )
+    assert 3 not in plan.delays_ms
+    assert any("пропущена целиком" in n for n in plan.notes)
+
+
+def test_plausible_inverted_snare_b_still_flipped():
+    """Контроль: инверсия при правдоподобном лаге 0.5 мс детектируется."""
+    snare_t = _click_train()
+    oh_l = _click_train(lag_ms=3.0, gain_db=-12.0)
+    oh_r = _click_train(lag_ms=3.5, gain_db=-12.0)
+    snare_b = -_click_train(lag_ms=0.5, gain_db=-3.0)
+    buffers = {2: snare_t, 3: snare_b, 6: oh_l, 7: oh_r}
+    plan = plan_drum_image(buffers, SR, oh_pair=(6, 7), snare_t=2, snare_b=3)
+    assert plan.polarity_flip.get(3) is True

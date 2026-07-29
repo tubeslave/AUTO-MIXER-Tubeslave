@@ -239,33 +239,40 @@ def plan_drum_image(
                 f"OH раньше близкого снейра ({est2.delay_ms:.2f} мс) — "
                 "физически неправдоподобно, шаг 2 пропущен")
 
-        # ── 3. Snare T ↔ Snare B: полярность, потом микрозадержка ──
+        # ── 3. Snare T ↔ Snare B: правдоподобие лага, ПОТОМ полярность ──
         snare_b_buf = buf(snare_b)
         if snare_b_buf is not None and snare_hits:
             est3 = estimate_pair_delay(snare, snare_b_buf, sample_rate,
                                        snare_hits)
             plan.measurements["snare_t_to_b"] = est3.to_dict()
-            lag_for_pol = est3.delay_ms if est3.accepted else 0.0
-            pol = polarity_decision(snare, snare_b_buf, sample_rate,
-                                    lag_ms=lag_for_pol)
-            plan.measurements["snare_b_polarity"] = pol
-            if pol.get("flip") is True:
-                plan.polarity_flip[snare_b] = True
-            if est3.accepted and abs(est3.delay_ms) <= SAME_SOURCE_DELAY_MAX_MS:
-                # est3>0: T позже B -> B догоняет задержкой; абсолютная цель
-                b_delay = snare_t_delay + float(est3.delay_ms)
-                if b_delay < 0:
-                    plan.notes.append(
-                        f"Snare B позже T на {-est3.delay_ms:.2f} мс — "
-                        "опережение невозможно, задержка B оставлена 0")
-                    b_delay = 0.0
-                if b_delay > 0.1:
-                    plan.delays_ms[snare_b] = b_delay
-            elif est3.accepted:
+            if est3.accepted and abs(est3.delay_ms) > SAME_SOURCE_DELAY_MAX_MS:
+                # Правило CLAUDE.md («9.90 мс» live 2026-07-06): лаг за
+                # пределами физики пары сантиметровых микрофонов =
+                # периодическая неоднозначность GCC-PHAT; знак r на таком
+                # лаге — мусор. Пара пропускается ЦЕЛИКОМ, включая
+                # полярность (ревью C3: флип уезжал ДО этой проверки).
                 plan.notes.append(
                     f"T↔B {est3.delay_ms:.2f} мс > "
                     f"{SAME_SOURCE_DELAY_MAX_MS} мс — периодическая "
-                    "неоднозначность GCC-PHAT, пара пропущена")
+                    "неоднозначность GCC-PHAT, пара пропущена целиком "
+                    "(включая полярность)")
+            else:
+                lag_for_pol = est3.delay_ms if est3.accepted else 0.0
+                pol = polarity_decision(snare, snare_b_buf, sample_rate,
+                                        lag_ms=lag_for_pol)
+                plan.measurements["snare_b_polarity"] = pol
+                if pol.get("flip") is True:
+                    plan.polarity_flip[snare_b] = True
+                if est3.accepted:
+                    # est3>0: T позже B -> B догоняет задержкой; абсолютная цель
+                    b_delay = snare_t_delay + float(est3.delay_ms)
+                    if b_delay < 0:
+                        plan.notes.append(
+                            f"Snare B позже T на {-est3.delay_ms:.2f} мс — "
+                            "опережение невозможно, задержка B оставлена 0")
+                        b_delay = 0.0
+                    if b_delay > 0.1:
+                        plan.delays_ms[snare_b] = b_delay
 
         # ── 4/5. Томы и тарелки к oh_ref по СНЕЙРУ в них ──
         for ch in list(toms) + list(cymbals):

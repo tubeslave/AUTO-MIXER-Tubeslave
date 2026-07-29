@@ -38,6 +38,8 @@ from heuristics.balance_v3 import (
 )
 from heuristics.gain_v3 import CLASS_GAIN_PROFILE as GAIN_V3_CLASS_PROFILE
 from heuristics.phase_v3 import (
+    detect_onsets as phase_detect_onsets,
+    estimate_pair_delay as phase_estimate_pair_delay,
     pair_alignment_allowed as phase_pair_alignment_allowed,
 )
 from heuristics.pan_v3 import PanConfig, assign_pans
@@ -7201,6 +7203,32 @@ class AutoSoundcheckEngine:
                 f"Ch {ch}: comp threshold follows trim "
                 f"{float(thr):.1f}→{new_thr:.1f} dB (Δtrim {delta_db:+.1f})"
             )
+        self._shift_gate_threshold_with_trim(ch, delta_db)
+
+    def _shift_gate_threshold_with_trim(self, ch: int, delta_db: float) -> None:
+        """Сдвинуть порог включённого гейта вслед за тримом.
+
+        Гейт пульта стоит ПОСЛЕ трима, а его порог считался от pre-trim
+        tap-домена: без сдвига Δtrim рассинхронизирует консольный и
+        измерительный домены (ревью 2026-07-29, DSP-архитектор §1.2 —
+        comp следовал за тримом, gate нет).
+        """
+        state = getattr(self.mixer_client, "state", None)
+        if not isinstance(state, dict):
+            return
+        if not self._as_bool(state.get(f"/ch/{ch}/gate/on"), False):
+            return
+        thr = state.get(f"/ch/{ch}/gate/thr")
+        if thr is None:
+            return
+        new_thr = float(np.clip(float(thr) + delta_db, -80.0, 0.0))
+        setter = getattr(self.mixer_client, "set_gate_threshold", None)
+        if callable(setter):
+            setter(ch, round(new_thr, 1))
+            logger.info(
+                f"Ch {ch}: gate threshold follows trim "
+                f"{float(thr):.1f}→{new_thr:.1f} dB (Δtrim {delta_db:+.1f})"
+            )
 
     # ── 5e. Phase / polarity detection ────────────────────────
 
@@ -7248,10 +7276,25 @@ class AutoSoundcheckEngine:
                         f"Phase: пара ch{ch_a}/{ch_b} пропущена ({deny_reason})")
                     continue
 
-                buf_a = self.audio_capture.get_buffer(ch_a, self.sample_rate * 2)
-                buf_b = self.audio_capture.get_buffer(ch_b, self.sample_rate * 2)
+                # Синхронный снапшот пары: последовательные get_buffer
+                # сдвигали каналы на целый блок (21.3 мс @48k) — тихие
+                # ложные no_valid_hits (ревью H1). Fallback для captures
+                # без синхронного API (обёртки/тестовые фейки).
+                sync_snap = getattr(
+                    self.audio_capture, "get_synchronized_buffers", None
+                )
+                if callable(sync_snap):
+                    snap = sync_snap([ch_a, ch_b], self.sample_rate * 2)
+                    buf_a = snap["buffers"].get(ch_a)
+                    buf_b = snap["buffers"].get(ch_b)
+                else:
+                    buf_a = self.audio_capture.get_buffer(
+                        ch_a, self.sample_rate * 2)
+                    buf_b = self.audio_capture.get_buffer(
+                        ch_b, self.sample_rate * 2)
 
-                if len(buf_a) < 4096 or len(buf_b) < 4096:
+                if buf_a is None or buf_b is None or \
+                        len(buf_a) < 4096 or len(buf_b) < 4096:
                     continue
 
                 # Use the full inter-channel comparison
@@ -7326,8 +7369,27 @@ class AutoSoundcheckEngine:
                         },
                     )
 
-                # Time alignment
+                # Time alignment. Для пар одного источника полнобуферный
+                # замер заменяется onset-gated phase_v3 (MAD/IQR-гейты,
+                # правило CLAUDE.md о GCC-PHAT в live с bleed) — ревью H3:
+                # сильный решатель был выключен из default-пути.
                 elif abs(icm.delay_ms) > 0.1 and icm.coherence > 0.3:
+                    if pair_type in self.SAME_SOURCE_CLOSE_PAIR_PRESETS:
+                        hits = phase_detect_onsets(buf_a, self.sample_rate)
+                        est = phase_estimate_pair_delay(
+                            buf_b, buf_a, self.sample_rate, hits
+                        )
+                        if not est.accepted:
+                            logger.info(
+                                f"Phase: {name_a} ↔ {name_b}: onset-gated "
+                                f"замер не подтверждён ({est.reject_reason}) "
+                                f"— нужен соло-проход, выравнивание пропущено"
+                            )
+                            continue
+                        icm.delay_ms = abs(float(est.delay_ms))
+                        icm.delay_samples = int(
+                            round(est.delay_ms / 1000.0 * self.sample_rate)
+                        )
                     align_ch = ch_b if icm.delay_samples > 0 else ch_a
                     align_info = self.channels.get(align_ch)
                     align_raw = self._snapshot_raw(align_info) if align_info else {}

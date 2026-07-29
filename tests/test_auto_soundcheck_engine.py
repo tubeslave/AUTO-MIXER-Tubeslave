@@ -1591,6 +1591,11 @@ class DetectorMixer:
         self.calls.append(("set_compressor_threshold", channel, threshold))
         return True
 
+    def set_gate_threshold(self, channel, threshold):
+        self.gate[channel] = threshold
+        self.calls.append(("set_gate_threshold", channel, threshold))
+        return True
+
     def set_compressor_gain(self, channel, gain):
         self.calls.append(("set_compressor_gain", channel, gain))
         return True
@@ -1845,12 +1850,21 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     # легаси-путь барабанной фазы: при включённой операторской схеме
     # drum_image (стадия 11b) он отключён — тест проверяет именно легаси
     engine.config_manager.get_section = lambda name: {}
-    engine.audio_capture = DetectorAudioCapture(
-        {
-            1: np.ones(48000, dtype=np.float32) * 0.1,
-            2: np.ones(48000, dtype=np.float32) * 0.1,
-        }
-    )
+    # Пара одного источника (kick in/out) с 2026-07-29 требует
+    # onset-gated подтверждения phase_v3 (Ф3): буферы — click-train со
+    # сдвигом 24 сэмпла (0.5 мс), а не плоский DC
+    fs = 48000
+    rng = np.random.default_rng(11)
+    base = (rng.standard_normal(fs * 2) * 1e-4).astype(np.float32)
+    click = (np.exp(-np.arange(128) / 12.0)
+             * rng.standard_normal(128) * 0.8).astype(np.float32)
+    buf_ref = base.copy()
+    buf_tgt = base.copy()
+    lag = 24
+    for pos in range(4000, fs * 2 - 4000, 7500):
+        buf_ref[pos:pos + 128] += click
+        buf_tgt[pos + lag:pos + lag + 128] += click
+    engine.audio_capture = DetectorAudioCapture({1: buf_ref, 2: buf_tgt})
     engine.channels = {
         1: ChannelInfo(
             channel=1,
@@ -1897,7 +1911,7 @@ def test_drum_phase_delay_corrects_processed_channels_through_safety(monkeypatch
     assert delay_blocks[0].payload["blocked_calls"][0]["channel"] == 2
     # саундчек-деривация (SOURCE_LEARNING): абсолютная цель выравнивания,
     # без пошагового live-лимита
-    assert delay_blocks[0].payload["blocked_calls"][0]["delay_ms"] == 0.5
+    assert delay_blocks[0].payload["blocked_calls"][0]["delay_ms"] == pytest.approx(0.5, abs=0.05)
     assert not any(call[0] == "set_delay" for call in mixer.calls)
 
 
@@ -4048,3 +4062,25 @@ def test_stepped_eq_apply_converges_within_total_cap():
     assert mixer.eq_gain[(1, 2)] == pytest.approx(-2.5, abs=0.05)
     eq_moves = [c for c in mixer.calls if c[0] == "set_eq_band"]
     assert len(eq_moves) >= 1
+
+
+def test_gate_threshold_follows_trim_shift():
+    """Ф3 (совет 2026-07-29): гейт пульта стоит ПОСЛЕ трима — его порог
+    обязан следовать за Δtrim симметрично компрессору, иначе консольный
+    и измерительный домены расходятся на дельту трима."""
+    mixer = DetectorMixer()
+    mixer.state = {
+        "/ch/1/dyn/on": 1, "/ch/1/dyn/thr": -43.5,
+        "/ch/1/gate/on": 1, "/ch/1/gate/thr": -52.0,
+    }
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine._shift_comp_threshold_with_trim(1, +6.0)
+    gate_calls = [c for c in mixer.calls if c[0] == "set_gate_threshold"]
+    assert gate_calls and gate_calls[-1][2] == pytest.approx(-46.0)
+
+    # выключенный гейт не трогается
+    mixer.state["/ch/1/gate/on"] = 0
+    n = len([c for c in mixer.calls if c[0] == "set_gate_threshold"])
+    engine._shift_comp_threshold_with_trim(1, -3.0)
+    assert len([c for c in mixer.calls if c[0] == "set_gate_threshold"]) == n
