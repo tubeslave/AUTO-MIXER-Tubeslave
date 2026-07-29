@@ -51,7 +51,9 @@ class FeedbackLiveMonitorConfig:
     fft_size: int = 2048
     persistence_frames: int = 12
     min_confidence: float = 0.75
-    peak_height_db: float = -12.0
+    # dBFS (с 2026-07-29 magnitude детектора нормируется к полной шкале);
+    # −12 из эпохи сырых FFT-дБ делал монитор глухим к реальной заводке
+    peak_height_db: float = -40.0
     peak_prominence_db: float = 10.0
     alert_freq_bucket_hz: float = 50.0
     alert_min_interval_sec: float = 5.0

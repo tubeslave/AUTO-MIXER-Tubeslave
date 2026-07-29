@@ -80,7 +80,8 @@ feedback_live:
   fft_size: 2048
   persistence_frames: 12
   min_confidence: 0.75
-  peak_height_db: -12.0
+  # dBFS (с 2026-07-29 magnitude детектора нормируется к полной шкале)
+  peak_height_db: -40.0
   peak_prominence_db: 10.0
   alert_freq_bucket_hz: 50.0
   alert_min_interval_sec: 5.0

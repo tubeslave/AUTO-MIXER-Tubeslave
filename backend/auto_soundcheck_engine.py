@@ -708,8 +708,10 @@ class AutoSoundcheckEngine:
         self.feedback_detector_min_confidence = float(
             detector_config.get("feedback_min_confidence", 0.75)
         )
+        # dBFS-единицы с 2026-07-29 (Ф2): −12 из эпохи сырых FFT-дБ в dBFS
+        # означал «заводка только у полной шкалы» — детектор был глух
         self.feedback_detector_peak_height_db = float(
-            detector_config.get("feedback_peak_height_db", -12.0)
+            detector_config.get("feedback_peak_height_db", -40.0)
         )
         self.feedback_detector_peak_prominence_db = float(
             detector_config.get("feedback_peak_prominence_db", 10.0)
@@ -3826,6 +3828,7 @@ class AutoSoundcheckEngine:
                     },
                     notes="Pre-analysis noise floor capture with existing mixer processing preserved",
                 )
+                self._run_venue_calibration()
 
             logger.info(
                 "Pre-analysis preserve complete: %s channels preserved, %s skipped for safety",
@@ -8959,17 +8962,69 @@ class AutoSoundcheckEngine:
 
         self._pc_current_channel = None
 
+    def _run_venue_calibration(self) -> None:
+        """Ф5б (совет 2026-07-29): профиль шума зала по захвату тишины →
+        per-venue пороги feedback-детектора. Ошибка калибровки не должна
+        ронять саундчек — при любой проблеме остаются базовые пороги."""
+        try:
+            from venue_calibration import (
+                calibrate_feedback_thresholds, profile_venue_noise,
+            )
+            if self.audio_capture is None:
+                return
+            window = int(self.sample_rate * 2)
+            buffers = {}
+            for ch in self.channels:
+                if ch in self.master_reference_channels:
+                    continue  # tap-каналы — не источники шума зала
+                buf = self.audio_capture.get_buffer(ch, window)
+                if buf is not None and len(buf) >= self.sample_rate:
+                    buffers[ch] = buf
+            if not buffers:
+                return
+            profile = profile_venue_noise(buffers, self.sample_rate)
+            self.venue_calibration = calibrate_feedback_thresholds(
+                profile,
+                base_peak_height_db=self.feedback_detector_peak_height_db,
+                base_steady_dbfs=-30.0,
+            )
+            for note in self.venue_calibration.notes:
+                logger.info(f"Venue calibration: {note}")
+            logger.info(
+                "Venue calibration: пол зала %.1f dBFS, порог пика %.1f, "
+                "steady %.1f",
+                profile.overall_floor_dbfs,
+                self.venue_calibration.peak_height_db,
+                self.venue_calibration.steady_state_min_level_dbfs,
+            )
+        except Exception:
+            logger.exception(
+                "Venue calibration failed — остаются базовые пороги"
+            )
+
+    def _build_feedback_detector_config(self) -> FeedbackDetectorConfig:
+        """Конфиг детектора: базовые пороги + venue-калибровка (если была)."""
+        cfg = FeedbackDetectorConfig(
+            sample_rate=self.sample_rate,
+            fft_size=2048,
+            persistence_frames=self.feedback_detector_persistence_frames,
+            min_confidence=self.feedback_detector_min_confidence,
+            peak_height_db=self.feedback_detector_peak_height_db,
+            peak_prominence_db=self.feedback_detector_peak_prominence_db,
+        )
+        calib = getattr(self, "venue_calibration", None)
+        if calib is not None:
+            cfg.peak_height_db = float(calib.peak_height_db)
+            cfg.steady_state_min_level_dbfs = float(
+                calib.steady_state_min_level_dbfs)
+            cfg.peak_prominence_db = float(
+                cfg.peak_prominence_db + calib.peak_prominence_bump_db)
+        return cfg
+
     def _monitor_loop(self):
         """Continuous monitoring: feedback detection + cautious mix cleanup."""
         self.feedback_detector = FeedbackDetector(
-            config=FeedbackDetectorConfig(
-                sample_rate=self.sample_rate,
-                fft_size=2048,
-                persistence_frames=self.feedback_detector_persistence_frames,
-                min_confidence=self.feedback_detector_min_confidence,
-                peak_height_db=self.feedback_detector_peak_height_db,
-                peak_prominence_db=self.feedback_detector_peak_prominence_db,
-            ),
+            config=self._build_feedback_detector_config(),
         )
 
         while not self._stop_event.is_set():
