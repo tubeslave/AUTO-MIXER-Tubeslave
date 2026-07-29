@@ -141,7 +141,10 @@ class FeedbackDetectorConfig:
     fft_size: int = 2048
     persistence_frames: int = 6
     min_confidence: float = 0.5
-    peak_height_db: float = -20.0
+    # Порог пика в dBFS (с 2026-07-29 magnitude нормируется к dBFS:
+    # 20·log10(2|X|/(N·coherent_gain)); раньше сырые FFT-дБ делали пороги
+    # бессмысленными, а оператор видел «+51.8 dB» в алерте)
+    peak_height_db: float = -40.0
     peak_prominence_db: float = 6.0
     peak_distance_bins: int = 5
     max_notch_filters: int = MAX_NOTCH_FILTERS
@@ -150,6 +153,13 @@ class FeedbackDetectorConfig:
     fader_reduction_floor_db: float = -18.0
     notch_stale_age_sec: float = 30.0
     freq_tolerance_cents: float = 50.0
+    # Установившаяся заводка (упёрлась в компрессию тракта и НЕ растёт):
+    # кандидат без требования роста при persistence >= factor×frames и
+    # уровне выше порога (dBFS). Ревью 2026-07-29 FB-D3: обязательный
+    # is_growing() пропускал стационарный визг монитора — худший кейс,
+    # оператор перестаёт следить сам.
+    steady_state_persistence_factor: float = 2.0
+    steady_state_min_level_dbfs: float = -30.0
     # Тональные критерии van Waterschoot & Moonen (JAES 58(11), 2010).
     # У заводки нет гармонической структуры (PHPR высок), тон доминирует над
     # соседними полосами (PNPR) и растёт экспоненциально (IMSD ~ постоянный
@@ -473,7 +483,10 @@ class FeedbackDetector:
 
         block = samples[-self.config.fft_size:].astype(np.float32) * self.window
         spectrum = np.abs(np.fft.rfft(block))
-        magnitude_db = 20.0 * np.log10(spectrum + 1e-10)
+        # dBFS: синус полной шкалы читается ~0 дБ (нормировка на N и
+        # когерентное усиление окна Ханна)
+        norm = self.config.fft_size * float(np.mean(self.window))
+        magnitude_db = 20.0 * np.log10(2.0 * spectrum / norm + 1e-10)
 
         if state.avg_spectrum is None:
             state.avg_spectrum = magnitude_db.copy()
@@ -501,7 +514,13 @@ class FeedbackDetector:
         ])
         peak_indices = peak_indices[freq_mask]
 
+        # Толеранс сопоставления: не уже 1.5 ширины бина — 50 центов на
+        # 200 Гц (~7 Гц) меньше бина 23.4 Гц, скачок на соседний бин рвал
+        # трекинг (ревью FB-D5)
+        bin_hz = float(self.config.sample_rate) / float(self.config.fft_size)
+
         current_bins = set()
+        matched_pids = set()
         for idx in peak_indices:
             current_bins.add(int(idx))
             freq = float(self.freqs[idx])
@@ -509,14 +528,21 @@ class FeedbackDetector:
 
             matched = False
             for pid, peak in state.tracked_peaks.items():
-                if _freq_close(peak.frequency, freq, self.config.freq_tolerance_cents):
+                if (
+                    _freq_close(peak.frequency, freq, self.config.freq_tolerance_cents)
+                    or abs(peak.frequency - freq) <= 1.5 * bin_hz
+                ):
                     peak.persistence += 1
                     peak.magnitude_db = mag
+                    # дрейфующая заводка (движение микрофона, прогрев):
+                    # якорь трека следует за фактической частотой
+                    peak.frequency = freq
                     peak.magnitude_history.append(mag)
                     if len(peak.magnitude_history) > 20:
                         peak.magnitude_history = peak.magnitude_history[-20:]
                     peak.last_seen = now
                     matched = True
+                    matched_pids.add(pid)
                     break
 
             if not matched:
@@ -528,9 +554,13 @@ class FeedbackDetector:
                     first_seen=now,
                     last_seen=now,
                 )
+                matched_pids.add(int(idx))
 
+        # Stale-декремент НЕ трогает сопоставленные треки: раньше пик,
+        # уехавший с бина-ключа, получал +1 и сразу −1 — persistence не
+        # накапливалась при дрейфе (ревью FB-D4, подтверждено синтетикой)
         stale = [pid for pid, p in state.tracked_peaks.items()
-                 if pid not in current_bins]
+                 if pid not in matched_pids]
         for pid in stale:
             peak = state.tracked_peaks[pid]
             peak.persistence = max(0, peak.persistence - 1)
@@ -542,9 +572,22 @@ class FeedbackDetector:
         # случайно набравший persistence, перебивал реальную заводку —
         # notch ставился на неверную частоту (подтверждено на реальном
         # аудиотракте: тон 3150 Гц → событие на случайной частоте).
+        steady_persistence = int(
+            self.config.persistence_frames
+            * self.config.steady_state_persistence_factor
+        )
         candidates = [
             peak for peak in state.tracked_peaks.values()
-            if peak.persistence >= self.config.persistence_frames and peak.is_growing()
+            if (
+                # растущая заводка — классический критерий
+                (peak.persistence >= self.config.persistence_frames
+                 and peak.is_growing())
+                # установившаяся: упёрлась в компрессию/лимит тракта и НЕ
+                # растёт — двойная persistence + громкость выше порога
+                or (peak.persistence >= steady_persistence
+                    and peak.magnitude_db
+                    >= self.config.steady_state_min_level_dbfs)
+            )
         ]
         candidates.sort(key=lambda p: p.magnitude_db, reverse=True)
         for peak in candidates:

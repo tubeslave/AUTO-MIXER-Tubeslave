@@ -88,6 +88,7 @@ from autofoh_safety import (
     CompressorMakeupAdjust,
     DCAFaderMove,
     DelayAdjust,
+    EmergencyChannelFaderMove,
     EmergencyFeedbackNotch,
     GateAdjust,
     HighPassAdjust,
@@ -9071,11 +9072,15 @@ class AutoSoundcheckEngine:
         try:
             current = info.fader_db
             new_fader = max(-144.0, current - 3.0)
+            # EmergencyChannelFaderMove (family emergency_fader) — един-
+            # ственный фейдерный action, который политика EMERGENCY_FEEDBACK
+            # пропускает; ChannelFaderMove (family fader) здесь блокировался
+            # всегда — pull-down был мёртвым кодом (P0 ревью 2026-07-29,
+            # DEC-0005). Бюджеты/шаги — в _apply_bounds контроллера.
             decision = self._execute_action(
-                ChannelFaderMove(
+                EmergencyChannelFaderMove(
                     channel_id=ch,
                     target_db=new_fader,
-                    is_lead=info.source_role == "lead_vocal",
                     reason=reason,
                 ),
                 runtime_state=RuntimeState.EMERGENCY_FEEDBACK,

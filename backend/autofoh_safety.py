@@ -132,6 +132,28 @@ class MasterFaderMove(TypedCorrectionAction):
 
 
 @dataclass
+class EmergencyChannelFaderMove(TypedCorrectionAction):
+    """Аварийный dip фейдера канала-виновника заводки (DEC-0005, ступень 2).
+
+    Family `emergency_fader` разрешена политикой в EMERGENCY_FEEDBACK —
+    в отличие от ChannelFaderMove (family `fader`), который там запрещён
+    (ревью 2026-07-29 P0: pull-down был мёртвым кодом). Бюджет и шаги
+    ограничиваются в _apply_bounds относительно pre-emergency baseline;
+    движение ВВЕРХ допустимо только как восстановление к baseline.
+    """
+    channel_id: int
+    target_db: float
+
+    @property
+    def family(self) -> str:
+        return ACTION_FAMILY_EMERGENCY_FADER
+
+    @property
+    def target_key(self) -> Tuple[Any, ...]:
+        return (self.action_type, self.channel_id)
+
+
+@dataclass
 class ChannelMuteMove(TypedCorrectionAction):
     channel_id: int
     muted: bool
@@ -417,6 +439,12 @@ class AutoFOHSafetyConfig:
     feedback_notch_max_cut_db: float = -6.0
     feedback_notch_min_q: float = 8.0
     feedback_notch_ttl_sec: float = 120.0
+    # Аварийный контур заводки (DEC-0005): live-запись notch/fader-dip.
+    # Default OFF — включает оператор осознанно; до включения контур
+    # остаётся proposal-only, как весь остальной карантин.
+    feedback_emergency_live_apply: bool = False
+    emergency_fader_step_db: float = 3.0
+    emergency_fader_budget_db: float = 9.0
     # Абсолютный кламп EQ-полосы в фазах саундчек-деривации (one-shot)
     soundcheck_eq_max_abs_db: float = 9.0
     # Фейдеры в деривации: срезы абсолютные, подъём шагом, паркинг не трогаем
@@ -453,6 +481,9 @@ class AutoFOHSafetyConfig:
             fx_return_min_interval_sec=float(config.get("fx_return_min_interval_sec", 3.0)),
             channel_mute_min_interval_sec=float(config.get("channel_mute_min_interval_sec", 3.0)),
             allow_direct_mute_writes=bool(config.get("allow_direct_mute_writes", False)),
+            feedback_emergency_live_apply=bool(config.get("feedback_emergency_live_apply", False)),
+            emergency_fader_step_db=float(config.get("emergency_fader_step_db", 3.0)),
+            emergency_fader_budget_db=float(config.get("emergency_fader_budget_db", 9.0)),
             master_fader_max_cut_db=float(config.get("master_fader_max_cut_db", 1.0)),
             master_fader_min_interval_sec=float(config.get("master_fader_min_interval_sec", 1.0)),
             delay_max_step_ms=float(config.get("delay_max_step_ms", 0.25)),
@@ -504,6 +535,9 @@ class AutoFOHSafetyController:
         self.time_provider = time_provider or time.monotonic
         self._last_sent_at: Dict[Tuple[Any, ...], float] = {}
         self._eq_baselines: Dict[Tuple[Any, ...], float] = {}
+        # Pre-emergency уровень фейдера на канал: бюджет dip'ов и потолок
+        # восстановления считаются от него (DEC-0005)
+        self._emergency_fader_baselines: Dict[int, float] = {}
         self.history: List[SafetyDecision] = []
 
     def execute(
@@ -608,6 +642,11 @@ class AutoFOHSafetyController:
     def _is_direct_write_allowed(self, action: TypedCorrectionAction) -> bool:
         if isinstance(action, AUTOFOH_ALLOWED_DIRECT_WRITE_TYPES):
             return True
+        # Аварийный контур заводки (DEC-0005): notch и fader-dip пишутся
+        # живьём ТОЛЬКО при явном операторском опт-ине; полный gated-цикл
+        # (pre-read/readback/rollback) исполнителя сохраняется.
+        if isinstance(action, (EmergencyFeedbackNotch, EmergencyChannelFaderMove)):
+            return bool(self.config.feedback_emergency_live_apply)
         # Операторский промоут (см. AutoFOHSafetyConfig): типы, явно
         # разрешённые конфигом, пишутся напрямую — исполнитель поверх
         # этого всё равно требует pre-read/readback/rollback.
@@ -637,6 +676,13 @@ class AutoFOHSafetyController:
         return payload
 
     def _blocked_calls_for(self, action: TypedCorrectionAction) -> List[Dict[str, Any]]:
+        if isinstance(action, EmergencyChannelFaderMove):
+            return [{
+                "cmd": "set_fader",
+                "channel": action.channel_id,
+                "value_db": action.target_db,
+                "semantic": "emergency_feedback_fader_dip",
+            }]
         if isinstance(action, BusFaderMove):
             return [{
                 "cmd": "set_bus_fader",
@@ -1095,6 +1141,30 @@ class AutoFOHSafetyController:
             bounded = not isinstance(action.muted, bool)
             return ChannelMuteMove(channel_id=action.channel_id, muted=muted, reason=action.reason), bounded
 
+        if isinstance(action, EmergencyChannelFaderMove):
+            current = self._safe_get(
+                lambda: self.mixer_client.get_fader(action.channel_id), default=None
+            )
+            if current is None:
+                raise CurrentStateUnknownError(
+                    f"channel {action.channel_id} fader unknown (emergency dip refused)"
+                )
+            baseline = self._emergency_fader_baselines.setdefault(
+                action.channel_id, float(current)
+            )
+            step = abs(self.config.emergency_fader_step_db)
+            budget_floor = baseline - abs(self.config.emergency_fader_budget_db)
+            # шаг от текущего, коридор [baseline − бюджет .. baseline]:
+            # вниз — dip, вверх — только восстановление к pre-emergency
+            target = max(current - step, min(current + step, float(action.target_db)))
+            target = max(budget_floor, min(baseline, target))
+            bounded = abs(target - float(action.target_db)) > 1e-6
+            return EmergencyChannelFaderMove(
+                channel_id=action.channel_id,
+                target_db=target,
+                reason=action.reason,
+            ), bounded
+
         if isinstance(action, EmergencyFeedbackNotch):
             gain_db = min(0.0, max(self.config.feedback_notch_max_cut_db, action.gain_db))
             q = max(self.config.feedback_notch_min_q, action.q)
@@ -1150,6 +1220,17 @@ class AutoFOHSafetyController:
             return self._require_method("set_gain", lambda a: self.mixer_client.set_gain(a.channel_id, a.target_db))
         if isinstance(action, ChannelFaderMove):
             return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, EmergencyChannelFaderMove):
+            return self._require_method("set_fader", lambda a: self.mixer_client.set_fader(a.channel_id, a.target_db))
+        if isinstance(action, EmergencyFeedbackNotch):
+            def _send_notch(a):
+                r_band = self.mixer_client.set_eq_band(
+                    a.channel_id, a.band, freq=a.freq_hz, gain=a.gain_db, q=a.q)
+                # notch в выключенном EQ неслышим — включение едет с полосой
+                # (правило CLAUDE.md; ревью FB-N2)
+                r_on = self.mixer_client.set_eq_on(a.channel_id, 1)
+                return (r_band is not False) and (r_on is not False)
+            return self._require_method("set_eq_band", _send_notch)
         if isinstance(action, DCAFaderMove):
             # финальный баланс стемов DCA-группами (оператор 2026-07-06);
             # оживает только при явном промоуте в конфиге
