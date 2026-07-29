@@ -746,126 +746,19 @@ class AutoFaderControllerV2:
         return True
     
     def _reset_faders_to_zero(self):
-        """Reset all selected channel faders to 0 dB before starting real-time mode"""
-        logger.info("🔄 _reset_faders_to_zero() called")
-        
-        if not self.mixer_client:
-            logger.warning("Cannot reset faders - mixer client not available")
-            return
-        
-        if not self.selected_channels:
-            logger.warning("No channels selected for reset")
-            return
-        
-        # #region agent log
-        try:
-            import json
-            import time
-            with open(DEBUG_LOG_PATH, "a") as f:
-                f.write(json.dumps({
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "D",
-                    "location": "controller.py:_reset_faders_to_zero",
-                    "message": "Reset started",
-                    "data": {
-                        "selected_channels": self.selected_channels[:10],
-                        "channels_count": len(self.selected_channels)
-                    },
-                    "timestamp": int(time.time() * 1000)
-                }) + "\n")
-        except Exception as e:
-            logger.error(f"Failed to write debug log: {e}")
-        # #endregion
-        
-        logger.info(f"🔄 Resetting {len(self.selected_channels)} faders to 0 dB...")
-        
-        # CRITICAL: Mark start of fader reset to ignore stale OSC updates
-        import time
-        if hasattr(self.mixer_client, '_fader_reset_time'):
-            self.mixer_client._fader_reset_time = time.time()
-            logger.info(f"Started fader reset protection period: {self.mixer_client._fader_reset_ignore_duration}s")
-        
-        reset_count = 0
-        initial_values = {}
-        for ch_id in self.selected_channels:
-            try:
-                # #region agent log
-                try:
-                    import json
-                    import time
-                    initial_val = self.mixer_client.get_channel_fader(ch_id)
-                    initial_values[ch_id] = initial_val
-                    with open(DEBUG_LOG_PATH, "a") as f:
-                        f.write(json.dumps({
-                            "sessionId": "debug-session",
-                            "runId": "run1",
-                            "hypothesisId": "D",
-                            "location": "controller.py:_reset_faders_to_zero",
-                            "message": "Before reset",
-                            "data": {
-                                "channel": ch_id,
-                                "initial_value": initial_val
-                            },
-                            "timestamp": int(time.time() * 1000)
-                        }) + "\n")
-                except: pass
-                # #endregion
-                
-                # Set fader to 0 dB
-                self.mixer_client.set_channel_fader(ch_id, 0.0)
-                # CRITICAL: Force update local cache to 0.0 immediately
-                # This prevents reading old values after reset
-                if hasattr(self.mixer_client, 'state'):
-                    fader_address = f"/ch/{ch_id}/fdr"
-                    self.mixer_client.state[fader_address] = 0.0
-                reset_count += 1
-            except Exception as e:
-                logger.error(f"Failed to reset channel {ch_id}: {e}")
-        
-        logger.info(f"✅ Reset {reset_count}/{len(self.selected_channels)} faders to 0 dB")
-        # Give mixer time to apply changes and verify
-        import time
-        time.sleep(0.8)  # Increased wait time
-        
-        # Verify reset by reading back values
-        verified_count = 0
-        verification_results = {}
-        for ch_id in self.selected_channels:
-            try:
-                current = self.mixer_client.get_channel_fader(ch_id)
-                verification_results[ch_id] = current
-                if current is not None and abs(current) < 0.1:  # Within 0.1 dB of 0
-                    verified_count += 1
-                else:
-                    logger.warning(f"Channel {ch_id} not reset properly: {current} dB (expected 0.0)")
-            except Exception as e:
-                logger.warning(f"Could not verify channel {ch_id}: {e}")
-        
-        # #region agent log
-        try:
-            import json
-            import time
-            with open(DEBUG_LOG_PATH, "a") as f:
-                f.write(json.dumps({
-                    "sessionId": "debug-session",
-                    "runId": "run1",
-                    "hypothesisId": "D",
-                    "location": "controller.py:_reset_faders_to_zero",
-                    "message": "Reset verification",
-                    "data": {
-                        "initial_values": initial_values,
-                        "verification_results": verification_results,
-                        "verified_count": verified_count,
-                        "total_count": len(self.selected_channels)
-                    },
-                    "timestamp": int(time.time() * 1000)
-                }) + "\n")
-        except: pass
-        # #endregion
-        
-        logger.info(f"Verified {verified_count}/{len(self.selected_channels)} faders at 0 dB")
-    
+        """УДАЛЕНО советом 2026-07-29 (Ф4, «заряженное ружьё» №6 ревью).
+
+        Прежняя реализация массово слэмила ВСЕ выбранные фейдеры в 0 dB
+        (unity — максимум разрешённого потолка!) при старте realtime-режима
+        и отравляла observed-кэш mixer_client.state командными значениями
+        (нарушение инварианта «state — только с пульта»). Baseline берётся
+        из _capture_initial_faders() от фактических позиций.
+        """
+        logger.warning(
+            "_reset_faders_to_zero: отклонено — массовый слэм в unity "
+            "удалён (совет 2026-07-29); baseline = фактические фейдеры"
+        )
+
     def configure(
         self,
         selected_channels: list[int],
@@ -992,13 +885,8 @@ class AutoFaderControllerV2:
         
         logger.info("✅ Real audio input validated")
         
-        # CRITICAL: Reset faders to 0 dB before starting real-time mode
-        # This prevents using old fader positions from previous sessions
-        logger.info("🔄 About to reset faders to zero...")
-        self._reset_faders_to_zero()
-        logger.info("✅ Fader reset completed")
-
-        # Capture initial fader positions as baseline
+        # Baseline — фактические позиции фейдеров (массовый слэм в unity
+        # удалён советом 2026-07-29: старт realtime не трогает пульт)
         self._capture_initial_faders()
 
         # Start peak calibration phase

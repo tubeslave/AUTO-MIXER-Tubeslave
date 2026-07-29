@@ -6967,8 +6967,11 @@ class AutoSoundcheckEngine:
                 )
             return
 
-        # Start with the operator's current fader and apply only a correction.
-        fader_db = current_fader + info.gain_correction_db
+        # Fallback без v3: АБСОЛЮТНЫЙ якорь от пресетной плоскости, не от
+        # текущего фейдера — «current + correction» по слепому pre-trim
+        # замеру наращивал ту же поправку при каждом повторном прогоне
+        # (интеграторный храповик между запусками; совет 2026-07-29 Ф4/№7)
+        fader_db = base_fader + info.gain_correction_db
 
         # Collect LUFS from all active channels for relative balance
         all_lufs: Dict[int, Tuple[float, str]] = {}

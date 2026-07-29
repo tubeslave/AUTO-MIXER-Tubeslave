@@ -5255,66 +5255,20 @@ class LUFSGainStagingController:
         return (None, pyaudio.paContinue)
     
     def start_realtime_correction(self) -> bool:
+        """УДАЛЕНО советом 2026-07-29 (Ф4, «заряженное ружьё» P0-2 ревью).
+
+        Прежний realtime-контур писал трим в пульт напрямую (без safety-
+        гейта _apply_trim_change), разрешал boost без opt-in и через
+        wildcard-эхо собственных записей строил интеграторный храповик —
+        ровно live-провал 2026-07-03 (+18 трима / −40 фейдера за 92 цикла).
+        Канонический путь: SafeGainCalibrator (one-shot, operator-mode gate
+        на сервере). Метод оставлен как явный отказ.
         """
-        Запуск real-time TRIM коррекции.
-        
-        Returns:
-            True если успешно запущен
-        """
-        if not self.is_active:
-            logger.error("Cannot start correction: controller not active")
-            return False
-        
-        if not self.mixer_client or not self.mixer_client.is_connected:
-            logger.error("Cannot start correction: mixer not connected")
-            return False
-        
-        if self.realtime_correction_enabled:
-            logger.warning("Real-time correction already enabled")
-            return True
-        
-        # Получаем текущие TRIM значения с микшера
-        for audio_ch, agc in list(self.channels.items()):
-            mixer_ch = self.channel_mapping.get(audio_ch, audio_ch)
-            try:
-                current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
-                agc.set_base_trim(current_trim)
-                logger.info(f"Channel {mixer_ch}: base TRIM = {current_trim:.1f} dB")
-                
-                # Инициализация состояния для Peak Staging режима
-                if self.peak_staging_mode:
-                    self.trim_correction_active[mixer_ch] = True
-                    self.last_trim_value[mixer_ch] = current_trim
-                    self.trim_reduction_count[mixer_ch] = 0
-                    logger.info(f"Channel {mixer_ch}: Peak staging initialized, active=True, trim={current_trim:.1f} dB")
-            except Exception as e:
-                logger.warning(f"Could not get TRIM for channel {mixer_ch}: {e}")
-                agc.set_base_trim(0.0)
-                if self.peak_staging_mode:
-                    self.trim_correction_active[mixer_ch] = True
-                    self.last_trim_value[mixer_ch] = 0.0
-                    self.trim_reduction_count[mixer_ch] = 0
-        
-        self.realtime_correction_enabled = True
-        self._stop_event.clear()
-        
-        # Запускаем поток коррекции
-        self._correction_thread = threading.Thread(
-            target=self._correction_loop, 
-            daemon=True
+        logger.error(
+            "start_realtime_correction: контур удалён (совет 2026-07-29, "
+            "интеграторный храповик) — используйте SafeGainCalibrator"
         )
-        self._correction_thread.start()
-        
-        mode_name = "Peak" if self.peak_staging_mode else "LUFS"
-        logger.info(f"Real-time {mode_name} correction started")
-        
-        if self.on_status_update:
-            self.on_status_update({
-                'type': 'realtime_correction_started',
-                'active': True
-            })
-        
-        return True
+        return False
 
     def handle_external_trim_change(self, mixer_channel: int, new_trim_db: float) -> None:
         """Обработка внешнего изменения TRIM для канала микшера."""
@@ -5347,180 +5301,6 @@ class LUFSGainStagingController:
 
         if not handled:
             logger.debug("No active TRIM channel state for mixer channel %s", mixer_channel)
-    
-    def _correction_loop(self):
-        """Основной цикл коррекции."""
-        logger.info("Correction loop started")
-        
-        iteration = 0
-        while self.realtime_correction_enabled and not self._stop_event.is_set():
-            try:
-                levels_update = {}
-                trim_updates = {}
-                iteration += 1
-                
-                # Логируем каждые 50 итераций статистику буферов
-                if iteration % 50 == 0:
-                    buffer_sizes = {ch: len(buf) for ch, buf in self._audio_buffers.items()}
-                    logger.info(f"Iteration {iteration}: buffer sizes = {buffer_sizes}")
-                
-                for audio_ch, agc in list(self.channels.items()):
-                    # Получаем накопленные аудио данные
-                    if audio_ch in self._audio_buffers and len(self._audio_buffers[audio_ch]) > 0:
-                        # Объединяем буферы
-                        chunks = list(self._audio_buffers[audio_ch])
-                        self._audio_buffers[audio_ch].clear()
-                        
-                        if chunks:
-                            try:
-                                audio_data = np.concatenate(chunks)
-                                
-                                # Обрабатываем (включая тихие данные - AGC сам отметит gated/idle)
-                                result = agc.process(audio_data)
-                            except Exception as e:
-                                logger.error(f"Error processing audio for channel {audio_ch}: {e}", exc_info=True)
-                                continue
-                            
-                            mixer_ch = self.channel_mapping.get(audio_ch, audio_ch)
-                            
-                            # Логируем первые несколько каналов каждые 50 итераций
-                            if iteration % 50 == 0 and audio_ch <= 3:
-                                logger.info(f"Ch{audio_ch}: LUFS={result['lufs']:.1f}, TruePeak={result['true_peak']:.1f}, "
-                                           f"gain={result['gain']:.2f}, gated={result['is_gated']}, status={result['status']}")
-                            
-                            # Обновляем measured_levels для совместимости
-                            self.measured_levels[audio_ch] = {
-                                'peak': result['true_peak'],
-                                'signal_present': not result['is_gated'],
-                                'lufs': result['lufs'],
-                                'true_peak': result['true_peak'],
-                                'gain': result['gain'],
-                                'applied_gain': result['applied_gain'],
-                                'status': result['status'],
-                            }
-                            
-                            # Bleed detection: блокируем повышение gain при высоком bleed_ratio
-                            bleed_info = None
-                            bleed_ratio = 0.0
-                            if self.bleed_service and self.bleed_service.enabled:
-                                bleed_info = self.bleed_service.get_bleed_info(audio_ch)
-                                if bleed_info:
-                                    bleed_ratio = float(bleed_info.bleed_ratio)
-                                    # Блокируем повышение gain при высоком bleed (>0.5)
-                                    if bleed_ratio > 0.5 and result['gain'] > agc.current_gain:
-                                        # Не повышаем gain - оставляем текущий
-                                        logger.debug(f"Ch{audio_ch}: High bleed (ratio={bleed_ratio:.2f}), blocking gain increase")
-                                        # Можно также компенсировать LUFS перед расчетом коррекции
-                                    # Компенсируем LUFS для более точного расчета
-                                    compensated_lufs = self.bleed_service.get_compensated_level(audio_ch, result['lufs'])
-                                    if compensated_lufs != result['lufs']:
-                                        # Пересчитываем gain с компенсированным LUFS
-                                        error = agc.target_lufs - compensated_lufs
-                                        compensated_gain = error / agc.ratio
-                                        compensated_gain = max(agc.min_gain_db, min(agc.max_gain_db, compensated_gain))
-                                        # Используем компенсированный gain только если он меньше (меньше усиление при блиде)
-                                        if compensated_gain < result['gain']:
-                                            agc.current_gain = compensated_gain
-                                            result['gain'] = compensated_gain
-                                            result['applied_gain'] = agc.base_trim + compensated_gain
-                                            logger.debug(f"Ch{audio_ch}: Compensated LUFS {result['lufs']:.1f} -> {compensated_lufs:.1f}, gain {result['gain']:.2f} -> {compensated_gain:.2f}")
-                            
-                            self.measured_levels[audio_ch]['bleed_ratio'] = bleed_ratio
-                            self.measured_levels[audio_ch]['bleed_source'] = int(bleed_info.bleed_source_channel) if bleed_info and bleed_info.bleed_source_channel else None
-                            
-                            levels_update[audio_ch] = self.measured_levels[audio_ch]
-                            
-                            # Peak Staging режим (пропуск при freeze)
-                            if self.peak_staging_mode and not self.automation_frozen:
-                                effective_min_trim = self.min_trim_db_live if self.live_mode else self.min_trim_db
-                                # Проверяем, активна ли коррекция для этого канала
-                                if self.trim_correction_active.get(mixer_ch, False):
-                                    # Получаем порог пика из channel_settings
-                                    channel_setting = self.channel_settings.get(audio_ch, {})
-                                    peak_threshold = channel_setting.get('peak_threshold', self.default_peak_threshold)
-                                    
-                                    # Проверяем превышение порога
-                                    if result['true_peak'] > peak_threshold:
-                                        logger.info(f"Peak threshold exceeded for channel {mixer_ch}: "
-                                                   f"{result['true_peak']:.1f} > {peak_threshold:.1f} dBTP")
-                                        
-                                        # Получаем текущий Trim
-                                        try:
-                                            current_trim = self.mixer_client.get_channel_gain(mixer_ch) or 0.0
-                                            
-                                            # Вычисляем новый Trim (снижаем на 1дБ)
-                                            new_trim = current_trim - self.trim_reduction_step_db
-                                            
-                                            # Ограничиваем диапазон (в live_mode не глубже min_trim_db_live)
-                                            new_trim = max(effective_min_trim, new_trim)
-                                            
-                                            # Применяем новый Trim
-                                            logger.info(f"Reducing Trim for channel {mixer_ch}: "
-                                                       f"{current_trim:.1f} -> {new_trim:.1f} dB")
-                                            self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                                            
-                                            # Проверяем фактический Trim после применения
-                                            actual_trim = self.mixer_client.get_channel_gain(mixer_ch) or new_trim
-                                            
-                                            # Определяем остановку коррекции
-                                            last_trim = self.last_trim_value.get(mixer_ch, current_trim)
-                                            
-                                            # Остановка если:
-                                            # 1. Trim не изменился после попытки снижения (actual_trim == current_trim)
-                                            #    Это означает, что микшер не принял изменение или достигнут минимум
-                                            # 2. Trim достиг минимального значения
-                                            # 3. Новый Trim равен предыдущему значению (Trim перестал уменьшаться)
-                                            trim_unchanged = abs(actual_trim - current_trim) < 0.01
-                                            trim_at_minimum = actual_trim <= effective_min_trim + 0.01
-                                            trim_no_progress = abs(actual_trim - last_trim) < 0.01 and self.trim_reduction_count.get(mixer_ch, 0) > 0
-                                            
-                                            if trim_unchanged or trim_at_minimum or trim_no_progress:
-                                                self.trim_correction_active[mixer_ch] = False
-                                                if trim_at_minimum:
-                                                    reason = "reached minimum limit"
-                                                elif trim_unchanged:
-                                                    reason = "trim did not change after reduction attempt"
-                                                else:
-                                                    reason = "no progress detected (trim stopped decreasing)"
-                                                logger.info(f"Trim correction stopped for channel {mixer_ch}: "
-                                                           f"{reason} (trim={actual_trim:.1f} dB, was={current_trim:.1f} dB, "
-                                                           f"last={last_trim:.1f} dB)")
-                                            else:
-                                                # Обновляем состояние
-                                                self.last_trim_value[mixer_ch] = actual_trim
-                                                self.trim_reduction_count[mixer_ch] = self.trim_reduction_count.get(mixer_ch, 0) + 1
-                                                logger.debug(f"Channel {mixer_ch}: Trim reduced, count={self.trim_reduction_count[mixer_ch]}")
-                                                
-                                        except Exception as e:
-                                            logger.error(f"Error processing peak staging for channel {mixer_ch}: {e}")
-                            else:
-                                # LUFS режим (оригинальная логика)
-                                # Если не gated и коррекция достаточно значительная
-                                if not result['is_gated'] and abs(result['gain']) > 0.1:
-                                    trim_updates[mixer_ch] = result['applied_gain']
-                
-                # Применяем TRIM коррекции (только для LUFS режима; пропуск при freeze)
-                if not self.peak_staging_mode and trim_updates and self.mixer_client and not self.automation_frozen:
-                    for mixer_ch, new_trim in trim_updates.items():
-                        try:
-                            # Ограничиваем диапазон
-                            new_trim = max(-18.0, min(18.0, new_trim))
-                            self.mixer_client.set_channel_gain(mixer_ch, new_trim)
-                            logger.info(f"Channel {mixer_ch}: TRIM -> {new_trim:.1f} dB")
-                        except Exception as e:
-                            logger.error(f"Error setting TRIM for channel {mixer_ch}: {e}")
-                
-                # Отправляем обновление уровней
-                if levels_update and self.on_levels_updated:
-                    self.on_levels_updated(levels_update)
-                
-            except Exception as e:
-                logger.error(f"Correction loop error: {e}", exc_info=True)
-            
-            # Ждем следующего цикла
-            self._stop_event.wait(self.update_interval)
-        
-        logger.info("Correction loop stopped")
     
     def stop_realtime_correction(self):
         """Остановка real-time коррекции."""

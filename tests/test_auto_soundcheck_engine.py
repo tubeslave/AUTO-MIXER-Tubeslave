@@ -4084,3 +4084,42 @@ def test_gate_threshold_follows_trim_shift():
     n = len([c for c in mixer.calls if c[0] == "set_gate_threshold"])
     engine._shift_comp_threshold_with_trim(1, -3.0)
     assert len([c for c in mixer.calls if c[0] == "set_gate_threshold"]) == n
+
+
+def test_fallback_fader_target_is_absolute_across_reruns():
+    """Ф4 (совет 2026-07-29, №7): fallback-путь без v3 обязан давать ту же
+    АБСОЛЮТНУЮ цель при повторном прогоне по тем же замерам — «current +
+    correction» по слепому pre-trim замеру наращивал поправку каждым
+    запуском (интеграторный храповик между прогонами)."""
+    mixer = DetectorMixer()
+    engine = AutoSoundcheckEngine(num_channels=1, auto_discover=False)
+    engine.mixer_client = mixer
+    engine.safety_controller = AutoFOHSafetyController(mixer)
+    engine.runtime_state = RuntimeState.SOURCE_LEARNING
+    engine._balance_v3_solution = None
+    info = ChannelInfo(
+        channel=1, name="KICK", preset="kick", has_signal=True,
+        original_snapshot=ChannelSnapshot(
+            channel=1, had_processing=False,
+            raw_settings={"fader_db": -5.0, "muted": 0},
+        ),
+    )
+    info.gain_correction_db = -2.0
+    engine.channels = {1: info}
+
+    def _targets():
+        return [
+            getattr(d.action, "target_db", None)
+            for d in engine.safety_controller.history
+            if getattr(d.action, "action_type", "") == "ChannelFaderMove"
+        ]
+
+    engine._apply_fader(1, info, "kick")
+    first = _targets()[-1]
+    # «повторный прогон»: фейдер уже сдвинут первой коррекцией
+    info.fader_db = first if first is not None else -7.0
+    engine._apply_fader(1, info, "kick")
+    second = _targets()[-1]
+    assert first == pytest.approx(second, abs=1e-6), (
+        f"повторный прогон изменил цель {first} -> {second} — храповик вернулся"
+    )
