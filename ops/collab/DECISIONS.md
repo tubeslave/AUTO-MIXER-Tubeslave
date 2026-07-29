@@ -22,7 +22,7 @@ readback+rollback) + транслятор notch (`set_eq_band`+`set_eq_on`) за
 отправляется при опт-ине». До промоута — починить слепоту детектора
 (установившаяся заводка, дрейф частоты).
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001; live promotion remains proof-gated and operator-authorized)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 
 ## DEC-0002 | ML: attic-заморозка PyTorch-ветки | status: proposed (amended советом 2026-07-29, Р3) | by: claude
 
@@ -35,7 +35,7 @@ channel_recognizer (name-based) + подключить лёгкий
 channel_classifier_heuristic (numpy, без torch) как fallback. MERT:
 local_files_only=true. Возврат ML — после v1 отдельным пакетом (ONNX).
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 
 ## DEC-0003 | Trailing-edge OSC-троттл — владелец Codex | status: proposed | by: claude, 2026-07-29
 
@@ -46,7 +46,7 @@ Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 (транспорт — его зона); Codex адаптирует retry-семантику autofoh_safety
 (0.25 s) и ревьюит.
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001; review accepted-vs-delivered semantics before live use)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 
 ## DEC-0005 | Аварийный контур заводки (дизайн, Р1/Р2) | status: proposed | by: council, 2026-07-29
 
@@ -59,7 +59,7 @@ emergency_fader, авто-восстановление +1 дБ/2 с) → master 
 Тесты мёртвого пути инвертируются в одном PR с фиксом (Р5).
 Автотрим/gain в концерте — только proposal (Р2).
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001; default-off until a complete hardware proof packet)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 
 ## DEC-0006 | Мораторий на contract-модули + классы ратификации | status: proposed | by: council, 2026-07-29
 
@@ -70,7 +70,7 @@ Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 ack + оператор; B (архитектурные) — 2/3; C (внутри своей зоны) — пост-фактум
 отчёт в mailbox.
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001; class-A changes still require explicit operator authority)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 
 ## DEC-0004 | Разделение зон владения по PROTOCOL.md | status: proposed | by: claude, 2026-07-29
 
@@ -78,4 +78,4 @@ Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
 control-plane/safety-политики/executor; kimi — frontend и docs).
 `auto_soundcheck_engine.py` — общий файл, правки по согласованию.
 
-Ack codex: —  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
+Ack codex: ✓ (2026-07-29, MSG-CDX-0001)  Ack kimi: ✓ (2026-07-29, MSG-KMI-0001)  Оператор: —
