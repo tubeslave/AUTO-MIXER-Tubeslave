@@ -204,3 +204,96 @@ class TestAutoEQCutSign:
                 f"позиционная shelf-конвертация вернулась: {c.frequency:.0f} Гц"
                 f" → {c.band_type}"
             )
+
+
+class TestTrailingEdgeThrottle:
+    """Совет 2026-07-29 (DEC-0003): троттл не блокирует вызывающий поток и
+    не задерживает записи в другие адреса (head-of-line устранён)."""
+
+    @staticmethod
+    def _client():
+        c = _make_wing_client()
+        c._osc_throttle_enabled = True
+        c._osc_throttle_hz = 10.0
+        return c
+
+    def test_no_head_of_line_blocking(self):
+        import time as _t
+        client = self._client()
+        # burst в один адрес
+        for i in range(50):
+            assert client.send("/ch/1/fdr", -float(i)) is True
+        # запись в ДРУГОЙ (холодный) адрес уходит немедленно
+        before = client.sock.sendto.call_count
+        t0 = _t.monotonic()
+        assert client.send("/ch/2/fdr", -6.0, priority="emergency") is True
+        elapsed = _t.monotonic() - t0
+        assert elapsed < 0.02, f"аварийная запись ждала {elapsed:.3f}s"
+        assert client.sock.sendto.call_count == before + 1
+        client.disconnect()
+
+    def test_last_value_wins_after_flush(self):
+        client = self._client()
+        for i in range(20):
+            client.send("/ch/3/fdr", -float(i))
+        assert client.flush_pending_writes(timeout=1.0) is True
+        assert client.commanded_state["/ch/3/fdr"] == -19.0
+        client.disconnect()
+
+    def test_query_never_throttled(self):
+        client = self._client()
+        client.send("/ch/4/fdr", -3.0)
+        before = client.sock.sendto.call_count
+        assert client.send("/ch/4/fdr") is True  # GET
+        assert client.sock.sendto.call_count == before + 1
+        client.disconnect()
+
+    def test_rollback_after_apply_same_address_delivered(self):
+        """Класс бага CH3 rollback_not_applied: apply + мгновенный rollback
+        в тот же адрес — rollback обязан доехать (последнее значение)."""
+        client = self._client()
+        assert client.send("/ch/5/fdr", -2.0) is True   # apply
+        assert client.send("/ch/5/fdr", -8.0) is True   # мгновенный rollback
+        assert client.flush_pending_writes(timeout=1.0) is True
+        assert client.commanded_state["/ch/5/fdr"] == -8.0
+        client.disconnect()
+
+
+class TestCurrentUnknownRefusal:
+    """Совет 2026-07-29 №4: current неизвестен → отказ, не подстановка −144
+    (live-move ронял живой канал в −143) и не 0 для мастера (срез → буст)."""
+
+    @staticmethod
+    def _controller(mixer):
+        from autofoh_safety import AutoFOHSafetyController
+        return AutoFOHSafetyController(mixer)
+
+    @pytest.mark.parametrize("action_kwargs", [
+        {"kind": "channel"}, {"kind": "bus"}, {"kind": "dca"},
+    ])
+    def test_relative_fader_move_blocked_on_empty_cache(self, action_kwargs):
+        from unittest.mock import MagicMock
+        from autofoh_safety import (
+            ChannelFaderMove, BusFaderMove, DCAFaderMove,
+        )
+        from autofoh_models import RuntimeState
+        mixer = MagicMock()
+        mixer.get_fader.return_value = None
+        mixer.get_bus_fader.return_value = None
+        mixer.get_dca_fader.return_value = None
+        ctl = self._controller(mixer)
+        kind = action_kwargs["kind"]
+        if kind == "channel":
+            action = ChannelFaderMove(channel_id=3, target_db=-6.0, reason="t")
+        elif kind == "bus":
+            action = BusFaderMove(bus_id=2, target_db=-6.0, reason="t")
+        else:
+            action = DCAFaderMove(dca_id=1, target_db=-6.0, reason="t")
+        decision = ctl.execute(action, RuntimeState.VERSE)
+        assert decision.allowed is False
+        assert decision.blocked is True
+        assert "current unknown" in decision.message
+        # ничего не отправлено и не откачено
+        mixer.set_channel_fader.assert_not_called()
+        mixer.set_bus_fader.assert_not_called()
+        mixer.set_dca_fader.assert_not_called()

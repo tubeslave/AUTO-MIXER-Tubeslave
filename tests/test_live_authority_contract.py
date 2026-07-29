@@ -29,7 +29,9 @@ def test_frontend_cannot_request_force_auto_apply():
 
 def test_wing_send_does_not_promote_commands_to_observed_state():
     source = _source("backend/wing_client.py")
-    send_body = source.split("    def send(self, address: str, *values):", 1)[1].split(
+    send_body = source.split(
+        '    def send(self, address: str, *values, priority: str = "correction"):', 1
+    )[1].split(
         "    def query_parameter", 1
     )[0]
 

@@ -29,6 +29,15 @@ from autofoh_runtime import (
 )
 
 
+class CurrentStateUnknownError(RuntimeError):
+    """Текущее значение контрола неизвестно (пустой кэш/реконнект).
+
+    Относительный move от подставного дефолта −144 отправлял живой канал
+    в −143 дБ (ревью 2026-07-29 №4, совет: «current неизвестен → не
+    писать»). Ловится в execute() → decision blocked, не отправляется.
+    """
+
+
 @dataclass
 class TypedCorrectionAction(ABC):
     reason: str
@@ -519,7 +528,14 @@ class AutoFOHSafetyController:
             self.history.append(decision)
             return decision
 
-        bounded_action, bounded = self._apply_bounds(action, runtime_state)
+        try:
+            bounded_action, bounded = self._apply_bounds(action, runtime_state)
+        except CurrentStateUnknownError as exc:
+            decision.allowed = False
+            decision.blocked = True
+            decision.message = f"current unknown, refusing relative move: {exc}"
+            self.history.append(decision)
+            return decision
         decision.action = bounded_action
         decision.bounded = bounded
 
@@ -804,7 +820,11 @@ class AutoFOHSafetyController:
             return ChannelGainMove(channel_id=action.channel_id, target_db=target, reason=action.reason), bounded
 
         if isinstance(action, ChannelFaderMove):
-            current = self._safe_get(lambda: self.mixer_client.get_fader(action.channel_id), default=-144.0)
+            current = self._safe_get(lambda: self.mixer_client.get_fader(action.channel_id), default=None)
+            if current is None:
+                raise CurrentStateUnknownError(
+                    f"channel {action.channel_id} fader unknown (empty cache)"
+                )
             if derivation:
                 # саундчек СТАВИТ баланс one-shot (замечание оператора
                 # 2026-07-06: «очень слабая балансировка фейдерами» — за
@@ -839,7 +859,11 @@ class AutoFOHSafetyController:
             ), bounded
 
         if isinstance(action, BusFaderMove):
-            current = self._safe_get(lambda: self.mixer_client.get_bus_fader(action.bus_id), default=-144.0)
+            current = self._safe_get(lambda: self.mixer_client.get_bus_fader(action.bus_id), default=None)
+            if current is None:
+                raise CurrentStateUnknownError(
+                    f"bus {action.bus_id} fader unknown (empty cache)"
+                )
             desired_delta = action.target_db - current
             bounded_delta = max(
                 -self.config.bus_fader_max_step_db,
@@ -855,7 +879,11 @@ class AutoFOHSafetyController:
             ), bounded
 
         if isinstance(action, DCAFaderMove):
-            current = self._safe_get(lambda: self.mixer_client.get_dca_fader(action.dca_id), default=-144.0)
+            current = self._safe_get(lambda: self.mixer_client.get_dca_fader(action.dca_id), default=None)
+            if current is None:
+                raise CurrentStateUnknownError(
+                    f"dca {action.dca_id} fader unknown (empty cache)"
+                )
             if derivation:
                 # финальный стем-баланс: абсолютная цель в [-12, 0] —
                 # DCA прибирает группы к плоскостям; буст всей группы —
@@ -881,8 +909,14 @@ class AutoFOHSafetyController:
         if isinstance(action, MasterFaderMove):
             current = self._safe_get(
                 lambda: self.mixer_client.get_main_fader(action.main_id),
-                default=0.0,
+                default=None,
             )
+            if current is None:
+                # при фактическом мастере −10 и «cut-цели» −6 подставной
+                # current=0 превращал срез в подъём +4 дБ
+                raise CurrentStateUnknownError(
+                    f"main {action.main_id} fader unknown (empty cache)"
+                )
             target = min(float(action.target_db), float(current), 0.0)
             target = max(float(current) - self.config.master_fader_max_cut_db, target)
             target = max(-144.0, min(0.0, target))

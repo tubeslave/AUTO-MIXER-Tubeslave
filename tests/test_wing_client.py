@@ -80,7 +80,8 @@ class TestOSCThrottle:
             assert client._osc_throttle_hz == 5.0
 
     def test_osc_throttle_delivers_rapid_final_send(self):
-        """Rapid same-address writes are serialized rather than dropped."""
+        """Trailing-edge: rapid same-address writes coalesce, last value wins,
+        caller thread is never blocked (совет 2026-07-29, DEC-0003)."""
         with patch.dict("sys.modules", {
             "pythonosc": MagicMock(),
             "pythonosc.udp_client": MagicMock(),
@@ -95,16 +96,19 @@ class TestOSCThrottle:
             client.sock = MagicMock()
             client.set_osc_throttle(enabled=True, hz=10.0)
 
-            # First send should succeed
+            t0 = time.monotonic()
             result1 = client.send("/ch/1/fdr", 0.5)
-            with patch("wing_client.time.sleep", return_value=None) as sleep:
-                result2 = client.send("/ch/1/fdr", 0.6)
+            result2 = client.send("/ch/1/fdr", 0.55)  # коалесцируется
+            result3 = client.send("/ch/1/fdr", 0.6)   # побеждает
+            elapsed = time.monotonic() - t0
 
-            assert result1 is True
-            assert result2 is True
-            sleep.assert_called_once()
+            assert result1 is True and result2 is True and result3 is True
+            assert elapsed < 0.05, f"send() блокировал поток {elapsed:.3f}s"
+            assert client.flush_pending_writes(timeout=1.0) is True
+            # первый ушёл сразу, из очереди — только последнее значение
             assert client.sock.sendto.call_count == 2
             assert client.commanded_state["/ch/1/fdr"] == 0.6
+            client.disconnect()
 
     def test_osc_throttle_allows_queries(self):
         """Queries (sends without values) should not be throttled."""

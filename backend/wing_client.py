@@ -94,6 +94,11 @@ class WingClient(MixerClientBase):
         self._osc_throttle_hz = 10.0  # Default: 10 Hz = 100ms minimum interval
         self._osc_last_send_time: Dict[str, float] = {}  # address -> last send time
         self._osc_send_lock = threading.Lock()
+        # Trailing-edge буфер троттла: address -> (values, lane, due_time)
+        self._osc_pending: Dict[str, tuple] = {}
+        self._osc_flush_wakeup = threading.Event()
+        self._osc_flusher_thread: Optional[threading.Thread] = None
+        self._osc_flusher_stop = False
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
@@ -323,6 +328,15 @@ class WingClient(MixerClientBase):
     def disconnect(self):
         """Disconnect from Wing"""
         self._stop_receiver = True
+        self._osc_flusher_stop = True
+        self._osc_flush_wakeup.set()
+        with self._osc_send_lock:
+            if self._osc_pending:
+                logger.warning(
+                    f"Disconnect drops {len(self._osc_pending)} pending "
+                    f"trailing-edge writes: {sorted(self._osc_pending)}"
+                )
+                self._osc_pending.clear()
         self.is_connected = False
         if self.sock:
             try:
@@ -410,71 +424,60 @@ class WingClient(MixerClientBase):
         self._osc_throttle_hz = hz
         logger.info(f"OSC throttle: {'enabled' if enabled else 'disabled'}, {hz} Hz")
     
-    def send(self, address: str, *values):
+    # Приоритетные полосы троттла: аварийная запись не ждёт косметику
+    _OSC_PRIORITY_LANES = {"emergency": 0, "operator": 1, "correction": 2}
+
+    def send(self, address: str, *values, priority: str = "correction"):
         """
-        Send OSC message to Wing
-        
+        Send OSC message to Wing.
+
+        Trailing-edge throttle (совет 2026-07-29, DEC-0003): запись в «горячий»
+        адрес (чаще ~10 Гц) НЕ блокирует вызывающий поток и НЕ теряется —
+        она коалесцируется в per-address буфере (последнее значение побеждает)
+        и отправляется фоновым flush-таймером, когда адрес остынет. Записи в
+        разные адреса независимы: head-of-line блокировки больше нет.
+
         Args:
             address: OSC address (e.g., '/ch/1/fdr')
             values: Optional values to send. If empty, this is a query.
+            priority: "emergency" | "operator" | "correction" — порядок
+                flush при одновременной готовности нескольких адресов.
+
+        Returns True когда запись отправлена ЛИБО принята trailing-edge
+        буфером с гарантией доставки последнего значения (проверяется
+        readback-слоем executor'а как и раньше).
         """
         if not self.is_connected:
             logger.warning("Not connected to Wing")
             return False
-        
+
         if not self.sock:
             logger.warning("Socket not available")
             self.is_connected = False
             return False
-        
+
+        lane = self._OSC_PRIORITY_LANES.get(priority, 2)
+
         try:
             with self._osc_send_lock:
-                # Throttle preserves the newest command by delaying it; it never
-                # reports a dropped command as a successful transport outcome.
                 if self._osc_throttle_enabled and values and self._osc_throttle_hz > 0:
                     min_interval = 1.0 / self._osc_throttle_hz
                     last_send = self._osc_last_send_time.get(address)
                     now = time.monotonic()
-                    if last_send is not None:
-                        delay = min_interval - (now - last_send)
-                        if delay > 0:
-                            time.sleep(delay)
-
-                # The authority-bearing boundary is intentionally the final
-                # safety preflight after any throttle delay. It runs before
-                # message construction so even malformed hostile values are
-                # durably visible to the boundary audit. Its return is the
-                # write linearization point.
-                if values:
-                    with self._mutation_boundary_lock:
-                        boundary = self._mutation_boundary
-                        if boundary is not None:
-                            try:
-                                allowed = boundary(address, tuple(values))
-                            except Exception as exc:
-                                logger.error(
-                                    "Mutation boundary rejected %s: %s",
-                                    address,
-                                    exc,
-                                )
-                                return False
-                            if allowed is not True:
-                                logger.warning(
-                                    "Mutation boundary blocked OSC write: %s",
-                                    address,
-                                )
-                                return False
-                builder = OscMessageBuilder(address=address)
-                for v in values:
-                    builder.add_arg(v)
-                msg = builder.build()
-                self.sock.sendto(msg.dgram, (self.ip, self.port))
-                if values:
-                    self._osc_last_send_time[address] = time.monotonic()
-                    commanded = values[0] if len(values) == 1 else values
-                    self._set_commanded_value(address, commanded)
-                logger.debug(f"Sent: {address} {values}")
-                return True
+                    if last_send is not None and (now - last_send) < min_interval:
+                        # Горячий адрес: ранний отказ границы — честный False
+                        # сейчас; принятое значение доставит flush-таймер.
+                        if not self._check_mutation_boundary(address, values):
+                            return False
+                        due = last_send + min_interval
+                        self._osc_pending[address] = (tuple(values), lane, due)
+                        self._ensure_flusher_running()
+                        self._osc_flush_wakeup.set()
+                        logger.debug(
+                            f"Queued (trailing-edge): {address} {values} lane={priority}"
+                        )
+                        return True
+                return self._send_now_locked(address, values)
         except OSError as e:
             # Socket error - mark as disconnected
             if e.errno in (9, 57, 32):  # Bad file descriptor, Socket not connected, Broken pipe
@@ -486,6 +489,110 @@ class WingClient(MixerClientBase):
         except Exception as e:
             logger.error(f"Send failed: {e}")
             return False
+
+    def _check_mutation_boundary(self, address: str, values: tuple) -> bool:
+        """Authority-bearing preflight; runs at accept-time AND at flush-time
+        (linearization point для отложенных записей)."""
+        if not values:
+            return True
+        with self._mutation_boundary_lock:
+            boundary = self._mutation_boundary
+            if boundary is None:
+                return True
+            try:
+                allowed = boundary(address, tuple(values))
+            except Exception as exc:
+                logger.error("Mutation boundary rejected %s: %s", address, exc)
+                return False
+            if allowed is not True:
+                logger.warning("Mutation boundary blocked OSC write: %s", address)
+                return False
+            return True
+
+    def _send_now_locked(self, address: str, values: tuple) -> bool:
+        """Собрать и отправить датаграмму. Вызывать под _osc_send_lock."""
+        if not self._check_mutation_boundary(address, values):
+            return False
+        builder = OscMessageBuilder(address=address)
+        for v in values:
+            builder.add_arg(v)
+        msg = builder.build()
+        self.sock.sendto(msg.dgram, (self.ip, self.port))
+        if values:
+            self._osc_last_send_time[address] = time.monotonic()
+            commanded = values[0] if len(values) == 1 else values
+            self._set_commanded_value(address, commanded)
+        logger.debug(f"Sent: {address} {values}")
+        return True
+
+    def _ensure_flusher_running(self):
+        if self._osc_flusher_thread is not None and self._osc_flusher_thread.is_alive():
+            return
+        self._osc_flusher_stop = False
+        self._osc_flusher_thread = threading.Thread(
+            target=self._osc_flush_loop, name="wing-osc-flush", daemon=True
+        )
+        self._osc_flusher_thread.start()
+
+    def _osc_flush_loop(self):
+        """Фоновый flush trailing-edge буфера: готовые адреса отправляются
+        в порядке приоритетной полосы, затем по времени готовности."""
+        while not self._osc_flusher_stop:
+            with self._osc_send_lock:
+                if not self._osc_pending:
+                    self._osc_flush_wakeup.clear()
+                    wait_for = None
+                else:
+                    now = time.monotonic()
+                    ready = sorted(
+                        (
+                            (lane, due, addr, vals)
+                            for addr, (vals, lane, due) in self._osc_pending.items()
+                            if due <= now
+                        ),
+                    )
+                    for lane, due, addr, vals in ready:
+                        self._osc_pending.pop(addr, None)
+                        if not self.is_connected or not self.sock:
+                            logger.warning(
+                                f"Trailing-edge flush dropped (disconnected): {addr}"
+                            )
+                            continue
+                        try:
+                            self._send_now_locked(addr, vals)
+                        except OSError as e:
+                            if e.errno in (9, 57, 32):
+                                self.is_connected = False
+                                logger.warning(
+                                    f"Flush socket error, connection lost: {e}"
+                                )
+                            else:
+                                logger.error(f"Flush OSError for {addr}: {e}")
+                        except Exception as e:
+                            logger.error(f"Flush failed for {addr}: {e}")
+                    if self._osc_pending:
+                        wait_for = max(
+                            0.0,
+                            min(d for (_v, _l, d) in self._osc_pending.values())
+                            - time.monotonic(),
+                        )
+                    else:
+                        self._osc_flush_wakeup.clear()
+                        wait_for = None
+            if wait_for is None:
+                self._osc_flush_wakeup.wait(timeout=1.0)
+            else:
+                time.sleep(min(wait_for, 0.05) if wait_for > 0 else 0.0)
+
+    def flush_pending_writes(self, timeout: float = 2.0) -> bool:
+        """Дождаться опустошения trailing-edge буфера (для тестов/шатдауна)."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            with self._osc_send_lock:
+                if not self._osc_pending:
+                    return True
+            time.sleep(0.005)
+        return False
 
     def install_mutation_boundary(
         self,
