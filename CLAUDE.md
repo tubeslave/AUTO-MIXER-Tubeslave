@@ -52,7 +52,7 @@ Docs/                    — PDF документация WING, техничес
 
 1. **Fader ceiling**: никогда не устанавливать fader > 0 dBFS без явного запроса оператора
 2. **True peak**: всегда проверять < -1.0 dBTP перед повышением gain
-3. **Feedback first**: feedback_detector.py имеет абсолютный приоритет — может снизить фейдер без одобрения других агентов
+3. **Feedback first**: feedback_detector.py имеет абсолютный приоритет — может снизить фейдер без одобрения других агентов. **ВНИМАНИЕ (2026-07-29): сейчас это ЦЕЛЬ, не факт — контур подавления мёртв (политика EMERGENCY_FEEDBACK/транслятор notch), система только детектирует и алертит. До закрытия Ф2 мастер-плана (docs/MASTER_PLAN_TO_V1.md) на автоматическое подавление НЕ рассчитывать**
 4. **Snap safety**: find_snap_by_name() читает только кэш имён. Загрузка снапшота перезаписывает настройки пульта
 5. **При сомнениях — снижай, не повышай**
 
@@ -108,12 +108,15 @@ Docs/                    — PDF документация WING, техничес
   reference matching по умолчанию; это только явные варианты по запросу
   оператора.
 
+- TruePeakMeter: cutoff `firwin` задаётся в долях Найквиста АПСЕМПЛИРОВАННОГО потока — `0.5/OS` режет полосу на fs/8 (12 кГц) и занижает ВЧ-пики до −20 дБ; правильно `1.0/OS` + страховка `max(interpolated, sample_peak)`. Регресс: tests/test_transport_safety_invariants.py (ВЧ-синусы + межсэмпловый пик)
+- auto_eq: `max_cut` в профилях ОТРИЦАТЕЛЕН — масштабирование среза только через `abs(max_cut)`, иначе срез меняет знак и становится бустом. Позиционная конвертация крайних полос в shelf запрещена (узкий рез 250 Гц как low-shelf выпиливает фундамент)
+
 ### Архитектурные решения
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
 - ScenarioDetector — кэшировать экземпляр, НЕ создавать на каждый аудиоблок
 - server.py — координатор. Логика в handlers/. НЕ добавлять новые маршруты в server.py напрямую
 - ML classifier — использовать полноценный из backend/ml/channel_classifier.py (25 классов), НЕ заглушку
-- Fader ceiling — потолок enforced на транспортной границе: `WingClient` клампит записи фейдера выше `fader_ceiling_db` (default 0.0 dBFS) с warning; опт-ин оператора через `AUTOMIXER_FADER_CEILING_DB`. Upper layers больше не единственная защита (defence-in-depth, ADR p1-fader-ceiling-defence-in-depth)
+- Fader ceiling — потолок enforced на транспортной границе: `WingClient` клампит записи фейдера выше `fader_ceiling_db` (default 0.0 dBFS) с warning; опт-ин оператора через `AUTOMIXER_FADER_CEILING_DB`. Upper layers больше не единственная защита (defence-in-depth, ADR p1-fader-ceiling-defence-in-depth). С 2026-07-29 кламп на ВСЕХ уровневых поверхностях (`_clamp_fader_db`): ch/bus/dca/main/fx-return/sends WING + `DLiveClient.set_fader` — DCA/шина выше unity обесценивали канальный потолок
 - Feedback live monitor — always-on детекция feedback вне саундчека: `backend/feedback_live_monitor.py`, конфиг `feedback_live:` в automixer.yaml, только детекция + алерты оператору, без записей в пульт (ADR c3-always-on-feedback-detection)
 
 ### DSP стандарты
@@ -156,3 +159,11 @@ CI: GitHub Actions — Python 3.10, 3.11, 3.12. Все PR должны прой�
 5. При обнаружении бага или паттерна — добавить в раздел «Зафиксированные правила» выше
 6. Перед коммитом — `PYTHONPATH=backend python -m pytest tests/ -x`
 7. Не добавлять зависимости без явной необходимости
+
+## Мульти-агентная разработка (Claude ⇄ Codex ⇄ Kimi)
+
+Над проектом совместно работают три AI-ассистента: Claude, Codex (ChatGPT,
+ведёт `ops/autopilot/`) и Kimi Code v3. Канал связи и зоны владения —
+`ops/collab/PROTOCOL.md`; в начале каждой сессии проверь свой
+`ops/collab/inbox/<имя>.md`, совместные решения — `ops/collab/DECISIONS.md`.
+Мастер-план до рабочей версии — `docs/MASTER_PLAN_TO_V1.md`.
