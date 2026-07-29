@@ -16,7 +16,7 @@ function sampleAlert(overrides = {}) {
     type: 'feedback_alert',
     channel: 3,
     frequency_hz: 2512.5,
-    magnitude_db: 7.25,
+    magnitude_db: -10,
     recommended_action: 'notch',
     confidence: 0.87,
     auto_action: 'none',
@@ -26,17 +26,16 @@ function sampleAlert(overrides = {}) {
   };
 }
 
-test('feedbackAlertSeverity classifies boundary magnitudes', () => {
+test('feedbackAlertSeverity classifies boundary magnitudes in dBFS', () => {
   const cases = [
-    [12, 'critical'],
-    [6.5, 'critical'],
-    [6, 'critical'],
-    [5.99, 'warning'],
-    [3, 'warning'],
-    [2.99, 'info'],
-    [0, 'info'],
-    [-2, 'info'],
-    ['7.25', 'critical'],
+    [-10, 'critical'],
+    [-12, 'critical'],
+    [-12.01, 'warning'],
+    [-20, 'warning'],
+    [-25, 'warning'],
+    [-25.01, 'info'],
+    [-40, 'info'],
+    ['-10', 'critical'],
     ['not-a-number', 'info'],
     [Number.NaN, 'info'],
     [undefined, 'info']
@@ -44,6 +43,14 @@ test('feedbackAlertSeverity classifies boundary magnitudes', () => {
   cases.forEach(([magnitude, expected]) => {
     assert.equal(feedbackAlertSeverity(magnitude), expected, String(magnitude));
   });
+});
+
+test('feedbackAlertSeverity promotes to critical on high confidence', () => {
+  assert.equal(feedbackAlertSeverity(-40, 0.95), 'critical', 'low magnitude + high confidence');
+  assert.equal(feedbackAlertSeverity(-25, 0.9), 'critical', 'exact threshold confidence');
+  assert.equal(feedbackAlertSeverity(-10, 0.89), 'critical', 'high magnitude + sub-threshold confidence');
+  assert.equal(feedbackAlertSeverity(-40, 0.89), 'info', 'low magnitude + sub-threshold confidence');
+  assert.equal(feedbackAlertSeverity(-40, undefined), 'info', 'low magnitude + no confidence');
 });
 
 test('feedbackAlertSeverityTone maps severities to operator tones', () => {
@@ -57,7 +64,7 @@ test('adaptFeedbackAlert maps the backend schema to the view model', () => {
 
   assert.equal(entry.channel, 3);
   assert.equal(entry.frequencyHz, 2512.5);
-  assert.equal(entry.magnitudeDb, 7.25);
+  assert.equal(entry.magnitudeDb, -10);
   assert.equal(entry.recommendedAction, 'notch');
   assert.equal(entry.confidence, 0.87);
   assert.equal(entry.autoAction, 'none');
@@ -67,7 +74,7 @@ test('adaptFeedbackAlert maps the backend schema to the view model', () => {
   assert.equal(entry.severityTone, 'red');
   assert.equal(entry.channelLabel, 'Ch 3');
   assert.equal(entry.frequencyLabel, '2512.5 Hz');
-  assert.equal(entry.magnitudeLabel, '7.25 dB');
+  assert.equal(entry.magnitudeLabel, '-10.00 dB');
   assert.equal(entry.confidenceLabel, '87%');
   assert.equal(entry.actionLabel, 'notch');
   assert.match(entry.timeLabel, /^\d{2}:\d{2}:\d{2}$/);
@@ -95,12 +102,12 @@ test('adaptFeedbackAlert carries the detection-only read-only note', () => {
 });
 
 test('adaptFeedbackAlert normalizes warning/info severities and defaults', () => {
-  const warning = adaptFeedbackAlert(sampleAlert({ magnitude_db: 4.2, recommended_action: 'fader' }));
+  const warning = adaptFeedbackAlert(sampleAlert({ magnitude_db: -20, recommended_action: 'fader' }));
   assert.equal(warning.severity, 'warning');
   assert.equal(warning.severityTone, 'yellow');
   assert.equal(warning.actionLabel, 'fader');
 
-  const info = adaptFeedbackAlert(sampleAlert({ magnitude_db: 1.5 }));
+  const info = adaptFeedbackAlert(sampleAlert({ magnitude_db: -30 }));
   assert.equal(info.severity, 'info');
   assert.equal(info.severityTone, 'blue');
 

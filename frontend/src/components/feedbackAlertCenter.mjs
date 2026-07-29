@@ -37,11 +37,11 @@ export function adaptFeedbackAlert(payload) {
   if (!Number.isInteger(channel) || channel < 1) return null;
   if (!Number.isFinite(frequencyHz) || !Number.isFinite(magnitudeDb)) return null;
 
-  const severity = feedbackAlertSeverity(magnitudeDb);
-  const recommendedAction = String(payload.recommended_action ?? '').trim() || 'manual review';
-  const autoAction = String(payload.auto_action ?? 'none').trim() || 'none';
   const rawConfidence = Number(payload.confidence);
   const confidence = Number.isFinite(rawConfidence) ? Math.min(1, Math.max(0, rawConfidence)) : 0;
+  const severity = feedbackAlertSeverity(magnitudeDb, confidence);
+  const recommendedAction = String(payload.recommended_action ?? '').trim() || 'manual review';
+  const autoAction = String(payload.auto_action ?? 'none').trim() || 'none';
   const timestamp = Number(payload.timestamp);
 
   return {
