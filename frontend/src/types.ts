@@ -433,6 +433,28 @@ export interface EmergencyStopUiState {
   reconciliationRequired?: boolean;
 }
 
+export type FeedbackAlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface FeedbackAlertRecord {
+  channel: number;
+  frequencyHz: number;
+  magnitudeDb: number;
+  recommendedAction: string;
+  confidence: number;
+  autoAction: string;
+  readOnly: boolean;
+  timestamp: number;
+  severity: FeedbackAlertSeverity;
+  severityTone: Tone;
+  channelLabel: string;
+  frequencyLabel: string;
+  magnitudeLabel: string;
+  confidenceLabel: string;
+  actionLabel: string;
+  timeLabel: string;
+  readOnlyNote: string;
+}
+
 export interface ActionFocus {
   action: string;
   target: string;
@@ -802,6 +824,7 @@ export interface UiState {
   backend: BackendUiState;
   soundcheck: SoundcheckRuntime;
   emergencyStop: EmergencyStopUiState;
+  feedbackAlerts: FeedbackAlertRecord[];
   decisionQueue: DecisionQueueState;
   proposalReview: ProposalReviewState;
   selectedAgentId: string;

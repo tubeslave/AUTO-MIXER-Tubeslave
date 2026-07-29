@@ -38,6 +38,10 @@ import {
   classifyRollbackToneValue
 } from './operatorStatusTone.mjs';
 import {
+  adaptFeedbackAlert,
+  appendFeedbackAlert
+} from '../components/feedbackAlertCenter.mjs';
+import {
   createUnavailableDecisionQueueState,
   isVerifiedProposalReviewForApply,
   markDecisionQueueLoading,
@@ -73,6 +77,7 @@ import type {
   DeviceRecord,
   DirectorRuntime,
   EmergencyStopUiState,
+  FeedbackAlertRecord,
   ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
@@ -965,6 +970,7 @@ export function useOperatorBackend() {
   const [proposalReview, setProposalReview] = useState<ProposalReviewState>(idleProposalReview);
   const [soundcheck, setSoundcheck] = useState<SoundcheckRuntime>(idleSoundcheckRuntime);
   const [emergencyStop, setEmergencyStop] = useState<EmergencyStopUiState>(idleEmergencyStop);
+  const [feedbackAlerts, setFeedbackAlerts] = useState<FeedbackAlertRecord[]>([]);
   const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decisionQueueRef = useRef<DecisionQueueState>(idleDecisionQueue);
   const proposalReviewRef = useRef<ProposalReviewState>(idleProposalReview);
@@ -1662,6 +1668,17 @@ export function useOperatorBackend() {
       setPayloads(current => ({ ...current, telemetryAlerts: payload }));
       setLogs(current => appendBackendLog(current, 'telemetry_alerts_snapshot', 'Telemetry alerts snapshot received. Read-only display only.', 'SUCCESS'));
     };
+    const handleFeedbackAlert = (payload: unknown) => {
+      const entry = adaptFeedbackAlert(payload);
+      if (!entry) return;
+      setFeedbackAlerts(current => appendFeedbackAlert(current, payload) as FeedbackAlertRecord[]);
+      setLogs(current => appendBackendLog(
+        current,
+        'feedback_alert',
+        `Feedback ${entry.channelLabel}: ${entry.frequencyLabel} at ${entry.magnitudeLabel} (${entry.severity}). Detection only; no console write sent.`,
+        entry.severity === 'critical' ? 'ERROR' : 'WARN'
+      ));
+    };
     const handleMode = (payload: unknown) => {
       setPayloads(current => ({ ...current, mode: payload }));
       setModeFromBackend(toUiMode((payload as { mode?: unknown })?.mode));
@@ -1959,6 +1976,7 @@ export function useOperatorBackend() {
     websocketService.on('processing_pipeline_snapshot', handleProcessing);
     websocketService.on('main_pipeline_preview', handleMainPipelinePreview);
     websocketService.on('telemetry_alerts_snapshot', handleTelemetryAlerts);
+    websocketService.on('feedback_alert', handleFeedbackAlert);
     websocketService.on('operator_mode_status', handleMode);
     websocketService.on('manual_write_supervision_status', handleManualWriteSupervision);
     websocketService.on('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -2019,6 +2037,7 @@ export function useOperatorBackend() {
       websocketService.off('processing_pipeline_snapshot', handleProcessing);
       websocketService.off('main_pipeline_preview', handleMainPipelinePreview);
       websocketService.off('telemetry_alerts_snapshot', handleTelemetryAlerts);
+      websocketService.off('feedback_alert', handleFeedbackAlert);
       websocketService.off('operator_mode_status', handleMode);
       websocketService.off('manual_write_supervision_status', handleManualWriteSupervision);
       websocketService.off('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -2188,6 +2207,7 @@ export function useOperatorBackend() {
     proposalReview,
     soundcheck,
     emergencyStop,
+    feedbackAlerts,
     modeFromBackend,
     viewData,
     backendActions,

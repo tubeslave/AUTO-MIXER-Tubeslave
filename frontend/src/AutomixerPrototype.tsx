@@ -20,6 +20,7 @@ export default function App() {
     connected,
     decisionQueue,
     emergencyStop,
+    feedbackAlerts,
     modeFromBackend,
     proposalReview,
     soundcheck,
@@ -265,6 +266,7 @@ export default function App() {
     decisionQueue,
     soundcheck,
     emergencyStop,
+    feedbackAlerts,
     proposalReview,
     selectedAgentId,
     selectedCommunicationKey,
@@ -287,7 +289,7 @@ export default function App() {
     lastAction,
     snapshotCount,
     toast
-  }), [backend, decisionQueue, emergencyStop, mode, proposalReview, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
+  }), [backend, decisionQueue, emergencyStop, feedbackAlerts, mode, proposalReview, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
 
   const actions: UiActions = useMemo(() => ({
     setMode: updateMode,

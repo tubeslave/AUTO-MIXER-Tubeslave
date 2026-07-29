@@ -1,3 +1,4 @@
+import { FeedbackAlertBanner, FeedbackAlertJournal } from '../components/prototype/FeedbackAlertCenter';
 import { Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { Tone, UiActions, UiState, ViewModel } from '../types';
@@ -51,7 +52,7 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
     title: 'Soundcheck',
     subtitle: 'Measure → derive absolute proposals → operator review. This screen never writes directly to WING.',
     content: (
-      <div className="grid h-full min-h-0 grid-rows-[auto_auto_1fr] gap-2">
+      <div className="grid h-full min-h-0 grid-rows-[auto_auto_auto_1fr] gap-2">
         <div className="grid grid-cols-6 gap-2">
           {[
             ['Console', ui.backend.mixerConnected ? 'Connected' : 'Required', ui.backend.mixerConnected ? 'green' : 'red', 'readback'],
@@ -69,6 +70,8 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
             </Panel>
           ))}
         </div>
+
+        <FeedbackAlertBanner alerts={ui.feedbackAlerts} />
 
         <Panel title="Soundcheck transport">
           <div className="flex flex-wrap items-center gap-2">
@@ -216,6 +219,7 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
                 )}
               </div>
             </Panel>
+            <FeedbackAlertJournal alerts={ui.feedbackAlerts} />
             <Panel className="flex-1" title="Evidence summary">
               <div className="space-y-3 text-[10px] text-muted">
                 <p><strong className="text-text">Channels with signal:</strong> {runtime.channelsWithSignal} / {runtime.totalChannels || channels.length}</p>
