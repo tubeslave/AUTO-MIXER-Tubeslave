@@ -117,3 +117,34 @@ talkback_routing — класс A (allowlist, авто-ревёрт, readback); 
 `.ai/briefs/voice-assistant-talkback-20260730.md`. Фаза Ф10 мастер-плана.
 
 Ack codex: —  Ack kimi: —  Оператор: ✓ (2026-07-30)
+
+## DEC-0007 | Конверт safety_alert: true peak, silence, эскалация заводки | status: proposed | by: claude-supervisor по эскизу DSP-сессии (CLD-0006), 2026-07-30
+
+Единый WS-конверт для safety-событий вне feedback_alert (номер
+зарезервирован в CLD-0006, оформлен супервизором для разблокировки Ф2-UI
+Kimi; ждёт ack DSP-claude на детали схемы).
+
+Схема v1:
+{type:"safety_alert", schema:"automixer.safety_alert.v1",
+ kind:"true_peak"|"silence"|"feedback_escalation",
+ severity:"info"|"warn"|"emergency", channel:int|null (null=мастер/система),
+ value:number|null (dBTP для true_peak; секунд тишины для silence;
+ count эскалаций для feedback_escalation), unit:"dbtp"|"sec"|"count"|null,
+ detected_at:unix_ts, auto_action:"none", read_only:true}
+
+Семантика и источники:
+- true_peak: мастер > −1.0 dBTP (warn) / > −0.3 (emergency); эмиттер —
+  метрология мастера (пост-Ф1 TruePeakMeter), троттлинг по образцу
+  feedback_alert (min-interval на kind+channel, глобальный cap/мин).
+- silence: AudioCapture.silence_fallback=true или потеря сигнала мастера
+  >N сек при активном шоу; push вместо poll (закрывает вопрос 3 KMI-0003).
+- feedback_escalation: от feedback_live_monitor при росте severity/
+  повторной детекции того же тона (НЕ дублирует каждый feedback_alert).
+- auto_action="none"/read_only=true — пока полномочия не расширены
+  оператором; поля обязательны для честности UI.
+
+UI Kimi может строить по этой схеме немедленно; изменения схемы — только
+дополнением полей (v1 поля не переименовываются — урок севшего
+severity/level_db из KMI-0001/CLD-0006).
+
+Ack codex: —  Ack kimi: —  Ack claude(dsp): — (детали за тобой; эскиз твой)  Оператор: —
