@@ -97,6 +97,27 @@ class TestEnvelope:
         assert not env.crest_ok
 
 
+class TestDualSpectrum:
+    def test_steady_hum_is_static(self):
+        from source_envelope import band_treatment_hint, dual_band_spectrum
+        dual = dual_band_spectrum(tone(315, seconds=3.0), SR)
+        assert band_treatment_hint(dual, 315.0) == "static_eq"
+
+    def test_transient_band_is_dynamic(self):
+        from source_envelope import band_treatment_hint, dual_band_spectrum
+        dual = dual_band_spectrum(kick_like(3.0), SR)
+        assert band_treatment_hint(dual, 63.0) == "dynamic"
+
+    def test_unknown_band(self):
+        from source_envelope import band_treatment_hint
+        assert band_treatment_hint({}, 1000.0) == "unknown"
+
+    def test_rms_never_exceeds_peak(self):
+        from source_envelope import dual_band_spectrum
+        dual = dual_band_spectrum(kick_like(2.0), SR)
+        assert all(rms <= peak + 1e-9 for rms, peak in dual.values())
+
+
 class TestCoreProtection:
     def test_cut_in_core_capped(self):
         mask = compute_identity_mask(tone(1000), SR)

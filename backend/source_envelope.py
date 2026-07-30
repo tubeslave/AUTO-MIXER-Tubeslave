@@ -186,6 +186,66 @@ def build_envelope(instrument: str, x: np.ndarray, sr: int) -> SourceEnvelope:
     )
 
 
+DUAL_FRAME = 4096
+DUAL_HOP = 2048
+STATIC_BAND_CREST_DB = 6.0
+# Полосный crest (пик−RMS по кадрам ~85 мс): стационарный тон ≈ 0–1 дБ,
+# перкуссия ≈ 11–13 дБ (окно размазывает удар) — порог 6 дБ посередине.
+
+
+def dual_band_spectrum(
+    x: np.ndarray,
+    sr: int,
+    frame: int = DUAL_FRAME,
+    hop: int = DUAL_HOP,
+) -> Dict[float, Tuple[float, float]]:
+    """Двухспектровый замер (DEC-0008 §3): по полосе (RMS_дБ, пик_дБ).
+
+    RMS-спектр — что звучит постоянно; пик-спектр — что звучит в ударах.
+    Один и тот же горб лечится по-разному: избыток в RMS — статический EQ;
+    избыток только в пиках — полосная динамика (статический рез сделает
+    тело тонким).
+    """
+    mono = np.asarray(x, dtype=np.float64)
+    if mono.ndim > 1:
+        mono = mono.mean(axis=1)
+    if len(mono) < frame:
+        return {}
+    window = np.hanning(frame)
+    freqs = np.fft.rfftfreq(frame, 1.0 / sr)
+    band_sel = {
+        c: (freqs >= c / 2 ** (1 / 6)) & (freqs < c * 2 ** (1 / 6))
+        for c in THIRD_OCT_CENTERS
+    }
+    frame_energies: Dict[float, List[float]] = {c: [] for c in THIRD_OCT_CENTERS}
+    for start in range(0, len(mono) - frame + 1, hop):
+        spec = np.abs(np.fft.rfft(mono[start:start + frame] * window)) ** 2
+        for c, sel in band_sel.items():
+            if sel.any():
+                frame_energies[c].append(float(spec[sel].mean()))
+    out: Dict[float, Tuple[float, float]] = {}
+    for c, energies in frame_energies.items():
+        if not energies:
+            continue
+        arr = np.asarray(energies)
+        rms_db = float(10.0 * np.log10(arr.mean() + 1e-20))
+        peak_db = float(10.0 * np.log10(arr.max() + 1e-20))
+        out[c] = (rms_db, peak_db)
+    return out
+
+
+def band_treatment_hint(
+    dual: Dict[float, Tuple[float, float]],
+    center_hz: float,
+    static_crest_db: float = STATIC_BAND_CREST_DB,
+) -> str:
+    """Для полосы с избытком: 'static_eq' (постоянный) или 'dynamic' (в ударах)."""
+    if center_hz not in dual:
+        return "unknown"
+    rms_db, peak_db = dual[center_hz]
+    return "static_eq" if (peak_db - rms_db) <= static_crest_db else "dynamic"
+
+
 def eq_cut_allowed(mask: IdentityMask, freq_hz: float, gain_db: float) -> float:
     """Кламп EQ-реза защитой ядра: в ядре не глубже CORE_MAX_CUT_DB.
 
