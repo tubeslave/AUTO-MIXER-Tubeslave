@@ -411,6 +411,54 @@ def write_summary(
     ensure_parent(summary_path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def sanitize_input_dir(input_dir: Path, output_path: Path) -> tuple[Path, dict[str, Any]]:
+    """Санитарный слой входа (Ф8.1, DEC-0008): скан + авто-ремонт кликов.
+
+    Клики (изолированные полномасштабные глитчи записи) чинятся
+    интерполяцией в отдельную копию входа; клиппинг/дропауты/тишина
+    только репортятся. Регрессия инцидента 2026-07-29 (−45 LUFS).
+    """
+    for extra in (str(REPO_ROOT), str(BACKEND_DIR)):
+        if extra not in sys.path:
+            sys.path.insert(0, extra)
+    from input_health import analyze_channel, repair_clicks, synchronized_click_groups
+
+    files = sorted(p for p in input_dir.iterdir() if p.suffix.lower() == ".wav")
+    healths = {}
+    sample_rate = 48000
+    for path in files:
+        audio, sample_rate = sf.read(str(path))
+        healths[path.name] = analyze_channel(audio, sample_rate)
+        del audio
+    sync_groups = synchronized_click_groups(list(healths.values()), sample_rate)
+    clicks_total = sum(len(h.clicks) for h in healths.values())
+    summary: dict[str, Any] = {
+        "files_scanned": len(files),
+        "files_unhealthy": sum(1 for h in healths.values() if not h.healthy),
+        "clicks_total": clicks_total,
+        "synchronized_click_groups": len(sync_groups),
+        "unhealthy": {
+            name: h.reasons for name, h in healths.items() if not h.healthy or h.silent
+        },
+        "repaired": False,
+    }
+    if clicks_total == 0:
+        return input_dir, summary
+
+    sanitized = output_path.parent / f"{output_path.stem}.sanitized_input"
+    sanitized.mkdir(parents=True, exist_ok=True)
+    for path in files:
+        audio, sr = sf.read(str(path))
+        health = healths[path.name]
+        if health.clicks:
+            audio = repair_clicks(audio, health.clicks, sr)
+        sf.write(str(sanitized / path.name), audio, sr, subtype="PCM_24")
+        del audio
+    summary["repaired"] = True
+    summary["sanitized_dir"] = str(sanitized)
+    return sanitized, summary
+
+
 def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     input_dir = resolve_input_dir(Path(args.input_dir).expanduser())
     output_path = Path(args.output).expanduser() if args.output else default_output_path()
@@ -426,6 +474,8 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     run_log_path = (
         Path(args.run_log).expanduser() if args.run_log else default_run_log_path(output_path)
     )
+
+    input_dir, input_health_summary = sanitize_input_dir(input_dir, output_path)
 
     run_current_soundcheck_renderer(
         input_dir=input_dir,
@@ -465,6 +515,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
         "summary": str(summary_path),
         "smart_dsp_report": str(smart_dsp_path) if smart_dsp_path else "",
         "run_log": str(run_log_path),
+        "input_health": input_health_summary,
         "final_lufs": soundcheck_report.get("final_lufs"),
         "final_peak_dbfs": soundcheck_report.get("final_peak_dbfs"),
         "sample_rate": soundcheck_report.get("sample_rate"),
