@@ -118,6 +118,51 @@ class TestVoiceAssistant:
         assert assistant.spoken_log == []
 
 
+class TestEngineWiring:
+    """Контракт подключения к per-channel движку (Ф10 этап 0)."""
+
+    def _engine(self):
+        from auto_soundcheck_engine import AutoSoundcheckEngine
+        return AutoSoundcheckEngine(
+            num_channels=2, auto_discover=False, mode="per_channel",
+        )
+
+    def _info(self, preset="kick", name="KICK"):
+        from auto_soundcheck_engine import ChannelInfo
+        return ChannelInfo(channel=3, name=name, preset=preset)
+
+    def test_emit_pc_status_feeds_voice_assistant(self):
+        engine = self._engine()
+        events = []
+
+        class FakeAssistant:
+            def handle_channel_update(self, ch, payload):
+                events.append((ch, payload))
+
+        engine.voice_assistant = FakeAssistant()
+        engine._emit_pc_status(3, self._info(), "waiting_for_signal")
+        assert events and events[0][0] == 3
+        assert events[0][1]["per_channel_status"] == "waiting_for_signal"
+        assert events[0][1]["preset"] == "kick"
+
+    def test_voice_failure_does_not_break_soundcheck(self):
+        engine = self._engine()
+
+        class BrokenAssistant:
+            def handle_channel_update(self, ch, payload):
+                raise RuntimeError("voice down")
+
+        engine.voice_assistant = BrokenAssistant()
+        engine._emit_pc_status(3, self._info(), "skipped")  # не должно бросить
+        assert engine._pc_results[3] == "skipped"
+
+    def test_assistant_defaults_to_none(self):
+        engine = self._engine()
+        assert engine.voice_assistant is None
+        engine._emit_pc_status(3, self._info(), "signal")
+        assert engine._pc_results[3] == "signal"
+
+
 @pytest.mark.skipif(
     not (sys.platform == "darwin" and SayTTS.available()),
     reason="macOS say недоступен",

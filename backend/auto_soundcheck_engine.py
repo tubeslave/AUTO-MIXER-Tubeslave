@@ -630,6 +630,9 @@ class AutoSoundcheckEngine:
         }
         self.mode = mode if mode in ("full_band", "per_channel") else "full_band"
         self.per_channel_wait_timeout_sec = max(5.0, float(per_channel_wait_timeout_sec))
+        # Опциональный голосовой помощник per-channel режима (Ф10, DEC-0010):
+        # объект с handle_channel_update(ch, payload); None = выключен.
+        self.voice_assistant = None
         self._pc_lock = threading.Lock()
         self._pc_command: Optional[str] = None
         self._pc_current_channel: Optional[int] = None
@@ -8858,17 +8861,25 @@ class AutoSoundcheckEngine:
 
     def _emit_pc_status(self, ch: int, info: ChannelInfo, status: str):
         self._pc_results[ch] = status
+        payload = {
+            "per_channel_status": status,
+            "index": self._pc_index,
+            "total": self._pc_total,
+            "name": info.name,
+            "preset": info.preset,
+            "has_signal": info.has_signal,
+            "peak_db": round(info.peak_db, 1),
+        }
         if self.on_channel_update:
             try:
-                self.on_channel_update(ch, {
-                    "per_channel_status": status,
-                    "index": self._pc_index,
-                    "total": self._pc_total,
-                    "name": info.name,
-                    "preset": info.preset,
-                    "has_signal": info.has_signal,
-                    "peak_db": round(info.peak_db, 1),
-                })
+                self.on_channel_update(ch, payload)
+            except Exception:
+                pass
+        # Голосовой помощник (Ф10, DEC-0010): опциональный слушатель тех же
+        # событий; локальный выход, ошибки голоса не трогают саундчек.
+        if self.voice_assistant is not None:
+            try:
+                self.voice_assistant.handle_channel_update(ch, payload)
             except Exception:
                 pass
 
