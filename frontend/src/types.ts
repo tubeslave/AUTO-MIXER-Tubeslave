@@ -455,6 +455,23 @@ export interface FeedbackAlertRecord {
   readOnlyNote: string;
 }
 
+export interface SafetyAlertRecord {
+  kind: 'true_peak' | 'silence' | 'feedback_escalation';
+  severity: 'info' | 'warn' | 'emergency';
+  channel?: number;
+  value?: number;
+  detectedAt: string;
+  message: string;
+}
+
+export interface SilenceFallbackState {
+  active: boolean;
+  reason: string;
+  channelCount: number;
+  timestamp: string;
+}
+
+
 export interface ActionFocus {
   action: string;
   target: string;
@@ -825,6 +842,8 @@ export interface UiState {
   soundcheck: SoundcheckRuntime;
   emergencyStop: EmergencyStopUiState;
   feedbackAlerts: FeedbackAlertRecord[];
+  safetyAlerts: SafetyAlertRecord[];
+  silenceFallback: SilenceFallbackState | null;
   decisionQueue: DecisionQueueState;
   proposalReview: ProposalReviewState;
   selectedAgentId: string;

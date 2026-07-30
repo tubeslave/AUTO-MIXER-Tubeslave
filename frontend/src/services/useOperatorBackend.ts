@@ -90,6 +90,8 @@ import type {
   RuleLibrarySnapshotRow,
   RoutingSegment,
   SafetyMonitorState,
+  SafetyAlertRecord,
+  SilenceFallbackState,
   SoundcheckRuntime,
   Task,
   TelemetryAlertsSnapshot,
@@ -971,6 +973,8 @@ export function useOperatorBackend() {
   const [soundcheck, setSoundcheck] = useState<SoundcheckRuntime>(idleSoundcheckRuntime);
   const [emergencyStop, setEmergencyStop] = useState<EmergencyStopUiState>(idleEmergencyStop);
   const [feedbackAlerts, setFeedbackAlerts] = useState<FeedbackAlertRecord[]>([]);
+  const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlertRecord[]>([]);
+  const [silenceFallback, setSilenceFallback] = useState<SilenceFallbackState | null>(null);
   const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decisionQueueRef = useRef<DecisionQueueState>(idleDecisionQueue);
   const proposalReviewRef = useRef<ProposalReviewState>(idleProposalReview);
@@ -1679,6 +1683,41 @@ export function useOperatorBackend() {
         entry.severity === 'critical' ? 'ERROR' : 'WARN'
       ));
     };
+    const handleSafetyAlert = (payload: unknown) => {
+      const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+      const kind = String(data.kind ?? 'feedback_escalation');
+      const severity = String(data.severity ?? 'info');
+      const message = String(data.message ?? '');
+      const channel = Number.isFinite(Number(data.channel)) ? Number(data.channel) : undefined;
+      const value = Number.isFinite(Number(data.value)) ? Number(data.value) : undefined;
+      const detectedAt = String(data.detected_at ?? data.timestamp ?? new Date().toISOString());
+      const record: SafetyAlertRecord = { kind: kind as SafetyAlertRecord['kind'], severity: severity as SafetyAlertRecord['severity'], message, detectedAt, channel, value };
+      setSafetyAlerts(current => [record, ...current].slice(0, 50));
+      setLogs(current => appendBackendLog(
+        current,
+        'safety_alert',
+        `Safety ${kind}: ${message}`.trim(),
+        severity === 'emergency' ? 'ERROR' : severity === 'warn' ? 'WARN' : 'INFO'
+      ));
+    };
+    const handleSilenceFallback = (payload: unknown) => {
+      const data = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {};
+      const state: SilenceFallbackState = {
+        active: data.active === true,
+        reason: String(data.reason ?? 'unknown'),
+        channelCount: Number.isFinite(Number(data.channel_count)) ? Number(data.channel_count) : 0,
+        timestamp: String(data.timestamp ?? new Date().toISOString())
+      };
+      setSilenceFallback(state);
+      if (state.active) {
+        setLogs(current => appendBackendLog(
+          current,
+          'silence_fallback',
+          `Silence fallback active: ${state.reason} (${state.channelCount} channels).`,
+          'WARN'
+        ));
+      }
+    };
     const handleMode = (payload: unknown) => {
       setPayloads(current => ({ ...current, mode: payload }));
       setModeFromBackend(toUiMode((payload as { mode?: unknown })?.mode));
@@ -1977,6 +2016,8 @@ export function useOperatorBackend() {
     websocketService.on('main_pipeline_preview', handleMainPipelinePreview);
     websocketService.on('telemetry_alerts_snapshot', handleTelemetryAlerts);
     websocketService.on('feedback_alert', handleFeedbackAlert);
+    websocketService.on('safety_alert', handleSafetyAlert);
+    websocketService.on('silence_fallback', handleSilenceFallback);
     websocketService.on('operator_mode_status', handleMode);
     websocketService.on('manual_write_supervision_status', handleManualWriteSupervision);
     websocketService.on('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -2038,6 +2079,8 @@ export function useOperatorBackend() {
       websocketService.off('main_pipeline_preview', handleMainPipelinePreview);
       websocketService.off('telemetry_alerts_snapshot', handleTelemetryAlerts);
       websocketService.off('feedback_alert', handleFeedbackAlert);
+      websocketService.off('safety_alert', handleSafetyAlert);
+      websocketService.off('silence_fallback', handleSilenceFallback);
       websocketService.off('operator_mode_status', handleMode);
       websocketService.off('manual_write_supervision_status', handleManualWriteSupervision);
       websocketService.off('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -2208,6 +2251,8 @@ export function useOperatorBackend() {
     soundcheck,
     emergencyStop,
     feedbackAlerts,
+    safetyAlerts,
+    silenceFallback,
     modeFromBackend,
     viewData,
     backendActions,

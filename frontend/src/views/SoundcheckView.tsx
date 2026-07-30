@@ -1,4 +1,4 @@
-import { FeedbackAlertBanner, FeedbackAlertJournal } from '../components/prototype/FeedbackAlertCenter';
+import { FeedbackAlertBanner, FeedbackAlertJournal, SafetyAlertBanner, SafetyAlertJournal, SilenceFallbackIndicator } from '../components/prototype/FeedbackAlertCenter';
 import { Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { Tone, UiActions, UiState, ViewModel } from '../types';
@@ -72,6 +72,8 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
         </div>
 
         <FeedbackAlertBanner alerts={ui.feedbackAlerts} />
+        <SafetyAlertBanner alerts={ui.safetyAlerts} />
+        <SilenceFallbackIndicator state={ui.silenceFallback} />
 
         <Panel title="Soundcheck transport">
           <div className="flex flex-wrap items-center gap-2">
@@ -220,6 +222,7 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
               </div>
             </Panel>
             <FeedbackAlertJournal alerts={ui.feedbackAlerts} />
+            <SafetyAlertJournal alerts={ui.safetyAlerts} />
             <Panel className="flex-1" title="Evidence summary">
               <div className="space-y-3 text-[10px] text-muted">
                 <p><strong className="text-text">Channels with signal:</strong> {runtime.channelsWithSignal} / {runtime.totalChannels || channels.length}</p>

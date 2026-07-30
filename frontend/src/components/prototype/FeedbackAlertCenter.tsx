@@ -1,4 +1,4 @@
-import type { FeedbackAlertRecord, Tone } from '../../types';
+import type { FeedbackAlertRecord, SafetyAlertRecord, SilenceFallbackState, Tone } from '../../types';
 import { Panel, StatusBadge } from './AutomixerComponents';
 
 const severityFrameClass: Record<Tone, string> = {
@@ -70,6 +70,95 @@ export function FeedbackAlertJournal({ alerts }: { alerts: FeedbackAlertRecord[]
       ) : (
         <p className="text-[10px] text-muted">Journal is empty. Newest backend feedback alerts list here (cap 50).</p>
       )}
+    </Panel>
+  );
+}
+
+function safetyAlertTone(severity: SafetyAlertRecord['severity']): Tone {
+  if (severity === 'emergency') return 'red';
+  if (severity === 'warn') return 'yellow';
+  return 'blue';
+}
+
+export function SafetyAlertBanner({ alerts }: { alerts: SafetyAlertRecord[] }) {
+  const latest = alerts[0] ?? null;
+  if (!latest) {
+    return (
+      <Panel title="Safety alert center">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone="muted">no safety alerts</StatusBadge>
+          <span className="text-[10px] text-muted">
+            Safety alert placeholder (true_peak / silence / feedback_escalation). Backend push in DEC-0007.
+          </span>
+        </div>
+      </Panel>
+    );
+  }
+  const tone = safetyAlertTone(latest.severity);
+  return (
+    <Panel title="Safety alert center" action={<StatusBadge tone={tone}>{latest.severity}</StatusBadge>}>
+      <div className={`rounded border p-2 ${severityFrameClass[tone]}`}>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <strong className="text-[16px] leading-none">
+            {latest.kind.toUpperCase()} {latest.channel !== undefined ? `Ch ${latest.channel}` : ''}
+          </strong>
+          <StatusBadge tone={tone}>{latest.severity}</StatusBadge>
+        </div>
+        <p className="mt-1 text-[9.5px] text-muted">{latest.message}</p>
+      </div>
+    </Panel>
+  );
+}
+
+export function SafetyAlertJournal({ alerts }: { alerts: SafetyAlertRecord[] }) {
+  return (
+    <Panel title="Safety journal">
+      {alerts.length ? (
+        <div className="am-scrollbar max-h-44 space-y-1 overflow-auto pr-1">
+          {alerts.map((alert, index) => {
+            const tone = safetyAlertTone(alert.severity);
+            return (
+              <div
+                className="flex items-center justify-between gap-2 rounded border border-line bg-panel2 px-2 py-1 text-[9.5px]"
+                key={`${alert.detectedAt}-${alert.kind}-${index}`}
+              >
+                <span className="min-w-0 truncate text-text">
+                  <strong>{alert.kind}</strong> {alert.channel !== undefined ? `· Ch ${alert.channel}` : ''} · {alert.message}
+                </span>
+                <StatusBadge tone={tone}>{alert.severity}</StatusBadge>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="text-[10px] text-muted">Safety journal empty. Cap 50.</p>
+      )}
+    </Panel>
+  );
+}
+
+export function SilenceFallbackIndicator({ state }: { state: SilenceFallbackState | null }) {
+  if (!state || !state.active) {
+    return (
+      <Panel title="Silence fallback">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone="green">clear</StatusBadge>
+          <span className="text-[10px] text-muted">
+            Audio capture is healthy. Poll-mode placeholder; push event in DEC-0007.
+          </span>
+        </div>
+      </Panel>
+    );
+  }
+  return (
+    <Panel title="Silence fallback" action={<StatusBadge tone="red">ACTIVE</StatusBadge>}>
+      <div className="rounded border border-danger/50 bg-danger/10 p-2 text-danger">
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <strong className="text-[16px] leading-none">SILENCE FALLBACK</strong>
+          <StatusBadge tone="red">{state.channelCount} channels</StatusBadge>
+        </div>
+        <p className="mt-1 text-[9.5px]">Reason: {state.reason}. The system has fallen back to silence detection mode.</p>
+      </div>
     </Panel>
   );
 }
