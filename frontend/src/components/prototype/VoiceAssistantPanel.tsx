@@ -1,4 +1,4 @@
-import { VOICE_ASSISTANT_BINDING_NOTE, VOICE_ASSISTANT_LANGUAGES } from '../voiceAssistantPanel.mjs';
+import { VOICE_ASSISTANT_LANGUAGES } from '../voiceAssistantPanel.mjs';
 import type { Tone, UiActions, VoiceAssistantState } from '../../types';
 import { Panel, StatusBadge } from './AutomixerComponents';
 
@@ -8,11 +8,13 @@ type VoiceAssistantPanelProps = {
   onToggleEnabled: UiActions['toggleVoiceEnabled'];
 };
 
-// Ф10 (DEC-0010): панель голосового помощника саундчека. Этап 0 backend —
-// локальный TTS (macOS say), НИКАКИХ записей на пульт. WS-обвязки пока нет,
-// поэтому переключатели меняют только локальное UI-состояние (см. note).
+// Ф10 (DEC-0010): панель голосового помощника саундчека, привязана к живой
+// WS-поверхности v1 (контракт CLD-0031): set_voice_language / set_voice_enabled
+// / get_voice_assistant_status → voice_assistant_status. Этапы 0-2 backend —
+// локальный TTS (routing "local_only"), НИКАКИХ записей на пульт.
 export function VoiceAssistantPanel({ state, onSetLanguage, onToggleEnabled }: VoiceAssistantPanelProps) {
   const enabledTone: Tone = state.enabled ? 'green' : 'muted';
+  const availableTone: Tone = state.available ? 'green' : 'yellow';
   return (
     <Panel
       action={<StatusBadge tone={enabledTone}>{state.enabled ? 'voice on' : 'voice off'}</StatusBadge>}
@@ -35,8 +37,9 @@ export function VoiceAssistantPanel({ state, onSetLanguage, onToggleEnabled }: V
           {state.enabled ? 'Mute voice' : 'Enable voice'}
         </button>
         <StatusBadge tone="blue">{state.lang}</StatusBadge>
+        <StatusBadge tone={availableTone}>{state.available ? `tts: ${state.backend}` : 'tts unavailable'}</StatusBadge>
+        <StatusBadge tone="muted">{state.routing === 'monitor_buses' ? 'monitor buses' : 'local output'}</StatusBadge>
       </div>
-      <p className="mt-1 text-[9.5px] text-muted">{VOICE_ASSISTANT_BINDING_NOTE}</p>
       {state.spokenLog.length ? (
         <div className="am-scrollbar mt-2 max-h-32 space-y-1 overflow-auto pr-1">
           {state.spokenLog.map((entry, index) => (
@@ -51,7 +54,7 @@ export function VoiceAssistantPanel({ state, onSetLanguage, onToggleEnabled }: V
         </div>
       ) : (
         <p className="mt-2 text-[10px] text-muted">
-          Spoken log is empty. Phrases appear here once the backend push (spoken_log) is bound; cap 50.
+          Spoken log is empty. Phrases appear here live from the backend (voice_assistant_status, cap 50).
         </p>
       )}
     </Panel>
