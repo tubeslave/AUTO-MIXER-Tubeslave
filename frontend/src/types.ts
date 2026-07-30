@@ -476,6 +476,12 @@ export interface SilenceFallbackState {
   timestamp: string;
 }
 
+export interface VoiceAssistantState {
+  lang: 'ru' | 'en';
+  enabled: boolean;
+  spokenLog: Array<{ phrase: string; text: string }>;
+}
+
 
 export interface ActionFocus {
   action: string;
@@ -849,6 +855,8 @@ export interface UiState {
   feedbackAlerts: FeedbackAlertRecord[];
   safetyAlerts: SafetyAlertRecord[];
   silenceFallback: SilenceFallbackState | null;
+  voiceAssistant: VoiceAssistantState;
+  decisionQueue: DecisionQueueState;
   decisionQueue: DecisionQueueState;
   proposalReview: ProposalReviewState;
   selectedAgentId: string;
@@ -913,5 +921,8 @@ export interface UiActions {
   finalizeSoundcheckReadiness: () => void;
   triggerEmergencyStop: () => boolean;
   pushToast: (message: string, tone?: Tone) => void;
+  dismissToast: () => void;
+  setVoiceLanguage: (lang: 'ru' | 'en') => void;
+  toggleVoiceEnabled: () => void;
   dismissToast: () => void;
 }
