@@ -42,6 +42,12 @@ import {
   appendFeedbackAlert
 } from '../components/feedbackAlertCenter.mjs';
 import {
+  initialVoiceAssistantState,
+  isVoiceAssistantLanguage,
+  setVoiceAssistantLanguage,
+  toggleVoiceAssistantEnabled
+} from '../components/voiceAssistantPanel.mjs';
+import {
   createUnavailableDecisionQueueState,
   isVerifiedProposalReviewForApply,
   markDecisionQueueLoading,
@@ -98,7 +104,8 @@ import type {
   Tone,
   TrainingSessionSnapshotRow,
   TopologyLink,
-  TopologyNode
+  TopologyNode,
+  VoiceAssistantState
 } from '../types';
 
 const idleSoundcheckRuntime: SoundcheckRuntime = {
@@ -975,6 +982,9 @@ export function useOperatorBackend() {
   const [feedbackAlerts, setFeedbackAlerts] = useState<FeedbackAlertRecord[]>([]);
   const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlertRecord[]>([]);
   const [silenceFallback, setSilenceFallback] = useState<SilenceFallbackState | null>(null);
+  const [voiceAssistant, setVoiceAssistant] = useState<VoiceAssistantState>(
+    () => initialVoiceAssistantState() as VoiceAssistantState
+  );
   const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decisionQueueRef = useRef<DecisionQueueState>(idleDecisionQueue);
   const proposalReviewRef = useRef<ProposalReviewState>(idleProposalReview);
@@ -1008,6 +1018,30 @@ export function useOperatorBackend() {
       globalThis.clearTimeout(emergencyStopAckTimer.current);
       emergencyStopAckTimer.current = null;
     }
+  }, []);
+
+  // Ф10 (DEC-0010): переключатели голосового помощника. WS-обвязки backend
+  // (voice_set_language / voice_set_enabled, push spoken_log) пока нет —
+  // меняем только локальное UI-состояние и честно пишем это в журнал.
+  const setVoiceLanguage = useCallback((lang: 'ru' | 'en') => {
+    if (!isVoiceAssistantLanguage(lang)) return;
+    setVoiceAssistant(current => setVoiceAssistantLanguage(current, lang) as VoiceAssistantState);
+    setLogs(current => appendBackendLog(
+      current,
+      'voice_assistant',
+      `Voice assistant language set to ${lang} (local only; backend WS binding pending).`,
+      'INFO'
+    ));
+  }, []);
+
+  const toggleVoiceEnabled = useCallback(() => {
+    setVoiceAssistant(current => toggleVoiceAssistantEnabled(current) as VoiceAssistantState);
+    setLogs(current => appendBackendLog(
+      current,
+      'voice_assistant',
+      'Voice assistant enable/mute toggled (local only; backend WS binding pending).',
+      'INFO'
+    ));
   }, []);
 
   const requestSnapshot = useCallback(() => {
@@ -2245,8 +2279,10 @@ export function useOperatorBackend() {
     acceptSoundcheckReplan,
     reanalyzeSoundcheckStage,
     finalizeSoundcheckReadiness,
-    triggerEmergencyStop
-  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, loadNextDecisionQueuePage, reanalyzeSoundcheckStage, refreshBackend, requestProposalDetail, runBackendAnalysis, setBackendMode, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, triggerEmergencyStop]);
+    triggerEmergencyStop,
+    setVoiceLanguage,
+    toggleVoiceEnabled
+  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, loadNextDecisionQueuePage, reanalyzeSoundcheckStage, refreshBackend, requestProposalDetail, runBackendAnalysis, setBackendMode, setVoiceLanguage, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, toggleVoiceEnabled, triggerEmergencyStop]);
 
   return {
     backend,
@@ -2257,6 +2293,7 @@ export function useOperatorBackend() {
     feedbackAlerts,
     safetyAlerts,
     silenceFallback,
+    voiceAssistant,
     modeFromBackend,
     viewData,
     backendActions,

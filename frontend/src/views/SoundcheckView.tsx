@@ -1,4 +1,5 @@
 import { FeedbackAlertBanner, FeedbackAlertJournal, SafetyAlertBanner, SafetyAlertJournal, SilenceFallbackIndicator } from '../components/prototype/FeedbackAlertCenter';
+import { VoiceAssistantPanel } from '../components/prototype/VoiceAssistantPanel';
 import { Panel, StatusBadge } from '../components/prototype/AutomixerComponents';
 import type { OperatorViewData } from '../services/useOperatorBackend';
 import type { Tone, UiActions, UiState, ViewModel } from '../types';
@@ -223,6 +224,11 @@ export function SoundcheckView(ui: UiState, actions: UiActions, data: OperatorVi
             </Panel>
             <FeedbackAlertJournal alerts={ui.feedbackAlerts} />
             <SafetyAlertJournal alerts={ui.safetyAlerts} />
+            <VoiceAssistantPanel
+              onSetLanguage={actions.setVoiceLanguage}
+              onToggleEnabled={actions.toggleVoiceEnabled}
+              state={ui.voiceAssistant}
+            />
             <Panel className="flex-1" title="Evidence summary">
               <div className="space-y-3 text-[10px] text-muted">
                 <p><strong className="text-text">Channels with signal:</strong> {runtime.channelsWithSignal} / {runtime.totalChannels || channels.length}</p>

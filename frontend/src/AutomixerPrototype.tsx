@@ -26,7 +26,8 @@ export default function App() {
     safetyAlerts,
     silenceFallback,
     soundcheck,
-    viewData
+    viewData,
+    voiceAssistant
   } = useOperatorBackend();
   const [activeRoute, setActiveRoute] = useState<RouteId>(() => readHashRoute());
   const [mode, setMode] = useState<AutomixerMode>('Assist');
@@ -271,6 +272,7 @@ export default function App() {
     feedbackAlerts,
     safetyAlerts,
     silenceFallback,
+    voiceAssistant,
     proposalReview,
     selectedAgentId,
     selectedCommunicationKey,
@@ -293,7 +295,7 @@ export default function App() {
     lastAction,
     snapshotCount,
     toast
-  }), [backend, decisionQueue, emergencyStop, feedbackAlerts, mode, proposalReview, safetyAlerts, silenceFallback, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
+  }), [backend, decisionQueue, emergencyStop, feedbackAlerts, mode, proposalReview, safetyAlerts, silenceFallback, voiceAssistant, selectedAgentId, selectedCommunicationKey, selectedPerformanceAgent, selectedSettingsSection, selectedChannelId, selectedBusName, selectedTaskId, selectedTopologyNodeId, selectedRoutingSegmentId, selectedOscMessageKey, selectedDeviceName, selectedLogKey, selectedMemoryName, selectedTrainingName, selectedRuleName, soundcheck, supervisedProposalTaskId, taskStatusOverrides, actionFocus, lastAction, snapshotCount, toast]);
 
   const actions: UiActions = useMemo(() => ({
     setMode: updateMode,
@@ -333,9 +335,11 @@ export default function App() {
     reanalyzeSoundcheckStage: backendActions.reanalyzeSoundcheckStage,
     finalizeSoundcheckReadiness: backendActions.finalizeSoundcheckReadiness,
     triggerEmergencyStop: backendActions.triggerEmergencyStop,
+    setVoiceLanguage: backendActions.setVoiceLanguage,
+    toggleVoiceEnabled: backendActions.toggleVoiceEnabled,
     pushToast,
     dismissToast: () => setToast(null)
-  }), [backendActions.acceptSoundcheckReplan, backendActions.connectWingReadOnly, backendActions.finalizeSoundcheckReadiness, backendActions.loadNextDecisionQueuePage, backendActions.reanalyzeSoundcheckStage, backendActions.refreshBackend, backendActions.runBackendAnalysis, backendActions.startSoundcheck, backendActions.stopSoundcheck, backendActions.toggleAudioPreview, backendActions.triggerEmergencyStop, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, navigate, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
+  }), [backendActions.acceptSoundcheckReplan, backendActions.connectWingReadOnly, backendActions.finalizeSoundcheckReadiness, backendActions.loadNextDecisionQueuePage, backendActions.reanalyzeSoundcheckStage, backendActions.refreshBackend, backendActions.runBackendAnalysis, backendActions.setVoiceLanguage, backendActions.startSoundcheck, backendActions.stopSoundcheck, backendActions.toggleAudioPreview, backendActions.toggleVoiceEnabled, backendActions.triggerEmergencyStop, closeSupervisedProposal, confirmSupervisedApply, createSnapshot, focusAction, navigate, openSupervisedProposal, pushToast, rollbackLastAction, setTaskStatus, startReplayRun, updateMode]);
 
   const view = useMemo(() => buildView(activeRoute, ui, actions, viewData), [activeRoute, ui, actions, viewData]);
 

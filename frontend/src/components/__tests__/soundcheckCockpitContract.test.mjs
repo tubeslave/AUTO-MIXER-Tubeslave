@@ -34,7 +34,7 @@ test('soundcheck transport is observation-only and uses canonical websocket mess
   const websocket = read('services/websocket.js');
   const hook = read('services/useOperatorBackend.ts');
 
-  assert.match(websocket, /startAutoSoundcheck\([^)]*observeOnly = true\)/s);
+  assert.match(websocket, /startAutoSoundcheck\([^)]*observeOnly = true[,)]/s);
   assert.match(websocket, /type: 'start_auto_soundcheck'/);
   assert.match(websocket, /type: 'stop_auto_soundcheck'/);
   assert.match(websocket, /type: 'get_auto_soundcheck_status'/);
