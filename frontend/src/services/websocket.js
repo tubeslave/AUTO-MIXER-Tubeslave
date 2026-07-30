@@ -538,6 +538,20 @@ class WebSocketService extends BaseWebSocketTransport {
     this.send({ type: 'get_audio_capture_status' });
   }
 
+  // Ф10 (DEC-0010, контракт MSG-CLD-0031): голосовой помощник саундчека v1.
+  // Невалидные lang/enabled бэкенд игнорирует молча, статус без изменений.
+  setVoiceLanguage(lang) {
+    this.send({ type: 'set_voice_language', lang });
+  }
+
+  setVoiceEnabled(enabled) {
+    this.send({ type: 'set_voice_enabled', enabled });
+  }
+
+  getVoiceAssistantStatus() {
+    this.send({ type: 'get_voice_assistant_status' });
+  }
+
   startAudioCapturePreview(deviceId = null, numChannels = 48, sampleRate = 48000) {
     this.send({
       type: 'start_audio_capture_preview',

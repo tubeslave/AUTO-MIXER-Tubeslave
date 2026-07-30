@@ -42,6 +42,7 @@ import {
   appendFeedbackAlert
 } from '../components/feedbackAlertCenter.mjs';
 import {
+  applyVoiceAssistantStatus,
   initialVoiceAssistantState,
   isVoiceAssistantLanguage,
   setVoiceAssistantLanguage,
@@ -985,6 +986,7 @@ export function useOperatorBackend() {
   const [voiceAssistant, setVoiceAssistant] = useState<VoiceAssistantState>(
     () => initialVoiceAssistantState() as VoiceAssistantState
   );
+  const voiceAssistantRef = useRef<VoiceAssistantState>(initialVoiceAssistantState() as VoiceAssistantState);
   const emergencyStopAckTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const decisionQueueRef = useRef<DecisionQueueState>(idleDecisionQueue);
   const proposalReviewRef = useRef<ProposalReviewState>(idleProposalReview);
@@ -1020,29 +1022,56 @@ export function useOperatorBackend() {
     }
   }, []);
 
-  // Ф10 (DEC-0010): переключатели голосового помощника. WS-обвязки backend
-  // (voice_set_language / voice_set_enabled, push spoken_log) пока нет —
-  // меняем только локальное UI-состояние и честно пишем это в журнал.
-  const setVoiceLanguage = useCallback((lang: 'ru' | 'en') => {
-    if (!isVoiceAssistantLanguage(lang)) return;
-    setVoiceAssistant(current => setVoiceAssistantLanguage(current, lang) as VoiceAssistantState);
-    setLogs(current => appendBackendLog(
-      current,
-      'voice_assistant',
-      `Voice assistant language set to ${lang} (local only; backend WS binding pending).`,
-      'INFO'
-    ));
+  const replaceVoiceAssistant = useCallback((next: VoiceAssistantState) => {
+    voiceAssistantRef.current = next;
+    setVoiceAssistant(next);
   }, []);
 
-  const toggleVoiceEnabled = useCallback(() => {
-    setVoiceAssistant(current => toggleVoiceAssistantEnabled(current) as VoiceAssistantState);
+  // Ф10 (DEC-0010, контракт CLD-0031): переключатели голосового помощника
+  // идут живыми WS-командами set_voice_language / set_voice_enabled;
+  // источник истины — voice_assistant_status от бэкенда (подписка ниже).
+  // Офлайн/mock — локальное UI-состояние с честной пометкой в журнале.
+  const setVoiceLanguage = useCallback((lang: 'ru' | 'en') => {
+    if (!isVoiceAssistantLanguage(lang)) return;
+    if (socketIsOpen()) {
+      websocketService.setVoiceLanguage(lang);
+      setLogs(current => appendBackendLog(
+        current,
+        'voice_assistant',
+        `Voice assistant language change requested (${lang}).`,
+        'INFO'
+      ));
+      return;
+    }
+    replaceVoiceAssistant(setVoiceAssistantLanguage(voiceAssistantRef.current, lang) as VoiceAssistantState);
     setLogs(current => appendBackendLog(
       current,
       'voice_assistant',
-      'Voice assistant enable/mute toggled (local only; backend WS binding pending).',
-      'INFO'
+      `Voice assistant language set to ${lang} (backend offline; local UI state only).`,
+      'WARN'
     ));
-  }, []);
+  }, [replaceVoiceAssistant]);
+
+  const toggleVoiceEnabled = useCallback(() => {
+    if (socketIsOpen()) {
+      const next = !voiceAssistantRef.current.enabled;
+      websocketService.setVoiceEnabled(next);
+      setLogs(current => appendBackendLog(
+        current,
+        'voice_assistant',
+        `Voice assistant ${next ? 'enable' : 'mute'} requested.`,
+        'INFO'
+      ));
+      return;
+    }
+    replaceVoiceAssistant(toggleVoiceAssistantEnabled(voiceAssistantRef.current) as VoiceAssistantState);
+    setLogs(current => appendBackendLog(
+      current,
+      'voice_assistant',
+      'Voice assistant enable/mute toggled (backend offline; local UI state only).',
+      'WARN'
+    ));
+  }, [replaceVoiceAssistant]);
 
   const requestSnapshot = useCallback(() => {
     websocketService.getOperatorMode();
@@ -1070,6 +1099,7 @@ export function useOperatorBackend() {
     websocketService.getTelemetryAlertsSnapshot(50, 8);
     websocketService.getAudioCaptureStatus();
     websocketService.getAutoSoundcheckStatus();
+    websocketService.getVoiceAssistantStatus();
     websocketService.subscribeMeters();
   }, [invalidateProposalReview, replaceDecisionQueue]);
 
@@ -1756,6 +1786,22 @@ export function useOperatorBackend() {
         ));
       }
     };
+    const handleVoiceAssistantStatus = (payload: unknown) => {
+      const previous = voiceAssistantRef.current;
+      const next = applyVoiceAssistantStatus(previous, payload) as VoiceAssistantState;
+      if (next === previous) return;
+      replaceVoiceAssistant(next);
+      if (next.enabled !== previous.enabled) {
+        setLogs(current => appendBackendLog(
+          current,
+          'voice_assistant',
+          next.enabled
+            ? `Voice assistant enabled (backend: ${next.backend}, routing: ${next.routing}).`
+            : 'Voice assistant muted.',
+          'INFO'
+        ));
+      }
+    };
     const handleMode = (payload: unknown) => {
       setPayloads(current => ({ ...current, mode: payload }));
       setModeFromBackend(toUiMode((payload as { mode?: unknown })?.mode));
@@ -2056,6 +2102,7 @@ export function useOperatorBackend() {
     websocketService.on('feedback_alert', handleFeedbackAlert);
     websocketService.on('safety_alert', handleSafetyAlert);
     websocketService.on('silence_fallback', handleSilenceFallback);
+    websocketService.on('voice_assistant_status', handleVoiceAssistantStatus);
     websocketService.on('operator_mode_status', handleMode);
     websocketService.on('manual_write_supervision_status', handleManualWriteSupervision);
     websocketService.on('manual_write_emergency_reset_result', handleEmergencyResetResult);
@@ -2119,6 +2166,7 @@ export function useOperatorBackend() {
       websocketService.off('feedback_alert', handleFeedbackAlert);
       websocketService.off('safety_alert', handleSafetyAlert);
       websocketService.off('silence_fallback', handleSilenceFallback);
+      websocketService.off('voice_assistant_status', handleVoiceAssistantStatus);
       websocketService.off('operator_mode_status', handleMode);
       websocketService.off('manual_write_supervision_status', handleManualWriteSupervision);
       websocketService.off('manual_write_emergency_reset_result', handleEmergencyResetResult);
