@@ -459,6 +459,52 @@ def sanitize_input_dir(input_dir: Path, output_path: Path) -> tuple[Path, dict[s
     return sanitized, summary
 
 
+_FILENAME_INSTRUMENTS = (
+    ("kick", "kick"), ("snare b", "snare"), ("snare", "snare"),
+    ("f tom", "floor_tom"), ("tom", "rack_tom"), ("oh", "overhead"),
+    ("hat", "overhead"), ("bass", "bass_guitar"), ("guitar", "electric_guitar"),
+    ("accordion", "accordion"), ("back vox", "backing_vocal"),
+    ("vocal", "lead_vocal"), ("vox", "lead_vocal"), ("playback", "playback"),
+    ("keys", "keys"), ("synth", "keys"),
+)
+
+
+def _instrument_from_filename(name: str) -> str:
+    lowered = name.lower()
+    for token, instrument in _FILENAME_INSTRUMENTS:
+        if token in lowered:
+            return instrument
+    return "unknown"
+
+
+def build_source_envelopes(input_dir: Path) -> dict[str, Any]:
+    """Паспорта источников (Ф8.2, DEC-0008) для манифеста прогона."""
+    for extra in (str(REPO_ROOT), str(BACKEND_DIR)):
+        if extra not in sys.path:
+            sys.path.insert(0, extra)
+    from source_envelope import build_envelope
+
+    out: dict[str, Any] = {}
+    for path in sorted(input_dir.iterdir()):
+        if path.suffix.lower() != ".wav":
+            continue
+        audio, sr = sf.read(str(path))
+        instrument = _instrument_from_filename(path.stem)
+        env = build_envelope(instrument, audio, sr)
+        out[path.name] = {
+            "instrument": instrument,
+            "core_bands_hz": env.identity.core_bands_hz,
+            "identity_confidence": round(env.identity.confidence, 2),
+            "activity_fraction": round(env.identity.activity_fraction, 3),
+            "measured_crest_db": round(env.measured_crest_db, 1),
+            "crest_target_db": list(env.crest_target_db),
+            "crest_ok": env.crest_ok,
+            "touch_zones_hz": [list(z) for z in env.touch_zones_hz],
+        }
+        del audio
+    return out
+
+
 def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
     input_dir = resolve_input_dir(Path(args.input_dir).expanduser())
     output_path = Path(args.output).expanduser() if args.output else default_output_path()
@@ -516,6 +562,7 @@ def run_pipeline(args: argparse.Namespace) -> dict[str, Any]:
         "smart_dsp_report": str(smart_dsp_path) if smart_dsp_path else "",
         "run_log": str(run_log_path),
         "input_health": input_health_summary,
+        "source_envelopes": build_source_envelopes(input_dir),
         "final_lufs": soundcheck_report.get("final_lufs"),
         "final_peak_dbfs": soundcheck_report.get("final_peak_dbfs"),
         "sample_rate": soundcheck_report.get("sample_rate"),

@@ -126,8 +126,8 @@ def band_spectrum_db(x: np.ndarray, sr: int, act: Optional[np.ndarray] = None) -
         mono = mono.mean(axis=1)
     if act is not None and act.size:
         frame = max(1, int(FRAME_MS * sr / 1000.0))
-        keep = np.repeat(act, frame)[: len(mono)]
-        mono = mono[keep[: len(mono)]]
+        keep = np.repeat(act, frame)
+        mono = mono[: len(keep)][keep]  # хвост неполного кадра отбрасывается
     if mono.size < sr // 10:
         return {}
     spectrum = np.abs(np.fft.rfft(mono * np.hanning(len(mono)))) ** 2
@@ -166,8 +166,8 @@ def measure_crest_db(x: np.ndarray, act: Optional[np.ndarray] = None, sr: int = 
         mono = mono.mean(axis=1)
     if act is not None and act.size:
         frame = max(1, int(FRAME_MS * sr / 1000.0))
-        keep = np.repeat(act, frame)[: len(mono)]
-        mono = mono[keep[: len(mono)]]
+        keep = np.repeat(act, frame)
+        mono = mono[: len(keep)][keep]
     if mono.size == 0:
         return 0.0
     peak = float(np.abs(mono).max())

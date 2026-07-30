@@ -97,6 +97,15 @@ class TestEnvelope:
         assert not env.crest_ok
 
 
+class TestNonDivisibleLength:
+    def test_envelope_on_odd_length_signal(self):
+        # длина не кратна кадру активности — регрессия IndexError на реальном файле
+        x = tone(440, seconds=2.0)[:-1237]
+        env = build_envelope("lead_vocal", x, SR)
+        assert env.identity.confidence > 0.9
+        assert env.measured_crest_db > 0
+
+
 class TestDualSpectrum:
     def test_steady_hum_is_static(self):
         from source_envelope import band_treatment_hint, dual_band_spectrum
