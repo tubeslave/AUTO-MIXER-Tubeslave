@@ -88,7 +88,7 @@ export function SafetyAlertBanner({ alerts }: { alerts: SafetyAlertRecord[] }) {
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge tone="muted">no safety alerts</StatusBadge>
           <span className="text-[10px] text-muted">
-            Safety alert placeholder (true_peak / silence / feedback_escalation). Backend push in DEC-0007.
+            Safety alert stream (true_peak / silence / feedback_escalation). Schema: automixer.safety_alert.v1.
           </span>
         </div>
       </Panel>
@@ -100,11 +100,16 @@ export function SafetyAlertBanner({ alerts }: { alerts: SafetyAlertRecord[] }) {
       <div className={`rounded border p-2 ${severityFrameClass[tone]}`}>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <strong className="text-[16px] leading-none">
-            {latest.kind.toUpperCase()} {latest.channel !== undefined ? `Ch ${latest.channel}` : ''}
+            {latest.kind.toUpperCase()} {latest.channel !== null ? `Ch ${latest.channel}` : ''}
           </strong>
-          <StatusBadge tone={tone}>{latest.severity}</StatusBadge>
+          <div className="flex flex-wrap items-center gap-1">
+            <StatusBadge tone={tone}>{latest.severity}</StatusBadge>
+            {latest.value !== null && latest.unit !== null && (
+              <StatusBadge tone="muted">{latest.value} {latest.unit}</StatusBadge>
+            )}
+          </div>
         </div>
-        <p className="mt-1 text-[9.5px] text-muted">{latest.message}</p>
+        <p className="mt-1 text-[9.5px] text-muted">{latest.message} — auto_action: {latest.autoAction} / read_only: {latest.readOnly ? 'true' : 'false'}</p>
       </div>
     </Panel>
   );
@@ -123,7 +128,7 @@ export function SafetyAlertJournal({ alerts }: { alerts: SafetyAlertRecord[] }) 
                 key={`${alert.detectedAt}-${alert.kind}-${index}`}
               >
                 <span className="min-w-0 truncate text-text">
-                  <strong>{alert.kind}</strong> {alert.channel !== undefined ? `· Ch ${alert.channel}` : ''} · {alert.message}
+                  <strong>{alert.kind}</strong> {alert.channel !== null ? `· Ch ${alert.channel}` : ''} · {alert.message}
                 </span>
                 <StatusBadge tone={tone}>{alert.severity}</StatusBadge>
               </div>
@@ -144,7 +149,7 @@ export function SilenceFallbackIndicator({ state }: { state: SilenceFallbackStat
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge tone="green">clear</StatusBadge>
           <span className="text-[10px] text-muted">
-            Audio capture is healthy. Poll-mode placeholder; push event in DEC-0007.
+            Audio capture is healthy. Silence push now routes through safety_alert (DEC-0007).
           </span>
         </div>
       </Panel>

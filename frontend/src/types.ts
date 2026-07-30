@@ -456,11 +456,16 @@ export interface FeedbackAlertRecord {
 }
 
 export interface SafetyAlertRecord {
+  type: 'safety_alert';
+  schema: string;
   kind: 'true_peak' | 'silence' | 'feedback_escalation';
   severity: 'info' | 'warn' | 'emergency';
-  channel?: number;
-  value?: number;
+  channel: number | null;
+  value: number | null;
+  unit: 'dbtp' | 'sec' | 'count' | null;
   detectedAt: string;
+  autoAction: string;
+  readOnly: boolean;
   message: string;
 }
 

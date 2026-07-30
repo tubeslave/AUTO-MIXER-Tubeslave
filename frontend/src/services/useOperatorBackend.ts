@@ -1688,10 +1688,14 @@ export function useOperatorBackend() {
       const kind = String(data.kind ?? 'feedback_escalation');
       const severity = String(data.severity ?? 'info');
       const message = String(data.message ?? '');
-      const channel = Number.isFinite(Number(data.channel)) ? Number(data.channel) : undefined;
-      const value = Number.isFinite(Number(data.value)) ? Number(data.value) : undefined;
+      const channel = Number.isFinite(Number(data.channel)) ? Number(data.channel) : null;
+      const value = Number.isFinite(Number(data.value)) ? Number(data.value) : null;
+      const unit = ['dbtp', 'sec', 'count'].includes(String(data.unit)) ? String(data.unit) as SafetyAlertRecord['unit'] : null;
       const detectedAt = String(data.detected_at ?? data.timestamp ?? new Date().toISOString());
-      const record: SafetyAlertRecord = { kind: kind as SafetyAlertRecord['kind'], severity: severity as SafetyAlertRecord['severity'], message, detectedAt, channel, value };
+      const autoAction = String(data.auto_action ?? 'none');
+      const readOnly = data.read_only !== false;
+      const schema = String(data.schema ?? 'automixer.safety_alert.v1');
+      const record: SafetyAlertRecord = { type: 'safety_alert', schema, kind: kind as SafetyAlertRecord['kind'], severity: severity as SafetyAlertRecord['severity'], message, detectedAt, channel, value, unit, autoAction, readOnly };
       setSafetyAlerts(current => [record, ...current].slice(0, 50));
       setLogs(current => appendBackendLog(
         current,
