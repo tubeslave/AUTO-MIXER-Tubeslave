@@ -31,7 +31,9 @@ def register_handlers(server):
         devices = get_audio_devices()
         await server.send_to_client(websocket, {
             "type": "audio_devices",
-            "devices": devices
+            "devices": devices,
+            "discovery_status": "available" if devices else "unavailable",
+            "synthetic_devices_used": False,
         })
 
     async def handle_get_dante_routing(websocket, data):

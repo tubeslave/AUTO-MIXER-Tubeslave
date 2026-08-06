@@ -6,7 +6,7 @@ Uses PyAudio for device enumeration.
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,7 @@ def get_audio_devices() -> List[Dict[str, Any]]:
         List of devices with their channels
     """
     devices = []
+    pa = None
     
     try:
         import pyaudio
@@ -45,42 +46,24 @@ def get_audio_devices() -> List[Dict[str, Any]]:
                     'max_channels': max_channels
                 })
         
-        pa.terminate()
         logger.info(f"Found {len(devices)} audio input devices")
         
     except ImportError:
-        logger.warning("PyAudio not installed, using mock devices")
-        # Fallback mock devices for testing
-        devices = _get_mock_devices()
+        logger.warning("PyAudio not installed; audio device discovery is unavailable")
     except Exception as e:
         logger.error(f"Error getting audio devices: {e}")
-        # Fallback to mock devices
-        devices = _get_mock_devices()
+        devices = []
+    finally:
+        if pa is not None:
+            try:
+                pa.terminate()
+            except Exception as exc:
+                logger.warning("Failed to terminate PyAudio after discovery: %s", exc)
     
     return devices
 
 
-def _get_mock_devices() -> List[Dict[str, Any]]:
-    """Return mock devices for testing when PyAudio is unavailable"""
-    return [
-        {
-            'id': 'mock-1',
-            'name': 'Wing USB (48 channels)',
-            'channels': [{'id': i, 'name': f'Ch {i}'} for i in range(1, 49)],
-            'sample_rate': 48000,
-            'max_channels': 48
-        },
-        {
-            'id': 'mock-2',
-            'name': 'Built-in Microphone',
-            'channels': [{'id': 1, 'name': 'Input 1'}, {'id': 2, 'name': 'Input 2'}],
-            'sample_rate': 48000,
-            'max_channels': 2
-        }
-    ]
-
-
-def get_device_by_id(device_id: str) -> Dict[str, Any]:
+def get_device_by_id(device_id: str) -> Optional[Dict[str, Any]]:
     """Get a specific audio device by ID"""
     devices = get_audio_devices()
     for device in devices:

@@ -2424,6 +2424,33 @@ class AutoSoundcheckEngine:
     def _read_control_state_for_action(self, action) -> Tuple[bool, Dict[str, Any]]:
         if self.mixer_client is None:
             return False, {"note": "no mixer client"}
+        if isinstance(action, ChannelGainMove):
+            get_channel_gain = getattr(self.mixer_client, "get_channel_gain", None)
+            if not callable(get_channel_gain):
+                return False, {
+                    "action_type": action.action_type,
+                    "control_state_verification_supported": False,
+                    "note": "channel gain readback is unavailable for this mixer client",
+                }
+            current_value = self._safe_call(
+                lambda: get_channel_gain(action.channel_id),
+                None,
+            )
+            if current_value is None:
+                return False, {
+                    "action_type": action.action_type,
+                    "control_state_verification_supported": True,
+                    "note": "channel gain state unavailable",
+                }
+            return (
+                abs(float(current_value) - float(action.target_db)) <= 0.25,
+                {
+                    "action_type": action.action_type,
+                    "control_state_verification_supported": True,
+                    "current_value_db": float(current_value),
+                    "target_value_db": float(action.target_db),
+                },
+            )
         if isinstance(action, ChannelFaderMove):
             current_value = self._safe_call(
                 lambda: self.mixer_client.get_fader(action.channel_id),
@@ -2494,7 +2521,11 @@ class AutoSoundcheckEngine:
                     "target_inverted": bool(action.inverted),
                 },
             )
-        return True, {"note": "control-state verification not implemented for action type"}
+        return False, {
+            "action_type": getattr(action, "action_type", action.__class__.__name__),
+            "control_state_verification_supported": False,
+            "note": "control-state verification not implemented for action type",
+        }
 
     def _evaluate_pending_actions(self, force: bool = False) -> List[ActionEvaluationOutcome]:
         if not self._pending_action_evaluations:

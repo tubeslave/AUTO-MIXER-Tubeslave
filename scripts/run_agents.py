@@ -74,7 +74,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, object]:
 def main() -> None:
     args = build_arg_parser().parse_args()
     agents = {
-        "architect": ArchitectAgent(),
+        "architect": ArchitectAgent(project_root=PROJECT_ROOT),
         "trainer": TrainerAgent(project_root=PROJECT_ROOT),
         "evaluator": EvaluatorAgent(),
     }

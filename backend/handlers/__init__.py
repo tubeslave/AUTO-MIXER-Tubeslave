@@ -41,5 +41,13 @@ def register_all_handlers(server):
     """Collect every handler mapping and return a single dispatch dict."""
     dispatch = {}
     for registrar in _ALL_REGISTRARS:
-        dispatch.update(registrar(server))
+        registered = registrar(server)
+        duplicate_types = sorted(set(dispatch).intersection(registered))
+        if duplicate_types:
+            registrar_name = getattr(registrar, "__qualname__", repr(registrar))
+            raise RuntimeError(
+                "Duplicate WebSocket handler type(s) from "
+                f"{registrar_name}: {', '.join(duplicate_types)}"
+            )
+        dispatch.update(registered)
     return dispatch

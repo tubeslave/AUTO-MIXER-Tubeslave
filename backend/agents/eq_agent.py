@@ -6,6 +6,7 @@ based on instrument profiles. Thread-safe shared state.
 """
 
 import logging
+import math
 import threading
 from typing import Any, Dict, Optional
 
@@ -79,29 +80,57 @@ class EQAgent(BaseAgent):
         return {"eq_state": eq_data}
 
     async def decide(self, observation: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate EQ corrections based on instrument profiles."""
+        """Build bounded proposals only from explicit measured spectral deltas."""
         eq_state = observation.get("eq_state", {})
+        spectral_deltas = observation.get("spectral_gain_delta_db")
+        provenance = observation.get("spectral_measurement_provenance")
+        if not isinstance(spectral_deltas, dict) or not isinstance(provenance, dict):
+            return {
+                "status": "unavailable",
+                "reason": "spectral_target_measurement_unavailable",
+                "corrections": {},
+            }
+        source = str(provenance.get("source", "")).strip().lower()
+        if provenance.get("measured") is not True or source in {"mock", "synthetic", "fixture"}:
+            return {
+                "status": "unavailable",
+                "reason": "spectral_measurement_provenance_untrusted",
+                "corrections": {},
+            }
+
         corrections = {}
 
         for ch_id, bands in eq_state.items():
             instrument = self._instrument_profiles.get(ch_id, "unknown")
             if instrument == "unknown":
                 continue
-            # Placeholder: in a full implementation this would compare
-            # current spectral shape against target curves and produce
-            # per-band gain deltas.
             ch_corrections = {}
-            for band_id, band_data in bands.items():
-                current_gain = band_data.get("gain", 0.0)
-                # Only correct large deviations (> 3 dB from flat)
-                if abs(current_gain) > 3.0:
-                    ch_corrections[band_id] = -current_gain * 0.2  # gentle pull toward flat
+            channel_deltas = spectral_deltas.get(ch_id, spectral_deltas.get(str(ch_id), {}))
+            if not isinstance(channel_deltas, dict):
+                continue
+            for band_id in bands:
+                raw_delta = channel_deltas.get(band_id, channel_deltas.get(str(band_id)))
+                if isinstance(raw_delta, bool) or not isinstance(raw_delta, (int, float)):
+                    continue
+                if not math.isfinite(float(raw_delta)):
+                    continue
+                bounded_delta = max(-3.0, min(3.0, float(raw_delta)))
+                if abs(bounded_delta) >= 0.1:
+                    ch_corrections[band_id] = bounded_delta
             if ch_corrections:
                 corrections[ch_id] = ch_corrections
 
         if corrections:
-            return {"corrections": corrections}
-        return {}
+            return {
+                "status": "proposal_only",
+                "measurement_provenance": dict(provenance),
+                "corrections": corrections,
+            }
+        return {
+            "status": "no_change",
+            "measurement_provenance": dict(provenance),
+            "corrections": {},
+        }
 
     async def act(self, decision: Dict[str, Any]) -> None:
         """Record EQ corrections as blocked evidence without live writes."""

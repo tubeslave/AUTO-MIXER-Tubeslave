@@ -248,6 +248,10 @@ class MuqEvalDirectorOfflineTest:
             raise ValueError("MUQ_EVAL_DIRECTOR_OFFLINE_TEST forbids send_osc=true")
         if self.config.shadow_mode:
             raise ValueError("MUQ_EVAL_DIRECTOR_OFFLINE_TEST applies offline renders; shadow_mode must be false")
+        if str(self.config.mode or "").strip().lower() == "muq_genre":
+            raise ValueError(
+                "muq_genre mode is unavailable until a measured genre scorer is configured"
+            )
 
         self.session_id = f"muq_director_{int(time.time())}"
         uses_default_log_root = Path(self.config.output_root).expanduser() == DEFAULT_MUQ_DIRECTOR_LOG_ROOT
@@ -935,8 +939,6 @@ class MuqEvalDirectorOfflineTest:
             + 0.05 * float(phase_mono_score)
             + 0.05 * float(anti_overprocessing_score)
         )
-        if mode == "muq_genre":
-            return float(0.95 * safe + 0.05 * self._genre_score_placeholder())
         return float(safe)
 
     def _evaluation_windows(self, audio: np.ndarray, sr: int) -> list[tuple[int, int]]:
@@ -1308,10 +1310,6 @@ class MuqEvalDirectorOfflineTest:
         changes = sum(channel.change_count for channel in state.channels.values())
         eq_count = sum(len(channel.eq_bands) for channel in state.channels.values())
         return min(0.25, changes * 0.005 + eq_count * 0.004)
-
-    @staticmethod
-    def _genre_score_placeholder() -> float:
-        return 0.7
 
     @staticmethod
     def _parameters_for_action(state: DirectorState, action: DirectorAction) -> dict[str, Any]:

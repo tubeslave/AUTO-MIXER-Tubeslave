@@ -28079,50 +28079,74 @@ class AutoMixerServer:
             return
         await self.send_to_client(websocket, {"type": "auto_compressor_status", **self.auto_compressor_controller.get_status()})
 
+    async def _send_unavailable_automation_status(
+        self,
+        websocket,
+        *,
+        response_type: str,
+        capability: str,
+        request_id=None,
+    ):
+        """Expose an honest, non-authoritative contract for absent automation."""
+        await self.send_to_client(websocket, {
+            "type": response_type,
+            "request_id": request_id,
+            "capability": capability,
+            "status": "unavailable",
+            "available": False,
+            "active": False,
+            "read_only": True,
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "reason": "capability_not_implemented",
+            "message": f"{capability} is unavailable in the current runtime",
+        })
+
     async def get_auto_gate_status(self, websocket, request_id=None):
         """Return Auto Gate status."""
-        await self.send_to_client(websocket, {
-            "type": "auto_gate_status",
-            "request_id": request_id,
-            "active": False,
-            "message": "Auto Gate not implemented"
-        })
+        await self._send_unavailable_automation_status(
+            websocket,
+            response_type="auto_gate_status",
+            capability="auto_gate",
+            request_id=request_id,
+        )
 
     async def get_auto_panner_status(self, websocket, request_id=None):
         """Return Auto Panner status."""
-        await self.send_to_client(websocket, {
-            "type": "auto_panner_status",
-            "request_id": request_id,
-            "active": False,
-            "message": "Auto Panner not implemented"
-        })
+        await self._send_unavailable_automation_status(
+            websocket,
+            response_type="auto_panner_status",
+            capability="auto_panner",
+            request_id=request_id,
+        )
 
     async def get_auto_reverb_status(self, websocket, request_id=None):
         """Return Auto Reverb status."""
-        await self.send_to_client(websocket, {
-            "type": "auto_reverb_status",
-            "request_id": request_id,
-            "active": False,
-            "message": "Auto Reverb not implemented"
-        })
+        await self._send_unavailable_automation_status(
+            websocket,
+            response_type="auto_reverb_status",
+            capability="auto_reverb",
+            request_id=request_id,
+        )
 
     async def get_auto_effects_status(self, websocket, request_id=None):
         """Return Auto Effects status."""
-        await self.send_to_client(websocket, {
-            "type": "auto_effects_status",
-            "request_id": request_id,
-            "active": False,
-            "message": "Auto Effects not implemented"
-        })
+        await self._send_unavailable_automation_status(
+            websocket,
+            response_type="auto_effects_status",
+            capability="auto_effects",
+            request_id=request_id,
+        )
 
     async def get_cross_adaptive_eq_status(self, websocket, request_id=None):
         """Return Cross-Adaptive EQ status."""
-        await self.send_to_client(websocket, {
-            "type": "cross_adaptive_eq_status",
-            "request_id": request_id,
-            "active": False,
-            "message": "Cross-Adaptive EQ not implemented"
-        })
+        await self._send_unavailable_automation_status(
+            websocket,
+            response_type="cross_adaptive_eq_status",
+            capability="cross_adaptive_eq",
+            request_id=request_id,
+        )
 
     async def start_auto_compressor_soundcheck(
         self, websocket,
