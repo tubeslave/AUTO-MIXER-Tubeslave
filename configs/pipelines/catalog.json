@@ -1,0 +1,83 @@
+{
+  "schema": "automixer.pipeline_entrypoint_catalog.v1",
+  "working": [
+    {
+      "id": "main_live_assist",
+      "path": "backend/server.py",
+      "role": "canonical_runtime"
+    },
+    {
+      "id": "wing_attended_soundcheck",
+      "path": "tools/wing_attended_soundcheck_runner.py",
+      "role": "supervised_hardware_runner"
+    },
+    {
+      "id": "repa_song_offline_mix",
+      "path": "tools/repa_song_soundcheck_pipeline.py",
+      "role": "canonical_offline_render"
+    },
+    {
+      "id": "phase_aware_drum_offline",
+      "path": "tools/offline_phase_aware_drum_pipeline.py",
+      "role": "specialized_offline_render"
+    }
+  ],
+  "experimental": [
+    {
+      "id": "channel_triggered_soundcheck",
+      "path": "tools/channel_triggered_soundcheck_mix.py",
+      "reason": "legacy soundcheck variant; not a canonical entrypoint"
+    },
+    {
+      "id": "online_soundcheck_mix",
+      "path": "tools/online_soundcheck_mix.py",
+      "reason": "legacy online variant; direct live path is not canonical"
+    },
+    {
+      "id": "live_wing_soundcheck_v2",
+      "path": "tools/live_wing_soundcheck_v2.py",
+      "reason": "quarantined predecessor of the attended runner"
+    },
+    {
+      "id": "live_wing_soundcheck_v2_stage2",
+      "path": "tools/live_wing_soundcheck_v2_stage2.py",
+      "reason": "quarantined duplicate experiment"
+    },
+    {
+      "id": "live_wing_soundcheck_v2_stage3",
+      "path": "tools/live_wing_soundcheck_v2_stage3.py",
+      "reason": "quarantined duplicate experiment"
+    },
+    {
+      "id": "live_wing_soundcheck_daemon",
+      "path": "tools/live_wing_soundcheck_daemon.py",
+      "reason": "quarantined unattended live experiment"
+    },
+    {
+      "id": "repa_song_smart_dsp_audition",
+      "path": "tools/repa_song_uncommitted_smart_dsp_audition_pipeline.py",
+      "reason": "offline audition experiment, not release proof"
+    }
+  ],
+  "duplicate_families": [
+    {
+      "canonical_id": "wing_attended_soundcheck",
+      "duplicate_ids": [
+        "channel_triggered_soundcheck",
+        "online_soundcheck_mix",
+        "live_wing_soundcheck_v2",
+        "live_wing_soundcheck_v2_stage2",
+        "live_wing_soundcheck_v2_stage3",
+        "live_wing_soundcheck_daemon"
+      ],
+      "disposition": "keep_paths_for_compatibility_but_exclude_from_canonical_execution"
+    },
+    {
+      "canonical_id": "repa_song_offline_mix",
+      "duplicate_ids": [
+        "repa_song_smart_dsp_audition"
+      ],
+      "disposition": "retain_as_explicit_offline_experiment"
+    }
+  ]
+}

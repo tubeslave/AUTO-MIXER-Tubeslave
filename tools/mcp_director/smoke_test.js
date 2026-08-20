@@ -1,22 +1,14 @@
 #!/usr/bin/env node
 "use strict";
 
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
-const { spawn, spawnSync } = require("node:child_process");
+import { spawn } from "node:child_process";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const repo = fs.mkdtempSync(path.join(os.tmpdir(), "automixer-mcp-director-"));
-spawnSync("git", ["init", "-b", "feature/mcp-director"], { cwd: repo, encoding: "utf8" });
-
-const serverPath = path.join(__dirname, "server.js");
-const server = spawn(process.execPath, [serverPath], {
-  env: {
-    ...process.env,
-    MCP_DIRECTOR_REPO: repo,
-    MCP_DIRECTOR_REQUIRED_BRANCH: "feature/mcp-director"
-  },
-  stdio: ["pipe", "pipe", "pipe"]
+const here = path.dirname(fileURLToPath(import.meta.url));
+const server = spawn(process.execPath, [path.join(here, "server.js")], {
+  env: { ...process.env, AUTOMIXER_WING_LAB_AUTOWRITE: "0" },
+  stdio: ["pipe", "pipe", "inherit"]
 });
 
 let stdout = Buffer.alloc(0);
@@ -25,114 +17,74 @@ const responses = [];
 server.stdout.on("data", (chunk) => {
   stdout = Buffer.concat([stdout, chunk]);
   while (true) {
-    const parsed = readFrame(stdout);
-    if (!parsed) {
-      break;
-    }
-    stdout = stdout.subarray(parsed.nextOffset);
-    responses.push(parsed.message);
+    const headerEnd = stdout.indexOf("\r\n\r\n");
+    if (headerEnd < 0) return;
+    const header = stdout.subarray(0, headerEnd).toString("utf8");
+    const match = /^Content-Length:\s*(\d+)\s*$/im.exec(header);
+    if (!match) throw new Error("missing_content_length");
+    const length = Number(match[1]);
+    const start = headerEnd + 4;
+    if (stdout.length < start + length) return;
+    responses.push(JSON.parse(stdout.subarray(start, start + length).toString("utf8")));
+    stdout = stdout.subarray(start + length);
   }
-});
-
-server.stderr.on("data", (chunk) => {
-  process.stderr.write(chunk);
 });
 
 function send(id, method, params = {}) {
-  const message = { jsonrpc: "2.0", id, method, params };
-  const body = JSON.stringify(message);
+  const body = JSON.stringify({ jsonrpc: "2.0", id, method, params });
   server.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`);
 }
 
-function readFrame(buffer) {
-  const index = buffer.indexOf("\r\n\r\n");
-  if (index < 0) {
-    return null;
-  }
-  const header = buffer.subarray(0, index).toString("utf8");
-  const match = /^Content-Length:\s*(\d+)\s*$/im.exec(header);
-  if (!match) {
-    throw new Error(`Missing Content-Length in response: ${header}`);
-  }
-  const length = Number(match[1]);
-  const start = index + 4;
-  const end = start + length;
-  if (buffer.length < end) {
-    return null;
-  }
-  return {
-    message: JSON.parse(buffer.subarray(start, end).toString("utf8")),
-    nextOffset: end
-  };
-}
-
-function waitForResponses(count, timeoutMs = 5000) {
-  const started = Date.now();
+function waitFor(count, timeoutMs = 5000) {
   return new Promise((resolve, reject) => {
+    const started = Date.now();
     const timer = setInterval(() => {
       if (responses.length >= count) {
         clearInterval(timer);
         resolve();
       } else if (Date.now() - started > timeoutMs) {
         clearInterval(timer);
-        reject(new Error(`Timed out waiting for ${count} responses; got ${responses.length}`));
+        reject(new Error(`timeout_waiting_for_${count}_responses`));
       }
-    }, 25);
+    }, 20);
   });
 }
 
-(async () => {
-  send(1, "initialize", { protocolVersion: "2024-11-05", clientInfo: { name: "smoke", version: "0" } });
+try {
+  send(1, "initialize", {
+    protocolVersion: "2024-11-05",
+    clientInfo: { name: "smoke", version: "1" }
+  });
   send(2, "tools/list");
-  send(3, "tools/call", {
-    name: "create_task",
-    arguments: {
-      title: "Smoke test task",
-      description: "Validate task persistence.",
-      agent: "analyzer"
-    }
-  });
-  send(4, "tools/call", {
-    name: "git_report",
-    arguments: {
-      title: "Smoke Git Report"
-    }
-  });
-  send(5, "tools/call", {
-    name: "telegram_notify",
-    arguments: {
-      message: "Smoke notification",
-      dryRun: true
-    }
-  });
-
-  await waitForResponses(5);
-  server.stdin.end();
-  server.kill();
+  send(3, "tools/call", { name: "wing_lab_status", arguments: {} });
+  send(4, "tools/call", { name: "automixer_pipeline_catalog", arguments: {} });
+  await waitFor(4);
 
   const errors = responses.filter((response) => response.error);
-  if (errors.length) {
-    throw new Error(`MCP errors: ${JSON.stringify(errors, null, 2)}`);
+  if (errors.length) throw new Error(JSON.stringify(errors));
+  const names = responses[1].result.tools.map((tool) => tool.name).sort();
+  const expected = [
+    "automixer_pipeline_catalog",
+    "wing_lab_apply_decisions",
+    "wing_lab_arm",
+    "wing_lab_emergency_stop",
+    "wing_lab_status",
+    "wing_lab_stop",
+    "wing_lab_trace"
+  ].sort();
+  if (JSON.stringify(names) !== JSON.stringify(expected)) {
+    throw new Error(`unexpected_tools:${names.join(",")}`);
   }
-
-  const tools = responses[1].result.tools.map((tool) => tool.name).sort();
-  const expected = ["create_task", "git_report", "run_agent", "run_full_review", "telegram_notify"].sort();
-  if (JSON.stringify(tools) !== JSON.stringify(expected)) {
-    throw new Error(`Unexpected tools: ${tools.join(", ")}`);
+  const status = responses[2].result.structuredContent;
+  if (status.enabled !== false || status.armed !== false) {
+    throw new Error(`unsafe_default_status:${JSON.stringify(status)}`);
   }
-
-  const taskFiles = fs.readdirSync(path.join(repo, ".paperclip", "tasks")).filter((file) => file.endsWith(".json"));
-  const reportFiles = fs.readdirSync(path.join(repo, ".paperclip", "reports")).filter((file) => file.endsWith(".md"));
-  if (taskFiles.length !== 1) {
-    throw new Error(`Expected one task file, got ${taskFiles.length}`);
+  const catalog = responses[3].result.structuredContent;
+  if (catalog.summary.experimental_live_execution_allowed !== false) {
+    throw new Error("pipeline_catalog_did_not_fail_closed");
   }
-  if (reportFiles.length < 2) {
-    throw new Error(`Expected at least two report files, got ${reportFiles.length}`);
-  }
-
-  process.stdout.write(`MCP Director smoke test passed in ${repo}\n`);
-})().catch((error) => {
-  server.kill();
-  process.stderr.write(`${error.stack || error.message}\n`);
-  process.exit(1);
-});
+  process.stdout.write("Automixer WING Lab MCP smoke test passed\n");
+} finally {
+  server.stdin.end();
+  server.kill("SIGTERM");
+}

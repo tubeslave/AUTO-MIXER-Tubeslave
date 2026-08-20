@@ -194,6 +194,7 @@ class WingClient(MixerClientBase):
         self._physical_receive_sequence = 0
         
         self.is_connected = False
+        self.handshake_info: Optional[str] = None
         
         # OSC throttle: track last send time per address to limit rate
         self._osc_throttle_enabled = True
@@ -397,6 +398,7 @@ class WingClient(MixerClientBase):
                 if addr != (self._configured_peer_ip, 2222):
                     raise ConnectionError("unexpected_wing_handshake_peer")
                 wing_info = data.decode('utf-8', errors='ignore')
+                self.handshake_info = wing_info
                 logger.info(f"Wing found: {wing_info}")
             except socket.timeout:
                 logger.error(f"Connection timeout: Wing at {self.ip} did not respond to handshake")

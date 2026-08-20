@@ -70,15 +70,27 @@ def test_legacy_live_tool_entrypoints_raise_before_transport_creation():
             assert isinstance(functions[name].body[0], ast.Raise), f"{relative}:{name}"
 
 
-def test_legacy_mcp_surfaces_are_minimal_fail_closed_stubs():
+def test_remote_mcp_gateway_stays_quarantined_and_local_lab_mcp_is_narrow():
     repo = Path(__file__).resolve().parents[1]
-    files = [
-        repo / "tools/mcp_director/server.js",
-        repo / "tools/mcp_director/install_mcp_director.sh",
+    remote_files = [
         repo / "tools/mcp_remote_gateway/server.js",
         repo / "tools/mcp_remote_gateway/start.sh",
     ]
-    combined = "\n".join(path.read_text(encoding="utf-8") for path in files)
-    assert "quarantined" in combined
-    for forbidden in ("git checkout", "TELEGRAM_BOT_TOKEN", "createMcpExpressApp", "fs.writeFile"):
-        assert forbidden not in combined
+    remote = "\n".join(path.read_text(encoding="utf-8") for path in remote_files)
+    assert "quarantined" in remote
+
+    local = (repo / "tools/mcp_director/server.js").read_text(encoding="utf-8")
+    assert "wing_lab_arm" in local
+    assert 'spawn("/usr/bin/python3", [bridgePath]' in local
+    for forbidden in (
+        "git checkout",
+        "TELEGRAM_BOT_TOKEN",
+        "createMcpExpressApp",
+        "fs.writeFile",
+        "execSync",
+        "shell: true",
+        "routing",
+        "snapshot",
+        "set_mute",
+    ):
+        assert forbidden not in local
