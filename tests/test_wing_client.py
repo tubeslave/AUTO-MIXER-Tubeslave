@@ -95,6 +95,9 @@ class TestOSCThrottle:
             client.is_connected = True
             client.sock = MagicMock()
             client.set_osc_throttle(enabled=True, hz=10.0)
+            boundary_token = client.install_mutation_boundary(
+                lambda _address, _values: True
+            )
 
             t0 = time.monotonic()
             result1 = client.send("/ch/1/fdr", 0.5)
@@ -108,6 +111,7 @@ class TestOSCThrottle:
             # первый ушёл сразу, из очереди — только последнее значение
             assert client.sock.sendto.call_count == 2
             assert client.commanded_state["/ch/1/fdr"] == 0.6
+            assert client.remove_mutation_boundary(boundary_token) is True
             client.disconnect()
 
     def test_osc_throttle_allows_queries(self):
@@ -354,7 +358,11 @@ class TestStateManagement:
                 nonlocal send_count
                 send_count += 1
                 if send_count == 1:
-                    client._handle_message(address, "-12.1", 0.47, -12.1)
+                    client._handle_transport_message(
+                        address,
+                        ("-12.1", 0.47, -12.1),
+                        ("127.0.0.1", 2223),
+                    )
                 return True
 
             client.send = send
@@ -374,14 +382,23 @@ class TestStateManagement:
             "pythonosc.osc_message_builder": MagicMock(),
             "pythonosc.osc_message": MagicMock(),
         }):
-            from wing_client import WingClient
+            from wing_client import (
+                WingClient,
+                verify_wing_physical_readback_receipt,
+            )
 
             client = WingClient(ip="127.0.0.1", port=2223)
+            client.is_connected = True
+            client.sock = object()
             replies = iter((-12.1, -12.0))
 
             def send(address, *values):
                 value = next(replies)
-                client._handle_message(address, str(value), 0.47, value)
+                client._handle_transport_message(
+                    address,
+                    (str(value), 0.47, value),
+                    ("127.0.0.1", 2223),
+                )
                 return True
 
             client.send = send
@@ -391,6 +408,78 @@ class TestStateManagement:
             assert result["status"] == "received"
             assert result["value"] == -12.0
             assert result["confirmed_round_trips"] == 2
+            assert result["authoritative"] is False
+            assert result["authentication"] == "none"
+            assert verify_wing_physical_readback_receipt(
+                client,
+                result,
+                "/ch/3/fdr",
+            ) is False
+            assert verify_wing_physical_readback_receipt(
+                client,
+                result,
+                "/ch/3/fdr",
+            ) is False
+            assert verify_wing_physical_readback_receipt(
+                client,
+                dict(result),
+                "/ch/3/fdr",
+            ) is False
+
+    def test_value_bearing_send_requires_installed_mutation_boundary(self):
+        from wing_client import WingClient
+
+        client = WingClient(ip="127.0.0.1", port=2223)
+        client.is_connected = True
+        client.sock = MagicMock()
+        client.set_osc_throttle(enabled=False)
+
+        assert client.send("/ch/1/fdr", -12.0) is False
+        assert client.sock.sendto.call_count == 0
+        assert client.send("/ch/1/fdr") is True
+        assert client.sock.sendto.call_count == 1
+
+    def test_query_parameter_rejects_direct_in_process_callbacks(self):
+        from wing_client import WingClient
+
+        client = WingClient(ip="127.0.0.1", port=2223)
+        client.is_connected = True
+        client.sock = object()
+
+        def send(address, *values):
+            client._handle_message(address, -12.0)
+            return True
+
+        client.send = send
+
+        result = client.query_parameter("/ch/3/fdr", timeout=0.01)
+
+        assert result == {
+            "status": "unverified_transport",
+            "address": "/ch/3/fdr",
+            "value": None,
+            "phase": "drain",
+        }
+
+    def test_transport_message_rejects_wrong_peer_before_state_or_callback(self):
+        from wing_client import WingClient
+
+        client = WingClient(ip="192.168.1.102", port=2223)
+        callback = MagicMock()
+        client.subscribe("/ch/3/fdr", callback)
+
+        assert client._handle_transport_message(
+            "/ch/3/fdr",
+            (-12.0,),
+            ("192.168.1.103", 2223),
+        ) is False
+        assert client._handle_transport_message(
+            "/ch/3/fdr",
+            (-12.0,),
+            ("192.168.1.102", 2222),
+        ) is False
+        assert "/ch/3/fdr" not in client.state
+        callback.assert_not_called()
 
 
 class TestChannelNameScanning:
@@ -651,6 +740,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False  # Disable throttle
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             result = client.send("/ch/1/fdr", 0.75)
             assert result is True
@@ -672,6 +762,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_channel_fader(1, -6.0) is True
             assert client.commanded_state.get("/ch/1/fdr") == -6.0
@@ -695,6 +786,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_channel_mute(1, 1) is True
             assert client.commanded_state.get("/ch/1/mute") == 1
@@ -717,6 +809,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_channel_pan(1, -50.0) is True
             assert client.commanded_state.get("/ch/1/pan") == -50.0
@@ -741,6 +834,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_fader(1, -6.0) is True
             assert client.set_gain(1, -3.0) is True
@@ -793,6 +887,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_high_cut(1, 1, frequency=12000.0, slope="12") is True
             assert client.set_eq_on(1, 1) is True
@@ -838,6 +933,7 @@ class TestConnectionLifecycle:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             with patch("wing_client.time.sleep", return_value=None):
                 assert client.set_compressor_on(1, 1) is True
@@ -955,6 +1051,7 @@ class TestAutoSoundcheckBridge:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             with patch("wing_client.time.sleep", return_value=None):
                 client.set_compressor(
@@ -988,6 +1085,7 @@ class TestAutoSoundcheckBridge:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             client.set_hpf(2, 90.0, enabled=True)
             client.set_polarity(2, True)
@@ -1023,6 +1121,7 @@ class TestWingClientFaderCeiling:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
             return client
 
     def test_ceiling_clamps_above_unity_by_default(self, caplog):
@@ -1111,6 +1210,7 @@ class TestSetterResultPropagation:
             client.is_connected = True
             client.sock = MagicMock()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
 
             assert client.set_main_fader(1, 99.0) is True
             assert client.commanded_state["/main/1/fdr"] == 10.0
@@ -1121,5 +1221,8 @@ class TestSetterResultPropagation:
             default_client.is_connected = True
             default_client.sock = MagicMock()
             default_client._osc_throttle_enabled = False
+            default_client.install_mutation_boundary(
+                lambda _address, _values: True
+            )
             assert default_client.set_main_fader(1, 5.0) is True
             assert default_client.commanded_state["/main/1/fdr"] == 0.0

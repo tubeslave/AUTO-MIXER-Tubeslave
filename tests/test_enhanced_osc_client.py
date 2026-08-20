@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from osc.enhanced_osc_client import ConnectionState, EnhancedOSCClient
+from wing_client import verify_wing_physical_readback_receipt
 
 
 @patch("wing_client.WingClient")
@@ -99,3 +100,32 @@ def test_mutation_boundary_match_check_delegates_to_wing_client(wing_client):
 
     assert client.mutation_boundary_matches(token) is True
     wing.mutation_boundary_matches.assert_called_once_with(token)
+
+
+def test_canonical_wrapper_receipt_is_bound_and_single_use():
+    client = EnhancedOSCClient(ip="127.0.0.1", port=2223)
+    client._wing.is_connected = True
+    client._wing.sock = object()
+    replies = iter((-12.1, -12.0))
+
+    def send(address, *values):
+        client._wing._handle_transport_message(
+            address,
+            (next(replies),),
+            ("127.0.0.1", 2223),
+        )
+        return True
+
+    client._wing.send = send
+    receipt = client.query_parameter("/ch/3/fdr", 0.01)
+
+    assert verify_wing_physical_readback_receipt(
+        client,
+        receipt,
+        "/ch/3/fdr",
+    ) is False
+    assert verify_wing_physical_readback_receipt(
+        client,
+        receipt,
+        "/ch/3/fdr",
+    ) is False

@@ -80,9 +80,8 @@ class MixingStationAdapter:
         if self.config.dry_run:
             self.connected = True
             return True
-        health = self.health_check()
-        self.connected = bool(health.get("success", False))
-        return self.connected
+        self.connected = False
+        return False
 
     def disconnect(self) -> None:
         self.connected = False
@@ -126,7 +125,9 @@ class MixingStationAdapter:
         correction = AutomixCorrection.from_dict(correction.to_dict())
         correction.console_profile = normalize_console_profile(correction.console_profile)
         correction.mode = correction.mode or self.config.mode
-        correction.dry_run = bool(self.config.dry_run)
+        # The reviewed Mixing Station transports have no application identity.
+        # Keep mapping and audit useful, but never emit a live command.
+        correction.dry_run = True
 
         requested_value = correction.value
         validation = self.validate_correction(correction)
@@ -229,7 +230,7 @@ class MixingStationAdapter:
             sent_value=command.value if command else correction.value,
             requested_value=correction.value if requested_value is None else requested_value,
             safety_status=correction.safety_status,
-            message="dry-run",
+            message="dry-run: mixing_station_authenticated_ipc_required",
             command=command,
         )
 

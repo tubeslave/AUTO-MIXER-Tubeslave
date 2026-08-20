@@ -69,7 +69,7 @@ def validate_maintenance_cli_request(
         return False, "rollback_plan_required"
 
     _ = operation
-    return True, None
+    return False, "legacy_mutation_surface_quarantined"
 
 
 def format_block_message(reason: str) -> str:
@@ -77,5 +77,6 @@ def format_block_message(reason: str) -> str:
         return "Maintenance action blocked: use --confirm-maintenance before execution."
     if reason == "rollback_plan_required":
         return "Maintenance action blocked: provide --rollback-snapshot PATH before execution."
+    if reason == "legacy_mutation_surface_quarantined":
+        return "Maintenance action blocked: legacy live mutation surface is quarantined."
     return "Maintenance action blocked."
-

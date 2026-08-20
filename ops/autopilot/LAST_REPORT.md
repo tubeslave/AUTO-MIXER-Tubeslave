@@ -1,5 +1,138 @@
 # Autopilot Last Report
 
+## M123 Instrument Space decision integration — 2026-08-04
+
+- Latest heartbeat: 2026-08-19T21:17:30Z.
+- Implemented the real Product Layer path from cached pan, level and spectral
+  measurements to explainable masking, spatial-imbalance and drift relations.
+- Added bounded 12-snapshot in-memory history, source-identity reset and
+  deterministic snapshot fingerprints; no persistence or hidden write path was
+  added.
+- Proposal annotations preserve measurements and evidence provenance, require
+  the exact read-only/no-authority contract and reject stale evidence older
+  than 30 seconds.
+- The dashboard exposes coordinates, measured deltas, provenance, blockers,
+  history and drift. It has no drag, queue import, console apply or authority
+  control.
+- Pre-final validation passed 43 focused tests, 337 broad backend tests, 278
+  frontend contracts, TypeScript and the production frontend build. The first
+  no-WING quick gate failed closed on an incomplete safe fallback DTO; that
+  integration gap is repaired and TypeScript now passes. The 64-channel
+  benchmark covered 2016 pairs, capped output at 128 relations and measured
+  16.677 ms mean, 18.590 ms p95 and 19.882 ms maximum.
+- Final software/no-console validation follows this final truth write. No backend,
+  WING or dLive endpoint was contacted; live writes and live authority remain
+  false.
+- Software status is `INTEGRATION_VERIFIED`; overall M123 status is
+  `WAITING_FOR_EXTERNAL_VALIDATION`. Attended console-specific pan mapping,
+  fresh physical readback, rollback and teardown remain external and cannot be
+  inferred from a green software suite.
+- Canonical report:
+  `Docs/reports/M123_INSTRUMENT_SPACE_DECISION_INTEGRATION_20260804.md`.
+
+## Parallel dLive readiness — 2026-08-04
+
+- Offline continuation now accepts only an operator-owned known-good packet
+  observed at selected-endpoint ingress and exactly matching the planned compact
+  NRPN. Effective security and reboot-after-change evidence are SHA-bound into
+  the one-shot approval. All 139 dLive tests pass; no console contact, capture
+  opening, MIDI send or authority expansion occurred.
+- Director machine-observed CDM32 and C3500 paired online on `V2.00 Rev.
+  83230`; fresh Surface and MixRack GET-only probes matched on `KICK`, raw
+  fader `106` and Mute ON.
+- A new exact Surface approval sent one `BB 63 00 62 17 06 65` packet while
+  outputs were isolated, KICK was muted, Receive MIDI was operator-confirmed
+  ON and the operator watched the fader. No movement occurred; four fresh
+  readbacks stayed at raw `106`.
+- Receipt `20260804T141746Z_def89219-2b15-4f4d-a1ef-6309e6bdec8e.json`, SHA-256
+  `f84d8b0394cfb428a5b4361e7ccca5dca78c3a34083e7cecd9bf8f2b523394f6`,
+  is terminal with `write_state_unknown=false`, clean teardown and no standing
+  authority. No same-plan retry is allowed.
+- Codec/base/selector/value match a passive Surface transmit observation. The
+  remaining blocker is effective inbound MIDI/security or wire delivery. Next
+  evidence must use security/reboot verification and a known-good client or
+  durable packet capture, not another blind write.
+- Pre-final offline validation passed 133 dLive/transport/safety tests and the
+  no-WING quick gate. Artifact
+  `artifacts/no_wing_release_check/20260804T143043Z_no_wing_release_check/summary.json`
+  has `failed_checks=[]`, no environment blockers, no WING/backend contact,
+  no live write and no live authority. Final post-truth repetition follows.
+- Latest heartbeat: 2026-08-04T20:43:19Z.
+- Closed reusable dLive approval: exact plan plus unique approval ID now derive
+  the confirmation token, and `prepared` WAL consumption prevents reuse.
+- Zero-contact production plan validation accepted the fresh C3500 artifact
+  for `-3.0 dB`, emitted exact apply/rollback packets and denied route/TCP/MIDI,
+  execution and authority. Validation passed 46 focused and 151 broad tests.
+- Final validation passed: 522 backend tests, 27 frontend contracts,
+  production frontend build, 6 handoff truth rails and a no-WING quick gate
+  with `failed_checks=[]`, zero WING/backend contact, zero live write and zero
+  live authority.
+- Closed the dLive identity/config propagation gap: Surface/MixRack endpoint,
+  MIDI base and user profile now survive saved config, direct/auto-connect,
+  soundcheck, UI and product-state paths. Validation passed 475 backend tests
+  and 27 frontend contracts.
+- Fresh C3500 GET-only artifact
+  `20260804T101948Z_54d4cb5b-b850-4644-9ef8-f40918a3394a.json`, SHA-256
+  `d4f5dd8ff84d0be7aaf0c5db2352450b59edd8f1170557fa8385288adfc44c40`,
+  records base 11/profile 0, `KICK`, `-0.582677 dB`, Mute ON, six GETs, zero
+  mutation writes and clean disconnect. Receive MIDI remains unknown, so no
+  write approval or live authority exists.
+- Replaced the incorrect 14-bit/speculative MIDI layer with official v2.0
+  7-bit vectors, Surface/MixRack endpoint validation, running-status parsing,
+  fresh double readback and fail-closed unsupported families.
+- Normal server, factory, soundcheck and UI connections are read-only; generic
+  raw MIDI and normal fader/mute setters are blocked. Removed boolean write
+  authority and added an isolated restore-only fader proof with one-shot
+  approval, shared writer lock, durable hash-chained WAL, CAS rollback,
+  teardown and exact-preimage recovery.
+- Restore-only writer/WAL/recovery validation passed 28, including exact
+  quantized direction, zero-grace cut bounds, `-inf` and above-0 dB preimage
+  rejection; writer/client validation passed 73;
+  dLive/server/config/safety/static integration passed 568; frontend
+  production build passed at the prior checkpoint. Final rails/full suite
+  follow this truth write and are not pre-claimed here.
+- The configured inactive dLive candidate now consistently uses
+  `192.168.3.70`; its no-transport preflight passed with no socket and no MIDI.
+- `en7` is now `192.168.3.59/24`; `192.168.3.70` routes via `en7`, and only
+  MixRack plain TCP `51325` is open. A GET-only search identified MIDI base
+  `11`; input 1 returned two fresh stable replies for `KICK`, approximately
+  `-0.58 dB`, mute off. Hardware/read-only MIDI contact occurred, all sessions
+  disconnected cleanly, mutation attempts and live writes stayed zero.
+- The canonical runner observed the same stable fields for operator-attested
+  `CDM32+C3500`, firmware `2.0`, Show `lv 1 master`; six GETs, zero mutations
+  and clean disconnect are recorded in artifact SHA-256
+  `f38220bdf85aa606c491ba8ae9323e3db8f2da34ca23bbc356b2161288c93be8`.
+- The operator confirmed the physical C3500 matches `KICK`, `-0.5827 dB`, mute
+  off; the SHA-bound read-only artifact is accepted.
+- Operational readiness is 78/100. Mutation remains blocked until every PA and
+  monitor output is physically contained and Input 1 is muted; no live scope is
+  granted.
+- The first contained/muted restore-only attempt sent one packet for `-3.0 dB`,
+  but the target was not observed; four fresh reads stayed at the exact
+  `-0.5826771653543332 dB` preimage. The terminal artifact is
+  `restored_after_unverified_apply`, `write_state_unknown=false`, with clean
+  teardown and SHA-256
+  `ebb8651a05fba959d2b7a3f1a7d296652ed072e1b51f95f131739b1b7498a1a6`.
+- Physical evidence identified a full-status-versus-running-status NRPN bug.
+  The encoder now sends `BB 63 00 62 17 06 65`; 93 focused regression tests
+  pass. The consumed approval is not reusable and no retry is pre-authorized.
+- The separately approved corrected-packet attempt was also an unchanged-state
+  terminal no-op (`write_state_unknown=false`, clean teardown), so packet shape
+  is not a sufficient physical root cause. C3500 Surface
+  `192.168.3.71:51328` is GET-verified and matches the MixRack. A new core gate
+  requires `Receive MIDI` explicitly enabled before any future proof; 94 focused
+  tests pass and no third write is authorized.
+- The restore-only proof now verifies an exact read-only artifact path, SHA and
+  content before route lookup or TCP. It binds endpoint/port, MIDI base, user
+  profile, input identity, mute, fader preimage, six GETs, zero writes and clean
+  teardown, then rechecks the exact 7-bit preimage live before WAL/apply.
+- Emergency interruption after `prepared` or apply boundary now terminates as
+  verified zero-send; interruption after transport restores the exact preimage.
+  Focused tests pass 41/41 and all dLive tests pass 110/110. The previous Surface
+  artifact lacks `user_profile`, so a fresh Surface probe is required. This code
+  checkpoint contacted no hardware and sent no live writes.
+- Canonical report: `Docs/reports/DLIVE_READINESS_REVIEW_20260803.md`.
+
 ## System Inspector iteration 001 — 2026-07-27
 
 - Latest heartbeat: 2026-07-27T20:46:42Z.
@@ -210,7 +343,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -3662,3 +3795,19 @@ Latest WING FX unsupported path guard passed: `WingClient.set_fx_on` fails close
 - Latest voice command malformed payload guard validation:
   The latest verified full suite passed with
   `5434 passed, 1 skipped, 1 warning`. No WING/backend transport was contacted and no live authority changed.
+
+## Codex Security local remediation — 2026-08-19
+
+The exact sealed 143-occurrence inventory is locally remediated or
+fail-closed and recorded as `locally_verified_unsealed`: 77 high, 59 medium,
+7 low, with unchanged occurrence-set digest
+`80146278415ba2ef4108d7998f7eff70a061a27df1b7afadbcbb926c9c6a57fd`.
+Focused owning cohorts passed (728 high, 272 Medium/Low, 544 expanded
+server/network/ML, and 57 replay-integrity tests). Aggregate repository modules
+are being verified in bounded pytest processes because a monolithic process on
+the nearly full APFS volume can temporarily violate the production 512 MiB
+result-evidence reserve. No production reserve was weakened. No hardware,
+audio, console, external training feed, Telegram, or remote MCP contact was
+performed; live authority and readiness closure remain false. Canonical closure
+is blocked until the unavailable Codex Security connector can run and seal a
+fresh full current-checkout scan.

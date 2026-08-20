@@ -21,7 +21,14 @@ def register_handlers(server):
         artifact_path = server._record_manual_write_event("manual_write_emergency_stop", payload)
         if artifact_path:
             payload["artifact_path"] = artifact_path
-        await server.send_to_client(websocket, payload)
+        if getattr(server, "_ws_auth_required", True):
+            response = payload
+        else:
+            response = {
+                "type": "emergency_stop_applied",
+                "status": "accepted",
+            }
+        await server.send_to_client(websocket, response)
 
     async def handle_get_manual_write_supervision(websocket, data):
         await server.send_to_client(

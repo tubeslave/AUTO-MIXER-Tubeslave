@@ -48,6 +48,11 @@ DEFAULT_INPUT_DIR = Path.home() / "Desktop" / "SONG  REPA"
 DEFAULT_OUTPUT_DIR = Path.home() / "Desktop" / "SONG_REPA_OFFLINE_SMARTEQ_V2_AIAK_LUFS"
 DEFAULT_OUTPUT = DEFAULT_OUTPUT_DIR / "SONG_REPA_OFFLINE_SMARTEQ_V2_AIAK_LUFS.wav"
 DEFAULT_REPORT = DEFAULT_OUTPUT_DIR / "SONG_REPA_OFFLINE_SMARTEQ_V2_AIAK_LUFS_report.json"
+MAX_RENDER_TRACKS = 128
+MAX_RENDER_SAMPLE_RATE = 192_000
+MAX_RENDER_CHANNELS = 64
+MAX_RENDER_DURATION_SEC = 30 * 60
+MAX_RENDER_SAMPLE_CELLS = 200_000_000
 
 
 def run_offline_smarteq_gainstaged_mix(
@@ -73,6 +78,8 @@ def run_offline_smarteq_gainstaged_mix(
     wavs = iter_wavs(input_dir)
     if not wavs:
         raise RuntimeError(f"No WAV files found in {input_dir}")
+    if len(wavs) > MAX_RENDER_TRACKS:
+        raise RuntimeError("offline render track count exceeds limit")
 
     config = load_config(config_path)
     cal_config = dict(calibration_config(config))
@@ -81,11 +88,24 @@ def run_offline_smarteq_gainstaged_mix(
     preamp_profile = LocalInputGainProfile.from_config(cal_config.get("local_input_preamp", {}))
 
     infos = [sf.info(str(path)) for path in wavs]
+    for info in infos:
+        if not 1 <= int(info.samplerate) <= MAX_RENDER_SAMPLE_RATE:
+            raise RuntimeError("offline render sample rate exceeds limit")
+        if not 1 <= int(info.channels) <= MAX_RENDER_CHANNELS:
+            raise RuntimeError("offline render channel count exceeds limit")
+        if int(info.frames) / float(info.samplerate) > MAX_RENDER_DURATION_SEC:
+            raise RuntimeError("offline render duration exceeds limit")
+        if int(info.frames) * int(info.channels) > MAX_RENDER_SAMPLE_CELLS:
+            raise RuntimeError("offline render decoded sample count exceeds limit")
     sample_rates = {int(info.samplerate) for info in infos}
     if len(sample_rates) != 1:
         raise RuntimeError(f"Sample-rate mismatch: {sorted(sample_rates)}")
     sr = sample_rates.pop()
     target_len = max(int(info.frames) for info in infos)
+    if target_len * 2 > MAX_RENDER_SAMPLE_CELLS:
+        raise RuntimeError("offline render mix allocation exceeds limit")
+    if sum(int(info.frames) * int(info.channels) for info in infos) > MAX_RENDER_SAMPLE_CELLS:
+        raise RuntimeError("offline render aggregate input exceeds limit")
     mix = np.zeros((target_len, 2), dtype=np.float32)
     tracks: List[Dict[str, Any]] = []
     pending_tracks: List[Dict[str, Any]] = []

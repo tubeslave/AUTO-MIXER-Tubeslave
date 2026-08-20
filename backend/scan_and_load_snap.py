@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 def scan_snapshots(client: WingClient, max_snapshots: int = 1000):
+    logger.error("Legacy snapshot cursor scan surface is quarantined")
+    return {}
+
     """
     Сканирование snapshots по номерам
     
@@ -90,6 +93,9 @@ def scan_snapshots(client: WingClient, max_snapshots: int = 1000):
 
 
 def find_snap_by_name(client: WingClient, snap_name: str, max_snapshots: int = 1000):
+    logger.error("Legacy snapshot cursor scan surface is quarantined")
+    return None, None
+
     """
     Поиск snapshot по имени и возврат его индекса
     """
@@ -125,6 +131,9 @@ def find_snap_by_name(client: WingClient, snap_name: str, max_snapshots: int = 1
 
 
 def load_snap_by_index(client: WingClient, snap_index: int):
+    logger.error("Legacy snapshot recall surface is quarantined")
+    return False
+
     """
     Загрузка snapshot по индексу
     

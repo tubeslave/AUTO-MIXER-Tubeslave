@@ -1036,10 +1036,29 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
     backend_only_validation_row = (
         latest_authority.get("backend_only_validation") is True
     )
+    parallel_dlive_row = latest["event"].startswith("dlive_")
+
+    def authority_value(key, dlive_default):
+        if parallel_dlive_row:
+            return latest_authority.get(key, dlive_default)
+        return latest_authority[key]
+
     if operator_approved_proof_row:
         # Operator-approved supervised proof rows may contact hardware and
         # perform bounded writes, but must never widen standing authority.
-        assert latest["event"].startswith("supervised_")
+        assert latest["event"].startswith("supervised_") or parallel_dlive_row
+        if parallel_dlive_row:
+            assert latest_authority["contacts_dlive"] is True
+            assert latest_authority["contacts_wing"] is False
+            assert latest_authority["live_write"] is False
+            assert latest_authority["standing_live_authority"] is False
+            assert latest["live_writes"]
+            assert all(
+                row["target_applied"] is False
+                and row["write_state_unknown"] is False
+                and row["teardown_verified"] is True
+                for row in latest["live_writes"]
+            )
         if latest_authority.get("operator_attended_diagnostic") is True:
             assert (
                 latest["event"]
@@ -1090,23 +1109,23 @@ def test_autopilot_latest_ledger_authority_stays_fail_closed_while_external_bloc
         ):
             assert latest_authority[flag] is state_authority[flag] is False
 
-    assert latest_authority["readiness_matrix_update_allowed"] is False
+    assert authority_value("readiness_matrix_update_allowed", False) is False
     assert (
-        latest_authority["release_ready_live_family_count"]
+        authority_value("release_ready_live_family_count", 0)
         == state_summary["wing_correction_apply_readiness_release_ready_live_family_count"]
         == 0
     )
     assert (
-        latest_authority["safety_coverage_live_allowed_row_count"]
+        authority_value("safety_coverage_live_allowed_row_count", 0)
         == len(state_summary["safety_coverage_matrix_live_allowed_row_ids"])
         == 0
     )
     assert (
-        latest_authority["supervised_current_live_write_kind_count"]
+        authority_value("supervised_current_live_write_kind_count", 0)
         == len(state_summary["autonomy_mode_transition_supervised_current_live_write_kinds"])
         == 0
     )
-    assert latest_authority["unrestricted_live_or_soundcheck_authority"] is False
+    assert authority_value("unrestricted_live_or_soundcheck_authority", False) is False
 
 
 def test_m116_operator_attended_diagnostic_remains_pinned_after_ledger_advances():

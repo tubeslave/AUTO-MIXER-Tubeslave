@@ -44,6 +44,9 @@ DCA_GROUPS = {
 
 
 def main() -> None:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: DCA rewrites are disabled"
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--confirm-live-wing-write", default="")
     parser.add_argument("--rollback", default="")

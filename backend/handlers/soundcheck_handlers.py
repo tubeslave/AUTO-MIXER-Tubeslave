@@ -517,6 +517,19 @@ def register_handlers(server):
             "mixer_port",
             mixer_config.get("port", 51328 if mixer_type == "dlive" else 2223)
         )
+        mixer_tls = bool(data.get("mixer_tls", mixer_config.get("tls", False)))
+        mixer_endpoint = data.get(
+            "mixer_endpoint",
+            mixer_config.get("endpoint", "surface"),
+        )
+        midi_base_channel = data.get(
+            "midi_base_channel",
+            mixer_config.get("midi_base_channel", 11),
+        )
+        user_profile = data.get(
+            "user_profile",
+            mixer_config.get("user_profile", 0),
+        )
         audio_device = (
             str(server._master_capture_route_authority.capture_device)
             if m110_analysis
@@ -763,6 +776,10 @@ def register_handlers(server):
                 mixer_type=mixer_type,
                 mixer_ip=mixer_ip,
                 mixer_port=mixer_port,
+                mixer_tls=mixer_tls,
+                mixer_endpoint=mixer_endpoint,
+                midi_base_channel=midi_base_channel,
+                user_profile=user_profile,
                 audio_device_name=audio_device,
                 num_channels=num_channels,
                 selected_channels=selected_channels,

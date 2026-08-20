@@ -33,6 +33,20 @@ except ImportError:  # pragma: no cover - direct PYTHONPATH=backend compatibilit
 DEFAULT_STORAGE_DIR = "data/telemetry/sessions"
 
 
+def _safe_session_id(value: Any) -> str:
+    session_id = str(value)
+    if (
+        not session_id
+        or len(session_id) > 128
+        or session_id in {".", ".."}
+        or "/" in session_id
+        or "\\" in session_id
+        or "\x00" in session_id
+    ):
+        raise ValueError("telemetry session_id must be one safe path component")
+    return session_id
+
+
 def default_telemetry_config() -> Dict[str, Any]:
     return {
         "enabled": False,
@@ -102,7 +116,12 @@ class TelemetrySessionManager:
         return self.storage_dir / "current_session.json"
 
     def session_dir(self, session_id: str) -> Path:
-        return self.storage_dir / session_id
+        component = _safe_session_id(session_id)
+        root = self.storage_dir.resolve()
+        path = (root / component).resolve()
+        if path.parent != root:
+            raise ValueError("telemetry session path escapes storage_dir")
+        return path
 
     def start_session(
         self,
@@ -126,7 +145,7 @@ class TelemetrySessionManager:
         if bool(self.config.get("safety", {}).get("allow_live_writes", False)):
             raise ValueError("telemetry.safety.allow_live_writes must remain false")
 
-        session_id = session_id or generate_session_id(mode)
+        session_id = _safe_session_id(generate_session_id(mode) if session_id is None else session_id)
         session = SessionRecord(
             session_id=session_id,
             started_at=utc_now(),

@@ -11,71 +11,60 @@ from wing_client import WingClient
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+MAX_READ_ONLY_SNAPSHOT_INDEX = 500
+
 
 def list_all_snapshots(client: WingClient, max_index: int = 500):
     """
-    Получить список всех snapshots
+    Получить список snapshots без загрузки или изменения активной сцены.
     """
+    if type(max_index) is not int or not 1 <= max_index <= MAX_READ_ONLY_SNAPSHOT_INDEX:
+        raise ValueError(
+            f"max_index must be an integer in range 1..{MAX_READ_ONLY_SNAPSHOT_INDEX}"
+        )
     logger.info("=" * 70)
-    logger.info(f"ПОЛУЧЕНИЕ СПИСКА ВСЕХ SNAPSHOTS (максимум {max_index} индексов)")
+    logger.info(f"ЧТЕНИЕ СПИСКА SNAPSHOTS (максимум {max_index} индексов)")
     logger.info("=" * 70)
-    
-    # Получаем текущий активный snapshot
+
+    # Read current scene and library cursor. The cursor is restored in finally.
     client.send("/$ctl/lib/$active")
     client.send("/$ctl/lib/$actidx")
+    client.send("/$ctl/lib/$actionidx")
     time.sleep(0.2)
     original_active = client.state.get("/$ctl/lib/$active")
     original_idx = client.state.get("/$ctl/lib/$actidx")
-    
+    original_cursor = client.state.get("/$ctl/lib/$actionidx")
+
     logger.info(f"\nТекущий активный snapshot: [{original_idx}] {original_active}")
-    logger.info(f"\nСканирование snapshots...")
-    logger.info("ВНИМАНИЕ: Будет временно загружаться каждый snapshot для проверки имени\n")
-    
+    logger.info("\nЧтение имён snapshots без команд LOAD/GO...\n")
+
     snapshots = {}
-    seen_names = set()
-    
-    if original_active and original_idx is not None:
-        snapshots[original_idx] = original_active
-        seen_names.add(original_active)
-        logger.info(f"  [{original_idx:4d}] {original_active}")
-    
-    for idx in range(1, max_index + 1):
-        try:
-            # Устанавливаем индекс
-            client.send("/$ctl/lib/$actionidx", idx)
-            time.sleep(0.1)
-            
-            # Отправляем GO для загрузки snapshot
-            client.send("/$ctl/lib/$action", "GO")
-            time.sleep(0.2)
-            
-            # Запрашиваем имя активной сцены
-            client.send("/$ctl/lib/$active")
-            time.sleep(0.1)
-            
-            active_name = client.state.get("/$ctl/lib/$active")
-            
-            # Если это новый snapshot
-            if active_name and active_name not in seen_names:
-                snapshots[idx] = active_name
-                seen_names.add(active_name)
-                logger.info(f"  [{idx:4d}] {active_name}")
-            
-        except Exception as e:
-            logger.debug(f"Ошибка при проверке индекса {idx}: {e}")
-        
-        # Прогресс каждые 50 индексов
-        if idx % 50 == 0:
-            logger.info(f"  ... проверено {idx} индексов, найдено {len(snapshots)} snapshots ...")
-    
-    # Возвращаемся к оригинальному snapshot
-    if original_idx is not None:
-        logger.info(f"\nВозврат к оригинальному snapshot (индекс {original_idx})...")
-        client.send("/$ctl/lib/$actionidx", original_idx)
-        time.sleep(0.1)
-        client.send("/$ctl/lib/$action", "GO")
-        time.sleep(0.2)
-    
+    try:
+        for idx in range(1, max_index + 1):
+            try:
+                client.send("/$ctl/lib/$actionidx", idx)
+                time.sleep(0.05)
+
+                # Clear stale cached data, then query the selected library name.
+                client.state.pop("/$ctl/lib/$name", None)
+                client.send("/$ctl/lib/$name")
+                time.sleep(0.05)
+                name = client.state.get("/$ctl/lib/$name")
+                if isinstance(name, str) and name.strip():
+                    snapshots[idx] = name
+                    logger.info(f"  [{idx:4d}] {name}")
+            except Exception as exc:
+                logger.debug(f"Ошибка при чтении индекса {idx}: {exc}")
+
+            if idx % 50 == 0:
+                logger.info(
+                    f"  ... проверено {idx} индексов, найдено {len(snapshots)} snapshots ..."
+                )
+    finally:
+        if type(original_cursor) is int:
+            client.send("/$ctl/lib/$actionidx", original_cursor)
+            time.sleep(0.05)
+
     logger.info("\n" + "=" * 70)
     logger.info(f"НАЙДЕНО SNAPSHOTS: {len(snapshots)}")
     logger.info("=" * 70)
@@ -86,8 +75,8 @@ def list_all_snapshots(client: WingClient, max_index: int = 500):
             logger.info(f"  [{idx:4d}] {name}")
     else:
         logger.warning("Snapshots не найдены")
-        logger.warning("Возможно, нужно увеличить MAX_INDEX или snapshots находятся в Show")
-    
+        logger.warning("Возможно, нужно увеличить MAX_INDEX или проверить активный Show")
+
     return snapshots
 
 

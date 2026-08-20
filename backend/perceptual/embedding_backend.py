@@ -194,12 +194,12 @@ class MERTEmbeddingBackend(EmbeddingBackend):
         self.feature_extractor = AutoFeatureExtractor.from_pretrained(
             model_name,
             local_files_only=self.local_files_only,
-            trust_remote_code=True,
+            trust_remote_code=False,
         )
         self.model = AutoModel.from_pretrained(
             model_name,
             local_files_only=self.local_files_only,
-            trust_remote_code=True,
+            trust_remote_code=False,
         )
         self.model.to(self.device)
         self.model.eval()

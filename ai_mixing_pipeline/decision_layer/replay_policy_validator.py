@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -12,6 +14,9 @@ from .replay_proposal_ranking import (
     ReplayDecisionProposal,
     ReplayGraphCheckpoint,
     compare_replay_graph_checkpoints,
+    validate_feedback_mitigation_values,
+    validate_fader_adjustment_values,
+    validate_gain_adjustment_values,
 )
 from .replay_restore_loader import load_replay_rewind_context
 
@@ -99,8 +104,11 @@ def _resolve_executor(executor_result: ReplayExecutorResult | dict[str, Any] | N
     if executor_result is None or isinstance(executor_result, ReplayExecutorResult):
         return executor_result
     payload = dict(executor_result)
+    raw_dry_run = payload.get("dry_run_only", True)
+    if type(raw_dry_run) is not bool:
+        raise ValueError("executor dry_run_only must be a JSON boolean")
     return ReplayExecutorResult(
-        dry_run_only=bool(payload.get("dry_run_only", True)),
+        dry_run_only=raw_dry_run,
         proposals_executed=[str(item) for item in payload.get("proposals_executed") or ()],
         selected_proposal_id=payload.get("selected_proposal_id"),
         events=[] if payload.get("events") is None else [
@@ -127,6 +135,13 @@ def _executor_event_payloads(executor_result: ReplayExecutorResult | None) -> li
 
 def _ranking_payload(ranking: ProposalRankResult) -> list[dict[str, Any]]:
     return [dict(item) for item in ranking.ranked_proposals]
+
+
+def _sha256_json(payload: Any, *, compact: bool = False) -> str:
+    kwargs: dict[str, Any] = {"sort_keys": True, "ensure_ascii": True}
+    if compact:
+        kwargs["separators"] = (",", ":")
+    return hashlib.sha256(json.dumps(payload, **kwargs).encode("utf-8")).hexdigest()
 
 
 def validate_replay_policy_consistency(
@@ -170,6 +185,57 @@ def validate_replay_policy_consistency(
     graph_metadata = dict(graph_checkpoint.replay_metadata or {})
     trim_metadata = dict(trim_snapshot.get("replay_metadata") or {})
 
+    if not resolved_manifest.manifest_id.strip():
+        add_finding(
+            "missing_manifest_id",
+            "error",
+            "Replay manifest is missing its integrity identifier.",
+            "policy",
+        )
+    if not trim_snapshot or not resolved_manifest.graph_checkpoint:
+        add_finding(
+            "empty_replay_manifest",
+            "error",
+            "Replay manifest must contain non-empty trim and graph checkpoints.",
+            "policy",
+        )
+
+    manifest_payload = resolved_manifest.to_dict()
+    claimed_manifest_id = str(manifest_payload.pop("manifest_id", ""))
+    expected_manifest_id = "replay_manifest::" + hashlib.sha256(
+        json.dumps(
+            manifest_payload,
+            sort_keys=True,
+            ensure_ascii=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()[:16]
+    if claimed_manifest_id and claimed_manifest_id != expected_manifest_id:
+        add_finding(
+            "manifest_integrity_mismatch",
+            "error",
+            "Replay manifest identifier does not match its canonical contents.",
+            "policy",
+            details={"expected_manifest_id": expected_manifest_id},
+        )
+
+    graph_core = {
+        "version": graph_checkpoint.version,
+        "proposals": [proposal.to_dict() for proposal in graph_checkpoint.proposals],
+        "ranking": graph_checkpoint.ranking.to_dict(),
+        "timeline_artifact": graph_checkpoint.timeline_artifact,
+        "replay_metadata": graph_checkpoint.replay_metadata,
+    }
+    expected_checkpoint_id = f"replay_graph::{_sha256_json(graph_core, compact=True)[:16]}"
+    if graph_checkpoint.checkpoint_id != expected_checkpoint_id:
+        add_finding(
+            "graph_checkpoint_integrity_mismatch",
+            "error",
+            "Replay graph checkpoint identifier does not match canonical contents.",
+            "policy",
+            details={"expected_checkpoint_id": expected_checkpoint_id},
+        )
+
     if not resolved_manifest.dry_run_only:
         add_finding(
             "replay_policy_not_dry_run",
@@ -184,7 +250,14 @@ def validate_replay_policy_consistency(
             "Replay manifest reports live mixer writes.",
             "policy",
         )
-    if bool(trim_transport.get("dry_run_only", True)) != bool(resolved_manifest.dry_run_only):
+    if type(trim_transport.get("dry_run_only")) is not bool:
+        add_finding(
+            "trim_transport_dry_run_marker_missing_or_invalid",
+            "error",
+            "Trim transport requires explicit boolean dry-run evidence.",
+            "replay_state",
+        )
+    elif trim_transport["dry_run_only"] != resolved_manifest.dry_run_only:
         add_finding(
             "trim_transport_policy_mismatch",
             "error",
@@ -195,7 +268,14 @@ def validate_replay_policy_consistency(
                 "manifest_dry_run_only": bool(resolved_manifest.dry_run_only),
             },
         )
-    if bool(timeline_artifact.get("dry_run_only", True)) != bool(resolved_manifest.dry_run_only):
+    if type(timeline_artifact.get("dry_run_only")) is not bool:
+        add_finding(
+            "timeline_dry_run_marker_missing_or_invalid",
+            "error",
+            "Replay timeline requires explicit boolean dry-run evidence.",
+            "decision",
+        )
+    elif timeline_artifact["dry_run_only"] != resolved_manifest.dry_run_only:
         add_finding(
             "timeline_policy_mismatch",
             "error",
@@ -206,7 +286,14 @@ def validate_replay_policy_consistency(
                 "manifest_dry_run_only": bool(resolved_manifest.dry_run_only),
             },
         )
-    if bool(timeline_artifact.get("live_mixer_writes", False)) != bool(resolved_manifest.live_mixer_writes):
+    if type(timeline_artifact.get("live_mixer_writes")) is not bool:
+        add_finding(
+            "timeline_live_write_marker_missing_or_invalid",
+            "error",
+            "Replay timeline requires an explicit boolean live-write marker.",
+            "decision",
+        )
+    elif timeline_artifact["live_mixer_writes"] != resolved_manifest.live_mixer_writes:
         add_finding(
             "timeline_live_write_mismatch",
             "error",
@@ -268,6 +355,75 @@ def validate_replay_policy_consistency(
                 proposal_id=proposal.proposal_id,
                 replay_correlation_id=proposal.replay_correlation_id,
             )
+        if proposal.family == "feedback_mitigation":
+            try:
+                validate_feedback_mitigation_values(
+                    channel=proposal.target.get("channel"),
+                    action=proposal.action_type,
+                    frequency_hz=proposal.target.get("frequency_hz"),
+                    gain_db=proposal.requested_state.get("gain_db"),
+                    q=proposal.requested_state.get("q"),
+                    max_q=proposal.safety.get("max_q"),
+                    max_cut_db=proposal.safety.get("max_cut_db"),
+                )
+            except ValueError as exc:
+                add_finding(
+                    "invalid_feedback_mitigation_bounds",
+                    "error",
+                    "Feedback mitigation proposal has malformed or unbounded values.",
+                    "analyzer",
+                    proposal_id=proposal.proposal_id,
+                    replay_correlation_id=proposal.replay_correlation_id,
+                    details={"validation_error": str(exc)},
+                )
+        if proposal.family == "gain_adjustment":
+            raw_safety_step = (
+                proposal.safety.get("max_step_db")
+                if "max_step_db" in proposal.safety
+                else proposal.safety.get("max_delta_db")
+            )
+            try:
+                validate_gain_adjustment_values(
+                    channel=proposal.target.get("channel"),
+                    action=proposal.action_type,
+                    current_gain_db=proposal.current_state.get("gain_db"),
+                    requested_gain_db=proposal.requested_state.get("gain_db"),
+                    max_step_db=raw_safety_step,
+                )
+            except ValueError as exc:
+                add_finding(
+                    "invalid_gain_adjustment_bounds",
+                    "error",
+                    "Gain adjustment proposal has malformed or missing safety bounds.",
+                    "analyzer",
+                    proposal_id=proposal.proposal_id,
+                    replay_correlation_id=proposal.replay_correlation_id,
+                    details={"validation_error": str(exc)},
+                )
+        if proposal.family == "fader_adjustment":
+            raw_safety_step = (
+                proposal.safety.get("max_step_db")
+                if "max_step_db" in proposal.safety
+                else proposal.safety.get("max_delta_db")
+            )
+            try:
+                validate_fader_adjustment_values(
+                    channel=proposal.target.get("channel"),
+                    action=proposal.action_type,
+                    current_fader_db=proposal.current_state.get("fader_db"),
+                    requested_fader_db=proposal.requested_state.get("fader_db"),
+                    max_step_db=raw_safety_step,
+                )
+            except ValueError as exc:
+                add_finding(
+                    "invalid_fader_adjustment_bounds",
+                    "error",
+                    "Fader adjustment proposal has malformed or missing safety bounds.",
+                    "analyzer",
+                    proposal_id=proposal.proposal_id,
+                    replay_correlation_id=proposal.replay_correlation_id,
+                    details={"validation_error": str(exc)},
+                )
 
     if sorted(correlation_ids) != sorted(resolved_manifest.replay_correlation_ids):
         add_finding(
@@ -285,8 +441,27 @@ def validate_replay_policy_consistency(
     critic_events: dict[str, list[dict[str, Any]]] = {}
     decision_events: dict[str, dict[str, Any]] = {}
     timeline = list(timeline_artifact.get("timeline") or ())
+    expected_timeline_seq = list(range(1, len(timeline) + 1))
+    actual_timeline_seq = [int(dict(item or {}).get("seq", 0)) for item in timeline]
+    if actual_timeline_seq != expected_timeline_seq:
+        add_finding(
+            "timeline_event_seq_gap",
+            "error",
+            "Replay timeline event sequence is not contiguous.",
+            "decision",
+        )
     for item in timeline:
         event = dict(item or {})
+        event_signature = str(event.pop("event_signature", ""))
+        event.pop("seq", None)
+        if event_signature != _sha256_json(event):
+            add_finding(
+                "timeline_event_integrity_mismatch",
+                "error",
+                "Replay timeline event signature does not match its contents.",
+                str(event.get("stage", "decision")),
+                proposal_id=str(event.get("proposal_id", "")),
+            )
         proposal_id = str(event.get("proposal_id", ""))
         stage = str(event.get("stage", ""))
         if stage == "analyzer":
@@ -354,6 +529,32 @@ def validate_replay_policy_consistency(
                 )
 
     ranked_proposals = _ranking_payload(ranking)
+    expected_run_signature = _sha256_json(
+        {
+            "count": len(ranked_proposals),
+            "run_input_signature": float(len(ranked_proposals)),
+            "ranked": [
+                (item.get("proposal_id"), item.get("confidence_weighted_score"))
+                for item in ranked_proposals
+            ],
+        }
+    )
+    if ranking.run_signature != expected_run_signature:
+        add_finding(
+            "ranking_integrity_mismatch",
+            "error",
+            "Replay ranking signature does not match ranked contents.",
+            "decision",
+        )
+    artifact_core = dict(timeline_artifact)
+    artifact_signature = str(artifact_core.pop("artifact_signature", ""))
+    if artifact_signature != _sha256_json(artifact_core):
+        add_finding(
+            "timeline_artifact_integrity_mismatch",
+            "error",
+            "Replay timeline artifact signature does not match its contents.",
+            "decision",
+        )
     selected_ranked = ranked_proposals[0]["proposal_id"] if ranked_proposals else None
     if selected_ranked != ranking.selected_proposal_id:
         add_finding(
@@ -391,6 +592,14 @@ def validate_replay_policy_consistency(
                 proposal_id=proposal_id,
             )
             continue
+        if str(ranked.get("replay_signature", "")) != proposal.replay_signature:
+            add_finding(
+                "ranking_proposal_signature_mismatch",
+                "error",
+                "Ranked proposal signature does not match canonical proposal contents.",
+                "decision",
+                proposal_id=proposal_id,
+            )
         if event is None:
             add_finding(
                 "missing_decision_event",
@@ -460,7 +669,27 @@ def validate_replay_policy_consistency(
                 "executor",
                 details={"actual_seq": actual_seq, "expected_seq": expected_seq},
             )
+        previous_post_signature: str | None = None
         for event in executor_events:
+            calculated_pre = _sha256_json(event.get("pre_state") or {})
+            calculated_post = _sha256_json(event.get("post_state") or {})
+            if event.get("pre_signature") != calculated_pre or event.get("post_signature") != calculated_post:
+                add_finding(
+                    "executor_state_signature_mismatch",
+                    "error",
+                    "Replay executor state signature does not match event state.",
+                    "executor",
+                    proposal_id=str(event.get("proposal_id", "")),
+                )
+            if previous_post_signature is not None and event.get("pre_signature") != previous_post_signature:
+                add_finding(
+                    "executor_state_chain_broken",
+                    "error",
+                    "Replay executor state transition chain is discontinuous.",
+                    "executor",
+                    proposal_id=str(event.get("proposal_id", "")),
+                )
+            previous_post_signature = str(event.get("post_signature", ""))
             proposal_id = str(event.get("proposal_id", ""))
             proposal = proposal_by_id.get(proposal_id)
             if proposal is None:
@@ -481,7 +710,7 @@ def validate_replay_policy_consistency(
                     proposal_id=proposal_id,
                     replay_correlation_id=proposal.replay_correlation_id,
                 )
-            if not bool(event.get("dry_run", True)):
+            if event.get("dry_run") is not True:
                 add_finding(
                     "executor_event_not_dry_run",
                     "error",
@@ -499,6 +728,21 @@ def validate_replay_policy_consistency(
                     proposal_id=proposal_id,
                     replay_correlation_id=proposal.replay_correlation_id,
                 )
+        expected_trace_signature = _sha256_json(
+            {
+                "dry_run_only": True,
+                "schema_version": "replay_executor/v1",
+                "executed": executor_events,
+                "state": executor.rollback_state,
+            }
+        )
+        if executor.trace_signature != expected_trace_signature:
+            add_finding(
+                "executor_trace_integrity_mismatch",
+                "error",
+                "Replay executor trace signature does not match events and final state.",
+                "executor",
+            )
 
     if resolved_manifest.dry_run_only and not resolved_manifest.live_mixer_writes:
         try:

@@ -23,3 +23,12 @@ class TestSessionManager:
             session = None
         # At minimum doesn't crash
         assert True
+
+    @pytest.mark.parametrize("name", ["../escape", "nested/name", "nested\\name", "..", ""])
+    def test_create_session_rejects_path_like_names(self, tmp_path, name):
+        manager = SessionManager(sessions_dir=str(tmp_path / "sessions"))
+
+        with pytest.raises(ValueError, match="safe path component"):
+            manager.create_session(name)
+
+        assert list(tmp_path.rglob("*.json")) == []

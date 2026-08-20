@@ -32,6 +32,7 @@ def _make_wing_client(**kwargs):
         client.is_connected = True
         client.sock = MagicMock()
         client._osc_throttle_enabled = False
+        client.install_mutation_boundary(lambda _address, _values: True)
         return client
 
 
@@ -87,25 +88,23 @@ class TestDLiveTransportInvariants:
         client._send_raw = fake_send_raw
         return client, sent_msgs
 
-    def test_set_fader_clamped_to_ceiling(self, caplog):
-        from dlive_client import db_to_fader_value
+    def test_normal_fader_setter_has_no_transport_surface(self, caplog):
         client, sent = self._make_client()
         with caplog.at_level(logging.WARNING):
-            assert client.set_fader(1, 8.0) is True
-        # NRPN data-байт соответствует потолку 0 dBFS, не запрошенным +8
-        assert any("Fader ceiling enforced" in r.message for r in caplog.records)
-        expected = db_to_fader_value(0.0)
-        overshoot = db_to_fader_value(8.0)
-        payload = sent[-1]
-        assert bytes([expected & 0x7F]) in payload or expected in payload
-        assert overshoot != expected  # тест не вырожден
+            assert client.set_fader(1, -6.0) is False
+        assert any("one_shot_supervised_proof" in r.message for r in caplog.records)
+        assert sent == []
 
-    def test_write_methods_return_send_result(self):
-        client, _ = self._make_client()
-        assert client.set_phantom(1, True) is True
-        assert client.set_pad(1, True) is True
-        assert client.set_channel_name(1, "KICK") is True
-        assert client.set_channel_colour(1, "red") is True
+    def test_unpromoted_write_families_fail_closed_without_bytes(self):
+        client, sent = self._make_client()
+        assert client.set_phantom(1, True) is False
+        assert client.set_pad(1, True) is False
+        assert client.set_channel_name(1, "KICK") is False
+        assert client.set_channel_colour(1, "red") is False
+        assert client.set_gain(1, 20.0) is False
+        assert client.set_eq_band(1, 1, 1000.0, -3.0, 1.0) is False
+        assert client.recall_scene(1) is False
+        assert sent == []
 
     def test_write_methods_propagate_failure(self):
         client, _ = self._make_client()
@@ -119,6 +118,14 @@ class TestDLiveTransportInvariants:
     def test_invalid_eq_band_returns_false(self):
         client, _ = self._make_client()
         assert client.set_eq_band(1, 9, 1000.0, -3.0, 2.0) is False
+
+    def test_default_client_blocks_fader_mute_and_raw_send(self):
+        from dlive_client import DLiveClient
+        client = DLiveClient(ip="127.0.0.1")
+        client._send_raw = lambda msg: pytest.fail("no bytes may reach transport")
+        assert client.set_fader(1, -6.0) is False
+        assert client.set_mute(1, True) is False
+        assert client.send("/raw", b"\x90\x00\x7f") is False
 
 
 class TestTruePeakHighFrequency:

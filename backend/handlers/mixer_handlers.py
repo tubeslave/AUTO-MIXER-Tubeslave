@@ -12,10 +12,17 @@ except ImportError:  # pragma: no cover - package import fallback
 def _wing_boundary_active(server) -> bool:
     checker = getattr(server, "_is_wing_deployment_write_boundary_active", None)
     policy_boundary = bool(checker()) if callable(checker) else False
-    # Direct WebSocket writes are never a supported WING path, even when a
-    # legacy deployment-boundary feature flag is disabled. The canonical
-    # operator-proposal path owns WING authorization and transaction proof.
-    return policy_boundary or str(getattr(server, "connection_mode", "")).lower() == "wing"
+    # Direct WebSocket writes are not a supported production-mixer path. The
+    # canonical supervised transaction owns console authorization and proof;
+    # offline fake mixers remain available for deterministic compatibility
+    # tests only.
+    production_mode = str(getattr(server, "connection_mode", "")).lower()
+    return policy_boundary or production_mode in {
+        "wing",
+        "dlive",
+        "mixing_station",
+        "ableton",
+    }
 
 
 def _target_type(operation: str) -> str:
@@ -371,40 +378,25 @@ def register_handlers(server):
             )
             if blocked:
                 return
-        if server.mixer_client:
-            parsed_value = server._coerce_optional_bool(value)
-            if parsed_value is None:
-                await send_direct_write_failed(
-                    websocket,
-                    data,
-                    surface=surface,
-                    value_type="mute",
-                    requested_value=value,
-                    reason="invalid_mute",
-                )
-                return
-            try:
-                write_result = server.mixer_client.set_channel_mute(channel, int(parsed_value))
-            except Exception as exc:
-                await send_direct_write_failed(
-                    websocket,
-                    data,
-                    surface=surface,
-                    value_type="mute",
-                    requested_value=bool(parsed_value),
-                    reason="mixer_write_exception",
-                    error=str(exc),
-                )
-                return
-            if write_result is False:
-                await send_direct_write_failed(
-                    websocket,
-                    data,
-                    surface=surface,
-                    value_type="mute",
-                    requested_value=bool(parsed_value),
-                    reason="mixer_write_failed",
-                )
+        parsed_value = server._coerce_optional_bool(value)
+        if parsed_value is None:
+            await send_direct_write_failed(
+                websocket,
+                data,
+                surface=surface,
+                value_type="mute",
+                requested_value=value,
+                reason="invalid_mute",
+            )
+            return
+        await send_direct_write_failed(
+            websocket,
+            data,
+            surface=surface,
+            value_type="mute",
+            requested_value=bool(parsed_value),
+            reason="direct_mute_write_requires_supervised_authority",
+        )
 
     async def handle_set_pan(websocket, data):
         channel = data.get("channel")

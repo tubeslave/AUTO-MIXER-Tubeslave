@@ -4,13 +4,40 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+from numbers import Real
 from dataclasses import dataclass, field
 from typing import Any
 
-from .replay_proposal_ranking import ReplayDecisionProposal, ReplayGraphCheckpoint
+from .replay_proposal_ranking import (
+    ReplayDecisionProposal,
+    ReplayGraphCheckpoint,
+    validate_feedback_mitigation_values,
+    validate_fader_adjustment_values,
+    validate_gain_adjustment_values,
+)
 
 
 REPLAY_EXECUTOR_SCHEMA_VERSION = "replay_executor/v1"
+
+
+def _contains_non_finite_number(value: Any) -> bool:
+    """Reject NaN/Inf anywhere in proposal-controlled replay payloads."""
+
+    if isinstance(value, dict):
+        return any(_contains_non_finite_number(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_non_finite_number(item) for item in value)
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, Real):
+        return not math.isfinite(float(value))
+    if isinstance(value, str):
+        try:
+            return not math.isfinite(float(value))
+        except ValueError:
+            return False
+    return False
 
 
 def _coerce_float(value: Any, default: float = 0.0) -> float:
@@ -240,20 +267,49 @@ def _simulate_gain(
     pre_signature: str,
 ) -> ReplayExecutionEvent:
     target = dict(proposal.target)
-    channel = _coerce_channel(target.get("channel", 0))
-    requested = _coerce_float(proposal.requested_state.get("gain_db"), state.gains.get(channel, 0.0))
-    safety_step = _coerce_float(proposal.safety.get("max_step_db"), _coerce_float(proposal.safety.get("max_delta_db"), 0.0))
-    current = _coerce_float(state.gains.get(channel), _coerce_float(proposal.current_state.get("gain_db")))
-    delta = requested - current
-    if safety_step and abs(delta) > safety_step:
+    raw_channel = target.get("channel")
+    state_channel = str(raw_channel) if type(raw_channel) is int else ""
+    current_value = (
+        state.gains[state_channel]
+        if state_channel in state.gains
+        else proposal.current_state.get("gain_db")
+    )
+    raw_safety_step = (
+        proposal.safety.get("max_step_db")
+        if "max_step_db" in proposal.safety
+        else proposal.safety.get("max_delta_db")
+    )
+    try:
+        values = validate_gain_adjustment_values(
+            channel=raw_channel,
+            action=proposal.action_type,
+            current_gain_db=current_value,
+            requested_gain_db=proposal.requested_state.get("gain_db"),
+            max_step_db=raw_safety_step,
+        )
+    except ValueError as exc:
+        return _emit_block(
+            state,
+            proposal,
+            pre_signature,
+            f"gain_validation_failed:{exc}",
+            {"validation_error": str(exc)},
+        )
+
+    channel = str(values["channel"])
+    requested = values["requested_gain_db"]
+    current = values["current_gain_db"]
+    safety_step = values["max_step_db"]
+    delta = values["delta_db"]
+    if abs(delta) > safety_step:
         return _emit_block(state, proposal, pre_signature, f"gain_step_exceeds_limit:{abs(delta):.3f}>{safety_step:.3f}", {
             "action": "gain",
             "channel": channel,
             "requested": requested,
             "safety_step": safety_step,
         })
-    state.gains[channel] = round(requested, 3)
     pre_state = state.to_dict()
+    state.gains[channel] = round(requested, 3)
     state.incident_log.append(
         {
             "family": proposal.family,
@@ -286,21 +342,48 @@ def _simulate_fader(
     proposal: ReplayDecisionProposal,
     pre_signature: str,
 ) -> ReplayExecutionEvent:
-    target = dict(proposal.target)
-    channel = _coerce_channel(target.get("channel", 0))
-    requested = _coerce_float(proposal.requested_state.get("fader_db"), state.faders.get(channel, 0.0))
-    safety_step = _coerce_float(proposal.safety.get("max_step_db"), _coerce_float(proposal.safety.get("max_delta_db"), 0.0))
-    current = _coerce_float(state.faders.get(channel), _coerce_float(proposal.current_state.get("fader_db")))
-    delta = requested - current
-    if safety_step and abs(delta) > safety_step:
+    raw_channel = proposal.target.get("channel")
+    state_channel = str(raw_channel) if type(raw_channel) is int else ""
+    current_value = (
+        state.faders[state_channel]
+        if state_channel in state.faders
+        else proposal.current_state.get("fader_db")
+    )
+    raw_safety_step = (
+        proposal.safety.get("max_step_db")
+        if "max_step_db" in proposal.safety
+        else proposal.safety.get("max_delta_db")
+    )
+    try:
+        values = validate_fader_adjustment_values(
+            channel=raw_channel,
+            action=proposal.action_type,
+            current_fader_db=current_value,
+            requested_fader_db=proposal.requested_state.get("fader_db"),
+            max_step_db=raw_safety_step,
+        )
+    except ValueError as exc:
+        return _emit_block(
+            state,
+            proposal,
+            pre_signature,
+            f"fader_validation_failed:{exc}",
+            {"validation_error": str(exc)},
+        )
+    channel = str(values["channel"])
+    requested = values["requested_fader_db"]
+    safety_step = values["max_step_db"]
+    current = values["current_fader_db"]
+    delta = values["delta_db"]
+    if abs(delta) > safety_step:
         return _emit_block(state, proposal, pre_signature, f"fader_step_exceeds_limit:{abs(delta):.3f}>{safety_step:.3f}", {
             "action": "fader",
             "channel": channel,
             "requested": requested,
             "safety_step": safety_step,
         })
-    state.faders[channel] = round(requested, 3)
     pre_state = state.to_dict()
+    state.faders[channel] = round(requested, 3)
     state.incident_log.append(
         {
             "family": proposal.family,
@@ -351,8 +434,8 @@ def _simulate_eq(
             "requested": change["gain_db"],
             "max_gain": max_gain,
         })
-    state.eq_bands.setdefault(channel, []).append(change)
     pre_state = state.to_dict()
+    state.eq_bands.setdefault(channel, []).append(change)
     state.incident_log.append({"family": proposal.family, "channel": channel, "action": "eq", **change})
     post_state = state.to_dict()
     return ReplayExecutionEvent(
@@ -395,8 +478,8 @@ def _simulate_compression(
         "makeup_gain_db": _coerce_float(proposal.requested_state.get("makeup_gain_db")),
         "action_type": proposal.action_type,
     }
-    state.compressors[channel] = payload
     pre_state = state.to_dict()
+    state.compressors[channel] = payload
     state.incident_log.append({"family": proposal.family, "channel": channel, "action": "compressor", **payload})
     post_state = state.to_dict()
     return ReplayExecutionEvent(
@@ -424,8 +507,63 @@ def _simulate_room_compensation(
     target = dict(proposal.target)
     room_target = str(target.get("target", "master"))
     requested = dict(proposal.requested_state)
-    state.room_compensation[room_target] = requested
+    filters = requested.get("filters")
+    raw_max_cut = proposal.safety.get("max_cut_db")
+    if isinstance(raw_max_cut, bool) or not isinstance(raw_max_cut, Real):
+        return _emit_block(
+            state, proposal, pre_signature, "room_compensation_invalid_max_cut", {}
+        )
+    max_cut = float(raw_max_cut)
+    if not math.isfinite(max_cut) or not 0.0 < max_cut <= 12.0:
+        return _emit_block(
+            state, proposal, pre_signature, "room_compensation_invalid_max_cut", {}
+        )
+    if not isinstance(filters, list) or not filters or len(filters) > 12:
+        return _emit_block(
+            state, proposal, pre_signature, "room_compensation_invalid_filter_inventory", {}
+        )
+    normalized_filters: list[dict[str, Any]] = []
+    for item in filters:
+        if not isinstance(item, dict):
+            return _emit_block(
+                state, proposal, pre_signature, "room_compensation_invalid_filter", {}
+            )
+        raw_frequency = item.get("frequency", item.get("frequency_hz"))
+        raw_gain = item.get("gain_db")
+        raw_q = item.get("q")
+        if any(isinstance(value, bool) or not isinstance(value, Real) for value in (raw_frequency, raw_gain, raw_q)):
+            return _emit_block(
+                state, proposal, pre_signature, "room_compensation_invalid_filter", {}
+            )
+        frequency, gain_db, q = float(raw_frequency), float(raw_gain), float(raw_q)
+        if not all(math.isfinite(value) for value in (frequency, gain_db, q)):
+            return _emit_block(
+                state, proposal, pre_signature, "room_compensation_invalid_filter", {}
+            )
+        if not 20.0 <= frequency <= 20_000.0 or not 0.1 <= q <= 20.0:
+            return _emit_block(
+                state, proposal, pre_signature, "room_compensation_filter_out_of_range", {}
+            )
+        if gain_db > 0.0 or gain_db < -max_cut:
+            return _emit_block(
+                state,
+                proposal,
+                pre_signature,
+                "room_compensation_cut_exceeds_limit",
+                {"gain_db": gain_db, "max_cut_db": max_cut},
+            )
+        normalized_filters.append(
+            {
+                "frequency": frequency,
+                "gain_db": gain_db,
+                "q": q,
+                "filter_type": str(item.get("filter_type", "peak")),
+            }
+        )
+    requested["filters"] = normalized_filters
+    requested["filter_count"] = len(normalized_filters)
     pre_state = state.to_dict()
+    state.room_compensation[room_target] = requested
     state.incident_log.append(
         {
             "family": proposal.family,
@@ -475,8 +613,8 @@ def _simulate_speech_priority(
         "priority_boost_db": _coerce_float(requested.get("priority_boost_db")),
         "priority_cut_db": _coerce_float(requested.get("priority_cut_db")),
     }
-    state.speech_priority[f"{leader}->{follower}"] = payload
     pre_state = state.to_dict()
+    state.speech_priority[f"{leader}->{follower}"] = payload
     state.incident_log.append({"family": proposal.family, "action": "speech_priority", **payload})
     post_state = state.to_dict()
     return ReplayExecutionEvent(
@@ -502,16 +640,34 @@ def _simulate_feedback(
     pre_signature: str,
 ) -> ReplayExecutionEvent:
     target = dict(proposal.target)
-    channel = _coerce_channel(target.get("channel", 0))
+    try:
+        values = validate_feedback_mitigation_values(
+            channel=target.get("channel"),
+            action=proposal.action_type,
+            frequency_hz=target.get("frequency_hz"),
+            gain_db=proposal.requested_state.get("gain_db"),
+            q=proposal.requested_state.get("q"),
+            max_q=proposal.safety.get("max_q"),
+            max_cut_db=proposal.safety.get("max_cut_db"),
+        )
+    except ValueError as exc:
+        return _emit_block(
+            state,
+            proposal,
+            pre_signature,
+            f"feedback_mitigation_validation_failed:{exc}",
+            {"validation_error": str(exc)},
+        )
+
     payload = {
-        "channel": channel,
-        "frequency_hz": _coerce_float(target.get("frequency_hz")),
-        "gain_db": _coerce_float(proposal.requested_state.get("gain_db")),
-        "q": _coerce_float(proposal.requested_state.get("q", 4.0)),
-        "action": str(proposal.action_type),
+        "channel": str(values["channel"]),
+        "frequency_hz": values["frequency_hz"],
+        "gain_db": values["gain_db"],
+        "q": values["q"],
+        "action": values["action"],
     }
-    state.feedback_mitigation.append(payload)
     pre_state = state.to_dict()
+    state.feedback_mitigation.append(payload)
     state.incident_log.append({"family": proposal.family, "action": "feedback_mitigation", **payload})
     post_state = state.to_dict()
     return ReplayExecutionEvent(
@@ -537,8 +693,8 @@ def _simulate_operator_assistance(
     pre_signature: str,
 ) -> ReplayExecutionEvent:
     message = str(proposal.requested_state.get("message", proposal.current_state.get("message", "")))
-    state.incident_log.append({"family": proposal.family, "action": "operator_assistance", "message": message})
     pre_state = state.to_dict()
+    state.incident_log.append({"family": proposal.family, "action": "operator_assistance", "message": message})
     post_state = state.to_dict()
     return ReplayExecutionEvent(
         seq=0,
@@ -550,7 +706,7 @@ def _simulate_operator_assistance(
         dry_run=True,
         applied=False,
         pre_signature=pre_signature,
-        post_signature=pre_signature,
+        post_signature=_state_signature(post_state),
         pre_state=pre_state,
         post_state=post_state,
         details={"message": message},
@@ -600,8 +756,8 @@ def _simulate_performer_stage_interaction(
         "spill_delta_db": spill_delta,
         "risk": requested.get("risk", "moderate"),
     }
-    state.performer_interaction[performer_id] = payload
     pre_state = state.to_dict()
+    state.performer_interaction[performer_id] = payload
     state.incident_log.append(
         {
             "family": proposal.family,
@@ -636,14 +792,33 @@ def _simulate_single_proposal(
 ) -> ReplayExecutionEvent:
     pre_signature = _state_signature(state.to_dict())
 
-    if proposal.auto_apply_blocked and not bool(proposal.dry_run_only):
-        return _emit_block(state, proposal, pre_signature, "auto_apply_blocked_without_dry_run", {
+    if proposal.dry_run_only is not True:
+        return _emit_block(state, proposal, pre_signature, "replay_requires_dry_run_only", {
             "proposal_id": proposal.proposal_id
         })
     if proposal.family == "gain_adjustment":
         return _simulate_gain(state, proposal, pre_signature)
     if proposal.family == "fader_adjustment":
         return _simulate_fader(state, proposal, pre_signature)
+    if proposal.family == "feedback_mitigation":
+        return _simulate_feedback(state, proposal, pre_signature)
+
+    if _contains_non_finite_number(
+        {
+            "target": proposal.target,
+            "current_state": proposal.current_state,
+            "requested_state": proposal.requested_state,
+            "safety": proposal.safety,
+        }
+    ):
+        return _emit_block(
+            state,
+            proposal,
+            pre_signature,
+            "non_finite_numeric_value",
+            {"proposal_id": proposal.proposal_id},
+        )
+
     if proposal.family == "eq_adjustment":
         return _simulate_eq(state, proposal, pre_signature)
     if proposal.family == "compression":
@@ -652,8 +827,6 @@ def _simulate_single_proposal(
         return _simulate_speech_priority(state, proposal, pre_signature)
     if proposal.family == "room_compensation":
         return _simulate_room_compensation(state, proposal, pre_signature)
-    if proposal.family == "feedback_mitigation":
-        return _simulate_feedback(state, proposal, pre_signature)
     if proposal.family == "operator_assistance":
         return _simulate_operator_assistance(state, proposal, _state_signature(state.to_dict()))
     if proposal.family == "performer_stage_interaction":
@@ -671,17 +844,37 @@ def simulate_replay_decisions(
     resolved = _coerce_proposals(proposals)
     if selected_proposal_id:
         resolved = [proposal for proposal in resolved if proposal.proposal_id == selected_proposal_id]
+        if not resolved:
+            raise ValueError("selected_proposal_id was not found")
     state = initial_state.clone() if isinstance(initial_state, ReplayExecutionState) else ReplayExecutionState.from_dict(
         initial_state if isinstance(initial_state, dict) else None
     )
+    baseline_state = state.to_dict()
     executed: list[str] = []
     events: list[ReplayExecutionEvent] = []
     snapshots: list[dict[str, Any]] = []
+    batch_contains_non_dry_run = any(
+        proposal.dry_run_only is not True for proposal in resolved
+    )
     for index, proposal in enumerate(resolved, start=1):
         if proposal.auto_apply_blocked:
             # Keep dry-run safe by default; still capture deterministic trace.
             pass
-        event = _simulate_single_proposal(state, proposal)
+        if batch_contains_non_dry_run:
+            reason = (
+                "replay_requires_dry_run_only"
+                if proposal.dry_run_only is not True
+                else "replay_batch_contains_non_dry_run_proposal"
+            )
+            event = _emit_block(
+                state,
+                proposal,
+                _state_signature(state.to_dict()),
+                reason,
+                {"proposal_id": proposal.proposal_id},
+            )
+        else:
+            event = _simulate_single_proposal(state, proposal)
         event.seq = index
         events.append(event)
         snapshots.append(state.to_dict())
@@ -695,7 +888,7 @@ def simulate_replay_decisions(
         if rollback_to < 0 or rollback_to > len(snapshots):
             raise ValueError("rollback_to must be within snapshot range")
         if rollback_to == 0:
-            restored_state = _restore_from_payload({})
+            restored_state = _restore_from_payload(baseline_state)
         else:
             restored_state = snapshots[rollback_to - 1]
         rollback_state = dict(restored_state)

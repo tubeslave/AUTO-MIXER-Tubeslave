@@ -567,7 +567,9 @@ class AutoSoundcheckEngine:
         mixer_ip: Optional[str] = None,
         mixer_port: Optional[int] = None,
         mixer_tls: bool = False,
-        midi_base_channel: int = 0,
+        mixer_endpoint: str = "surface",
+        midi_base_channel: int = 11,
+        user_profile: int = 0,
         audio_device_name: Optional[str] = None,
         num_channels: int = 48,
         sample_rate: int = 48000,
@@ -596,7 +598,9 @@ class AutoSoundcheckEngine:
         self.mixer_ip = mixer_ip
         self.mixer_port = mixer_port
         self.mixer_tls = mixer_tls
+        self.mixer_endpoint = mixer_endpoint
         self.midi_base_channel = midi_base_channel
+        self.user_profile = user_profile
         self.audio_device_name = audio_device_name
         self.num_channels = num_channels
         self.sample_rate = sample_rate
@@ -1040,7 +1044,11 @@ class AutoSoundcheckEngine:
             if not config.enabled:
                 return
             adapter = MixingStationAdapter(config)
-            adapter.connect()
+            if not adapter.connect():
+                logger.warning(
+                    "Mixing Station adapter quarantined: authenticated IPC required"
+                )
+                return
             self.mixing_station_adapter = adapter
             logger.info(
                 "Mixing Station adapter enabled: profile=%s mode=%s transport=%s dry_run=%s",
@@ -3228,6 +3236,7 @@ class AutoSoundcheckEngine:
         self.mixer_ip = discovered.ip
         self.mixer_port = discovered.port
         self.mixer_tls = discovered.tls
+        self.mixer_endpoint = getattr(discovered, "endpoint", "surface") or "surface"
 
         logger.info(
             f"Auto-discovered: {discovered.mixer_type.upper()} "
@@ -3282,6 +3291,7 @@ class AutoSoundcheckEngine:
                 self.mixer_ip = discovered.ip
                 self.mixer_port = discovered.port
                 self.mixer_tls = discovered.tls
+                self.mixer_endpoint = getattr(discovered, "endpoint", "surface") or "surface"
                 logger.info(f"Confirmed mixer at {discovered.ip}: {discovered.mixer_type.upper()}")
             else:
                 logger.info(
@@ -3317,6 +3327,8 @@ class AutoSoundcheckEngine:
                         None,
                     ),
                     midi_base_channel=self.midi_base_channel,
+                    user_profile=self.user_profile,
+                    endpoint=self.mixer_endpoint,
                 )
             elif self.mixer_type == "wing":
                 from wing_client import WingClient
@@ -10069,6 +10081,12 @@ def main():
                         help="Mixer port (default: auto)")
     parser.add_argument("--tls", action="store_true",
                         help="Use TLS for dLive connection")
+    parser.add_argument("--endpoint", choices=["surface", "mixrack"], default="surface",
+                        help="dLive TCP endpoint (default: surface)")
+    parser.add_argument("--midi-base-channel", type=int, choices=range(12), default=11,
+                        help="dLive MIDI base channel 0..11 (default: 11)")
+    parser.add_argument("--user-profile", type=int, choices=range(32), default=0,
+                        help="dLive user profile 0..31 (default: 0)")
     parser.add_argument("--no-discover", action="store_true",
                         help="Skip auto-discovery, use --ip directly")
     parser.add_argument("--full-scan", action="store_true",
@@ -10125,6 +10143,9 @@ def main():
         mixer_ip=args.ip,
         mixer_port=args.port,
         mixer_tls=args.tls,
+        mixer_endpoint=args.endpoint,
+        midi_base_channel=args.midi_base_channel,
+        user_profile=args.user_profile,
         audio_device_name=args.audio_device,
         num_channels=args.channels,
         sample_rate=args.sample_rate,

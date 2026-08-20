@@ -8,6 +8,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _strict_bool(value: Any, *, field_name: str) -> bool:
+    if type(value) is not bool:
+        raise ValueError(f"{field_name} must be a JSON boolean")
+    return value
+
+
 def _sanitize(value: Any) -> Any:
     if isinstance(value, dict):
         return {str(key): _sanitize(value[key]) for key in sorted(value)}
@@ -94,8 +100,10 @@ class ReplayCheckpointManifest:
             replay_correlation_ids=[
                 str(item) for item in payload.get("replay_correlation_ids") or ()
             ],
-            dry_run_only=bool(payload.get("dry_run_only", True)),
-            live_mixer_writes=bool(payload.get("live_mixer_writes", False)),
+            dry_run_only=_strict_bool(payload.get("dry_run_only"), field_name="dry_run_only"),
+            live_mixer_writes=_strict_bool(
+                payload.get("live_mixer_writes"), field_name="live_mixer_writes"
+            ),
             trim_snapshot=dict(payload.get("trim_snapshot") or {}),
             graph_checkpoint=dict(payload.get("graph_checkpoint") or {}),
             critic_artifacts=dict(payload.get("critic_artifacts") or {}),

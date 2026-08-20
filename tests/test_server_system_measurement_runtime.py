@@ -111,6 +111,7 @@ def test_ensure_audio_capture_restarts_when_existing_ring_is_too_short(
         buffer_seconds=22.0,
         source_type=server_module.AudioSourceType.SOUNDDEVICE,
         device_name=None,
+        spectral_cache_enabled=True,
     )
     replacement.start.assert_called_once_with()
     assert result is replacement

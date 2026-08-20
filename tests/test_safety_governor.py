@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import soundfile as sf
 
 from ai_mixing_pipeline.models import CandidateAction, MixCandidate
@@ -82,3 +83,93 @@ def test_decision_layer_safety_scores_margin_for_safe_render(tmp_path):
     assert result["passed"] is True
     assert 0.0 < result["safety_score"] < 1.0
     assert result["penalties"]
+
+
+@pytest.mark.parametrize("malformed", [float("nan"), float("inf"), float("-inf")])
+def test_safety_governors_reject_non_finite_action_values(tmp_path, malformed):
+    wav = tmp_path / "safe.wav"
+    _write(wav, amp=0.1)
+
+    final_result = SafetyGovernor().evaluate(
+        MixCandidate(
+            candidate_id="malformed",
+            label="malformed",
+            actions=[
+                CandidateAction(
+                    action_type="gain_change",
+                    target="vocal",
+                    parameters={"gain_db": malformed},
+                )
+            ],
+        ),
+        str(wav),
+    )
+    decision_result = DecisionSafetyGovernor().check_actions(
+        CandidateActionSet("malformed", [GainAction("vocal", malformed)])
+    )
+
+    assert final_result.passed is False
+    assert any("invalid_numeric:action:gain_change:gain_db" in reason for reason in final_result.reasons)
+    assert decision_result["passed"] is False
+    assert any("invalid_numeric:action:gain:gain_db" in reason for reason in decision_result["reasons"])
+
+
+def test_safety_governors_reject_non_finite_render_metrics(monkeypatch):
+    metrics = {
+        "level": {
+            "true_peak_dbtp": float("nan"),
+            "headroom_db": float("inf"),
+            "clip_count": 0,
+        },
+        "stereo": {
+            "phase_cancellation_risk": False,
+            "inter_channel_correlation": float("nan"),
+        },
+        "spectral": {"harshness_proxy": 0.0, "muddiness_proxy": 0.0},
+    }
+    monkeypatch.setattr(
+        "ai_mixing_pipeline.safety_governor.governor.measure_audio_file",
+        lambda _path: metrics,
+    )
+    monkeypatch.setattr(
+        "ai_mixing_pipeline.decision_layer.safety_governor.measure_audio_file",
+        lambda _path: metrics,
+    )
+
+    final_result = SafetyGovernor().evaluate(
+        MixCandidate(candidate_id="malformed", label="malformed"),
+        "unused.wav",
+    )
+    decision_result = DecisionSafetyGovernor().check_render(
+        CandidateActionSet("malformed"),
+        "unused.wav",
+    )
+
+    assert final_result.passed is False
+    assert decision_result["passed"] is False
+    assert any("invalid_numeric:render:true_peak_dbtp" in reason for reason in final_result.reasons)
+    assert any("invalid_numeric:render:true_peak_dbtp" in reason for reason in decision_result["reasons"])
+
+
+def test_safety_governors_reject_non_finite_critic_values(tmp_path):
+    wav = tmp_path / "safe.wav"
+    _write(wav, amp=0.1)
+    critics = {
+        "mert": {"delta": {"vocal_clarity": float("nan")}},
+        "panns_or_beats": {"scores": {"bleed_score": float("inf")}},
+    }
+
+    final_result = SafetyGovernor().evaluate(
+        MixCandidate(candidate_id="malformed", label="malformed"),
+        str(wav),
+        critic_results=critics,
+    )
+    decision_result = DecisionSafetyGovernor().check_critics(
+        CandidateActionSet("malformed"),
+        critics,
+    )
+
+    assert final_result.passed is False
+    assert decision_result["passed"] is False
+    assert any("invalid_numeric:critic:vocal_clarity" in reason for reason in final_result.reasons)
+    assert any("invalid_numeric:critic:vocal_clarity" in reason for reason in decision_result["reasons"])

@@ -128,7 +128,7 @@ def register_handlers(server):
         agent_running = bool(
             getattr(getattr(current_agent, "state", None), "is_running", False)
         )
-        await server.send_to_client(websocket, {
+        payload = {
             "type": "agent_emergency_stopped",
             "is_running": False if stopped else agent_running,
             "emergency_stop": bool(
@@ -139,7 +139,13 @@ def register_handlers(server):
             "teardown_complete": bool(result.get("teardown_complete") is True),
             "teardown_errors": list(result.get("teardown_errors") or []),
             "generation": result.get("generation"),
-        })
+        }
+        if not getattr(server, "_ws_auth_required", True):
+            payload = {
+                "type": "agent_emergency_stopped",
+                "status": "accepted",
+            }
+        await server.send_to_client(websocket, payload)
 
     async def handle_set_agent_mode(websocket, data):
         if await _reject_removed_force_auto_apply(websocket, data):

@@ -1,5 +1,5 @@
 {
-  "artifact_signature": "e2f6e9367bdd4b6d79720c6ba673a010923ccec582433c30177906dc4f4177a1",
+  "artifact_signature": "87e5297307568c4ff22f70a759fad3ab1bea9ea95f0b3218b99da5ac3eccf5c5",
   "artifact_type": "deterministic_replay_timeline",
   "dry_run_only": true,
   "live_mixer_writes": false,
@@ -21,7 +21,7 @@
         "magnitude_db": 0.0
       },
       "dry_run_only": true,
-      "event_signature": "9ca44b67082dff758a4749b0c6a1f0a40d0a5f57588a28ef0be2e99a796f2615",
+      "event_signature": "e23838da65a3ce8743f11cef5d7734540e55f3ffd3264d788367b7e398cfc649",
       "family": "feedback_mitigation",
       "metadata": {
         "action": "notch",
@@ -35,6 +35,7 @@
         "q": 4.0
       },
       "safety": {
+        "max_cut_db": 9.0,
         "max_q": 8.0,
         "operator_override_required": true
       },

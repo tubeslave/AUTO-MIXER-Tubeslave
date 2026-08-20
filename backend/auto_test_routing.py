@@ -1,27 +1,24 @@
 #!/usr/bin/env python3
-"""
-Автоматический тест установки маршрутизации через различные адреса
+"""Generate WING routing-address candidates without touching a console.
+
+Routing mutation requires the canonical supervised transaction path with
+operator authority, readback, and rollback.  This legacy helper therefore
+remains proposal-only and never opens a transport or sends OSC commands.
 """
 
 import sys
-import time
 import logging
-from wing_client import WingClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+ROUTING_LIVE_APPLY_BLOCK_REASON = "routing_live_apply_requires_supervised_authority"
 
-def auto_test_routing(client: WingClient, channel: int = 1, dante_output: int = 1):
-    """Автоматически пробует установить маршрутизацию через различные адреса"""
-    
-    logger.info(f"Автоматическое тестирование маршрутизации канала {channel} на Dante выход {dante_output}")
-    logger.info("=" * 70)
-    logger.info("Проверяйте на пульте после каждого метода (пауза 5 секунд)")
-    logger.info("=" * 70)
-    
-    # Варианты адресов для установки маршрутизации
-    test_methods = [
+
+def build_routing_test_plan(channel: int = 1, dante_output: int = 1):
+    """Return legacy address candidates as inert review data."""
+
+    return [
         {
             "name": "Метод 1: /routing/outputs/ch/{ch}/srcgrp и /routing/outputs/ch/{ch}/outgrp",
             "addresses": [
@@ -65,32 +62,30 @@ def auto_test_routing(client: WingClient, channel: int = 1, dante_output: int = 
             ]
         },
     ]
-    
-    for i, method in enumerate(test_methods, 1):
-        logger.info(f"\n{'='*70}")
-        logger.info(f"МЕТОД {i}: {method['name']}")
-        logger.info(f"{'='*70}")
-        
-        for addr, value in method['addresses']:
-            try:
-                logger.info(f"  Отправка: {addr} = {value}")
-                result = client.send(addr, value)
-                time.sleep(0.1)
-                if result:
-                    logger.info(f"    ✓ Успешно отправлено")
-                else:
-                    logger.warning(f"    ✗ Ошибка отправки")
-            except Exception as e:
-                logger.error(f"    ✗ Ошибка: {e}")
-        
-        logger.info(f"\n⏸  Пауза 5 секунд - проверьте на пульте, изменилась ли маршрутизация канала {channel}")
-        logger.info(f"   Если сработало, нажмите Ctrl+C и сообщите номер метода: {i}")
-        time.sleep(5)
-    
-    logger.info("\n" + "="*70)
-    logger.info("Все методы протестированы.")
-    logger.info("Если ни один не сработал, возможно нужны другие адреса.")
-    logger.info("="*70)
+
+
+def auto_test_routing(client=None, channel: int = 1, dante_output: int = 1):
+    """Return a blocked receipt and inert candidates; never use ``client``."""
+
+    del client
+    plan = build_routing_test_plan(channel=channel, dante_output=dante_output)
+    logger.warning(
+        "Live routing test blocked: %s; generated %s review-only candidates",
+        ROUTING_LIVE_APPLY_BLOCK_REASON,
+        len(plan),
+    )
+    for index, method in enumerate(plan, 1):
+        logger.info("Кандидат %s: %s", index, method["name"])
+        for address, value in method["addresses"]:
+            logger.info("  proposal_only: %s = %s", address, value)
+    return {
+        "status": "blocked",
+        "reason": ROUTING_LIVE_APPLY_BLOCK_REASON,
+        "live_authority_granted": False,
+        "live_write": False,
+        "attempted_writes": 0,
+        "proposals": plan,
+    }
 
 
 def main():
@@ -99,21 +94,13 @@ def main():
     else:
         ip = "192.168.1.102"
     
-    logger.info(f"Подключение к пульту {ip}...")
-    client = WingClient(ip=ip, port=2223)
-    
-    if not client.connect():
-        logger.error("Не удалось подключиться!")
-        return 1
-    
-    try:
-        auto_test_routing(client, channel=1, dante_output=1)
-    except KeyboardInterrupt:
-        logger.info("\n\nПрервано пользователем")
-    finally:
-        client.disconnect()
-    
-    return 0
+    logger.warning(
+        "Соединение с %s не открыто: live routing доступен только через "
+        "supervised authority/readback/rollback workflow",
+        ip,
+    )
+    auto_test_routing(channel=1, dante_output=1)
+    return 2
 
 
 if __name__ == "__main__":

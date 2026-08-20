@@ -3,22 +3,26 @@ notes:
   - "Mixing Station connects to the dLive MixRack, not the surface."
   - "Scenes are read-only here; cue lists, soft-keys, and actions are not used."
   - "Not all deep dLive parameters are exposed through Mixing Station."
+  - "No dLive live-control family is promoted before attended readback and rollback proof."
 parameters:
   fader:
     supported: true
     visualization: true
     read_only: false
-    live_control: true
+    live_control: false
+    needs_physical_proof: true
   mute:
     supported: true
     visualization: true
     read_only: false
-    live_control: true
+    live_control: false
+    needs_physical_proof: true
   pan:
     supported: true
     visualization: true
     read_only: false
-    live_control: true
+    live_control: false
+    needs_physical_proof: true
   gain:
     supported: true
     visualization: true

@@ -128,4 +128,4 @@ def test_replay_executor_fail_closes_non_dry_run_auto_apply_blocked_proposals():
     assert result.events[0].status == "blocked"
     assert result.events[0].applied is False
     assert result.events[0].dry_run is False
-    assert result.events[0].blocked_reason == "auto_apply_blocked_without_dry_run"
+    assert result.events[0].blocked_reason == "replay_requires_dry_run_only"

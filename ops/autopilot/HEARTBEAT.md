@@ -1,17 +1,164 @@
 # Autopilot Heartbeat
 
-Last heartbeat UTC: 2026-07-27T20:46:42Z
+Last heartbeat UTC: 2026-08-19T21:17:30Z
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
+
+## Codex Security full-ledger remediation — 2026-08-19
+
+The frozen ledger contains 143 exact findings from sealed scan
+`2c00402a-b02e-4b80-a68f-c9c079eb70c4`. All 77 High findings are locally
+verified and remain unsealed pending a fresh full scan. The 59 Medium and 7
+Low paths are also locally verified unsealed: legacy live and MCP mutation
+surfaces are fail-closed, remote ML ingestion is local-only quarantined, replay
+integrity is recomputed, and offline resource inputs are bounded before
+allocation. No mixer, network endpoint, audio device, or live authority was
+used. The exact ledger identity and aggregate bounded test packages pass; only
+a fresh sealed Codex Security scan remains as canonical closure authority.
 
 Active milestone: M001
 
 Active checkpoint: M001-EXTERNAL-WING-READONLY-ARTIFACT
 
-Writer lease: none at the committed validation boundary. The bounded M119
-implementation lease is released before validation and commit. CP05 is dynamically
-checked against the current non-marker Git tree and must pass before any
-hardware attempt.
+Writer lease: none at the final M123 validation boundary. Thread
+`019fce80-5fb9-7b03-814b-0ae2a06bc76f` released its bounded implementation
+lease before the final repeat. No hardware contact is permitted.
+
+## M123 Instrument Space decision integration — 2026-08-04
+
+The software integration is complete pending its final post-truth repeat. Real
+cached pan, level and spectral measurements now drive explainable masking,
+spatial-imbalance and drift relations. Runtime Product Layer history retains at
+most 12 in-memory snapshots, resets on source identity changes and carries
+measurement provenance into fresh proposal-only annotations. The dashboard is
+read-only and has no drag, queue-import or apply path.
+
+Pre-final validation passed 43 focused tests, 337 broad backend tests, 278
+frontend contracts, TypeScript and a production build. The first no-WING quick
+gate correctly failed closed on an incomplete mock fallback DTO; history and
+decision-support denial fields are now explicit and TypeScript passes. A
+64-channel benchmark covered all
+2016 pairs, emitted at most 128 candidates and measured 18.590 ms p95. The
+final post-truth repeat follows this checkpoint. No backend, WING or dLive endpoint
+was contacted and no live write or authority was granted.
+
+M123 is `WAITING_FOR_EXTERNAL_VALIDATION`: attended console-specific pan
+mapping/readback/rollback/teardown proof remains separate. dLive pan stays
+unavailable where there is no verified mapping. This does not change M001 or
+the existing WING/dLive authority boundaries.
+
+## Parallel dLive readiness — 2026-08-04
+
+Director machine-observed CDM32 and C3500 paired online on firmware `V2.00
+Rev. 83230`; fresh Surface and MixRack GET-only probes agreed on `KICK`, raw
+fader `106` and Mute ON. The renewed attended Surface proof sent exactly one
+compact NRPN packet, but the operator saw no movement and four fresh readbacks
+remained at the preimage. Transaction
+`def89219-2b15-4f4d-a1ef-6309e6bdec8e` is terminal with
+`write_state_unknown=false`, verified teardown and no standing authority.
+Do not repeat it. The next evidence is effective Surface/MixRack Security and
+reboot state plus known-good-client or wire-capture comparison.
+
+The offline gate for that evidence is implemented: it reviews only a supplied
+operator capture, requires selected-endpoint ingress and exact compact-NRPN
+bytes, binds the accepted review and security/reboot attestation into the
+one-shot approval, and grants no authority. All 139 dLive tests pass; no console
+or capture interface was contacted.
+
+After this truth correction, the pre-final offline dLive/transport/safety slice
+passed `133` tests. The no-WING quick gate artifact
+`artifacts/no_wing_release_check/20260804T143043Z_no_wing_release_check/summary.json`
+is `passed` with empty failed/environment-blocked checks and zero WING/backend
+contact, live write or live authority. A final post-truth repetition follows.
+
+The operator-confirmation gap is now fail-closed: the token SHA-binds a unique
+approval ID plus the exact artifact, Surface, channel identity, console
+attestation, target/raw value and cut; the durable `prepared` WAL row consumes
+the ID. The old generic literal exits before route/TCP. A zero-contact
+production validator accepted the fresh C3500 plan (`raw 106 -> 101`, apply
+`bb630062170665`, rollback `bb63006217066a`) while explicitly denying route,
+TCP, MIDI, execution and authority. Validation passed 46 focused and 151 broad
+dLive/transport/safety tests. Receive MIDI and operator approval remain absent.
+
+Final validation after truth synchronization passed: 522 backend tests, 27
+frontend service/UI contracts, production frontend build and 6 handoff rails.
+The no-WING quick gate artifact
+`/tmp/automixer-dlive-final-pKObcp/20260804T102712Z_no_wing_release_check/summary.json`
+is `passed` with `failed_checks=[]`, no WING/backend contact, no live write and
+no live authority. This does not change the 78/100 physical-readiness boundary.
+
+The normal dLive identity pipeline now preserves endpoint, MIDI base `11` and
+user profile `0` through persisted config, direct/auto-connect, soundcheck,
+mobile/settings UI and operator state; the C3500 default is
+`192.168.3.71:51328`. Focused validation passed 475 backend tests and 27
+frontend contracts. A fresh attended Surface artifact at
+`/Users/dmitrijvolkov/.automixer/runtime/dlive_readonly_probes/20260804T101948Z_54d4cb5b-b850-4644-9ef8-f40918a3394a.json`
+(SHA-256 `d4f5dd8ff84d0be7aaf0c5db2352450b59edd8f1170557fa8385288adfc44c40`)
+contains `user_profile`, two fresh matches per field for `KICK`,
+`-0.582677 dB`, Mute ON, six GETs, zero mutation writes and clean disconnect.
+It is proof-binding eligible. `Receive MIDI` is still unknown; no third write,
+standing approval or live authority exists.
+
+The dLive MIDI/TCP layer now follows the official firmware-v2.0+ 7-bit
+protocol, distinguishes Surface and MixRack endpoints, parses running status,
+requires fresh double readback and blocks raw/speculative writes. Normal
+server/factory/UI connections are read-only. The old boolean write flag is
+removed. A separate restore-only proof path now binds one bounded downward
+fader apply and exact rollback to a short-lived literal approval, the shared
+per-user console writer lock and a hash-chained/fsynced WAL. Interrupted rows
+block new proofs and have an exact-preimage-only recovery path. Direction is
+now checked by exact 7-bit value, the operator cut bound has no grace, and
+`-inf` targets plus above-0 dB preimages fail before mutation. Focused
+writer/WAL/recovery validation passed 28; writer/client validation passed 73;
+dLive/server/config/safety/static integration passed 568. The subnet-3
+no-transport preflight passed with no socket and no MIDI; frontend production
+build passed at the prior checkpoint.
+
+The attended network checkpoint now reaches the hardware read-only. `en7` is
+`192.168.3.59/24`, route to `192.168.3.70` selects `en7`, and only MixRack
+plain TCP port `51325` is open. A bounded GET-only base-channel search found
+base `11`; input 1 then returned two fresh stable replies per field: name
+`KICK`, fader approximately `-0.58 dB`, mute off. Every connection closed
+cleanly. Hardware contact and read-only MIDI GETs are now true; mutation
+attempts and live writes remain zero, live authority remains denied. Overall
+dLive readiness is 78/100. The canonical runner observed the same three fields
+while bound to operator-attested `CDM32+C3500`, firmware `2.0`, Show
+`lv 1 master`; artifact SHA-256 is
+`f38220bdf85aa606c491ba8ae9323e3db8f2da34ca23bbc356b2161288c93be8`.
+Six GETs, zero mutation writes and clean disconnect are recorded. The operator
+confirmed the physical C3500 matches `KICK`, `-0.5827 dB`, mute off, so the
+SHA-bound read-only artifact is accepted. Mutation remains blocked until all PA
+and monitor outputs are contained and Input 1 is muted. WING milestone, blocker
+and authority are unchanged.
+
+The first physically contained, muted-input restore-only attempt targeted
+`-3.0 dB`. One full-status NRPN packet was sent, but four fresh fader readbacks
+remained at the exact `-0.5826771653543332 dB` preimage. WAL transaction
+`520414f7-4a87-45f5-8e33-e03e449a49a5` is terminal as
+`restored_after_unverified_apply`; `write_state_unknown=false` and teardown is
+clean. The console exposed a transmitter compatibility bug: the packet repeated
+the status byte, while the official dLive shape uses MIDI running status. The
+encoder now produces `BB 63 00 62 17 06 65`; 93 focused tests pass. No retry or
+standing authority exists; a new physical confirmation and literal approval
+are required.
+
+The newly approved corrected-packet attempt was also a terminal unchanged-state
+no-op with `write_state_unknown=false` and clean teardown, so packet shape is
+not a sufficient root cause. C3500 Surface `192.168.3.71:51328` is now separately
+GET-verified and matches the MixRack. The runner now requires explicit
+`Receive MIDI` enabled attestation before contact; 94 focused tests pass. No
+third write is authorized.
+
+The proof is now bound to one exact owner-controlled GET-only artifact by path,
+SHA-256 and content before route lookup or TCP connection. Endpoint, port, MIDI
+base, user profile, input identity, mute, fader preimage, six GETs, zero-write
+authority and clean teardown must all match; fresh fader readback must still
+match the artifact's exact 7-bit value. Emergency interruption after `prepared`
+or the durable apply boundary now closes terminal with zero send, while an
+interruption after transport exercises exact-preimage rollback. Focused tests
+pass 41/41 and all dLive tests pass 110/110. The existing Surface artifact
+predates the new `user_profile` field, so it cannot authorize another proof.
+No hardware contact or live write occurred in this implementation checkpoint.
 
 ## System Inspector iteration 001 — 2026-07-27
 
@@ -187,7 +334,7 @@ External validation requirements:
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 
@@ -528,3 +675,23 @@ does not grant unrestricted EQ, dynamics, FX, routing, master, scene, live or
 soundcheck authority.
 
 Latest M005 software disconnect protection evidence (partial): on the real WING, software disconnect made physical readback unavailable, an approved supervised write attempt produced no applied write, and reconnect restored verified readback with CH3 unchanged at 0.0. Physical cable-loss/timeout phases were skipped by operator decision and remain the open M005 evidence. See artifacts/wing_timeout_disconnect_proof/20260704T074537Z_wing_m005_disconnect_timeout_stale_proof/summary.json.
+
+## Codex Security remediation heartbeat — 2026-08-19T20:45:33Z
+
+The offline remediation writer lease remains active for the sealed 143-occurrence
+Codex Security ledger. High-severity and Medium/Low remediation cohorts are
+implemented or fail-closed, and the expanded server/network/ML cohort passed
+544 tests. No WING, dLive, audio device, external training feed, Telegram, or
+remote MCP service was contacted. The full repository test suite and a fresh
+sealed Codex Security rescan remain pending; no live authority or readiness
+status is granted by this heartbeat.
+
+## Codex Security remediation lease release — 2026-08-19T21:13:51Z
+
+The exact 143-occurrence ledger is locally verified unsealed with the frozen
+occurrence digest unchanged. High, Medium, and Low owning cohorts pass; truth
+surfaces record that only a fresh full Codex Security scan can close the work.
+No hardware, audio device, console, external feed, Telegram endpoint, or remote
+MCP service was contacted, and no live authority or readiness closure was
+granted. The writer lease is released before the lease-sensitive final test
+package is repeated.

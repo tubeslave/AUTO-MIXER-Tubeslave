@@ -26,6 +26,9 @@ def load_snap(client: WingClient, snap_name: str, max_index: int = 200):
     2. Находит индекс snapshot
     3. Загружает snapshot по найденному индексу
     """
+    logger.error("Legacy snapshot recall surface is quarantined")
+    return False
+
     logger.info("=" * 70)
     logger.info(f"ЗАГРУЗКА SNAPSHOT: {snap_name}")
     logger.info("=" * 70)

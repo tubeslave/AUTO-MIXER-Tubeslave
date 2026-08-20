@@ -233,6 +233,9 @@ def build_executor(mixer: Any, artifact_path: Path) -> GatedCorrectionActionExec
 
 
 def main() -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: reusable physical-write flags are disabled"
+    )
     parser = build_parser()
     args = parser.parse_args()
     run_id = f"{compact_stamp()}_{args.action}_ch{args.channel}"

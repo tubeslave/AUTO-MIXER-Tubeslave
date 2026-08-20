@@ -33,13 +33,16 @@ def register_handlers(server):
             })
             return
 
-        force = bool(data.get("force", False))
+        force = data.get("force", False)
+        if type(force) is not bool:
+            await server.send_to_client(websocket, {
+                "type": "training_start_failed",
+                "error": "force must be a JSON boolean",
+            })
+            return
         reason = str(data.get("reason", "manual"))
-        manifest_url = data.get("manifest_url")
-        if not isinstance(manifest_url, str) or not manifest_url.strip():
-            manifest_url = None
-
-        result = await service.start_once(force=force, reason=reason, manifest_url=manifest_url)
+        # Network destinations are trusted local configuration, never ingress.
+        result = await service.start_once(force=force, reason=reason)
         await server.send_to_client(websocket, {
             "type": "training_started",
             "result": result,

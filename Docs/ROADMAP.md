@@ -112,7 +112,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 The detailed table below is a frozen dependency taxonomy, not the operational
 task selector; its old M002-M006 status labels are historical. Current release
@@ -245,6 +245,7 @@ Documentation cleanup, cosmetic refactoring и speculative architecture work н�
 | M105 | Project Director post-M104 intake loop guard | Project Director detects the post-M104 WING read-only intake-hardening streak and narrows further autonomous work to real external validation or a named unverified contract gap | M001 | critical autopilot direction | UNIT_VERIFIED post-M104 intake-loop guard; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M106 | Project Director post-M105 intake loop persistence | Project Director keeps the post-M104 intake-loop guard active even after direction-guard commits sit above the WING read-only streak | M001 | critical autopilot direction | UNIT_VERIFIED post-M105 loop persistence; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
 | M107 | Project Director intake loop lookback floor | Project Director keeps the post-M104 intake-loop guard active even when additional direction-guard commits would otherwise push the WING read-only streak outside the requested lookback window | M001 | critical autopilot direction | UNIT_VERIFIED intake-loop lookback floor; live authority remains blocked | WAITING_FOR_EXTERNAL_VALIDATION |
+| M123 | Instrument Space decision integration | Measured scene relations and drift deterministically select existing analyzers and annotate proposal review without creating console authority | M122 read-only slice; owner-directed parallel software work | high, advisory-only | INTEGRATION_VERIFIED software evidence; attended WING/dLive proof remains separate | WAITING_FOR_EXTERNAL_VALIDATION |
 
 ## Active milestone
 

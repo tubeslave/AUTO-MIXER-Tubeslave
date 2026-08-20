@@ -145,3 +145,38 @@ class TestGainPanPredictor:
         result = predictor.predict(channels, block_size=2048)
         assert len(result['gains_db']) == 3
         assert len(result['pans']) == 3
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+def test_gain_pan_training_rejects_resource_hyperparameters_before_allocation(monkeypatch):
+    from ml import train_gain_predictor as training
+
+    def fail_if_dataset_allocates(*args, **kwargs):
+        raise AssertionError("dataset allocation must not run for invalid hyperparameters")
+
+    monkeypatch.setattr(training, "SyntheticMixDataset", fail_if_dataset_allocates)
+
+    invalid_requests = [
+        {"n_epochs": 10**9},
+        {"batch_size": 10**9},
+        {"n_channels": 10**9},
+        {"n_samples": 10**9},
+        {"lr": float("nan")},
+        {"n_epochs": 200, "n_samples": 4096},
+        {"batch_size": 128, "n_channels": 64},
+    ]
+    for overrides in invalid_requests:
+        with pytest.raises(ValueError):
+            training.train_gain_predictor(**overrides)
+
+
+@pytest.mark.skipif(not HAS_TORCH, reason="torch not installed")
+def test_gain_pan_synthetic_dataset_rejects_joint_allocation_bypass():
+    from ml.train_gain_predictor import SyntheticMixDataset
+
+    with pytest.raises(ValueError, match="synthetic dataset allocation limit exceeded"):
+        SyntheticMixDataset(n_samples=4096, n_channels=64, audio_len=8192)
+
+    dataset = SyntheticMixDataset(n_samples=2, n_channels=1, audio_len=32)
+    assert len(dataset) == 2
+    assert tuple(dataset[0][0].shape) == (1, 32)

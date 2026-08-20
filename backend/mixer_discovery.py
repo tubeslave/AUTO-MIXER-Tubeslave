@@ -3,7 +3,7 @@ Mixer auto-discovery via network scanning.
 
 Supports:
 - Behringer WING: UDP broadcast 'WING?' to port 2222
-- Allen & Heath dLive: TCP probe to port 51328 / 51329
+- Allen & Heath dLive: TCP candidate probe on MixRack and Surface ports
 - Subnet scanning for unknown IPs
 
 Usage:
@@ -24,8 +24,18 @@ logger = logging.getLogger(__name__)
 
 WING_DISCOVERY_PORT = 2222
 WING_OSC_PORT = 2223
-DLIVE_TCP_PORT = 51328
-DLIVE_TLS_PORT = 51329
+DLIVE_MIXRACK_TCP_PORT = 51325
+DLIVE_MIXRACK_TLS_PORT = 51327
+DLIVE_SURFACE_TCP_PORT = 51328
+DLIVE_SURFACE_TLS_PORT = 51329
+DLIVE_TCP_PORT = DLIVE_SURFACE_TCP_PORT
+DLIVE_TLS_PORT = DLIVE_SURFACE_TLS_PORT
+DLIVE_PORTS = {
+    DLIVE_MIXRACK_TCP_PORT: ("mixrack", False),
+    DLIVE_MIXRACK_TLS_PORT: ("mixrack", True),
+    DLIVE_SURFACE_TCP_PORT: ("surface", False),
+    DLIVE_SURFACE_TLS_PORT: ("surface", True),
+}
 SCAN_TIMEOUT = 1.5
 BROADCAST_TIMEOUT = 2.0
 MAX_SUBNET_SCAN_WORKERS = 64
@@ -41,6 +51,8 @@ class DiscoveredMixer:
     firmware: str = ""
     model: str = ""
     tls: bool = False
+    endpoint: str = ""
+    identity_verified: bool = False
     discovery_method: str = ""  # "broadcast", "tcp_probe", "subnet_scan"
     response_time_ms: float = 0.0
 
@@ -214,7 +226,9 @@ def _probe_wing_unicast(ip: str, timeout: float = SCAN_TIMEOUT) -> Optional[Disc
 def _probe_dlive_tcp(
     ip: str, port: int = DLIVE_TCP_PORT, timeout: float = SCAN_TIMEOUT
 ) -> Optional[DiscoveredMixer]:
-    """Probe a specific IP:port for a dLive mixer via TCP connect."""
+    """Probe an official dLive port and return an unverified candidate."""
+    if port not in DLIVE_PORTS:
+        return None
     try:
         start = time.time()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -224,13 +238,15 @@ def _probe_dlive_tcp(
 
         if result == 0:
             sock.close()
-            tls = port == DLIVE_TLS_PORT
+            endpoint, tls = DLIVE_PORTS.get(port, ("unknown", False))
             mixer = DiscoveredMixer(
                 mixer_type="dlive",
                 ip=ip,
                 port=port,
                 name=f"dLive @ {ip}",
                 tls=tls,
+                endpoint=endpoint,
+                identity_verified=False,
                 discovery_method="tcp_probe",
                 response_time_ms=resp_ms,
             )
@@ -247,7 +263,7 @@ def discover_dlive_subnet(
     timeout: float = SCAN_TIMEOUT,
     max_workers: int = MAX_SUBNET_SCAN_WORKERS,
 ) -> List[DiscoveredMixer]:
-    """Scan a /24 subnet for dLive mixers on TCP port 51328 and 51329."""
+    """Scan a /24 for unverified dLive endpoint candidates on official ports."""
     results: List[DiscoveredMixer] = []
 
     if subnet is None:
@@ -263,8 +279,8 @@ def discover_dlive_subnet(
     for sub in subnets:
         for host in range(1, 255):
             ip = f"{sub}.{host}"
-            targets.append((ip, DLIVE_TCP_PORT))
-            targets.append((ip, DLIVE_TLS_PORT))
+            for port in DLIVE_PORTS:
+                targets.append((ip, port))
 
     logger.info(f"Scanning {len(targets)} targets for dLive (subnets: {subnets})...")
 
@@ -302,11 +318,11 @@ def discover_dlive_known_ips(
         ips = list(base_ips)
 
     results: List[DiscoveredMixer] = []
-    with ThreadPoolExecutor(max_workers=min(len(ips) * 2, 32)) as pool:
+    with ThreadPoolExecutor(max_workers=min(len(ips) * len(DLIVE_PORTS), 64)) as pool:
         futures = []
         for ip in ips:
-            futures.append(pool.submit(_probe_dlive_tcp, ip, DLIVE_TCP_PORT, timeout))
-            futures.append(pool.submit(_probe_dlive_tcp, ip, DLIVE_TLS_PORT, timeout))
+            for port in DLIVE_PORTS:
+                futures.append(pool.submit(_probe_dlive_tcp, ip, port, timeout))
         for future in as_completed(futures):
             mixer = future.result()
             if mixer:
@@ -391,7 +407,7 @@ def discover_mixer_auto(
     )
 
     if preferred_ip:
-        for port in [DLIVE_TCP_PORT, DLIVE_TLS_PORT]:
+        for port in DLIVE_PORTS:
             mixer = _probe_dlive_tcp(preferred_ip, port, timeout)
             if mixer:
                 logger.info(f"Found preferred dLive at {preferred_ip}:{port}")
@@ -464,6 +480,9 @@ def main():
             tls_str = " [TLS]" if m.tls else ""
             print(f"  {i}. {m.mixer_type.upper()} @ {m.ip}:{m.port}{tls_str}")
             print(f"     Name: {m.name}")
+            if m.mixer_type == "dlive":
+                print(f"     Endpoint: {m.endpoint or 'unknown'}")
+                print("     Identity: unverified TCP candidate")
             print(f"     Method: {m.discovery_method}")
             print(f"     Response: {m.response_time_ms:.0f}ms")
             print()
@@ -472,7 +491,8 @@ def main():
         print("\nTips:")
         print("  - Check that the mixer is on the same network")
         print("  - Try --full-scan for a full subnet scan")
-        print("  - For dLive, ensure TCP MIDI is enabled (port 51328)")
+        print("  - For dLive, enable TCP MIDI and select Surface or MixRack endpoint")
+        print("  - dLive ports: MixRack 51325/51327; Surface 51328/51329")
         print("  - For WING, check that UDP port 2222 is reachable")
 
 

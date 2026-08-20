@@ -1256,6 +1256,20 @@ def is_local_paperclip_api(api_url: str) -> bool:
     return (parsed.hostname or "").lower() in {"127.0.0.1", "localhost", "::1"}
 
 
+def validate_paperclip_transport(api_url: str, token: str | None) -> None:
+    parsed = urllib.parse.urlparse(str(api_url or ""))
+    host = (parsed.hostname or "").lower()
+    loopback_http = parsed.scheme == "http" and host in {"127.0.0.1", "localhost", "::1"}
+    if parsed.username is not None or parsed.password is not None:
+        raise ValueError("Paperclip URL credentials are forbidden")
+    if parsed.scheme == "http" and not loopback_http:
+        raise ValueError("non-loopback Paperclip endpoints require HTTPS")
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Paperclip API must use loopback HTTP or HTTPS")
+    if token and parsed.scheme != "https" and not loopback_http:
+        raise ValueError("Paperclip bearer token transport is not secure")
+
+
 def load_state(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"version": 1, "days": {}}
@@ -1566,6 +1580,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     settings = Settings.from_env()
+    validate_paperclip_transport(settings.api_url, settings.token)
     logger = configure_logger(settings)
 
     if args.command == "once":

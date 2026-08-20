@@ -3,6 +3,7 @@ Training script for the differentiable mixing console.
 Uses multi-resolution STFT loss to optimize mix parameters against reference mixes.
 """
 import json
+import math
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -13,27 +14,113 @@ from typing import List, Optional, Tuple
 
 from .differentiable_console import DifferentiableMixingConsole
 from .losses import MultiResolutionSTFTLoss, LoudnessLoss, MixConsistencyLoss
+from .npz_archive_safety import load_validated_numeric_npz, open_regular_binary_file
 
 logger = logging.getLogger(__name__)
 
+MAX_MIX_CONSOLE_EPOCHS = 200
+MAX_MIX_CONSOLE_CHANNELS = 64
+MAX_MIX_CONSOLE_AUDIO_LEN = 262_144
+MAX_MIX_CONSOLE_SAMPLES = 4096
+MAX_MIX_CONSOLE_DATASET_ELEMENTS = 40_000_000
+MAX_MIX_CONSOLE_SAMPLE_ELEMENTS = 8_000_000
+MAX_MIX_CONSOLE_TRAINING_EXAMPLES = 200_000
+MAX_MIX_CONSOLE_JSONL_BYTES = 32 * 1024 * 1024
+MAX_MIX_CONSOLE_JSONL_LINE_BYTES = 1024 * 1024
+MIN_MIX_CONSOLE_LEARNING_RATE = 1e-8
+MAX_MIX_CONSOLE_LEARNING_RATE = 1.0
 
-def _load_dataset_from_file(path: str, n_channels: int) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+
+def _bounded_int(name: str, value: int, *, minimum: int, maximum: int) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be an integer in range {minimum}..{maximum}")
+    return value
+
+
+def _validate_mix_console_training_request(
+    *,
+    n_epochs: int,
+    lr: float,
+    n_channels: int,
+    audio_len: int,
+    n_samples: int,
+    sample_rate: int,
+) -> None:
+    _bounded_int("n_epochs", n_epochs, minimum=1, maximum=MAX_MIX_CONSOLE_EPOCHS)
+    _bounded_int("n_channels", n_channels, minimum=1, maximum=MAX_MIX_CONSOLE_CHANNELS)
+    _bounded_int("audio_len", audio_len, minimum=32, maximum=MAX_MIX_CONSOLE_AUDIO_LEN)
+    _bounded_int("n_samples", n_samples, minimum=2, maximum=MAX_MIX_CONSOLE_SAMPLES)
+    _bounded_int("sample_rate", sample_rate, minimum=8000, maximum=384000)
+    if isinstance(lr, bool) or not isinstance(lr, (int, float)):
+        raise ValueError("lr must be a finite numeric value")
+    if not math.isfinite(float(lr)) or not MIN_MIX_CONSOLE_LEARNING_RATE <= float(lr) <= MAX_MIX_CONSOLE_LEARNING_RATE:
+        raise ValueError(
+            f"lr must be in range {MIN_MIX_CONSOLE_LEARNING_RATE}..{MAX_MIX_CONSOLE_LEARNING_RATE}"
+        )
+    if n_samples * (n_channels + 1) * audio_len > MAX_MIX_CONSOLE_DATASET_ELEMENTS:
+        raise ValueError("mix-console synthetic dataset allocation limit exceeded")
+    if n_epochs * n_samples > MAX_MIX_CONSOLE_TRAINING_EXAMPLES:
+        raise ValueError("mix-console training work limit exceeded")
+
+
+def _load_dataset_from_file(
+    path: str,
+    n_channels: int,
+    *,
+    max_dataset_bytes: Optional[int] = None,
+) -> Tuple[List[np.ndarray], List[np.ndarray]]:
+    _bounded_int(
+        "n_channels",
+        n_channels,
+        minimum=1,
+        maximum=MAX_MIX_CONSOLE_CHANNELS,
+    )
+    if max_dataset_bytes is not None and (
+        type(max_dataset_bytes) is not int or max_dataset_bytes <= 0
+    ):
+        raise ValueError("max_dataset_bytes must be a positive integer")
+    effective_max_bytes = min(
+        MAX_MIX_CONSOLE_JSONL_BYTES,
+        max_dataset_bytes or MAX_MIX_CONSOLE_JSONL_BYTES,
+    )
     path = os.path.abspath(path)
     _, ext = os.path.splitext(path.lower())
     if ext == ".npz":
-        with np.load(path, allow_pickle=False) as raw:
-            if "multitracks" not in raw.files:
-                raise ValueError("NPZ must include 'multitracks'")
-            if "references" not in raw.files:
-                raise ValueError("NPZ must include 'references'")
-            multitracks = raw["multitracks"].tolist()
-            references = raw["references"].tolist()
+        with load_validated_numeric_npz(
+            path,
+            required_key_groups=(("multitracks",), ("references",)),
+            max_compressed_bytes=effective_max_bytes,
+        ) as raw:
+            multitracks = raw["multitracks"]
+            references = raw["references"]
     elif ext == ".jsonl":
         multitracks = []
         references = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                row = json.loads(line)
+        with open_regular_binary_file(
+            path,
+            error_message="mix-console dataset must be a regular file",
+        ) as f:
+            opened_stat = os.fstat(f.fileno())
+            if opened_stat.st_size > effective_max_bytes:
+                raise ValueError("mix-console JSONL byte limit exceeded")
+            bytes_read = 0
+            while True:
+                raw_line = f.readline(MAX_MIX_CONSOLE_JSONL_LINE_BYTES + 1)
+                if not raw_line:
+                    break
+                bytes_read += len(raw_line)
+                if bytes_read > effective_max_bytes:
+                    raise ValueError("mix-console JSONL byte limit exceeded")
+                if len(raw_line) > MAX_MIX_CONSOLE_JSONL_LINE_BYTES:
+                    raise ValueError("mix-console JSONL line limit exceeded")
+                if len(multitracks) >= MAX_MIX_CONSOLE_SAMPLES:
+                    raise ValueError("mix-console dataset sample limit exceeded")
+                try:
+                    row = json.loads(raw_line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("invalid mix-console JSONL row") from exc
+                if not isinstance(row, dict):
+                    raise ValueError("mix-console JSONL row must be an object")
                 multitracks.append(row.get("multitracks") or row.get("channels"))
                 references.append(row.get("references") or row.get("reference"))
     else:
@@ -41,22 +128,35 @@ def _load_dataset_from_file(path: str, n_channels: int) -> Tuple[List[np.ndarray
 
     if len(multitracks) != len(references):
         raise ValueError("multitracks/references length mismatch")
-    if not multitracks:
+    if len(multitracks) == 0:
         raise ValueError(f"External dataset is empty: {path}")
+    if len(multitracks) > MAX_MIX_CONSOLE_SAMPLES:
+        raise ValueError("mix-console dataset sample limit exceeded")
 
     parsed_multitracks: List[np.ndarray] = []
     parsed_references: List[np.ndarray] = []
+    materialized_elements = 0
     for tracks, ref in zip(multitracks, references):
         tracks_np = np.asarray(tracks, dtype=np.float32)
+        if tracks_np.ndim == 1:
+            tracks_np = tracks_np.reshape(1, -1)
         if tracks_np.ndim != 2:
-            tracks_np = np.asarray(tracks_np).reshape(1, -1)
+            raise ValueError("Each mix-console sample must be a 2D channels/audio array")
+        ref_np = np.asarray(ref, dtype=np.float32).reshape(-1)
+        if ref_np.size != tracks_np.shape[1]:
+            raise ValueError("mix-console reference length mismatch")
+        sample_elements = (n_channels * tracks_np.shape[1]) + ref_np.size
+        if sample_elements > MAX_MIX_CONSOLE_SAMPLE_ELEMENTS:
+            raise ValueError("mix-console sample element limit exceeded")
+        materialized_elements += sample_elements
+        if materialized_elements > MAX_MIX_CONSOLE_DATASET_ELEMENTS:
+            raise ValueError("mix-console materialized element limit exceeded")
         if tracks_np.shape[0] < n_channels:
             pad = np.zeros((n_channels - tracks_np.shape[0], tracks_np.shape[1]), dtype=np.float32)
             tracks_np = np.vstack([tracks_np, pad])
         tracks_np = tracks_np[:n_channels]
-        ref_np = np.asarray(ref, dtype=np.float32).reshape(-1).astype(np.float32)
-        parsed_multitracks.append(tracks_np)
-        parsed_references.append(ref_np)
+        parsed_multitracks.append(tracks_np.astype(np.float32, copy=False))
+        parsed_references.append(ref_np.astype(np.float32, copy=False))
 
     return parsed_multitracks, parsed_references
 
@@ -65,6 +165,14 @@ def generate_synthetic_multitracks(n_samples: int, n_channels: int,
                                    audio_len: int,
                                    sample_rate: int = 48000):
     """Generate synthetic multitrack audio and reference mixes for training."""
+    _validate_mix_console_training_request(
+        n_epochs=1,
+        lr=1e-2,
+        n_channels=n_channels,
+        audio_len=audio_len,
+        n_samples=n_samples,
+        sample_rate=sample_rate,
+    )
     multitracks = []
     references = []
 
@@ -125,8 +233,17 @@ def train_mix_console(
     sample_rate: int = 48000,
     dataset_path: Optional[str] = None,
     device: Optional[str] = None,
+    max_dataset_bytes: Optional[int] = None,
 ):
     """Train the differentiable mixing console parameters against reference mixes."""
+    _validate_mix_console_training_request(
+        n_epochs=n_epochs,
+        lr=lr,
+        n_channels=n_channels,
+        audio_len=audio_len,
+        n_samples=n_samples,
+        sample_rate=sample_rate,
+    )
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
@@ -134,13 +251,34 @@ def train_mix_console(
 
     if dataset_path:
         logger.info("Loading external multitracks from %s", dataset_path)
-        multitracks, references = _load_dataset_from_file(dataset_path, n_channels)
+        multitracks, references = _load_dataset_from_file(
+            dataset_path,
+            n_channels,
+            max_dataset_bytes=max_dataset_bytes,
+        )
         n_samples = len(multitracks)
     else:
         logger.info("Generating synthetic multitrack data...")
         multitracks, references = generate_synthetic_multitracks(
             n_samples, n_channels, audio_len, sample_rate,
         )
+
+    if len(multitracks) < 2 or len(multitracks) > MAX_MIX_CONSOLE_SAMPLES:
+        raise ValueError(
+            f"mix-console dataset size must be in range 2..{MAX_MIX_CONSOLE_SAMPLES}"
+        )
+    materialized_elements = 0
+    for tracks, reference in zip(multitracks, references):
+        if tracks.ndim != 2 or tracks.shape[0] != n_channels:
+            raise ValueError("mix-console sample channel shape mismatch")
+        if reference.ndim != 1 or reference.shape[0] != tracks.shape[1]:
+            raise ValueError("mix-console reference length mismatch")
+        materialized_elements += int(tracks.size) + int(reference.size)
+        if materialized_elements > MAX_MIX_CONSOLE_DATASET_ELEMENTS:
+            raise ValueError("mix-console dataset allocation limit exceeded")
+    if n_epochs * len(multitracks) > MAX_MIX_CONSOLE_TRAINING_EXAMPLES:
+        raise ValueError("mix-console training work limit exceeded")
+    n_samples = len(multitracks)
 
     # Split into train/val
     split = int(0.8 * n_samples)

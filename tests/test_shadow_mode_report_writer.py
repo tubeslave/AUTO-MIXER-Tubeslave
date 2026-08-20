@@ -11,7 +11,10 @@ from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     build_replay_graph_checkpoint,
     rank_replay_proposals,
 )
-from ai_mixing_pipeline.reports.shadow_report_writer import write_shadow_mode_reports
+from ai_mixing_pipeline.reports.shadow_report_writer import (
+    _build_promotion_readiness,
+    write_shadow_mode_reports,
+)
 
 
 def test_shadow_mode_reports_include_operator_ai_comparison_and_rollback_paths(tmp_path):
@@ -141,3 +144,32 @@ def test_shadow_mode_reports_flag_readiness_as_ready_for_stable_shadow_workflow(
     assert comparison["disagreements"] == []
     assert readiness["ready"] is True
     assert readiness["promotion_readiness_score"] >= 75
+
+
+def test_promotion_readiness_fails_closed_when_authoritative_evidence_is_missing_or_invalid():
+    manifest = {
+        "manifest_id": "manifest-1",
+        "dry_run_only": True,
+        "live_mixer_writes": False,
+    }
+    executor = {"dry_run_only": True, "trace_signature": "trace-1"}
+    validation = {"valid": True, "summary": {"error_count": 0}}
+
+    missing_manifest = _build_promotion_readiness({}, executor, validation, [])
+    missing_executor = _build_promotion_readiness(manifest, None, validation, [])
+    missing_validation = _build_promotion_readiness(manifest, executor, None, [])
+    explicit_failure = _build_promotion_readiness(
+        manifest,
+        executor,
+        {"valid": False, "summary": {"error_count": 0}},
+        [],
+    )
+
+    assert missing_manifest["ready"] is False
+    assert "manifest_evidence_missing" in missing_manifest["blocking_reasons"]
+    assert missing_executor["ready"] is False
+    assert "executor_evidence_missing" in missing_executor["blocking_reasons"]
+    assert missing_validation["ready"] is False
+    assert "validation_evidence_missing" in missing_validation["blocking_reasons"]
+    assert explicit_failure["ready"] is False
+    assert "validation_errors_or_invalid" in explicit_failure["blocking_reasons"]

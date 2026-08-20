@@ -436,7 +436,7 @@ class VirtualWingMixer:
         self.setup_osc()
         
         self.server = AsyncIOOSCUDPServer(
-            ("0.0.0.0", self.osc_port),
+            ("127.0.0.1", self.osc_port),
             self.dispatcher,
             asyncio.get_event_loop()
         )
@@ -458,6 +458,13 @@ class VirtualWingMixer:
     
     def set_input_signal(self, ch: int, level_db: float):
         """Set input signal level (for simulation)."""
+        if type(ch) is not int or ch not in self.input_channels:
+            raise ValueError("channel must be an integer in range 1..32")
+        if isinstance(level_db, bool) or not isinstance(level_db, (int, float)):
+            raise ValueError("level_db must be a finite numeric value")
+        level_db = float(level_db)
+        if not np.isfinite(level_db) or not -120.0 <= level_db <= 24.0:
+            raise ValueError("level_db must be finite and in range -120..24")
         if ch in self.input_channels:
             self.input_channels[ch].input_signal = level_db
             # Calculate output with fader

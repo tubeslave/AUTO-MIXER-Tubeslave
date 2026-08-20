@@ -15,9 +15,10 @@ that pass the Safety Governor.
   for offline render candidates. If missing, manual candidates still run.
 - Optuna: optional experimental batch optimizer. It is not required for the
   default workflow.
-- pymixconsole: preferred headless console backend. It is installed from the
-  upstream GitHub repository and used for gain, pan, EQ, and compression when
-  available; the adapter falls back automatically if it cannot be imported.
+- pymixconsole: optional headless console backend. The project installer never
+  downloads it from a mutable VCS branch. An independently audited local
+  installation may be used for gain, pan, EQ, and compression; the adapter
+  falls back automatically if it cannot be imported.
   Default pymixconsole delay/reverb busses are disabled in offline correction
   unless FX sends are modeled explicitly.
 - fallback_virtual_mixer: dependency-light WAV/FLAC/AIFF loader and summing
@@ -42,12 +43,11 @@ source .venv/bin/activate
 scripts/install_ai_decision_layer.sh
 ```
 
-Missing optional packages do not break the pipeline. `pymixconsole` is pinned
-to its upstream source:
-
-```bash
-pip install "pymixconsole @ git+https://github.com/csteinmetz1/pymixconsole"
-```
+Missing optional packages do not break the pipeline. The installer
+intentionally omits `pymixconsole`: installing executable code from its mutable
+GitHub default branch is prohibited. Use `fallback_virtual_mixer`, or provision
+an independently reviewed immutable artifact through the operator's normal
+supply-chain process. Do not add an unpinned VCS URL to the requirements file.
 
 `dasp-pytorch` exists on PyPI as `dasp-pytorch==0.0.1`, but it may conflict
 with local PyTorch stacks, so it is intentionally manual.

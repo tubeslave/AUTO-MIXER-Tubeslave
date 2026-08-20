@@ -3,7 +3,7 @@ import websocketService from '../services/websocket';
 import './SettingsTab.css';
 
 const DEFAULTS = {
-  mixer: { mixerType: 'wing', mixerIp: '192.168.1.102', mixerPort: 2223, dliveIp: '192.168.1.70', dlivePort: 51328, dliveTls: false, dliveMidiChannel: 0 },
+  mixer: { mixerType: 'wing', mixerIp: '192.168.1.102', mixerPort: 2223, dliveIp: '192.168.3.71', dliveEndpoint: 'surface', dlivePort: 51328, dliveTls: false, dliveMidiChannel: 11, dliveUserProfile: 0 },
   gainStaging: { targetLufs: -23, truePeakLimit: -1, ratio: 4, learningDurationSec: 30 },
   autoFader: { bleedThreshold: -50, targetLoudness: -18, smoothingAlpha: 0.3 },
   voiceControl: { language: 'ru', modelSize: 'small' },
@@ -85,6 +85,21 @@ function SettingsTab({ mixerIp, mixerPort, onMixerSettingsChange }) {
           </>)}
           {allSettings.mixer.mixerType === 'dlive' && (<>
             <div className="setting-row">
+              <label>Endpoint</label>
+              <select value={allSettings.mixer.dliveEndpoint || 'surface'}
+                onChange={e => {
+                  const endpoint = e.target.value;
+                  handleChange('mixer', 'dliveEndpoint', endpoint);
+                  handleChange('mixer', 'dliveIp', endpoint === 'mixrack' ? '192.168.3.70' : '192.168.3.71');
+                  handleChange('mixer', 'dlivePort', endpoint === 'mixrack'
+                    ? (allSettings.mixer.dliveTls ? 51327 : 51325)
+                    : (allSettings.mixer.dliveTls ? 51329 : 51328));
+                }}>
+                <option value="surface">Surface</option>
+                <option value="mixrack">MixRack</option>
+              </select>
+            </div>
+            <div className="setting-row">
               <label>dLive IP</label>
               <input type="text" value={allSettings.mixer.dliveIp}
                 onChange={e => handleChange('mixer', 'dliveIp', e.target.value)}
@@ -99,12 +114,24 @@ function SettingsTab({ mixerIp, mixerPort, onMixerSettingsChange }) {
             <div className="setting-row">
               <label>TLS</label>
               <input type="checkbox" checked={allSettings.mixer.dliveTls}
-                onChange={e => handleChange('mixer', 'dliveTls', e.target.checked)} />
+                onChange={e => {
+                  const tls = e.target.checked;
+                  handleChange('mixer', 'dliveTls', tls);
+                  handleChange('mixer', 'dlivePort', (allSettings.mixer.dliveEndpoint || 'surface') === 'mixrack'
+                    ? (tls ? 51327 : 51325)
+                    : (tls ? 51329 : 51328));
+                }} />
             </div>
             <div className="setting-row">
               <label>MIDI Base Ch</label>
-              <input type="number" min="0" max="15" value={allSettings.mixer.dliveMidiChannel}
+              <input type="number" min="0" max="11" value={allSettings.mixer.dliveMidiChannel}
                 onChange={e => handleChange('mixer', 'dliveMidiChannel', parseInt(e.target.value))}
+                style={{width: '60px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
+            </div>
+            <div className="setting-row">
+              <label>User Profile</label>
+              <input type="number" min="0" max="31" value={allSettings.mixer.dliveUserProfile ?? 0}
+                onChange={e => handleChange('mixer', 'dliveUserProfile', parseInt(e.target.value))}
                 style={{width: '60px', padding: '4px 8px', border: '1px solid #30363d', borderRadius: '4px', background: '#0d1117', color: '#e6e6e6'}} />
             </div>
           </>)}

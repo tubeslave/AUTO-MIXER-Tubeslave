@@ -7,6 +7,7 @@ import csv
 import gzip
 import hashlib
 import html
+import ipaddress
 import os
 import json
 import logging
@@ -16,6 +17,7 @@ import stat
 import tarfile
 import zipfile
 import re
+import socket
 from datetime import datetime, timedelta, timezone
 from html.parser import HTMLParser
 from pathlib import Path, PurePosixPath, PureWindowsPath
@@ -29,8 +31,12 @@ import requests
 from .train_classifier import train_classifier
 from .train_gain_predictor import train_gain_predictor
 from .train_mix_console import train_mix_console
+from .npz_archive_safety import open_regular_binary_file
 
 logger = logging.getLogger(__name__)
+
+MAX_CSV_PHYSICAL_LINE_BYTES = 1024 * 1024
+MAX_CSV_CONVERTED_ROWS = 8192
 
 
 class _StudyHTMLTextExtractor(HTMLParser):
@@ -141,6 +147,10 @@ TARGET_FILE_HINT_KEYWORDS = {
         "stems",
     ),
 }
+
+REMOTE_MANIFEST_TARGET_FIELDS = frozenset(
+    {"dataset_id", "version", "dataset_url", "dataset_urls", "url"}
+)
 
 
 class AgentTrainingService:
@@ -295,6 +305,14 @@ class AgentTrainingService:
             "safe_autostart": self._safe_bool(config.get("safe_autostart"), False),
             "interval_seconds": max(60, int(interval_minutes * 60)),
             "manifest_url": config.get("manifest_url"),
+            "manifest_allowed_domains": self._safe_list(
+                config.get("manifest_allowed_domains"),
+                [],
+            ),
+            "dataset_allowed_domains": self._safe_list(
+                config.get("dataset_allowed_domains"),
+                ["huggingface.co"],
+            ),
             "request_timeout_sec": max(5, request_timeout),
             "max_retries": self._safe_int(config.get("max_retries"), 0),
             "max_dataset_bytes": max(1024 * 1024, max_dataset_bytes),
@@ -430,6 +448,10 @@ class AgentTrainingService:
         reason: str = "manual",
         manifest_url: Optional[str] = None,
     ) -> Dict[str, Any]:
+        if type(force) is not bool:
+            return {"started": False, "reason": "force must be a boolean"}
+        if not self.config.get("enabled", False):
+            return {"started": False, "reason": "training disabled by local config"}
         if self._active_task and not self._active_task.done():
             return {"started": False, "reason": "training already running"}
 
@@ -535,7 +557,24 @@ class AgentTrainingService:
                 try:
                     merged = dict(target)
                     if manifest and isinstance(manifest.get("targets"), dict):
-                        merged.update(manifest.get("targets", {}).get(target_name, {}))
+                        manifest_target = manifest.get("targets", {}).get(target_name, {})
+                        if isinstance(manifest_target, dict):
+                            ignored_fields = sorted(
+                                set(manifest_target) - REMOTE_MANIFEST_TARGET_FIELDS
+                            )
+                            if ignored_fields:
+                                logger.warning(
+                                    "Ignoring untrusted manifest target fields for %s: %s",
+                                    target_name,
+                                    ignored_fields,
+                                )
+                            merged.update(
+                                {
+                                    key: value
+                                    for key, value in manifest_target.items()
+                                    if key in REMOTE_MANIFEST_TARGET_FIELDS
+                                }
+                            )
 
                     if manifest and not merged.get("dataset_id"):
                         merged["dataset_id"] = manifest.get("dataset_id") or manifest.get("version")
@@ -594,6 +633,10 @@ class AgentTrainingService:
                         config=merged,
                         dataset_path=dataset_path,
                         dataset_id=dataset_version,
+                        max_dataset_bytes=int(
+                            resolve_info.get("max_dataset_bytes")
+                            or self.config["max_dataset_bytes"]
+                        ),
                     )
 
                     target_state["last_status"] = "ok"
@@ -730,6 +773,10 @@ class AgentTrainingService:
         manifest: Optional[Dict[str, Any]],
         max_per_type: int,
     ) -> List[Dict[str, Any]]:
+        # Remote study ingestion is quarantined until signed-resource binding
+        # and DNS-pinned transport are implemented end to end.
+        return []
+
         study_cfg = self.config["study"]
         source_types = self._safe_list(study_cfg.get("source_types"), list(DEFAULT_STUDY_SOURCE_TYPES))
         candidates: List[Dict[str, Any]] = []
@@ -1092,12 +1139,20 @@ class AgentTrainingService:
         return path
 
     def _fetch_study_text(self, url: str, timeout: float, max_bytes: int) -> str:
+        self._validate_training_url(
+            url,
+            self._normalized_allowed_domains(
+                self.config.get("study", {}).get("allowed_domains")
+            ),
+        )
         response = requests.get(
             url,
             timeout=timeout,
             stream=True,
-            allow_redirects=True,
+            allow_redirects=False,
         )
+        if 300 <= response.status_code < 400:
+            raise RuntimeError("training_study_redirect_forbidden")
         response.raise_for_status()
 
         content_length = response.headers.get("Content-Length") or response.headers.get("content-length")
@@ -1134,6 +1189,7 @@ class AgentTrainingService:
         config: Dict[str, Any],
         dataset_path: Optional[str],
         dataset_id: Optional[str],
+        max_dataset_bytes: int,
     ) -> None:
         output_path = self._abs_path(config["output_path"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1151,6 +1207,7 @@ class AgentTrainingService:
                     n_frames=int(config.get("n_frames", 64)),
                     dataset_path=dataset_path,
                     device=str(config.get("device", "cpu")),
+                    max_dataset_bytes=max_dataset_bytes,
                 )
             elif target_name == "gain_pan_predictor":
                 train_gain_predictor(
@@ -1162,6 +1219,7 @@ class AgentTrainingService:
                     n_samples=int(config.get("n_samples", 500)),
                     dataset_path=dataset_path,
                     device=str(config.get("device", "cpu")),
+                    max_dataset_bytes=max_dataset_bytes,
                 )
             elif target_name == "mix_console":
                 train_mix_console(
@@ -1174,6 +1232,7 @@ class AgentTrainingService:
                     sample_rate=int(config.get("sample_rate", 48000)),
                     dataset_path=dataset_path,
                     device=str(config.get("device", "cpu")),
+                    max_dataset_bytes=max_dataset_bytes,
                 )
             else:
                 raise ValueError(f"Unknown target: {target_name}")
@@ -1188,9 +1247,24 @@ class AgentTrainingService:
                     pass
 
     async def _fetch_manifest_with_retries(self, manifest_url: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        url = manifest_url or self.config.get("manifest_url")
+        logger.warning("Remote training manifests are quarantined; local datasets only")
+        return None
+
+        configured_url = str(self.config.get("manifest_url") or "").strip()
+        requested_url = str(manifest_url or "").strip()
+        if requested_url and requested_url != configured_url:
+            logger.error("Rejected non-configured training manifest URL")
+            return None
+        url = configured_url
         if not url:
             return None
+
+        configured_domains = self._normalized_allowed_domains(
+            self.config.get("manifest_allowed_domains")
+        )
+        if not configured_domains:
+            configured_host = (urlparse(url).hostname or "").lower()
+            configured_domains = {configured_host} if configured_host else set()
 
         timeout = self.config["request_timeout_sec"]
         retries = max(0, int(self.config.get("max_retries", 0)))
@@ -1198,7 +1272,14 @@ class AgentTrainingService:
 
         for attempt in range(retries + 1):
             try:
-                response = requests.get(url, timeout=timeout)
+                self._validate_training_url(url, configured_domains)
+                response = requests.get(
+                    url,
+                    timeout=timeout,
+                    allow_redirects=False,
+                )
+                if 300 <= response.status_code < 400:
+                    raise RuntimeError("training_manifest_redirect_forbidden")
                 response.raise_for_status()
                 return response.json()
             except Exception as exc:
@@ -1212,6 +1293,57 @@ class AgentTrainingService:
         if last_error:
             self._last_error = f"manifest_fetch:{last_error}"
         return None
+
+    @staticmethod
+    def _normalized_allowed_domains(values: Any) -> set[str]:
+        return {
+            str(value).strip().lower().lstrip(".")
+            for value in (values if isinstance(values, (list, tuple, set)) else [])
+            if isinstance(value, str) and value.strip()
+        }
+
+    @staticmethod
+    def _validate_training_url(url: str, allowed_domains: set[str]) -> str:
+        """Validate one HTTPS destination before an outbound training request."""
+        parsed = urlparse(str(url or ""))
+        if parsed.scheme.lower() != "https":
+            raise ValueError("training_url_https_required")
+        if parsed.username is not None or parsed.password is not None:
+            raise ValueError("training_url_credentials_forbidden")
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if not host or not allowed_domains or not any(
+            host == domain or host.endswith(f".{domain}")
+            for domain in allowed_domains
+        ):
+            raise ValueError("training_url_domain_not_allowed")
+        try:
+            port = parsed.port
+        except ValueError as exc:
+            raise ValueError("training_url_port_invalid") from exc
+        if port not in (None, 443):
+            raise ValueError("training_url_port_not_allowed")
+
+        try:
+            addresses = {
+                item[4][0]
+                for item in socket.getaddrinfo(
+                    host,
+                    443,
+                    type=socket.SOCK_STREAM,
+                )
+            }
+        except OSError as exc:
+            raise ValueError("training_url_dns_resolution_failed") from exc
+        if not addresses:
+            raise ValueError("training_url_dns_resolution_failed")
+        for address in addresses:
+            try:
+                resolved_ip = ipaddress.ip_address(address)
+            except ValueError as exc:
+                raise ValueError("training_url_resolved_ip_invalid") from exc
+            if not resolved_ip.is_global:
+                raise ValueError("training_url_public_ip_required")
+        return url
 
     @staticmethod
     def _dataset_signature(path: Path) -> str:
@@ -1339,19 +1471,82 @@ class AgentTrainingService:
         self._register_run_download(output_path)
         return output_path
 
-    def _convert_csv_to_jsonl(self, target_name: str, raw_path: Path) -> Path:
+    def _convert_csv_to_jsonl(
+        self,
+        target_name: str,
+        raw_path: Path,
+        *,
+        max_dataset_bytes: Optional[int] = None,
+    ) -> Path:
         output_path = raw_path.with_name(f"{raw_path.stem}.{target_name}.jsonl")
         converted = 0
-        with open(raw_path, "r", encoding="utf-8", newline="") as source:
-            reader = csv.DictReader(source)
-            with open(output_path, "w", encoding="utf-8") as sink:
-                for row in reader:
-                    normalized = self._coerce_to_target_row(target_name, row)
-                    if normalized is None:
-                        continue
-                    sink.write(json.dumps(normalized, ensure_ascii=False))
-                    sink.write("\n")
-                    converted += 1
+        output_bytes = 0
+        service_max_bytes = max(
+            1,
+            self._safe_int(
+                self.config.get("max_dataset_bytes"),
+                30 * 1024 * 1024,
+            ),
+        )
+        requested_max_bytes = (
+            service_max_bytes
+            if max_dataset_bytes is None
+            else max(1, self._safe_int(max_dataset_bytes, service_max_bytes))
+        )
+        max_bytes = min(service_max_bytes, requested_max_bytes)
+
+        try:
+            with open_regular_binary_file(
+                raw_path,
+                error_message="CSV dataset must be a regular file",
+            ) as source:
+                opened_stat = os.fstat(source.fileno())
+                if opened_stat.st_size > max_bytes:
+                    raise RuntimeError("CSV dataset exceeds max_dataset_bytes")
+                input_bytes = 0
+
+                def bounded_lines():
+                    nonlocal input_bytes
+                    while True:
+                        raw_line = source.readline(MAX_CSV_PHYSICAL_LINE_BYTES + 1)
+                        if not raw_line:
+                            return
+                        input_bytes += len(raw_line)
+                        if input_bytes > max_bytes:
+                            raise RuntimeError(
+                                "CSV dataset exceeds max_dataset_bytes"
+                            )
+                        if len(raw_line) > MAX_CSV_PHYSICAL_LINE_BYTES:
+                            raise RuntimeError("CSV row exceeds line byte limit")
+                        try:
+                            yield raw_line.decode("utf-8")
+                        except UnicodeDecodeError as exc:
+                            raise ValueError("CSV dataset is not valid UTF-8") from exc
+
+                reader = csv.DictReader(bounded_lines())
+                with open(output_path, "w", encoding="utf-8", newline="") as sink:
+                    rows_seen = 0
+                    for row in reader:
+                        if rows_seen >= MAX_CSV_CONVERTED_ROWS:
+                            raise RuntimeError("CSV dataset sample limit exceeded")
+                        rows_seen += 1
+                        normalized = self._coerce_to_target_row(target_name, row)
+                        if normalized is None:
+                            continue
+                        encoded = (
+                            json.dumps(normalized, ensure_ascii=False) + "\n"
+                        )
+                        encoded_bytes = len(encoded.encode("utf-8"))
+                        if output_bytes + encoded_bytes > max_bytes:
+                            raise RuntimeError(
+                                "converted JSONL exceeds max_dataset_bytes"
+                            )
+                        sink.write(encoded)
+                        output_bytes += encoded_bytes
+                        converted += 1
+        except Exception:
+            output_path.unlink(missing_ok=True)
+            raise
         if converted == 0:
             output_path.unlink(missing_ok=True)
             raise ValueError(f"No usable rows after CSV conversion: {raw_path}")
@@ -1397,7 +1592,26 @@ class AgentTrainingService:
         if not (member.isfile() or member.isdir()):
             raise ValueError(f"Unsafe archive entry type: {member.name}")
 
-    def _extract_first_supported_in_archive(self, target_name: str, archive: Path) -> Optional[Path]:
+    @staticmethod
+    def _copy_archive_member_with_limit(source, sink, max_bytes: int) -> int:
+        """Copy decompressed archive data without exceeding the local budget."""
+        copied = 0
+        while True:
+            chunk = source.read(1024 * 256)
+            if not chunk:
+                return copied
+            copied += len(chunk)
+            if copied > max_bytes:
+                raise RuntimeError("archive member exceeds max_dataset_bytes")
+            sink.write(chunk)
+
+    def _extract_first_supported_in_archive(
+        self,
+        target_name: str,
+        archive: Path,
+        *,
+        max_dataset_bytes: Optional[int] = None,
+    ) -> Optional[Path]:
         target_dir = archive.parent / f".tmp_{archive.stem}"
         target_dir.mkdir(parents=True, exist_ok=True)
         self._register_run_download(target_dir)
@@ -1407,6 +1621,14 @@ class AgentTrainingService:
         is_targz = archive_name_lower.endswith(".tar.gz")
         is_tgz = archive.suffix.lower() == ".tgz"
         is_tar = archive.suffix.lower() == ".tar" or is_targz or is_tgz
+        service_max_bytes = self._safe_int(
+            self.config.get("max_dataset_bytes"),
+            30 * 1024 * 1024,
+        )
+        max_bytes = min(
+            service_max_bytes,
+            max_dataset_bytes or service_max_bytes,
+        )
 
         if is_zip:
             with zipfile.ZipFile(archive) as zf:
@@ -1423,9 +1645,11 @@ class AgentTrainingService:
                     raise ValueError(f"No supported files in archive: {archive}")
                 if chosen.is_dir():
                     raise ValueError(f"Archive entry is a directory: {chosen.filename}")
+                if chosen.file_size > max_bytes:
+                    raise RuntimeError("archive member exceeds max_dataset_bytes")
                 raw = target_dir / self._safe_archive_member_basename(chosen.filename)
                 with zf.open(chosen) as source, open(raw, "wb") as sink:
-                    sink.write(source.read())
+                    self._copy_archive_member_with_limit(source, sink, max_bytes)
         elif is_tar:
             mode = "r:gz" if (is_targz or is_tgz) else "r"
             with tarfile.open(archive, mode=mode) as tf:
@@ -1441,36 +1665,60 @@ class AgentTrainingService:
                         break
                 if chosen is None:
                     raise ValueError(f"No supported files in archive: {archive}")
+                if chosen.size > max_bytes:
+                    raise RuntimeError("archive member exceeds max_dataset_bytes")
                 raw = target_dir / self._safe_archive_member_basename(chosen.name)
                 extracted = tf.extractfile(chosen)
                 if extracted is None:
                     raise ValueError(f"Unable to extract archive entry: {chosen.name}")
                 with extracted, open(raw, "wb") as sink:
-                    shutil.copyfileobj(extracted, sink)
+                    self._copy_archive_member_with_limit(extracted, sink, max_bytes)
         else:
             # Single-file gzip payload (for example .jsonl.gz / .npz.gz).
             raw = target_dir / archive.with_suffix("").name
             with gzip.open(archive, "rb") as source, open(raw, "wb") as sink:
-                shutil.copyfileobj(source, sink)
+                self._copy_archive_member_with_limit(source, sink, max_bytes)
 
-        return self._prepare_dataset_path(target_name, raw)
+        return self._prepare_dataset_path(
+            target_name,
+            raw,
+            max_dataset_bytes=max_bytes,
+        )
 
-    def _prepare_dataset_path(self, target_name: str, raw_path: Path) -> Path:
+    def _prepare_dataset_path(
+        self,
+        target_name: str,
+        raw_path: Path,
+        *,
+        max_dataset_bytes: Optional[int] = None,
+    ) -> Path:
         extension = raw_path.suffix.lower()
         if extension in {".jsonl", ".npz"}:
             self._register_run_download(raw_path)
             return raw_path
         if extension == ".json":
-            return self._convert_to_jsonl(target_name, raw_path)
+            raise ValueError("whole-document JSON datasets are quarantined; use bounded JSONL")
         if extension == ".csv":
-            return self._convert_csv_to_jsonl(target_name, raw_path)
+            return self._convert_csv_to_jsonl(
+                target_name,
+                raw_path,
+                max_dataset_bytes=max_dataset_bytes,
+            )
         if extension in {".zip", ".tgz", ".tar", ".gz"}:
-            normalized = self._extract_first_supported_in_archive(target_name, raw_path)
+            normalized = self._extract_first_supported_in_archive(
+                target_name,
+                raw_path,
+                max_dataset_bytes=max_dataset_bytes,
+            )
             self._register_run_download(raw_path)
             return normalized
         raise ValueError(f"Unsupported dataset file format: {raw_path}")
 
     def _select_candidate_dataset_urls(self, target_name: str, cfg: Dict[str, Any]) -> List[str]:
+        # Network dataset discovery/download is intentionally disabled. Only
+        # code-owned local dataset_file/data_path values may train models.
+        return []
+
         urls: List[str] = []
         discovery = self.config.get("discovery", {})
         for item in self._safe_list(cfg.get("dataset_urls"), []):
@@ -1640,13 +1888,25 @@ class AgentTrainingService:
         if not max_bytes:
             return True
         try:
-            head = requests.head(url, timeout=self.config["request_timeout_sec"], allow_redirects=True)
+            self._validate_training_url(
+                url,
+                self._normalized_allowed_domains(
+                    self.config.get("dataset_allowed_domains")
+                ),
+            )
+            head = requests.head(
+                url,
+                timeout=self.config["request_timeout_sec"],
+                allow_redirects=False,
+            )
+            if 300 <= head.status_code < 400:
+                return False
             content_length = head.headers.get("Content-Length") or head.headers.get("content-length")
             if content_length:
                 return int(content_length) <= max_bytes
             return True
         except Exception:
-            return True
+            return False
 
     async def _resolve_dataset(
         self,
@@ -1668,18 +1928,34 @@ class AgentTrainingService:
             "reason": None,
             "max_dataset_bytes": None,
         }
-        max_bytes = self._safe_int(
+        service_max_bytes = max(
+            1,
+            self._safe_int(
+                self.config.get("max_dataset_bytes"),
+                30 * 1024 * 1024,
+            ),
+        )
+        requested_max_bytes = self._safe_int(
             cfg.get("max_dataset_bytes"),
             self._safe_int(
                 self.config.get("discovery", {}).get("max_dataset_bytes"),
-                self._safe_int(self.config.get("max_dataset_bytes"), 30 * 1024 * 1024),
+                service_max_bytes,
             ),
         )
+        max_bytes = min(service_max_bytes, max(1, requested_max_bytes))
         resolve_info["max_dataset_bytes"] = max_bytes
 
         if dataset_file:
             resolved = self._abs_path(str(dataset_file))
             if resolved.exists():
+                if not resolved.is_file() or resolved.stat().st_size > max_bytes:
+                    raise RuntimeError("configured dataset_file exceeds max_dataset_bytes")
+                if resolved.suffix.lower() == ".csv":
+                    resolved = self._convert_csv_to_jsonl(
+                        target_name,
+                        resolved,
+                        max_dataset_bytes=max_bytes,
+                    )
                 dataset_id = manifest_id or self._dataset_signature(resolved)
                 resolve_info["status"] = "resolved_local_dataset_file"
                 resolve_info["selected"] = {
@@ -1703,6 +1979,14 @@ class AgentTrainingService:
                 resolve_info["status"] = "error"
                 resolve_info["reason"] = error
                 raise FileNotFoundError(error)
+            if not resolved.is_file() or resolved.stat().st_size > max_bytes:
+                raise RuntimeError("configured data_path exceeds max_dataset_bytes")
+            if resolved.suffix.lower() == ".csv":
+                resolved = self._convert_csv_to_jsonl(
+                    target_name,
+                    resolved,
+                    max_dataset_bytes=max_bytes,
+                )
             dataset_id = manifest_id or self._dataset_signature(resolved)
             resolve_info["status"] = "resolved_local_path"
             resolve_info["selected"] = {
@@ -1821,6 +2105,8 @@ class AgentTrainingService:
         )
 
     async def _download_dataset(self, target_name: str, url: str) -> Tuple[Path, str]:
+        raise RuntimeError("remote_training_dataset_download_quarantined")
+
         timeout = self.config["request_timeout_sec"]
         attempts = max(0, int(self.config.get("max_retries", 0)))
         final_path = self._dataset_cache_path(target_name, url)
@@ -1841,7 +2127,20 @@ class AgentTrainingService:
             try:
                 if not self._is_within_size_limit(url, max_bytes):
                     raise RuntimeError(f"dataset too large: {url}")
-                resp = requests.get(url, timeout=timeout, stream=True)
+                self._validate_training_url(
+                    url,
+                    self._normalized_allowed_domains(
+                        self.config.get("dataset_allowed_domains")
+                    ),
+                )
+                resp = requests.get(
+                    url,
+                    timeout=timeout,
+                    stream=True,
+                    allow_redirects=False,
+                )
+                if 300 <= resp.status_code < 400:
+                    raise RuntimeError("training_dataset_redirect_forbidden")
                 resp.raise_for_status()
                 h = hashlib.sha256()
                 downloaded = 0

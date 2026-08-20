@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import tempfile
 from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
@@ -44,11 +45,19 @@ def normalize_mixer_user_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
         })
         return normalized
 
-    ip = normalized.get("dliveIp") or normalized.get("mixerIp") or normalized.get("ip") or "192.168.3.70"
-    port = normalized.get("dlivePort") or normalized.get("mixerPort") or normalized.get("port") or 51328
     tls = normalized.get("dliveTls")
     if tls is None:
         tls = normalized.get("tls", False)
+    endpoint = normalized.get("dliveEndpoint") or normalized.get("endpoint") or "surface"
+    default_ip = "192.168.3.70" if endpoint == "mixrack" else "192.168.3.71"
+    ip = normalized.get("dliveIp") or normalized.get("mixerIp") or normalized.get("ip") or default_ip
+    default_port = {
+        ("mixrack", False): 51325,
+        ("mixrack", True): 51327,
+        ("surface", False): 51328,
+        ("surface", True): 51329,
+    }.get((endpoint, bool(tls)), 51328)
+    port = normalized.get("dlivePort") or normalized.get("mixerPort") or normalized.get("port") or default_port
     tls_ca_file = normalized.get("dliveTlsCaFile") or normalized.get("tls_ca_file") or ""
     tls_server_hostname = (
         normalized.get("dliveTlsServerHostname")
@@ -57,7 +66,10 @@ def normalize_mixer_user_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
     )
     midi_base_channel = normalized.get("dliveMidiChannel")
     if midi_base_channel is None:
-        midi_base_channel = normalized.get("midi_base_channel", 0)
+        midi_base_channel = normalized.get("midi_base_channel", 11)
+    user_profile = normalized.get("dliveUserProfile")
+    if user_profile is None:
+        user_profile = normalized.get("user_profile", 0)
 
     normalized.update({
         "mixerType": "dlive",
@@ -74,8 +86,12 @@ def normalize_mixer_user_settings(settings: Dict[str, Any]) -> Dict[str, Any]:
         "tls_ca_file": tls_ca_file,
         "dliveTlsServerHostname": tls_server_hostname,
         "tls_server_hostname": tls_server_hostname,
+        "dliveEndpoint": endpoint,
+        "endpoint": endpoint,
         "dliveMidiChannel": midi_base_channel,
         "midi_base_channel": midi_base_channel,
+        "dliveUserProfile": user_profile,
+        "user_profile": user_profile,
     })
     return normalized
 
@@ -111,8 +127,29 @@ def save_user_config(path: str, section: str, settings: Dict[str, Any]) -> Dict[
     existing[section] = normalize_mixer_user_settings(settings) if section == "mixer" else settings
 
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2, ensure_ascii=False)
+    fd, temporary_path = tempfile.mkstemp(
+        prefix=f".{os.path.basename(path)}.",
+        suffix=".tmp",
+        dir=os.path.dirname(path),
+    )
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(existing, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(temporary_path, path)
+        os.chmod(path, 0o600)
+    except Exception:
+        try:
+            os.close(fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(temporary_path)
+        except OSError:
+            pass
+        raise
 
     logger.info("User config saved to %s: section=%s", path, section)
     return existing

@@ -6,9 +6,31 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import re
 import threading
 import uuid
 from typing import Any, Iterable, Mapping
+
+
+REDACTED = "[REDACTED]"
+_SENSITIVE_KEY_PARTS = (
+    "api_key",
+    "apikey",
+    "authorization",
+    "bot_token",
+    "cookie",
+    "credential",
+    "passwd",
+    "password",
+    "private_key",
+    "secret",
+    "token",
+)
+_BEARER_RE = re.compile(r"(?i)(bearer\s+)[^\s,;]+")
+_URL_CREDENTIAL_RE = re.compile(r"(?i)(https?://)[^/@\s:]+:[^/@\s]+@")
+_KNOWN_TOKEN_RE = re.compile(
+    r"(?i)(?:sk-[a-z0-9_-]{12,}|pplx-[a-z0-9_-]{12,}|\b\d{6,12}:[a-z0-9_-]{20,})"
+)
 
 
 def _utc_now() -> datetime:
@@ -20,15 +42,33 @@ def _isoformat(value: datetime | None = None) -> str:
     return moment.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+def _redact_text(value: str) -> str:
+    if "-----BEGIN " in value and "PRIVATE KEY-----" in value:
+        return REDACTED
+    value = _BEARER_RE.sub(r"\1" + REDACTED, value)
+    value = _URL_CREDENTIAL_RE.sub(r"\1" + REDACTED + "@", value)
+    return _KNOWN_TOKEN_RE.sub(REDACTED, value)
+
+
+def _is_sensitive_key(key: Any) -> bool:
+    normalized = re.sub(r"[^a-z0-9]+", "_", str(key).strip().lower()).strip("_")
+    return any(part in normalized for part in _SENSITIVE_KEY_PARTS)
+
+
 def _json_safe(value: Any) -> Any:
     if is_dataclass(value):
         return _json_safe(asdict(value))
     if isinstance(value, Mapping):
-        return {str(key): _json_safe(item) for key, item in value.items()}
+        return {
+            str(key): REDACTED if _is_sensitive_key(key) else _json_safe(item)
+            for key, item in value.items()
+        }
     if isinstance(value, (list, tuple, set)):
         return [_json_safe(item) for item in value]
     if isinstance(value, Path):
         return str(value)
+    if isinstance(value, str):
+        return _redact_text(value)
     return value
 
 
@@ -56,10 +96,10 @@ class OperationalMemoryStore:
     ) -> dict[str, Any]:
         event = {
             "event_id": uuid.uuid4().hex,
-            "event_type": str(event_type),
+            "event_type": _redact_text(str(event_type)),
             "recorded_at": _isoformat(),
-            "source": str(source or "unknown"),
-            "summary": str(summary or "").strip(),
+            "source": _redact_text(str(source or "unknown")),
+            "summary": _redact_text(str(summary or "").strip()),
             "payload": _json_safe(dict(payload or {})),
         }
         with self._lock:

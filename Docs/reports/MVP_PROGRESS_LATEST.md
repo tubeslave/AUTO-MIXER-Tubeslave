@@ -30,7 +30,7 @@ Supervised WING Rack proof.
 - Local engineering readiness: `95/100` against `95/100`; achieved: `true` (excludes public signing/notarization and standing live autonomy)
 - Public release ready from score gate: `false` (no standing supervised transaction authority)
 - Score gate: do not report public-release `95/100` or public-release readiness while the current-source and public release requirements remain open.
-- Current aggregate read-only decision status: `operator_review_required`
+- Current aggregate read-only decision status: `security_local_unsealed_global_m001_unchanged`
 - Historical exact-source decision marker: `accepted_decision_ready`; it is not the current aggregate ledger status.
 - Closed historical marker: `rollback_not_applied` is retained as audit history and closed by the passed CH3 fader rerun.
 - Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital silence. On clean CP05-bound source 45e2a2ae66853dc79a8db693f8ccfe15cbc67cc8, accepted route artifact /Users/dmitrijvolkov/.automixer/runtime/m110_master_route_proofs/4937d06623084a2d98e7bc3f9b8f8a17.json verified the exact WING serial and firmware, serial-bound USB/CoreAudio 48x48/48 kHz identity, two complete Main 47/48 MAIN L/R route passes, fresh signal at conservative -12.318 dBTP, and 0 console mutation writes. The runner remained blocked only by proof_owned_master_route_teardown_failed:wing_disconnect_failed:RuntimeError because the expected post-disconnect readiness_invalidated broadcast was treated as fatal; the backend log shows capture stop, route revocation, WING/OSC disconnect and clean backend shutdown. M120 adds a teardown-only exact-envelope receiver; independent rereview is ACCEPT and 142 runner tests passed. The pre-fix attempt cannot close HW01: a fresh clean committed M120/CP05-bound route-only repetition with verified teardown is required. HW02-HW05 remain pending; reset, corrections and live writes remain 0. M111 still requires exact same-console attestation, a clean committed compatibility replay and an explicit migration-bound M006 decision. Strict real-live readiness stays 88/100: normal allowlist 0, standing authority false, safe_core_ready/show_mix_ready unproven.
@@ -51,7 +51,7 @@ Supervised WING Rack proof.
   - real current-tree arm64 packaged-app launch smoke replay from a clean checkout, operator-accessible remote-client token provisioning and invalid or expired-token recovery without persistence or disclosure, Developer ID signing, notarization, stapling and Gatekeeper acceptance
   - operator-present room and PA listening with audible rollback, stereo master 47/48 route and true-peak verification, and emergency-stop validation
   - clean-checkout full suite plus reproduction of the final five-store no-WING, hashed-dependency and arm64 package evidence after writer-lease release, preserving all five canonical hashes and excluding documented synthetic and legacy-unbound audit rows from physical evidence
-- Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`
+- Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 

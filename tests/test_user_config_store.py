@@ -2,6 +2,7 @@
 
 import json
 import os
+import stat
 import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
@@ -36,15 +37,39 @@ def test_normalize_dlive_settings_from_backend_keys():
     normalized = normalize_mixer_user_settings({
         "type": "dlive",
         "ip": "192.168.3.70",
-        "port": 51328,
+        "port": 51329,
         "tls": True,
+        "endpoint": "surface",
         "midi_base_channel": 3,
+        "user_profile": 7,
     })
     assert normalized["mixerType"] == "dlive"
     assert normalized["dliveIp"] == "192.168.3.70"
-    assert normalized["dlivePort"] == 51328
+    assert normalized["dlivePort"] == 51329
     assert normalized["dliveTls"] is True
     assert normalized["dliveMidiChannel"] == 3
+    assert normalized["dliveUserProfile"] == 7
+    assert normalized["user_profile"] == 7
+    assert normalized["dliveEndpoint"] == "surface"
+
+
+def test_normalize_dlive_mixrack_endpoint_alias():
+    normalized = normalize_mixer_user_settings({
+        "mixerType": "dlive",
+        "dliveIp": "192.168.3.70",
+        "dliveEndpoint": "mixrack",
+        "dlivePort": 51325,
+    })
+    assert normalized["endpoint"] == "mixrack"
+    assert normalized["port"] == 51325
+
+
+def test_normalize_dlive_surface_defaults_match_attended_network_identity():
+    normalized = normalize_mixer_user_settings({"mixerType": "dlive"})
+    assert normalized["dliveIp"] == "192.168.3.71"
+    assert normalized["dlivePort"] == 51328
+    assert normalized["dliveMidiChannel"] == 11
+    assert normalized["dliveUserProfile"] == 0
 
 
 def test_normalize_user_config_only_touches_mixer_section():
@@ -73,3 +98,4 @@ def test_save_and_load_user_config_roundtrip(tmp_path):
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
     assert raw["mixer"]["type"] == "wing"
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600

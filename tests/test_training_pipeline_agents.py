@@ -11,6 +11,10 @@ from src.agent_ops.trainer_agent import TrainerAgent
 
 
 def test_trainer_agent_runs_yaml_experiments_and_selects_lowest_loss(tmp_path: Path):
+    scripts_dir = tmp_path / "scripts"
+    scripts_dir.mkdir()
+    (scripts_dir / "high_loss.py").write_text("print('loss=0.8000 accuracy=0.10')\n")
+    (scripts_dir / "low_loss.py").write_text("print('loss=0.2000 accuracy=0.90')\n")
     config_dir = tmp_path / "configs" / "training"
     config_dir.mkdir(parents=True)
     config_path = config_dir / "experiments.yaml"
@@ -22,16 +26,14 @@ def test_trainer_agent_runs_yaml_experiments_and_selects_lowest_loss(tmp_path: P
                         "name": "high_loss",
                         "command": [
                             sys.executable,
-                            "-c",
-                            "print('loss=0.8000 accuracy=0.10')",
+                            "scripts/high_loss.py",
                         ],
                     },
                     {
                         "name": "low_loss",
                         "command": [
                             sys.executable,
-                            "-c",
-                            "print('loss=0.2000 accuracy=0.90')",
+                            "scripts/low_loss.py",
                         ],
                     },
                 ],
@@ -67,7 +69,7 @@ def test_evaluator_agent_writes_evaluation_for_best_run(tmp_path: Path):
         "metrics": {"loss": 0.2},
     }
 
-    result = EvaluatorAgent().run({"best_run": best_run})
+    result = EvaluatorAgent(project_root=tmp_path, runs_dir=".").run({"best_run": best_run})
 
     assert result["status"] == "ok"
     assert result["evaluated_run"] == "test_run"

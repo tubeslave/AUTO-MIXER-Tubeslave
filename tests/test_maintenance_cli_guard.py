@@ -57,3 +57,14 @@ def test_validate_allows_dry_run_without_rollback():
     assert ok is True
     assert reason is None
 
+
+def test_validate_quarantines_legacy_live_mutation_even_with_nominal_rollback_path():
+    ok, reason = validate_maintenance_cli_request(
+        operation="load_snapshot",
+        confirm_maintenance=True,
+        rollback_snapshot_path="/tmp/nominal-only.snap",
+        dry_run=False,
+    )
+
+    assert ok is False
+    assert reason == "legacy_mutation_surface_quarantined"

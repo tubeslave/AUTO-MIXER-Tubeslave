@@ -381,6 +381,43 @@ def test_bleed_control_corrective_eq_uses_only_eq_cuts():
     assert [band["frequency_hz"] for band in report["actions"][0]["bands"]] == [6500.0, 9500.0]
 
 
+@pytest.mark.parametrize(
+    "output_name",
+    ["../escaped", "nested/escaped", r"nested\escaped", "/tmp/escaped"],
+)
+def test_pipeline_rejects_output_name_paths_before_loading_audio(tmp_path, output_name):
+    output_dir = tmp_path / "outputs"
+
+    with pytest.raises(ValueError, match="path or traversal"):
+        run_ayaic_offline_pipeline(
+            input_dir=tmp_path / "missing-inputs",
+            output_dir=output_dir,
+            output_name=output_name,
+            write_mp3=False,
+        )
+
+    assert not (tmp_path / "escaped.wav").exists()
+    assert not (tmp_path / "escaped_report.json").exists()
+
+
+@pytest.mark.parametrize("suffix", [".wav", ".mp3", "_report.json"])
+def test_pipeline_rejects_existing_output_symlinks(tmp_path, suffix):
+    output_dir = tmp_path / "outputs"
+    output_dir.mkdir()
+    outside = tmp_path / f"outside{suffix}"
+    (output_dir / f"safe{suffix}").symlink_to(outside)
+
+    with pytest.raises(ValueError, match="existing symlink"):
+        run_ayaic_offline_pipeline(
+            input_dir=tmp_path / "missing-inputs",
+            output_dir=output_dir,
+            output_name="safe",
+            write_mp3=True,
+        )
+
+    assert not outside.exists()
+
+
 def test_pipeline_skips_group_levels_by_default(tmp_path):
     import soundfile as sf
 

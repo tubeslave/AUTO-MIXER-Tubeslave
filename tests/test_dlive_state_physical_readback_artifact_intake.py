@@ -4,6 +4,10 @@ from pathlib import Path
 
 from backend.dlive_state_physical_readback_artifact_intake import (
     DEFAULT_DLIVE_STATE_PHYSICAL_READBACK_ARTIFACT_ROOTS,
+    DLIVE_STATE_MAX_ARTIFACT_BYTES,
+    DLIVE_STATE_MAX_ARTIFACT_COUNT,
+    DLIVE_STATE_MAX_JSON_DEPTH,
+    DLIVE_STATE_MAX_JSON_NODES,
     DLIVE_STATE_PHYSICAL_READBACK_ARTIFACT_INTAKE_METHOD_ID,
     build_dlive_state_physical_readback_artifact_intake,
 )
@@ -263,6 +267,126 @@ def test_dlive_state_artifact_intake_discovers_json_files(tmp_path):
         "artifact_load_error:JSONDecodeError" in row["violations"]
         for row in intake["artifacts"]
     )
+
+
+def test_dlive_state_artifact_intake_bounds_inline_artifact_count():
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_payloads=(
+            {"index": index} for index in range(DLIVE_STATE_MAX_ARTIFACT_COUNT + 1)
+        ),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == DLIVE_STATE_MAX_ARTIFACT_COUNT
+    assert any(
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+        in row["violations"]
+        for row in intake["artifacts"]
+    )
+
+
+def test_dlive_state_artifact_intake_rejects_oversized_file_before_json_decode(tmp_path):
+    artifact_path = tmp_path / "oversized.json"
+    artifact_path.write_bytes(b'{"padding":"' + b"x" * DLIVE_STATE_MAX_ARTIFACT_BYTES)
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
+
+
+def test_dlive_state_artifact_intake_rejects_deep_inline_json_without_recursion():
+    artifact = {}
+    cursor = artifact
+    for _ in range(DLIVE_STATE_MAX_JSON_DEPTH + 1):
+        nested = {}
+        cursor["nested"] = nested
+        cursor = nested
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
+
+
+def test_dlive_state_artifact_intake_rejects_deep_file_before_json_decoder(tmp_path):
+    artifact_path = tmp_path / "deep.json"
+    depth = DLIVE_STATE_MAX_JSON_DEPTH + 1
+    artifact_path.write_bytes((b'{"nested":' * depth) + b"null" + (b"}" * depth))
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_paths=(artifact_path,),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
+
+
+def test_dlive_state_artifact_intake_rejects_wide_inline_json_node_bomb():
+    artifact = {"items": [None] * DLIVE_STATE_MAX_JSON_NODES}
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
+
+
+def test_dlive_state_artifact_intake_bounds_root_generator_without_hanging():
+    def endless_roots():
+        index = 0
+        while True:
+            yield f"missing-root-{index}"
+            index += 1
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_roots=endless_roots()
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["source_id"] == "artifact_roots"
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
+
+
+def test_dlive_state_artifact_intake_rejects_cyclic_inline_mapping():
+    artifact = {}
+    artifact["self"] = artifact
+
+    intake = build_dlive_state_physical_readback_artifact_intake(
+        artifact_payloads=(artifact,),
+        artifact_roots=(),
+    )
+
+    assert intake["status"] == "invalid_operator_artifact_present"
+    assert intake["summary"]["artifact_count"] == 1
+    assert intake["artifacts"][0]["violations"] == [
+        "artifact_load_error:DLiveStateArtifactResourceLimitError"
+    ]
 
 
 def test_dlive_state_artifact_intake_uses_repo_default_roots():

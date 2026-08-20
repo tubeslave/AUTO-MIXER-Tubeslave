@@ -114,6 +114,7 @@ private:
     double actual_sample_rate_ = 0;
     int actual_channels_ = 0;
     int block_size_ = 256;
+    uint32_t allocated_frame_capacity_ = 0;
     
     // Deinterleaved channel pointers for callback
     std::vector<std::vector<float>> channel_buffers_;

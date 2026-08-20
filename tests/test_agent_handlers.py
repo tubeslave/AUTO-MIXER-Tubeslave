@@ -205,3 +205,29 @@ async def test_emergency_stop_agent_propagates_incomplete_system_teardown():
     assert payload["teardown_errors"] == [
         {"step": "engine", "error": "RuntimeError"}
     ]
+
+
+@pytest.mark.asyncio
+async def test_tokenless_emergency_stop_agent_returns_minimal_acknowledgement():
+    server = DummyServer()
+    server._ws_auth_required = False
+    server._manual_write_emergency_stopped = True
+
+    async def detailed_stop(_reason):
+        return {
+            "status": "stop_incomplete",
+            "success": False,
+            "teardown_complete": False,
+            "teardown_errors": [{"step": "secret-path", "error": "OSError"}],
+            "generation": 7,
+        }
+
+    server.activate_system_emergency_stop = detailed_stop
+    handlers = register_handlers(server)
+
+    await handlers["emergency_stop_agent"]("ws", {})
+
+    assert server.sent_messages[-1][1] == {
+        "type": "agent_emergency_stopped",
+        "status": "accepted",
+    }

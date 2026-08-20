@@ -77,6 +77,16 @@ def test_telemetry_disabled_does_not_create_session_files(tmp_path):
     assert not (tmp_path / "sessions").exists()
 
 
+@pytest.mark.parametrize("session_id", ["../escape", "nested/session", "nested\\session", "..", ""])
+def test_telemetry_rejects_path_like_session_ids_before_writing(tmp_path, session_id):
+    manager = _manager(tmp_path)
+
+    with pytest.raises(ValueError, match="safe path component"):
+        manager.start_session(session_id=session_id)
+
+    assert not (tmp_path / "escape").exists()
+
+
 def test_append_jsonl_events_and_manifest_counters(tmp_path):
     manager = _manager(tmp_path)
     session = manager.start_session(mode="rehearsal", venue_name="Room")

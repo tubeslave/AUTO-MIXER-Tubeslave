@@ -16,7 +16,6 @@ fi
 echo "Using virtualenv: $VIRTUAL_ENV"
 python -m pip install -r "$REQ_FILE" || {
   echo "WARNING: some optional requirements failed to install. The pipeline will use fallbacks where needed."
-  echo "         pymixconsole source: git+https://github.com/csteinmetz1/pymixconsole"
 }
 
 python - <<'PY'
@@ -40,7 +39,8 @@ for module, label in checks:
     else:
         print(f"WARNING: {label} not installed")
 print("")
-print("pymixconsole: installed from upstream GitHub when available; fallback_virtual_mixer remains active if installation fails.")
+print("pymixconsole: never downloaded by this installer; an independently audited local installation may be used when present.")
+print("fallback_virtual_mixer remains active when pymixconsole is absent.")
 print("dasp-pytorch: optional trainable DSP is disabled unless installed manually and compatible with your Python/PyTorch stack.")
 PY
 

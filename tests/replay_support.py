@@ -54,10 +54,11 @@ class RecordedTransportEvent:
 class RecordingSender:
     """Replay sender that records intended OSC sends without touching the network."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, send_result: bool = True) -> None:
         self.events: list[RecordedTransportEvent] = []
+        self.send_result = bool(send_result)
 
-    def send(self, address: str, *values: Any) -> None:
+    def send(self, address: str, *values: Any) -> bool:
         self.events.append(
             RecordedTransportEvent(
                 address=str(address),
@@ -66,6 +67,7 @@ class RecordingSender:
                 transport_kind="mutation" if values else "query",
             )
         )
+        return self.send_result
 
     def incident_records(self) -> list[dict[str, Any]]:
         return [

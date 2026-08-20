@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
 from ai_mixing_pipeline.decision_layer.replay_checkpoint_manifest import (
+    ReplayCheckpointManifest,
     build_replay_checkpoint_manifest,
 )
 from ai_mixing_pipeline.decision_layer.replay_executor import (
@@ -12,6 +15,7 @@ from ai_mixing_pipeline.decision_layer.replay_policy_validator import (
     validate_replay_policy_consistency,
 )
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
+    ReplayDecisionProposal,
     build_fader_proposals,
     build_gain_proposals,
     build_replay_graph_checkpoint,
@@ -128,6 +132,110 @@ def test_replay_policy_validator_accepts_replay_safe_manifest_and_executor():
     assert report.findings == []
 
 
+def test_replay_policy_validator_rejects_unbounded_feedback_proposal_without_executor():
+    base_manifest, _, _ = _build_manifest()
+    proposal = ReplayDecisionProposal(
+        proposal_id="feedback::notch::3::unbounded",
+        family="feedback_mitigation",
+        source_system="untrusted_restore",
+        action_type="notch",
+        target={"channel": 3, "frequency_hz": 2000.0},
+        current_state={"magnitude_db": 0.0},
+        requested_state={"gain_db": -1000.0, "q": 100.0},
+        confidence=0.8,
+        safety={"max_q": 8.0, "max_cut_db": 9.0},
+        auto_apply_blocked=True,
+    )
+    ranking = rank_replay_proposals([proposal])
+    graph_checkpoint = build_replay_graph_checkpoint(
+        [proposal],
+        ranking,
+        metadata={"event_seq": 34, "stage": "policy_validator"},
+    ).to_dict()
+    manifest = build_replay_checkpoint_manifest(
+        trim_snapshot=base_manifest.trim_snapshot,
+        graph_checkpoint=graph_checkpoint,
+        metadata=base_manifest.metadata,
+    )
+
+    report = validate_replay_policy_consistency(manifest)
+
+    assert report.valid is False
+    finding = next(item for item in report.findings if item.code == "invalid_feedback_mitigation_bounds")
+    assert finding.proposal_id == proposal.proposal_id
+    assert "exceeds declared max_q" in finding.details["validation_error"]
+
+
+def test_replay_policy_validator_rejects_gain_proposal_with_missing_step_bound():
+    base_manifest, _, _ = _build_manifest()
+    proposal = ReplayDecisionProposal(
+        proposal_id="gain::missing-bound::1",
+        family="gain_adjustment",
+        source_system="untrusted_restore",
+        action_type="set_gain_db",
+        target={"channel": 1, "kind": "gain"},
+        current_state={"gain_db": 0.0},
+        requested_state={"gain_db": 10.0},
+        confidence=0.8,
+        safety={},
+        auto_apply_blocked=False,
+    )
+    ranking = rank_replay_proposals([proposal])
+    graph_checkpoint = build_replay_graph_checkpoint(
+        [proposal],
+        ranking,
+        metadata={"event_seq": 34, "stage": "policy_validator"},
+    ).to_dict()
+    manifest = build_replay_checkpoint_manifest(
+        trim_snapshot=base_manifest.trim_snapshot,
+        graph_checkpoint=graph_checkpoint,
+        metadata=base_manifest.metadata,
+    )
+
+    report = validate_replay_policy_consistency(manifest)
+
+    assert report.valid is False
+    finding = next(item for item in report.findings if item.code == "invalid_gain_adjustment_bounds")
+    assert finding.proposal_id == proposal.proposal_id
+    assert "max_step_db must be an exact numeric value" in finding.details["validation_error"]
+
+
+def test_replay_policy_validator_rejects_fader_proposal_with_missing_step_bound():
+    base_manifest, _, _ = _build_manifest()
+    proposal = ReplayDecisionProposal(
+        proposal_id="fader::missing-bound::2",
+        family="fader_adjustment",
+        source_system="untrusted_restore",
+        action_type="set_fader_db",
+        target={"channel": 2, "kind": "fader"},
+        current_state={"fader_db": -3.0},
+        requested_state={"fader_db": -2.0},
+        confidence=0.8,
+        safety={},
+        auto_apply_blocked=False,
+    )
+    ranking = rank_replay_proposals([proposal])
+    graph_checkpoint = build_replay_graph_checkpoint(
+        [proposal],
+        ranking,
+        metadata={"event_seq": 34, "stage": "policy_validator"},
+    ).to_dict()
+    manifest = build_replay_checkpoint_manifest(
+        trim_snapshot=base_manifest.trim_snapshot,
+        graph_checkpoint=graph_checkpoint,
+        metadata=base_manifest.metadata,
+    )
+
+    report = validate_replay_policy_consistency(manifest)
+
+    assert report.valid is False
+    finding = next(
+        item for item in report.findings if item.code == "invalid_fader_adjustment_bounds"
+    )
+    assert finding.proposal_id == proposal.proposal_id
+    assert "max_step_db must be an exact numeric value" in finding.details["validation_error"]
+
+
 def test_replay_policy_validator_detects_policy_signature_and_executor_mismatches():
     manifest, proposals, ranking = _build_manifest()
     graph_checkpoint = dict(manifest.graph_checkpoint)
@@ -189,3 +297,19 @@ def test_replay_policy_validator_detects_selection_drift_against_baseline():
     assert report.valid is True
     assert "drift_selected_proposal_changed" in codes
     assert report.drift_summary["selected_proposal_changed"] is True
+
+
+def test_replay_manifest_rejects_truthy_strings_missing_markers_and_tampering():
+    manifest, _, _ = _build_manifest()
+    payload = manifest.to_dict()
+    payload["dry_run_only"] = "false"
+    with pytest.raises(ValueError, match="JSON boolean"):
+        ReplayCheckpointManifest.from_dict(payload)
+
+    tampered = manifest.to_dict()
+    tampered["graph_checkpoint"]["timeline_artifact"].pop("dry_run_only")
+    report = validate_replay_policy_consistency(tampered)
+    codes = {finding.code for finding in report.findings}
+    assert report.valid is False
+    assert "timeline_dry_run_marker_missing_or_invalid" in codes
+    assert "manifest_integrity_mismatch" in codes

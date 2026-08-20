@@ -17,11 +17,79 @@ class TestAudioCapture:
         assert capture is not None
         assert capture.num_channels == 8
         assert capture.sample_rate == 48000
+        assert capture.spectral_cache_enabled is False
+        capture._running = True
+        assert capture.get_spectral_metrics(1)["reason"] == "spectral_cache_disabled"
+        capture._running = False
 
     def test_test_mode(self):
         """Test that test signal generation works."""
         capture = AudioCapture(num_channels=2, sample_rate=48000)
         assert capture.source_type is not None
+
+    def test_read_only_spectral_cache_measures_centroid_outside_snapshot_path(self):
+        capture = AudioCapture(
+            num_channels=2,
+            sample_rate=48000,
+            buffer_seconds=0.25,
+            block_size=1024,
+            spectral_cache_enabled=True,
+        )
+        frequency_hz = 42 * capture.sample_rate / 2048
+        time_axis = np.arange(2048, dtype=np.float32) / capture.sample_rate
+        sine = 0.25 * np.sin(2.0 * np.pi * frequency_hz * time_axis)
+        with capture._data_lock:
+            capture._buffers[1].write(sine)
+            capture._buffers[2].write(np.zeros_like(sine))
+            capture._captured_sample_count = len(sine)
+        capture._running = True
+
+        capture._refresh_spectral_cache()
+
+        measured = capture.get_spectral_metrics(1)
+        silence = capture.get_spectral_metrics(2)
+        assert measured["available"] is True
+        assert measured["freshness_status"] == "fresh"
+        assert measured["source"] == "audio_capture_spectral_cache"
+        assert abs(measured["centroid_hz"] - frequency_hz) < 5.0
+        assert 0.0 <= measured["brightness"] <= 1.0
+        assert silence["available"] is False
+        assert silence["reason"] == "signal_below_threshold"
+
+        with capture._spectral_cache_lock:
+            capture._spectral_cache[1]["updated_monotonic"] -= 3.0
+        stale = capture.get_spectral_metrics(1)
+        assert stale["available"] is False
+        assert stale["freshness_status"] == "stale"
+        assert stale["reason"] == "spectral_cache_stale"
+
+        capture._running = False
+        assert capture.get_spectral_metrics(1)["reason"] == "audio_capture_not_running"
+
+    def test_opt_in_spectral_worker_stops_with_capture(self):
+        capture = AudioCapture(
+            num_channels=1,
+            sample_rate=48000,
+            buffer_seconds=0.25,
+            block_size=1024,
+            source_type=AudioSourceType.TEST_SINE,
+            spectral_cache_enabled=True,
+        )
+        capture.start()
+        try:
+            deadline = time.monotonic() + 1.5
+            metrics = capture.get_spectral_metrics(1)
+            while not metrics.get("available") and time.monotonic() < deadline:
+                time.sleep(0.02)
+                metrics = capture.get_spectral_metrics(1)
+            assert metrics["available"] is True
+            assert capture._spectral_thread is not None
+            assert capture._spectral_thread.is_alive() is True
+        finally:
+            capture.stop()
+
+        assert capture.running is False
+        assert capture._spectral_thread is None
 
     @pytest.mark.parametrize(
         "source_type",

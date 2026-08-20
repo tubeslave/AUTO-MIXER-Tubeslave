@@ -15,6 +15,20 @@ from typing import Any, Dict, List, Optional
 logger = logging.getLogger(__name__)
 
 
+def _safe_session_component(value: Any, *, field: str) -> str:
+    component = str(value)
+    if (
+        not component
+        or len(component) > 128
+        or component in {".", ".."}
+        or "/" in component
+        or "\\" in component
+        or "\x00" in component
+    ):
+        raise ValueError(f"{field} must be one safe path component")
+    return component
+
+
 def _get_nested(data: Dict[str, Any], path: str, default: Any = None) -> Any:
     """Read a nested value using dot notation."""
     current: Any = data
@@ -193,6 +207,7 @@ class SessionManager:
 
     def create_session(self, name: str = "default", **config_kwargs) -> Session:
         """Create a new mixing session."""
+        name = _safe_session_component(name, field="session name")
         config = SessionConfig(name=name, **config_kwargs)
         session_id = f"{name}_{int(time.time())}"
         session = Session(id=session_id, config=config)
@@ -279,7 +294,10 @@ class SessionManager:
             return False
         if self._current_session and self._current_session.id == session_id:
             self._current_session = None
-        path = self._sessions_dir / f"{session_id}.json"
+        try:
+            path = self._session_path(session_id)
+        except ValueError:
+            return False
         if path.exists():
             try:
                 path.unlink()
@@ -303,8 +321,8 @@ class SessionManager:
 
     def _save_session(self, session: Session):
         """Save session to disk."""
-        filepath = self._sessions_dir / f"{session.id}.json"
         try:
+            filepath = self._session_path(session.id)
             config = session.config.to_dict() if isinstance(session.config, SessionConfig) else dict(session.config or {})
             data = {
                 "id": session.id,
@@ -335,6 +353,7 @@ class SessionManager:
                     events=data.get("events", []),
                     metadata=data.get("metadata", {}),
                 )
+                _safe_session_component(session.id, field="session id")
                 self._sessions[session.id] = session
             except Exception as e:
                 logger.warning(f"Failed to load session {filepath}: {e}")
@@ -356,8 +375,20 @@ class SessionManager:
         except OSError:
             return None
         session = Session.from_dict(data)
+        try:
+            _safe_session_component(session.session_id, field="session id")
+        except ValueError:
+            return None
         self._sessions[session.session_id] = session
         return session
+
+    def _session_path(self, session_id: str) -> Path:
+        component = _safe_session_component(session_id, field="session id")
+        root = self._sessions_dir.resolve()
+        path = (root / f"{component}.json").resolve()
+        if path.parent != root:
+            raise ValueError("session path escapes configured directory")
+        return path
 
     def get_config(self, key: str, default: Any = None) -> Any:
         """Read dot-notated config from the active session."""

@@ -11,6 +11,11 @@ import numpy as np
 import soundfile as sf
 
 AUDIO_SUFFIXES = {".wav", ".wave", ".flac", ".aif", ".aiff", ".ogg"}
+MAX_AUDIO_FILES = 128
+MAX_AUDIO_CHANNELS = 64
+MAX_AUDIO_SAMPLE_RATE = 192_000
+MAX_AUDIO_DURATION_SEC = 30 * 60
+MAX_AUDIO_SAMPLE_CELLS = 200_000_000
 
 
 def safe_slug(value: str) -> str:
@@ -27,11 +32,34 @@ def audio_files(path: str | Path) -> list[Path]:
     root = Path(path).expanduser()
     if not root.exists():
         return []
-    return sorted(
+    files = sorted(
         item
         for item in root.iterdir()
         if item.is_file() and item.suffix.lower() in AUDIO_SUFFIXES
     )
+    if len(files) > MAX_AUDIO_FILES:
+        raise ValueError(f"audio file count exceeds limit: {len(files)}>{MAX_AUDIO_FILES}")
+    return files
+
+
+def _validate_audio_shape(frames: int, channels: int, sample_rate: int) -> None:
+    if frames <= 0 or channels <= 0 or sample_rate <= 0:
+        raise ValueError("audio metadata must be positive")
+    if channels > MAX_AUDIO_CHANNELS:
+        raise ValueError(f"audio channel count exceeds limit: {channels}")
+    if sample_rate > MAX_AUDIO_SAMPLE_RATE:
+        raise ValueError(f"audio sample rate exceeds limit: {sample_rate}")
+    if frames / float(sample_rate) > MAX_AUDIO_DURATION_SEC:
+        raise ValueError("audio duration exceeds limit")
+    if frames * channels > MAX_AUDIO_SAMPLE_CELLS:
+        raise ValueError("audio decoded sample count exceeds limit")
+
+
+def _finite_audio(audio: np.ndarray) -> np.ndarray:
+    data = np.asarray(audio, dtype=np.float32)
+    if not np.all(np.isfinite(data)):
+        raise ValueError("audio contains non-finite samples")
+    return data
 
 
 def amp_to_db(value: float) -> float:
@@ -93,14 +121,22 @@ def _resample_linear(audio: np.ndarray, source_rate: int, target_rate: int) -> n
 def resample_audio(audio: np.ndarray, source_rate: int, target_rate: int) -> np.ndarray:
     """Resample audio with scipy when available, otherwise linear interpolation."""
 
-    if source_rate == target_rate or source_rate <= 0 or target_rate <= 0:
-        return np.asarray(audio, dtype=np.float32)
+    if not (0 < int(source_rate) <= MAX_AUDIO_SAMPLE_RATE):
+        raise ValueError("source sample rate is outside supported bounds")
+    if not (0 < int(target_rate) <= MAX_AUDIO_SAMPLE_RATE):
+        raise ValueError("target sample rate is outside supported bounds")
+    data = _finite_audio(audio)
+    data_2d = ensure_2d(data)
+    target_frames = max(1, int(round(len(data_2d) * int(target_rate) / int(source_rate))))
+    _validate_audio_shape(target_frames, data_2d.shape[1], int(target_rate))
+    if source_rate == target_rate:
+        return data
     try:
         from scipy.signal import resample_poly
 
         ratio = Fraction(int(target_rate), int(source_rate)).limit_denominator(1000)
         return resample_poly(
-            ensure_2d(audio),
+            data_2d,
             ratio.numerator,
             ratio.denominator,
             axis=0,
@@ -112,14 +148,20 @@ def resample_audio(audio: np.ndarray, source_rate: int, target_rate: int) -> np.
 def read_audio(path: str | Path, target_sample_rate: int | None = None) -> tuple[np.ndarray, int]:
     """Read audio as float32, optionally resampling to target sample rate."""
 
-    audio, sample_rate = sf.read(str(Path(path).expanduser()), always_2d=True, dtype="float32")
+    source = Path(path).expanduser()
+    info = sf.info(str(source))
+    _validate_audio_shape(int(info.frames), int(info.channels), int(info.samplerate))
+    if target_sample_rate is not None and not (0 < int(target_sample_rate) <= MAX_AUDIO_SAMPLE_RATE):
+        raise ValueError("target sample rate is outside supported bounds")
+    audio, sample_rate = sf.read(str(source), always_2d=True, dtype="float32")
     if audio.size == 0:
         raise ValueError(f"{path} contains no audio")
+    audio = _finite_audio(audio)
     sample_rate = int(sample_rate)
     if target_sample_rate and sample_rate != int(target_sample_rate):
         audio = resample_audio(audio, sample_rate, int(target_sample_rate))
         sample_rate = int(target_sample_rate)
-    return np.asarray(audio, dtype=np.float32), sample_rate
+    return _finite_audio(audio), sample_rate
 
 
 def write_audio(path: str | Path, audio: np.ndarray, sample_rate: int) -> Path:
@@ -146,7 +188,11 @@ def limit_peak(audio: np.ndarray, ceiling_dbfs: float = -1.0) -> tuple[np.ndarra
 def measure_audio(audio: np.ndarray, sample_rate: int) -> dict[str, Any]:
     """Return level/spectral/dynamics/stereo metrics using existing project code."""
 
-    data = np.asarray(audio, dtype=np.float32)
+    data = _finite_audio(audio)
+    if data.ndim not in (1, 2):
+        raise ValueError("audio must be one- or two-dimensional")
+    channels = 1 if data.ndim == 1 else data.shape[1]
+    _validate_audio_shape(len(data), channels, int(sample_rate))
     try:
         from mix_agent.analysis.dynamics import compute_dynamics_metrics
         from mix_agent.analysis.loudness import compute_level_metrics

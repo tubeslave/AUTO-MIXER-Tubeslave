@@ -214,6 +214,47 @@ def gain_dry_run_summary():
     }
 
 
+def rejected_fake_proof_summary():
+    payload = gain_dry_run_summary()
+    payload.update(
+        {
+            "reason": "fake_physical_proof_rejected_and_emergency_gate_verified",
+            "physical_proof_claimed": False,
+            "fake_physical_proof_rejection_status": "verified",
+            "pre_read_status": "readback_unavailable",
+            "pre_read_source": "fake_mixer",
+            "readback_source": "fake_mixer",
+            "readback_status": None,
+            "proof_status": "blocked",
+            "rollback_available": False,
+            "rollback_readback_status": "not_attempted",
+            "rollback_readback_source": "not_attempted",
+            "rollback_proof_status": "not_attempted",
+            "blocked_followup_status": "verified",
+            "emergency_stop_proof_status": "verified",
+            "operator_approval_recorded": True,
+            "idempotency_key_present": True,
+            "apply_result": {
+                "apply_result": {
+                    "status": "blocked",
+                    "reason": "pre_read_unavailable",
+                    "pre_read_status": "readback_unavailable",
+                    "pre_read_source": "physical_readback",
+                    "pre_read_error": "physical_query_provenance_unverified",
+                    "proof_status": "blocked",
+                    "no_console_send_proven": True,
+                    "write_attempts": 0,
+                }
+            },
+            "rollback_result": {
+                "status": "not_attempted",
+                "reason": "fake_apply_rejected_before_write",
+            },
+        }
+    )
+    return payload
+
+
 def test_dict_parser_maps_gain_dry_run_runner_summary():
     artifact = supervised_proof_artifact_from_dict(gain_dry_run_summary())
 
@@ -234,6 +275,20 @@ def test_dict_parser_maps_gain_dry_run_runner_summary():
     assert result.status == "dry_run_ready"
     assert result.promotion_allowed is False
     assert "physical_proof_required_for_promotion" in result.blockers
+
+
+def test_rejected_fake_proof_is_dry_run_ready_without_physical_claim():
+    result = evaluate_supervised_proof_artifact_dict(
+        rejected_fake_proof_summary(),
+        require_physical=True,
+    )
+
+    assert result.status == "dry_run_ready"
+    assert result.promotion_allowed is False
+    assert result.blockers == ("physical_proof_required_for_promotion",)
+    assert result.evidence["fake_physical_proof_rejection_status"] == "verified"
+    assert result.evidence["physical_proof_claimed"] is False
+    assert result.evidence["rollback_readback_status"] == "not_attempted"
 
 
 def test_dict_parser_honors_explicit_physical_runner_schema():

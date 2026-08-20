@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from ai_mixing_pipeline.models import CandidateAction, MixCandidate
 from ai_mixing_pipeline.sandbox_renderer import SandboxRenderer
@@ -89,6 +90,68 @@ def test_sandbox_renderer_pre_trims_candidates_before_safety(tmp_path):
     assert rendered.output_gain_db < 0.0
     assert rendered.metrics["level"]["true_peak_dbtp"] <= -1.0
     assert safety.passed is True
+
+
+@pytest.mark.parametrize(
+    ("candidate_id", "render_filename"),
+    [
+        ("000_initial_mix", "../escaped-initial.wav"),
+        ("candidate_escape", "../escaped-explicit.wav"),
+        ("../escaped-fallback", ""),
+        ("candidate_absolute", "/tmp/escaped-absolute.wav"),
+    ],
+)
+def test_sandbox_renderer_rejects_candidate_paths_outside_render_root(
+    tmp_path,
+    candidate_id,
+    render_filename,
+):
+    renderer = SandboxRenderer()
+    candidate = MixCandidate(
+        candidate_id=candidate_id,
+        label="escape",
+        render_filename=render_filename,
+    )
+
+    with pytest.raises(ValueError, match="Candidate render filename"):
+        renderer.render_candidate(
+            candidate,
+            {"stem": _sine(440.0)},
+            {"stem": "unknown"},
+            48000,
+            tmp_path / "renders",
+            loudness_match=False,
+        )
+
+    assert not (tmp_path / "escaped-initial.wav").exists()
+    assert not (tmp_path / "escaped-explicit.wav").exists()
+    assert not (tmp_path / "escaped-fallback.wav").exists()
+
+
+def test_sandbox_renderer_rejects_symlinked_candidate_outside_render_root(tmp_path):
+    output_dir = tmp_path / "renders"
+    output_dir.mkdir()
+    outside = tmp_path / "outside.wav"
+    outside.write_bytes(b"preserve-me")
+    (output_dir / "candidate.wav").symlink_to(outside)
+    renderer = SandboxRenderer()
+    candidate = MixCandidate(
+        candidate_id="candidate_symlink",
+        label="escape",
+        render_filename="candidate.wav",
+    )
+
+    with pytest.raises(ValueError, match="escapes the render directory"):
+        renderer.render_candidate(
+            candidate,
+            {"stem": _sine(440.0)},
+            {"stem": "unknown"},
+            48000,
+            output_dir,
+            loudness_match=False,
+        )
+
+    assert outside.read_bytes() == b"preserve-me"
 
 
 def test_decision_layer_sandbox_renderer_creates_manifest(tmp_path):

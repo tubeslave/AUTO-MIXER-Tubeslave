@@ -24,13 +24,13 @@ from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_PATH = REPO_ROOT / "backend"
+DRY_RUN_RESULT_STORE_MIN_FREE_BYTES = 64 * 1024 * 1024
+DRY_RUN_RESULT_STORE_MAX_BYTES = 8 * 1024 * 1024
+DRY_RUN_RESULT_STORE_MAX_ARTIFACT_BYTES = 1 * 1024 * 1024
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 if str(BACKEND_PATH) not in sys.path:
     sys.path.insert(0, str(BACKEND_PATH))
-
-VERIFIED_READBACK_STATUSES = {"verified_from_cache", "verified_from_physical_readback"}
-
 
 def utc_stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -180,15 +180,6 @@ def proposal_review_binding(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def verified(result: Dict[str, Any]) -> bool:
-    return (
-        result.get("status") == "applied"
-        and result.get("readback_status") in VERIFIED_READBACK_STATUSES
-        and result.get("proof_status", "verified") == "verified"
-        and bool(result.get("rollback_available"))
-    )
-
-
 def validate_args(args: argparse.Namespace) -> Optional[str]:
     if args.channel < 1 or args.channel > 48:
         return "--channel must be in 1..48"
@@ -320,6 +311,16 @@ async def run(args: argparse.Namespace) -> int:
         summary["console_runtime_isolated"] = True
         summary["operator_proposal_result_runtime_isolated"] = True
         summary["evidence_stores_isolated"] = True
+        result_store = server.operator_proposal_queue._result_store
+        result_store.min_free_bytes = DRY_RUN_RESULT_STORE_MIN_FREE_BYTES
+        result_store.max_total_bytes = DRY_RUN_RESULT_STORE_MAX_BYTES
+        result_store.max_artifact_bytes = DRY_RUN_RESULT_STORE_MAX_ARTIFACT_BYTES
+        summary["operator_proposal_result_store_limits"] = {
+            "max_artifact_bytes": result_store.max_artifact_bytes,
+            "max_total_bytes": result_store.max_total_bytes,
+            "min_free_bytes": result_store.min_free_bytes,
+            "scope": "isolated_fake_dry_run_only",
+        }
         fake_mixer = FakeProofMixer(args.channel, args.initial_gain_db)
         server.connection_mode = "wing"
         server.mixer_client = fake_mixer
@@ -364,67 +365,38 @@ async def run(args: argparse.Namespace) -> int:
                 "idempotency_key_present": True,
             }
         )
-        if not verified(apply_result):
-            summary.update({"status": "failed", "reason": "apply_not_verified"})
+        fake_apply_rejected = bool(
+            apply_result.get("status") == "blocked"
+            and apply_result.get("reason") == "pre_read_unavailable"
+            and apply_result.get("pre_read_error")
+            == "physical_query_provenance_unverified"
+            and apply_result.get("no_console_send_proven") is True
+            and apply_result.get("write_attempts") == 0
+            and not fake_mixer.write_calls
+        )
+        if not fake_apply_rejected:
+            summary.update(
+                {
+                    "status": "failed",
+                    "reason": "fake_physical_proof_not_rejected",
+                }
+            )
             recorder.write_summary(summary)
             print(json.dumps(summary, indent=2, sort_keys=True))
             return 3
-
-        cooldown_id = f"gain-proof-dry-run:cooldown:{run_id}"
-        cooldown_proposal = build_gain_proposal(cooldown_id, args.channel, target_value, target_value + args.delta_db, args.reason)
-        cooldown_result = await dispatch(server, recorder, "create_operator_proposal", {"proposal": cooldown_proposal})
-        cooldown_apply = await dispatch(
-            server,
-            recorder,
-            "apply_operator_proposal",
-            {
-                "proposal_id": cooldown_id,
-                **proposal_review_binding(cooldown_result),
-                "approved": True,
-                "approval_id": f"gain-proof-dry-run:cooldown-approved:{run_id}",
-                "idempotency_key": f"gain-proof-dry-run:cooldown-approved:{run_id}",
-                "reason": f"cooldown:{args.reason}",
-            },
-        )
-        summary["cooldown_proposal_result"] = cooldown_result
-        summary["cooldown_apply_result"] = cooldown_apply
-        if extract_apply_result(cooldown_apply).get("reason") != "cooldown":
-            summary.update({"status": "failed", "reason": "cooldown_not_blocked"})
-            recorder.write_summary(summary)
-            print(json.dumps(summary, indent=2, sort_keys=True))
-            return 4
-
-        rollback_payload = await dispatch(
-            server,
-            recorder,
-            "rollback_last_manual_write",
-            {
-                "approved": True,
-                "approval_id": f"gain-proof-dry-run:rollback:{run_id}",
-                "reason": f"rollback:{args.reason}",
-                "transaction_id": extract_apply_result(apply_result).get("transaction_id"),
-            },
-        )
-        rollback_status = rollback_payload.get("rollback_readback_status") or rollback_payload.get("readback_status")
-        rollback_proof_status = rollback_payload.get("rollback_proof_status") or rollback_payload.get("proof_status")
-        summary["rollback_result"] = rollback_payload
         summary.update(
             {
-                "rollback_readback_status": rollback_status,
-                "rollback_readback_source": "fake_mixer",
-                "rollback_proof_status": rollback_proof_status,
+                "fake_physical_proof_rejection_status": "verified",
+                "physical_proof_claimed": False,
+                "rollback_result": {
+                    "status": "not_attempted",
+                    "reason": "fake_apply_rejected_before_write",
+                },
+                "rollback_readback_status": "not_attempted",
+                "rollback_readback_source": "not_attempted",
+                "rollback_proof_status": "not_attempted",
             }
         )
-        if (
-            rollback_payload.get("type") != "manual_write_rollback_applied"
-            or rollback_payload.get("rollback_status") != "applied"
-            or rollback_status not in VERIFIED_READBACK_STATUSES
-            or rollback_proof_status != "verified"
-        ):
-            summary.update({"status": "failed", "reason": "rollback_not_verified"})
-            recorder.write_summary(summary)
-            print(json.dumps(summary, indent=2, sort_keys=True))
-            return 5
 
         emergency = await dispatch(server, recorder, "emergency_stop", {})
         emergency_id = f"gain-proof-dry-run:emergency:{run_id}"
@@ -449,7 +421,8 @@ async def run(args: argparse.Namespace) -> int:
         emergency_apply_result = extract_apply_result(emergency_apply)
         emergency_reason = emergency_apply_result.get("reason")
         emergency_latched = bool(
-            (emergency.get("manual_write_supervision") or {}).get(
+            server._manual_write_emergency_stopped
+            or (emergency.get("manual_write_supervision") or {}).get(
                 "emergency_stopped"
             )
         )
@@ -465,7 +438,9 @@ async def run(args: argparse.Namespace) -> int:
         summary["emergency_stop_proof_status"] = (
             "verified" if emergency_block_proven else ""
         )
-        summary["blocked_followup_status"] = "verified" if extract_apply_result(cooldown_apply).get("reason") == "cooldown" else ""
+        summary["blocked_followup_status"] = (
+            "verified" if fake_apply_rejected else ""
+        )
         if not emergency_block_proven:
             summary.update({"status": "failed", "reason": "emergency_stop_not_blocked"})
             recorder.write_summary(summary)
@@ -474,7 +449,7 @@ async def run(args: argparse.Namespace) -> int:
 
         summary.update({
             "status": "passed",
-            "reason": "fake_gain_proof_readback_rollback_cooldown_emergency_complete",
+            "reason": "fake_physical_proof_rejected_and_emergency_gate_verified",
             "fake_mixer_write_calls": fake_mixer.write_calls,
         })
         recorder.write_summary(summary)

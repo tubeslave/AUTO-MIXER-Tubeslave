@@ -28,6 +28,7 @@ def make_config(tmp_path: Path, *, company_id: str | None = "company-1") -> brid
         paperclip_api_url="http://127.0.0.1:3100",
         project_root=tmp_path,
         paperclip_company_id=company_id,
+        bridge_token="test-bridge-token-0123456789abcdef",
     )
 
 
@@ -197,6 +198,26 @@ def test_health_endpoint_returns_payload_without_socket(tmp_path: Path) -> None:
     assert payload["read_only"] is True
 
 
+def test_context_endpoint_rejects_missing_token_or_untrusted_host(tmp_path: Path) -> None:
+    config = make_config(tmp_path)
+    handler_class = bridge.make_handler(config, client_factory=lambda _config: FakePaperclipClient(make_routes()))
+    handler = object.__new__(handler_class)
+    handler.path = "/v1/context/automixer"
+    handler.command = "GET"
+    handler.request_version = "HTTP/1.1"
+    handler.requestline = "GET /v1/context/automixer HTTP/1.1"
+    handler.client_address = ("127.0.0.1", 0)
+    handler.server = object()
+    handler.rfile = BytesIO()
+    handler.wfile = BytesIO()
+    handler.headers = {"Host": "evil.example", "Authorization": f"Bearer {config.bridge_token}"}
+
+    handler.do_GET()
+
+    status = int(handler.wfile.getvalue().split(maxsplit=2)[1])
+    assert status == 401
+
+
 def test_build_config_from_env_reads_environment(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("PAPERCLIP_API_URL", "http://127.0.0.1:3200/")
     monkeypatch.setenv("AUTOMIXER_PROJECT_ROOT", str(tmp_path))
@@ -225,6 +246,10 @@ def dispatch_handler(
     handler.requestline = f"{method} {path} HTTP/1.1"
     handler.client_address = ("127.0.0.1", 0)
     handler.server = object()
+    handler.headers = {
+        "Host": "127.0.0.1:8788",
+        "Authorization": f"Bearer {config.bridge_token}",
+    }
     handler.rfile = BytesIO()
     handler.wfile = BytesIO()
 

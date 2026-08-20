@@ -80,7 +80,7 @@ def test_adapter_blocks_read_only_compressor_model(tmp_path):
     assert "read-only" in result.error
 
 
-def test_adapter_non_dry_run_rest_refuses_unknown_write_endpoint(tmp_path):
+def test_adapter_non_dry_run_is_forced_to_authenticated_ipc_quarantine(tmp_path):
     adapter = MixingStationAdapter(make_config(tmp_path, dry_run=False, transport="rest"))
     correction = AutomixCorrection(
         console_profile="wing_rack",
@@ -95,6 +95,7 @@ def test_adapter_non_dry_run_rest_refuses_unknown_write_endpoint(tmp_path):
 
     result = adapter.send_correction(correction)
 
-    assert result.success is False
+    assert result.success is True
     assert result.sent is False
-    assert "write endpoint is not configured" in result.error
+    assert result.dry_run is True
+    assert "mixing_station_authenticated_ipc_required" in result.message

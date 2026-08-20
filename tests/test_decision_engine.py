@@ -1,7 +1,10 @@
+import pytest
+
 from ai_mixing_pipeline.decision_engine import DecisionEngine
 from ai_mixing_pipeline.decision_layer.action_schema import CandidateActionSet, GainAction, NoChangeAction
 from ai_mixing_pipeline.decision_layer.decision_engine import CorrectionDecisionEngine
 from ai_mixing_pipeline.models import MixCandidate, SafetyResult
+from ai_mixing_pipeline.decision_layer.score_normalizer import normalize_delta, normalize_score
 
 
 def _candidate(candidate_id):
@@ -140,3 +143,79 @@ def test_correction_decision_engine_downweights_proxy_scores():
     assert breakdown["weight_sources"]["muq_eval"] == "proxy"
     assert breakdown["effective_weights"]["muq_eval"] == 0.075
     assert breakdown["normalized_weights"]["muq_eval"] < 0.30 / (0.30 + 0.05)
+
+
+@pytest.mark.parametrize("malformed", [float("nan"), float("inf"), float("-inf")])
+def test_score_normalizer_neutralizes_non_finite_values(malformed):
+    assert normalize_score("muq_eval", malformed) == 0.0
+    assert normalize_score("safety", malformed) == 0.0
+    assert normalize_delta(0.0, malformed) == 0.0
+    assert normalize_delta(malformed, 1.0) == 0.0
+
+
+def test_correction_decision_engine_cannot_select_non_finite_critic_score():
+    candidates = [
+        CandidateActionSet("candidate_000_no_change", [NoChangeAction()]),
+        CandidateActionSet("candidate_001_malformed", [GainAction("vocal", 0.5)]),
+    ]
+    critics = {
+        "candidate_000_no_change": {"muq_eval": {"delta": {"overall": 0.0}}},
+        "candidate_001_malformed": {
+            "muq_eval": {"delta": {"overall": float("nan")}}
+        },
+    }
+    safety = {
+        "candidate_000_no_change": {"passed": True, "safety_score": 1.0},
+        "candidate_001_malformed": {"passed": True, "safety_score": 1.0},
+    }
+
+    decision = CorrectionDecisionEngine().choose_best(
+        "run",
+        candidates,
+        critics,
+        safety,
+    )
+
+    assert decision["selected_candidate_id"] == "candidate_000_no_change"
+    assert decision["decision"] == "no_change"
+
+
+def test_correction_decision_engine_rejects_non_finite_safety_evidence():
+    candidates = [
+        CandidateActionSet("candidate_000_no_change", [NoChangeAction()]),
+        CandidateActionSet("candidate_001_malformed", [GainAction("vocal", 0.5)]),
+    ]
+    critics = {
+        "candidate_000_no_change": {"muq_eval": {"delta": {"overall": 0.0}}},
+        "candidate_001_malformed": {"muq_eval": {"delta": {"overall": 1.0}}},
+    }
+    safety = {
+        "candidate_000_no_change": {"passed": True, "safety_score": 1.0},
+        "candidate_001_malformed": {
+            "passed": True,
+            "safety_score": float("nan"),
+        },
+    }
+
+    decision = CorrectionDecisionEngine().choose_best(
+        "run",
+        candidates,
+        critics,
+        safety,
+    )
+
+    assert decision["selected_candidate_id"] == "candidate_000_no_change"
+    assert decision["safety_passed"] is True
+
+
+@pytest.mark.parametrize(
+    "config",
+    [
+        {"safety": {"min_score_improvement": float("nan")}},
+        {"proxy_weight_multiplier": float("inf")},
+        {"critics": {"muq_eval": {"enabled": True, "weight": float("nan")}}},
+    ],
+)
+def test_correction_decision_engine_rejects_non_finite_config(config):
+    with pytest.raises(ValueError, match="finite"):
+        CorrectionDecisionEngine(config)

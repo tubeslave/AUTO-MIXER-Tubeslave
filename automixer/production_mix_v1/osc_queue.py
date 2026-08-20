@@ -48,7 +48,43 @@ class OSCCommandQueue:
         if self.dry_run or sender is None:
             return QueueFlushResult(dry_run=self.dry_run, would_send=[cmd.to_dict() for cmd in self._commands], warnings=["dry_run_enabled_no_osc_sent"] if self._commands else [])
         sent = []
-        for cmd in self._commands:
-            sender.send(cmd.address, *cmd.args)
+        blocked = []
+        failed = []
+        warnings = []
+        for index, cmd in enumerate(self._commands):
+            if cmd.dry_run_only:
+                blocked.append({**cmd.to_dict(), "block_reason": "command_dry_run_only"})
+                continue
+            try:
+                send_result = sender.send(cmd.address, *cmd.args)
+            except Exception as exc:
+                failed.append(
+                    {
+                        **cmd.to_dict(),
+                        "failure_reason": "transport_send_raised",
+                        "transport_error_type": type(exc).__name__,
+                    }
+                )
+                warnings.append("osc_transport_failed_no_success_recorded")
+                blocked.extend(
+                    {**pending.to_dict(), "block_reason": "prior_transport_failure"}
+                    for pending in self._commands[index + 1 :]
+                )
+                break
+            if send_result is not True:
+                failed.append(
+                    {
+                        **cmd.to_dict(),
+                        "failure_reason": "transport_result_not_true",
+                    }
+                )
+                warnings.append("osc_transport_failed_no_success_recorded")
+                blocked.extend(
+                    {**pending.to_dict(), "block_reason": "prior_transport_failure"}
+                    for pending in self._commands[index + 1 :]
+                )
+                break
             sent.append(cmd.to_dict())
-        return QueueFlushResult(dry_run=False, sent=sent)
+        if any(item.get("block_reason") == "command_dry_run_only" for item in blocked):
+            warnings.append("command_dry_run_only_no_osc_sent")
+        return QueueFlushResult(dry_run=False, sent=sent, blocked=blocked, failed=failed, warnings=warnings)

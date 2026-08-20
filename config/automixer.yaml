@@ -10,6 +10,23 @@ mixer:
   keepalive_interval: 5.0
   command_rate_limit: 10.0
   connection_timeout: 10.0
+# Inactive dLive candidate profile. Selecting it never grants write authority;
+# endpoint/IP/firmware/show must be operator-attested and read back first.
+dlive:
+  endpoint: mixrack
+  ip: 192.168.3.70
+  port: 51327
+  tls: true
+  # Connection remains unavailable until the operator supplies an absolute CA
+  # path, the certificate identity, and the name of an environment variable
+  # containing the dLive TLS password. Never store the password in this file.
+  tls_ca_file: ""
+  tls_server_hostname: ""
+  tls_password_env: ""
+  midi_base_channel: 11
+  user_profile: 0
+  auto_reconnect: false
+  live_write: false
 audio:
   sample_rate: 48000
   block_size: 1024
@@ -405,6 +422,9 @@ training:
   safe_autostart: false
   interval_minutes: 360
   manifest_url: ''
+  manifest_allowed_domains: []
+  dataset_allowed_domains:
+  - huggingface.co
   request_timeout_sec: 30
   max_retries: 2
   max_dataset_bytes: 21474836480

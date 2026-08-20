@@ -30,6 +30,12 @@ class MixingStationOSCClient:
         return OSCMessagePreview(address=f"/con/{value_kind}/{data_path}", value=command.value)
 
     def send_command(self, command: MixingStationCommand) -> TransportResult:
+        return TransportResult(
+            success=False,
+            error="mixing_station_authenticated_ipc_required",
+        )
+
+        # Retained unreachable implementation documents the former API shape.
         message = self.build_message(command)
         try:
             from pythonosc.udp_client import SimpleUDPClient

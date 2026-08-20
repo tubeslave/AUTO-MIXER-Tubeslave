@@ -42,6 +42,9 @@ DELAY_TOKENS = ("time", "feed", "flc", "fhc", "mode")
 
 
 def connect() -> WingClient:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: FX rack writes are disabled"
+    )
     mixer = yaml.safe_load(open(REPO_ROOT / "config" / "automixer.yaml"))["mixer"]
     client = WingClient(ip=mixer["ip"], port=int(mixer.get("receive_port", 2223)))
     if not client.connect(timeout=5.0):
@@ -158,6 +161,9 @@ def rollback(client: WingClient, snap: dict) -> None:
 
 
 def main() -> None:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: FX rack writes are disabled"
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--confirm-live-wing-write", default="")
     parser.add_argument("--rollback", default="",

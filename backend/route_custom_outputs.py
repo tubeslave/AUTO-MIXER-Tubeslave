@@ -40,6 +40,15 @@ def route_custom_outputs(client: WingClient, output_group: str, output_source_pa
             (20, "MOD", 14),
         ])
     """
+    _ = (client, output_group)
+    return {
+        "status": "blocked",
+        "reason": "legacy_routing_surface_quarantined",
+        "attempted_writes": 0,
+        "live_authority_granted": False,
+        "requested_output_count": len(output_source_pairs),
+    }
+
     logger.info("=" * 70)
     logger.info("МАРШРУТИЗАЦИЯ НА ПРОИЗВОЛЬНЫЕ ВЫХОДЫ")
     logger.info("=" * 70)
@@ -68,6 +77,9 @@ def route_custom_outputs(client: WingClient, output_group: str, output_source_pa
 
 def main():
     """Основная функция"""
+    logger.error("Legacy custom-output routing surface is quarantined")
+    return 2
+
     if len(sys.argv) < 2:
         print("Использование:")
         print("  python3 route_custom_outputs.py <IP>")

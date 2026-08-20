@@ -257,6 +257,32 @@ def _append_physical_blockers(
         blockers.append("physical_rollback_readback_required")
 
 
+def _verified_fake_provenance_rejection(
+    artifact: SupervisedProofArtifactInput,
+) -> bool:
+    """Recognize a dry-run that proves fake WING proof is rejected pre-write."""
+
+    metadata = artifact.metadata or {}
+    return bool(
+        artifact.proof_mode == "dry_run"
+        and metadata.get("physical_wing") is False
+        and metadata.get("physical_proof_claimed") is False
+        and metadata.get("fake_physical_proof_rejection_status") == "verified"
+        and metadata.get("summary_status") == "passed"
+        and artifact.pre_read_status == "readback_unavailable"
+        and artifact.pre_read_source == "fake_mixer"
+        and artifact.proof_status == "blocked"
+        and artifact.rollback_available is False
+        and artifact.rollback_readback_status == "not_attempted"
+        and artifact.rollback_readback_source == "not_attempted"
+        and artifact.rollback_proof_status == "not_attempted"
+        and _proof_verified(artifact.emergency_stop_proof_status)
+        and _proof_verified(artifact.blocked_followup_status)
+        and artifact.operator_approval_recorded
+        and artifact.idempotency_key_present
+    )
+
+
 def evaluate_supervised_proof_artifact(
     artifact: SupervisedProofArtifactInput,
     *,
@@ -265,7 +291,9 @@ def evaluate_supervised_proof_artifact(
     """Evaluate one proof artifact without granting autonomous authority."""
 
     blockers: list[str] = []
-    _append_common_blockers(artifact, blockers)
+    fake_provenance_rejection = _verified_fake_provenance_rejection(artifact)
+    if not fake_provenance_rejection:
+        _append_common_blockers(artifact, blockers)
     common_blockers = tuple(blockers)
     _append_physical_blockers(artifact, blockers, require_physical=require_physical)
     blockers_tuple = tuple(sorted(set(blockers)))
@@ -292,6 +320,12 @@ def evaluate_supervised_proof_artifact(
         "blocked_followup_status": artifact.blocked_followup_status,
         "operator_approval_recorded": artifact.operator_approval_recorded,
         "idempotency_key_present": artifact.idempotency_key_present,
+        "fake_physical_proof_rejection_status": (
+            "verified" if fake_provenance_rejection else ""
+        ),
+        "physical_proof_claimed": bool(
+            (artifact.metadata or {}).get("physical_proof_claimed")
+        ),
         "delta_db": artifact.normalized_delta(),
         "require_physical": require_physical,
     }
@@ -465,6 +499,10 @@ def supervised_proof_artifact_from_dict(payload: Mapping[str, Any]) -> Supervise
             "proof_artifact_schema": payload.get("proof_artifact_schema"),
             "proof_runner": payload.get("proof_runner"),
             "physical_wing": payload.get("physical_wing"),
+            "physical_proof_claimed": payload.get("physical_proof_claimed"),
+            "fake_physical_proof_rejection_status": payload.get(
+                "fake_physical_proof_rejection_status"
+            ),
         },
     )
 

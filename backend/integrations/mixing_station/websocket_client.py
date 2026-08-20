@@ -47,6 +47,12 @@ class MixingStationWebSocketClient:
         return f"ws://{self.host}:{self.port}{self.path}"
 
     def send_command(self, command: MixingStationCommand) -> TransportResult:
+        return TransportResult(
+            success=False,
+            error="mixing_station_authenticated_ipc_required",
+        )
+
+        # Retained unreachable implementation documents the former API shape.
         if not self.command_path_template:
             return TransportResult(
                 success=False,
@@ -64,6 +70,12 @@ class MixingStationWebSocketClient:
         return asyncio.run(self.send_request(request))
 
     async def send_request(self, request: WebSocketRequest) -> TransportResult:
+        return TransportResult(
+            success=False,
+            error="mixing_station_authenticated_ipc_required",
+        )
+
+        # Retained unreachable implementation documents the former API shape.
         try:
             async with websockets.connect(
                 self.url,

@@ -364,6 +364,49 @@ class AyaicPipelineResult:
     summary: dict[str, Any]
 
 
+def _prepare_ayaic_output_paths(
+    output_dir: str | Path,
+    output_name: str,
+    *,
+    write_mp3: bool,
+) -> tuple[Path, Path, Path, Path | None]:
+    """Create a fixed output root and reject names or symlinks that escape it."""
+
+    if not isinstance(output_name, str) or not output_name:
+        raise ValueError("output_name must be a non-empty filename stem")
+    if (
+        "\x00" in output_name
+        or "/" in output_name
+        or "\\" in output_name
+        or Path(output_name).is_absolute()
+        or Path(output_name).name != output_name
+    ):
+        raise ValueError("output_name must not contain a path or traversal component")
+
+    root = Path(output_dir).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    filenames = [f"{output_name}.wav", f"{output_name}_report.json"]
+    if write_mp3:
+        filenames.append(f"{output_name}.mp3")
+
+    resolved: dict[str, Path] = {}
+    for filename in filenames:
+        candidate = root / filename
+        if candidate.is_symlink():
+            raise ValueError("output_name resolves through an existing symlink")
+        destination = candidate.resolve(strict=False)
+        if destination.parent != root:
+            raise ValueError("output_name resolves outside output_dir")
+        resolved[filename] = destination
+
+    return (
+        root,
+        resolved[f"{output_name}.wav"],
+        resolved[f"{output_name}_report.json"],
+        resolved.get(f"{output_name}.mp3"),
+    )
+
+
 def run_ayaic_offline_pipeline(
     *,
     input_dir: str | Path,
@@ -392,6 +435,11 @@ def run_ayaic_offline_pipeline(
     output_balance_style: str = DEFAULT_MUSICAL_BALANCE_STYLE,
     output_balance_report_only: bool = False,
 ) -> AyaicPipelineResult:
+    _output_root, wav_path, report_path, expected_mp3_path = _prepare_ayaic_output_paths(
+        output_dir,
+        output_name,
+        write_mp3=write_mp3,
+    )
     corrective_eq_method = _normalize_corrective_eq_method(corrective_eq_method)
     stems = _load_stems(input_dir)
     if drums_only:
@@ -544,12 +592,10 @@ def run_ayaic_offline_pipeline(
         else "global_bleed_phase_alignment"
     )
 
-    out = Path(output_dir).expanduser()
-    out.mkdir(parents=True, exist_ok=True)
-    wav_path = out / f"{output_name}.wav"
-    report_path = out / f"{output_name}_report.json"
     _write_wav(wav_path, final_mix, sample_rate)
     mp3_path = _write_mp3(wav_path) if write_mp3 else None
+    if mp3_path is not None and mp3_path.resolve(strict=False) != expected_mp3_path:
+        raise RuntimeError("generated MP3 path escaped the validated output destination")
 
     summary = {
         "run_id": f"ayaic_offline.{int(time.time() * 1000)}",

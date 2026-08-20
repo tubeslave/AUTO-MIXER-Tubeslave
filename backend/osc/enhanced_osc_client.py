@@ -138,8 +138,8 @@ class EnhancedOSCClient:
             self._start_reconnect_loop()
         return ok
 
-    def disconnect(self):
-        """Disconnect and stop reconnect loop."""
+    def disconnect(self) -> bool:
+        """Disconnect, stop reconnect loop, and report verified teardown."""
         with self._state_lock:
             self._manual_disconnect = True
             self._manual_disconnect_epoch += 1
@@ -147,7 +147,7 @@ class EnhancedOSCClient:
             if self._state != ConnectionState.DISCONNECTED:
                 self._transport_generation += 1
             self._state = ConnectionState.DISCONNECTED
-        self._wing.disconnect()
+        teardown_ok = self._wing.disconnect() is True
         reconnect_thread = self._reconnect_thread
         if (
             reconnect_thread is not None
@@ -157,11 +157,14 @@ class EnhancedOSCClient:
             reconnect_thread.join(timeout=5.5)
             if reconnect_thread.is_alive():
                 logger.error("EnhancedOSCClient reconnect thread did not stop")
+                teardown_ok = False
         self._stats["last_disconnected"] = time.time()
         if self._connected_since:
             self._stats["connection_uptime_sec"] += time.time() - self._connected_since
             self._connected_since = None
-        logger.info("EnhancedOSCClient disconnected")
+        if teardown_ok:
+            logger.info("EnhancedOSCClient disconnected")
+        return teardown_ok
 
     # ---- Send / subscribe (delegated) ----
 

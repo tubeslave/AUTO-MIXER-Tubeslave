@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from backend.offline_validation_harness import (
     OfflineChannelFixture,
     OfflineMixerState,
@@ -122,6 +124,16 @@ def test_offline_validation_writes_summary_and_events(tmp_path):
     assert summary.exists()
     assert events.exists()
     assert "offline_proposal_result" in events.read_text()
+
+
+@pytest.mark.parametrize("run_id", ["../escape", "nested/run", "nested\\run", "..", ""])
+def test_offline_validation_rejects_path_like_run_ids(tmp_path, run_id):
+    result = run_offline_validation(modes=("supervised",))
+
+    with pytest.raises(ValueError, match="safe path component"):
+        write_offline_validation_artifacts(result, artifact_root=tmp_path / "root", run_id=run_id)
+
+    assert not (tmp_path / "summary.json").exists()
 
 
 def test_offline_validation_harness_source_has_no_live_transport_imports():

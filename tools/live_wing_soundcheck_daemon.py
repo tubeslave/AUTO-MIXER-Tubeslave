@@ -193,6 +193,9 @@ def detect_feedback(x: np.ndarray) -> dict | None:
 
 
 def main() -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: continuous write authority is disabled"
+    )
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--confirm-live-wing-write", default="")

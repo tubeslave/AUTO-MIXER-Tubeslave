@@ -1,6 +1,131 @@
 # Current State
 
-Generated: 2026-07-27T20:46:42Z
+Generated: 2026-08-19T21:17:30Z
+
+## M123 Instrument Space decision integration — 2026-08-04
+
+The Canvas-inspired Product Layer now retains a bounded 12-snapshot in-memory
+history keyed to the exact mixer/audio source context. A source identity change
+resets the baseline instead of comparing different consoles or audio devices.
+Runtime snapshots therefore produce real pan/frequency/level drift evidence
+instead of permanently reporting `baseline_required`.
+
+Pair relations and soundcheck annotations now preserve measured deltas,
+per-channel source/freshness/identity provenance and missing-data blockers.
+Proposal review rejects an otherwise read-only Instrument Space contract when
+its source snapshot is undated or older than 30 seconds. Requested correction
+values, supervised transaction plans, queue authority and console authority are
+unchanged.
+
+The dashboard renders drift, bounded-history status, measured deltas, evidence
+sources and existing next analyzers with no drag/apply gesture. Focused software
+evidence currently passes 43 focused backend/runtime tests, 337 broad Product
+Layer/M123/soundcheck tests, 215 frontend contracts and a production frontend
+build. A 200-run local 64-channel diagnostic measured
+16.677 ms mean, 18.590 ms p95 and 19.882 ms max for 2,016 evaluated pairs with
+128 emitted relations. Final post-truth no-console/full-suite validation is
+pending; WING/dLive attended hardware proof and all live authority remain
+separate and unchanged.
+
+## dLive offline evidence gate — 2026-08-04
+
+The next restore-only proof is now fail-closed on two new prerequisites: an
+operator-owned known-good packet observed at the selected endpoint ingress and
+an explicit effective-security/reboot-after-change attestation. The offline
+review requires exact compact-NRPN bytes and never opens transport; the accepted
+report still proves neither console acceptance nor physical movement. All 139
+dLive tests pass. Hardware is disconnected, no packet was sent, and dLive live
+authority remains false.
+
+## dLive paired-online write result — 2026-08-04
+
+dLive Director machine-observed both `CDM32` and `C3500` online on firmware
+`V2.00 Rev. 83230`, Show `lv 1 master`. Fresh independent GET-only probes from
+the Surface and MixRack both returned Input 1 `KICK`, raw fader `106`
+(`-0.5826771653543332 dB`) and Mute ON. The accepted Surface artifact is
+`20260804T141200Z_907c4441-ad71-49af-b671-0ecda661347a.json`, SHA-256
+`e6dbfb574dc6f77caa50fcb1d3c224776433412d926a229e98dc7fa0366f180d`.
+
+With Director closed, outputs physically isolated, KICK muted, Receive MIDI
+operator-confirmed ON and the operator watching C3500, approval
+`18f5ba39-f9f0-4704-a7fd-db5636a4c203` sent exactly one compact NRPN apply
+packet `BB 63 00 62 17 06 65` to Surface `192.168.3.71:51328`. The operator
+observed no movement and four fresh readbacks remained at raw `106`. Transaction
+`def89219-2b15-4f4d-a1ef-6309e6bdec8e` is terminal as
+`restored_after_unverified_apply`; `write_state_unknown=false`, teardown is
+verified and standing authority is false. Receipt SHA-256 is
+`f84d8b0394cfb428a5b4361e7ccca5dca78c3a34083e7cecd9bf8f2b523394f6`.
+
+The codec/base/selector/value are not the remaining leading suspect: a passive
+zero-send session previously observed C3500 itself transmit the same compact
+packet for the manual move. The blocker is now inbound mutation acceptance or
+wire delivery. No repeat is authorized. Next evidence must verify the effective
+Surface/MixRack security level and reboot state, then use a known-good client or
+packet capture to separate console configuration from AUTO-MIXER transport.
+Operational readiness remains **78/100** and dLive mutation authority remains
+denied.
+
+Offline regression after recording the terminal result passed 133 focused
+dLive/transport/safety tests. The no-WING quick gate at
+`artifacts/no_wing_release_check/20260804T143043Z_no_wing_release_check/summary.json`
+passed with empty failed/environment-blocked checks and no WING/backend contact,
+live write or live authority. Final post-truth repetition is required before
+handoff.
+
+## Parallel dLive readiness checkpoint — 2026-08-03
+
+The former reusable confirmation literal is closed. One token now binds the
+unique approval ID, exact C3500/artifact/channel/attestation/target/cut plan;
+`prepared` WAL consumes the ID. A zero-contact production validator accepted
+the fresh Surface artifact for raw `106 -> 101`, apply `bb630062170665` and
+rollback `bb63006217066a`, with route/TCP/MIDI/execution/authority all false.
+Focused validation passed 46 tests and the broad dLive/transport/safety slice
+passed 151. Receive MIDI and physical apply/rollback remain unverified, so
+readiness stays 78/100.
+
+Final post-truth validation passed: 522 backend tests, 27 frontend contracts,
+production frontend build, 6 handoff rails and the no-WING quick gate with no
+failed checks, WING/backend contact, live write or live authority. This is
+software/offline evidence; `Receive MIDI` and physical apply/rollback remain
+open, so dLive readiness stays 78/100.
+
+The normal read-only configuration pipeline now preserves the observed C3500
+identity (`192.168.3.71:51328`, MIDI base `11`, user profile `0`) through
+saved settings, direct/auto-connect, soundcheck, both setup UIs and operator
+state. Focused validation passed 475 backend tests and 27 frontend contracts.
+A fresh Surface GET-only artifact with the required `user_profile` field is
+proof-binding eligible: SHA-256
+`d4f5dd8ff84d0be7aaf0c5db2352450b59edd8f1170557fa8385288adfc44c40`.
+It observed `KICK`, `-0.582677 dB`, Mute ON twice per field, sent six GETs,
+zero mutation writes and disconnected cleanly. Receive MIDI remains unknown;
+physical apply/rollback and live authority remain false.
+
+The active WING milestone and its external blocker remain unchanged. In a
+separate fail-closed scope, dLive now has the official firmware-v2.0+ 7-bit
+MIDI/TCP protocol, read-only normal connections and a one-shot restore-only
+downward-fader proof. MixRack `192.168.3.70:51325` and C3500 Surface
+`192.168.3.71:51328` are GET-verified through `en7`; MIDI base is `11`, input 1
+is `KICK` at about `-0.5827 dB`, currently muted. Model `CDM32`, Surface
+`C3500`, firmware `2.0` and Show `lv 1 master` are operator-attested.
+
+Two contained, approved MixRack WRITE attempts are terminal at the exact
+preimage with clean teardown and known state, but neither physically proved
+the `-3.0 dB` apply. The second used the corrected documented running-status
+packet, so packet shape alone was not sufficient. Physical write/rollback
+readiness remains open and standing live authority remains denied.
+
+The proof now binds one exact owner-controlled GET-only artifact by path,
+SHA-256 and content before route lookup or TCP. It verifies endpoint, port,
+MIDI base, user profile, input identity, muted state, fader preimage, six GETs,
+zero-write authority and clean teardown, then requires matching fresh 7-bit
+preimage before apply. Emergency interruption before transport closes a
+terminal zero-send WAL row; interruption after transport restores the exact
+preimage. Focused validation passes 41 tests and all dLive tests pass 110.
+The existing Surface artifact predates the required `user_profile` field and
+cannot authorize another proof. Next physical action requires `Receive MIDI:
+ON`, a fresh accepted Surface artifact and a new literal one-shot approval.
+Operational readiness remains 78/100; normal dLive connections grant no write
+authority. See `Docs/reports/DLIVE_READINESS_REVIEW_20260803.md`.
 
 ## System Inspector iteration 001 — 2026-07-27
 
@@ -239,7 +364,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

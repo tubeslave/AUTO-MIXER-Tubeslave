@@ -6,6 +6,7 @@ from typing import Any
 
 from .action_schema import CandidateActionSet
 from .score_normalizer import aggregate_scores, configured_weights
+from ai_mixing_pipeline.numeric_safety import finite_float
 
 
 class CorrectionDecisionEngine:
@@ -14,8 +15,16 @@ class CorrectionDecisionEngine:
     def __init__(self, config: dict[str, Any] | None = None):
         self.config = dict(config or {})
         self.weights = configured_weights(self.config)
-        self.min_score_improvement = float((self.config.get("safety", {}) or {}).get("min_score_improvement", 0.03))
-        self.proxy_weight_multiplier = float(self.config.get("proxy_weight_multiplier", 1.0))
+        self.min_score_improvement = finite_float(
+            (self.config.get("safety", {}) or {}).get("min_score_improvement", 0.03)
+        )
+        self.proxy_weight_multiplier = finite_float(
+            self.config.get("proxy_weight_multiplier", 1.0)
+        )
+        if self.min_score_improvement is None or self.min_score_improvement < 0.0:
+            raise ValueError("min_score_improvement must be finite and non-negative")
+        if self.proxy_weight_multiplier is None or self.proxy_weight_multiplier < 0.0:
+            raise ValueError("proxy_weight_multiplier must be finite and non-negative")
 
     def choose_best(
         self,
@@ -29,6 +38,7 @@ class CorrectionDecisionEngine:
         no_change = next((candidate for candidate in candidates if candidate.is_no_change), candidates[0])
         breakdown: dict[str, Any] = {}
         final_scores: dict[str, float] = {}
+        validated_safety: dict[str, bool] = {}
         for candidate in candidates:
             combined_scores = dict(critic_scores.get(candidate.candidate_id, {}))
             combined_scores["safety"] = safety_scores.get(candidate.candidate_id, {})
@@ -37,7 +47,11 @@ class CorrectionDecisionEngine:
                 self.weights,
                 proxy_weight_multiplier=self.proxy_weight_multiplier,
             )
-            if not safety_scores.get(candidate.candidate_id, {}).get("passed", False) and not candidate.is_no_change:
+            safety = safety_scores.get(candidate.candidate_id, {})
+            safety_score = finite_float(safety.get("safety_score"))
+            safety_passed = safety.get("passed") is True and safety_score is not None
+            validated_safety[candidate.candidate_id] = safety_passed
+            if not safety_passed and not candidate.is_no_change:
                 aggregate["final_score"] -= 1.0
             breakdown[candidate.candidate_id] = aggregate
             final_scores[candidate.candidate_id] = float(aggregate["final_score"])
@@ -54,7 +68,7 @@ class CorrectionDecisionEngine:
             score_delta = 0.0
             decision = "no_change"
             reason = f"Best improvement below min_score_improvement {self.min_score_improvement:.4f}; keeping no_change."
-        if not safety_scores.get(selected_id, {}).get("passed", False):
+        if not validated_safety.get(selected_id, False):
             selected = no_change
             selected_id = no_change.candidate_id
             score_delta = 0.0
@@ -67,7 +81,7 @@ class CorrectionDecisionEngine:
             "selected_actions": [action.to_dict() for action in selected.actions] if not selected.is_no_change else [],
             "final_score": final_scores.get(selected_id, 0.0),
             "score_delta_vs_no_change": score_delta,
-            "safety_passed": bool(safety_scores.get(selected_id, {}).get("passed", False)),
+            "safety_passed": validated_safety.get(selected_id, False),
             "decision": decision,
             "reason": reason,
             "critic_breakdown": breakdown,

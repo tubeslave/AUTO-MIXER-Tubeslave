@@ -29,11 +29,15 @@ MAX_TELEGRAM_TEXT = 3900
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Poll Telegram and handle local project commands.")
     parser.add_argument("--repo", default=os.getcwd(), help="Repository directory to manage.")
-    parser.add_argument("--token", default=os.getenv("TELEGRAM_BOT_TOKEN"), help="Telegram bot token.")
     parser.add_argument(
         "--chat-id",
         default=os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_ALLOWED_CHAT_ID"),
         help="Allowed Telegram chat id.",
+    )
+    parser.add_argument(
+        "--user-id",
+        default=os.getenv("TELEGRAM_ALLOWED_USER_ID"),
+        help="Allowed Telegram sender user id; required even for private chats.",
     )
     parser.add_argument("--poll-timeout", type=int, default=30, help="Telegram long-poll timeout.")
     parser.add_argument("--skip-existing", action="store_true", help="Ignore messages that arrived before startup.")
@@ -248,7 +252,7 @@ def handle_codex_ask(repo: Path, prompt: str) -> str:
             output_path.unlink()
 
 
-def extract_message(update: dict[str, object]) -> tuple[str, str] | None:
+def extract_message(update: dict[str, object]) -> tuple[str, str, str] | None:
     message = update.get("message")
     if not isinstance(message, dict):
         return None
@@ -256,10 +260,29 @@ def extract_message(update: dict[str, object]) -> tuple[str, str] | None:
     if not isinstance(chat, dict):
         return None
     chat_id = chat.get("id")
+    sender = message.get("from")
     text = message.get("text")
-    if chat_id is None or not isinstance(text, str):
+    if not isinstance(sender, dict):
         return None
-    return str(chat_id), text
+    user_id = sender.get("id")
+    if chat_id is None or user_id is None or not isinstance(text, str):
+        return None
+    return str(chat_id), str(user_id), text
+
+
+def is_authorized_sender(
+    incoming_chat_id: str,
+    incoming_user_id: str,
+    *,
+    allowed_chat_id: str,
+    allowed_user_id: str,
+) -> bool:
+    """Bind bridge authority to both the exact chat and exact Telegram user."""
+
+    return bool(
+        incoming_chat_id == allowed_chat_id
+        and incoming_user_id == allowed_user_id
+    )
 
 
 def initial_offset(token: str) -> int | None:
@@ -274,7 +297,14 @@ def initial_offset(token: str) -> int | None:
     return max(numeric_ids) + 1
 
 
-def poll_loop(repo: Path, token: str, chat_id: str, poll_timeout: int, offset: int | None) -> None:
+def poll_loop(
+    repo: Path,
+    token: str,
+    chat_id: str,
+    user_id: str,
+    poll_timeout: int,
+    offset: int | None,
+) -> None:
     while True:
         payload: dict[str, object] = {
             "limit": 20,
@@ -297,9 +327,14 @@ def poll_loop(repo: Path, token: str, chat_id: str, poll_timeout: int, offset: i
                 extracted = extract_message(update)
                 if not extracted:
                     continue
-                incoming_chat_id, text = extracted
-                if incoming_chat_id != chat_id:
-                    send_message(token, incoming_chat_id, "Этот бот принимает команды только из разрешённого чата.")
+                incoming_chat_id, incoming_user_id, text = extracted
+                if not is_authorized_sender(
+                    incoming_chat_id,
+                    incoming_user_id,
+                    allowed_chat_id=chat_id,
+                    allowed_user_id=user_id,
+                ):
+                    print("ignored unauthorized Telegram sender", file=sys.stderr, flush=True)
                     continue
                 reply = handle_message(repo, text)
                 send_message(token, chat_id, reply)
@@ -311,24 +346,35 @@ def poll_loop(repo: Path, token: str, chat_id: str, poll_timeout: int, offset: i
 def main() -> int:
     args = parse_args()
     repo = Path(args.repo).expanduser().resolve()
-    if not args.token:
-        print("Missing TELEGRAM_BOT_TOKEN or --token.", file=sys.stderr)
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    if not token:
+        print("Missing TELEGRAM_BOT_TOKEN.", file=sys.stderr)
         return 2
     if not args.chat_id:
         print("Missing TELEGRAM_CHAT_ID/TELEGRAM_ALLOWED_CHAT_ID or --chat-id.", file=sys.stderr)
+        return 2
+    if not args.user_id:
+        print("Missing TELEGRAM_ALLOWED_USER_ID or --user-id.", file=sys.stderr)
         return 2
     if not (repo / ".git").exists():
         print(f"{repo} is not a git repository.", file=sys.stderr)
         return 2
 
-    offset = initial_offset(args.token) if args.skip_existing else None
+    offset = initial_offset(token) if args.skip_existing else None
     if args.startup_message:
         send_message(
-            args.token,
+            token,
             str(args.chat_id),
             f"Telegram-Codex bridge запущен.\nТекущая ветка: {current_branch(repo)}\n/help - команды",
         )
-    poll_loop(repo, args.token, str(args.chat_id), args.poll_timeout, offset)
+    poll_loop(
+        repo,
+        token,
+        str(args.chat_id),
+        str(args.user_id),
+        args.poll_timeout,
+        offset,
+    )
     return 0
 
 

@@ -51,15 +51,57 @@ class MixingStationClient:
         self.sock = None
         self.receiver_thread = None
         self._stop_receiver = False
+        self._osc_peer = None
+        self._expected_osc_sources = frozenset()
         
         self.state = {}
         self.state_timestamps = {}
+        self._state_events = {}
         self.callbacks = {}
         
         self.is_connected = False
         self.mixer_info = {}
         
         logger.info(f"MixingStationClient initialized for {host}:{osc_port} (REST: {rest_port})")
+
+    def _resolve_osc_peer(self):
+        """Resolve the configured UDP peer once and bind replies to its IP/port."""
+        addresses = {
+            (sockaddr[0], int(sockaddr[1]))
+            for _family, _type, _proto, _canonname, sockaddr in socket.getaddrinfo(
+                self.host,
+                self.osc_port,
+                family=socket.AF_INET,
+                type=socket.SOCK_DGRAM,
+            )
+        }
+        if not addresses:
+            raise OSError("Mixing Station OSC peer did not resolve")
+        self._expected_osc_sources = frozenset(addresses)
+        self._osc_peer = sorted(addresses)[0]
+
+    def _is_expected_osc_source(self, addr) -> bool:
+        try:
+            source = (str(addr[0]), int(addr[1]))
+        except (IndexError, TypeError, ValueError):
+            return False
+        return source in self._expected_osc_sources
+
+    def _osc_target(self):
+        return self._osc_peer or (self.host, self.osc_port)
+
+    def _process_received_datagram(self, data: bytes, addr) -> bool:
+        """Accept state only from the peer resolved for this connection."""
+        if not self._is_expected_osc_source(addr):
+            logger.debug("Discarded OSC datagram from unexpected source %r", addr)
+            return False
+        try:
+            osc_msg = OscMessage(data)
+            self._handle_message(osc_msg.address, *osc_msg.params)
+        except Exception as exc:
+            logger.debug("Error parsing OSC message from expected peer: %s", exc)
+            return False
+        return True
 
     def connect(self, timeout: float = 5.0) -> bool:
         """
@@ -68,6 +110,11 @@ class MixingStationClient:
         Returns:
             True if connected successfully, False otherwise
         """
+        logger.warning(
+            "Mixing Station connection blocked: authenticated local IPC is required"
+        )
+        return False
+
         try:
             # Step 1: Try REST API to verify Mixing Station is running
             logger.info(f"Checking Mixing Station REST API at {self.host}:{self.rest_port}...")
@@ -75,7 +122,8 @@ class MixingStationClient:
             try:
                 response = requests.get(
                     f"http://{self.host}:{self.rest_port}/api/status",
-                    timeout=timeout
+                    timeout=timeout,
+                    allow_redirects=False,
                 )
                 if response.status_code == 200:
                     self.mixer_info = response.json()
@@ -85,6 +133,7 @@ class MixingStationClient:
                 # Continue anyway - OSC might still work
             
             # Step 2: Set up OSC socket
+            self._resolve_osc_peer()
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.settimeout(timeout)
             self.sock.bind(('0.0.0.0', 0))
@@ -96,25 +145,41 @@ class MixingStationClient:
             # Note: Mixing Station may not respond to subscription, but will send updates
             builder = OscMessageBuilder(address='/hi/v')
             msg = builder.build()
-            self.sock.sendto(msg.dgram, (self.host, self.osc_port))
+            self.sock.sendto(msg.dgram, self._osc_target())
             logger.info("Sent subscription request /hi/v")
             
             # Step 4: Verify connection by querying a parameter
             builder = OscMessageBuilder(address='/con/v/ch.0.mix.lvl')
             msg = builder.build()
-            self.sock.sendto(msg.dgram, (self.host, self.osc_port))
+            self.sock.sendto(msg.dgram, self._osc_target())
             
-            try:
-                data, addr = self.sock.recvfrom(4096)
-                osc_msg = OscMessage(data)
-                logger.info(f"Mixing Station verified: {osc_msg.address} = {osc_msg.params}")
-                
-                # Convert to our state format
-                state_key = self._ms_to_state_address(osc_msg.address)
-                self.state[state_key] = osc_msg.params[0] if osc_msg.params else None
-                self.state_timestamps[state_key] = time.time()
-                
-            except socket.timeout:
+            expected_address = '/con/v/ch.0.mix.lvl'
+            deadline = time.monotonic() + timeout
+            verified_message = None
+            while time.monotonic() < deadline:
+                self.sock.settimeout(max(0.01, deadline - time.monotonic()))
+                try:
+                    data, addr = self.sock.recvfrom(4096)
+                except socket.timeout:
+                    break
+                if not self._is_expected_osc_source(addr):
+                    logger.debug("Ignored connection response from %r", addr)
+                    continue
+                try:
+                    candidate = OscMessage(data)
+                except Exception as exc:
+                    logger.debug("Ignored malformed connection response: %s", exc)
+                    continue
+                if candidate.address != expected_address or not candidate.params:
+                    logger.debug(
+                        "Ignored unrelated connection response %s",
+                        candidate.address,
+                    )
+                    continue
+                verified_message = candidate
+                break
+
+            if verified_message is None:
                 logger.error("Mixing Station OSC not responding")
                 logger.error("Please ensure:")
                 logger.error("  1. Mixing Station is running")
@@ -122,6 +187,16 @@ class MixingStationClient:
                 logger.error(f"  3. OSC port is set to {self.osc_port}")
                 self.sock.close()
                 return False
+
+            logger.info(
+                "Mixing Station verified: %s = %s",
+                verified_message.address,
+                verified_message.params,
+            )
+            self._handle_message(
+                verified_message.address,
+                *verified_message.params,
+            )
             
             self.is_connected = True
             
@@ -158,11 +233,7 @@ class MixingStationClient:
         while not self._stop_receiver and self.is_connected:
             try:
                 data, addr = self.sock.recvfrom(4096)
-                try:
-                    osc_msg = OscMessage(data)
-                    self._handle_message(osc_msg.address, *osc_msg.params)
-                except Exception as e:
-                    logger.debug(f"Error parsing OSC message: {e}")
+                self._process_received_datagram(data, addr)
             except socket.timeout:
                 pass
             except Exception as e:
@@ -180,6 +251,9 @@ class MixingStationClient:
         if args:
             self.state[state_key] = args[0]
             self.state_timestamps[state_key] = time.time()
+            event = self._state_events.get(state_key)
+            if event is not None:
+                event.set()
         
         # Call registered callbacks for both the raw Mixing Station address and
         # the canonical state key used by the rest of the backend.
@@ -296,6 +370,11 @@ class MixingStationClient:
             address: Wing-style OSC address (e.g., '/ch/1/fdr')
             values: Optional values to send. If empty, this is a query.
         """
+        if values:
+            logger.warning(
+                "Mixing Station mutation blocked: authenticated local IPC is required"
+            )
+            return False
         if not self.is_connected:
             logger.warning("Not connected to Mixing Station")
             return False
@@ -316,7 +395,7 @@ class MixingStationClient:
                 builder = OscMessageBuilder(address=osc_address)
             
             msg = builder.build()
-            self.sock.sendto(msg.dgram, (self.host, self.osc_port))
+            self.sock.sendto(msg.dgram, self._osc_target())
             logger.debug(f"Sent: {osc_address} {values}")
             return True
         except Exception as e:
@@ -338,7 +417,7 @@ class MixingStationClient:
                     builder = OscMessageBuilder(address='/hi/v')
                     msg = builder.build()
                     try:
-                        self.sock.sendto(msg.dgram, (self.host, self.osc_port))
+                        self.sock.sendto(msg.dgram, self._osc_target())
                         logger.debug("Renewed Mixing Station subscription")
                     except:
                         pass
@@ -439,7 +518,7 @@ class MixingStationClient:
             builder = OscMessageBuilder(address=osc_address)
             builder.add_arg(float(value))
             msg = builder.build()
-            self.sock.sendto(msg.dgram, (self.host, self.osc_port))
+            self.sock.sendto(msg.dgram, self._osc_target())
             return True
         except Exception as e:
             logger.error(f"Send failed: {e}")
@@ -452,8 +531,15 @@ class MixingStationClient:
     def query(self, address: str) -> Optional[Any]:
         """Query a parameter and wait for response"""
         address = self._canonical_state_address(address)
-        self.send(address)
-        time.sleep(0.1)
+        event = self._state_events.setdefault(address, threading.Event())
+        event.clear()
+        issued_at = time.time()
+        if not self.send(address):
+            return None
+        if not event.wait(timeout=0.1):
+            return None
+        if self.state_timestamps.get(address, 0.0) < issued_at:
+            return None
         return self.state.get(address)
 
     def query_parameter(self, address: str) -> Dict[str, Any]:
@@ -500,6 +586,10 @@ def discover_mixing_station(timeout: float = 2.0) -> Optional[Dict[str, int]]:
             
             data, addr = sock.recvfrom(4096)
             sock.close()
+
+            if (str(addr[0]), int(addr[1])) != ('127.0.0.1', port):
+                continue
+            OscMessage(data)
             
             logger.info(f"Found Mixing Station OSC on port {port}")
             return {'osc_port': port, 'rest_port': port}

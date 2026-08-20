@@ -74,6 +74,9 @@ def pink_deviation(centers: np.ndarray, levels: np.ndarray) -> np.ndarray:
 
 
 def main() -> None:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: master EQ writes are disabled"
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--confirm-live-wing-write", default="")
     parser.add_argument("--rollback", default="")

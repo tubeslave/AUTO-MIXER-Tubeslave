@@ -13686,7 +13686,7 @@ def test_no_wing_release_check_rejects_gain_dry_run_report_that_claims_promotion
     assert "gain_dry_run_promotion_allowed_not_false" in result.detail["violations"]
     assert "gain_dry_run_autonomous_ready_not_false" in result.detail["violations"]
     assert "gain_dry_run_physical_proof_blocker_missing" in result.detail["violations"]
-    assert "gain_dry_run_pre_read_source_not_fake_mixer" in result.detail["violations"]
+    assert "gain_dry_run_pre_read_source_unexpected_source" in result.detail["violations"]
 
 
 def test_no_wing_release_check_rejects_missing_proof_report_gap_rollup(tmp_path):

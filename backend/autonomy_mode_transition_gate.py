@@ -19,6 +19,7 @@ try:
         MODE_ASSIST,
         MODE_AUTO,
         MODE_SUPERVISED,
+        PROVEN_LIVE_WRITE_SURFACE_BY_KIND,
         VALID_OPERATOR_MODES,
         build_operator_mode_status,
     )
@@ -30,6 +31,7 @@ except ImportError:  # pragma: no cover - package import compatibility
         MODE_ASSIST,
         MODE_AUTO,
         MODE_SUPERVISED,
+        PROVEN_LIVE_WRITE_SURFACE_BY_KIND,
         VALID_OPERATOR_MODES,
         build_operator_mode_status,
     )
@@ -139,6 +141,46 @@ def _readiness_rows_by_id(readiness: Mapping[str, Any]) -> Dict[str, Mapping[str
     }
 
 
+PROVEN_LIVE_WRITE_KINDS_BY_ACTION_FAMILY = {
+    "fader": ("fader",),
+    "gain": ("gain",),
+    "mute": ("mute",),
+    "pan_phase_delay": ("pan",),
+}
+
+
+def _proven_live_write_kinds(
+    readiness: Mapping[str, Any],
+    target_ids: Tuple[str, ...],
+    policy_kinds: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    """Intersect static policy with the exact action families proved live."""
+
+    readiness_rows = _readiness_rows_by_id(readiness)
+    proven = set()
+    for target_id in target_ids:
+        row = readiness_rows.get(target_id)
+        if not isinstance(row, Mapping):
+            continue
+        action_family = row.get("action_family")
+        if not isinstance(action_family, str):
+            continue
+        proven.update(PROVEN_LIVE_WRITE_KINDS_BY_ACTION_FAMILY.get(action_family, ()))
+    return tuple(kind for kind in policy_kinds if kind in proven)
+
+
+def _proven_live_write_surfaces(
+    policy_surfaces: Tuple[str, ...],
+    proven_kinds: Tuple[str, ...],
+) -> Tuple[str, ...]:
+    proven_surfaces = {
+        surface
+        for kind in proven_kinds
+        for surface in PROVEN_LIVE_WRITE_SURFACE_BY_KIND.get(kind, ())
+    }
+    return tuple(surface for surface in policy_surfaces if surface in proven_surfaces)
+
+
 def _unique(values: Tuple[str, ...]) -> Tuple[str, ...]:
     return tuple(dict.fromkeys(value for value in values if value))
 
@@ -234,6 +276,16 @@ def _row_for_mode(
     next_actions = []
     target_ids: Tuple[str, ...] = ()
     evidence_statuses: Tuple[str, ...] = ()
+    policy_live_write_kinds = tuple(
+        str(item) for item in capabilities.get("allowed_live_write_kinds", ()) if item
+    )
+    policy_live_write_surfaces = tuple(
+        str(item)
+        for item in (project_mode.get("effective_live_write_surfaces") or ())
+        if item
+    )
+    current_live_write_kinds = policy_live_write_kinds
+    current_live_write_surfaces = policy_live_write_surfaces
 
     if mode in {MODE_ANALYZE, MODE_ASSIST}:
         status = "available"
@@ -242,16 +294,29 @@ def _row_for_mode(
         blockers.append("mode_has_no_live_apply_authority")
     elif mode == MODE_SUPERVISED:
         target_ids = _supervised_target_ids(readiness)
+        current_live_write_kinds = _proven_live_write_kinds(
+            readiness,
+            target_ids,
+            policy_live_write_kinds,
+        )
+        current_live_write_surfaces = _proven_live_write_surfaces(
+            policy_live_write_surfaces,
+            current_live_write_kinds,
+        )
         evidence_statuses = tuple(
             str(overlay_rows[target_id].get("status"))
             for target_id in target_ids
             if target_id in overlay_rows
         )
-        runtime_entry_allowed = bool(capabilities.get("can_apply_to_console") and target_ids)
+        runtime_entry_allowed = bool(
+            capabilities.get("can_apply_to_console") and current_live_write_kinds
+        )
         status = "limited_available" if runtime_entry_allowed else "blocked"
         mode_expansion_allowed = False
         blockers.extend(_proof_overlay_blockers(overlay))
         blockers.append("supervised_mode_is_narrow_fader_gain_only")
+        if target_ids and not current_live_write_kinds:
+            blockers.append("proven_action_family_live_write_scope_missing")
         for target_id in target_ids:
             target_row = readiness_rows.get(target_id, {})
             next_actions.extend(str(item) for item in target_row.get("next_required_evidence", ()) if item)
@@ -279,10 +344,6 @@ def _row_for_mode(
     if mode in {MODE_SUPERVISED, MODE_AUTO} and wing_boundary_active:
         blockers.append("wing_deployment_requires_manual_safety_review")
 
-    current_live_write_kinds = tuple(str(item) for item in capabilities.get("allowed_live_write_kinds", ()) if item)
-    current_live_write_surfaces = tuple(
-        str(item) for item in (project_mode.get("effective_live_write_surfaces") or ()) if item
-    )
     live_apply_allowed = bool(runtime_entry_allowed and mode == MODE_SUPERVISED and current_live_write_kinds)
 
     return AutonomyModeGateRow(

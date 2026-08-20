@@ -51,6 +51,9 @@ THROTTLE_GAP_S = 0.15
 
 
 def main() -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: broad routing rewrites are disabled"
+    )
     mixer = yaml.safe_load(open(REPO / "config" / "automixer.yaml"))["mixer"]
     c = WingClient(ip=mixer["ip"], port=int(mixer.get("receive_port", 2223)))
     assert c.connect(timeout=5.0), "пульт не отвечает"

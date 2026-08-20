@@ -6,8 +6,23 @@ from typing import Any
 
 
 class EvaluatorAgent:
-    def __init__(self, name: str = "evaluator") -> None:
+    def __init__(
+        self,
+        name: str = "evaluator",
+        project_root: str | Path = ".",
+        runs_dir: str | Path = "artifacts/runs",
+    ) -> None:
         self.name = name
+        self.project_root = Path(project_root).resolve()
+        self.runs_dir = (self.project_root / runs_dir).resolve()
+
+    def _confined_run_path(self, raw_path: Any) -> Path:
+        path = Path(str(raw_path)).resolve()
+        try:
+            path.relative_to(self.runs_dir)
+        except ValueError as exc:
+            raise ValueError("evaluation path must remain beneath the configured runs directory") from exc
+        return path
 
     def run(self, data: dict[str, Any]) -> dict[str, Any]:
         best_run = data.get("best_run")
@@ -22,7 +37,10 @@ class EvaluatorAgent:
                 "error": "No best_run provided",
             }
 
-        model_path = Path(model_dir)
+        try:
+            model_path = self._confined_run_path(model_dir)
+        except ValueError as exc:
+            return {"agent": self.name, "status": "failed", "error": str(exc)}
         if not model_path.is_dir():
             return {
                 "agent": self.name,
@@ -39,13 +57,15 @@ class EvaluatorAgent:
             for pattern in ("evaluation.json", "training_summary.json", "metadata.json")
             for path in model_path.rglob(pattern)
             if path.is_file()
-        )
+        )[:256]
         parsed_artifacts = []
         invalid_artifacts = []
         for artifact_path in artifact_paths:
             try:
+                if artifact_path.is_symlink() or artifact_path.stat().st_size > 1_000_000:
+                    raise ValueError("artifact is a symlink or exceeds the byte limit")
                 payload = json.loads(artifact_path.read_text(encoding="utf-8"))
-            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            except (OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
                 invalid_artifacts.append({
                     "path": str(artifact_path),
                     "error": type(exc).__name__,
@@ -97,8 +117,12 @@ class EvaluatorAgent:
                 "error": f"best_run missing required fields: {', '.join(missing_fields)}",
             }
 
-        run_dir = Path(best_run["run_dir"])
-        log_path = Path(best_run["log_path"])
+        try:
+            run_dir = self._confined_run_path(best_run["run_dir"])
+            log_path = Path(best_run["log_path"]).resolve()
+            log_path.relative_to(run_dir)
+        except ValueError as exc:
+            return {"agent": self.name, "status": "failed", "error": str(exc)}
         run_dir_exists = run_dir.is_dir()
         log_exists = log_path.is_file()
         training_success = best_run.get("success") is True

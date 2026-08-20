@@ -106,6 +106,12 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert summary["evidence_stores_isolated"] is True
     assert summary["operator_proposal_result_runtime_isolated"] is True
     assert summary["operator_proposal_result_runtime_cleaned"] is True
+    assert summary["operator_proposal_result_store_limits"] == {
+        "max_artifact_bytes": 1 * 1024 * 1024,
+        "max_total_bytes": 8 * 1024 * 1024,
+        "min_free_bytes": 64 * 1024 * 1024,
+        "scope": "isolated_fake_dry_run_only",
+    }
     assert not Path(summary["operator_proposal_result_runtime_dir"]).exists()
     assert Path(summary["operator_proposal_result_dir"]).parent == Path(
         summary["operator_proposal_result_runtime_dir"]
@@ -113,7 +119,6 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert Path(summary["console_runtime_dir"]) == (
         Path(summary["summary_path"]).parent / "console_runtime"
     )
-    assert Path(summary["console_wal_path"]).is_file()
     assert Path(summary["console_wal_path"]).parent == Path(summary["console_runtime_dir"])
     assert process_wal.read_bytes() == process_wal_before
     for filename, artifact_path in process_artifacts.items():
@@ -131,34 +136,30 @@ async def test_gain_proof_dry_run_uses_operator_proposal_path_only(tmp_path: Pat
     assert summary["write_policy"] == "fake_mixer_apply_operator_proposal_only"
     assert summary["pre_read_source"] == "fake_mixer"
     assert summary["readback_source"] == "fake_mixer"
-    assert summary["rollback_readback_source"] == "fake_mixer"
+    assert summary["rollback_readback_source"] == "not_attempted"
     assert summary["operator_approval_recorded"] is True
     assert summary["idempotency_key_present"] is True
     apply_result = summary["apply_result"]["apply_result"]
-    assert apply_result["pre_read_status"] == "verified_from_physical_readback"
-    assert apply_result["readback_status"] == "verified_from_physical_readback"
-    assert apply_result["proof_status"] == "verified"
-    assert apply_result["rollback_available"] is True
-    assert summary["cooldown_apply_result"]["apply_result"]["reason"] == "cooldown"
-    assert summary["rollback_result"]["rollback_readback_status"] == "verified_from_physical_readback"
-    assert summary["rollback_result"]["rollback_proof_status"] == "verified"
+    assert apply_result["status"] == "blocked"
+    assert apply_result["reason"] == "pre_read_unavailable"
+    assert apply_result["pre_read_status"] == "readback_unavailable"
+    assert apply_result["pre_read_error"] == "physical_query_provenance_unverified"
+    assert apply_result["proof_status"] == "blocked"
+    assert apply_result["no_console_send_proven"] is True
+    assert summary["fake_physical_proof_rejection_status"] == "verified"
+    assert summary["physical_proof_claimed"] is False
+    assert summary["rollback_result"]["status"] == "not_attempted"
     assert summary["post_emergency_apply_result"]["apply_result"]["reason"] == (
         "operator_proposal_global_hazard_active"
     )
     assert summary["emergency_stop_proof_status"] == "verified"
-    assert [call["method"] for call in summary["fake_mixer_write_calls"]] == [
-        "set_channel_gain",
-        "set_channel_gain",
-    ]
+    assert summary["fake_mixer_write_calls"] == []
 
     sent_types = [event["payload"]["type"] for event in read_events(summary) if event["event_type"] == "send"]
     assert sent_types == [
         "set_operator_mode",
         "create_operator_proposal",
         "apply_operator_proposal",
-        "create_operator_proposal",
-        "apply_operator_proposal",
-        "rollback_last_manual_write",
         "emergency_stop",
         "create_operator_proposal",
         "apply_operator_proposal",

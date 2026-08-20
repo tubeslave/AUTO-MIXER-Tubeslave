@@ -1,5 +1,32 @@
 # Autopilot Blockers
 
+## Codex Security closure blocker — 2026-08-19
+
+All 143 sealed occurrences are locally remediated or fail-closed and recorded
+as `locally_verified_unsealed`, but the Codex Security connector is not
+connected. A fresh full current-checkout scan cannot currently be run or sealed.
+Do not relabel the local result as canonical closure, do not grant live
+authority, and do not replace the frozen occurrence identity. When connector
+access returns, run one fresh full scan and reconcile its occurrence set against
+`Docs/reports/CODEX_SECURITY_DISPOSITION_LEDGER_20260819.jsonl`.
+
+## Parallel dLive blocker — 2026-08-04
+
+CDM32 and C3500 are machine-observed paired online and both answer fresh GETs,
+but the newly approved Surface fader SET produced no physical movement and no
+readback change. Transaction `def89219-2b15-4f4d-a1ef-6309e6bdec8e` is
+terminal, teardown is clean and authority is false. Because the compact packet
+matches the Surface's own passive transmit observation, another blind retry is
+blocked. Verify effective Surface/MixRack Security and reboot state, then use a
+known-good client or durable wire capture to isolate console configuration from
+AUTO-MIXER transport before any fresh approval.
+
+The software preflight now enforces that next evidence: only an operator-owned
+known-good packet observed at selected-endpoint ingress and matching the exact
+compact NRPN is accepted, and a security change requires reboot confirmation.
+All 139 dLive tests pass without hardware contact. The real evidence is still
+missing while the console is disconnected.
+
 ## M120 current blocker — 2026-07-15
 
 Digital silence is closed as the current HW01 prerequisite: accepted artifact
@@ -135,7 +162,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

@@ -45,8 +45,8 @@ if TYPE_CHECKING:
 else:
     WebSocketServerProtocol = Any
 
-from wing_client import WingClient
-from dlive_client import DLiveClient
+from wing_client import WingClient, verify_wing_physical_readback_receipt
+from dlive_client import DLiveClient, validate_dlive_connection_config
 from osc.enhanced_osc_client import EnhancedOSCClient
 from mixing_station_client import MixingStationClient, discover_mixing_station
 from audio_devices import get_audio_devices
@@ -426,88 +426,16 @@ SYSTEM_MEASUREMENT_MAX_DURATION_SEC = 20.0
 SYSTEM_MEASUREMENT_CAPTURE_GRACE_SEC = 1.0
 SYSTEM_MEASUREMENT_CAPTURE_POLL_SEC = 0.05
 
-# A source backend without a configured bearer token is intentionally useful
-# for local read-only diagnostics. It must never become a control plane merely
-# because the listener is bound to loopback: any local process can open a
-# native WebSocket without a browser Origin header. Keep this list small and
-# deny every other message before handler dispatch.
+# A source backend without a configured bearer token exposes only emergency
+# stop and static runtime identity. Loopback is not an authentication boundary:
+# any local process can open a native WebSocket without a browser Origin header.
+# Mixer-derived state, physical readback, device discovery, scans, and resource
+# lifecycle operations always require an authenticated session.
 UNAUTHENTICATED_READ_ONLY_MESSAGE_TYPES = frozenset(
     {
-        "connect_wing",
+        "get_runtime_identity",
         "emergency_stop",
         "emergency_stop_agent",
-        "get_action_history",
-        "get_agent_communications_snapshot",
-        "get_agent_status",
-        "get_arrangement_automation_status",
-        "get_audio_capture_status",
-        "get_audio_devices",
-        "get_auto_compressor_status",
-        "get_auto_effects_status",
-        "get_auto_engine_status",
-        "get_auto_eq_status",
-        "get_auto_fader_status",
-        "get_auto_gate_status",
-        "get_auto_panner_status",
-        "get_auto_reverb_status",
-        "get_auto_soundcheck_status",
-        "get_bus_main_dca_snapshot",
-        "get_channel_input_routing",
-        "get_channel_intelligence",
-        "get_channel_inventory",
-        "get_channel_meters",
-        "get_channel_processing_snapshot",
-        "get_connection_topology",
-        "get_cross_adaptive_eq_status",
-        "get_dante_routing",
-        "get_dashboard_snapshot",
-        "get_decision_queue",
-        "get_decision_traces",
-        "get_dlive_state_snapshot",
-        "get_eq_profiles",
-        "get_freeze_status",
-        "get_fx_inserts_snapshot",
-        "get_fx_overview",
-        "get_gain_staging_recommendations",
-        "get_gain_staging_status",
-        "get_groups_buses_snapshot",
-        "get_insert_state",
-        "get_live_input_trim_recommendations",
-        "get_main_pipeline_preview",
-        "get_manual_write_supervision",
-        "get_matrix_snapshot",
-        "get_memory_knowledge_snapshot",
-        "get_operator_agent_roster",
-        "get_operator_mode",
-        "get_output_routing",
-        "get_pending_actions",
-        "get_phase_alignment_status",
-        "get_processing_pipeline_snapshot",
-        "query_mixer_parameter",
-        "get_ready_for_live",
-        "get_replay_runs",
-        "get_routing_sends_snapshot",
-        "get_rules_library_snapshot",
-        "get_runtime_identity",
-        "get_safety_monitor",
-        "get_snapshots_scenes_snapshot",
-        "get_state",
-        "get_system_measurement_status",
-        "get_telemetry_alerts_snapshot",
-        "get_training_sessions_snapshot",
-        "get_training_status",
-        "get_user_presets_snapshot",
-        "get_voice_control_status",
-        "rescan_channel_names",
-        "scan_audio_devices",
-        "scan_channel_names",
-        "scan_mixer_channel_names",
-        "scan_mixers",
-        "select_audio_device",
-        "start_audio_capture_preview",
-        "stop_audio_capture_preview",
-        "subscribe_meters",
-        "unsubscribe_meters",
     }
 )
 
@@ -914,6 +842,16 @@ class AutoMixerServer:
         # Unified mixer client (can be EnhancedOSCClient wrapping WingClient, DLiveClient, or MixingStationClient)
         self.mixer_client: Optional[Union[EnhancedOSCClient, WingClient, DLiveClient, MixingStationClient]] = None
         self.connection_mode: Optional[str] = None  # 'wing', 'dlive', or 'mixing_station'
+        self._mixer_transport_owner_connection_id: Optional[int] = None
+        self._mixer_transport_owner_ref: Optional[WebSocketServerProtocol] = None
+        # Serialize the full transport lifecycle.  Ownership checks are only
+        # meaningful when authorize -> disconnect -> connect -> bind is one
+        # atomic async operation; otherwise a sibling session can interleave
+        # while disconnect broadcasts yield to the event loop.
+        self._mixer_transport_lifecycle_lock = asyncio.Lock()
+        # A failed transport teardown may leave an unreachable live socket.
+        # Never open another transport in that process after such a failure.
+        self._mixer_transport_teardown_failed = False
 
         self.connected_clients: Set[WebSocketServerProtocol] = set()
 
@@ -1464,7 +1402,12 @@ class AutoMixerServer:
 
     async def _authenticate_websocket(self, websocket: WebSocketServerProtocol) -> bool:
         """Authenticate the first frame before registering a remotely bound client."""
+        if not self._ws_auth_required and self._network_runtime_started:
+            await websocket.close(code=1008, reason="launch_token_required")
+            return False
         if not self._ws_auth_required:
+            # Constructor-only unit tests may exercise the local dispatcher;
+            # a real listening runtime sets _network_runtime_started first.
             return True
         if not self._ws_auth_attempt_bucket.consume():
             await websocket.close(code=1013, reason="authentication_rate_limited")
@@ -1661,11 +1604,6 @@ class AutoMixerServer:
             return True
         if not isinstance(message_type, str) or not message_type:
             return False
-        if message_type == "connect_wing":
-            return (
-                payload.get("observation_only") is True
-                or payload.get("observe_only") is True
-            )
         return message_type in UNAUTHENTICATED_READ_ONLY_MESSAGE_TYPES
 
     async def _block_unauthenticated_control_message(
@@ -2566,7 +2504,9 @@ class AutoMixerServer:
         if self._is_shutting_down or self._manual_write_emergency_stopped:
             logger.warning("Dropped voice command after live-write gate closed")
             return
-        task = asyncio.create_task(self._execute_voice_command(command))
+        task = asyncio.create_task(
+            self._execute_voice_command(command, ambient_voice=True)
+        )
         self._voice_command_tasks.add(task)
         task.add_done_callback(self._finish_voice_command_task)
 
@@ -2737,7 +2677,7 @@ class AutoMixerServer:
         try:
             if isinstance(self.last_soundcheck_readiness, Mapping):
                 try:
-                    await self.broadcast({
+                    readiness_payload = {
                         "type": "auto_soundcheck_status",
                         "status": "readiness_invalidated",
                         "running": False,
@@ -2745,10 +2685,12 @@ class AutoMixerServer:
                         "message": (
                             "Emergency stop active; soundcheck readiness invalidated."
                         ),
-                        "soundcheck_readiness": dict(
+                    }
+                    if self._ws_auth_required:
+                        readiness_payload["soundcheck_readiness"] = dict(
                             self.last_soundcheck_readiness
-                        ),
-                    })
+                        )
+                    await self.broadcast(readiness_payload)
                 except asyncio.CancelledError:
                     raise
                 except Exception as exc:
@@ -3273,8 +3215,29 @@ class AutoMixerServer:
                     reason="superseded_soundcheck_manifest_revision",
                 )
 
+        proposal_bundle = copy.deepcopy(bundle or {})
+        if "instrument_space_decision_support" not in proposal_bundle:
+            # Product Layer reads only the already-owned mixer/audio caches.
+            # Failure to build this supplemental evidence must not invent data
+            # or alter the canonical soundcheck correction/transaction plan.
+            try:
+                from operator_product_state import build_channel_inventory
+
+                inventory = build_channel_inventory(self)
+                scene = inventory.get("instrument_space")
+                if isinstance(scene, Mapping) and isinstance(
+                    scene.get("decision_support"), Mapping
+                ):
+                    proposal_bundle["instrument_space_decision_support"] = copy.deepcopy(
+                        scene["decision_support"]
+                    )
+            except Exception:
+                logger.debug(
+                    "Instrument Space decision evidence unavailable for proposal review",
+                    exc_info=True,
+                )
         proposals = build_soundcheck_operator_proposals(
-            bundle or {},
+            proposal_bundle,
             mixer_client=self.mixer_client,
             source=source,
         )
@@ -8019,7 +7982,13 @@ class AutoMixerServer:
         request: Optional[Dict[str, Any]] = None,
         extra: Optional[Dict[str, Any]] = None,
     ) -> bool:
-        if not self._is_wing_deployment_write_boundary_active():
+        # ``offline`` is the only compatibility mode allowed to exercise the
+        # legacy fake-mixer path. Every production mixer mode is quarantined:
+        # authentication alone is not operation-specific live-write authority.
+        if (
+            not self._is_wing_deployment_write_boundary_active()
+            and getattr(self, "connection_mode", "offline") == "offline"
+        ):
             return False
 
         payload: Dict[str, Any] = {
@@ -8029,7 +7998,7 @@ class AutoMixerServer:
             "reason": "deployment_write_surface_quarantined",
             "surface": surface,
             "message": (
-                "WING deployment path is limited to approved manual fader/gain writes; "
+                "Production mixer paths are limited to approved supervised writes; "
                 f"{surface} is quarantined."
             ),
             "manual_write_supervision": self.get_manual_write_supervision_status(),
@@ -8048,9 +8017,9 @@ class AutoMixerServer:
             payload["operator_correction"] = operator_correction
 
         logger.warning(
-            "Blocked quarantined WING deployment write surface",
+            "Blocked quarantined production-mixer write surface",
             extra={
-                "event": "wing_deployment_boundary_blocked",
+                "event": "production_mixer_write_boundary_blocked",
                 "surface": surface,
                 "result_type": result_type,
             },
@@ -8213,37 +8182,57 @@ class AutoMixerServer:
             return dict(command)
         return {"raw_command": command}
 
-    async def _block_quarantined_voice_command_if_needed(self, command: Dict[str, Any]) -> bool:
+    async def _block_quarantined_voice_command_if_needed(
+        self,
+        command: Dict[str, Any],
+        *,
+        ambient_voice: bool = False,
+    ) -> bool:
         command = self._normalize_voice_command_payload(command)
         cmd_type = str(command.get("type") or "").strip().lower()
-        if (
-            not self._is_wing_deployment_write_boundary_active()
-            or not self._is_voice_command_write_surface(cmd_type)
-        ):
+        if not self._is_voice_command_write_surface(cmd_type):
+            return False
+        if not ambient_voice and not self._is_wing_deployment_write_boundary_active():
             return False
 
         request_payload = dict(command)
         surface = f"voice_command:{cmd_type}"
+        reason = (
+            "ambient_voice_write_requires_operator_authorization"
+            if ambient_voice
+            else "deployment_write_surface_quarantined"
+        )
+        message = (
+            "Ambient voice recognition is proposal-only and cannot authorize "
+            "a mixer write. Review and apply the requested change through the "
+            "operator-owned supervised path."
+            if ambient_voice
+            else (
+                "WING deployment path is limited to Product Layer proposals and "
+                "approved manual fader/gain/pan writes; direct voice-command writes "
+                "are quarantined."
+            )
+        )
         payload = {
             "type": "voice_command_blocked",
             "status": "blocked",
             "success": False,
-            "reason": "deployment_write_surface_quarantined",
+            "reason": reason,
             "surface": surface,
             "command": cmd_type,
             "request": request_payload,
-            "message": (
-                "WING deployment path is limited to Product Layer proposals and "
-                "approved manual fader/gain/pan writes; direct voice-command writes "
-                "are quarantined."
-            ),
+            "ambient_voice": bool(ambient_voice),
+            "live_write": False,
+            "live_authority_granted": False,
+            "readiness_closure_allowed": False,
+            "message": message,
             "manual_write_supervision": self.get_manual_write_supervision_status(),
         }
         operator_correction = self._quarantined_write_operator_correction(
             surface=surface,
             result_type="voice_command_blocked",
             request=request_payload,
-            extra={"command": cmd_type},
+            extra={"command": cmd_type, "ambient_voice": bool(ambient_voice)},
         )
         if operator_correction:
             payload["operator_correction"] = operator_correction
@@ -10070,6 +10059,7 @@ class AutoMixerServer:
         prefer_physical: bool = False,
         allow_cache_fallback: bool = True,
         minimum_cache_updated_at_epoch: Optional[float] = None,
+        require_authoritative_physical_provenance: bool = False,
     ) -> Dict[str, Any]:
         """Read a whitelisted WING parameter for proof metadata without writing.
 
@@ -10123,6 +10113,22 @@ class AutoMixerServer:
                     "error": "physical_query_contract_unverified",
                     "raw": raw,
                 }
+            if (
+                require_authoritative_physical_provenance
+                and not verify_wing_physical_readback_receipt(
+                    client,
+                    raw,
+                    address,
+                )
+            ):
+                return {
+                    "value": None,
+                    "status": "readback_unavailable",
+                    "source": "physical_readback",
+                    "address": address,
+                    "error": "physical_query_provenance_unverified",
+                    "raw": raw,
+                }
             value = self._extract_manual_write_read_value(raw)
             if not self._readonly_read_value_available(value_type, value):
                 return {
@@ -10143,6 +10149,8 @@ class AutoMixerServer:
         if prefer_physical:
             physical = await physical_read()
             if physical and physical.get("value") is not None:
+                return physical
+            if require_authoritative_physical_provenance and physical is not None:
                 return physical
             if not allow_cache_fallback:
                 return physical or {
@@ -10505,6 +10513,9 @@ class AutoMixerServer:
             value_type=write_kind,
             address=address,
             prefer_physical=True,
+            require_authoritative_physical_provenance=(
+                self.connection_mode == "wing"
+            ),
         )
         if approval_deadline is not None and approval_deadline <= time.time():
             return self._manual_write_blocked_result(
@@ -10649,6 +10660,9 @@ class AutoMixerServer:
                 address=address,
                 prefer_physical=True,
                 allow_cache_fallback=False,
+                require_authoritative_physical_provenance=(
+                    self.connection_mode == "wing"
+                ),
             )
             tolerance = float(
                 MANUAL_WRITE_KIND_CONFIG.get(write_kind, {}).get(
@@ -11050,6 +11064,9 @@ class AutoMixerServer:
                 address=address,
                 prefer_physical=True,
                 minimum_cache_updated_at_epoch=write_started_epoch,
+                require_authoritative_physical_provenance=(
+                    self.connection_mode == "wing"
+                ),
             )
         except asyncio.CancelledError:
             self._append_manual_write_wal(
@@ -11311,6 +11328,9 @@ class AutoMixerServer:
             value_type=str(previous.get("value_type")),
             address=rollback_address,
             prefer_physical=True,
+            require_authoritative_physical_provenance=(
+                self.connection_mode == "wing"
+            ),
         )
         current_status = self._manual_write_readback_status(
             old_value=previous.get("effective_value"),
@@ -12045,6 +12065,20 @@ class AutoMixerServer:
             logger.error(f"Failed to save user config: {e}")
             raise
 
+    def _cached_mixer_state_payload(
+        self,
+        mixer_client: Any,
+        *,
+        websocket: Optional[WebSocketServerProtocol] = None,
+    ) -> Dict[str, Any]:
+        """Return cached mixer state only across an authenticated boundary."""
+        authenticated = self._ws_auth_required and (
+            websocket is None or id(websocket) in self._authenticated_websocket_ids
+        )
+        if not authenticated:
+            return {"state_status": "authentication_required"}
+        return {"state": mixer_client.get_state()}
+
     async def register_client(self, websocket: WebSocketServerProtocol):
         self.connected_clients.add(websocket)
         logger.info(f"Client connected. Total clients: {len(self.connected_clients)}")
@@ -12054,7 +12088,10 @@ class AutoMixerServer:
                 "type": "connection_status",
                 "connected": True,
                 "mode": self.connection_mode,
-                "state": self.mixer_client.get_state()
+                **self._cached_mixer_state_payload(
+                    self.mixer_client,
+                    websocket=websocket,
+                ),
             })
 
     async def unregister_client(self, websocket: WebSocketServerProtocol):
@@ -12430,6 +12467,7 @@ class AutoMixerServer:
                 buffer_seconds=buffer_seconds,
                 source_type=source_type,
                 device_name=requested_device,
+                spectral_cache_enabled=True,
             )
             self.audio_capture.allow_silence_fallback = False
             try:
@@ -12976,7 +13014,108 @@ class AutoMixerServer:
             logger.error(f"Error handling message: {e}", exc_info=True)
             await self._send_runtime_error(websocket, e)
 
+    def _configured_wing_connection_target(self) -> Dict[str, Any]:
+        """Return the exact operator-owned RFC1918 WING destination."""
+
+        configured = self.config.get("mixer")
+        if not isinstance(configured, Mapping):
+            raise ValueError("wing_configured_destination_required")
+        if str(configured.get("type") or "").strip().lower() != "wing":
+            raise ValueError("wing_configured_destination_required")
+
+        host = str(configured.get("ip") or "").strip()
+        try:
+            parsed_ip = ipaddress.ip_address(host)
+        except ValueError as exc:
+            raise ValueError("wing_configured_rfc1918_ipv4_required") from exc
+        private_networks = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+        )
+        last_octet = str(parsed_ip).rsplit(".", 1)[-1]
+        if (
+            parsed_ip.version != 4
+            or not any(parsed_ip in network for network in private_networks)
+            or last_octet in {"0", "255"}
+        ):
+            raise ValueError("wing_configured_rfc1918_ipv4_required")
+
+        send_port = configured.get("send_port")
+        receive_port = configured.get("receive_port")
+        configured_port = configured.get("port", receive_port)
+        if (
+            isinstance(send_port, bool)
+            or not isinstance(send_port, int)
+            or send_port != 2222
+            or isinstance(receive_port, bool)
+            or not isinstance(receive_port, int)
+            or receive_port != 2223
+            or isinstance(configured_port, bool)
+            or not isinstance(configured_port, int)
+            or configured_port != 2223
+        ):
+            raise ValueError("wing_official_ports_required")
+        return {
+            "ip": str(parsed_ip),
+            "send_port": send_port,
+            "receive_port": receive_port,
+        }
+
+    def _authorize_wing_connection_target(
+        self,
+        *,
+        ip: Any,
+        send_port: Any,
+        receive_port: Any,
+    ) -> Dict[str, Any]:
+        """Fail closed unless a WING request resolves to the configured target."""
+
+        configured = self._configured_wing_connection_target()
+        try:
+            requested_ip = str(ipaddress.ip_address(str(ip or "").strip()))
+        except ValueError as exc:
+            raise PermissionError("wing_destination_not_configured") from exc
+
+        requested_send_port = (
+            configured["send_port"] if send_port is None else send_port
+        )
+        requested_receive_port = (
+            configured["receive_port"] if receive_port is None else receive_port
+        )
+        if (
+            requested_ip != configured["ip"]
+            or isinstance(requested_send_port, bool)
+            or requested_send_port not in {2222, 2223}
+            or isinstance(requested_receive_port, bool)
+            or requested_receive_port != 2223
+        ):
+            raise PermissionError("wing_destination_not_configured")
+        return configured
+
     async def connect_wing(
+        self,
+        ip: str,
+        send_port: int = 2223,
+        receive_port: int = 2223,
+        *,
+        observation_only: Optional[bool] = None,
+        record_telemetry: Optional[bool] = None,
+        telemetry_session_label: Optional[str] = None,
+        owner_websocket: Optional[WebSocketServerProtocol] = None,
+    ):
+        async with self._mixer_transport_lifecycle_lock:
+            return await self._connect_wing_locked(
+                ip,
+                send_port,
+                receive_port,
+                observation_only=observation_only,
+                record_telemetry=record_telemetry,
+                telemetry_session_label=telemetry_session_label,
+                owner_websocket=owner_websocket,
+            )
+
+    async def _connect_wing_locked(
         self,
         ip: str,
         send_port: int = 2223,
@@ -12996,10 +13135,54 @@ class AutoMixerServer:
         """
         if await self.block_packaged_offline_transport("connect_wing"):
             return False
+        if self._mixer_transport_teardown_failed:
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "status": "blocked",
+                "reason": "mixer_transport_teardown_quarantined",
+            })
+            return False
         m110_launch_active = (
             self._runtime_identity.get("launch_binding", {}).get("mode")
             == "m110_attended_runner"
         )
+        if not m110_launch_active:
+            if owner_websocket is not None and (
+                not self._ws_auth_required
+                or id(owner_websocket) not in self._authenticated_websocket_ids
+            ):
+                await self.send_to_client(
+                    owner_websocket,
+                    {
+                        "type": "connection_status",
+                        "connected": False,
+                        "status": "blocked",
+                        "reason": "authenticated_transport_owner_required",
+                    },
+                )
+                return False
+            if not await self._authorize_mixer_transport_replacement(owner_websocket):
+                return False
+            try:
+                authorized_target = self._authorize_wing_connection_target(
+                    ip=ip,
+                    send_port=send_port,
+                    receive_port=receive_port,
+                )
+            except (PermissionError, TypeError, ValueError) as exc:
+                await self.broadcast(
+                    {
+                        "type": "connection_status",
+                        "connected": False,
+                        "status": "blocked",
+                        "error": str(exc),
+                    }
+                )
+                return False
+            ip = authorized_target["ip"]
+            send_port = authorized_target["send_port"]
+            receive_port = authorized_target["receive_port"]
         if m110_launch_active:
             blockers = self._m110_preconnect_blockers(
                 owner_websocket,
@@ -13030,13 +13213,15 @@ class AutoMixerServer:
             observation_only = True
             record_telemetry = False
         # Disconnect existing connection if any
-        await self.disconnect_mixer()
+        if not await self._disconnect_mixer_locked(force=True):
+            return False
         self._agent_force_auto_apply = False
         if observation_only is not None:
             self._wing_observation_only = bool(observation_only)
         if record_telemetry is not None:
             self._wing_record_telemetry = bool(record_telemetry)
 
+        candidate_client = None
         try:
             osc_port = receive_port or send_port or 2223
             if send_port and receive_port and send_port != receive_port:
@@ -13048,6 +13233,7 @@ class AutoMixerServer:
                 )
 
             self.mixer_client = EnhancedOSCClient(ip=ip, port=osc_port)
+            candidate_client = self.mixer_client
             self.connection_mode = 'wing'
 
             # Store the event loop reference for thread-safe callback
@@ -13062,6 +13248,22 @@ class AutoMixerServer:
             success = self.mixer_client.connect()
 
             if success:
+                if not self._mixer_transport_owner_can_bind(owner_websocket):
+                    self._disconnect_mixer_candidate(
+                        candidate_client,
+                        "wing_owner_tombstoned_before_bind",
+                    )
+                    self.mixer_client = None
+                    self.connection_mode = None
+                    self._clear_mixer_transport_owner()
+                    await self.broadcast({
+                        "type": "connection_status",
+                        "connected": False,
+                        "status": "blocked",
+                        "reason": "authenticated_transport_owner_required",
+                    })
+                    return False
+                self._bind_mixer_transport_owner(owner_websocket)
                 if m110_launch_active:
                     self._m110_transport_owner_connection_id = id(
                         owner_websocket
@@ -13075,21 +13277,20 @@ class AutoMixerServer:
                     "connected": True,
                     "mode": "wing",
                     "ip": ip,
-                    "state": self.mixer_client.get_state(),
+                    **self._cached_mixer_state_payload(self.mixer_client),
                     "observation_only": self._wing_observation_only,
                     "record_telemetry": self._wing_record_telemetry,
                     "telemetry_session_label": telemetry_session_label,
                 })
                 logger.info("Wing connected successfully (direct OSC)")
             else:
-                disconnect_failed_client = getattr(self.mixer_client, "disconnect", None)
-                if callable(disconnect_failed_client):
-                    self._safe_cleanup_call(
-                        disconnect_failed_client,
-                        "Error stopping failed Wing connection attempt",
-                    )
+                self._disconnect_mixer_candidate(
+                    candidate_client,
+                    "failed_wing_connection_attempt",
+                )
                 self.mixer_client = None
                 self.connection_mode = None
+                self._clear_mixer_transport_owner()
                 self._m110_transport_owner_connection_id = None
                 self._m110_transport_owner_ref = None
                 await self.broadcast({
@@ -13099,15 +13300,25 @@ class AutoMixerServer:
                 })
 
         except asyncio.CancelledError:
+            self._disconnect_mixer_candidate(
+                candidate_client,
+                "cancelled_wing_connection_attempt",
+            )
             self.mixer_client = None
             self.connection_mode = None
+            self._clear_mixer_transport_owner()
             self._m110_transport_owner_connection_id = None
             self._m110_transport_owner_ref = None
             raise
         except Exception as e:
             logger.error(f"Error connecting to Wing: {e}")
+            self._disconnect_mixer_candidate(
+                candidate_client,
+                "errored_wing_connection_attempt",
+            )
             self.mixer_client = None
             self.connection_mode = None
+            self._clear_mixer_transport_owner()
             self._m110_transport_owner_connection_id = None
             self._m110_transport_owner_ref = None
             await self.broadcast({
@@ -13116,30 +13327,220 @@ class AutoMixerServer:
                 "error": str(e)
             })
 
-    async def connect_dlive(self, ip: str = "192.168.3.70", port: int = 51328,
-                            tls: bool = False, midi_base_channel: int = 0,
-                            tls_ca_file: Optional[str] = None,
-                            tls_server_hostname: Optional[str] = None):
-        """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
-        if await self.block_packaged_offline_transport("connect_dlive"):
-            return False
-        await self.disconnect_mixer()
-        self._agent_force_auto_apply = False
+    def _configured_dlive_connection_target(self) -> Dict[str, Any]:
+        """Return the only outbound dLive destination trusted by this runtime."""
+        configured = self.config.get("dlive")
+        if not isinstance(configured, Mapping):
+            raise ValueError("dlive_configured_destination_required")
 
+        host = str(configured.get("ip") or "").strip()
         try:
-            client = DLiveClient(
+            parsed_ip = ipaddress.ip_address(host)
+        except ValueError as exc:
+            raise ValueError("dlive_configured_rfc1918_ipv4_required") from exc
+        private_networks = (
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+        )
+        last_octet = str(parsed_ip).rsplit(".", 1)[-1]
+        if (
+            parsed_ip.version != 4
+            or not any(parsed_ip in network for network in private_networks)
+            or last_octet in {"0", "255"}
+        ):
+            raise ValueError("dlive_configured_rfc1918_ipv4_required")
+
+        validated = validate_dlive_connection_config(
+            host=host,
+            endpoint=configured.get("endpoint", "surface"),
+            tls=configured.get("tls", True),
+            port=configured.get("port"),
+            midi_base_channel=configured.get("midi_base_channel", 11),
+            user_profile=configured.get("user_profile", 0),
+        )
+        if not validated["tls"]:
+            raise ValueError("dlive_authenticated_tls_required")
+        tls_ca_file = str(configured.get("tls_ca_file") or "").strip()
+        tls_server_hostname = str(
+            configured.get("tls_server_hostname") or ""
+        ).strip()
+        tls_password_env = str(
+            configured.get("tls_password_env") or ""
+        ).strip()
+        if not tls_ca_file or not os.path.isabs(tls_ca_file):
+            raise ValueError("dlive_tls_ca_file_required")
+        if (
+            not tls_server_hostname
+            or len(tls_server_hostname) > 253
+            or any(char.isspace() for char in tls_server_hostname)
+            or "/" in tls_server_hostname
+        ):
+            raise ValueError("dlive_tls_server_identity_required")
+        if re.fullmatch(r"[A-Z][A-Z0-9_]{0,127}", tls_password_env) is None:
+            raise ValueError("dlive_tls_password_env_required")
+        return {
+            "ip": validated["host"],
+            "port": validated["port"],
+            "tls": validated["tls"],
+            "endpoint": validated["endpoint"],
+            "midi_base_channel": validated["midi_base_channel"],
+            "user_profile": validated["user_profile"],
+            "tls_ca_file": tls_ca_file,
+            "tls_server_hostname": tls_server_hostname,
+            "tls_password_env": tls_password_env,
+        }
+
+    def _authorize_dlive_connection_target(
+        self,
+        *,
+        ip: str,
+        port: Optional[int],
+        tls: bool,
+        endpoint: str,
+        midi_base_channel: int,
+        user_profile: int,
+        tls_ca_file: Optional[str],
+        tls_server_hostname: Optional[str],
+        tls_password_env: Optional[str],
+    ) -> Dict[str, Any]:
+        """Fail closed unless a request exactly matches the configured destination."""
+        configured = self._configured_dlive_connection_target()
+        requested = validate_dlive_connection_config(
+            host=ip,
+            endpoint=endpoint,
+            tls=tls,
+            port=port,
+            midi_base_channel=midi_base_channel,
+            user_profile=user_profile,
+        )
+        destination_fields = ("host", "port", "tls", "endpoint")
+        configured_preflight = {
+            "host": configured["ip"],
+            "port": configured["port"],
+            "tls": configured["tls"],
+            "endpoint": configured["endpoint"],
+        }
+        if any(
+            requested[field] != configured_preflight[field]
+            for field in destination_fields
+        ):
+            raise PermissionError("dlive_destination_not_configured")
+        if (
+            (tls_ca_file or None) != configured["tls_ca_file"]
+            or (tls_server_hostname or None)
+            != configured["tls_server_hostname"]
+            or (tls_password_env or None) != configured["tls_password_env"]
+        ):
+            raise PermissionError("dlive_tls_identity_not_configured")
+        return {
+            **configured,
+            "midi_base_channel": requested["midi_base_channel"],
+            "user_profile": requested["user_profile"],
+        }
+
+    async def connect_configured_dlive(
+        self,
+        owner_websocket: Optional[WebSocketServerProtocol] = None,
+    ):
+        """Connect only to the operator-owned destination in server config."""
+        try:
+            target = self._configured_dlive_connection_target()
+        except (TypeError, ValueError) as exc:
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "error": str(exc),
+            })
+            return False
+        return await self.connect_dlive(**target, owner_websocket=owner_websocket)
+
+    async def connect_dlive(self, ip: str = "192.168.3.71", port: Optional[int] = None,
+                            tls: bool = True, endpoint: str = "surface",
+                            midi_base_channel: int = 11, user_profile: int = 0,
+                            tls_ca_file: Optional[str] = None,
+                            tls_server_hostname: Optional[str] = None,
+                            tls_password_env: Optional[str] = None,
+                            owner_websocket: Optional[WebSocketServerProtocol] = None):
+        async with self._mixer_transport_lifecycle_lock:
+            return await self._connect_dlive_locked(
                 ip=ip,
                 port=port,
                 tls=tls,
+                endpoint=endpoint,
+                midi_base_channel=midi_base_channel,
+                user_profile=user_profile,
                 tls_ca_file=tls_ca_file,
                 tls_server_hostname=tls_server_hostname,
-                midi_base_channel=midi_base_channel,
+                tls_password_env=tls_password_env,
+                owner_websocket=owner_websocket,
             )
+
+    async def _connect_dlive_locked(self, ip: str = "192.168.3.71", port: Optional[int] = None,
+                                    tls: bool = True, endpoint: str = "surface",
+                                    midi_base_channel: int = 11, user_profile: int = 0,
+                                    tls_ca_file: Optional[str] = None,
+                                    tls_server_hostname: Optional[str] = None,
+                                    tls_password_env: Optional[str] = None,
+                                    owner_websocket: Optional[WebSocketServerProtocol] = None):
+        """Connect to Allen & Heath dLive mixer via MIDI over TCP."""
+        if await self.block_packaged_offline_transport("connect_dlive"):
+            return False
+        if self._mixer_transport_teardown_failed:
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "status": "blocked",
+                "reason": "mixer_transport_teardown_quarantined",
+            })
+            return False
+
+        if not await self._authorize_mixer_transport_replacement(owner_websocket):
+            return False
+
+        client = None
+        try:
+            authorized = self._authorize_dlive_connection_target(
+                ip=ip,
+                port=port,
+                tls=tls,
+                endpoint=endpoint,
+                midi_base_channel=midi_base_channel,
+                user_profile=user_profile,
+                tls_ca_file=tls_ca_file,
+                tls_server_hostname=tls_server_hostname,
+                tls_password_env=tls_password_env,
+            )
+            password = os.environ.get(authorized["tls_password_env"], "")
+            if not password:
+                raise ValueError("dlive_tls_password_unavailable")
+            if not await self._disconnect_mixer_locked(force=True):
+                return False
+            self._agent_force_auto_apply = False
+            client_config = dict(authorized)
+            client_config.pop("tls_password_env", None)
+            client = DLiveClient(**client_config, password=password)
             success = client.connect()
 
             if success:
+                if not self._mixer_transport_owner_can_bind(owner_websocket):
+                    self._disconnect_mixer_candidate(
+                        client,
+                        "dlive_owner_tombstoned_before_bind",
+                    )
+                    self.mixer_client = None
+                    self.connection_mode = None
+                    self._clear_mixer_transport_owner()
+                    await self.broadcast({
+                        "type": "connection_status",
+                        "connected": False,
+                        "status": "blocked",
+                        "reason": "authenticated_transport_owner_required",
+                    })
+                    return False
                 self.mixer_client = client
                 self.connection_mode = 'dlive'
+                self._bind_mixer_transport_owner(owner_websocket)
                 if self.mixing_agent is not None:
                     self.mixing_agent.mixer = self.mixer_client
                 self._enforce_agent_dry_run_mode()
@@ -13154,11 +13555,28 @@ class AutoMixerServer:
                     "type": "connection_status",
                     "connected": True,
                     "mode": "dlive",
-                    "ip": ip,
-                    "state": client.get_state()
+                    "ip": authorized["ip"],
+                    "port": client.port,
+                    "endpoint": client.endpoint,
+                    "tls": client.tls,
+                    "midi_base_channel": client.midi_base_channel,
+                    "user_profile": client.user_profile,
+                    "identity_verified": False,
+                    "identity_status": "operator_attestation_required",
+                    "live_write": False,
+                    "live_authority_granted": False,
+                    **self._cached_mixer_state_payload(client),
                 })
-                logger.info(f"dLive connected at {ip}:{port}")
+                logger.info(
+                    "dLive connected read-only at %s:%s",
+                    authorized["ip"],
+                    client.port,
+                )
             else:
+                self._disconnect_mixer_candidate(
+                    client,
+                    "failed_dlive_connection_attempt",
+                )
                 await self.broadcast({
                     "type": "connection_status",
                     "connected": False,
@@ -13166,20 +13584,104 @@ class AutoMixerServer:
                 })
 
         except asyncio.CancelledError:
+            self._disconnect_mixer_candidate(
+                client,
+                "cancelled_dlive_connection_attempt",
+            )
             self.mixer_client = None
             self.connection_mode = None
+            self._clear_mixer_transport_owner()
             raise
         except Exception as e:
             logger.error(f"Error connecting to dLive: {e}")
+            self._disconnect_mixer_candidate(
+                client,
+                "errored_dlive_connection_attempt",
+            )
             self.mixer_client = None
             self.connection_mode = None
+            self._clear_mixer_transport_owner()
             await self.broadcast({
                 "type": "connection_status",
                 "connected": False,
                 "error": str(e)
             })
 
-    async def connect_mixing_station(self, host: str = "127.0.0.1", osc_port: int = 8000, rest_port: int = 8080):
+    def _configured_mixing_station_connection_target(self) -> Dict[str, Any]:
+        """Load the one loopback Mixing Station destination trusted by the app."""
+        config_path = os.path.join(_REPO_ROOT, "config", "mixing_station.yaml")
+        try:
+            import yaml
+
+            with open(config_path, encoding="utf-8") as config_file:
+                configured = yaml.safe_load(config_file)
+        except Exception as exc:
+            raise ValueError("mixing_station_config_unavailable") from exc
+        if not isinstance(configured, Mapping):
+            raise ValueError("mixing_station_config_invalid")
+
+        host = str(configured.get("host") or "").strip()
+        try:
+            parsed_ip = ipaddress.ip_address(host)
+        except ValueError as exc:
+            raise ValueError("mixing_station_loopback_ip_required") from exc
+        if parsed_ip.version != 4 or not parsed_ip.is_loopback:
+            raise ValueError("mixing_station_loopback_ip_required")
+
+        ports: Dict[str, int] = {}
+        for field in ("osc_port", "rest_port"):
+            value = configured.get(field)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"mixing_station_{field}_invalid")
+            if not 1 <= value <= 65535:
+                raise ValueError(f"mixing_station_{field}_invalid")
+            ports[field] = value
+        return {"host": str(parsed_ip), **ports}
+
+    def _authorize_mixing_station_connection_target(
+        self,
+        *,
+        host: str,
+        osc_port: int,
+        rest_port: int,
+    ) -> Dict[str, Any]:
+        configured = self._configured_mixing_station_connection_target()
+        requested = {
+            "host": str(host or "").strip(),
+            "osc_port": osc_port,
+            "rest_port": rest_port,
+        }
+        if requested != configured:
+            raise PermissionError("mixing_station_destination_not_configured")
+        return configured
+
+    async def connect_configured_mixing_station(
+        self,
+        owner_websocket: Optional[WebSocketServerProtocol] = None,
+    ):
+        """Connect using only config/mixing_station.yaml destination fields."""
+        try:
+            target = self._configured_mixing_station_connection_target()
+        except (TypeError, ValueError) as exc:
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "error": str(exc),
+            })
+            return False
+        return await self.connect_mixing_station(
+            **target,
+            owner_websocket=owner_websocket,
+        )
+
+    async def connect_mixing_station(
+        self,
+        host: str = "127.0.0.1",
+        osc_port: int = 8000,
+        rest_port: int = 8080,
+        *,
+        owner_websocket: Optional[WebSocketServerProtocol] = None,
+    ):
         """
         Connect to mixer via Mixing Station app
 
@@ -13190,12 +13692,25 @@ class AutoMixerServer:
         """
         if await self.block_packaged_offline_transport("connect_mixing_station"):
             return False
-        # Disconnect existing connection if any
-        await self.disconnect_mixer()
-        self._agent_force_auto_apply = False
 
         try:
-            self.mixer_client = MixingStationClient(host, osc_port, rest_port)
+            authorized = self._authorize_mixing_station_connection_target(
+                host=host,
+                osc_port=osc_port,
+                rest_port=rest_port,
+            )
+            await self.broadcast({
+                "type": "connection_status",
+                "connected": False,
+                "status": "blocked",
+                "reason": "mixing_station_authenticated_ipc_required",
+            })
+            return False
+            # Preserve the current transport until the replacement destination
+            # has passed the complete local policy.
+            await self.disconnect_mixer(force=True)
+            self._agent_force_auto_apply = False
+            self.mixer_client = MixingStationClient(**authorized)
             self.connection_mode = 'mixing_station'
 
             # Store the event loop reference for thread-safe callback
@@ -13217,9 +13732,9 @@ class AutoMixerServer:
                     "type": "connection_status",
                     "connected": True,
                     "mode": "mixing_station",
-                    "host": host,
-                    "osc_port": osc_port,
-                    "state": self.mixer_client.get_state()
+                    "host": authorized["host"],
+                    "osc_port": authorized["osc_port"],
+                    **self._cached_mixer_state_payload(self.mixer_client),
                 })
                 logger.info("Connected to Mixing Station successfully")
             else:
@@ -13249,6 +13764,13 @@ class AutoMixerServer:
         """Try to auto-discover Mixing Station on common ports"""
         if await self.block_packaged_offline_transport("discover_mixing_station"):
             return False
+        await self.broadcast({
+            "type": "mixing_station_discovered",
+            "found": False,
+            "status": "blocked",
+            "reason": "mixing_station_authenticated_ipc_required",
+        })
+        return False
         logger.info("Discovering Mixing Station...")
 
         result = discover_mixing_station()
@@ -13269,21 +13791,150 @@ class AutoMixerServer:
             })
             logger.info("Mixing Station not found")
 
-    async def disconnect_mixer(self):
+    def _bind_mixer_transport_owner(
+        self,
+        owner_websocket: Optional[WebSocketServerProtocol],
+    ) -> None:
+        self._mixer_transport_owner_ref = owner_websocket
+        self._mixer_transport_owner_connection_id = (
+            id(owner_websocket) if owner_websocket is not None else None
+        )
+
+    def _clear_mixer_transport_owner(self) -> None:
+        self._mixer_transport_owner_connection_id = None
+        self._mixer_transport_owner_ref = None
+
+    def _mixer_transport_owner_can_bind(
+        self,
+        owner_websocket: Optional[WebSocketServerProtocol],
+    ) -> bool:
+        """Revalidate a requester immediately before binding a live transport."""
+
+        if owner_websocket is None:
+            return True
+        return (
+            self._ws_auth_required
+            and id(owner_websocket) in self._authenticated_websocket_ids
+        )
+
+    def _disconnect_mixer_candidate(self, client: Any, context: str) -> bool:
+        """Best-effort candidate cleanup with a persistent fail-closed latch."""
+
+        if client is None:
+            return True
+        disconnect = getattr(client, "disconnect", None)
+        if not callable(disconnect):
+            self._mixer_transport_teardown_failed = True
+            logger.error("Mixer transport has no disconnect method (%s)", context)
+            return False
+        try:
+            teardown_verified = disconnect()
+            if teardown_verified is True:
+                return True
+            self._mixer_transport_teardown_failed = True
+            logger.error(
+                "Mixer transport teardown was not verified (%s): %r",
+                context,
+                teardown_verified,
+            )
+            return False
+        except Exception:
+            self._mixer_transport_teardown_failed = True
+            logger.exception("Mixer transport teardown failed (%s)", context)
+            return False
+
+    async def _authorize_mixer_transport_replacement(
+        self,
+        owner_websocket: Optional[WebSocketServerProtocol],
+    ) -> bool:
+        """Allow a first transport or replacement by its authenticated owner."""
+
+        if owner_websocket is None:
+            return True
+        if (
+            not self._ws_auth_required
+            or id(owner_websocket) not in self._authenticated_websocket_ids
+        ):
+            await self.send_to_client(owner_websocket, {
+                "type": "connection_status",
+                "connected": False,
+                "status": "blocked",
+                "reason": "authenticated_transport_owner_required",
+            })
+            return False
+        current_owner = self._mixer_transport_owner_connection_id
+        if self.mixer_client is not None and (
+            current_owner != id(owner_websocket)
+            or self._mixer_transport_owner_ref is not owner_websocket
+        ):
+            await self.send_to_client(owner_websocket, {
+                "type": "connection_status",
+                "connected": True,
+                "status": "blocked",
+                "reason": "mixer_transport_owned_by_another_session",
+            })
+            return False
+        return True
+
+    async def disconnect_mixer(
+        self,
+        requester_websocket: Optional[WebSocketServerProtocol] = None,
+        *,
+        force: bool = False,
+    ):
+        async with self._mixer_transport_lifecycle_lock:
+            return await self._disconnect_mixer_locked(
+                requester_websocket=requester_websocket,
+                force=force,
+            )
+
+    async def _disconnect_mixer_locked(
+        self,
+        requester_websocket: Optional[WebSocketServerProtocol] = None,
+        *,
+        force: bool = False,
+    ):
         """Disconnect from current mixer (Wing or Mixing Station)"""
+        if self._mixer_transport_teardown_failed:
+            return False
+        if not force and requester_websocket is not None:
+            if (
+                not self._ws_auth_required
+                or id(requester_websocket) not in self._authenticated_websocket_ids
+                or self._mixer_transport_owner_connection_id
+                != id(requester_websocket)
+                or self._mixer_transport_owner_ref is not requester_websocket
+            ):
+                await self.send_to_client(requester_websocket, {
+                    "type": "connection_status",
+                    "connected": self.mixer_client is not None,
+                    "status": "blocked",
+                    "reason": "mixer_transport_owner_required",
+                })
+                return False
+        client = self.mixer_client
+        mode = self.connection_mode
+        teardown_ok = True
+        if client is not None:
+            teardown_ok = self._disconnect_mixer_candidate(
+                client,
+                "active_mixer_disconnect",
+            )
+
+        # Clear shared state even if the transport's own cleanup raises.  The
+        # persistent teardown latch above prevents a replacement from opening
+        # beside a possibly orphaned physical socket.
+        self.mixer_client = None
+        self.connection_mode = None
+        if self.mixing_agent is not None:
+            self.mixing_agent.mixer = None
         self._agent_force_auto_apply = False
         self._m110_transport_owner_connection_id = None
         self._m110_transport_owner_ref = None
+        self._clear_mixer_transport_owner()
         self._mixer_connection_generation += 1
         self._revoke_m110_route_authority("mixer_disconnected_or_reconnected")
-        if self.mixer_client:
-            self.mixer_client.disconnect()
-            self.mixer_client = None
-            if self.mixing_agent is not None:
-                self.mixing_agent.mixer = None
-            mode = self.connection_mode
-            self.connection_mode = None
-
+        if client is not None:
             for run_id in list(getattr(self, "_soundcheck_manifests", {})):
                 self._invalidate_soundcheck_console_fence(
                     run_id,
@@ -13292,7 +13943,13 @@ class AutoMixerServer:
 
             await self.broadcast({
                 "type": "connection_status",
-                "connected": False
+                "connected": False,
+                "status": "disconnected" if teardown_ok else "error",
+                "reason": (
+                    None
+                    if teardown_ok
+                    else "mixer_transport_teardown_quarantined"
+                ),
             })
             if isinstance(self.last_soundcheck_readiness, Mapping):
                 await self.broadcast({
@@ -13305,7 +13962,9 @@ class AutoMixerServer:
                         self.last_soundcheck_readiness
                     ),
                 })
-            logger.info(f"Disconnected from mixer (was: {mode})")
+            if teardown_ok:
+                logger.info(f"Disconnected from mixer (was: {mode})")
+        return teardown_ok
 
     async def start_voice_control(self, model_size: str = "small", language: str = "ru",
                                   device_id: Optional[str] = None, channel: int = 0):
@@ -17851,6 +18510,11 @@ class AutoMixerServer:
             else None
         )
         value = self._extract_manual_write_read_value(raw)
+        authoritative_receipt = verify_wing_physical_readback_receipt(
+            self.mixer_client,
+            raw,
+            address,
+        )
         if not (
             isinstance(raw, Mapping)
             and raw.get("status") == "received"
@@ -17859,6 +18523,7 @@ class AutoMixerServer:
             and not isinstance(confirmed_round_trips, bool)
             and confirmed_round_trips >= 2
             and value is not None
+            and authoritative_receipt
         ):
             return {
                 "verified": False,
@@ -23427,6 +24092,11 @@ class AutoMixerServer:
                 and confirmed >= 2
                 and normalized in {0, 1}
                 and normalized == expected
+                and verify_wing_physical_readback_receipt(
+                    client,
+                    raw,
+                    address,
+                )
             )
             passes.append(row)
         elapsed = time.monotonic() - started
@@ -23542,6 +24212,11 @@ class AutoMixerServer:
                     and isinstance(confirmed, int)
                     and not isinstance(confirmed, bool)
                     and confirmed >= 2
+                    and verify_wing_physical_readback_receipt(
+                        client,
+                        raw,
+                        address,
+                    )
                 )
                 if not valid_transport or not expected_value_matches(
                     expected_value,
@@ -28659,7 +29334,12 @@ class AutoMixerServer:
             logger.error(f"Error sending soundcheck status: {e}", exc_info=True)
             # Don't raise - we don't want to stop the cycle if status update fails
 
-    async def _execute_voice_command(self, command: dict):
+    async def _execute_voice_command(
+        self,
+        command: dict,
+        *,
+        ambient_voice: bool = False,
+    ):
         """Execute a recognized voice command"""
         command = self._normalize_voice_command_payload(command)
         command_generation = self._manual_write_emergency_generation
@@ -28686,7 +29366,10 @@ class AutoMixerServer:
         try:
             cmd_type = str(command.get("type") or "").strip().lower()
             channel = command.get("channel")
-            if await self._block_quarantined_voice_command_if_needed(command):
+            if await self._block_quarantined_voice_command_if_needed(
+                command,
+                ambient_voice=ambient_voice,
+            ):
                 return
             if (
                 self._is_shutting_down
@@ -29177,16 +29860,15 @@ class AutoMixerServer:
                 if self._is_shutting_down:
                     await websocket.close(code=1001, reason="server_shutdown")
                     break
+                if expires_at is not None and time.time() >= expires_at:
+                    await self._close_expired_authenticated_websocket(websocket)
+                    break
                 if msg_type in EMERGENCY_FAST_LANE_TYPES:
                     # Exact stop message types bypass both token buckets and the
                     # normal FIFO. The first accepted stop also invalidates all
                     # normal messages already queued under the previous epoch.
                     self._schedule_websocket_emergency(websocket, message)
                     continue
-
-                if expires_at is not None and time.time() >= expires_at:
-                    await self._close_expired_authenticated_websocket(websocket)
-                    break
 
                 now = time.monotonic()
                 if not consume_token_buckets(
@@ -29242,7 +29924,7 @@ class AutoMixerServer:
                 with suppress(asyncio.CancelledError):
                     await expiry_task
             if m110_transport_owner_closing:
-                await self.disconnect_mixer()
+                await self.disconnect_mixer(force=True)
             authority = getattr(self, "_master_capture_route_authority", None)
             if (
                 authority is not None
@@ -29269,10 +29951,14 @@ class AutoMixerServer:
         self._authenticated_websocket_expiry.pop(id(websocket), None)
         self._authenticated_websocket_expiry_close_started.discard(id(websocket))
         self._authenticated_websocket_ids.discard(id(websocket))
-        owner_closing = self._m110_transport_owner_ref is websocket
+        owner_closing = (
+            self._m110_transport_owner_ref is websocket
+            or self._mixer_transport_owner_ref is websocket
+        )
         if owner_closing:
             self._m110_transport_owner_ref = None
             self._m110_transport_owner_connection_id = None
+            self._clear_mixer_transport_owner()
             self._revoke_m110_route_authority(
                 "owner_websocket_disconnect_started"
             )

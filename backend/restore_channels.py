@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 def restore_channel(client: WingClient, channel_data: dict):
     """Restore a single channel's settings"""
+    raise PermissionError("legacy_channel_restore_surface_quarantined")
     ch = channel_data['channel']
     
     logger.info(f"Restoring channel {ch}...")
@@ -193,6 +194,10 @@ def restore_channel(client: WingClient, channel_data: dict):
 
 def restore_from_backup_using_client(client: "WingClient", backup_file: str, skip_confirm: bool = False) -> bool:
     """Restore all channels from backup file using an already-connected client (no prompt)."""
+    logger.error("Legacy channel restore surface is quarantined")
+    return False
+
+    # Retained below only as historical implementation context; unreachable.
     try:
         with open(backup_file, 'r', encoding='utf-8') as f:
             backup_data = json.load(f)
@@ -214,6 +219,9 @@ def restore_from_backup_using_client(client: "WingClient", backup_file: str, ski
 
 def restore_from_backup(backup_file: str, ip: str = "192.168.1.102", port: int = 2223):
     """Restore all channels from backup file"""
+
+    logger.error("Legacy channel restore surface is quarantined")
+    return False
 
     require_manual_recovery_ack("restore_channels.py")
     

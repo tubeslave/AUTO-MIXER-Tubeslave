@@ -14,6 +14,9 @@ from lufs_gain_staging import KWeightingFilter
 AIAK_INTEGRATED_LUFS_METHOD_ID = "aiak_rolling_integrated_lufs_correction_v1"
 AIAK_LEVEL_PLANE_METHOD_ID = "aiak_integrated_lufs_level_plane_correction_v1"
 MIN_POWER = 1e-20
+MAX_LUFS_SAMPLE_RATE = 192_000
+MAX_LUFS_DURATION_SEC = 30 * 60
+MAX_LUFS_CHANNELS = 64
 
 
 LEVEL_PLANE_DEFAULT_BASE_LUFS = -24.0
@@ -168,10 +171,12 @@ def resolve_aiak_level_plane_target_lufs(role: str | None, base_lufs: float = LE
 def _as_channels(audio: np.ndarray) -> np.ndarray:
     arr = np.asarray(audio, dtype=np.float32)
     if arr.ndim == 1:
-        return arr[:, None]
-    if arr.ndim == 2:
-        return arr
-    raise ValueError(f"audio must be 1D or 2D, got shape {arr.shape}")
+        arr = arr[:, None]
+    elif arr.ndim != 2:
+        raise ValueError(f"audio must be 1D or 2D, got shape {arr.shape}")
+    if arr.shape[1] > MAX_LUFS_CHANNELS or not np.all(np.isfinite(arr)):
+        raise ValueError("audio channel or finite-sample limit violated")
+    return arr
 
 
 def _sample_peak_dbfs(audio: np.ndarray) -> float:
@@ -195,7 +200,13 @@ def aiak_block_lufs_samples(
     block_sec: float = 0.4,
     hop_sec: float = 0.1,
 ) -> Tuple[Tuple[float, float], ...]:
+    if type(sample_rate) is not int or not 1 <= sample_rate <= MAX_LUFS_SAMPLE_RATE:
+        raise ValueError("sample_rate is outside supported bounds")
+    if not (0.05 <= float(block_sec) <= 10.0 and 0.01 <= float(hop_sec) <= 10.0):
+        raise ValueError("LUFS block/hop duration is outside supported bounds")
     weighted = _k_weight_channels(audio, sample_rate)
+    if weighted.shape[0] / float(sample_rate) > MAX_LUFS_DURATION_SEC:
+        raise ValueError("audio duration exceeds LUFS limit")
     block_size = max(1, int(round(float(sample_rate) * float(block_sec))))
     hop_size = max(1, int(round(float(sample_rate) * float(hop_sec))))
     if weighted.shape[0] < block_size:

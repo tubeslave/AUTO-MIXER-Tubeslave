@@ -8,6 +8,7 @@ semantics. It does not send OSC.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import math
 import time
 from typing import Any, Dict, Mapping, Tuple
 
@@ -60,9 +61,63 @@ class SafetyGateConfig:
     budget_window_sec: float = 60.0
     min_hold_sec: float = 0.0
 
+    def __post_init__(self) -> None:
+        numeric_fields = {
+            name: value
+            for name, value in vars(self).items()
+            if name not in {
+                "live_mode_blocks_abrupt_changes",
+                "dry_run",
+                "emergency_bypass",
+            }
+        }
+        for name, value in numeric_fields.items():
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise ValueError(f"{name} must be a finite numeric value")
+            if not math.isfinite(float(value)):
+                raise ValueError(f"{name} must be a finite numeric value")
+
+        non_negative = (
+            "max_gain_change_db",
+            "max_live_gain_increase_db",
+            "min_gain_change_db",
+            "max_eq_boost_db",
+            "max_eq_cut_db",
+            "max_pan_step",
+            "max_compression_threshold_change_db",
+            "min_interval_sec",
+            "cooldown_sec",
+            "hysteresis_db",
+            "max_rate_db_per_sec",
+            "correction_budget_db",
+            "min_hold_sec",
+        )
+        for name in non_negative:
+            if float(getattr(self, name)) < 0.0:
+                raise ValueError(f"{name} must be non-negative")
+        if self.max_eq_q <= 0.0:
+            raise ValueError("max_eq_q must be positive")
+        if self.min_eq_frequency_hz <= 0.0:
+            raise ValueError("min_eq_frequency_hz must be positive")
+        if self.max_eq_frequency_hz <= self.min_eq_frequency_hz:
+            raise ValueError("max_eq_frequency_hz must exceed min_eq_frequency_hz")
+        if not 0.0 <= self.max_pan_abs <= 1.0:
+            raise ValueError("max_pan_abs must be in range 0..1")
+        if self.max_compression_ratio < 1.0:
+            raise ValueError("max_compression_ratio must be at least 1")
+        if self.budget_window_sec <= 0.0:
+            raise ValueError("budget_window_sec must be positive")
+        if self.true_peak_ceiling_dbtp > 0.0:
+            raise ValueError("true_peak_ceiling_dbtp must not exceed 0 dBTP")
+
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any] | None) -> "SafetyGateConfig":
         payload = payload or {}
+        def exact_bool(name: str, default: bool) -> bool:
+            value = payload.get(name, default)
+            if type(value) is not bool:
+                raise ValueError(f"{name} must be an exact boolean")
+            return value
         return cls(
             max_gain_change_db=float(payload.get("max_gain_change_db", 1.0)),
             max_live_gain_increase_db=float(payload.get("max_live_gain_increase_db", 0.5)),
@@ -81,12 +136,10 @@ class SafetyGateConfig:
             min_interval_sec=float(payload.get("min_interval_sec", 3.0)),
             cooldown_sec=float(payload.get("cooldown_sec", 2.0)),
             hysteresis_db=float(payload.get("hysteresis_db", 0.25)),
-            live_mode_blocks_abrupt_changes=bool(
-                payload.get("live_mode_blocks_abrupt_changes", True)
-            ),
+            live_mode_blocks_abrupt_changes=exact_bool("live_mode_blocks_abrupt_changes", True),
             true_peak_ceiling_dbtp=float(payload.get("true_peak_ceiling_dbtp", -1.0)),
-            dry_run=bool(payload.get("dry_run", False)),
-            emergency_bypass=bool(payload.get("emergency_bypass", False)),
+            dry_run=exact_bool("dry_run", False),
+            emergency_bypass=exact_bool("emergency_bypass", False),
             max_rate_db_per_sec=float(payload.get("max_rate_db_per_sec", 0.0)),
             correction_budget_db=float(payload.get("correction_budget_db", 0.0)),
             budget_window_sec=float(payload.get("budget_window_sec", 60.0)),
@@ -214,7 +267,12 @@ class SafetyGate:
         if decision.action_type == ACTION_NO_ACTION:
             return self._mark_allowed(decision, "no_action", dry_run), "no action"
 
-        emergency = self.config.emergency_bypass or bool(decision.metadata.get("emergency", False))
+        if _contains_non_finite_number(decision.parameters):
+            return None, "non_finite_parameter"
+
+        # Emergency authority is code/config owned. Untrusted decision metadata
+        # is descriptive and can never relax safety limits.
+        emergency = self.config.emergency_bypass is True
         if not emergency:
             if not decision.safe_to_apply:
                 return None, "decision_engine_marked_unsafe"
@@ -404,9 +462,27 @@ def _number(value: Any, default: float | None) -> float | None:
     try:
         if value is None:
             return default
-        return float(value)
+        numeric = float(value)
+        return numeric if math.isfinite(numeric) else default
     except (TypeError, ValueError):
         return default
+
+
+def _contains_non_finite_number(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return any(_contains_non_finite_number(item) for item in value.values())
+    if isinstance(value, (list, tuple)):
+        return any(_contains_non_finite_number(item) for item in value)
+    if isinstance(value, bool) or value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return not math.isfinite(float(value))
+    if isinstance(value, str):
+        try:
+            return not math.isfinite(float(value))
+        except ValueError:
+            return False
+    return False
 
 
 def _target_state(current_state: Mapping[str, Any], target: str) -> Dict[str, Any]:

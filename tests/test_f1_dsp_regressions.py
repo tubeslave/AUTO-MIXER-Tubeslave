@@ -104,6 +104,7 @@ class TestWingRatioTokens:
             from unittest.mock import MagicMock as MM
             client.sock = MM()
             client._osc_throttle_enabled = False
+            client.install_mutation_boundary(lambda _address, _values: True)
             assert client.set_compressor(1, ratio=10.0) is True
             sent = client.commanded_state.get("/ch/1/dyn/ratio")
             assert sent in WING_RATIO_STRINGS, f"на пульт ушёл токен {sent!r}"

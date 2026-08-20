@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from auto_soundcheck_engine import AutoSoundcheckEngine, ChannelInfo, ChannelSnapshot
-from automixer.production_mix_v1.models import MixAction, MixCandidate, SafetyResult
+from automixer.production_mix_v1.models import MixAction, MixCandidate, OSCCommand, SafetyResult
 from automixer.production_mix_v1.osc_queue import OSCCommandQueue
 from feedback_detector import FeedbackEvent
 import handlers.mixer_handlers as mixer_handlers
@@ -64,7 +64,7 @@ def test_replay_queue_dry_run_reconstructs_would_send_without_transport(monkeypa
     ]
 
 
-def test_replay_queue_live_flush_records_incident_without_network(monkeypatch: pytest.MonkeyPatch):
+def test_replay_queue_live_flush_blocks_command_level_dry_run_without_network(monkeypatch: pytest.MonkeyPatch):
     install_transport_blockers(monkeypatch)
     sender = RecordingSender()
     queue = OSCCommandQueue(dry_run=False)
@@ -76,20 +76,78 @@ def test_replay_queue_live_flush_records_incident_without_network(monkeypatch: p
     records = sender.incident_records()
     assert result.dry_run is False
     assert result.would_send == []
-    assert len(result.sent) == 1
-    assert len(records) == 1
-    assert records[0]["event_index"] == 1
-    assert records[0]["address"] == "/ch/07/gain"
-    assert records[0]["channel"] == 7
-    assert records[0]["transport_kind"] == "mutation"
-    assert result.sent[0]["replay_correlation_id"] == "corr::gain::7"
-    assert records[0]["values"] == [
-        {
-            "gain_db": -1.5,
-            "reason": "replay_test",
-            "replay_correlation_id": "corr::gain::7",
-        }
-    ]
+    assert result.sent == []
+    assert records == []
+    assert result.warnings == ["command_dry_run_only_no_osc_sent"]
+    assert len(result.blocked) == 1
+    assert result.blocked[0]["address"] == "/ch/07/gain"
+    assert result.blocked[0]["dry_run_only"] is True
+    assert result.blocked[0]["block_reason"] == "command_dry_run_only"
+    assert result.blocked[0]["replay_correlation_id"] == "corr::gain::7"
+
+
+def _live_command(channel_id: int) -> OSCCommand:
+    return OSCCommand(
+        address=f"/ch/{channel_id:02d}/gain",
+        args=[{"gain_db": -1.0}],
+        dry_run_only=False,
+        replay_correlation_id=f"corr::live::{channel_id}",
+    )
+
+
+def test_replay_queue_records_sent_only_after_explicit_transport_success(monkeypatch: pytest.MonkeyPatch):
+    install_transport_blockers(monkeypatch)
+    sender = RecordingSender(send_result=True)
+    queue = OSCCommandQueue(dry_run=False)
+    queue._commands.append(_live_command(8))
+
+    result = queue.flush(sender=sender)
+
+    assert len(sender.incident_records()) == 1
+    assert [item["address"] for item in result.sent] == ["/ch/08/gain"]
+    assert result.failed == []
+    assert result.blocked == []
+    assert result.warnings == []
+
+
+def test_replay_queue_false_transport_result_fails_and_stops_batch(monkeypatch: pytest.MonkeyPatch):
+    install_transport_blockers(monkeypatch)
+    sender = RecordingSender(send_result=False)
+    queue = OSCCommandQueue(dry_run=False)
+    queue._commands.extend([_live_command(9), _live_command(10)])
+
+    result = queue.flush(sender=sender)
+
+    assert len(sender.incident_records()) == 1
+    assert result.sent == []
+    assert len(result.failed) == 1
+    assert result.failed[0]["address"] == "/ch/09/gain"
+    assert result.failed[0]["failure_reason"] == "transport_result_not_true"
+    assert len(result.blocked) == 1
+    assert result.blocked[0]["address"] == "/ch/10/gain"
+    assert result.blocked[0]["block_reason"] == "prior_transport_failure"
+    assert result.warnings == ["osc_transport_failed_no_success_recorded"]
+
+
+def test_replay_queue_transport_exception_fails_without_success_record(monkeypatch: pytest.MonkeyPatch):
+    install_transport_blockers(monkeypatch)
+
+    class RaisingSender:
+        def send(self, address, *args):
+            raise TimeoutError("synthetic replay timeout")
+
+    queue = OSCCommandQueue(dry_run=False)
+    queue._commands.append(_live_command(11))
+
+    result = queue.flush(sender=RaisingSender())
+
+    assert result.sent == []
+    assert result.blocked == []
+    assert len(result.failed) == 1
+    assert result.failed[0]["address"] == "/ch/11/gain"
+    assert result.failed[0]["failure_reason"] == "transport_send_raised"
+    assert result.failed[0]["transport_error_type"] == "TimeoutError"
+    assert result.warnings == ["osc_transport_failed_no_success_recorded"]
 
 
 def test_replay_autosoundcheck_gain_recommendations_are_read_only(monkeypatch: pytest.MonkeyPatch):

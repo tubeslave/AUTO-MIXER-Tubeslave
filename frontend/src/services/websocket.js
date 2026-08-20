@@ -27,13 +27,15 @@ class WebSocketService extends BaseWebSocketTransport {
   }
 
   // dLive MIDI/TCP connection
-  connectDLive(ip, port = 51328, tls = false, midiBaseChannel = 0) {
+  connectDLive(ip, port = 51328, tls = false, midiBaseChannel = 11, endpoint = 'surface', userProfile = 0) {
     this.send({
       type: 'connect_dlive',
       ip,
       port,
       tls,
-      midi_base_channel: midiBaseChannel
+      endpoint,
+      midi_base_channel: midiBaseChannel,
+      user_profile: userProfile
     });
   }
 
@@ -70,12 +72,14 @@ class WebSocketService extends BaseWebSocketTransport {
     });
   }
 
-  autoConnectMixer(preferredType = null, preferredIp = null, fullScan = false) {
+  autoConnectMixer(preferredType = null, preferredIp = null, fullScan = false, midiBaseChannel = 11, userProfile = 0) {
     this.send({
       type: 'auto_connect',
       preferred_type: preferredType,
       preferred_ip: preferredIp,
-      full_scan: fullScan
+      full_scan: fullScan,
+      midi_base_channel: midiBaseChannel,
+      user_profile: userProfile
     });
   }
 

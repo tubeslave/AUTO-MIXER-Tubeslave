@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,24 @@ from .score_normalizer import aggregate_scores, configured_weights
 
 
 REPLAY_TRACE_SCHEMA_VERSION = "replay_trace/v1"
+
+FEEDBACK_MIN_FREQUENCY_HZ = 80.0
+FEEDBACK_MAX_FREQUENCY_HZ = 12000.0
+FEEDBACK_MIN_Q = 0.1
+FEEDBACK_HARD_MAX_Q = 12.0
+FEEDBACK_DEFAULT_MAX_Q = 8.0
+FEEDBACK_HARD_MAX_CUT_DB = 12.0
+FEEDBACK_DEFAULT_MAX_CUT_DB = 9.0
+
+GAIN_MIN_DB = -18.0
+GAIN_MAX_DB = 18.0
+GAIN_HARD_MAX_STEP_DB = 12.0
+GAIN_DEFAULT_MAX_STEP_DB = 3.0
+
+FADER_MIN_DB = -144.0
+FADER_MAX_DB = 0.0
+FADER_HARD_MAX_STEP_DB = 12.0
+FADER_DEFAULT_MAX_STEP_DB = 2.0
 
 PROPOSAL_FAMILIES = {
     "gain_adjustment",
@@ -31,6 +50,141 @@ def _coerce_float(value: Any, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _strict_finite_number(value: Any, family: str, field: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ValueError(f"{family} {field} must be an exact numeric value")
+    normalized = float(value)
+    if not math.isfinite(normalized):
+        raise ValueError(f"{family} {field} must be finite")
+    return normalized
+
+
+def validate_feedback_mitigation_values(
+    *,
+    channel: Any,
+    action: Any,
+    frequency_hz: Any,
+    gain_db: Any,
+    q: Any,
+    max_q: Any,
+    max_cut_db: Any,
+) -> dict[str, Any]:
+    """Validate a feedback-notch proposal without coercing untrusted values."""
+
+    if type(channel) is not int or not 1 <= channel <= 48:
+        raise ValueError("feedback channel must be an integer in range 1..48")
+    if type(action) is not str or action not in {"notch", "fader_reduce"}:
+        raise ValueError("feedback action must be exactly 'notch' or 'fader_reduce'")
+
+    frequency = _strict_finite_number(frequency_hz, "feedback", "frequency_hz")
+    requested_gain = _strict_finite_number(gain_db, "feedback", "gain_db")
+    requested_q = _strict_finite_number(q, "feedback", "q")
+    q_limit = _strict_finite_number(max_q, "feedback", "max_q")
+    cut_limit = _strict_finite_number(max_cut_db, "feedback", "max_cut_db")
+
+    if not FEEDBACK_MIN_FREQUENCY_HZ <= frequency <= FEEDBACK_MAX_FREQUENCY_HZ:
+        raise ValueError(
+            "feedback frequency_hz must be in range "
+            f"{FEEDBACK_MIN_FREQUENCY_HZ:.0f}..{FEEDBACK_MAX_FREQUENCY_HZ:.0f}"
+        )
+    if not FEEDBACK_MIN_Q <= q_limit <= FEEDBACK_HARD_MAX_Q:
+        raise ValueError(
+            f"feedback max_q must be in range {FEEDBACK_MIN_Q:.1f}..{FEEDBACK_HARD_MAX_Q:.1f}"
+        )
+    if not FEEDBACK_MIN_Q <= requested_q <= q_limit:
+        raise ValueError(f"feedback q exceeds declared max_q:{requested_q:.3f}>{q_limit:.3f}")
+    if not 0.0 < cut_limit <= FEEDBACK_HARD_MAX_CUT_DB:
+        raise ValueError(
+            f"feedback max_cut_db must be in range 0..{FEEDBACK_HARD_MAX_CUT_DB:.1f}"
+        )
+    if requested_gain > 0.0 or requested_gain < -cut_limit:
+        raise ValueError(
+            "feedback gain_db must be cut-only and within declared max_cut_db:"
+            f"{requested_gain:.3f} not in [{-cut_limit:.3f},0.000]"
+        )
+
+    return {
+        "channel": channel,
+        "action": action,
+        "frequency_hz": frequency,
+        "gain_db": requested_gain,
+        "q": requested_q,
+        "max_q": q_limit,
+        "max_cut_db": cut_limit,
+    }
+
+
+def validate_gain_adjustment_values(
+    *,
+    channel: Any,
+    action: Any,
+    current_gain_db: Any,
+    requested_gain_db: Any,
+    max_step_db: Any,
+) -> dict[str, Any]:
+    """Validate replay gain values and the declared step limit without coercion."""
+
+    if type(channel) is not int or not 1 <= channel <= 48:
+        raise ValueError("gain channel must be an integer in range 1..48")
+    if type(action) is not str or action not in {"set_gain", "set_gain_db"}:
+        raise ValueError("gain action must be exactly 'set_gain' or 'set_gain_db'")
+
+    current = _strict_finite_number(current_gain_db, "gain", "current_gain_db")
+    requested = _strict_finite_number(requested_gain_db, "gain", "requested_gain_db")
+    step_limit = _strict_finite_number(max_step_db, "gain", "max_step_db")
+
+    for field, value in (("current_gain_db", current), ("requested_gain_db", requested)):
+        if not GAIN_MIN_DB <= value <= GAIN_MAX_DB:
+            raise ValueError(f"gain {field} must be in range {GAIN_MIN_DB:.1f}..{GAIN_MAX_DB:.1f}")
+    if not 0.0 < step_limit <= GAIN_HARD_MAX_STEP_DB:
+        raise ValueError(f"gain max_step_db must be in range 0..{GAIN_HARD_MAX_STEP_DB:.1f}")
+
+    return {
+        "channel": channel,
+        "action": action,
+        "current_gain_db": current,
+        "requested_gain_db": requested,
+        "max_step_db": step_limit,
+        "delta_db": requested - current,
+    }
+
+
+def validate_fader_adjustment_values(
+    *,
+    channel: Any,
+    action: Any,
+    current_fader_db: Any,
+    requested_fader_db: Any,
+    max_step_db: Any,
+) -> dict[str, Any]:
+    """Validate replay fader values and the declared step limit without coercion."""
+
+    if type(channel) is not int or not 1 <= channel <= 48:
+        raise ValueError("fader channel must be an integer in range 1..48")
+    if type(action) is not str or action not in {"set_fader", "set_fader_db"}:
+        raise ValueError("fader action must be exactly 'set_fader' or 'set_fader_db'")
+    current = _strict_finite_number(current_fader_db, "fader", "current_fader_db")
+    requested = _strict_finite_number(requested_fader_db, "fader", "requested_fader_db")
+    step_limit = _strict_finite_number(max_step_db, "fader", "max_step_db")
+    for field, value in (("current_fader_db", current), ("requested_fader_db", requested)):
+        if not FADER_MIN_DB <= value <= FADER_MAX_DB:
+            raise ValueError(
+                f"fader {field} must be in range {FADER_MIN_DB:.1f}..{FADER_MAX_DB:.1f}"
+            )
+    if not 0.0 < step_limit <= FADER_HARD_MAX_STEP_DB:
+        raise ValueError(
+            f"fader max_step_db must be in range 0..{FADER_HARD_MAX_STEP_DB:.1f}"
+        )
+    return {
+        "channel": channel,
+        "action": action,
+        "current_fader_db": current,
+        "requested_fader_db": requested,
+        "max_step_db": step_limit,
+        "delta_db": requested - current,
+    }
 
 
 def _replay_correlation_id_from_payload(payload: dict[str, Any] | None) -> str:
@@ -88,6 +242,8 @@ class ReplayDecisionProposal:
     def __post_init__(self) -> None:
         if self.family not in PROPOSAL_FAMILIES:
             raise ValueError(f"Unsupported proposal family: {self.family}")
+        if type(self.dry_run_only) is not bool or type(self.auto_apply_blocked) is not bool:
+            raise ValueError("replay proposal safety markers must be exact booleans")
         if not self.replay_correlation_id:
             object.__setattr__(self, "replay_correlation_id", self._default_replay_correlation_id())
 
@@ -159,8 +315,8 @@ class ReplayDecisionProposal:
             requested_state=dict(payload.get("requested_state") or {}),
             confidence=float(payload.get("confidence", 0.0)),
             safety=dict(payload.get("safety") or {}),
-            dry_run_only=bool(payload.get("dry_run_only", True)),
-            auto_apply_blocked=bool(payload.get("auto_apply_blocked", False)),
+            dry_run_only=payload.get("dry_run_only"),
+            auto_apply_blocked=payload.get("auto_apply_blocked"),
             replay_correlation_id=str(payload.get("replay_correlation_id", "")),
             metadata=dict(payload.get("metadata") or {}),
             analyst_observation=dict(payload.get("analyst_observation") or {}),
@@ -457,10 +613,29 @@ def compare_replay_graph_checkpoints(
 def build_gain_proposals(*, recommendations: list[dict[str, Any]]) -> list[ReplayDecisionProposal]:
     proposals: list[ReplayDecisionProposal] = []
     for rec in recommendations:
+        if type(rec) is not dict:
+            raise ValueError("gain recommendation must be an exact dict")
+        metadata = rec.get("metadata", {})
+        if type(metadata) is not dict:
+            raise ValueError("gain metadata must be an exact dict")
         source = str(rec.get("source", "autogain"))
-        channel = int(_coerce_float(rec.get("mixer_channel", rec.get("channel", 0)), 0))
-        current_db = _coerce_float(rec.get("current_trim_db", 0.0))
-        target_db = _coerce_float(rec.get("recommended_target_trim_db", current_db))
+        values = validate_gain_adjustment_values(
+            channel=rec.get("mixer_channel", rec.get("channel")),
+            action="set_gain_db",
+            current_gain_db=rec.get("current_trim_db", 0.0),
+            requested_gain_db=rec.get(
+                "recommended_target_trim_db", rec.get("current_trim_db", 0.0)
+            ),
+            max_step_db=metadata.get("max_step_db", GAIN_DEFAULT_MAX_STEP_DB),
+        )
+        confidence = _strict_finite_number(rec.get("confidence", 0.5), "gain", "confidence")
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("gain confidence must be in range 0..1")
+        if "dry_run_only" in rec and type(rec["dry_run_only"]) is not bool:
+            raise ValueError("gain dry_run_only must be an exact bool")
+        channel = values["channel"]
+        current_db = values["current_gain_db"]
+        target_db = values["requested_gain_db"]
         proposals.append(
             ReplayDecisionProposal(
                 proposal_id=f"gain::{source}::{channel}::{rec.get('role', 'unknown')}::v1",
@@ -470,9 +645,9 @@ def build_gain_proposals(*, recommendations: list[dict[str, Any]]) -> list[Repla
                 target={"channel": channel, "kind": "gain"},
                 current_state={"gain_db": current_db},
                 requested_state={"gain_db": target_db, "delta_db": target_db - current_db},
-                confidence=float(rec.get("confidence", 0.5)),
+                confidence=confidence,
                 safety={
-                    "max_step_db": float(rec.get("metadata", {}).get("max_step_db", 3.0)),
+                    "max_step_db": values["max_step_db"],
                     "bounded_by": str(rec.get("limited_by", "none")),
                 },
                 auto_apply_blocked=not bool(rec.get("dry_run_only", True)),
@@ -491,9 +666,26 @@ def build_gain_proposals(*, recommendations: list[dict[str, Any]]) -> list[Repla
 def build_fader_proposals(*, fader_updates: list[dict[str, Any]]) -> list[ReplayDecisionProposal]:
     proposals: list[ReplayDecisionProposal] = []
     for rec in fader_updates:
-        channel = int(_coerce_float(rec.get("mixer_channel", rec.get("channel", 0)), 0))
-        current = _coerce_float(rec.get("current_fader_db", 0.0))
-        target = _coerce_float(rec.get("target_fader_db", current))
+        if type(rec) is not dict:
+            raise ValueError("fader update must be an exact dict")
+        values = validate_fader_adjustment_values(
+            channel=rec.get("mixer_channel", rec.get("channel")),
+            action="set_fader_db",
+            current_fader_db=rec.get("current_fader_db", 0.0),
+            requested_fader_db=rec.get("target_fader_db", rec.get("current_fader_db", 0.0)),
+            max_step_db=rec.get("max_step_db", FADER_DEFAULT_MAX_STEP_DB),
+        )
+        confidence = _strict_finite_number(rec.get("confidence", 0.55), "fader", "confidence")
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("fader confidence must be in range 0..1")
+        deadband = _strict_finite_number(rec.get("deadband_db", 0.0), "fader", "deadband_db")
+        if not 0.0 <= deadband <= values["max_step_db"]:
+            raise ValueError("fader deadband_db must be in range 0..max_step_db")
+        if "live_apply_safe" in rec and type(rec["live_apply_safe"]) is not bool:
+            raise ValueError("fader live_apply_safe must be an exact bool")
+        channel = values["channel"]
+        current = values["current_fader_db"]
+        target = values["requested_fader_db"]
         proposals.append(
             ReplayDecisionProposal(
                 proposal_id=f"fader::{rec.get('source', 'auto_fader')}::{channel}::v1",
@@ -503,10 +695,10 @@ def build_fader_proposals(*, fader_updates: list[dict[str, Any]]) -> list[Replay
                 target={"channel": channel, "kind": "fader"},
                 current_state={"fader_db": current},
                 requested_state={"fader_db": target, "delta_db": target - current},
-                confidence=float(rec.get("confidence", 0.55)),
+                confidence=confidence,
                 safety={
-                    "max_step_db": float(rec.get("max_step_db", 2.0)),
-                    "deadband_db": float(rec.get("deadband_db", 0.0)),
+                    "max_step_db": values["max_step_db"],
+                    "deadband_db": deadband,
                 },
                 auto_apply_blocked=not bool(rec.get("live_apply_safe", False)),
                 replay_correlation_id=_replay_correlation_id_from_payload(rec),
@@ -570,7 +762,7 @@ def build_room_compensation_proposals(*, room_plans: list[dict[str, Any]]) -> li
                 safety={
                     "dry_run_only": bool(plan.get("dry_run_only", True)),
                     "blocked": bool(plan.get("blocked", False)),
-                    "max_cut_db": float(plan.get("max_cut_db", 0.0)),
+                    "max_cut_db": float(plan.get("max_cut_db", 6.0)),
                 },
                 auto_apply_blocked=True,
                 replay_correlation_id=_replay_correlation_id_from_payload(plan),
@@ -589,28 +781,51 @@ def build_room_compensation_proposals(*, room_plans: list[dict[str, Any]]) -> li
 def build_feedback_mitigation_proposals(*, feedback_events: list[dict[str, Any]]) -> list[ReplayDecisionProposal]:
     proposals: list[ReplayDecisionProposal] = []
     for event in feedback_events:
-        channel = int(_coerce_float(event.get("channel", 0), 0))
+        if type(event) is not dict:
+            raise ValueError("feedback event must be an exact dict")
+        raw_magnitude = _strict_finite_number(
+            event.get("magnitude_db", -6.0), "feedback", "magnitude_db"
+        )
+        values = validate_feedback_mitigation_values(
+            channel=event.get("channel"),
+            action=event.get("action", "notch"),
+            frequency_hz=event.get("frequency_hz"),
+            gain_db=-abs(raw_magnitude),
+            q=event.get("q", 4.0),
+            max_q=event.get("max_q", FEEDBACK_DEFAULT_MAX_Q),
+            max_cut_db=event.get("max_cut_db", FEEDBACK_DEFAULT_MAX_CUT_DB),
+        )
+        confidence = _strict_finite_number(
+            event.get("confidence", 0.7), "feedback", "confidence"
+        )
+        if not 0.0 <= confidence <= 1.0:
+            raise ValueError("feedback confidence must be in range 0..1")
+        for boolean_field in ("operator_override_required", "live_apply_allowed"):
+            if boolean_field in event and type(event[boolean_field]) is not bool:
+                raise ValueError(f"feedback {boolean_field} must be an exact bool")
+        channel = values["channel"]
         proposals.append(
             ReplayDecisionProposal(
-                proposal_id=f"feedback::{event.get('action', 'notch')}::{channel}::{event.get('event_id', 'anon')}",
+                proposal_id=f"feedback::{values['action']}::{channel}::{event.get('event_id', 'anon')}",
                 family="feedback_mitigation",
                 source_system=str(event.get("source", "feedback_detector")),
-                action_type=str(event.get("action", "notch")),
-                target={"channel": channel, "frequency_hz": _coerce_float(event.get("frequency_hz", 0.0))},
+                action_type=values["action"],
+                target={"channel": channel, "frequency_hz": values["frequency_hz"]},
                 current_state={"magnitude_db": 0.0},
                 requested_state={
-                    "gain_db": -abs(_coerce_float(event.get("magnitude_db", -6.0), 0.0)),
-                    "q": _coerce_float(event.get("q", 4.0)),
+                    "gain_db": values["gain_db"],
+                    "q": values["q"],
                 },
-                confidence=float(event.get("confidence", 0.7)),
+                confidence=confidence,
                 safety={
-                    "operator_override_required": bool(event.get("operator_override_required", False)),
-                    "max_q": float(event.get("max_q", 8.0)),
+                    "operator_override_required": event.get("operator_override_required", False),
+                    "max_q": values["max_q"],
+                    "max_cut_db": values["max_cut_db"],
                 },
-                auto_apply_blocked=not bool(event.get("live_apply_allowed", False)),
+                auto_apply_blocked=not event.get("live_apply_allowed", False),
                 replay_correlation_id=_replay_correlation_id_from_payload(event),
-                metadata={"action": str(event.get("action", "notch")), "channel": channel},
-                analyst_observation={"frequency_hz": _coerce_float(event.get("frequency_hz", 0.0))},
+                metadata={"action": values["action"], "channel": channel},
+                analyst_observation={"frequency_hz": values["frequency_hz"]},
             )
         )
     return proposals

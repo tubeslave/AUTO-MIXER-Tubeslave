@@ -3,6 +3,7 @@
 import json
 import os
 import sys
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -12,6 +13,7 @@ from auto_soundcheck_engine import AutoSoundcheckEngine, ChannelInfo
 from autofoh_models import RuntimeState
 from autofoh_safety import AutoFOHSafetyController, ChannelEQMove
 from perceptual import PerceptualConfig, PerceptualEvaluator
+from perceptual.embedding_backend import MERTEmbeddingBackend
 from perceptual.metrics import cosine_distance, embedding_mse
 from perceptual.reward import RewardSignal
 
@@ -106,6 +108,32 @@ def test_mert_backend_strict_mode_raises_when_unavailable():
         assert "fallback_to_lightweight is disabled" in str(exc)
     else:
         raise AssertionError("strict MERT config must not silently fall back")
+
+
+def test_mert_backend_never_enables_remote_repository_code(monkeypatch):
+    calls = []
+
+    class FakeLoader:
+        @classmethod
+        def from_pretrained(cls, model_name, **kwargs):
+            calls.append((model_name, kwargs))
+            return SimpleNamespace(to=lambda _device: None, eval=lambda: None)
+
+    fake_torch = SimpleNamespace(
+        cuda=SimpleNamespace(is_available=lambda: False),
+        backends=SimpleNamespace(mps=SimpleNamespace(is_available=lambda: False)),
+    )
+    fake_transformers = SimpleNamespace(
+        AutoFeatureExtractor=FakeLoader,
+        AutoModel=FakeLoader,
+    )
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "transformers", fake_transformers)
+
+    MERTEmbeddingBackend(model_name="fixed/model", local_files_only=False)
+
+    assert len(calls) == 2
+    assert all(call_kwargs["trust_remote_code"] is False for _, call_kwargs in calls)
 
 
 def test_reference_embedding_is_cached_for_candidate_scoring():

@@ -6,6 +6,44 @@ Title: WING read-only preflight evidence gate
 
 Status: WAITING_FOR_EXTERNAL_VALIDATION
 
+## Parallel M123 software milestone — 2026-08-04
+
+At the owner's explicit request, M123 advances the already-approved read-only
+Instrument Space into deterministic correction-decision evidence. It remains a
+parallel, no-console software milestone while M001 waits for external WING
+validation and dLive hardware is disconnected. Instrument Space may select the
+next existing analyzer and annotate review proposals; it cannot select a final
+console value, mutate a queue, apply to WING/dLive, inherit hardware evidence or
+grant live authority. Plan: `Docs/plans/M123-instrument-space-decision-integration.md`.
+
+M123 now also has bounded in-memory history keyed to mixer/audio source
+identity, runtime drift, measurement provenance and a 30-second proposal-review
+freshness gate. Source changes reset the baseline; history remains read-only and
+non-persistent. Final CP05 software/no-console truth validation is still
+required before the parallel milestone can be closed.
+
+## Parallel dLive paired-online blocker — 2026-08-04
+
+Director machine-observed `CDM32+C3500` paired online on `V2.00 Rev. 83230`,
+and fresh Surface/MixRack GET probes agreed on Input 1 state. One renewed,
+physically contained Surface proof sent the compact fader SET, but the operator
+saw no movement and four readbacks stayed at the preimage. The WAL transaction
+is terminal with known original state and clean teardown. No retry or standing
+authority exists. The next dLive gate is effective security/reboot validation
+plus known-good-client or wire-capture evidence; the active WING milestone and
+its authority remain unchanged.
+
+Offline continuation and the exact next attended gate are recorded in
+`Docs/plans/M122-dlive-offline-continuation-and-mix-scene-readonly-research.md`.
+The parallel Mix Scene research in that plan is read-only and cannot promote
+dLive, WING or live-write authority.
+
+Offline follow-up now enforces an exact operator-owned selected-endpoint-ingress
+capture review plus effective-security and reboot-after-change attestation
+before a plan can request operator confirmation. Validation passed all 139
+dLive tests without console contact; real capture and attended movement/readback
+evidence remain external.
+
 ## M120 accepted route; teardown repeat required — 2026-07-15
 
 Clean CP05-bound source `45e2a2ae66853dc79a8db693f8ccfe15cbc67cc8`
@@ -142,7 +180,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `system_inspector_iteration_001_source_checkpoint_committed` at `2026-07-27T20:46:42Z`.
+Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
 
 ## Earlier superseding status — 2026-07-11
 

@@ -94,6 +94,12 @@ class MixingStationRestClient:
 
     def send_command(self, command: MixingStationCommand) -> TransportResult:
         """Send a mapped command through a configured REST write endpoint."""
+        return TransportResult(
+            success=False,
+            error="mixing_station_authenticated_ipc_required",
+        )
+
+        # Retained unreachable implementation documents the former API shape.
         if not self.command_endpoint:
             return TransportResult(
                 success=False,

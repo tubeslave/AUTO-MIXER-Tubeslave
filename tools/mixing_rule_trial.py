@@ -77,6 +77,9 @@ def evaluate(left, right, sr):
 
 
 def run_trial(rule_id: str, channel: int) -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: direct EQ trials are disabled"
+    )
     rule = load_rule(rule_id)
     templates = [t for t in rule.action_templates
                  if t.get("action_type") == "eq_tonal_target"]
@@ -189,6 +192,9 @@ def run_trial(rule_id: str, channel: int) -> int:
 
 
 def rollback_trial(rule_id: str, channel: int) -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: unauthenticated rollback is disabled"
+    )
     files = sorted((REPO / "reports").glob(
         f"rule_trial_rollback_{rule_id}_*.json"))
     assert files, "rollback-файл не найден"

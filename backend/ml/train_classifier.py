@@ -6,6 +6,7 @@ provided.
 """
 import json
 import logging
+import math
 import os
 from typing import Dict, List, Optional, Sequence
 
@@ -16,8 +17,66 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 
 from .channel_classifier import ChannelClassifierNet, INSTRUMENT_CLASSES, NUM_CLASSES
+from .npz_archive_safety import load_validated_numeric_npz, open_regular_binary_file
 
 logger = logging.getLogger(__name__)
+
+MAX_CLASSIFIER_EPOCHS = 200
+MAX_CLASSIFIER_BATCH_SIZE = 256
+MAX_CLASSIFIER_SAMPLES_PER_CLASS = 1000
+MAX_CLASSIFIER_DATASET_SAMPLES = 8192
+MAX_CLASSIFIER_MELS = 256
+MAX_CLASSIFIER_FRAMES = 512
+MAX_CLASSIFIER_DATASET_ELEMENTS = 32_000_000
+MAX_CLASSIFIER_BATCH_ELEMENTS = 8_000_000
+MAX_CLASSIFIER_TRAINING_EXAMPLES = 500_000
+MAX_CLASSIFIER_JSONL_BYTES = 32 * 1024 * 1024
+MAX_CLASSIFIER_JSONL_LINE_BYTES = 1024 * 1024
+MIN_CLASSIFIER_LEARNING_RATE = 1e-8
+MAX_CLASSIFIER_LEARNING_RATE = 1.0
+
+
+def _bounded_int(name: str, value: int, *, minimum: int, maximum: int) -> int:
+    if type(value) is not int or not minimum <= value <= maximum:
+        raise ValueError(f"{name} must be an integer in range {minimum}..{maximum}")
+    return value
+
+
+def _validate_classifier_training_request(
+    *,
+    n_epochs: int,
+    batch_size: int,
+    lr: float,
+    n_samples_per_class: int,
+    n_mels: int,
+    n_frames: int,
+) -> None:
+    _bounded_int("n_epochs", n_epochs, minimum=1, maximum=MAX_CLASSIFIER_EPOCHS)
+    _bounded_int("batch_size", batch_size, minimum=1, maximum=MAX_CLASSIFIER_BATCH_SIZE)
+    _bounded_int(
+        "n_samples_per_class",
+        n_samples_per_class,
+        minimum=1,
+        maximum=MAX_CLASSIFIER_SAMPLES_PER_CLASS,
+    )
+    _bounded_int("n_mels", n_mels, minimum=8, maximum=MAX_CLASSIFIER_MELS)
+    _bounded_int("n_frames", n_frames, minimum=8, maximum=MAX_CLASSIFIER_FRAMES)
+    if isinstance(lr, bool) or not isinstance(lr, (int, float)):
+        raise ValueError("lr must be a finite numeric value")
+    if not math.isfinite(float(lr)) or not MIN_CLASSIFIER_LEARNING_RATE <= float(lr) <= MAX_CLASSIFIER_LEARNING_RATE:
+        raise ValueError(
+            f"lr must be in range {MIN_CLASSIFIER_LEARNING_RATE}..{MAX_CLASSIFIER_LEARNING_RATE}"
+        )
+    sample_count = n_samples_per_class * NUM_CLASSES
+    sample_elements = n_mels * n_frames
+    if sample_count > MAX_CLASSIFIER_DATASET_SAMPLES:
+        raise ValueError("classifier dataset sample limit exceeded")
+    if sample_count * sample_elements > MAX_CLASSIFIER_DATASET_ELEMENTS:
+        raise ValueError("classifier synthetic dataset allocation limit exceeded")
+    if batch_size * sample_elements > MAX_CLASSIFIER_BATCH_ELEMENTS:
+        raise ValueError("classifier training batch allocation limit exceeded")
+    if n_epochs * sample_count > MAX_CLASSIFIER_TRAINING_EXAMPLES:
+        raise ValueError("classifier training work limit exceeded")
 
 
 def _label_to_index(label: str) -> int:
@@ -37,17 +96,38 @@ def _to_numpy_array(payload: Sequence, *, expected_mels: int, expected_frames: i
             arr = padded.reshape(expected_mels, expected_frames)
         else:
             arr = arr.reshape(expected_mels, expected_frames)
+    if not np.all(np.isfinite(arr)):
+        raise ValueError("classifier dataset contains non-finite features")
     return arr
 
 
-def _load_dataset_from_file(path: str, *, n_mels: int, n_frames: int) -> List[tuple]:
+def _load_dataset_from_file(
+    path: str,
+    *,
+    n_mels: int,
+    n_frames: int,
+    max_dataset_bytes: Optional[int] = None,
+) -> List[tuple]:
+    if max_dataset_bytes is not None and (
+        type(max_dataset_bytes) is not int or max_dataset_bytes <= 0
+    ):
+        raise ValueError("max_dataset_bytes must be a positive integer")
+    effective_max_bytes = min(
+        MAX_CLASSIFIER_JSONL_BYTES,
+        max_dataset_bytes or MAX_CLASSIFIER_JSONL_BYTES,
+    )
     path = os.path.abspath(path)
     _, ext = os.path.splitext(path.lower())
     features: List[np.ndarray] = []
     labels: List[int] = []
 
     if ext == ".npz":
-        with np.load(path, allow_pickle=False) as raw:
+        with load_validated_numeric_npz(
+            path,
+            required_key_groups=(("data", "features"), ("labels",)),
+            bounded_text_keys=("labels",),
+            max_compressed_bytes=effective_max_bytes,
+        ) as raw:
             data = raw["data"] if "data" in raw.files else None
             feat = raw["features"] if "features" in raw.files else None
             lab = raw["labels"] if "labels" in raw.files else None
@@ -60,18 +140,36 @@ def _load_dataset_from_file(path: str, *, n_mels: int, n_frames: int) -> List[tu
     elif ext == ".jsonl":
         sample_data = []
         sample_labels = []
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                row = json.loads(line)
+        with open_regular_binary_file(
+            path,
+            error_message="classifier dataset must be a regular file",
+        ) as f:
+            opened_stat = os.fstat(f.fileno())
+            if opened_stat.st_size > effective_max_bytes:
+                raise ValueError("classifier JSONL byte limit exceeded")
+            bytes_read = 0
+            while True:
+                raw_line = f.readline(MAX_CLASSIFIER_JSONL_LINE_BYTES + 1)
+                if not raw_line:
+                    break
+                bytes_read += len(raw_line)
+                if bytes_read > effective_max_bytes:
+                    raise ValueError("classifier JSONL byte limit exceeded")
+                if len(raw_line) > MAX_CLASSIFIER_JSONL_LINE_BYTES:
+                    raise ValueError("classifier JSONL line limit exceeded")
+                if len(sample_data) >= MAX_CLASSIFIER_DATASET_SAMPLES:
+                    raise ValueError("classifier dataset sample limit exceeded")
+                try:
+                    row = json.loads(raw_line.decode("utf-8"))
+                except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                    raise ValueError("invalid classifier JSONL row") from exc
+                if not isinstance(row, dict):
+                    raise ValueError("classifier JSONL row must be an object")
                 sample_data.append(row.get("spectrogram") or row.get("features"))
                 sample_labels.append(row.get("label", "unknown"))
     else:
         raise ValueError(f"Unsupported dataset format: {ext}")
 
-    if isinstance(sample_data, np.ndarray):
-        sample_data = sample_data.tolist()
-    if isinstance(sample_labels, np.ndarray):
-        sample_labels = sample_labels.tolist()
     if len(sample_data) != len(sample_labels):
         raise ValueError("Dataset payloads and labels have different lengths")
 
@@ -101,6 +199,19 @@ class SyntheticInstrumentDataset(Dataset):
 
     def __init__(self, n_samples_per_class: int = 100, n_mels: int = 64,
                  n_frames: int = 64, sample_rate: int = 48000):
+        _bounded_int(
+            "n_samples_per_class",
+            n_samples_per_class,
+            minimum=1,
+            maximum=MAX_CLASSIFIER_SAMPLES_PER_CLASS,
+        )
+        _bounded_int("n_mels", n_mels, minimum=8, maximum=MAX_CLASSIFIER_MELS)
+        _bounded_int("n_frames", n_frames, minimum=8, maximum=MAX_CLASSIFIER_FRAMES)
+        _bounded_int("sample_rate", sample_rate, minimum=8000, maximum=384000)
+        if n_samples_per_class * NUM_CLASSES > MAX_CLASSIFIER_DATASET_SAMPLES:
+            raise ValueError("classifier dataset sample limit exceeded")
+        if n_samples_per_class * NUM_CLASSES * n_mels * n_frames > MAX_CLASSIFIER_DATASET_ELEMENTS:
+            raise ValueError("classifier synthetic dataset allocation limit exceeded")
         self.n_mels = n_mels
         self.n_frames = n_frames
         self.sample_rate = sample_rate
@@ -183,8 +294,17 @@ def train_classifier(
     n_frames: int = 64,
     dataset_path: Optional[str] = None,
     device: Optional[str] = None,
+    max_dataset_bytes: Optional[int] = None,
 ):
     """Train the channel classifier model."""
+    _validate_classifier_training_request(
+        n_epochs=n_epochs,
+        batch_size=batch_size,
+        lr=lr,
+        n_samples_per_class=n_samples_per_class,
+        n_mels=n_mels,
+        n_frames=n_frames,
+    )
     if device is None:
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
     device = torch.device(device)
@@ -193,7 +313,10 @@ def train_classifier(
     if dataset_path:
         logger.info("Loading external dataset from %s", dataset_path)
         records = _load_dataset_from_file(
-            dataset_path, n_mels=n_mels, n_frames=n_frames,
+            dataset_path,
+            n_mels=n_mels,
+            n_frames=n_frames,
+            max_dataset_bytes=max_dataset_bytes,
         )
         dataset = ExternalInstrumentDataset(records)
     else:
@@ -202,6 +325,15 @@ def train_classifier(
             n_mels=n_mels,
             n_frames=n_frames,
         )
+    if len(dataset) < 2 or len(dataset) > MAX_CLASSIFIER_DATASET_SAMPLES:
+        raise ValueError(
+            f"classifier dataset size must be in range 2..{MAX_CLASSIFIER_DATASET_SAMPLES}"
+        )
+    sample_elements = n_mels * n_frames
+    if len(dataset) * sample_elements > MAX_CLASSIFIER_DATASET_ELEMENTS:
+        raise ValueError("classifier dataset allocation limit exceeded")
+    if n_epochs * len(dataset) > MAX_CLASSIFIER_TRAINING_EXAMPLES:
+        raise ValueError("classifier training work limit exceeded")
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_set, val_set = torch.utils.data.random_split(
@@ -209,7 +341,7 @@ def train_classifier(
     )
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=batch_size)
-    model = ChannelClassifierNet().to(device)
+    model = ChannelClassifierNet(n_mels=n_mels).to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(

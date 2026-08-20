@@ -17,6 +17,7 @@ Requirements:
 import asyncio
 import json
 import logging
+import math
 import websockets
 from typing import Dict, Set
 from datetime import datetime
@@ -73,7 +74,7 @@ class VirtualMixerTestBridge:
         # Start WebSocket server
         ws_server = await websockets.serve(
             self._handle_websocket,
-            "0.0.0.0",
+            "127.0.0.1",
             self.websocket_port
         )
         
@@ -122,10 +123,14 @@ class VirtualMixerTestBridge:
         """Handle WebSocket messages from clients."""
         try:
             data = json.loads(message)
+            if not isinstance(data, dict):
+                raise ValueError("message root must be an object")
             msg_type = data.get('type', '')
             
             if msg_type == 'set_test_mode':
                 mode = data.get('mode', 'silence')
+                if mode not in {"silence", "drums", "full_mix"}:
+                    raise ValueError("mode must be silence, drums, or full_mix")
                 self._set_test_mode(mode)
                 await websocket.send(json.dumps({
                     'type': 'test_mode_changed',
@@ -135,6 +140,13 @@ class VirtualMixerTestBridge:
             elif msg_type == 'set_channel_level':
                 ch = data.get('channel', 1)
                 level_db = data.get('level_db', -20)
+                if type(ch) is not int or ch not in self.signals.channels:
+                    raise ValueError("channel must be an integer in range 1..32")
+                if isinstance(level_db, bool) or not isinstance(level_db, (int, float)):
+                    raise ValueError("level_db must be a finite numeric value")
+                level_db = float(level_db)
+                if not math.isfinite(level_db) or not -120.0 <= level_db <= 24.0:
+                    raise ValueError("level_db must be finite and in range -120..24")
                 self.signals.channels[ch].level_db = level_db
             
             elif msg_type == 'get_mixer_state':
@@ -146,6 +158,11 @@ class VirtualMixerTestBridge:
             
             elif msg_type == 'start_song':
                 bpm = data.get('bpm', 120)
+                if isinstance(bpm, bool) or not isinstance(bpm, (int, float)):
+                    raise ValueError("bpm must be a finite numeric value")
+                bpm = float(bpm)
+                if not math.isfinite(bpm) or not 20.0 <= bpm <= 300.0:
+                    raise ValueError("bpm must be finite and in range 20..300")
                 self.signals.start_song(bpm)
                 await websocket.send(json.dumps({
                     'type': 'song_started',
@@ -157,6 +174,16 @@ class VirtualMixerTestBridge:
                 
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON: {message}")
+            await websocket.send(json.dumps({
+                'type': 'error',
+                'error': 'invalid_json',
+            }))
+        except ValueError as e:
+            logger.warning("Rejected virtual mixer input: %s", e)
+            await websocket.send(json.dumps({
+                'type': 'error',
+                'error': str(e),
+            }))
         except Exception as e:
             logger.error(f"WS error: {e}")
     

@@ -8,7 +8,11 @@ soundfile
 pyloudnorm
 pandas
 pyyaml
-pymixconsole @ git+https://github.com/csteinmetz1/pymixconsole
+
+# SECURITY: do not add a VCS/default-branch pymixconsole requirement here.
+# The automated installer must never download executable code from a mutable
+# repository ref. The adapter safely uses fallback_virtual_mixer when an
+# independently audited local pymixconsole installation is absent.
 
 # Optional experimental trainable DSP. Install manually if it conflicts with
 # the project environment.

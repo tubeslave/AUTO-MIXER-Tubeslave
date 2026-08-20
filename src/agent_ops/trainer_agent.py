@@ -3,7 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 from pathlib import Path
+import re
 import subprocess
+import sys
 import time
 from typing import Any
 
@@ -12,6 +14,7 @@ import yaml
 
 DEFAULT_TRAINING_SUBPROCESS_TIMEOUT_SEC = 12 * 60 * 60
 TRAINING_TIMEOUT_RETURNCODE = 124
+SAFE_EXPERIMENT_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$")
 
 
 @dataclass
@@ -145,9 +148,12 @@ class TrainerAgent:
             raise ValueError("Each experiment must be a dict")
 
         name = str(exp["name"])
-        command = [str(item) for item in exp["command"]]
+        if not SAFE_EXPERIMENT_NAME.fullmatch(name):
+            raise ValueError("experiment name must be a safe single path component")
+        command = self._validate_command(exp.get("command"))
         run_id = time.strftime("%Y%m%d_%H%M%S") + f"_{name}"
-        run_dir = self.runs_dir / run_id
+        run_dir = (self.runs_dir / run_id).resolve()
+        run_dir.relative_to(self.runs_dir)
         run_dir.mkdir(parents=True, exist_ok=True)
 
         log_path = run_dir / "train.log"
@@ -224,7 +230,7 @@ class TrainerAgent:
 
     def _resolve_command(self, data: dict[str, Any]) -> list[str]:
         if "command" in data and isinstance(data["command"], list) and data["command"]:
-            return [str(item) for item in data["command"]]
+            raise ValueError("caller-selected command vectors are quarantined")
 
         task = str(data.get("task", "")).strip().lower()
         if task in {"discover_datasets", "dataset_discovery"}:
@@ -238,14 +244,14 @@ class TrainerAgent:
         if mode == "script":
             script_path = cfg.get("script_path", "scripts/train.py")
             extra_args = cfg.get("args", [])
-            return [self.default_python, script_path, *map(str, extra_args)]
+            return self._validate_command([self.default_python, script_path, *map(str, extra_args)])
 
         if mode == "module":
             module_name = cfg.get("module_name")
             if not module_name:
                 raise ValueError("train_config.module_name is required when mode='module'")
             extra_args = cfg.get("args", [])
-            return [self.default_python, "-m", module_name, *map(str, extra_args)]
+            return self._validate_command([self.default_python, "-m", module_name, *map(str, extra_args)])
 
         raise ValueError(f"Unsupported train mode: {mode}")
 
@@ -289,6 +295,30 @@ class TrainerAgent:
         if cfg.get("convert_jsonl") is False:
             command.append("--no-convert-jsonl")
 
+        return self._validate_command(command)
+
+    def _validate_command(self, raw_command: Any) -> list[str]:
+        if not isinstance(raw_command, list) or not raw_command or len(raw_command) > 64:
+            raise ValueError("training command must be a bounded argument vector")
+        command = [str(item) for item in raw_command]
+        allowed_python = {self.default_python, "python", "python3", sys.executable}
+        if command[0] not in allowed_python:
+            raise ValueError("training executable is not allowlisted")
+        if len(command) < 2 or command[1] in {"-c", "-", "-i"}:
+            raise ValueError("inline or interactive Python execution is forbidden")
+        if command[1] == "-m":
+            if len(command) < 3 or not command[2].startswith(("backend.ml.", "ml.")):
+                raise ValueError("training module is not allowlisted")
+            return command
+        script = (self.project_root / command[1]).resolve()
+        scripts_root = (self.project_root / "scripts").resolve()
+        try:
+            script.relative_to(scripts_root)
+        except ValueError as exc:
+            raise ValueError("training script must be beneath project scripts/") from exc
+        if script.suffix != ".py" or not script.is_file() or script.is_symlink():
+            raise ValueError("training script must be an existing regular Python file")
+        command[1] = str(script.relative_to(self.project_root))
         return command
 
     def _parse_metrics(self, text: str) -> dict[str, float]:
@@ -332,9 +362,16 @@ class TrainerAgent:
         )[0]
 
     def _load_yaml(self, path: str | Path) -> dict[str, Any]:
-        full_path = self.project_root / path
+        config_root = (self.project_root / "configs" / "training").resolve()
+        full_path = (self.project_root / path).resolve()
+        try:
+            full_path.relative_to(config_root)
+        except ValueError as exc:
+            raise ValueError("experiment config must be beneath configs/training/") from exc
         if not full_path.exists():
             raise FileNotFoundError(f"Config not found: {full_path}")
+        if full_path.is_symlink() or full_path.stat().st_size > 1_000_000:
+            raise ValueError("experiment config is not a bounded regular file")
 
         with full_path.open("r", encoding="utf-8") as yaml_file:
             config = yaml.safe_load(yaml_file) or {}

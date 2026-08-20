@@ -1,18 +1,26 @@
+"""Allen & Heath dLive MIDI over TCP/IP client.
+
+The transport codec in this module is intentionally limited to the public
+Allen & Heath protocol for dLive firmware v2.0 and later:
+
+https://www.allen-heath.com/content/uploads/2024/06/dLive-MIDI-Over-TCP-Protocol-V2.0.pdf
+
+Read-only queries cover input fader, mute and name. Normal client instances
+have no mutation surface. The only encoded mutation retained here is an input
+fader write reachable solely through the one-shot attended proof authority in
+``dlive_supervised_fader_proof``. Every other mutation family fails closed
+without sending bytes until a separate mapping and attended proof exists.
 """
-Allen & Heath dLive mixer client — MIDI over TCP/IP.
 
-Protocol reference:
-  https://www.allen-heath.com/content/uploads/2024/06/dLive-MIDI-Over-TCP-Protocol-V2.0.pdf
+from __future__ import annotations
 
-Default port: 51328 (plain TCP) or 51329 (TLS).
-"""
-
+import ipaddress
 import logging
 import math
 import os
+import re
 import socket
 import ssl
-import struct
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -21,515 +29,718 @@ from mixer_client_base import MixerClientBase
 
 logger = logging.getLogger(__name__)
 
-# ── Constants ──────────────────────────────────────────────────
-DLIVE_TCP_PORT = 51328
-DLIVE_TLS_PORT = 51329
-SYSEX_HEADER = bytes([0xF0, 0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00])
+DLIVE_MIXRACK_TCP_PORT = 51325
+DLIVE_MIXRACK_TLS_PORT = 51327
+DLIVE_SURFACE_TCP_PORT = 51328
+DLIVE_SURFACE_TLS_PORT = 51329
+
+# Backwards-compatible names mean Surface endpoints, as they did historically.
+DLIVE_TCP_PORT = DLIVE_SURFACE_TCP_PORT
+DLIVE_TLS_PORT = DLIVE_SURFACE_TLS_PORT
+
+DLIVE_ENDPOINT_PORTS = {
+    ("mixrack", False): DLIVE_MIXRACK_TCP_PORT,
+    ("mixrack", True): DLIVE_MIXRACK_TLS_PORT,
+    ("surface", False): DLIVE_SURFACE_TCP_PORT,
+    ("surface", True): DLIVE_SURFACE_TLS_PORT,
+}
+
+SYSEX_HEADER = bytes((0xF0, 0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00))
+SYSEX_BODY_HEADER = SYSEX_HEADER[1:]
 SYSEX_END = 0xF7
+DLIVE_MAX_SYSEX_FRAME_BYTES = 64 * 1024
 
-# Fader value mapping:
-#   0x0000 = -inf,  0x2AAA = 0 dB,  0x3FFF = +10 dB
-FADER_MAX = 0x3FFF          # 16383
-FADER_0DB = 0x2AAA          # 10922
-FADER_NEG_INF = 0x0000
+FADER_PARAMETER_ID = 0x17
+FADER_MAX = 0x7F
+FADER_0DB = 0x6B
+FADER_NEG_INF = 0x00
 
-# NRPN MSB constants for PEQ bands (Input channels)
 PEQ_BANDS = {
-    1: {"freq": 0x40, "gain": 0x41, "q": 0x42},
-    2: {"freq": 0x44, "gain": 0x45, "q": 0x46},
-    3: {"freq": 0x48, "gain": 0x49, "q": 0x4A},
-    4: {"freq": 0x4C, "gain": 0x4D, "q": 0x4E},
+    1: {"type": 0x1A, "freq": 0x1B, "width": 0x1C, "gain": 0x1D},
+    2: {"type": 0x1E, "freq": 0x1F, "width": 0x20, "gain": 0x21},
+    3: {"type": 0x22, "freq": 0x23, "width": 0x24, "gain": 0x25},
+    4: {"type": 0x26, "freq": 0x27, "width": 0x28, "gain": 0x29},
 }
+HPF_FREQ_PARAMETER_ID = 0x30
+HPF_ON_PARAMETER_ID = 0x31
 
-# HPF
-HPF_FREQ_MSB = 0x50
-HPF_ON_MSB = 0x51
-
-# Pan / Balance (NRPN MSB)
-PAN_MSB = 0x30
-
-# Compressor / Dynamics (NRPN MSBs)
-COMP_ON_MSB = 0x54
-COMP_THRESHOLD_MSB = 0x55
-COMP_RATIO_MSB = 0x56
-COMP_ATTACK_MSB = 0x57
-COMP_RELEASE_MSB = 0x58
-COMP_KNEE_MSB = 0x59
-COMP_MAKEUP_MSB = 0x5A
-
-# Gate (NRPN MSBs)
-GATE_ON_MSB = 0x5C
-GATE_THRESHOLD_MSB = 0x5D
-
-# Input delay (NRPN MSBs)
-DELAY_TIME_MSB = 0x20
-DELAY_ON_MSB = 0x21
-
-# Polarity / Phase invert (NRPN MSB)
-POLARITY_MSB = 0x0F
-
-# FX Send levels: NRPN MSB = 0x60 + (send_bus - 1)
-FX_SEND_BASE_MSB = 0x60
-
-# Channel type → MIDI channel offset from base
+# MIDI status-channel offset, selector base, maximum count.
+CHANNEL_SELECTION = {
+    "input": (0, 0x00, 128),
+    "mono_group": (1, 0x00, 62),
+    "stereo_group": (1, 0x40, 31),
+    "mono_aux": (2, 0x00, 62),
+    "stereo_aux": (2, 0x40, 31),
+    "mono_matrix": (3, 0x00, 62),
+    "stereo_matrix": (3, 0x40, 31),
+    "mono_fx_send": (4, 0x00, 16),
+    "stereo_fx_send": (4, 0x10, 16),
+    "fx_return": (4, 0x20, 16),
+    "main": (4, 0x30, 6),
+    "dca": (4, 0x36, 24),
+    "mute_group": (4, 0x4E, 8),
+    "stereo_ufx_send": (4, 0x56, 8),
+    "stereo_ufx_return": (4, 0x5E, 8),
+}
 CHANNEL_TYPE_OFFSET = {
-    "input": 0,
-    "mono_group": 1,
-    "stereo_group": 1,
-    "mono_aux": 2,
-    "mono_fx_send": 2,
-    "stereo_aux": 2,
-    "stereo_fx_send": 2,
-    "mono_matrix": 3,
-    "stereo_matrix": 3,
-    "dca": 4,
+    name: values[0] for name, values in CHANNEL_SELECTION.items()
 }
 
-# dLive colour codes
 COLOURS = {
-    "off": 0x00, "red": 0x01, "green": 0x02, "yellow": 0x03,
-    "blue": 0x04, "purple": 0x05, "lt_blue": 0x06, "white": 0x07,
+    "off": 0x00,
+    "red": 0x01,
+    "green": 0x02,
+    "yellow": 0x03,
+    "blue": 0x04,
+    "purple": 0x05,
+    "lt_blue": 0x06,
+    "white": 0x07,
 }
 
+NORMAL_WRITE_FAMILIES = frozenset()
+RESTORE_ONLY_PROOF_WRITE_FAMILIES = frozenset({"fader"})
+_DLIVE_SUPERVISED_WRITE_SEAL = object()
 
-# ══════════════════════════════════════════════════════════════
-#  Value conversion helpers
-# ══════════════════════════════════════════════════════════════
+
+def _finite_float(value: Any, field: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{field}_must_be_finite_number")
+    try:
+        parsed = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{field}_must_be_finite_number") from exc
+    if not math.isfinite(parsed):
+        raise ValueError(f"{field}_must_be_finite_number")
+    return parsed
+
+
+def _valid_host(host: str) -> bool:
+    if not host or host != host.strip() or len(host) > 253:
+        return False
+    try:
+        parsed = ipaddress.ip_address(host)
+        return parsed.version == 4
+    except ValueError:
+        labels = host.rstrip(".").split(".")
+        if len(labels) == 4 and all(label.isdigit() for label in labels):
+            return False
+        return all(
+            label
+            and len(label) <= 63
+            and re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label)
+            for label in labels
+        )
+
+
+def validate_dlive_connection_config(
+    *,
+    host: str,
+    endpoint: str = "surface",
+    tls: bool = False,
+    port: Optional[int] = None,
+    midi_base_channel: int = 0,
+    user_profile: int = 0,
+) -> Dict[str, Any]:
+    """Validate dLive connection inputs without DNS, sockets or console I/O."""
+
+    endpoint_value = str(endpoint or "").strip().lower()
+    if endpoint_value not in {"surface", "mixrack"}:
+        raise ValueError("dlive_endpoint_must_be_surface_or_mixrack")
+    if not isinstance(tls, bool):
+        raise ValueError("dlive_tls_must_be_boolean")
+    if not _valid_host(str(host or "")):
+        raise ValueError("dlive_host_invalid")
+    if isinstance(midi_base_channel, bool) or not isinstance(midi_base_channel, int):
+        raise ValueError("dlive_midi_base_channel_must_be_integer")
+    if not 0 <= midi_base_channel <= 11:
+        raise ValueError("dlive_midi_base_channel_out_of_range_0_11")
+    if isinstance(user_profile, bool) or not isinstance(user_profile, int):
+        raise ValueError("dlive_user_profile_must_be_integer")
+    if not 0 <= user_profile <= 0x1F:
+        raise ValueError("dlive_user_profile_out_of_range_0_31")
+
+    expected_port = DLIVE_ENDPOINT_PORTS[(endpoint_value, tls)]
+    effective_port = expected_port if port is None else port
+    if isinstance(effective_port, bool) or not isinstance(effective_port, int):
+        raise ValueError("dlive_port_must_be_integer")
+    if effective_port != expected_port:
+        raise ValueError(
+            f"dlive_port_endpoint_tls_mismatch:expected_{expected_port}"
+        )
+
+    return {
+        "schema": "automixer.dlive_connection_preflight.v1",
+        "status": "valid_no_transport_config",
+        "host": str(host),
+        "endpoint": endpoint_value,
+        "tls": tls,
+        "port": effective_port,
+        "midi_base_channel": midi_base_channel,
+        "user_profile": user_profile,
+        "socket_created": False,
+        "console_contacted": False,
+        "midi_sent": False,
+        "live_write": False,
+        "live_authority_granted": False,
+    }
+
 
 def db_to_fader_value(db: float) -> int:
-    """Convert dB to dLive 14-bit fader value (0x0000–0x3FFF).
+    """Convert dB to the official 7-bit dLive fader value."""
 
-    Mapping:  -inf → 0x0000,  0 dB → 0x2AAA,  +10 dB → 0x3FFF.
-    Uses linear interpolation between -inf/0dB and 0dB/+10dB regions.
-    """
-    if db <= -100.0:
+    value = _finite_float(db, "fader_db")
+    if value <= -54.0:
         return FADER_NEG_INF
-    if db >= 10.0:
-        return FADER_MAX
-    if db <= 0.0:
-        # Map -100 .. 0 dB → 0 .. 0x2AAA  (log-linear approximation)
-        ratio = (db + 100.0) / 100.0
-        return int(ratio * FADER_0DB)
-    # 0 .. +10 dB → 0x2AAA .. 0x3FFF
-    ratio = db / 10.0
-    return FADER_0DB + int(ratio * (FADER_MAX - FADER_0DB))
+    value = min(10.0, value)
+    return max(1, min(FADER_MAX, int(((value + 54.0) / 64.0) * 127.0)))
 
 
 def fader_value_to_db(value: int) -> float:
-    """Convert 14-bit fader value to dB."""
+    """Convert the official 7-bit dLive fader value to dB."""
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError("fader_value_must_be_integer")
     value = max(0, min(FADER_MAX, value))
-    if value == 0:
+    if value == FADER_NEG_INF:
         return -100.0
-    if value <= FADER_0DB:
-        ratio = value / FADER_0DB
-        return ratio * 100.0 - 100.0
-    ratio = (value - FADER_0DB) / (FADER_MAX - FADER_0DB)
-    return ratio * 10.0
+    return (float(value) * 64.0 / 127.0) - 54.0
 
 
 def db_to_gain_value(db: float) -> int:
-    """Convert preamp gain dB to 14-bit pitchbend value.
+    """Convert MixRack socket preamp gain (+5..+60 dB) to 7-bit GV."""
 
-    Range roughly -inf .. +60 dB mapped to 0x0000 .. 0x3FFF.
-    """
-    if db <= -100.0:
-        return 0
-    if db >= 60.0:
-        return FADER_MAX
-    ratio = (db + 100.0) / 160.0
-    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
+    value = max(5.0, min(60.0, _finite_float(db, "preamp_gain_db")))
+    return max(0, min(0x7F, int(((value - 5.0) / 55.0) * 127.0)))
 
 
 def freq_to_nrpn(freq_hz: float) -> int:
-    """Convert frequency in Hz to 14-bit NRPN value (log scale 20–20000 Hz)."""
-    freq_hz = max(20.0, min(20000.0, freq_hz))
-    log_ratio = math.log10(freq_hz / 20.0) / math.log10(20000.0 / 20.0)
-    return max(0, min(FADER_MAX, int(log_ratio * FADER_MAX)))
+    """Convert PEQ frequency (20 Hz..20 kHz) to official 7-bit value."""
+
+    freq = max(20.0, min(20000.0, _finite_float(freq_hz, "peq_frequency_hz")))
+    raw = 127.0 * ((4608.0 * math.log2(freq / 4.0) - 10699.0) / 45922.0)
+    return max(0, min(0x7F, int(raw)))
+
+
+def hpf_freq_to_nrpn(freq_hz: float) -> int:
+    """Convert HPF frequency to the official 7-bit value."""
+
+    freq = max(20.0, min(20000.0, _finite_float(freq_hz, "hpf_frequency_hz")))
+    raw = 127.0 * ((4608.0 * math.log2(freq / 4.0) - 10699.0) / 41314.0)
+    return max(0, min(0x7F, int(raw)))
 
 
 def db_to_eq_gain(db: float) -> int:
-    """Convert EQ gain dB (±15 dB) to 14-bit NRPN value."""
-    db = max(-15.0, min(15.0, db))
-    ratio = (db + 15.0) / 30.0
-    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
+    """Convert PEQ gain (-15..+15 dB) to official 0..126 value."""
+
+    value = max(-15.0, min(15.0, _finite_float(db, "peq_gain_db")))
+    return max(0, min(0x7E, int(((value + 15.0) * 126.0) / 30.0)))
+
+
+_WIDTH_VALUES = (
+    1.5, 1.4, 1.3, 1.2, 1.1, 1.0, 0.95, 0.9, 0.85, 0.8, 0.75, 0.7,
+    2.0 / 3.0, 0.6, 0.55, 0.5, 0.45, 0.4, 1.0 / 3.0, 0.3, 0.25,
+    0.2, 1.0 / 6.0, 0.13, 1.0 / 9.0,
+)
 
 
 def q_to_nrpn(q: float) -> int:
-    """Convert Q value (0.3 – 35) to 14-bit NRPN value (log scale)."""
-    q = max(0.3, min(35.0, q))
-    log_ratio = math.log10(q / 0.3) / math.log10(35.0 / 0.3)
-    return max(0, min(FADER_MAX, int(log_ratio * FADER_MAX)))
+    """Approximate Q as the nearest documented dLive width value."""
+
+    q_value = max(0.1, _finite_float(q, "peq_q"))
+    width_octaves = 2.0 * math.asinh(1.0 / (2.0 * q_value)) / math.log(2.0)
+    return min(range(len(_WIDTH_VALUES)), key=lambda i: abs(_WIDTH_VALUES[i] - width_octaves))
 
 
-def pan_to_nrpn(pan: float) -> int:
-    """Convert pan (-100..+100, 0=center) to 14-bit NRPN.
+def build_nrpn(
+    midi_channel: int,
+    channel_selector: int,
+    parameter_id: int,
+    value: int,
+) -> bytes:
+    """Build the documented dLive 7-bit NRPN running-status sequence.
 
-    0x0000=hard left, 0x2000=center, 0x3FFF=hard right.
+    Allen & Heath documents the repeated ``BN`` status bytes in square
+    brackets and describes dLive running status. The proof path emits that
+    compact seven-byte form. Hardware no-op attempts do not establish that a
+    standards-valid full-status form is intrinsically incompatible; receive
+    enablement, endpoint state and the actual wire send remain separate gates.
     """
-    pan = max(-100.0, min(100.0, pan))
-    ratio = (pan + 100.0) / 200.0
-    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
 
-
-def ms_to_delay_nrpn(ms: float, max_ms: float = 500.0) -> int:
-    """Convert delay time in ms to 14-bit NRPN value."""
-    ms = max(0.0, min(max_ms, ms))
-    return max(0, min(FADER_MAX, int((ms / max_ms) * FADER_MAX)))
-
-
-def comp_threshold_to_nrpn(db: float) -> int:
-    """Convert compressor threshold (-60..0 dB) to 14-bit NRPN."""
-    db = max(-60.0, min(0.0, db))
-    ratio = (db + 60.0) / 60.0
-    return max(0, min(FADER_MAX, int(ratio * FADER_MAX)))
-
-
-def comp_ratio_to_nrpn(ratio: float) -> int:
-    """Convert compressor ratio (1:1 .. 20:1) to 14-bit NRPN."""
-    ratio = max(1.0, min(20.0, ratio))
-    return max(0, min(FADER_MAX, int(((ratio - 1.0) / 19.0) * FADER_MAX)))
-
-
-def comp_time_to_nrpn(ms: float, max_ms: float = 500.0) -> int:
-    """Convert attack/release time in ms to 14-bit NRPN (log scale)."""
-    ms = max(0.1, min(max_ms, ms))
-    log_ratio = math.log10(ms / 0.1) / math.log10(max_ms / 0.1)
-    return max(0, min(FADER_MAX, int(log_ratio * FADER_MAX)))
-
-
-# ══════════════════════════════════════════════════════════════
-#  MIDI message builders (pure functions → easy to unit-test)
-# ══════════════════════════════════════════════════════════════
-
-def build_nrpn(channel: int, msb: int, lsb: int, value: int) -> bytes:
-    """Build a 4-message NRPN sequence (8 bytes).
-
-    channel:  MIDI channel 0-15
-    msb/lsb:  NRPN parameter address
-    value:    14-bit value 0-16383
-    """
-    ch = channel & 0x0F
-    val_msb = (value >> 7) & 0x7F
-    val_lsb = value & 0x7F
-    return bytes([
-        0xB0 | ch, 0x63, msb & 0x7F,   # NRPN MSB
-        0xB0 | ch, 0x62, lsb & 0x7F,   # NRPN LSB
-        0xB0 | ch, 0x06, val_msb,       # Data Entry MSB
-        0xB0 | ch, 0x26, val_lsb,       # Data Entry LSB
-    ])
+    status = 0xB0 | (int(midi_channel) & 0x0F)
+    return bytes(
+        (
+            status, 0x63, int(channel_selector) & 0x7F,
+            0x62, int(parameter_id) & 0x7F,
+            0x06, int(value) & 0x7F,
+        )
+    )
 
 
 def build_note_on(channel: int, note: int, velocity: int) -> bytes:
-    """Note On message (3 bytes)."""
-    return bytes([0x90 | (channel & 0x0F), note & 0x7F, velocity & 0x7F])
+    return bytes((0x90 | (int(channel) & 0x0F), note & 0x7F, velocity & 0x7F))
 
 
-def build_pitchbend(channel: int, value: int) -> bytes:
-    """Pitch Bend message (3 bytes).  value is 14-bit (0-16383)."""
-    lsb = value & 0x7F
-    msb = (value >> 7) & 0x7F
-    return bytes([0xE0 | (channel & 0x0F), lsb, msb])
+def build_pitchbend(channel: int, socket_selector: int, gain_value: int) -> bytes:
+    """Build dLive socket-preamp gain: EN, MP, GV."""
+
+    return bytes(
+        (0xE0 | (int(channel) & 0x0F), socket_selector & 0x7F, gain_value & 0x7F)
+    )
 
 
 def build_sysex(payload: bytes) -> bytes:
-    """Wrap *payload* in the dLive SysEx header + F7 trailer."""
-    return SYSEX_HEADER + payload + bytes([SYSEX_END])
+    return SYSEX_HEADER + bytes(payload) + bytes((SYSEX_END,))
 
 
-def build_program_change(channel: int, bank_msb: int, bank_lsb: int, program: int) -> bytes:
-    """Bank Select + Program Change (5 bytes)."""
-    ch = channel & 0x0F
-    return bytes([
-        0xB0 | ch, 0x00, bank_msb & 0x7F,
-        0xB0 | ch, 0x20, bank_lsb & 0x7F,
-        0xC0 | ch, program & 0x7F,
-    ])
+def build_program_change(channel: int, bank: int, program: int) -> bytes:
+    """Build official scene bank-select CC0 + Program Change bytes."""
+
+    midi_channel = int(channel) & 0x0F
+    return bytes((0xB0 | midi_channel, 0x00, bank & 0x7F, 0xC0 | midi_channel, program & 0x7F))
 
 
-# ══════════════════════════════════════════════════════════════
-#  DLiveClient
-# ══════════════════════════════════════════════════════════════
+def build_get_fader(midi_channel: int, selector: int) -> bytes:
+    return build_sysex(bytes((midi_channel & 0x0F, 0x05, 0x0B, 0x17, selector & 0x7F)))
+
+
+def build_get_mute(midi_channel: int, selector: int) -> bytes:
+    return build_sysex(bytes((midi_channel & 0x0F, 0x05, 0x09, selector & 0x7F)))
+
+
+def build_get_name(midi_channel: int, selector: int) -> bytes:
+    return build_sysex(bytes((midi_channel & 0x0F, 0x01, selector & 0x7F)))
+
 
 class DLiveClient(MixerClientBase):
-    """Allen & Heath dLive mixer client using MIDI over TCP."""
+    """Narrow, fail-closed dLive MIDI/TCP client."""
 
     def __init__(
         self,
-        ip: str = "192.168.1.70",
-        port: int = DLIVE_TCP_PORT,
+        ip: str = "192.168.3.70",
+        port: Optional[int] = None,
         tls: bool = False,
         tls_ca_file: Optional[str] = None,
         tls_server_hostname: Optional[str] = None,
         midi_base_channel: int = 0,
         user_profile: int = 0,
         password: str = "",
+        endpoint: str = "surface",
+        auto_reconnect: bool = False,
     ):
-        self.ip = ip
-        self.port = port
-        self.tls = tls
+        validated = validate_dlive_connection_config(
+            host=ip,
+            endpoint=endpoint,
+            tls=tls,
+            port=port,
+            midi_base_channel=midi_base_channel,
+            user_profile=user_profile,
+        )
+        self.ip = validated["host"]
+        self.endpoint = validated["endpoint"]
+        self.port = validated["port"]
+        self.tls = validated["tls"]
         self.tls_ca_file = tls_ca_file
         self.tls_server_hostname = tls_server_hostname
-        self.midi_base_channel = midi_base_channel & 0x0F
-        self.user_profile = user_profile
-        self.password = password
+        self.midi_base_channel = validated["midi_base_channel"]
+        self.user_profile = validated["user_profile"]
+        self.password = str(password or "")
+        self.auto_reconnect = bool(auto_reconnect)
 
         self._sock: Optional[socket.socket] = None
         self._ssl_sock: Optional[ssl.SSLSocket] = None
         self.is_connected = False
-
         self._lock = threading.Lock()
         self._recv_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
         self._reconnect_interval = 3.0
+        self._teardown_failed = False
 
         self.state: Dict[str, Any] = {}
         self.state_timestamps: Dict[str, float] = {}
         self.callbacks: Dict[str, List[Callable]] = {}
         self._channel_names: Dict[int, str] = {}
         self._parse_buffer = bytearray()
+        self._running_status: Optional[int] = None
+        self._discarding_oversized_sysex = False
 
-        # Defence-in-depth: fader ceiling on the transport boundary, same
-        # opt-in as WingClient (AUTOMIXER_FADER_CEILING_DB), default 0 dBFS.
         try:
             ceiling = float(os.getenv("AUTOMIXER_FADER_CEILING_DB", "") or 0.0)
         except ValueError:
             ceiling = 0.0
-        self._fader_ceiling_db = max(-144.0, min(10.0, ceiling))
+        self._fader_ceiling_db = max(-54.0, min(10.0, ceiling))
 
         logger.info(
-            "DLiveClient initialized for %s:%s (TLS=%s, tls_ca_file=%s, "
-            "tls_server_hostname=%s, base_ch=%s)",
-            ip,
-            port,
-            tls,
-            bool(tls_ca_file),
-            tls_server_hostname or ip,
-            midi_base_channel,
+            "DLiveClient initialized for %s %s:%s (TLS=%s, base_ch=%s, normal_writes=none)",
+            self.endpoint,
+            self.ip,
+            self.port,
+            self.tls,
+            self.midi_base_channel,
         )
 
-    # ── Connection ─────────────────────────────────────────────
-
     def connect(self, timeout: float = 5.0) -> bool:
+        if self._teardown_failed:
+            logger.error("dLive connection refused after unverified transport teardown")
+            return False
         if self.is_connected:
             return True
-        try:
-            raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            raw.settimeout(timeout)
-            raw.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-            raw.connect((self.ip, self.port))
-
-            if self.tls:
-                ctx = ssl.create_default_context(cafile=self.tls_ca_file)
-                server_hostname = self.tls_server_hostname or self.ip
-                self._ssl_sock = ctx.wrap_socket(raw, server_hostname=server_hostname)
-                self._sock = self._ssl_sock
-                # Authenticate
-                auth_msg = f"{chr(self.user_profile)},{self.password}"
-                self._sock.sendall(auth_msg.encode("utf-8"))
-                resp = self._sock.recv(256).decode("utf-8", errors="ignore")
-                if "AuthOK" not in resp:
-                    logger.error(f"dLive auth failed: {resp}")
-                    self._sock.close()
-                    return False
-                logger.info("dLive TLS auth successful")
-            else:
-                self._sock = raw
-
-            self.is_connected = True
-            self._stop_event.clear()
-
-            self._recv_thread = threading.Thread(target=self._receiver_loop, daemon=True)
-            self._recv_thread.start()
-
-            logger.info(f"Connected to dLive at {self.ip}:{self.port}")
-            return True
-
-        except Exception as e:
-            logger.error(f"dLive connection failed: {e}")
-            self.is_connected = False
+        validate_dlive_connection_config(
+            host=self.ip,
+            endpoint=self.endpoint,
+            tls=self.tls,
+            port=self.port,
+            midi_base_channel=self.midi_base_channel,
+            user_profile=self.user_profile,
+        )
+        peer_ip = ipaddress.ip_address(self.ip)
+        if not self.tls and not peer_ip.is_loopback:
+            logger.error("dLive connection refused: non-loopback cleartext is disabled")
             return False
-
-    def disconnect(self):
-        self._stop_event.set()
-        self.is_connected = False
-        if self._sock:
-            try:
-                self._sock.close()
-            except Exception:
-                pass
-            self._sock = None
-            self._ssl_sock = None
-        if self._recv_thread and self._recv_thread.is_alive():
-            self._recv_thread.join(timeout=2.0)
-        logger.info("dLive disconnected")
-
-    # ── Send raw bytes (thread-safe) ───────────────────────────
-
-    def _send_raw(self, data: bytes) -> bool:
-        with self._lock:
-            if not self.is_connected or not self._sock:
+        tls_context: Optional[ssl.SSLContext] = None
+        tls_password = b""
+        if self.tls:
+            if not self.tls_server_hostname:
+                logger.error("dLive TLS connection refused: server identity is required")
+                return False
+            if not self.tls_ca_file:
+                logger.error("dLive TLS connection refused: CA file is required")
                 return False
             try:
-                self._sock.sendall(data)
+                tls_password = self.password.encode("utf-8")
+            except UnicodeEncodeError:
+                logger.error("dLive TLS connection refused: password encoding is invalid")
+                return False
+            if (
+                not tls_password
+                or len(tls_password) > 128
+                or any(byte in tls_password for byte in (0x00, 0x0A, 0x0D, 0x2C))
+            ):
+                logger.error("dLive TLS connection refused: password is invalid")
+                return False
+            try:
+                # Load trust and enable hostname verification before any network contact.
+                tls_context = ssl.create_default_context(cafile=self.tls_ca_file)
+            except Exception as exc:
+                logger.error("dLive TLS trust configuration failed: %s", exc)
+                return False
+        raw: Optional[socket.socket] = None
+        try:
+            raw = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            raw.settimeout(float(timeout))
+            raw.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            raw.connect((self.ip, self.port))
+            connected: socket.socket = raw
+            if self.tls:
+                assert tls_context is not None
+                connected = tls_context.wrap_socket(
+                    raw,
+                    server_hostname=self.tls_server_hostname,
+                )
+                self._ssl_sock = connected  # type: ignore[assignment]
+                auth = bytes((self.user_profile,)) + b"," + tls_password
+                connected.sendall(auth)
+                response = connected.recv(256)
+                if not response.startswith(b"AuthOK"):
+                    raise ConnectionError("dlive_tls_auth_failed")
+            self._reset_parser_state()
+            self._sock = connected
+            self.is_connected = True
+            self._stop_event.clear()
+            self._recv_thread = threading.Thread(
+                target=self._receiver_loop,
+                name="dlive-midi-receiver",
+                daemon=True,
+            )
+            self._recv_thread.start()
+            logger.info("Connected to dLive %s at %s:%s", self.endpoint, self.ip, self.port)
+            return True
+        except Exception as exc:
+            logger.error("dLive connection failed: %s", exc)
+            self.is_connected = False
+            failed_transport = self._ssl_sock or raw
+            self._sock = None
+            self._ssl_sock = None
+            if failed_transport is not None:
+                try:
+                    failed_transport.close()
+                except Exception as close_exc:
+                    self._teardown_failed = True
+                    logger.error("dLive failed transport close error: %s", close_exc)
+            return False
+
+    def disconnect(self) -> bool:
+        """Stop the socket/receiver and return verified teardown status."""
+        self._stop_event.set()
+        self.is_connected = False
+        sock = self._sock
+        self._sock = None
+        self._ssl_sock = None
+        teardown_ok = not self._teardown_failed
+        if sock is not None:
+            try:
+                sock.close()
+            except Exception as exc:
+                teardown_ok = False
+                self._teardown_failed = True
+                logger.error("dLive socket close error: %s", exc)
+        thread = self._recv_thread
+        if thread and thread is not threading.current_thread() and thread.is_alive():
+            thread.join(timeout=2.0)
+            if thread.is_alive():
+                teardown_ok = False
+                self._teardown_failed = True
+                logger.error("dLive receiver thread did not stop")
+            else:
+                self._recv_thread = None
+        elif thread is None or thread is not threading.current_thread():
+            self._recv_thread = None
+        self._reset_parser_state()
+        if teardown_ok:
+            logger.info("dLive disconnected")
+        return teardown_ok
+
+    def _send_raw(self, data: bytes) -> bool:
+        payload = bytes(data)
+        if not payload:
+            return False
+        with self._lock:
+            if not self.is_connected or self._sock is None:
+                return False
+            try:
+                self._sock.sendall(payload)
                 return True
-            except Exception as e:
-                logger.error(f"dLive send error: {e}")
+            except Exception as exc:
+                logger.error("dLive send error: %s", exc)
                 self.is_connected = False
                 return False
 
-    # ── Receiver loop ──────────────────────────────────────────
-
     def _receiver_loop(self):
-        """Read incoming MIDI bytes from dLive and dispatch callbacks."""
         while not self._stop_event.is_set() and self.is_connected:
             try:
-                if self._sock is None:
+                sock = self._sock
+                if sock is None:
                     break
-                self._sock.settimeout(1.0)
-                data = self._sock.recv(4096)
+                sock.settimeout(1.0)
+                data = sock.recv(4096)
                 if not data:
-                    logger.warning("dLive connection closed by remote")
                     self.is_connected = False
                     break
                 self._parse_incoming(data)
             except socket.timeout:
                 continue
-            except Exception as e:
+            except Exception as exc:
                 if self.is_connected:
-                    logger.error(f"dLive receiver error: {e}")
-                    self.is_connected = False
+                    logger.error("dLive receiver error: %s", exc)
+                self.is_connected = False
                 break
-
-        # Auto-reconnect
-        if not self._stop_event.is_set():
-            logger.info(f"dLive reconnecting in {self._reconnect_interval}s …")
-            time.sleep(self._reconnect_interval)
+        if self.auto_reconnect and not self._stop_event.wait(self._reconnect_interval):
+            self._recv_thread = None
             self.connect()
 
+    @staticmethod
+    def _message_data_length(status: int) -> Optional[int]:
+        kind = status & 0xF0
+        if kind in {0x80, 0x90, 0xA0, 0xB0, 0xE0}:
+            return 2
+        if kind in {0xC0, 0xD0}:
+            return 1
+        return None
+
     def _parse_incoming(self, data: bytes):
-        """Best-effort parse of incoming MIDI messages for state tracking."""
-        self._parse_buffer.extend(data)
-        data = bytes(self._parse_buffer)
-        i = 0
-        while i < len(data):
-            status = data[i]
-            if status == 0xF0:
-                # SysEx — find F7
-                end = data.find(b'\xF7', i)
-                if end == -1:
-                    break
-                sysex_body = data[i + 1:end]
-                self._handle_sysex(sysex_body)
-                i = end + 1
-            elif status & 0xF0 == 0xB0:
-                # CC / NRPN — 3 bytes
-                if i + 2 >= len(data):
-                    break
-                self._handle_cc(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
-            elif status & 0xF0 == 0x90:
-                if i + 2 >= len(data):
-                    break
-                self._handle_note(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
-            elif status & 0xF0 == 0xE0:
-                if i + 2 >= len(data):
-                    break
-                self._handle_pitchbend(status & 0x0F, data[i + 1], data[i + 2])
-                i += 3
-            elif status & 0xF0 == 0xC0:
-                if i + 1 >= len(data):
-                    break
-                self._set_state_value(f"program/{status & 0x0F}", data[i + 1])
-                i += 2
+        """Parse fragmented MIDI/TCP, including MIDI running status."""
+
+        offset = 0
+        while offset < len(data):
+            if self._discarding_oversized_sysex:
+                terminator = data.find(bytes((SYSEX_END,)), offset)
+                if terminator < 0:
+                    return
+                self._discarding_oversized_sysex = False
+                offset = terminator + 1
+                continue
+
+            available = DLIVE_MAX_SYSEX_FRAME_BYTES - len(self._parse_buffer)
+            if available <= 0:
+                self._discard_oversized_sysex()
+                continue
+
+            chunk_end = min(len(data), offset + available)
+            self._parse_buffer.extend(data[offset:chunk_end])
+            offset = chunk_end
+            self._drain_parse_buffer()
+
+            if (
+                self._parse_buffer
+                and self._parse_buffer[0] == 0xF0
+                and len(self._parse_buffer) >= DLIVE_MAX_SYSEX_FRAME_BYTES
+            ):
+                self._discard_oversized_sysex()
+
+    def _discard_oversized_sysex(self) -> None:
+        logger.warning(
+            "Discarding dLive SysEx frame exceeding %s bytes",
+            DLIVE_MAX_SYSEX_FRAME_BYTES,
+        )
+        self._parse_buffer.clear()
+        self._running_status = None
+        self._discarding_oversized_sysex = True
+
+    def _reset_parser_state(self) -> None:
+        self._parse_buffer.clear()
+        self._running_status = None
+        self._discarding_oversized_sysex = False
+
+    def _drain_parse_buffer(self) -> None:
+        while self._parse_buffer:
+            first = self._parse_buffer[0]
+            if first == 0xF0:
+                try:
+                    end = self._parse_buffer.index(SYSEX_END, 1)
+                except ValueError:
+                    return
+                body = bytes(self._parse_buffer[1:end])
+                del self._parse_buffer[: end + 1]
+                self._running_status = None
+                self._handle_sysex(body)
+                continue
+            if first >= 0xF8:
+                del self._parse_buffer[0]
+                continue
+
+            if first & 0x80:
+                data_length = self._message_data_length(first)
+                if data_length is None:
+                    del self._parse_buffer[0]
+                    self._running_status = None
+                    continue
+                if len(self._parse_buffer) < data_length + 1:
+                    return
+                status = first
+                message_data = bytes(self._parse_buffer[1 : data_length + 1])
+                del self._parse_buffer[: data_length + 1]
+                self._running_status = status
             else:
-                i += 1
-        if i:
-            del self._parse_buffer[:i]
+                status = self._running_status
+                if status is None:
+                    del self._parse_buffer[0]
+                    continue
+                data_length = self._message_data_length(status)
+                if data_length is None or len(self._parse_buffer) < data_length:
+                    return
+                message_data = bytes(self._parse_buffer[:data_length])
+                del self._parse_buffer[:data_length]
+            self._dispatch_midi(status, message_data)
+
+    def _dispatch_midi(self, status: int, data: bytes) -> None:
+        kind = status & 0xF0
+        channel = status & 0x0F
+        if kind == 0xB0:
+            self._handle_cc(channel, data[0], data[1])
+        elif kind == 0x90:
+            self._handle_note(channel, data[0], data[1])
+        elif kind == 0x80:
+            self._handle_note(channel, data[0], 0)
+        elif kind == 0xE0:
+            self._handle_pitchbend(channel, data[0], data[1])
+        elif kind == 0xC0:
+            self._set_state_value(f"program/{channel}", data[0])
 
     def _set_state_value(self, key: str, value: Any) -> None:
         self.state[key] = value
         self.state_timestamps[key] = time.time()
 
+    def _selector(self, channel: int, channel_type: str = "input") -> Tuple[int, int]:
+        if channel_type not in CHANNEL_SELECTION:
+            raise ValueError("dlive_channel_type_unsupported")
+        offset, selector_base, maximum = CHANNEL_SELECTION[channel_type]
+        if isinstance(channel, bool) or not isinstance(channel, int) or not 1 <= channel <= maximum:
+            raise ValueError(f"dlive_{channel_type}_channel_out_of_range_1_{maximum}")
+        return self.midi_base_channel + offset, selector_base + channel - 1
+
+    def _decode_selector(self, midi_channel: int, selector: int) -> Optional[Tuple[str, int]]:
+        offset = midi_channel - self.midi_base_channel
+        for channel_type, (expected_offset, selector_base, maximum) in CHANNEL_SELECTION.items():
+            if expected_offset != offset:
+                continue
+            if selector_base <= selector < selector_base + maximum:
+                return channel_type, selector - selector_base + 1
+        return None
+
+    @staticmethod
+    def _surface_key(kind: str, channel_type: str, channel: int) -> str:
+        if channel_type == "input":
+            return f"{kind}/{channel}"
+        return f"{kind}/{channel_type}/{channel}"
+
     def _handle_cc(self, channel: int, cc: int, value: int):
-        key = f"cc/{channel}/{cc}"
-        self._set_state_value(key, value)
-
-        # Track NRPN state machine to reconstruct fader values
-        if cc == 0x63:  # NRPN MSB
-            self._set_state_value(f"_nrpn_msb/{channel}", value)
-        elif cc == 0x62:  # NRPN LSB
-            self._set_state_value(f"_nrpn_lsb/{channel}", value)
-        elif cc == 0x06:  # Data Entry MSB
-            self._set_state_value(f"_data_msb/{channel}", value)
-        elif cc == 0x26:  # Data Entry LSB
-            data_msb = self.state.get(f"_data_msb/{channel}", 0)
-            nrpn_msb = self.state.get(f"_nrpn_msb/{channel}", 0)
-            nrpn_lsb = self.state.get(f"_nrpn_lsb/{channel}", 0)
-            full_value = (data_msb << 7) | value
-
-            # NRPN MSB 0x00 = fader level for input channels
-            if nrpn_msb == 0x00:
-                ch_1based = nrpn_lsb + 1
-                self._set_state_value(f"fader/{ch_1based}", full_value)
-                self._notify(f"fader/{ch_1based}", fader_value_to_db(full_value))
-
-        self._notify(key, value)
+        self._set_state_value(f"cc/{channel}/{cc}", value)
+        if cc == 0x63:
+            self._set_state_value(f"_nrpn_selector/{channel}", value)
+        elif cc == 0x62:
+            self._set_state_value(f"_nrpn_parameter/{channel}", value)
+        elif cc == 0x06:
+            selector = self.state.get(f"_nrpn_selector/{channel}")
+            parameter = self.state.get(f"_nrpn_parameter/{channel}")
+            if isinstance(selector, int) and isinstance(parameter, int):
+                decoded = self._decode_selector(channel, selector)
+                if decoded is not None:
+                    channel_type, channel_number = decoded
+                    raw_key = f"nrpn/{channel_type}/{channel_number}/{parameter}"
+                    self._set_state_value(raw_key, value)
+                    if parameter == FADER_PARAMETER_ID:
+                        key = self._surface_key("fader", channel_type, channel_number)
+                        self._set_state_value(key, value)
+                        self._notify(key, fader_value_to_db(value))
+        self._notify(f"cc/{channel}/{cc}", value)
 
     def _handle_note(self, channel: int, note: int, velocity: int):
-        key = f"note/{channel}/{note}"
-        self._set_state_value(key, velocity)
-        # Track mute state: note number = channel-1. dLive sends a velocity=0
-        # release after both mute and unmute events; release must not overwrite
-        # the latched mute state.
-        if velocity:
-            ch_1based = note + 1
-            self._set_state_value(f"mute/{ch_1based}", velocity >= 0x40)
-        self._notify(key, velocity)
+        self._set_state_value(f"note/{channel}/{note}", velocity)
+        decoded = self._decode_selector(channel, note)
+        if velocity and decoded is not None:
+            channel_type, channel_number = decoded
+            key = self._surface_key("mute", channel_type, channel_number)
+            self._set_state_value(key, velocity >= 0x40)
+            self._notify(key, velocity >= 0x40)
+        self._notify(f"note/{channel}/{note}", velocity)
 
-    def _handle_pitchbend(self, channel: int, lsb: int, msb: int):
-        value = (msb << 7) | lsb
-        key = f"pitchbend/{channel}"
-        self._set_state_value(key, value)
-        self._notify(key, value)
+    def _handle_pitchbend(self, channel: int, socket_selector: int, gain_value: int):
+        self._set_state_value(f"preamp/{socket_selector + 1}/gain_raw", gain_value)
+        self._notify(f"preamp/{socket_selector + 1}/gain_raw", gain_value)
 
     def _handle_sysex(self, body: bytes):
-        """Parse dLive SysEx messages for channel names and other data."""
-        # dLive SysEx header: 00 00 1A 50 10 01 00
-        header = bytes([0x00, 0x00, 0x1A, 0x50, 0x10, 0x01, 0x00])
-        if not body.startswith(header):
+        if not body.startswith(SYSEX_BODY_HEADER):
             return
-        payload = body[len(header):]
+        payload = body[len(SYSEX_BODY_HEADER) :]
         if len(payload) < 3:
             return
-        midi_ch = payload[0]
-        msg_type = payload[1]
-        ch_idx = payload[2]
-        ch_1based = ch_idx + 1
-
-        if msg_type == 0x03:
-            # Channel name
-            name_bytes = payload[3:]
-            name = name_bytes.decode("ascii", errors="replace").rstrip('\x00').strip()
-            self._channel_names[ch_1based] = name
-            self._set_state_value(f"name/{ch_1based}", name)
-            logger.debug(f"dLive ch {ch_1based} name: '{name}'")
+        midi_channel, message_type, selector = payload[:3]
+        decoded = self._decode_selector(midi_channel, selector)
+        if message_type == 0x02 and decoded is not None:
+            channel_type, channel_number = decoded
+            name = payload[3:].decode("ascii", errors="replace").rstrip("\x00").strip()
+            key = self._surface_key("name", channel_type, channel_number)
+            self._set_state_value(key, name)
+            if channel_type == "input":
+                self._channel_names[channel_number] = name
+            self._notify(key, name)
+        elif message_type == 0x08 and len(payload) >= 4:
+            self._set_state_value(f"preamp/{selector + 1}/pad", payload[3] >= 0x40)
+        elif message_type == 0x0B and len(payload) >= 4:
+            self._set_state_value(f"preamp/{selector + 1}/phantom", payload[3] >= 0x40)
 
     def _notify(self, address: str, *args):
-        for pattern, cbs in list(self.callbacks.items()):
-            if pattern == "*" or pattern == address:
-                for cb in cbs:
+        for pattern, callbacks in list(self.callbacks.items()):
+            if pattern in {"*", address}:
+                for callback in list(callbacks):
                     try:
-                        cb(address, *args)
-                    except Exception as e:
-                        logger.debug(f"Callback error: {e}")
-
-    # ── MixerClientBase interface ──────────────────────────────
+                        callback(address, *args)
+                    except Exception as exc:
+                        logger.debug("dLive callback error: %s", exc)
 
     def send(self, address: str, *args):
-        """Generic send — for dLive we accept raw bytes in args[0]."""
-        if args and isinstance(args[0], (bytes, bytearray)):
-            return self._send_raw(args[0])
+        """Reject the generic raw-byte surface; use typed methods only."""
+
+        return False
 
     def subscribe(self, address: str, callback: Callable):
         self.callbacks.setdefault(address, []).append(callback)
@@ -537,23 +748,142 @@ class DLiveClient(MixerClientBase):
     def get_state(self) -> Dict[str, Any]:
         return dict(self.state)
 
-    # ── Faders (NRPN) ─────────────────────────────────────────
-
     def _midi_channel(self, channel_type: str = "input") -> int:
-        return (self.midi_base_channel + CHANNEL_TYPE_OFFSET.get(channel_type, 0)) & 0x0F
+        return self._selector(1, channel_type)[0]
 
     def set_fader(self, channel: int, value_db: float, channel_type: str = "input"):
-        value_db = float(value_db)
-        if value_db > self._fader_ceiling_db:
-            logger.warning(
-                f"Fader ceiling enforced: dLive {channel_type} ch{channel} requested "
-                f"{value_db:.2f} dB > ceiling {self._fader_ceiling_db:.2f} dB; clamping"
+        return self._unsupported_write("fader_requires_one_shot_supervised_proof")
+
+    def _supervised_fader_write(
+        self,
+        channel: int,
+        value_db: float,
+        *,
+        authority: Any,
+        phase: str,
+        channel_type: str = "input",
+    ) -> bool:
+        """Send one authority-bound fader proof packet.
+
+        The authority transitions before ``sendall``. A failed or interrupted
+        send therefore leaves only the exact rollback phase authorized.
+        """
+
+        if channel_type != "input":
+            return self._unsupported_write(f"{channel_type}_fader")
+        requested = _finite_float(value_db, "fader_db")
+        # Apply obeys the configured ceiling. Exact-preimage rollback is
+        # recovery authority, not a new target, and must not be stranded by a
+        # ceiling that was lowered after the physical preimage was observed.
+        effective = (
+            min(requested, 0.0)
+            if phase == "rollback"
+            else min(requested, self._fader_ceiling_db, 0.0)
+        )
+        consume = getattr(authority, "consume_fader_write", None)
+        if (
+            getattr(authority, "_dlive_transport_seal", None)
+            is not _DLIVE_SUPERVISED_WRITE_SEAL
+            or not callable(consume)
+            or consume(
+                client=self,
+                channel=channel,
+                value_db=effective,
+                phase=phase,
+            ) is not True
+        ):
+            return self._unsupported_write(
+                "invalid_or_expired_supervised_fader_authority"
             )
-            value_db = self._fader_ceiling_db
-        midi_ch = self._midi_channel(channel_type)
-        fader_val = db_to_fader_value(value_db)
-        msg = build_nrpn(midi_ch, 0x00, channel - 1, fader_val)
-        return self._send_raw(msg)
+        midi_channel, selector = self._selector(channel, channel_type)
+        return self._send_raw(
+            build_nrpn(midi_channel, selector, FADER_PARAMETER_ID, db_to_fader_value(effective))
+        )
+
+    def set_channel_fader(self, channel: int, value_db: float):
+        return self.set_fader(channel, value_db)
+
+    def request_fader(self, channel: int, channel_type: str = "input") -> bool:
+        midi_channel, selector = self._selector(channel, channel_type)
+        return self._send_raw(build_get_fader(midi_channel, selector))
+
+    def request_mute(self, channel: int, channel_type: str = "input") -> bool:
+        midi_channel, selector = self._selector(channel, channel_type)
+        return self._send_raw(build_get_mute(midi_channel, selector))
+
+    def request_channel_name(self, channel: int, channel_type: str = "input") -> bool:
+        midi_channel, selector = self._selector(channel, channel_type)
+        return self._send_raw(build_get_name(midi_channel, selector))
+
+    def _query_input_state(
+        self,
+        channel: int,
+        kind: str,
+        *,
+        timeout_sec: float = 0.5,
+        round_trips: int = 2,
+    ) -> Dict[str, Any]:
+        self._selector(channel, "input")
+        key = f"{kind}/{channel}"
+        request = {
+            "fader": self.request_fader,
+            "mute": self.request_mute,
+            "name": self.request_channel_name,
+        }.get(kind)
+        if request is None:
+            return {"status": "unsupported", "key": key, "confirmed_round_trips": 0}
+        values: List[Any] = []
+        timestamps: List[float] = []
+        for _ in range(max(1, int(round_trips))):
+            before = self.state_timestamps.get(key, 0.0)
+            sent_at = time.time()
+            if request(channel) is False:
+                return {"status": "send_failed", "key": key, "confirmed_round_trips": len(values)}
+            deadline = time.monotonic() + max(0.0, float(timeout_sec))
+            while time.monotonic() < deadline:
+                timestamp = self.state_timestamps.get(key, 0.0)
+                if timestamp > before and timestamp >= sent_at:
+                    values.append(self.state.get(key))
+                    timestamps.append(timestamp)
+                    break
+                time.sleep(0.005)
+            else:
+                return {"status": "unconfirmed", "key": key, "confirmed_round_trips": len(values)}
+        if not values or any(value != values[0] for value in values[1:]):
+            return {
+                "status": "unstable",
+                "key": key,
+                "values": values,
+                "confirmed_round_trips": len(values),
+            }
+        return {
+            "status": "received",
+            "key": key,
+            "value": values[0],
+            "confirmed_round_trips": len(values),
+            "response_timestamps": timestamps,
+        }
+
+    def query_parameter(self, address: str, timeout_sec: float = 0.5) -> Dict[str, Any]:
+        match = re.fullmatch(r"/ch/(\d+)/(fdr|mute|name)", str(address or ""))
+        if match is None:
+            return {
+                "status": "unsupported",
+                "address": address,
+                "confirmed_round_trips": 0,
+            }
+        channel = int(match.group(1))
+        kind = {"fdr": "fader", "mute": "mute", "name": "name"}[match.group(2)]
+        result = self._query_input_state(
+            channel,
+            kind,
+            timeout_sec=timeout_sec,
+            round_trips=2,
+        )
+        value = result.get("value")
+        if result.get("status") == "received" and kind == "fader":
+            value = fader_value_to_db(int(value))
+        return {**result, "address": address, "value": value}
 
     def set_fader_verified(
         self,
@@ -562,293 +892,178 @@ class DLiveClient(MixerClientBase):
         channel_type: str = "input",
         *,
         timeout_sec: float = 0.5,
-        tolerance_db: float = 0.5,
+        tolerance_db: float = 0.6,
     ) -> Dict[str, Any]:
-        """Set a fader and report applied only after matching MIDI echo."""
-        midi_ch = self._midi_channel(channel_type)
-        target_value = db_to_fader_value(value_db)
-        msg = build_nrpn(midi_ch, 0x00, channel - 1, target_value)
-        send_result = self._send_raw(msg)
-        if send_result is False:
-            return {"status": "send_failed", "channel": channel, "target_db": value_db}
-
-        deadline = time.time() + max(0.0, float(timeout_sec))
-        readback_value = self.state.get(f"fader/{channel}")
-        while readback_value is None and time.time() < deadline:
-            time.sleep(0.01)
-            readback_value = self.state.get(f"fader/{channel}")
-
-        if readback_value is None:
-            return {"status": "unconfirmed", "channel": channel, "target_db": value_db}
-
-        readback_db = fader_value_to_db(int(readback_value))
-        status = "applied" if abs(readback_db - float(value_db)) <= tolerance_db else "mismatch"
+        if channel_type != "input":
+            return {"status": "unsupported", "channel": channel, "channel_type": channel_type}
+        requested = _finite_float(value_db, "fader_db")
+        effective = min(requested, self._fader_ceiling_db, 10.0)
+        target_raw = db_to_fader_value(effective)
+        if self.set_fader(channel, effective, channel_type) is False:
+            return {"status": "send_failed", "channel": channel, "target_db": requested}
+        readback = self._query_input_state(
+            channel,
+            "fader",
+            timeout_sec=timeout_sec,
+            round_trips=2,
+        )
+        if readback.get("status") != "received":
+            return {
+                "status": "unconfirmed",
+                "channel": channel,
+                "target_db": requested,
+                "effective_db": effective,
+                "readback": readback,
+            }
+        readback_raw = int(readback["value"])
+        readback_db = fader_value_to_db(readback_raw)
+        matched = readback_raw == target_raw or abs(readback_db - effective) <= tolerance_db
         return {
-            "status": status,
+            "status": "applied" if matched else "mismatch",
             "channel": channel,
-            "target_db": float(value_db),
+            "target_db": requested,
+            "effective_db": effective,
+            "target_value": target_raw,
             "readback_db": readback_db,
-            "readback_value": int(readback_value),
+            "readback_value": readback_raw,
+            "confirmed_round_trips": readback["confirmed_round_trips"],
         }
 
-    def get_fader(self, channel: int) -> float:
-        key = f"fader/{channel}"
-        val = self.state.get(key)
-        if val is not None:
-            return fader_value_to_db(int(val))
-        return -100.0
-
-    # ── Mutes (Note On) ───────────────────────────────────────
+    def get_fader(self, channel: int) -> Optional[float]:
+        self._selector(channel, "input")
+        value = self.state.get(f"fader/{channel}")
+        return None if value is None else fader_value_to_db(int(value))
 
     def set_mute(self, channel: int, muted: bool, channel_type: str = "input"):
-        midi_ch = self._midi_channel(channel_type)
-        note = channel - 1
-        velocity = 0x7F if muted else 0x3F
-        msg = build_note_on(midi_ch, note, velocity) + build_note_on(midi_ch, note, 0x00)
-        return self._send_raw(msg)
+        return self._unsupported_write("mute_mapping_not_physically_proven")
 
-    def get_mute(self, channel: int) -> bool:
-        key = f"mute/{channel}"
-        val = self.state.get(key, 0)
-        return bool(val)
+    def set_channel_mute(self, channel: int, muted: bool):
+        return self.set_mute(channel, muted)
 
-    # ── Gain / Preamp (Pitchbend) ──────────────────────────────
+    def get_mute(self, channel: int) -> Optional[bool]:
+        self._selector(channel, "input")
+        value = self.state.get(f"mute/{channel}")
+        return None if value is None else bool(value)
 
-    def set_gain(self, channel: int, value_db: float):
-        midi_ch = self._midi_channel("input")
-        gain_val = db_to_gain_value(value_db)
-        msg = build_pitchbend(midi_ch, gain_val)
-        return self._send_raw(msg)
-
-    # ── Phantom 48V (SysEx) ────────────────────────────────────
-
-    def set_phantom(self, channel: int, enabled: bool):
-        midi_ch = self._midi_channel("input")
-        val = 0x7F if enabled else 0x00
-        payload = bytes([midi_ch, 0x0B, channel - 1, val])
-        # Возврат результата обязателен: None здесь читался gate'ом как
-        # «applied» — ложное подтверждение 48V на концерте
-        return self._send_raw(build_sysex(payload))
-
-    # ── Pad (SysEx) ────────────────────────────────────────────
-
-    def set_pad(self, channel: int, enabled: bool):
-        midi_ch = self._midi_channel("input")
-        val = 0x7F if enabled else 0x00
-        payload = bytes([midi_ch, 0x0A, channel - 1, val])
-        return self._send_raw(build_sysex(payload))
-
-    # ── PEQ (NRPN) ────────────────────────────────────────────
-
-    def set_eq_band(self, channel: int, band: int, freq: float, gain: float, q: float):
-        """Set PEQ band parameters (band 1-4)."""
-        if band not in PEQ_BANDS:
-            logger.warning(f"Invalid PEQ band {band}, must be 1-4")
-            return False
-        midi_ch = self._midi_channel("input")
-        ch_idx = channel - 1
-        params = PEQ_BANDS[band]
-
-        msgs = b""
-        msgs += build_nrpn(midi_ch, params["freq"], ch_idx, freq_to_nrpn(freq))
-        msgs += build_nrpn(midi_ch, params["gain"], ch_idx, db_to_eq_gain(gain))
-        msgs += build_nrpn(midi_ch, params["q"], ch_idx, q_to_nrpn(q))
-        return self._send_raw(msgs)
-
-    # ── HPF (NRPN) ─────────────────────────────────────────────
-
-    def set_hpf(self, channel: int, freq: float, enabled: bool = True):
-        midi_ch = self._midi_channel("input")
-        ch_idx = channel - 1
-        msgs = build_nrpn(midi_ch, HPF_FREQ_MSB, ch_idx, freq_to_nrpn(freq))
-        on_val = FADER_MAX if enabled else 0
-        msgs += build_nrpn(midi_ch, HPF_ON_MSB, ch_idx, on_val)
-        return self._send_raw(msgs)
-
-    # ── Scene Recall (Program Change) ──────────────────────────
-
-    def recall_scene(self, scene_number: int):
-        """Recall scene by number (0-499).  Scenes span 4 banks of 125."""
-        midi_ch = self._midi_channel("input")
-        bank = scene_number // 128
-        program = scene_number % 128
-        msg = build_program_change(midi_ch, 0, bank, program)
-        return self._send_raw(msg)
-
-    # ── Channel Name (SysEx) ───────────────────────────────────
-
-    def set_channel_name(self, channel: int, name: str, channel_type: str = "input"):
-        midi_ch = self._midi_channel(channel_type)
-        name_bytes = name.encode("ascii", errors="replace")[:8]
-        payload = bytes([midi_ch, 0x03, channel - 1]) + name_bytes
-        return self._send_raw(build_sysex(payload))
+    def set_mute_verified(
+        self,
+        channel: int,
+        muted: bool,
+        *,
+        timeout_sec: float = 0.5,
+    ) -> Dict[str, Any]:
+        target = bool(muted)
+        if self.set_mute(channel, target) is False:
+            return {"status": "send_failed", "channel": channel, "target_muted": target}
+        readback = self._query_input_state(
+            channel,
+            "mute",
+            timeout_sec=timeout_sec,
+            round_trips=2,
+        )
+        if readback.get("status") != "received":
+            return {
+                "status": "unconfirmed",
+                "channel": channel,
+                "target_muted": target,
+                "readback": readback,
+            }
+        actual = bool(readback["value"])
+        return {
+            "status": "applied" if actual == target else "mismatch",
+            "channel": channel,
+            "target_muted": target,
+            "readback_muted": actual,
+            "confirmed_round_trips": readback["confirmed_round_trips"],
+        }
 
     def get_channel_name(self, channel: int) -> str:
-        """Get cached channel name, or request it from dLive."""
-        cached = self._channel_names.get(channel)
-        if cached:
-            return cached
-        # Also check state (populated by SysEx parse)
-        state_name = self.state.get(f"name/{channel}")
-        if state_name:
-            return state_name
-        return f"Ch {channel}"
+        self._selector(channel, "input")
+        return self._channel_names.get(channel) or self.state.get(f"name/{channel}") or f"Ch {channel}"
 
     def request_channel_names(self, num_channels: int = 48):
-        """Request channel names from dLive via SysEx.
+        if isinstance(num_channels, bool) or not isinstance(num_channels, int):
+            return False
+        if not 1 <= num_channels <= 128:
+            return False
+        return all(self.request_channel_name(channel) for channel in range(1, num_channels + 1))
 
-        The dLive may respond with SysEx messages containing channel names.
-        Results are cached in ``_channel_names`` as they arrive.
-        """
-        midi_ch = self._midi_channel("input")
-        for ch in range(1, num_channels + 1):
-            payload = bytes([midi_ch, 0x13, ch - 1])
-            self._send_raw(build_sysex(payload))
-        logger.info(f"Requested names for channels 1-{num_channels}")
+    @staticmethod
+    def _unsupported_write(family: str) -> bool:
+        logger.warning("dLive %s write blocked: no promoted official+physical proof", family)
+        return False
 
-    # ── Channel Colour (SysEx) ─────────────────────────────────
+    def set_gain(self, channel: int, value_db: float):
+        return self._unsupported_write("preamp_gain")
+
+    def set_channel_gain(self, channel: int, value_db: float):
+        return self.set_gain(channel, value_db)
+
+    def set_phantom(self, channel: int, enabled: bool):
+        return self._unsupported_write("phantom_48v")
+
+    def set_pad(self, channel: int, enabled: bool):
+        return self._unsupported_write("preamp_pad")
+
+    def set_eq_band(self, channel: int, band: int, freq: float, gain: float, q: float):
+        return self._unsupported_write("peq")
+
+    def set_hpf(self, channel: int, freq: float, enabled: bool = True):
+        return self._unsupported_write("hpf")
+
+    def recall_scene(self, scene_number: int):
+        return self._unsupported_write("scene_recall")
+
+    def set_channel_name(self, channel: int, name: str, channel_type: str = "input"):
+        return self._unsupported_write("channel_name")
 
     def set_channel_colour(self, channel: int, colour: str, channel_type: str = "input"):
-        midi_ch = self._midi_channel(channel_type)
-        col_val = COLOURS.get(colour, 0x00)
-        payload = bytes([midi_ch, 0x05, channel - 1, col_val])
-        return self._send_raw(build_sysex(payload))
-
-    # ── Pan / Balance (NRPN) ─────────────────────────────────────
+        return self._unsupported_write("channel_colour")
 
     def set_pan(self, channel: int, pan: float, channel_type: str = "input"):
-        """Set pan position. pan: -100 (L) .. 0 (C) .. +100 (R)."""
-        midi_ch = self._midi_channel(channel_type)
-        msg = build_nrpn(midi_ch, PAN_MSB, channel - 1, pan_to_nrpn(pan))
-        return self._send_raw(msg)
-
-    # ── Polarity / Phase Invert (NRPN) ────────────────────────
+        return self._unsupported_write("pan")
 
     def set_polarity(self, channel: int, inverted: bool):
-        """Set input polarity (phase invert)."""
-        midi_ch = self._midi_channel("input")
-        val = FADER_MAX if inverted else 0
-        msg = build_nrpn(midi_ch, POLARITY_MSB, channel - 1, val)
-        return self._send_raw(msg)
-
-    # ── Input Delay (NRPN) ────────────────────────────────────
+        return self._unsupported_write("polarity")
 
     def set_delay(self, channel: int, delay_ms: float, enabled: bool = True):
-        """Set input delay in milliseconds (0..500ms)."""
-        midi_ch = self._midi_channel("input")
-        msgs = build_nrpn(midi_ch, DELAY_TIME_MSB, channel - 1,
-                          ms_to_delay_nrpn(delay_ms))
-        on_val = FADER_MAX if enabled else 0
-        msgs += build_nrpn(midi_ch, DELAY_ON_MSB, channel - 1, on_val)
-        return self._send_raw(msgs)
+        return self._unsupported_write("delay")
 
-    # ── Compressor / Dynamics (NRPN) ──────────────────────────
-
-    def set_compressor(
-        self, channel: int,
-        threshold_db: float = -20.0,
-        ratio: float = 4.0,
-        attack_ms: float = 10.0,
-        release_ms: float = 100.0,
-        makeup_db: float = 0.0,
-        enabled: bool = True,
-    ):
-        """Set compressor parameters for a channel."""
-        midi_ch = self._midi_channel("input")
-        ch_idx = channel - 1
-        msgs = b""
-        msgs += build_nrpn(midi_ch, COMP_ON_MSB, ch_idx,
-                           FADER_MAX if enabled else 0)
-        msgs += build_nrpn(midi_ch, COMP_THRESHOLD_MSB, ch_idx,
-                           comp_threshold_to_nrpn(threshold_db))
-        msgs += build_nrpn(midi_ch, COMP_RATIO_MSB, ch_idx,
-                           comp_ratio_to_nrpn(ratio))
-        msgs += build_nrpn(midi_ch, COMP_ATTACK_MSB, ch_idx,
-                           comp_time_to_nrpn(attack_ms, 300.0))
-        msgs += build_nrpn(midi_ch, COMP_RELEASE_MSB, ch_idx,
-                           comp_time_to_nrpn(release_ms, 2000.0))
-        msgs += build_nrpn(midi_ch, COMP_MAKEUP_MSB, ch_idx,
-                           db_to_eq_gain(max(-15.0, min(15.0, makeup_db))))
-        result = self._send_raw(msgs)
-        logger.debug(
-            f"Ch {channel}: comp thr={threshold_db:.0f}dB ratio={ratio:.1f}:1 "
-            f"atk={attack_ms:.0f}ms rel={release_ms:.0f}ms makeup={makeup_db:.1f}dB"
-        )
-        return result
+    def set_compressor(self, channel: int, **kwargs):
+        return self._unsupported_write("compressor")
 
     def set_compressor_on(self, channel: int, enabled: bool):
-        midi_ch = self._midi_channel("input")
-        msg = build_nrpn(midi_ch, COMP_ON_MSB, channel - 1,
-                         FADER_MAX if enabled else 0)
-        return self._send_raw(msg)
+        return self._unsupported_write("compressor")
 
-    # ── Gate (NRPN) ───────────────────────────────────────────
+    def set_gate(self, channel: int, *args, **kwargs):
+        return self._unsupported_write("gate")
 
-    def set_gate(self, channel: int, threshold_db: float = -40.0,
-                 enabled: bool = True):
-        midi_ch = self._midi_channel("input")
-        ch_idx = channel - 1
-        msgs = build_nrpn(midi_ch, GATE_ON_MSB, ch_idx,
-                          FADER_MAX if enabled else 0)
-        msgs += build_nrpn(midi_ch, GATE_THRESHOLD_MSB, ch_idx,
-                           comp_threshold_to_nrpn(threshold_db))
-        return self._send_raw(msgs)
-
-    # ── FX / Aux Sends (NRPN) ────────────────────────────────
-
-    def set_send_level(self, channel: int, send_bus: int,
-                       level_db: float, channel_type: str = "input"):
-        """Set send level to a mix bus (aux/FX send).
-
-        send_bus: 1-based bus number.
-        level_db: send level in dB (-inf .. +10).
-        """
-        midi_ch = self._midi_channel(channel_type)
-        msb = FX_SEND_BASE_MSB + (send_bus - 1)
-        msg = build_nrpn(midi_ch, msb, channel - 1, db_to_fader_value(level_db))
-        return self._send_raw(msg)
-
-    # ── Channel reset (set processing to neutral) ────────────────
+    def set_send_level(self, channel: int, send_bus: int, level_db: float, channel_type: str = "input"):
+        return self._unsupported_write("send_level")
 
     def reset_channel_eq(self, channel: int):
-        """Reset PEQ to flat: all 4 bands gain=0, default freq/Q."""
-        default_freqs = [200.0, 800.0, 2500.0, 8000.0]
-        for band in range(1, 5):
-            self.set_eq_band(channel, band, default_freqs[band - 1], 0.0, 1.0)
-        logger.debug(f"Ch {channel}: EQ reset to flat")
+        return self._unsupported_write("peq_reset")
 
     def reset_channel_hpf(self, channel: int):
-        """Reset HPF to off / minimum frequency."""
-        self.set_hpf(channel, 20.0, enabled=False)
-        logger.debug(f"Ch {channel}: HPF reset to off")
+        return self._unsupported_write("hpf_reset")
 
     def reset_channel_dynamics(self, channel: int):
-        """Reset compressor and gate to off."""
-        self.set_compressor_on(channel, False)
-        self.set_gate(channel, enabled=False)
-        logger.debug(f"Ch {channel}: dynamics reset to off")
+        return self._unsupported_write("dynamics_reset")
 
     def reset_channel_processing(self, channel: int):
-        """Reset all channel processing to neutral."""
-        self.reset_channel_eq(channel)
-        self.reset_channel_hpf(channel)
-        self.reset_channel_dynamics(channel)
-        self.set_polarity(channel, False)
-        self.set_delay(channel, 0.0, enabled=False)
-        logger.info(f"Ch {channel}: processing reset to neutral")
+        return self._unsupported_write("channel_processing_reset")
 
     def get_channel_settings(self, channel: int) -> Dict[str, Any]:
-        """Read current channel settings from cached state."""
+        self._selector(channel, "input")
         return {
             "channel": channel,
             "name": self.get_channel_name(channel),
             "fader_db": self.get_fader(channel),
             "muted": self.get_mute(channel),
+            "fader_updated_at": self.state_timestamps.get(f"fader/{channel}"),
+            "mute_updated_at": self.state_timestamps.get(f"mute/{channel}"),
+            "name_updated_at": self.state_timestamps.get(f"name/{channel}"),
         }
 
-    # ── Find snap by name (not directly available via MIDI) ────
-
     def find_snap_by_name(self, name: str) -> Optional[int]:
-        """dLive does not support scene query by name over MIDI — returns None."""
-        logger.info(f"find_snap_by_name not available over dLive MIDI protocol")
         return None

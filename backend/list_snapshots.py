@@ -16,6 +16,9 @@ def get_snapshots_list(client: WingClient):
     """
     Получение списка snapshots через различные методы
     """
+    logger.error("Legacy mutating snapshot discovery is quarantined; use list_all_snapshots.py")
+    return {}
+
     logger.info("=" * 70)
     logger.info("ПОЛУЧЕНИЕ СПИСКА SNAPSHOTS")
     logger.info("=" * 70)
@@ -109,6 +112,9 @@ def get_snapshots_list(client: WingClient):
 
 def main():
     """Основная функция"""
+    logger.error("Legacy mutating snapshot discovery is quarantined; use list_all_snapshots.py")
+    return 2
+
     ip = sys.argv[1] if len(sys.argv) > 1 else "192.168.1.102"
     
     logger.info(f"Подключение к пульту {ip}...")

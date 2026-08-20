@@ -105,25 +105,16 @@ def register_handlers(server):
         await server.send_to_client(websocket, result)
 
     async def handle_connect_dlive(websocket, data):
-        await server.connect_dlive(
-            ip=data.get("ip", "192.168.3.70"),
-            port=data.get("port", 51328),
-            tls=data.get("tls", False),
-            midi_base_channel=data.get("midi_base_channel", 0),
-        )
+        await server.connect_configured_dlive(owner_websocket=websocket)
 
     async def handle_connect_mixing_station(websocket, data):
-        await server.connect_mixing_station(
-            data.get("host", "127.0.0.1"),
-            data.get("osc_port", 8000),
-            data.get("rest_port", 8080)
-        )
+        await server.connect_configured_mixing_station(owner_websocket=websocket)
 
     async def handle_discover_mixing_station(websocket, data):
         await server.discover_mixing_station()
 
     async def handle_disconnect(websocket, data):
-        await server.disconnect_mixer()
+        await server.disconnect_mixer(requester_websocket=websocket)
 
     async def handle_scan_mixers(websocket, data):
         """Scan the network for all available mixers (WING + dLive)."""
@@ -132,14 +123,15 @@ def register_handlers(server):
             websocket=websocket,
         ):
             return
-        full_scan = data.get("full_scan", False)
-        subnet = data.get("subnet", None)
+        full_scan = data.get("full_scan") is True
 
         loop = asyncio.get_event_loop()
         results = await loop.run_in_executor(
             None,
             lambda: discover_mixers(
-                scan_subnet=full_scan, subnet=subnet, timeout=2.0
+                # Full scans derive active local subnets inside the trusted
+                # discovery boundary; WebSocket input never selects a target.
+                scan_subnet=full_scan, subnet=None, timeout=2.0
             ),
         )
 
@@ -152,6 +144,8 @@ def register_handlers(server):
                 "name": m.name,
                 "model": m.model,
                 "tls": m.tls,
+                "endpoint": getattr(m, "endpoint", ""),
+                "identity_verified": getattr(m, "identity_verified", False),
                 "method": m.discovery_method,
                 "response_ms": round(m.response_time_ms, 0),
             })
@@ -171,8 +165,12 @@ def register_handlers(server):
         ):
             return
         preferred_type = data.get("preferred_type", None)
-        preferred_ip = data.get("preferred_ip", None)
+        # Never let an ingress message choose a network probe destination.
+        # A discovered dLive target is independently checked by connect_dlive.
+        preferred_ip = None
         full_scan = data.get("full_scan", False)
+        midi_base_channel = data.get("midi_base_channel", 11)
+        user_profile = data.get("user_profile", 0)
 
         await server.send_to_client(websocket, {
             "type": "auto_connect_status",
@@ -206,6 +204,8 @@ def register_handlers(server):
             "ip": discovered.ip,
             "port": discovered.port,
             "name": discovered.name,
+            "midi_base_channel": midi_base_channel if discovered.mixer_type == "dlive" else None,
+            "user_profile": user_profile if discovered.mixer_type == "dlive" else None,
             "message": f"Found {discovered.mixer_type.upper()} @ {discovered.ip}:{discovered.port}",
         })
 
@@ -214,6 +214,10 @@ def register_handlers(server):
                 ip=discovered.ip,
                 port=discovered.port,
                 tls=discovered.tls,
+                endpoint=getattr(discovered, "endpoint", "surface") or "surface",
+                midi_base_channel=midi_base_channel,
+                user_profile=user_profile,
+                owner_websocket=websocket,
             )
         elif discovered.mixer_type == "wing":
             await server.connect_wing(

@@ -222,15 +222,29 @@ def _build_promotion_readiness(
     validation_report: dict[str, Any] | None,
     disagreements: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    summary = dict((validation_report or {}).get("summary") or {})
-    valid = bool((validation_report or {}).get("valid", True))
-    errors = int((validation_report or {}).get("summary", {}).get("error_count", 0) if validation_report else 0)
+    manifest_present = isinstance(manifest, dict) and bool(
+        str(manifest.get("manifest_id", "")).strip()
+    )
+    executor_present = executor is not None
+    validation_present = isinstance(validation_report, dict)
+    summary = dict(validation_report.get("summary") or {}) if validation_present else {}
+    valid = validation_present and validation_report.get("valid") is True
+    raw_errors = summary.get("error_count") if validation_present else None
+    errors = int(raw_errors) if type(raw_errors) is int and raw_errors >= 0 else -1
     dry_run_only = bool(manifest.get("dry_run_only", True))
     live_writes = bool(manifest.get("live_mixer_writes", False))
     executor_payload = _coerce_executor_dict(executor)
     executor_dry_run_only = bool(executor_payload.get("dry_run_only", True))
     blocking = []
     score = 0
+    if not manifest_present:
+        blocking.append("manifest_evidence_missing")
+    if not executor_present:
+        blocking.append("executor_evidence_missing")
+    if not validation_present:
+        blocking.append("validation_evidence_missing")
+    if errors < 0:
+        blocking.append("validation_error_count_missing_or_invalid")
     if dry_run_only and executor_dry_run_only:
         score += 40
     else:
@@ -239,7 +253,7 @@ def _build_promotion_readiness(
         score += 25
     else:
         blocking.append("live_writes_disabled_required")
-    if valid and errors == 0:
+    if validation_present and valid and errors == 0:
         score += 20
     else:
         blocking.append("validation_errors_or_invalid")
@@ -251,7 +265,7 @@ def _build_promotion_readiness(
         "schema_version": REPLAY_SHADOW_REPORT_SCHEMA_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "manifest_id": str(manifest.get("manifest_id", "")),
-        "ready": score >= 80,
+        "ready": not blocking and score == 100,
         "promotion_readiness_score": min(100, score),
         "blocking_reasons": blocking,
         "policy_checks": {
@@ -260,6 +274,9 @@ def _build_promotion_readiness(
             "manifest_live_writes": bool(manifest.get("live_mixer_writes", False)),
             "validation_valid": valid,
             "error_count": errors,
+            "manifest_evidence_present": manifest_present,
+            "executor_evidence_present": executor_present,
+            "validation_evidence_present": validation_present,
             "disagreement_count": len(disagreements),
             "validation_summary": summary,
         },
@@ -278,7 +295,7 @@ def _coerce_executor_dict(executor: Any) -> dict[str, Any]:
         "dry_run_only": bool(getattr(executor, "dry_run_only", True)),
         "trace_signature": str(getattr(executor, "trace_signature", "")),
         "state_snapshots": [dict(item) for item in getattr(executor, "state_snapshots", []) or ()],
-        "restored_state": dict(getattr(executor, "restored_state") or {}),
+        "restored_state": dict(getattr(executor, "restored_state", None) or {}),
     }
 
 

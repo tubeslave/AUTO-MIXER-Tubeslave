@@ -22,6 +22,10 @@ LIVE_CAPTURE_MAX_SAMPLE_RATE = 192_000
 LIVE_CAPTURE_MIN_BUFFER_SECONDS = 0.25
 LIVE_CAPTURE_MAX_BUFFER_SECONDS = 30.0
 LIVE_CAPTURE_MAX_BUFFER_BYTES = 256 * 1024 * 1024
+SPECTRAL_CACHE_FFT_SIZE = 2048
+SPECTRAL_CACHE_INTERVAL_SEC = 0.5
+SPECTRAL_CACHE_STALE_AFTER_SEC = 2.0
+SPECTRAL_CACHE_MIN_SIGNAL_DB = -90.0
 
 
 def validate_live_capture_dimensions(
@@ -279,6 +283,7 @@ class AudioCapture:
         device_name: Optional[str] = None,
         channels: Optional[int] = None,
         buffer_duration: Optional[float] = None,
+        spectral_cache_enabled: bool = False,
     ):
         if channels is not None:
             num_channels = channels
@@ -291,6 +296,7 @@ class AudioCapture:
         self.block_size = block_size
         self.source_type = source_type
         self.device_name = device_name
+        self.spectral_cache_enabled = bool(spectral_cache_enabled)
         self._resolved_device_name: Optional[str] = None
         self._resolved_device_index: Optional[int] = None
 
@@ -308,6 +314,10 @@ class AudioCapture:
         self._global_subscribers: List[Callable] = []
         self._running = False
         self._capture_thread: Optional[threading.Thread] = None
+        self._spectral_thread: Optional[threading.Thread] = None
+        self._spectral_stop_event = threading.Event()
+        self._spectral_cache_lock = threading.Lock()
+        self._spectral_cache: Dict[int, Dict[str, Any]] = {}
         self._stream = None
         self._lock = threading.Lock()
         # A callback block is one alignment generation. Writers hold this lock
@@ -353,11 +363,15 @@ class AudioCapture:
         else:
             self._start_test_generator()
 
+        if self.spectral_cache_enabled:
+            self._start_spectral_cache_worker()
+
         logger.info(f"AudioCapture started ({self.source_type.value})")
 
     def stop(self):
         """Stop audio capture."""
         self._running = False
+        self._spectral_stop_event.set()
         errors = []
         if self._stream:
             stream = self._stream
@@ -384,6 +398,17 @@ class AudioCapture:
                 self._capture_thread = None
         elif self._capture_thread is not None:
             self._capture_thread = None
+        if self._spectral_thread and self._spectral_thread.is_alive():
+            self._spectral_thread.join(timeout=2.0)
+            if self._spectral_thread.is_alive():
+                errors.append((
+                    "spectral_cache_thread",
+                    RuntimeError("spectral cache thread did not stop within 2 seconds"),
+                ))
+            else:
+                self._spectral_thread = None
+        elif self._spectral_thread is not None:
+            self._spectral_thread = None
         if errors:
             details = ", ".join(
                 f"{step}:{type(error).__name__}" for step, error in errors
@@ -490,6 +515,142 @@ class AudioCapture:
             target=self._test_generator_loop, daemon=True
         )
         self._capture_thread.start()
+
+    def _start_spectral_cache_worker(self):
+        """Start the bounded read-only spectral cache worker."""
+
+        self._spectral_stop_event.clear()
+        with self._spectral_cache_lock:
+            self._spectral_cache.clear()
+        self._spectral_thread = threading.Thread(
+            target=self._spectral_cache_loop,
+            name="audio-capture-spectral-cache",
+            daemon=True,
+        )
+        self._spectral_thread.start()
+
+    def _spectral_cache_loop(self):
+        """Refresh spectral descriptors outside the realtime audio callback."""
+
+        while self._running and not self._spectral_stop_event.is_set():
+            try:
+                self._refresh_spectral_cache()
+            except Exception as error:
+                logger.debug("Spectral cache refresh error: %s", error)
+            self._spectral_stop_event.wait(SPECTRAL_CACHE_INTERVAL_SEC)
+
+    def _refresh_spectral_cache(self):
+        """Compute one aligned spectral snapshot for every capture channel."""
+
+        channels = list(range(1, self.num_channels + 1))
+        snapshot = self.get_synchronized_buffers(
+            channels,
+            SPECTRAL_CACHE_FFT_SIZE,
+        )
+        captured_sample_count = int(snapshot["captured_sample_count"])
+        updated_monotonic = time.monotonic()
+        window = np.hanning(SPECTRAL_CACHE_FFT_SIZE)
+        frequencies = np.fft.rfftfreq(
+            SPECTRAL_CACHE_FFT_SIZE,
+            1.0 / self.sample_rate,
+        )
+        next_cache: Dict[int, Dict[str, Any]] = {}
+
+        for channel in channels:
+            samples = np.asarray(snapshot["buffers"].get(channel, []), dtype=np.float64)
+            available_samples = int(snapshot["available_samples"].get(channel, 0))
+            if available_samples < 256 or samples.size < 256:
+                next_cache[channel] = {
+                    "available": False,
+                    "reason": "insufficient_samples",
+                    "updated_monotonic": updated_monotonic,
+                    "captured_sample_count": captured_sample_count,
+                }
+                continue
+            if samples.size < SPECTRAL_CACHE_FFT_SIZE:
+                samples = np.pad(samples, (0, SPECTRAL_CACHE_FFT_SIZE - samples.size))
+            elif samples.size > SPECTRAL_CACHE_FFT_SIZE:
+                samples = samples[-SPECTRAL_CACHE_FFT_SIZE:]
+
+            rms = float(np.sqrt(np.mean(samples ** 2) + 1e-12))
+            rms_db = float(20.0 * np.log10(rms + 1e-10))
+            if rms_db <= SPECTRAL_CACHE_MIN_SIGNAL_DB:
+                next_cache[channel] = {
+                    "available": False,
+                    "reason": "signal_below_threshold",
+                    "rms_db": round(rms_db, 2),
+                    "updated_monotonic": updated_monotonic,
+                    "captured_sample_count": captured_sample_count,
+                }
+                continue
+
+            power = np.abs(np.fft.rfft(samples * window)) ** 2
+            total_power = float(np.sum(power))
+            if not np.isfinite(total_power) or total_power <= 1e-18:
+                next_cache[channel] = {
+                    "available": False,
+                    "reason": "spectral_energy_unavailable",
+                    "rms_db": round(rms_db, 2),
+                    "updated_monotonic": updated_monotonic,
+                    "captured_sample_count": captured_sample_count,
+                }
+                continue
+
+            centroid_hz = float(np.sum(frequencies * power) / total_power)
+            brightness = float(np.sum(power[frequencies >= 4000.0]) / total_power)
+            next_cache[channel] = {
+                "available": True,
+                "centroid_hz": round(centroid_hz, 1),
+                "brightness": round(max(0.0, min(1.0, brightness)), 4),
+                "rms_db": round(rms_db, 2),
+                "updated_monotonic": updated_monotonic,
+                "captured_sample_count": captured_sample_count,
+                "source": "audio_capture_spectral_cache",
+            }
+
+        with self._spectral_cache_lock:
+            self._spectral_cache = next_cache
+
+    def get_spectral_metrics(self, channel: int) -> Dict[str, Any]:
+        """Return cached spectral evidence without running FFT in the caller."""
+
+        if not self.spectral_cache_enabled:
+            return {
+                "available": False,
+                "reason": "spectral_cache_disabled",
+                "source": "audio_capture_spectral_cache",
+            }
+        if not self._running:
+            return {
+                "available": False,
+                "reason": "audio_capture_not_running",
+                "source": "audio_capture_spectral_cache",
+            }
+        with self._spectral_cache_lock:
+            cached = dict(self._spectral_cache.get(int(channel), {}))
+        if not cached:
+            return {
+                "available": False,
+                "reason": "spectral_cache_pending",
+                "source": "audio_capture_spectral_cache",
+            }
+        updated_monotonic = cached.pop("updated_monotonic", None)
+        age_sec = (
+            max(0.0, time.monotonic() - float(updated_monotonic))
+            if updated_monotonic is not None
+            else None
+        )
+        cached["age_sec"] = round(age_sec, 3) if age_sec is not None else None
+        cached["freshness_status"] = (
+            "fresh"
+            if age_sec is not None and age_sec <= SPECTRAL_CACHE_STALE_AFTER_SEC
+            else "stale"
+        )
+        cached["source"] = "audio_capture_spectral_cache"
+        if cached["freshness_status"] != "fresh":
+            cached["available"] = False
+            cached["reason"] = "spectral_cache_stale"
+        return cached
 
     def _test_generator_loop(self):
         """Generate test audio signals."""

@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from ai_mixing_pipeline.decision_layer.replay_executor import build_replay_executor_from_rewind_context, simulate_replay_decisions
+import pytest
+
+from ai_mixing_pipeline.decision_layer.replay_executor import (
+    ReplayExecutionState,
+    build_replay_executor_from_rewind_context,
+    simulate_replay_decisions,
+)
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import ReplayDecisionProposal
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     build_fader_proposals,
@@ -64,6 +70,84 @@ def _build_eq_and_compression_proposals():
     return eq_proposal, compression_proposal
 
 
+def _direct_feedback_proposal(
+    *,
+    channel=3,
+    frequency_hz=2000.0,
+    gain_db=-6.0,
+    q=4.0,
+    max_q=8.0,
+    max_cut_db=9.0,
+):
+    safety = {"max_q": max_q, "max_cut_db": max_cut_db}
+    if max_q is None:
+        safety.pop("max_q")
+    if max_cut_db is None:
+        safety.pop("max_cut_db")
+    return ReplayDecisionProposal(
+        proposal_id="feedback::notch::3::direct",
+        family="feedback_mitigation",
+        source_system="feedback_detector",
+        action_type="notch",
+        target={"channel": channel, "frequency_hz": frequency_hz},
+        current_state={"magnitude_db": 0.0},
+        requested_state={"gain_db": gain_db, "q": q},
+        confidence=0.8,
+        safety=safety,
+        auto_apply_blocked=True,
+    )
+
+
+def _direct_gain_proposal(
+    *,
+    channel=1,
+    current_gain_db=0.0,
+    requested_gain_db=3.0,
+    max_step_db=3.0,
+    action_type="set_gain_db",
+):
+    safety = {"max_step_db": max_step_db}
+    if max_step_db is None:
+        safety.clear()
+    return ReplayDecisionProposal(
+        proposal_id="gain::direct::1",
+        family="gain_adjustment",
+        source_system="untrusted_restore",
+        action_type=action_type,
+        target={"channel": channel, "kind": "gain"},
+        current_state={"gain_db": current_gain_db},
+        requested_state={"gain_db": requested_gain_db},
+        confidence=0.8,
+        safety=safety,
+        auto_apply_blocked=False,
+    )
+
+
+def _direct_fader_proposal(
+    *,
+    channel=2,
+    current_fader_db=-3.0,
+    requested_fader_db=-2.0,
+    max_step_db=2.0,
+    action_type="set_fader_db",
+):
+    safety = {"max_step_db": max_step_db}
+    if max_step_db is None:
+        safety.clear()
+    return ReplayDecisionProposal(
+        proposal_id="fader::direct::2",
+        family="fader_adjustment",
+        source_system="untrusted_restore",
+        action_type=action_type,
+        target={"channel": channel, "kind": "fader"},
+        current_state={"fader_db": current_fader_db},
+        requested_state={"fader_db": requested_fader_db},
+        confidence=0.8,
+        safety=safety,
+        auto_apply_blocked=False,
+    )
+
+
 def _live_trim_config():
     return {
         "automation": {
@@ -115,6 +199,150 @@ def test_replay_executor_simulates_all_supported_action_families_deterministical
     assert any(event.family == "speech_arbitration" for event in first.events)
 
 
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"q": 100.0, "max_q": 8.0},
+        {"gain_db": -1000.0, "max_cut_db": 9.0},
+        {"frequency_hz": float("nan")},
+        {"frequency_hz": float("inf")},
+        {"channel": "3"},
+        {"gain_db": True},
+        {"max_q": None},
+        {"max_cut_db": None},
+        {"max_q": 100.0},
+        {"max_cut_db": 100.0},
+    ],
+)
+def test_feedback_replay_blocks_malformed_or_unbounded_values_before_state_mutation(overrides):
+    proposal = _direct_feedback_proposal(**overrides)
+
+    result = simulate_replay_decisions([proposal])
+    event = result.events[0]
+
+    assert event.status == "blocked"
+    assert event.applied is False
+    assert event.blocked_reason.startswith("feedback_mitigation_validation_failed:")
+    assert event.pre_signature == event.post_signature
+    assert event.pre_state == event.post_state
+    assert event.post_state["feedback_mitigation"] == []
+    assert event.post_state["incident_log"] == []
+    assert result.proposals_executed == []
+
+
+def test_feedback_replay_applies_values_only_with_explicit_bounded_safety_limits():
+    proposal = _direct_feedback_proposal(q=8.0, max_q=8.0, gain_db=-9.0, max_cut_db=9.0)
+
+    result = simulate_replay_decisions([proposal])
+    event = result.events[0]
+
+    assert event.status == "applied"
+    assert event.applied is True
+    assert event.details == {
+        "channel": "3",
+        "frequency_hz": 2000.0,
+        "gain_db": -9.0,
+        "q": 8.0,
+        "action": "notch",
+    }
+    assert result.rollback_state["feedback_mitigation"] == [event.details]
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"max_step_db": None},
+        {"max_step_db": float("nan")},
+        {"max_step_db": float("inf")},
+        {"max_step_db": 0.0},
+        {"max_step_db": 12.1},
+        {"max_step_db": "3.0"},
+        {"channel": "1"},
+        {"requested_gain_db": float("nan")},
+        {"requested_gain_db": float("inf")},
+        {"requested_gain_db": True},
+        {"requested_gain_db": 18.1},
+        {"current_gain_db": -18.1},
+        {"action_type": "arbitrary_gain"},
+    ],
+)
+def test_gain_replay_blocks_malformed_or_missing_bounds_before_state_mutation(overrides):
+    proposal = _direct_gain_proposal(**overrides)
+
+    result = simulate_replay_decisions([proposal])
+    event = result.events[0]
+
+    assert event.status == "blocked"
+    assert event.applied is False
+    assert event.blocked_reason.startswith("gain_validation_failed:")
+    assert event.pre_signature == event.post_signature
+    assert event.pre_state == event.post_state
+    assert event.post_state["gains"] == {}
+    assert event.post_state["incident_log"] == []
+    assert result.proposals_executed == []
+
+
+def test_gain_replay_blocks_excess_step_and_applies_explicit_bounded_step():
+    excessive = simulate_replay_decisions(
+        [_direct_gain_proposal(requested_gain_db=3.1, max_step_db=3.0)]
+    ).events[0]
+    bounded = simulate_replay_decisions(
+        [_direct_gain_proposal(requested_gain_db=12.0, max_step_db=12.0)]
+    ).events[0]
+
+    assert excessive.status == "blocked"
+    assert excessive.applied is False
+    assert excessive.blocked_reason == "gain_step_exceeds_limit:3.100>3.000"
+    assert excessive.pre_signature == excessive.post_signature
+    assert bounded.status == "applied"
+    assert bounded.applied is True
+    assert bounded.details == {"channel": "1", "requested": 12.0, "previous": 0.0}
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"max_step_db": None},
+        {"max_step_db": float("nan")},
+        {"max_step_db": float("inf")},
+        {"max_step_db": 0.0},
+        {"max_step_db": 12.1},
+        {"max_step_db": "2.0"},
+        {"channel": "2"},
+        {"requested_fader_db": float("nan")},
+        {"requested_fader_db": float("inf")},
+        {"requested_fader_db": True},
+        {"requested_fader_db": 0.1},
+        {"current_fader_db": -144.1},
+        {"action_type": "arbitrary_fader"},
+    ],
+)
+def test_fader_replay_blocks_malformed_or_missing_bounds_before_state_mutation(overrides):
+    event = simulate_replay_decisions([_direct_fader_proposal(**overrides)]).events[0]
+
+    assert event.status == "blocked"
+    assert event.applied is False
+    assert event.blocked_reason.startswith("fader_validation_failed:")
+    assert event.pre_signature == event.post_signature
+    assert event.pre_state == event.post_state
+    assert event.post_state["faders"] == {}
+    assert event.post_state["incident_log"] == []
+
+
+def test_fader_replay_blocks_excess_step_and_applies_explicit_bounded_step():
+    excessive = simulate_replay_decisions(
+        [_direct_fader_proposal(requested_fader_db=-0.9, max_step_db=2.0)]
+    ).events[0]
+    bounded = simulate_replay_decisions(
+        [_direct_fader_proposal(requested_fader_db=-1.0, max_step_db=2.0)]
+    ).events[0]
+
+    assert excessive.status == "blocked"
+    assert excessive.blocked_reason == "fader_step_exceeds_limit:2.100>2.000"
+    assert bounded.status == "applied"
+    assert bounded.details == {"channel": "2", "requested": -1.0, "previous": -3.0}
+
+
 def test_replay_executor_allows_rollback_to_intermediate_state():
     gain = build_gain_proposals(
         recommendations=[{"source": "auto_soundcheck_engine", "mixer_channel": 1, "current_trim_db": 0.0, "recommended_target_trim_db": 1.0, "confidence": 0.9}]
@@ -127,6 +355,58 @@ def test_replay_executor_allows_rollback_to_intermediate_state():
     assert result.restored_state is not None
     assert result.restored_state["gains"] == {"1": 1.0}
     assert result.rollback_state == result.restored_state
+
+
+def test_replay_executor_rollback_to_zero_restores_supplied_initial_state():
+    initial_state = ReplayExecutionState(
+        gains={"9": -2.5},
+        faders={"9": -8.0},
+        incident_log=[{"kind": "baseline", "channel": "9"}],
+    )
+    gain = build_gain_proposals(
+        recommendations=[
+            {
+                "source": "auto_soundcheck_engine",
+                "mixer_channel": 1,
+                "current_trim_db": 0.0,
+                "recommended_target_trim_db": 1.0,
+                "confidence": 0.9,
+            }
+        ]
+    )[0]
+
+    result = simulate_replay_decisions([gain], initial_state=initial_state, rollback_to=0)
+
+    assert result.restored_state == initial_state.to_dict()
+    assert result.rollback_state == initial_state.to_dict()
+    assert result.restored_state["gains"] == {"9": -2.5}
+    assert result.restored_state["faders"] == {"9": -8.0}
+    assert result.restored_state["incident_log"] == [{"kind": "baseline", "channel": "9"}]
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), "-inf"])
+def test_replay_executor_blocks_non_finite_values_before_any_state_mutation(bad_value):
+    proposal = ReplayDecisionProposal(
+        proposal_id="eq::non-finite",
+        family="eq_adjustment",
+        source_system="security_regression",
+        action_type="set_eq_band",
+        target={"channel": 1, "band_id": "band_1"},
+        current_state={"gain_db": 0.0},
+        requested_state={"freq_hz": 1000.0, "gain_db": bad_value, "q": 1.0},
+        confidence=0.9,
+        safety={"max_gain_db": 6.0},
+        auto_apply_blocked=True,
+        metadata={},
+        analyst_observation={},
+    )
+
+    result = simulate_replay_decisions([proposal])
+
+    assert result.events[0].status == "blocked"
+    assert result.events[0].blocked_reason == "non_finite_numeric_value"
+    assert result.events[0].pre_state == result.events[0].post_state
+    assert result.proposals_executed == []
 
 
 def test_replay_executor_from_rewind_context_initializes_existing_state():

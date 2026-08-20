@@ -47,7 +47,7 @@ def test_evaluator_parses_existing_metrics_artifact(tmp_path: Path):
     artifact = tmp_path / "evaluation.json"
     artifact.write_text(json.dumps({"metrics": {"loss": 0.2}}), encoding="utf-8")
 
-    result = EvaluatorAgent().run({"model_dir": str(tmp_path)})
+    result = EvaluatorAgent(project_root=tmp_path, runs_dir=".").run({"model_dir": str(tmp_path)})
 
     assert result["status"] == "ok"
     assert result["result"]["artifact_count"] == 1
@@ -56,7 +56,7 @@ def test_evaluator_parses_existing_metrics_artifact(tmp_path: Path):
 
 
 def test_evaluator_does_not_claim_success_without_evaluation_artifacts(tmp_path: Path):
-    result = EvaluatorAgent().run({"model_dir": str(tmp_path)})
+    result = EvaluatorAgent(project_root=tmp_path, runs_dir=".").run({"model_dir": str(tmp_path)})
 
     assert result["status"] == "incomplete"
     assert result["result"]["artifact_count"] == 0
@@ -67,7 +67,7 @@ def test_evaluator_does_not_claim_success_for_failed_best_run(tmp_path: Path):
     log_path = tmp_path / "train.log"
     log_path.write_text("training failed\n", encoding="utf-8")
 
-    result = EvaluatorAgent().run({
+    result = EvaluatorAgent(project_root=tmp_path, runs_dir=".").run({
         "best_run": {
             "run_id": "failed-run",
             "run_dir": str(tmp_path),

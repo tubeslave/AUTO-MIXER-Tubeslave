@@ -25,6 +25,27 @@ supervised `fader`/`gain-down` proof с physical readback, rollback и
 emergency-stop evidence, и только после этого последующее расширение
 soundcheck-автоматизации отдельными hardware-backed решениями.
 
+## Параллельная software-цель M123 — Instrument Space
+
+Довести Canvas-inspired Instrument Space до production-grade слоя принятия
+решений: измеренные pan, спектральный центроид и уровень должны формировать
+детерминированные пространственные/спектральные/уровневые связи, evidence для
+drift и указание следующего существующего анализатора. Результат встраивается в
+Product Layer и review soundcheck-предложений одинаково для WING и dLive.
+
+Эта цель не создает новый путь записи. Instrument Space не выбирает конечный
+EQ, pan, fader или gain из координат, не мутирует proposal queue и не получает
+live authority. Любая коррекция остается в существующем source-identity,
+ERB/frequency-separation, mono/phase, headroom, Safety Kernel, approval,
+readback, rollback и hardware-proof контуре. Исполняемый план:
+`Docs/plans/M123-instrument-space-decision-integration.md`.
+
+Текущий software-срез хранит до 12 read-only snapshot в памяти процесса,
+сбрасывает историю при смене mixer/audio identity, вычисляет реальный drift и
+переносит pan/centroid/level provenance в soundcheck review. Evidence старше 30
+секунд или без UTC timestamp не аннотирует proposal. UI показывает drift,
+измерения, источники и следующий существующий анализатор; drag/apply пути нет.
+
 ## Текущий план доведения soundcheck pipeline до рабочего состояния
 
 План принят владельцем проекта 2026-07-10. Его цель — получить безопасный,

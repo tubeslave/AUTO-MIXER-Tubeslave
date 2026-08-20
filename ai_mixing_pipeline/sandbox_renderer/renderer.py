@@ -70,11 +70,12 @@ class SandboxRenderer:
         target_lufs: float | None = None,
         loudness_match: bool = True,
     ) -> RenderResult:
-        output_dir = Path(output_dir).expanduser()
+        output_dir = Path(output_dir).expanduser().resolve()
         output_dir.mkdir(parents=True, exist_ok=True)
         if candidate.candidate_id == "000_initial_mix":
             filename = candidate.render_filename or "000_initial_mix.wav"
-            return self.render_initial_mix(stems, stem_roles, sample_rate, output_dir / filename)
+            output_path = self._resolve_candidate_output_path(output_dir, filename)
+            return self.render_initial_mix(stems, stem_roles, sample_rate, output_path)
 
         mix, audit = self._sum_processed_stems(stems, stem_roles, candidate.actions, sample_rate)
         output_gain = 0.0
@@ -90,7 +91,8 @@ class SandboxRenderer:
         else:
             mix, output_gain = limit_peak(mix, self.peak_ceiling_dbfs)
         filename = candidate.render_filename or f"{candidate.candidate_id}.wav"
-        path = write_audio(output_dir / filename, mix, sample_rate)
+        output_path = self._resolve_candidate_output_path(output_dir, filename)
+        path = write_audio(output_path, mix, sample_rate)
         metrics = measure_audio(mix, sample_rate)
         return RenderResult(
             candidate_id=candidate.candidate_id,
@@ -103,6 +105,24 @@ class SandboxRenderer:
             metrics=metrics,
             metadata=self._render_policy_metadata(),
         )
+
+    @staticmethod
+    def _resolve_candidate_output_path(output_dir: Path, filename: str) -> Path:
+        """Resolve a candidate filename without allowing it to escape the render root."""
+
+        candidate_path = Path(str(filename))
+        if candidate_path.is_absolute() or not candidate_path.parts:
+            raise ValueError("Candidate render filename must be a relative path")
+        if any(part in {"", ".", ".."} for part in candidate_path.parts):
+            raise ValueError("Candidate render filename contains an unsafe path component")
+
+        output_root = output_dir.resolve()
+        output_path = output_root.joinpath(candidate_path)
+        try:
+            output_path.resolve(strict=False).relative_to(output_root)
+        except ValueError as exc:
+            raise ValueError("Candidate render filename escapes the render directory") from exc
+        return output_path
 
     def _render_policy_metadata(self) -> dict[str, Any]:
         return {
@@ -175,15 +195,12 @@ class SandboxRenderer:
         return audio.astype(np.float32, copy=False), "logged_not_rendered"
 
     def _high_pass(self, audio: np.ndarray, sample_rate: int, frequency_hz: float) -> np.ndarray:
-        try:
-            from scipy.signal import butter, sosfilt
+        from scipy.signal import butter, sosfilt
 
-            data = np.asarray(audio, dtype=np.float32)
-            cutoff = max(10.0, min(frequency_hz, 0.45 * float(sample_rate)))
-            sos = butter(2, cutoff, btype="highpass", fs=int(sample_rate), output="sos")
-            return sosfilt(sos, data, axis=0).astype(np.float32)
-        except Exception:
-            return np.asarray(audio, dtype=np.float32)
+        data = np.asarray(audio, dtype=np.float32)
+        cutoff = max(10.0, min(frequency_hz, 0.45 * float(sample_rate)))
+        sos = butter(2, cutoff, btype="highpass", fs=int(sample_rate), output="sos")
+        return sosfilt(sos, data, axis=0).astype(np.float32)
 
     def _peaking_eq(
         self,
@@ -193,12 +210,9 @@ class SandboxRenderer:
         gain_db: float,
         q: float,
     ) -> np.ndarray:
-        try:
-            from mix_agent.actions.base import apply_parametric_eq
+        from mix_agent.actions.base import apply_parametric_eq
 
-            return apply_parametric_eq(audio, int(sample_rate), frequency_hz, gain_db, q)
-        except Exception:
-            return np.asarray(audio, dtype=np.float32)
+        return apply_parametric_eq(audio, int(sample_rate), frequency_hz, gain_db, q)
 
     @staticmethod
     def _compress(audio: np.ndarray, params: dict[str, Any]) -> np.ndarray:

@@ -146,6 +146,108 @@ def test_gate_blocks_supervised_when_static_policy_has_no_live_target_even_with_
     assert rows["supervised"]["readiness_gap_target_ids_by_bucket"] == {}
 
 
+def test_gate_limits_supervised_write_scope_to_proven_action_families():
+    custom_context = proof_context()
+    custom_context["autonomy_promotion_readiness"] = {
+        "summary": {
+            "supervised_live_allowed_target_ids": ["fader_supervised_promotion"],
+        },
+        "rows": [
+            {
+                "id": "fader_supervised_promotion",
+                "action_family": "fader",
+                "next_required_evidence": [],
+            },
+        ],
+    }
+    custom_context["autonomy_evidence_overlay"] = {
+        "summary": {},
+        "rows": [
+            {
+                "target_id": "fader_supervised_promotion",
+                "status": "ready",
+            },
+        ],
+    }
+
+    gate = build_autonomy_mode_transition_gate(custom_context)
+    supervised = {row["mode"]: row for row in gate["rows"]}["supervised"]
+
+    assert supervised["runtime_entry_allowed"] is True
+    assert supervised["live_apply_allowed"] is True
+    assert supervised["current_live_write_kinds"] == ["fader"]
+    assert supervised["current_live_write_surfaces"] == ["fader"]
+    assert "gain" not in gate["summary"]["supervised_current_live_write_kinds"]
+    assert "preamp" not in gate["summary"]["supervised_current_live_write_surfaces"]
+    assert "trim" not in gate["summary"]["supervised_current_live_write_surfaces"]
+
+
+def test_gate_preserves_fader_and_gain_scope_only_when_both_families_are_proven():
+    custom_context = proof_context()
+    custom_context["autonomy_promotion_readiness"] = {
+        "summary": {
+            "supervised_live_allowed_target_ids": [
+                "fader_supervised_promotion",
+                "gain_trim_supervised_promotion",
+            ],
+        },
+        "rows": [
+            {
+                "id": "fader_supervised_promotion",
+                "action_family": "fader",
+                "next_required_evidence": [],
+            },
+            {
+                "id": "gain_trim_supervised_promotion",
+                "action_family": "gain",
+                "next_required_evidence": [],
+            },
+        ],
+    }
+    custom_context["autonomy_evidence_overlay"] = {
+        "summary": {},
+        "rows": [
+            {"target_id": "fader_supervised_promotion", "status": "ready"},
+            {"target_id": "gain_trim_supervised_promotion", "status": "ready"},
+        ],
+    }
+
+    gate = build_autonomy_mode_transition_gate(custom_context)
+    supervised = {row["mode"]: row for row in gate["rows"]}["supervised"]
+
+    assert supervised["current_live_write_kinds"] == ["fader", "gain"]
+    assert supervised["current_live_write_surfaces"] == ["preamp", "trim", "fader"]
+
+
+def test_gate_fails_closed_when_proven_target_has_unknown_action_family():
+    custom_context = proof_context()
+    custom_context["autonomy_promotion_readiness"] = {
+        "summary": {
+            "supervised_live_allowed_target_ids": ["future_target"],
+        },
+        "rows": [
+            {
+                "id": "future_target",
+                "action_family": "future_unmapped_family",
+                "next_required_evidence": [],
+            },
+        ],
+    }
+    custom_context["autonomy_evidence_overlay"] = {
+        "summary": {},
+        "rows": [{"target_id": "future_target", "status": "ready"}],
+    }
+
+    gate = build_autonomy_mode_transition_gate(custom_context)
+    supervised = {row["mode"]: row for row in gate["rows"]}["supervised"]
+
+    assert supervised["runtime_entry_allowed"] is False
+    assert supervised["live_apply_allowed"] is False
+    assert supervised["current_live_write_kinds"] == []
+    assert supervised["current_live_write_surfaces"] == []
+    assert "proven_action_family_live_write_scope_missing" in supervised["blockers"]
+
+
 def test_gate_reflects_auto_mode_unlock_in_auto_blockers_for_non_wing_connections():
     locked_gate = build_autonomy_mode_transition_gate(
         proof_context(),

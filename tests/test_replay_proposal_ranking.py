@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from ai_mixing_pipeline.decision_layer.replay_proposal_ranking import (
     REPLAY_TRACE_SCHEMA_VERSION,
     ReplayDecisionProposal,
@@ -156,6 +158,154 @@ def test_replay_proposal_builders_emit_dry_run_and_traceable_payloads():
             "operator_assistance",
             "performer_stage_interaction",
         }
+
+    assert feedback[0].safety == {
+        "operator_override_required": False,
+        "max_q": 8.0,
+        "max_cut_db": 9.0,
+    }
+    assert gain[0].safety["max_step_db"] == 3.0
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"mixer_channel": "1"},
+        {"mixer_channel": True},
+        {"current_trim_db": float("nan")},
+        {"current_trim_db": -18.1},
+        {"recommended_target_trim_db": float("nan")},
+        {"recommended_target_trim_db": float("inf")},
+        {"recommended_target_trim_db": 18.1},
+        {"confidence": float("nan")},
+        {"confidence": 1.1},
+        {"metadata": {"max_step_db": float("nan")}},
+        {"metadata": {"max_step_db": 0.0}},
+        {"metadata": {"max_step_db": 12.1}},
+        {"metadata": {"max_step_db": "3.0"}},
+        {"metadata": []},
+        {"dry_run_only": "true"},
+    ],
+)
+def test_gain_builder_rejects_malformed_or_out_of_bounds_source_values(overrides):
+    recommendation = {**_gain_rec("auto_soundcheck_engine", 1, 0.0, 1.2), **overrides}
+
+    with pytest.raises(ValueError, match="gain"):
+        build_gain_proposals(recommendations=[recommendation])
+
+
+def test_gain_builder_preserves_explicit_bounded_step_for_executor_decision():
+    proposal = build_gain_proposals(
+        recommendations=[
+            {
+                **_gain_rec("auto_soundcheck_engine", 1, -18.0, 18.0, confidence=1.0),
+                "metadata": {"max_step_db": 12.0},
+            }
+        ]
+    )[0]
+
+    assert proposal.current_state == {"gain_db": -18.0}
+    assert proposal.requested_state == {"gain_db": 18.0, "delta_db": 36.0}
+    assert proposal.safety["max_step_db"] == 12.0
+    event = simulate_replay_decisions([proposal]).events[0]
+    assert event.status == "blocked"
+    assert event.blocked_reason == "gain_step_exceeds_limit:36.000>12.000"
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"mixer_channel": "2"},
+        {"mixer_channel": True},
+        {"current_fader_db": float("nan")},
+        {"current_fader_db": -144.1},
+        {"target_fader_db": float("nan")},
+        {"target_fader_db": float("inf")},
+        {"target_fader_db": 0.1},
+        {"max_step_db": 0.0},
+        {"max_step_db": 12.1},
+        {"max_step_db": "2.0"},
+        {"deadband_db": -0.1},
+        {"deadband_db": 2.1, "max_step_db": 2.0},
+        {"confidence": float("nan")},
+        {"confidence": 1.1},
+        {"live_apply_safe": "true"},
+    ],
+)
+def test_fader_builder_rejects_malformed_or_out_of_bounds_source_values(overrides):
+    update = {**_fader_rec(2, -4.0, -3.0), **overrides}
+
+    with pytest.raises(ValueError, match="fader"):
+        build_fader_proposals(fader_updates=[update])
+
+
+def test_fader_builder_preserves_explicit_bounded_step_for_executor_decision():
+    proposal = build_fader_proposals(
+        fader_updates=[{**_fader_rec(2, -12.0, 0.0), "max_step_db": 12.0}]
+    )[0]
+
+    assert proposal.safety["max_step_db"] == 12.0
+    event = simulate_replay_decisions([proposal]).events[0]
+    assert event.status == "applied"
+    assert event.details == {"channel": "2", "requested": 0.0, "previous": -12.0}
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"channel": "5"},
+        {"frequency_hz": float("nan")},
+        {"frequency_hz": float("inf")},
+        {"frequency_hz": 79.9},
+        {"frequency_hz": 12000.1},
+        {"magnitude_db": -12.1, "max_cut_db": 12.0},
+        {"magnitude_db": "-6.0"},
+        {"q": 8.1, "max_q": 8.0},
+        {"q": True},
+        {"max_q": 12.1},
+        {"max_cut_db": 12.1},
+        {"confidence": float("nan")},
+        {"confidence": 1.1},
+        {"live_apply_allowed": "false"},
+        {"operator_override_required": 1},
+        {"action": "arbitrary_action"},
+    ],
+)
+def test_feedback_builder_rejects_malformed_or_out_of_bounds_source_values(overrides):
+    event = {**_feedback_event(5), **overrides}
+
+    with pytest.raises(ValueError, match="feedback"):
+        build_feedback_mitigation_proposals(feedback_events=[event])
+
+
+def test_feedback_builder_accepts_values_at_declared_bounds():
+    proposal = build_feedback_mitigation_proposals(
+        feedback_events=[
+            {
+                **_feedback_event(5),
+                "frequency_hz": 12000.0,
+                "magnitude_db": -12.0,
+                "q": 12.0,
+                "max_q": 12.0,
+                "max_cut_db": 12.0,
+                "confidence": 1.0,
+            }
+        ]
+    )[0]
+
+    assert proposal.requested_state == {"gain_db": -12.0, "q": 12.0}
+    assert proposal.safety["max_q"] == 12.0
+    assert proposal.safety["max_cut_db"] == 12.0
+
+
+def test_feedback_builder_preserves_bounded_fader_reduce_fallback():
+    proposal = build_feedback_mitigation_proposals(
+        feedback_events=[{**_feedback_event(5), "action": "fader_reduce"}]
+    )[0]
+
+    assert proposal.action_type == "fader_reduce"
+    assert proposal.requested_state["gain_db"] == -7.0
+    assert proposal.safety["max_cut_db"] == 9.0
 
 
 def test_rank_replay_proposals_is_deterministic_and_confidence_aware():

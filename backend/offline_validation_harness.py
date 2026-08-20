@@ -36,6 +36,20 @@ ALLOWED_OFFLINE_VALUE_TYPES = tuple(CURRENT_PROVEN_LIVE_WRITE_KINDS)
 FORBIDDEN_LIVE_MESSAGES = ["set_fader", "set_gain", "route_output", "load_snap", "save_snap"]
 
 
+def _safe_run_id(value: Any) -> str:
+    run_id = str(value)
+    if (
+        not run_id
+        or len(run_id) > 128
+        or run_id in {".", ".."}
+        or "/" in run_id
+        or "\\" in run_id
+        or "\x00" in run_id
+    ):
+        raise ValueError("run_id must be one safe path component")
+    return run_id
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -457,8 +471,13 @@ def write_offline_validation_artifacts(
     run_id: Optional[str] = None,
     teacher_examples: Optional[Iterable[Dict[str, Any]]] = None,
 ) -> Dict[str, str]:
-    run_id = run_id or f"{compact_stamp()}_offline_operator_validation"
-    run_dir = Path(artifact_root) / run_id
+    run_id = _safe_run_id(
+        f"{compact_stamp()}_offline_operator_validation" if run_id is None else run_id
+    )
+    root = Path(artifact_root).resolve()
+    run_dir = (root / run_id).resolve()
+    if run_dir.parent != root:
+        raise ValueError("run_id escapes artifact_root")
     run_dir.mkdir(parents=True, exist_ok=True)
     summary_path = run_dir / "summary.json"
     events_path = run_dir / "events.jsonl"

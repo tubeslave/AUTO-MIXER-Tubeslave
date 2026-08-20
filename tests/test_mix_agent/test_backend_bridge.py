@@ -47,7 +47,7 @@ def test_backend_bridge_blocks_ambiguous_mix_bus_gain():
     assert result.blocked[0]["reason"] == "mix_bus_gain_changes_require_explicit_operator_target_mapping"
 
 
-def test_backend_bridge_applies_channel_gain_through_safety_controller():
+def test_backend_bridge_quarantines_caller_selected_apply_boolean():
     mixer = FakeMixer()
     controller = AutoFOHSafetyController(
         mixer,
@@ -67,11 +67,10 @@ def test_backend_bridge_applies_channel_gain_through_safety_controller():
 
     result = bridge.validate_or_apply([action], runtime_state=RuntimeState.SOURCE_LEARNING, apply=True)
 
-    assert result.decisions[0]["sent"] is True
-    # деривационная семантика 2026-07-06: срез идёт к абсолютной цели
-    # (пошаговые лимиты — для live-состояний)
-    assert result.decisions[0]["bounded"] is False
-    assert mixer.calls[-1] == ("set_fader", 1, -12.0)
+    assert result.mode == "suggest"
+    assert result.decisions == []
+    assert result.blocked[0]["reason"] == "legacy_mix_agent_apply_quarantined"
+    assert mixer.calls == []
 
 
 def test_backend_bridge_keeps_sidechain_as_advisory():

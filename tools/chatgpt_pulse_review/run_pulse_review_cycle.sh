@@ -137,11 +137,6 @@ trap cleanup EXIT INT TERM
   printf 'run_log=%s\n' "${RUN_LOG}"
 } > "${LOCK_OWNER}"
 
-if [ ! -r "${PROMPT_FILE}" ]; then
-  echo "Prompt file is missing or unreadable: ${PROMPT_FILE}"
-  exit 66
-fi
-
 if [ ! -r "${FETCHER}" ]; then
   echo "Pulse fetcher is missing or unreadable: ${FETCHER}"
   exit 66
@@ -152,14 +147,7 @@ if [ -z "${PYTHON_PATH}" ] || [ ! -x "${PYTHON_PATH}" ]; then
   exit 127
 fi
 
-if [ -z "${CODEX_PATH}" ] || [ ! -x "${CODEX_PATH}" ]; then
-  echo "codex executable was not found. Set CODEX_BIN or install Codex CLI."
-  exit 127
-fi
-
 echo "python_path=${PYTHON_PATH}"
-echo "codex_path=${CODEX_PATH}"
-"${CODEX_PATH}" --version || true
 
 cd "${PROJECT_ROOT}"
 
@@ -171,27 +159,16 @@ cd "${PROJECT_ROOT}"
 cp "${PULSE_JSON}" "${LOG_DIR}/latest_pulse.json"
 cp "${PULSE_MD}" "${LOG_DIR}/latest_pulse.md"
 
-{
-  cat "${PROMPT_FILE}"
-  printf '\n\n## Current Pulse File\n\n'
-  printf 'PULSE_JSON=%s\n' "${PULSE_JSON}"
-  printf 'PULSE_MARKDOWN=%s\n' "${PULSE_MD}"
-  printf 'RUN_LOG=%s\n' "${RUN_LOG}"
-} > "${EXPANDED_PROMPT}"
-
-CODEX_EXIT=0
-"${CODEX_PATH}" exec \
-  -C "${PROJECT_ROOT}" \
-  --sandbox workspace-write \
-  -c 'approval_policy="never"' \
-  --color never \
-  --output-last-message "${LAST_MESSAGE}" \
-  - < "${EXPANDED_PROMPT}" || CODEX_EXIT=$?
-
-if [ "${CODEX_EXIT}" -ne 0 ]; then
-  echo "codex exec failed with exit code ${CODEX_EXIT}."
-  exit "${CODEX_EXIT}"
-fi
+# Pulse cards are remote, untrusted content. Scheduled ingestion is therefore
+# snapshot-only: no autonomous agent receives this material and no workspace
+# write authority is created. A human may review latest_pulse.md and open a
+# separately authenticated Codex task with an explicit, bounded request.
+printf '%s\n' \
+  '# ChatGPT Pulse scheduled review is quarantined' \
+  '' \
+  'The remote snapshot was saved for manual review only.' \
+  'No Codex agent was started and no project files were modified.' \
+  > "${LAST_MESSAGE}"
 
 echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] chatgpt pulse review: finished"
 echo "pulse_json=${PULSE_JSON}"

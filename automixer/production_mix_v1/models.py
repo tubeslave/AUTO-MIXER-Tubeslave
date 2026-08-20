@@ -236,6 +236,7 @@ class QueueFlushResult:
     sent: list[dict[str, Any]] = field(default_factory=list)
     would_send: list[dict[str, Any]] = field(default_factory=list)
     blocked: list[dict[str, Any]] = field(default_factory=list)
+    failed: list[dict[str, Any]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

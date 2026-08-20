@@ -4,6 +4,7 @@ Integrates knowledge base, rule engine, and LLM for intelligent mixing.
 """
 import asyncio
 import logging
+import math
 import time
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
@@ -379,33 +380,37 @@ class MixingAgent:
             self._reject_action(action, f"Unsupported action type: {action.action_type}")
             return None
 
-        try:
-            channel = int(action.channel)
-        except (TypeError, ValueError):
+        if isinstance(action.channel, bool) or not isinstance(action.channel, int):
             self._reject_action(action, f"Invalid channel: {action.channel}")
             return None
+        channel = action.channel
         if channel <= 0:
             self._reject_action(action, f"Invalid channel: {channel}")
             return None
 
         params = dict(action.parameters or {})
-        confidence = max(0.0, min(1.0, float(action.confidence)))
+        try:
+            confidence = max(0.0, min(1.0, self._finite_float(action.confidence)))
 
-        if action.action_type == 'reduce_gain':
-            params['amount_db'] = max(-self._max_fader_step_db, min(0.0, float(params.get('amount_db', -1.0))))
-        elif action.action_type == 'adjust_gain':
-            adjustment = float(params.get('adjustment_db', 0.0))
-            params['adjustment_db'] = max(-self._max_fader_step_db, min(self._max_fader_step_db, adjustment))
-        elif action.action_type == 'apply_hpf':
-            params['frequency'] = self._clamp_float(params.get('frequency', 80.0), 20.0, 400.0)
-        elif action.action_type == 'adjust_compressor':
-            params = self._normalize_compressor_params(params)
-        elif action.action_type == 'set_eq':
-            params['gain'] = self._clamp_float(params.get('gain', 0.0), -self._max_eq_step_db, self._max_eq_step_db)
-            params['freq'] = self._clamp_float(params.get('freq', 1000.0), 20.0, 20000.0)
-            params['q'] = self._clamp_float(params.get('q', 1.0), 0.2, 10.0)
-        elif action.action_type == 'llm_recommendation':
-            params = self._normalize_llm_recommendation(params)
+            if action.action_type == 'reduce_gain':
+                amount = self._finite_float(params.get('amount_db', -1.0))
+                params['amount_db'] = max(-self._max_fader_step_db, min(0.0, amount))
+            elif action.action_type == 'adjust_gain':
+                adjustment = self._finite_float(params.get('adjustment_db', 0.0))
+                params['adjustment_db'] = max(-self._max_fader_step_db, min(self._max_fader_step_db, adjustment))
+            elif action.action_type == 'apply_hpf':
+                params['frequency'] = self._clamp_float(params.get('frequency', 80.0), 20.0, 400.0)
+            elif action.action_type == 'adjust_compressor':
+                params = self._normalize_compressor_params(params)
+            elif action.action_type == 'set_eq':
+                params['gain'] = self._clamp_float(params.get('gain', 0.0), -self._max_eq_step_db, self._max_eq_step_db)
+                params['freq'] = self._clamp_float(params.get('freq', 1000.0), 20.0, 20000.0)
+                params['q'] = self._clamp_float(params.get('q', 1.0), 0.2, 10.0)
+            elif action.action_type == 'llm_recommendation':
+                params = self._normalize_llm_recommendation(params)
+        except ValueError as exc:
+            self._reject_action(action, str(exc))
+            return None
 
         return AgentAction(
             action_type=action.action_type,
@@ -428,12 +433,18 @@ class MixingAgent:
         if normalized.get('pan') is not None:
             normalized['pan'] = self._clamp_float(normalized['pan'], -1.0, 1.0)
 
+        raw_eq_bands = normalized.get('eq_bands') or []
+        if not isinstance(raw_eq_bands, list):
+            raise ValueError("LLM eq_bands must be a list")
         eq_bands = []
-        for idx, band in enumerate(normalized.get('eq_bands') or [], start=1):
+        for idx, band in enumerate(raw_eq_bands, start=1):
             if not isinstance(band, dict):
-                continue
+                raise ValueError("LLM EQ band must be a mapping")
+            band_number = band.get('band', idx)
+            if isinstance(band_number, bool) or not isinstance(band_number, int) or not 1 <= band_number <= 4:
+                raise ValueError("LLM EQ band must be an integer in range 1..4")
             eq_bands.append({
-                'band': int(band.get('band', idx)),
+                'band': band_number,
                 'freq': self._clamp_float(band.get('freq', 1000.0), 20.0, 20000.0),
                 'gain_db': self._clamp_float(
                     band.get('gain_db', band.get('gain', 0.0)),
@@ -471,11 +482,18 @@ class MixingAgent:
         return normalized
 
     def _clamp_float(self, value: Any, minimum: float, maximum: float) -> float:
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            numeric = minimum
+        numeric = self._finite_float(value)
         return max(minimum, min(maximum, numeric))
+
+    @staticmethod
+    def _finite_float(value: Any) -> float:
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(float(value))
+        ):
+            raise ValueError("Action numeric fields must be finite real numbers")
+        return float(value)
 
     def _reject_action(self, action: AgentAction, reason: str):
         self.state.errors.append(f"Rejected action: {reason}")
@@ -498,16 +516,24 @@ class MixingAgent:
                 if self.mixer:
                     if action.action_type == 'reduce_gain':
                         amount = action.parameters.get('amount_db', -3)
-                        current = self._safe_get_fader(action.channel) or 0.0
-                        target = max(-100.0, current + amount)
-                        self._safe_set_fader(action.channel, target)
-                        applied = True
+                        current = self._safe_get_fader(action.channel)
+                        if current is not None:
+                            target = max(-100.0, current + amount)
+                            applied = self._safe_set_fader(
+                                action.channel,
+                                target,
+                                current=current,
+                            )
                     elif action.action_type == 'adjust_gain':
                         adj = action.parameters.get('adjustment_db', 0)
-                        current = self._safe_get_fader(action.channel) or 0.0
-                        target = max(-100.0, min(10.0, current + adj))
-                        self._safe_set_fader(action.channel, target)
-                        applied = True
+                        current = self._safe_get_fader(action.channel)
+                        if current is not None:
+                            target = max(-100.0, min(10.0, current + adj))
+                            applied = self._safe_set_fader(
+                                action.channel,
+                                target,
+                                current=current,
+                            )
                     elif action.action_type == 'mute_channel':
                         self.mixer.set_mute(action.channel, True)
                         applied = True
@@ -526,17 +552,17 @@ class MixingAgent:
                             action.channel,
                             action.parameters.get('threshold_db', -18),
                         )
-                        if hasattr(self.mixer, 'set_channel_compressor'):
-                            self.mixer.set_channel_compressor(
+                        if threshold is not None and hasattr(self.mixer, 'set_channel_compressor'):
+                            result = self.mixer.set_channel_compressor(
                                 action.channel,
                                 threshold=threshold,
                                 ratio=action.parameters.get('ratio', 3.0),
                                 attack=action.parameters.get('attack_ms', 10),
                                 release=action.parameters.get('release_ms', 100),
                             )
-                            applied = True
-                        elif hasattr(self.mixer, 'set_compressor'):
-                            self.mixer.set_compressor(
+                            applied = result is not False
+                        elif threshold is not None and hasattr(self.mixer, 'set_compressor'):
+                            result = self.mixer.set_compressor(
                                 action.channel,
                                 threshold_db=threshold,
                                 ratio=action.parameters.get('ratio', 3.0),
@@ -544,7 +570,7 @@ class MixingAgent:
                                 release_ms=action.parameters.get('release_ms', 100),
                                 enabled=True,
                             )
-                            applied = True
+                            applied = result is not False
                     elif action.action_type == 'adjust_deesser':
                         if hasattr(self.mixer, 'set_channel_deesser'):
                             self.mixer.set_channel_deesser(
@@ -588,40 +614,56 @@ class MixingAgent:
                 self.state.errors.append(error_msg)
                 self._record_audit(action, "error", str(e))
 
-    def _safe_set_fader(self, channel: int, value_db: float):
+    def _safe_set_fader(
+        self,
+        channel: int,
+        value_db: float,
+        *,
+        current: Optional[float] = None,
+    ) -> bool:
         """Set fader using whichever method the mixer client provides."""
+        try:
+            value_db = self._finite_float(value_db)
+        except ValueError:
+            return False
         value_db = max(-100.0, min(self._max_fader_db, value_db))
-        current = self._safe_get_fader(channel)
-        if current is not None:
-            value_db = max(current - self._max_fader_step_db, min(current + self._max_fader_step_db, value_db))
+        if current is None:
+            current = self._safe_get_fader(channel)
+        if current is None:
+            return False
+        value_db = max(
+            current - self._max_fader_step_db,
+            min(current + self._max_fader_step_db, value_db),
+        )
         if hasattr(self.mixer, 'set_channel_fader_db'):
-            self.mixer.set_channel_fader_db(channel, value_db)
+            return self.mixer.set_channel_fader_db(channel, value_db) is not False
         elif hasattr(self.mixer, 'set_fader'):
-            self.mixer.set_fader(channel, value_db)
+            return self.mixer.set_fader(channel, value_db) is not False
+        return False
 
     def _apply_llm_recommendation(self, action: AgentAction) -> bool:
         """Apply a structured LLM recommendation using safe mixer adapters."""
-        rec = action.parameters
+        try:
+            rec = self._normalize_llm_recommendation(action.parameters)
+        except (TypeError, ValueError):
+            return False
         applied = False
 
         if rec.get('gain_db') is not None:
-            self._safe_set_fader(action.channel, float(rec['gain_db']))
-            applied = True
+            applied = self._safe_set_fader(
+                action.channel,
+                float(rec['gain_db']),
+            ) or applied
 
-        if rec.get('pan') is not None and hasattr(self.mixer, 'set_pan'):
-            current_pan = None
-            if hasattr(self.mixer, 'get_pan'):
-                try:
-                    candidate = self.mixer.get_pan(action.channel)
-                    if isinstance(candidate, (int, float)):
-                        current_pan = float(candidate)
-                except Exception:
-                    current_pan = None
+        pan_setter = getattr(self.mixer, 'set_pan', None)
+        if pan_setter is None:
+            pan_setter = getattr(self.mixer, 'set_channel_pan', None)
+        if rec.get('pan') is not None and callable(pan_setter):
+            current_pan = self._safe_get_pan(action.channel)
             target_pan = float(rec['pan'])
             if current_pan is not None:
                 target_pan = max(current_pan - self._max_pan_step, min(current_pan + self._max_pan_step, target_pan))
-            self.mixer.set_pan(action.channel, target_pan)
-            applied = True
+                applied = pan_setter(action.channel, target_pan) is not False or applied
 
         eq_bands = rec.get('eq_bands') or []
         if eq_bands and hasattr(self.mixer, 'set_eq_band'):
@@ -639,41 +681,79 @@ class MixingAgent:
         comp_ratio = rec.get('comp_ratio', rec.get('ratio'))
         if comp_threshold is not None and hasattr(self.mixer, 'set_compressor'):
             comp_threshold = self._limited_compressor_threshold(action.channel, comp_threshold)
-            self.mixer.set_compressor(
-                action.channel,
-                threshold_db=comp_threshold,
-                ratio=comp_ratio or 3.0,
-                attack_ms=rec.get('comp_attack_ms', rec.get('attack_ms', 10.0)),
-                release_ms=rec.get('comp_release_ms', rec.get('release_ms', 100.0)),
-                enabled=True,
-            )
-            applied = True
+            if comp_threshold is not None:
+                result = self.mixer.set_compressor(
+                    action.channel,
+                    threshold_db=comp_threshold,
+                    ratio=comp_ratio or 3.0,
+                    attack_ms=rec.get('comp_attack_ms', rec.get('attack_ms', 10.0)),
+                    release_ms=rec.get('comp_release_ms', rec.get('release_ms', 100.0)),
+                    enabled=True,
+                )
+                applied = result is not False or applied
 
         return applied
 
-    def _limited_compressor_threshold(self, channel: int, target: float) -> float:
+    def _limited_compressor_threshold(self, channel: int, target: float) -> Optional[float]:
         target = self._clamp_float(target, -60.0, 0.0)
-        if not hasattr(self.mixer, 'get_compressor_threshold'):
-            return target
-        try:
-            current = self.mixer.get_compressor_threshold(channel)
-        except Exception:
-            return target
-        if not isinstance(current, (int, float)):
-            return target
-        current = float(current)
+        current = self._read_current_mixer_value(
+            channel,
+            f"/ch/{channel}/dyn/thr",
+            ("get_compressor_threshold",),
+        )
+        if current is None:
+            return None
         return max(current - self._max_comp_threshold_step_db, min(current + self._max_comp_threshold_step_db, target))
 
-    def _safe_get_fader(self, channel: int) -> float:
-        """Get fader value using whichever method the mixer client provides."""
-        if hasattr(self.mixer, 'get_fader'):
+    def _read_current_mixer_value(
+        self,
+        channel: int,
+        address: str,
+        getter_names: tuple[str, ...],
+    ) -> Optional[float]:
+        """Read one finite value, preferring operation-specific readback."""
+        query_parameter = getattr(self.mixer, "query_parameter", None)
+        if callable(query_parameter):
             try:
-                value = self.mixer.get_fader(channel)
-                if isinstance(value, (int, float)):
-                    return float(value)
+                result = query_parameter(address)
             except Exception:
                 return None
-        return None
+            if not isinstance(result, dict) or result.get("status") != "received":
+                return None
+            candidate = result.get("value")
+        else:
+            candidate = None
+            for getter_name in getter_names:
+                getter = getattr(self.mixer, getter_name, None)
+                if not callable(getter):
+                    continue
+                try:
+                    candidate = getter(channel)
+                except Exception:
+                    return None
+                break
+        if (
+            isinstance(candidate, bool)
+            or not isinstance(candidate, (int, float))
+            or not math.isfinite(float(candidate))
+        ):
+            return None
+        return float(candidate)
+
+    def _safe_get_fader(self, channel: int) -> Optional[float]:
+        """Get fader value using whichever method the mixer client provides."""
+        return self._read_current_mixer_value(
+            channel,
+            f"/ch/{channel}/fdr",
+            ("get_fader", "get_channel_fader_db", "get_channel_fader"),
+        )
+
+    def _safe_get_pan(self, channel: int) -> Optional[float]:
+        return self._read_current_mixer_value(
+            channel,
+            f"/ch/{channel}/pan",
+            ("get_pan", "get_channel_pan"),
+        )
 
     def update_channel_state(self, channel_id: int, state: Dict):
         """Update observed state for a channel. Called by the metering subsystem."""

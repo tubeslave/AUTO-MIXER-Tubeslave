@@ -22,6 +22,9 @@ README_FILENAMES = {"README.md", "readme.md"}
 DEFAULT_MAX_DATASET_BYTES = 50 * 1024 * 1024
 DEFAULT_REPORT_PATH = "/Users/dmitrijvolkov/Downloads/deep-research-report.md"
 HASH_COMMAND_TIMEOUT_SEC = 10.0
+MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_PARQUET_ROWS = 100_000
+MAX_PARQUET_UNCOMPRESSED_BYTES = 100 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -120,7 +123,10 @@ def build_hf_file_url(dataset_id: str, filename: str) -> str:
 def http_json(url: str, timeout: float) -> dict[str, Any] | list[Any]:
     request = Request(url, headers={"User-Agent": "AUTO-MIXER-dataset-bootstrap/1.0"})
     with urlopen(request, timeout=timeout) as response:
-        return json.loads(response.read().decode("utf-8"))
+        payload = response.read(MAX_API_RESPONSE_BYTES + 1)
+        if len(payload) > MAX_API_RESPONSE_BYTES:
+            raise RuntimeError("dataset API response exceeds byte limit")
+        return json.loads(payload.decode("utf-8"))
 
 
 def http_content_length(url: str, timeout: float) -> int | None:
@@ -234,12 +240,28 @@ def convert_parquet_to_jsonl(path: Path) -> Path | None:
     except Exception:
         return None
 
-    table = pq.read_table(path)
+    if path.stat().st_size > DEFAULT_MAX_DATASET_BYTES:
+        raise RuntimeError("Parquet compressed byte limit exceeded")
+    parquet = pq.ParquetFile(path)
+    metadata = parquet.metadata
+    if metadata.num_rows > MAX_PARQUET_ROWS:
+        raise RuntimeError("Parquet row limit exceeded")
+    total_uncompressed = sum(
+        metadata.row_group(index).total_byte_size
+        for index in range(metadata.num_row_groups)
+    )
+    if total_uncompressed > MAX_PARQUET_UNCOMPRESSED_BYTES:
+        raise RuntimeError("Parquet expanded byte limit exceeded")
     output_path = path.with_suffix(".jsonl")
+    written = 0
     with output_path.open("w", encoding="utf-8") as handle:
-        for row in table.to_pylist():
-            handle.write(json.dumps(row, ensure_ascii=False, default=str))
-            handle.write("\n")
+        for batch in parquet.iter_batches(batch_size=1000):
+            for row in batch.to_pylist():
+                written += 1
+                if written > MAX_PARQUET_ROWS:
+                    raise RuntimeError("Parquet row limit exceeded")
+                handle.write(json.dumps(row, ensure_ascii=False, default=str))
+                handle.write("\n")
     return output_path
 
 

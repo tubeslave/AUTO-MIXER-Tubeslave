@@ -17,6 +17,7 @@
 Управляющие записи (fader/EQ/…) НЕ выполняются — это диагностика.
 """
 import argparse
+import ipaddress
 import socket
 import sys
 import time
@@ -64,6 +65,26 @@ def _osc_message(address: str) -> bytes:
     return b
 
 
+def _valid_wing_discovery_response(data: bytes, addr, local_addresses) -> bool:
+    """Accept only WING-labelled replies from the queried local /24 boundary."""
+    try:
+        source_ip = ipaddress.ip_address(str(addr[0]))
+        source_port = int(addr[1])
+    except (IndexError, TypeError, ValueError):
+        return False
+    if source_port != 2222 or not source_ip.is_private or source_ip.is_loopback:
+        return False
+    local_networks = {
+        ipaddress.ip_network(f"{value}/24", strict=False)
+        for value in local_addresses
+        if ipaddress.ip_address(value).is_private
+    }
+    if not any(source_ip in network for network in local_networks):
+        return False
+    text = data.decode("utf-8", "ignore").strip()
+    return 0 < len(text) <= 4096 and "wing" in text.casefold()
+
+
 def check_discovery(timeout=3.0):
     """WING broadcast discovery на порт 2222. Возвращает список (ip, info)."""
     print(f"\n{DIM}[1/4] Discovery{RESET}")
@@ -76,8 +97,9 @@ def check_discovery(timeout=3.0):
         # Directed broadcast по каждому локальному интерфейсу. Глобальный
         # 255.255.255.255 на macOS часто даёт EHOSTUNREACH и не должен
         # ронять весь скан — каждый sendto изолирован
+        local_addresses = _local_ipv4_addresses()
         targets = ["255.255.255.255"]
-        for local_ip in _local_ipv4_addresses():
+        for local_ip in local_addresses:
             prefix = ".".join(local_ip.split(".")[:3])
             targets.append(f"{prefix}.255")
         for tgt in targets:
@@ -91,6 +113,8 @@ def check_discovery(timeout=3.0):
         while time.time() - start < timeout:
             try:
                 data, addr = s.recvfrom(4096)
+                if not _valid_wing_discovery_response(data, addr, local_addresses):
+                    continue
                 if addr[0] in seen:
                     continue
                 seen.add(addr[0])
@@ -117,6 +141,12 @@ def check_osc_reachable(ip, port=2223, timeout=2.0):
         s.sendto(_osc_message("/?"), (ip, port))
         s.sendto(_osc_message("/xinfo"), (ip, port))
         data, addr = s.recvfrom(65535)
+        if addr[0] != ip or int(addr[1]) != int(port):
+            _fail("OSC-ответ пришёл не от запрошенного WING endpoint")
+            return False
+        if not (data.startswith(b"/xinfo") or data.startswith(b"/?")):
+            _fail("OSC-ответ не подтверждает запрошенную WING identity")
+            return False
         _ok(f"OSC отвечает: {data[:60]!r}")
         return True
     except socket.timeout:
@@ -258,6 +288,12 @@ def main():
     ap.add_argument("--osc-port", type=int, default=2223)
     ap.add_argument("--skip-audio", action="store_true")
     args = ap.parse_args()
+    if args.wing_ip:
+        address = ipaddress.ip_address(args.wing_ip)
+        if not address.is_private or address.is_loopback:
+            raise SystemExit("--wing-ip must be a private non-loopback IPv4 address")
+    if args.osc_port != 2223:
+        raise SystemExit("--osc-port must be the canonical WING OSC port 2223")
 
     print("=" * 62)
     print(" AUTO-MIXER — валидация на реальном железе (read-only)")

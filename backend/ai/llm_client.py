@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
+UNTRUSTED_DATA_BACKENDS = frozenset({"openai", "ollama", "perplexity"})
+
 
 @dataclass
 class LLMResponse:
@@ -82,9 +84,7 @@ class LLMClient:
 
     def query(self, prompt: str, context: Optional[str] = None) -> LLMResponse:
         """Send query to LLM backend and return response."""
-        full_prompt = prompt
-        if context:
-            full_prompt = f"Context:\n{context}\n\nQuestion:\n{prompt}"
+        full_prompt = self._compose_prompt(prompt, context)
 
         if self.backend == 'auto':
             return self._query_auto(full_prompt)
@@ -101,6 +101,37 @@ class LLMClient:
                 text='', model=self.model, tokens_used=0,
                 success=False, error=f"Unknown backend: {self.backend}"
             )
+
+    @staticmethod
+    def _compose_prompt(prompt: str, context: Optional[str]) -> str:
+        if context:
+            return f"Context:\n{context}\n\nQuestion:\n{prompt}"
+        return prompt
+
+    def query_untrusted_data(
+        self,
+        prompt: str,
+        context: Optional[str] = None,
+    ) -> LLMResponse:
+        """Query inference-only backends without exposing data to an agentic CLI."""
+        full_prompt = self._compose_prompt(prompt, context)
+        if self.backend == "auto":
+            return self._query_auto(
+                full_prompt,
+                allowed_backends=UNTRUSTED_DATA_BACKENDS,
+            )
+        if self.backend not in UNTRUSTED_DATA_BACKENDS:
+            return LLMResponse(
+                text="",
+                model=self.model,
+                tokens_used=0,
+                success=False,
+                error=(
+                    f"Backend {self.backend!r} is not allowed for untrusted "
+                    "runtime data"
+                ),
+            )
+        return self._query_backend(self.backend, full_prompt, self.model)
 
     def _parse_model_fallbacks(self, fallbacks: Optional[List[str]]) -> List[Tuple[str, str]]:
         if not fallbacks:
@@ -133,10 +164,17 @@ class LLMClient:
                 parsed.append((backend, model))
         return parsed
 
-    def _query_auto(self, prompt: str) -> LLMResponse:
+    def _query_auto(
+        self,
+        prompt: str,
+        *,
+        allowed_backends: Optional[frozenset[str]] = None,
+    ) -> LLMResponse:
         """Try preferred online models first, then local Ollama fallbacks."""
         errors = []
         for backend, model in self.model_fallbacks:
+            if allowed_backends is not None and backend not in allowed_backends:
+                continue
             response = self._query_backend(backend, prompt, model)
             if response.success:
                 return response
@@ -443,7 +481,7 @@ class LLMClient:
             "(low, medium, or high)."
         )
 
-        response = self.query(prompt, context)
+        response = self.query_untrusted_data(prompt, context)
         if response.success:
             try:
                 text = response.text

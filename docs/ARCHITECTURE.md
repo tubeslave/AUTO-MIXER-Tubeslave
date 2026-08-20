@@ -142,10 +142,18 @@ ABC определяет интерфейс: connect, disconnect, send, subscrib
 - Fader mapping: 0.0 = -∞, 0.7498 = 0 dB, 1.0 = +10 dB
 
 #### DLiveClient (`dlive_client.py`)
-- MIDI over TCP на порт 51328/51329
-- NRPN 14-bit для faders, EQ, compressor
-- SysEx для расширенных параметров
-- Fader mapping: 0x0000 = -∞, 0x2AAA = 0 dB, 0x3FFF = +10 dB
+- MIDI over TCP: MixRack `51325/51327`, Surface `51328/51329`
+- валидирует endpoint/TLS/port и MIDI base channel до создания socket
+- принимает fragmented TCP и MIDI running status
+- NRPN 7-bit fader: parameter `0x17`, `0x00=-∞`, `0x6B=0 dB`, `0x7F=+10 dB`
+- обычный server/factory connect только read-only; raw MIDI surface закрыта
+- read-only GET: input fader, mute, name; свежесть подтверждается двумя ответами
+- normal fader/mute setters всегда zero-send
+- отдельный `dlive_supervised_fader_proof.py` даёт только one-shot
+  downward-fader apply + exact rollback; он разделяет per-user writer lock с
+  WING, пишет durable hash-chained WAL и имеет recovery-only путь
+- preamp, 48 V, scene, routing, EQ/HPF, sends, pan, compressor, gate, delay,
+  polarity и metadata writes fail closed до отдельного физического proof
 
 ## Потоки данных
 

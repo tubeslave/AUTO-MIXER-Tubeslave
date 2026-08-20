@@ -6,6 +6,7 @@ via shared memory IPC.
 """
 
 import mmap
+import secrets
 import struct
 import logging
 from dataclasses import dataclass
@@ -54,6 +55,8 @@ class SharedMemoryWrapper:
     def read(self, size: int = -1, offset: int = 0):
         if size == -1:
             size = self.size - offset
+        if offset < 0 or size < 0 or offset + size > self.size:
+            raise ValueError("shared-memory read exceeds mapped bounds")
         # Create array and read from memory
         arr = (ctypes.c_uint8 * size).from_address(self.ptr + offset)
         return bytes(arr)
@@ -122,9 +125,12 @@ class CppBridge:
     HEADER_SIZE = 32  # bytes
     # ChannelMetrics: int32_t (4) + 6 floats (24) + BandEnergy 7 floats (28) + bool (1) + padding (3) + float (4) + uint64_t (8) = 72 bytes
     METRICS_SIZE = 72  # bytes per ChannelMetrics
+    MAX_CHANNELS = 128
+    MAX_BUFFER_CAPACITY = 65536
+    MAX_SHM_SIZE = HEADER_SIZE + MAX_BUFFER_CAPACITY * METRICS_SIZE
     
-    def __init__(self, shm_name: str = "auto_fader_metrics"):
-        self.shm_name = shm_name
+    def __init__(self, shm_name: Optional[str] = None):
+        self.shm_name = shm_name or f"auto_fader_metrics_{os.getpid()}_{secrets.token_hex(16)}"
         self.cpp_process: Optional[subprocess.Popen] = None
         self.shm_fd = None
         self.shm_mmap = None
@@ -183,7 +189,8 @@ class CppBridge:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,  # Merge stderr to stdout
                 text=True,
-                bufsize=1  # Line buffered
+                bufsize=1,  # Line buffered
+                env={**os.environ, "AUTO_FADER_SHM_NAME": self.shm_name},
             )
             
             # Start thread to read C++ process output
@@ -257,6 +264,9 @@ class CppBridge:
             True if successful
         """
         try:
+            if self.cpp_process is None or self.cpp_process.poll() is not None:
+                logger.error("Refusing shared memory without the owned live C++ producer")
+                return False
             if platform.system() == "Darwin":  # macOS
                 # Use POSIX shm_open
                 shm_name_bytes = f"/{self.shm_name}".encode('utf-8')
@@ -277,9 +287,9 @@ class CppBridge:
                     st = os.fstat(self.shm_fd)
                     shm_size = st.st_size
                     logger.debug(f"Shared memory size from fstat: {shm_size} bytes")
-                    
-                    if shm_size == 0:
-                        logger.error("Shared memory size is 0")
+
+                    if not self._validate_shm_stat(st):
+                        logger.error("Shared memory ownership, mode, or size is invalid")
                         self.libc.close(self.shm_fd)
                         self.shm_fd = None
                         return False
@@ -327,6 +337,11 @@ class CppBridge:
                     return False
                 
                 self.shm_file = open(shm_path, "r+b")
+                if not self._validate_shm_stat(os.fstat(self.shm_file.fileno())):
+                    logger.error("Shared memory ownership, mode, or size is invalid")
+                    self.shm_file.close()
+                    self.shm_file = None
+                    return False
                 self.shm_mmap = mmap.mmap(self.shm_file.fileno(), 0)
             
             # Validate header
@@ -367,15 +382,38 @@ class CppBridge:
         if not self.shm_mmap or len(self.shm_mmap) < self.HEADER_SIZE:
             return False
         
-        # Read magic number and version
-        # Handle both mmap.mmap objects and SharedMemoryWrapper
-        if isinstance(self.shm_mmap, SharedMemoryWrapper):
-            header_data = self.shm_mmap.read(self.HEADER_SIZE, 0)
-            magic, version = struct.unpack_from("II", header_data, 0)
-        else:
-            magic, version = struct.unpack_from("II", self.shm_mmap, 0)
-        
-        return magic == self.MAGIC_NUMBER and version == self.VERSION
+        try:
+            if isinstance(self.shm_mmap, SharedMemoryWrapper):
+                header_data = self.shm_mmap.read(self.HEADER_SIZE, 0)
+            else:
+                header_data = self.shm_mmap[: self.HEADER_SIZE]
+            magic, version, num_channels, buffer_capacity, write_idx, read_idx, producer_alive, _ = (
+                struct.unpack_from("IIIIIIBB", header_data, 0)
+            )
+        except (BufferError, TypeError, ValueError, struct.error):
+            return False
+
+        required_size = self.HEADER_SIZE + buffer_capacity * self.METRICS_SIZE
+        return bool(
+            magic == self.MAGIC_NUMBER
+            and version == self.VERSION
+            and 1 <= num_channels <= self.MAX_CHANNELS
+            and 1 <= buffer_capacity <= self.MAX_BUFFER_CAPACITY
+            and required_size <= len(self.shm_mmap) <= self.MAX_SHM_SIZE
+            and read_idx < buffer_capacity
+            and write_idx < buffer_capacity
+            and producer_alive == 1
+        )
+
+    def _validate_shm_stat(self, stat_result) -> bool:
+        """Accept only bounded, same-user, non-group/world-writable shared memory."""
+
+        return bool(
+            stat_result.st_uid == os.geteuid()
+            and stat_result.st_size >= self.HEADER_SIZE + self.METRICS_SIZE
+            and stat_result.st_size <= self.MAX_SHM_SIZE
+            and (stat_result.st_mode & 0o022) == 0
+        )
     
     def read_metrics(self) -> List[ChannelMetrics]:
         """
@@ -388,6 +426,12 @@ class CppBridge:
             return []
         
         try:
+            if self.cpp_process is None or self.cpp_process.poll() is not None:
+                self.last_error = "Owned C++ producer is not running"
+                return []
+            if not self._validate_header():
+                self.last_error = "Shared memory header became invalid"
+                return []
             # Read header - handle both mmap.mmap and SharedMemoryWrapper
             # Header: magic (4), version (4), num_channels (4), buffer_capacity (4), write_index (4), read_index (4), producer_alive (1), consumer_alive (1), padding (10)
             if isinstance(self.shm_mmap, SharedMemoryWrapper):
@@ -416,7 +460,8 @@ class CppBridge:
             else:
                 logger.debug(f"Reading metrics: read_idx={read_idx}, write_idx={write_idx}, available={write_idx - read_idx if write_idx > read_idx else buffer_capacity - read_idx + write_idx}")
             
-            while read_idx != write_idx:
+            records_read = 0
+            while read_idx != write_idx and records_read < buffer_capacity:
                 # Calculate base offset for this metric block
                 base_offset = self.HEADER_SIZE + (read_idx % buffer_capacity) * self.METRICS_SIZE
                 
@@ -472,6 +517,7 @@ class CppBridge:
                 )
                 
                 metrics_list.append(metrics)
+                records_read += 1
                 self.latest_metrics[metrics.channel_id] = metrics
                 
                 # Update read index

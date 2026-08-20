@@ -6,6 +6,9 @@ from src.agent_ops.trainer_agent import TrainerAgent
 
 
 def test_trainer_agent_builds_dataset_discovery_command(tmp_path: Path):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "discover_training_datasets.py").write_text("print('discovery')\n")
     agent = TrainerAgent(project_root=tmp_path, default_python="python3")
 
     command = agent._resolve_command(
@@ -39,6 +42,9 @@ def test_trainer_agent_builds_dataset_discovery_command(tmp_path: Path):
 
 
 def test_trainer_agent_records_command_timeout(tmp_path: Path, monkeypatch):
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "train.py").write_text("print('training')\n")
     agent = TrainerAgent(project_root=tmp_path, default_timeout_sec=2.5)
     seen = {}
 
@@ -48,7 +54,7 @@ def test_trainer_agent_records_command_timeout(tmp_path: Path, monkeypatch):
 
     monkeypatch.setattr(trainer_agent.subprocess, "run", fake_run)
 
-    result = agent.run({"command": ["python", "train.py"]})
+    result = agent.run({"train_config": {"script_path": "scripts/train.py"}})
 
     assert seen["timeout"] == 2.5
     assert result["status"] == "failed"
@@ -60,12 +66,17 @@ def test_trainer_agent_records_command_timeout(tmp_path: Path, monkeypatch):
 
 def test_trainer_experiment_uses_per_experiment_timeout(tmp_path: Path, monkeypatch):
     agent = TrainerAgent(project_root=tmp_path, default_timeout_sec=100.0)
-    config = tmp_path / "experiments.yaml"
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    (scripts / "train.py").write_text("print('training')\n")
+    config_dir = tmp_path / "configs" / "training"
+    config_dir.mkdir(parents=True)
+    config = config_dir / "experiments.yaml"
     config.write_text(
         """
 experiments:
   - name: short
-    command: [python, train.py]
+    command: [python, scripts/train.py]
     timeout_sec: 3
 selection_metric: loss
 selection_mode: min
@@ -80,7 +91,7 @@ selection_mode: min
 
     monkeypatch.setattr(trainer_agent.subprocess, "run", fake_run)
 
-    result = agent.run({"experiments_config": config.name})
+    result = agent.run({"experiments_config": "configs/training/experiments.yaml"})
 
     assert seen["timeout"] == 3.0
     assert result["status"] == "ok"

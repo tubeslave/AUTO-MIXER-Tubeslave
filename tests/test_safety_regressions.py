@@ -260,13 +260,13 @@ def _dlive():
 
 def test_dlive_parser_survives_any_split_boundary():
     """MIDI-сообщение, разрезанное на любой границе recv(), не теряется."""
-    from dlive_client import build_nrpn, fader_value_to_db
+    from dlive_client import build_nrpn
 
     client_ref = _dlive()
-    msg = build_nrpn(0, 0x00, 4, 8000)  # fader канала 5
+    msg = build_nrpn(0, 4, 0x17, 97)  # input 5 fader = -5 dB
     client_ref._parse_incoming(msg)
     expected = client_ref.state.get("fader/5")
-    assert expected == 8000
+    assert expected == 97
 
     for split in range(1, len(msg)):
         client = _dlive()
@@ -347,52 +347,20 @@ def test_feedback_detector_picks_dominant_peak_frequency():
     assert abs(detected[-1] - fb_freq) < 25, f"устойчивая фаза: {detected[-1]}"
 
 
-# ── dLive: best-effort верификация записи фейдера ───────────────────
+# ── dLive: normal client has no mutation authority ─────────────────
 
 
-def test_dlive_set_fader_verified_applied_on_echo():
-    """Эхо NRPN от пульта с совпадающим значением → status=applied."""
-    from dlive_client import build_nrpn, db_to_fader_value
-
+def test_dlive_normal_fader_and_mute_writes_are_zero_send():
+    """Обычный клиент не получает запись булевым флагом или через setter."""
     client = _dlive()
-    client.is_connected = True
+    sent = []
+    client._send_raw = lambda data: sent.append(bytes(data)) or True
 
-    def fake_send(data):
-        # Пульт эхоит применённое значение
-        echo = build_nrpn(0, 0x00, 4, db_to_fader_value(-6.0))
-        client._parse_incoming(echo)
-        return True
-
-    client._send_raw = fake_send
-    result = client.set_fader_verified(5, -6.0, timeout_sec=0.2)
-    assert result["status"] == "applied"
-    assert abs(result["readback_db"] - (-6.0)) <= 0.5
-
-
-def test_dlive_set_fader_verified_unconfirmed_without_echo():
-    """Нет эха → status=unconfirmed (НЕ applied), запись не подтверждена."""
-    client = _dlive()
-    client.is_connected = True
-    client._send_raw = lambda data: True
-    result = client.set_fader_verified(5, -6.0, timeout_sec=0.1)
-    assert result["status"] == "unconfirmed"
-
-
-def test_dlive_set_fader_verified_mismatch():
-    """Эхо с другим значением (пульт клэмпнул) → status=mismatch."""
-    from dlive_client import build_nrpn, db_to_fader_value
-
-    client = _dlive()
-    client.is_connected = True
-
-    def fake_send(data):
-        echo = build_nrpn(0, 0x00, 4, db_to_fader_value(0.0))
-        client._parse_incoming(echo)
-        return True
-
-    client._send_raw = fake_send
-    result = client.set_fader_verified(5, -20.0, timeout_sec=0.2)
-    assert result["status"] == "mismatch"
+    assert client.set_fader(5, -6.0) is False
+    assert client.set_fader_verified(5, -6.0)["status"] == "send_failed"
+    assert client.set_mute(5, True) is False
+    assert client.set_mute_verified(5, True)["status"] == "send_failed"
+    assert sent == []
 
 
 # ── Auth: клиент без токена не проходит ─────────────────────────────

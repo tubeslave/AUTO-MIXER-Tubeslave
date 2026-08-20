@@ -31,6 +31,7 @@ DEFAULT_BATCH_SIZE = 96
 DEFAULT_PAPERCLIP_API_URL = "http://127.0.0.1:3100"
 DEFAULT_PAPERCLIP_STATUSES = "backlog,todo,in_progress,in_review,blocked"
 DEFAULT_PAPERCLIP_LIMIT = 200
+MAX_PAPERCLIP_RESPONSE_BYTES = 4 * 1024 * 1024
 DEFAULT_HTTP_TIMEOUT_SECONDS = 5.0
 
 DEFAULT_INCLUDE_GLOBS = (
@@ -630,6 +631,7 @@ def paperclip_get_json(
     params: dict[str, Any] | None = None,
     timeout_seconds: float = DEFAULT_HTTP_TIMEOUT_SECONDS,
 ) -> Any:
+    validate_paperclip_base_url(base_url, token_present=bool(token))
     query = ""
     if params:
         query = "?" + urllib.parse.urlencode(
@@ -640,10 +642,27 @@ def paperclip_get_json(
     if token:
         request.add_header("Authorization", f"Bearer {token}")
     with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-        raw = response.read().decode("utf-8", errors="replace")
+        payload = response.read(MAX_PAPERCLIP_RESPONSE_BYTES + 1)
+        if len(payload) > MAX_PAPERCLIP_RESPONSE_BYTES:
+            raise RuntimeError("Paperclip response exceeds byte limit")
+        raw = payload.decode("utf-8", errors="replace")
     if not raw:
         return None
     return json.loads(raw)
+
+
+def validate_paperclip_base_url(base_url: str, *, token_present: bool) -> None:
+    parsed = urllib.parse.urlparse(str(base_url or ""))
+    if parsed.username is not None or parsed.password is not None or parsed.query or parsed.fragment:
+        raise ValueError("Paperclip base URL contains forbidden components")
+    host = (parsed.hostname or "").lower()
+    loopback_http = parsed.scheme == "http" and host in {"127.0.0.1", "localhost", "::1"}
+    if parsed.scheme == "http" and not loopback_http:
+        raise ValueError("non-loopback Paperclip endpoints require HTTPS")
+    if parsed.scheme not in {"http", "https"}:
+        raise ValueError("Paperclip base URL must use HTTP loopback or HTTPS")
+    if token_present and parsed.scheme != "https" and not loopback_http:
+        raise ValueError("Paperclip bearer token transport is not secure")
 
 
 def extract_items(payload: Any, candidate_keys: list[str]) -> list[dict[str, Any]]:

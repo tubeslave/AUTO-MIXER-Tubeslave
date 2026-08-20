@@ -22,6 +22,105 @@ WING_RATIO_VALUES = [1.1, 1.2, 1.3, 1.5, 1.7, 2.0, 2.5, 3.0,
                      3.5, 4.0, 5.0, 6.0, 8.0, 10.0, 20.0, 50.0, 100.0]
 
 
+class _WingPhysicalReadbackReceipt(dict):
+    """Process-local proof that the canonical query path observed two replies.
+
+    A plain mapping is intentionally insufficient: server-side write proof must
+    remain bound to the exact ``WingClient`` instance that performed the query.
+    """
+
+    __slots__ = ("_client_token", "_issued_monotonic", "_consumed")
+
+    def __init__(self, payload: Dict[str, Any], *, client_token: object):
+        super().__init__(payload)
+        self._client_token = client_token
+        self._issued_monotonic = time.monotonic()
+        self._consumed = False
+
+
+def verify_wing_physical_readback_receipt(
+    client: object,
+    receipt: object,
+    address: str,
+    *,
+    maximum_age_sec: float = 2.0,
+) -> bool:
+    """Reject OSC observations as authority-bearing physical proof.
+
+    WING OSC has no authenticated peer identity or request-bound response
+    nonce. A UDP source tuple, even with two fresh observations and a private
+    in-process wrapper, is forgeable by another LAN peer and therefore cannot
+    authorize or verify a physical mutation.
+    """
+
+    return False
+
+
+def _verify_legacy_wing_observation_receipt(
+    client: object,
+    receipt: object,
+    address: str,
+    *,
+    maximum_age_sec: float = 2.0,
+) -> bool:
+    """Validate a process-local observation receipt without granting authority."""
+
+    transport = None
+    if type(client) is WingClient:
+        query = getattr(client, "query_parameter", None)
+        if getattr(query, "__func__", None) is not WingClient.query_parameter:
+            return False
+        transport = client
+    else:
+        # Imported lazily to avoid the module cycle used by the reconnecting
+        # wrapper. Exact types prevent duck-typed in-process clients from
+        # minting authority-bearing physical proof.
+        try:
+            from osc.enhanced_osc_client import EnhancedOSCClient
+        except ImportError:
+            return False
+        if type(client) is not EnhancedOSCClient:
+            return False
+        query = getattr(client, "query_parameter", None)
+        if getattr(query, "__func__", None) is not EnhancedOSCClient.query_parameter:
+            return False
+        transport = getattr(client, "_wing", None)
+        if type(transport) is not WingClient:
+            return False
+
+    if (
+        not getattr(transport, "is_connected", False)
+        or getattr(transport, "sock", None) is None
+        or type(receipt) is not _WingPhysicalReadbackReceipt
+        or receipt._client_token is not getattr(
+            transport,
+            "_physical_readback_receipt_token",
+            None,
+        )
+        or receipt._consumed
+        or receipt.get("status") != "received"
+        or receipt.get("address") != address
+        or receipt.get("confirmed_round_trips") != 2
+        or receipt.get("peer_ip")
+        != getattr(transport, "_configured_peer_ip", None)
+        or receipt.get("peer_port") != getattr(transport, "port", None)
+    ):
+        return False
+    sequences = receipt.get("receive_sequences")
+    if (
+        not isinstance(sequences, tuple)
+        or len(sequences) != 2
+        or any(isinstance(item, bool) or not isinstance(item, int) for item in sequences)
+        or sequences[0] >= sequences[1]
+    ):
+        return False
+    age = time.monotonic() - receipt._issued_monotonic
+    if age < 0.0 or age > max(0.0, float(maximum_age_sec)):
+        return False
+    receipt._consumed = True
+    return True
+
+
 def ratio_to_wing_token(ratio) -> str:
     """Nearest valid WING ratio token for a float/str ratio."""
     if isinstance(ratio, str) and ratio in WING_RATIO_STRINGS:
@@ -55,6 +154,7 @@ class WingClient(MixerClientBase):
         """
         self.ip = ip
         self.port = port
+        self._configured_peer_ip = str(ip)
 
         if fader_ceiling_db is None:
             try:
@@ -86,6 +186,12 @@ class WingClient(MixerClientBase):
         self._mutation_boundary_lock = threading.RLock()
         self._mutation_boundary: Optional[Callable[[str, tuple[Any, ...]], bool]] = None
         self._mutation_boundary_token: object | None = None
+        # Only this exact transport instance can mint receipts accepted by the
+        # supervised write proof boundary. The token never enters JSON output.
+        self._physical_readback_receipt_token = object()
+        self._physical_readback_context = threading.local()
+        self._physical_receive_lock = threading.Lock()
+        self._physical_receive_sequence = 0
         
         self.is_connected = False
         
@@ -99,6 +205,7 @@ class WingClient(MixerClientBase):
         self._osc_flush_wakeup = threading.Event()
         self._osc_flusher_thread: Optional[threading.Thread] = None
         self._osc_flusher_stop = False
+        self._teardown_failed = False
         
         logger.info(f"WingClient initialized for {ip}:{port}")
 
@@ -266,7 +373,11 @@ class WingClient(MixerClientBase):
         Returns:
             True if connected successfully, False otherwise
         """
+        if self._teardown_failed:
+            logger.error("Wing connection refused after unverified transport teardown")
+            return False
         try:
+            self._configured_peer_ip = socket.gethostbyname(self.ip)
             # Create UDP socket for bidirectional communication
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.sock.settimeout(timeout)
@@ -283,11 +394,13 @@ class WingClient(MixerClientBase):
             
             try:
                 data, addr = self.sock.recvfrom(4096)
+                if addr != (self._configured_peer_ip, 2222):
+                    raise ConnectionError("unexpected_wing_handshake_peer")
                 wing_info = data.decode('utf-8', errors='ignore')
                 logger.info(f"Wing found: {wing_info}")
             except socket.timeout:
                 logger.error(f"Connection timeout: Wing at {self.ip} did not respond to handshake")
-                self.sock.close()
+                self._close_socket_verified()
                 return False
             
             # Step 2: Verify OSC is working by querying a parameter
@@ -297,11 +410,13 @@ class WingClient(MixerClientBase):
             
             try:
                 data, addr = self.sock.recvfrom(4096)
+                if addr != (self._configured_peer_ip, self.port):
+                    raise ConnectionError("unexpected_wing_osc_peer")
                 osc_msg = OscMessage(data)
                 logger.info(f"OSC verified, ch1 fader: {osc_msg.params}")
             except socket.timeout:
                 logger.error(f"OSC timeout: Wing not responding on port {self.port}")
-                self.sock.close()
+                self._close_socket_verified()
                 return False
             
             self.is_connected = True
@@ -323,10 +438,25 @@ class WingClient(MixerClientBase):
         except Exception as e:
             logger.error(f"Connection failed: {e}")
             self.is_connected = False
+            if self.sock is not None:
+                self._close_socket_verified()
             return False
 
-    def disconnect(self):
-        """Disconnect from Wing"""
+    def _close_socket_verified(self) -> bool:
+        sock = self.sock
+        self.sock = None
+        if sock is None:
+            return not self._teardown_failed
+        try:
+            sock.close()
+        except Exception as exc:
+            self._teardown_failed = True
+            logger.error("Error closing Wing socket: %s", exc)
+            return False
+        return not self._teardown_failed
+
+    def disconnect(self) -> bool:
+        """Disconnect from Wing and return verified teardown status."""
         self._stop_receiver = True
         self._osc_flusher_stop = True
         self._osc_flush_wakeup.set()
@@ -338,13 +468,24 @@ class WingClient(MixerClientBase):
                 )
                 self._osc_pending.clear()
         self.is_connected = False
-        if self.sock:
-            try:
-                self.sock.close()
-            except Exception as e:
-                logger.debug(f"Error closing socket: {e}")
-            self.sock = None
-        logger.info("Disconnected from Wing")
+        teardown_ok = self._close_socket_verified()
+        for attr_name in ("receiver_thread", "_osc_flusher_thread"):
+            thread = getattr(self, attr_name, None)
+            if (
+                thread is not None
+                and thread is not threading.current_thread()
+                and thread.is_alive()
+            ):
+                thread.join(timeout=2.0)
+                if thread.is_alive():
+                    teardown_ok = False
+                    self._teardown_failed = True
+                    logger.error("Wing transport thread did not stop: %s", attr_name)
+                else:
+                    setattr(self, attr_name, None)
+        if teardown_ok:
+            logger.info("Disconnected from Wing")
+        return teardown_ok
 
     def _receiver_loop(self):
         """Background thread to receive OSC messages from Wing"""
@@ -362,7 +503,11 @@ class WingClient(MixerClientBase):
                 data, addr = self.sock.recvfrom(4096)
                 try:
                     osc_msg = OscMessage(data)
-                    self._handle_message(osc_msg.address, *osc_msg.params)
+                    self._handle_transport_message(
+                        osc_msg.address,
+                        tuple(osc_msg.params),
+                        addr,
+                    )
                 except Exception as e:
                     logger.debug(f"Error parsing OSC message: {e}")
             except socket.timeout:
@@ -376,6 +521,38 @@ class WingClient(MixerClientBase):
             except Exception as e:
                 if self.is_connected:
                     logger.debug(f"Receiver error: {e}")
+
+    def _handle_transport_message(
+        self,
+        address: str,
+        args: tuple[Any, ...],
+        peer: tuple[Any, ...],
+    ) -> bool:
+        """Accept one OSC message only from the configured WING UDP peer."""
+
+        if (
+            not isinstance(peer, tuple)
+            or len(peer) < 2
+            or str(peer[0]) != self._configured_peer_ip
+            or isinstance(peer[1], bool)
+            or not isinstance(peer[1], int)
+            or peer[1] != self.port
+        ):
+            logger.debug("Ignored OSC datagram from unexpected peer: %r", peer)
+            return False
+        with self._physical_receive_lock:
+            self._physical_receive_sequence += 1
+            sequence = self._physical_receive_sequence
+        self._physical_readback_context.current = {
+            "peer_ip": str(peer[0]),
+            "peer_port": int(peer[1]),
+            "receive_sequence": sequence,
+        }
+        try:
+            self._handle_message(address, *args)
+        finally:
+            self._physical_readback_context.current = None
+        return True
 
     def _handle_message(self, address: str, *args):
         """Handle incoming OSC message from Wing"""
@@ -498,7 +675,11 @@ class WingClient(MixerClientBase):
         with self._mutation_boundary_lock:
             boundary = self._mutation_boundary
             if boundary is None:
-                return True
+                logger.warning(
+                    "Blocked WING OSC mutation without an installed authority boundary: %s",
+                    address,
+                )
+                return False
             try:
                 allowed = boundary(address, tuple(values))
             except Exception as exc:
@@ -652,7 +833,12 @@ class WingClient(MixerClientBase):
         """
 
         event = threading.Event()
-        captured: Dict[str, Any] = {"value": None, "args": None}
+        captured: Dict[str, Any] = {
+            "value": None,
+            "args": None,
+            "transport": None,
+        }
+        confirmations: list[Dict[str, Any]] = []
 
         def callback(_address: str, *args: Any) -> None:
             captured["args"] = args
@@ -662,6 +848,8 @@ class WingClient(MixerClientBase):
                 captured["value"] = args[0]
             else:
                 captured["value"] = self.state.get(address)
+            context = getattr(self._physical_readback_context, "current", None)
+            captured["transport"] = dict(context) if isinstance(context, dict) else None
             event.set()
 
         self.subscribe(address, callback)
@@ -670,6 +858,7 @@ class WingClient(MixerClientBase):
                 event.clear()
                 captured["value"] = None
                 captured["args"] = None
+                captured["transport"] = None
                 send = send_callable or self.send
                 if not send(address):
                     return {
@@ -685,13 +874,33 @@ class WingClient(MixerClientBase):
                         "value": None,
                         "phase": phase,
                     }
-            return {
-                "status": "received",
-                "address": address,
-                "value": captured["value"],
-                "args": captured["args"],
-                "confirmed_round_trips": 2,
-            }
+                transport = captured.get("transport")
+                if not isinstance(transport, dict):
+                    return {
+                        "status": "unverified_transport",
+                        "address": address,
+                        "value": None,
+                        "phase": phase,
+                    }
+                confirmations.append(dict(transport))
+            return _WingPhysicalReadbackReceipt(
+                {
+                    "status": "received",
+                    "authoritative": False,
+                    "authentication": "none",
+                    "provenance": "unauthenticated_udp_observation",
+                    "address": address,
+                    "value": captured["value"],
+                    "args": captured["args"],
+                    "confirmed_round_trips": 2,
+                    "peer_ip": confirmations[-1]["peer_ip"],
+                    "peer_port": confirmations[-1]["peer_port"],
+                    "receive_sequences": tuple(
+                        item["receive_sequence"] for item in confirmations
+                    ),
+                },
+                client_token=self._physical_readback_receipt_token,
+            )
         finally:
             self.unsubscribe(address, callback)
 

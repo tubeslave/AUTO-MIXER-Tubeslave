@@ -44,6 +44,62 @@ DLIVE_STATE_INTAKE_STATUSES = {
     "valid_operator_artifact_available",
     "invalid_operator_artifact_present",
 }
+DLIVE_STATE_MAX_ARTIFACT_ROOTS = 16
+DLIVE_STATE_MAX_ARTIFACT_COUNT = 128
+DLIVE_STATE_MAX_ARTIFACT_BYTES = 1 * 1024 * 1024
+DLIVE_STATE_MAX_TOTAL_ARTIFACT_BYTES = 8 * 1024 * 1024
+DLIVE_STATE_MAX_JSON_DEPTH = 32
+DLIVE_STATE_MAX_JSON_NODES = 50_000
+DLIVE_STATE_MAX_TOTAL_JSON_NODES = 200_000
+DLIVE_STATE_MAX_SCALAR_CHARACTERS = 1 * 1024 * 1024
+DLIVE_STATE_MAX_TOTAL_SCALAR_CHARACTERS = 8 * 1024 * 1024
+
+
+class DLiveStateArtifactResourceLimitError(ValueError):
+    """Raised when untrusted artifact intake exceeds a hard resource budget."""
+
+
+@dataclass
+class _ArtifactResourceBudget:
+    artifact_count: int = 0
+    total_file_bytes: int = 0
+    total_json_nodes: int = 0
+    total_scalar_characters: int = 0
+
+    def reserve_artifact(self) -> None:
+        if self.artifact_count >= DLIVE_STATE_MAX_ARTIFACT_COUNT:
+            raise DLiveStateArtifactResourceLimitError(
+                f"artifact_count_exceeds_{DLIVE_STATE_MAX_ARTIFACT_COUNT}"
+            )
+        self.artifact_count += 1
+
+    def account_file_bytes(self, size: int) -> None:
+        if size > DLIVE_STATE_MAX_ARTIFACT_BYTES:
+            raise DLiveStateArtifactResourceLimitError(
+                f"artifact_bytes_exceed_{DLIVE_STATE_MAX_ARTIFACT_BYTES}"
+            )
+        if self.total_file_bytes + size > DLIVE_STATE_MAX_TOTAL_ARTIFACT_BYTES:
+            raise DLiveStateArtifactResourceLimitError(
+                f"total_artifact_bytes_exceed_{DLIVE_STATE_MAX_TOTAL_ARTIFACT_BYTES}"
+            )
+        self.total_file_bytes += size
+
+    def account_json_shape(self, payload: Any) -> None:
+        remaining_nodes = DLIVE_STATE_MAX_TOTAL_JSON_NODES - self.total_json_nodes
+        remaining_characters = (
+            DLIVE_STATE_MAX_TOTAL_SCALAR_CHARACTERS
+            - self.total_scalar_characters
+        )
+        nodes, scalar_characters = _json_shape_cost(
+            payload,
+            node_limit=min(DLIVE_STATE_MAX_JSON_NODES, remaining_nodes),
+            scalar_character_limit=min(
+                DLIVE_STATE_MAX_SCALAR_CHARACTERS,
+                remaining_characters,
+            ),
+        )
+        self.total_json_nodes += nodes
+        self.total_scalar_characters += scalar_characters
 
 
 @dataclass(frozen=True)
@@ -93,13 +149,97 @@ def _string_tuple(value: Any) -> Tuple[str, ...]:
     return tuple(str(item) for item in value if isinstance(item, str) and item)
 
 
+def _json_shape_cost(
+    payload: Any,
+    *,
+    node_limit: int,
+    scalar_character_limit: int,
+) -> Tuple[int, int]:
+    """Measure JSON-like input iteratively before recursive contract validation."""
+
+    nodes = 0
+    scalar_characters = 0
+    stack: list[tuple[Any, int]] = [(payload, 1)]
+    while stack:
+        value, depth = stack.pop()
+        if depth > DLIVE_STATE_MAX_JSON_DEPTH:
+            raise DLiveStateArtifactResourceLimitError(
+                f"json_depth_exceeds_{DLIVE_STATE_MAX_JSON_DEPTH}"
+            )
+        nodes += 1
+        if nodes > node_limit:
+            raise DLiveStateArtifactResourceLimitError(
+                f"json_nodes_exceed_{node_limit}"
+            )
+        if isinstance(value, Mapping):
+            if nodes + len(stack) + len(value) > node_limit:
+                raise DLiveStateArtifactResourceLimitError(
+                    f"json_nodes_exceed_{node_limit}"
+                )
+            for key, nested in value.items():
+                if not isinstance(key, str):
+                    raise ValueError("artifact JSON object keys must be strings")
+                scalar_characters += len(key)
+                stack.append((nested, depth + 1))
+        elif isinstance(value, (list, tuple)):
+            if nodes + len(stack) + len(value) > node_limit:
+                raise DLiveStateArtifactResourceLimitError(
+                    f"json_nodes_exceed_{node_limit}"
+                )
+            stack.extend((nested, depth + 1) for nested in value)
+        elif isinstance(value, str):
+            scalar_characters += len(value)
+        elif value is not None and type(value) not in {bool, int, float}:
+            raise ValueError("artifact contains a non-JSON value")
+        if scalar_characters > scalar_character_limit:
+            raise DLiveStateArtifactResourceLimitError(
+                "scalar_characters_exceed_"
+                f"{scalar_character_limit}"
+            )
+    return nodes, scalar_characters
+
+
+def _validate_encoded_json_depth(encoded: bytes) -> None:
+    """Reject excessive object/list nesting before the recursive JSON decoder."""
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for byte in encoded:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif byte == 0x5C:  # backslash
+                escaped = True
+            elif byte == 0x22:  # quote
+                in_string = False
+            continue
+        if byte == 0x22:
+            in_string = True
+        elif byte in {0x5B, 0x7B}:  # [ or {
+            depth += 1
+            if depth > DLIVE_STATE_MAX_JSON_DEPTH:
+                raise DLiveStateArtifactResourceLimitError(
+                    f"json_depth_exceeds_{DLIVE_STATE_MAX_JSON_DEPTH}"
+                )
+        elif byte in {0x5D, 0x7D}:  # ] or }
+            depth = max(0, depth - 1)
+
+
 def _artifact_roots(artifact_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
     roots = (
-        tuple(artifact_roots)
+        artifact_roots
         if artifact_roots is not None
         else DEFAULT_DLIVE_STATE_PHYSICAL_READBACK_ARTIFACT_ROOTS
     )
-    return tuple(Path(root) for root in roots)
+    bounded: list[Path] = []
+    for root in roots:
+        if len(bounded) >= DLIVE_STATE_MAX_ARTIFACT_ROOTS:
+            raise DLiveStateArtifactResourceLimitError(
+                f"artifact_roots_exceed_{DLIVE_STATE_MAX_ARTIFACT_ROOTS}"
+            )
+        bounded.append(Path(root))
+    return tuple(bounded)
 
 
 def _discover_artifact_paths(artifact_roots: Iterable[str | Path] | None) -> Tuple[Path, ...]:
@@ -107,17 +247,39 @@ def _discover_artifact_paths(artifact_roots: Iterable[str | Path] | None) -> Tup
     for root in _artifact_roots(artifact_roots):
         if root.is_file() and root.suffix.lower() == ".json":
             paths.append(root)
+            if len(paths) > DLIVE_STATE_MAX_ARTIFACT_COUNT:
+                raise DLiveStateArtifactResourceLimitError(
+                    f"artifact_count_exceeds_{DLIVE_STATE_MAX_ARTIFACT_COUNT}"
+                )
         if not root.is_dir():
             continue
-        paths.extend(path for path in root.rglob("*.json") if path.is_file())
+        for path in root.rglob("*.json"):
+            if not path.is_file():
+                continue
+            paths.append(path)
+            if len(paths) > DLIVE_STATE_MAX_ARTIFACT_COUNT:
+                raise DLiveStateArtifactResourceLimitError(
+                    f"artifact_count_exceeds_{DLIVE_STATE_MAX_ARTIFACT_COUNT}"
+                )
     return tuple(sorted(dict.fromkeys(paths), key=lambda path: str(path)))
 
 
-def _load_json_artifact(path: Path) -> Mapping[str, Any]:
-    with path.open("r", encoding="utf-8") as handle:
-        payload = json.load(handle)
+def _load_json_artifact(
+    path: Path,
+    budget: _ArtifactResourceBudget,
+) -> Mapping[str, Any]:
+    remaining_total_bytes = (
+        DLIVE_STATE_MAX_TOTAL_ARTIFACT_BYTES - budget.total_file_bytes
+    )
+    read_limit = min(DLIVE_STATE_MAX_ARTIFACT_BYTES, remaining_total_bytes)
+    with path.open("rb") as handle:
+        encoded = handle.read(read_limit + 1)
+    budget.account_file_bytes(len(encoded))
+    _validate_encoded_json_depth(encoded)
+    payload = json.loads(encoded.decode("utf-8"))
     if not isinstance(payload, Mapping):
         raise ValueError("artifact JSON root must be an object")
+    budget.account_json_shape(payload)
     return payload
 
 
@@ -163,15 +325,27 @@ def _artifact_records(
     artifact_roots: Iterable[str | Path] | None,
 ) -> Tuple[DLiveStatePhysicalReadbackArtifactRecord, ...]:
     records: list[DLiveStatePhysicalReadbackArtifactRecord] = []
-    paths = (
-        tuple(Path(path) for path in artifact_paths)
-        if artifact_paths is not None
-        else _discover_artifact_paths(artifact_roots)
-    )
+    budget = _ArtifactResourceBudget()
+    try:
+        if artifact_paths is not None:
+            paths_list: list[Path] = []
+            for path in artifact_paths:
+                if len(paths_list) >= DLIVE_STATE_MAX_ARTIFACT_COUNT:
+                    raise DLiveStateArtifactResourceLimitError(
+                        f"artifact_count_exceeds_{DLIVE_STATE_MAX_ARTIFACT_COUNT}"
+                    )
+                paths_list.append(Path(path))
+            paths = tuple(paths_list)
+        else:
+            paths = _discover_artifact_paths(artifact_roots)
+    except Exception as exc:
+        return (_record_from_load_error("artifact_discovery", exc),)
+
     for path in paths:
         try:
+            budget.reserve_artifact()
             validation = validate_dlive_state_physical_readback_artifact(
-                _load_json_artifact(path)
+                _load_json_artifact(path, budget)
             )
             records.append(_record_from_validation(str(path), validation))
         except Exception as exc:  # pragma: no cover - defensive artifact parser
@@ -179,8 +353,26 @@ def _artifact_records(
 
     if artifact_payloads is not None:
         for index, payload in enumerate(artifact_payloads):
-            validation = validate_dlive_state_physical_readback_artifact(payload)
-            records.append(_record_from_validation(f"inline_payload_{index}", validation))
+            source_id = f"inline_payload_{index}"
+            if budget.artifact_count >= DLIVE_STATE_MAX_ARTIFACT_COUNT:
+                limit_record = _record_from_load_error(
+                    source_id,
+                    DLiveStateArtifactResourceLimitError(
+                        f"artifact_count_exceeds_{DLIVE_STATE_MAX_ARTIFACT_COUNT}"
+                    ),
+                )
+                if records:
+                    records[-1] = limit_record
+                else:
+                    records.append(limit_record)
+                break
+            try:
+                budget.reserve_artifact()
+                budget.account_json_shape(payload)
+                validation = validate_dlive_state_physical_readback_artifact(payload)
+                records.append(_record_from_validation(source_id, validation))
+            except Exception as exc:
+                records.append(_record_from_load_error(source_id, exc))
 
     return tuple(records)
 
@@ -193,11 +385,16 @@ def build_dlive_state_physical_readback_artifact_intake(
 ) -> Dict[str, Any]:
     """Build a read-only intake snapshot for dLive-state readbacks."""
 
-    records = _artifact_records(
-        artifact_paths=artifact_paths,
-        artifact_payloads=artifact_payloads,
-        artifact_roots=artifact_roots,
-    )
+    try:
+        normalized_roots = _artifact_roots(artifact_roots)
+        records = _artifact_records(
+            artifact_paths=artifact_paths,
+            artifact_payloads=artifact_payloads,
+            artifact_roots=normalized_roots,
+        )
+    except Exception as exc:
+        normalized_roots = ()
+        records = (_record_from_load_error("artifact_roots", exc),)
     valid_records = tuple(row for row in records if row.accepted_as_physical_fixture_candidate)
     invalid_records = tuple(row for row in records if not row.accepted_as_physical_fixture_candidate)
     if invalid_records:
@@ -243,7 +440,7 @@ def build_dlive_state_physical_readback_artifact_intake(
             "dlive_apply_allowed": False,
         },
         "summary": {
-            "artifact_search_roots": [str(root) for root in _artifact_roots(artifact_roots)],
+            "artifact_search_roots": [str(root) for root in normalized_roots],
             "artifact_count": len(records),
             "valid_candidate_count": len(valid_records),
             "invalid_candidate_count": len(invalid_records),

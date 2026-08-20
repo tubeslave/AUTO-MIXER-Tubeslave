@@ -332,6 +332,15 @@ class TestMixingAgent:
             def __init__(self):
                 self.calls = []
 
+            def get_fader(self, channel):
+                return -6.0
+
+            def get_pan(self, channel):
+                return 0.0
+
+            def get_compressor_threshold(self, channel):
+                return -15.0
+
             def set_fader(self, *args):
                 self.calls.append(("set_fader", args))
 
@@ -380,6 +389,214 @@ class TestMixingAgent:
             },
         ) in mixer.calls
         assert agent.state.applied_actions[-1] is action
+
+    @pytest.mark.asyncio
+    async def test_relative_writes_require_current_operation_readback(self):
+        agent, *_ = self._make_agent(mode=AgentMode.AUTO)
+
+        class UnavailableReadbackMixer:
+            def __init__(self):
+                self.calls = []
+
+            def query_parameter(self, address):
+                return {"status": "timeout", "address": address, "value": None}
+
+            def get_fader(self, channel):
+                return 0.0
+
+            def get_pan(self, channel):
+                return 0.0
+
+            def get_compressor_threshold(self, channel):
+                return -18.0
+
+            def set_fader(self, *args):
+                self.calls.append(("set_fader", args))
+
+            def set_pan(self, *args):
+                self.calls.append(("set_pan", args))
+
+            def set_compressor(self, *args, **kwargs):
+                self.calls.append(("set_compressor", args, kwargs))
+
+            def set_channel_compressor(self, *args, **kwargs):
+                self.calls.append(("set_channel_compressor", args, kwargs))
+
+        mixer = UnavailableReadbackMixer()
+        agent.mixer = mixer
+        actions = [
+            AgentAction(
+                action_type='adjust_gain',
+                channel=1,
+                parameters={'adjustment_db': -1.0},
+                confidence=1.0,
+            ),
+            AgentAction(
+                action_type='adjust_compressor',
+                channel=1,
+                parameters={'threshold_db': -24.0},
+                confidence=1.0,
+            ),
+            AgentAction(
+                action_type='llm_recommendation',
+                channel=1,
+                parameters={
+                    'gain_db': -8.0,
+                    'pan': 0.5,
+                    'comp_threshold': -24.0,
+                    'comp_ratio': 3.0,
+                },
+                confidence=1.0,
+            ),
+        ]
+
+        await agent._act(actions)
+
+        assert mixer.calls == []
+        assert agent.state.applied_actions == []
+
+    @pytest.mark.asyncio
+    async def test_relative_writes_use_fresh_readback_and_apply_bounded_steps(self):
+        agent, *_ = self._make_agent(mode=AgentMode.AUTO)
+
+        class FreshReadbackMixer:
+            def __init__(self):
+                self.calls = []
+                self.values = {
+                    "/ch/1/fdr": -10.0,
+                    "/ch/1/pan": 0.0,
+                    "/ch/1/dyn/thr": -18.0,
+                }
+
+            def query_parameter(self, address):
+                return {
+                    "status": "received",
+                    "address": address,
+                    "value": self.values[address],
+                }
+
+            def set_fader(self, *args):
+                self.calls.append(("set_fader", args))
+
+            def set_pan(self, *args):
+                self.calls.append(("set_pan", args))
+
+            def set_compressor(self, *args, **kwargs):
+                self.calls.append(("set_compressor", args, kwargs))
+
+        mixer = FreshReadbackMixer()
+        agent.mixer = mixer
+        action = AgentAction(
+            action_type='llm_recommendation',
+            channel=1,
+            parameters={
+                'gain_db': -2.0,
+                'pan': 1.0,
+                'comp_threshold': -30.0,
+                'comp_ratio': 3.0,
+            },
+            confidence=1.0,
+        )
+
+        await agent._act([action])
+
+        assert ("set_fader", (1, -9.0)) in mixer.calls
+        assert ("set_pan", (1, 0.25)) in mixer.calls
+        assert (
+            "set_compressor",
+            (1,),
+            {
+                "threshold_db": -21.0,
+                "ratio": 3.0,
+                "attack_ms": 10.0,
+                "release_ms": 100.0,
+                "enabled": True,
+            },
+        ) in mixer.calls
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "parameters",
+        [
+            {"gain_db": float("nan")},
+            {"gain_db": float("inf")},
+            {"pan": float("-inf")},
+            {"eq_bands": [{"band": 1, "freq": float("nan"), "gain_db": 0.0, "q": 1.0}]},
+            {"eq_bands": [{"band": 1, "freq": 1000.0, "gain_db": float("inf"), "q": 1.0}]},
+            {"comp_threshold": float("nan")},
+            {"comp_threshold": -18.0, "comp_ratio": float("inf")},
+            {"comp_threshold": -18.0, "comp_attack_ms": float("nan")},
+            {"comp_threshold": -18.0, "comp_release_ms": float("inf")},
+        ],
+    )
+    async def test_non_finite_llm_fields_never_reach_mixer_dispatch(self, parameters):
+        agent, *_ = self._make_agent(mode=AgentMode.AUTO)
+
+        class RecordingMixer:
+            def __init__(self):
+                self.calls = []
+
+            def query_parameter(self, address):
+                values = {
+                    "/ch/1/fdr": -10.0,
+                    "/ch/1/pan": 0.0,
+                    "/ch/1/dyn/thr": -18.0,
+                }
+                return {"status": "received", "value": values[address]}
+
+            def set_fader(self, *args):
+                self.calls.append(("set_fader", args))
+
+            def set_pan(self, *args):
+                self.calls.append(("set_pan", args))
+
+            def set_eq_band(self, *args, **kwargs):
+                self.calls.append(("set_eq_band", args, kwargs))
+
+            def set_compressor(self, *args, **kwargs):
+                self.calls.append(("set_compressor", args, kwargs))
+
+        mixer = RecordingMixer()
+        agent.mixer = mixer
+        action = AgentAction(
+            action_type="llm_recommendation",
+            channel=1,
+            parameters=parameters,
+            confidence=1.0,
+        )
+
+        assert agent._prepare_actions([action]) == []
+        await agent._act([action])
+
+        assert mixer.calls == []
+        assert agent.state.applied_actions == []
+
+    def test_bounded_llm_fields_remain_valid_after_strict_numeric_validation(self):
+        agent, *_ = self._make_agent(mode=AgentMode.AUTO)
+        action = AgentAction(
+            action_type="llm_recommendation",
+            channel=1,
+            parameters={
+                "gain_db": -8.0,
+                "pan": 0.2,
+                "eq_bands": [
+                    {"band": 1, "freq": 3000.0, "gain_db": 2.0, "q": 1.2}
+                ],
+                "comp_threshold": -18.0,
+                "comp_ratio": 3.0,
+                "comp_attack_ms": 10.0,
+                "comp_release_ms": 120.0,
+            },
+            confidence=0.8,
+        )
+
+        prepared = agent._prepare_actions([action])
+
+        assert len(prepared) == 1
+        assert prepared[0].parameters["gain_db"] == -8.0
+        assert prepared[0].parameters["pan"] == 0.2
+        assert prepared[0].parameters["eq_bands"][0]["gain_db"] == 2.0
+        assert prepared[0].parameters["comp_threshold"] == -18.0
 
     @pytest.mark.asyncio
     async def test_auto_actions_are_limited_before_apply(self):

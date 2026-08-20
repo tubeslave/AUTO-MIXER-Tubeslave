@@ -5,7 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
+import secrets
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,6 +26,10 @@ DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ACTIVE_RUN_STATUSES = {"queued", "running", "active", "busy", "in_progress", "started", "working"}
 TERMINAL_RUN_STATUSES = {"done", "failed", "succeeded", "cancelled", "canceled", "finished"}
 REPORT_EXCERPT_CHARS = 2000
+MAX_UPSTREAM_RESPONSE_BYTES = 1024 * 1024
+MAX_WATCHDOG_STATE_BYTES = 1024 * 1024
+MAX_REQUEST_THREADS = 16
+REQUEST_HEADER_TIMEOUT_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -31,6 +38,7 @@ class BridgeConfig:
     project_root: Path
     paperclip_company_id: str | None = None
     paperclip_timeout_seconds: float = 3.0
+    bridge_token: str | None = None
 
 
 class PaperclipClient:
@@ -47,7 +55,17 @@ class PaperclipClient:
         url = f"{self.base_url}{path}{query}"
         request = urllib.request.Request(url, method="GET")
         with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
-            raw = response.read().decode("utf-8", errors="replace")
+            content_length = getattr(response, "headers", {}).get("Content-Length")
+            if content_length:
+                try:
+                    if int(content_length) > MAX_UPSTREAM_RESPONSE_BYTES:
+                        raise ValueError("Paperclip response exceeds byte limit")
+                except ValueError as exc:
+                    raise ValueError("invalid or oversized Paperclip Content-Length") from exc
+            payload = response.read(MAX_UPSTREAM_RESPONSE_BYTES + 1)
+            if len(payload) > MAX_UPSTREAM_RESPONSE_BYTES:
+                raise ValueError("Paperclip response exceeds byte limit")
+            raw = payload.decode("utf-8", errors="replace")
         if not raw:
             return None
         return json.loads(raw)
@@ -60,6 +78,7 @@ def build_config_from_env(environ: dict[str, str] | None = None) -> BridgeConfig
         project_root=Path(env.get("AUTOMIXER_PROJECT_ROOT", str(DEFAULT_PROJECT_ROOT))).expanduser().resolve(),
         paperclip_company_id=env.get("PAPERCLIP_COMPANY_ID") or None,
         paperclip_timeout_seconds=parse_float(env.get("GPT_CONTROL_BRIDGE_PAPERCLIP_TIMEOUT_SECONDS"), 3.0),
+        bridge_token=(env.get("GPT_CONTROL_BRIDGE_TOKEN") or "").strip() or None,
     )
 
 
@@ -70,7 +89,7 @@ def parse_float(value: str | None, default: float) -> float:
         parsed = float(value)
     except ValueError:
         return default
-    return parsed if parsed > 0 else default
+    return parsed if math.isfinite(parsed) and 0 < parsed <= 30.0 else default
 
 
 def health_payload() -> dict[str, Any]:
@@ -246,13 +265,15 @@ def latest_report(project_root: Path) -> dict[str, Any]:
         return {"exists": False, "excerpt": "", "path": None, "truncated": False}
 
     selected = max(candidates, key=lambda path: (path.stat().st_mtime_ns, path.name))
-    text = selected.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
+    with selected.open("rb") as report_file:
+        payload = report_file.read(REPORT_EXCERPT_CHARS + 1)
+    text = payload.decode("utf-8", errors="replace").replace("\r\n", "\n")
     excerpt = text[:REPORT_EXCERPT_CHARS]
     return {
         "exists": True,
         "excerpt": excerpt,
         "path": str(selected),
-        "truncated": len(text) > REPORT_EXCERPT_CHARS,
+        "truncated": len(payload) > REPORT_EXCERPT_CHARS,
     }
 
 
@@ -265,8 +286,12 @@ def watchdog_state_summary(project_root: Path) -> dict[str, Any]:
             "valid_json": False,
         }
     try:
-        state = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        with state_path.open("rb") as state_file:
+            payload = state_file.read(MAX_WATCHDOG_STATE_BYTES + 1)
+        if len(payload) > MAX_WATCHDOG_STATE_BYTES:
+            raise ValueError("watchdog state exceeds byte limit")
+        state = json.loads(payload.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
         return {
             "error": f"{type(exc).__name__}: {exc}",
             "exists": True,
@@ -465,6 +490,9 @@ def make_handler(
         server_version = f"{SERVICE_NAME}/1.0"
 
         def do_GET(self) -> None:
+            if not self.request_is_authorized():
+                self.send_json(401, {"error": "authentication_required", "read_only": True})
+                return
             parsed = urllib.parse.urlparse(self.path)
             if parsed.path == "/health":
                 self.send_json(200, health_payload())
@@ -473,6 +501,30 @@ def make_handler(
                 self.send_json(200, build_context(config, client=factory(config)))
                 return
             self.send_json(404, {"error": "not_found", "read_only": True, "service": SERVICE_NAME})
+
+        def request_is_authorized(self) -> bool:
+            token = config.bridge_token
+            if not isinstance(token, str) or len(token) < 32:
+                return False
+            headers = getattr(self, "headers", {})
+            host_value = str(headers.get("Host", ""))
+            try:
+                host = urllib.parse.urlparse(f"//{host_value}").hostname or ""
+            except ValueError:
+                return False
+            if host.lower() not in {"127.0.0.1", "localhost", "::1"}:
+                return False
+            origin = str(headers.get("Origin", "")).strip()
+            if origin:
+                try:
+                    origin_host = urllib.parse.urlparse(origin).hostname or ""
+                except ValueError:
+                    return False
+                if origin_host.lower() not in {"127.0.0.1", "localhost", "::1"}:
+                    return False
+            supplied = str(headers.get("Authorization", ""))
+            expected = f"Bearer {token}"
+            return secrets.compare_digest(supplied, expected)
 
         def do_POST(self) -> None:
             self.method_not_allowed()
@@ -519,9 +571,42 @@ def validate_bind_host(host: str) -> str:
     return host
 
 
+class BoundedThreadingHTTPServer(ThreadingHTTPServer):
+    """Threaded HTTP server with admission and header-read bounds."""
+
+    daemon_threads = True
+
+    def __init__(self, server_address, handler_class, *, max_workers: int = MAX_REQUEST_THREADS):
+        self._request_slots = threading.BoundedSemaphore(max_workers)
+        super().__init__(server_address, handler_class)
+
+    def get_request(self):
+        request, client_address = super().get_request()
+        request.settimeout(REQUEST_HEADER_TIMEOUT_SECONDS)
+        return request, client_address
+
+    def process_request(self, request, client_address) -> None:
+        if not self._request_slots.acquire(blocking=False):
+            self.shutdown_request(request)
+            return
+        try:
+            super().process_request(request, client_address)
+        except BaseException:
+            self._request_slots.release()
+            raise
+
+    def process_request_thread(self, request, client_address) -> None:
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self._request_slots.release()
+
+
 def run_server(host: str, port: int, config: BridgeConfig) -> None:
     host = validate_bind_host(host)
-    server = ThreadingHTTPServer((host, port), make_handler(config))
+    if not isinstance(config.bridge_token, str) or len(config.bridge_token) < 32:
+        raise ValueError("GPT_CONTROL_BRIDGE_TOKEN must contain at least 32 characters")
+    server = BoundedThreadingHTTPServer((host, port), make_handler(config))
     print(f"{SERVICE_NAME} listening on http://{host}:{port}")
     print("read_only=true write_routes_enabled=false")
     try:

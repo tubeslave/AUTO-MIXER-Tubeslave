@@ -1,4 +1,13 @@
-from automixer.decision.models import ACTION_GAIN, ActionDecision, ActionPlan
+import pytest
+
+from automixer.decision.models import (
+    ACTION_COMPRESSION,
+    ACTION_EQ,
+    ACTION_GAIN,
+    ACTION_PAN,
+    ActionDecision,
+    ActionPlan,
+)
 from automixer.safety import SafetyGate, SafetyGateConfig
 
 
@@ -90,3 +99,41 @@ def test_safety_gate_blocks_positive_gain_when_true_peak_is_unknown():
 
     assert result.allowed_count == 0
     assert result.blocked[0]["reason"] == "true_peak_headroom_unknown"
+
+
+@pytest.mark.parametrize(
+    ("action_type", "parameters"),
+    [
+        (ACTION_GAIN, {"gain_db": float("nan")}),
+        (ACTION_EQ, {"gain_db": float("inf"), "q": 1.0, "frequency_hz": 1000.0}),
+        (ACTION_COMPRESSION, {"ratio": "nan", "threshold_db": -18.0}),
+        (ACTION_PAN, {"pan": float("-inf")}),
+    ],
+)
+def test_safety_gate_rejects_non_finite_parameters_before_dispatch(action_type, parameters):
+    plan = ActionPlan(
+        plan_id="non-finite",
+        decisions=[
+            ActionDecision(
+                id="non-finite.action",
+                action_type=action_type,
+                target="channel:1",
+                parameters=parameters,
+                reason="security regression",
+                confidence=0.9,
+                risk_level="low",
+                source_modules=["test"],
+                expected_audio_effect="none",
+                safe_to_apply=True,
+            )
+        ],
+    )
+
+    result = SafetyGate(SafetyGateConfig(dry_run=False)).evaluate_plan(
+        plan,
+        current_state={"channel:1": {"true_peak_dbtp": -12.0, "pan": 0.0}},
+        live_mode=True,
+    )
+
+    assert result.allowed_count == 0
+    assert result.blocked[0]["reason"] == "non_finite_parameter"

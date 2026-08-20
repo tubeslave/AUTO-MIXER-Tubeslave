@@ -190,6 +190,9 @@ def estimate_tempo(kick: np.ndarray) -> float:
 
 
 def main() -> int:
+    raise RuntimeError(
+        "legacy_live_mutation_surface_quarantined: use the supervised control plane"
+    )
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--confirm-live-wing-write", default="")

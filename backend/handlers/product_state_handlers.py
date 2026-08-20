@@ -3,11 +3,57 @@
 import asyncio
 import json
 import math
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Mapping
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _append_text_beneath_root(root: Path, relative_path: str, block: str) -> int:
+    """Append beneath a trusted root without following a final symlink."""
+    root_path = Path(root).resolve(strict=True)
+    relative = Path(str(relative_path or ""))
+    if relative.is_absolute() or not relative.parts or any(
+        part in {"", ".", ".."} for part in relative.parts
+    ):
+        raise ValueError("operator_memory_target_path_invalid")
+
+    target = root_path.joinpath(relative)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    resolved_parent = target.parent.resolve(strict=True)
+    try:
+        resolved_parent.relative_to(root_path)
+    except ValueError as exc:
+        raise ValueError("operator_memory_target_outside_repository") from exc
+    if target.is_symlink():
+        raise ValueError("operator_memory_target_symlink_forbidden")
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+    try:
+        descriptor = os.open(target, flags, 0o600)
+    except OSError as exc:
+        raise ValueError("operator_memory_target_open_failed") from exc
+    payload = block.strip() + "\n"
+    try:
+        with os.fdopen(descriptor, "a", encoding="utf-8") as sink:
+            if sink.tell() == 0:
+                sink.write("# Project Memory\n\n")
+            else:
+                sink.write("\n")
+            sink.write(payload)
+    except Exception:
+        try:
+            os.close(descriptor)
+        except OSError:
+            pass
+        raise
+    return len(payload.encode("utf-8"))
 
 from operator_mode_policy import CURRENT_PROVEN_LIVE_WRITE_KINDS
 from operator_proposal_queue import soundcheck_proposal_apply_blocker
@@ -9119,24 +9165,23 @@ def register_handlers(server):
             ]
         )
 
-    def append_sequence_policy_memory_records(root, records):
+    def append_sequence_policy_memory_records(records):
         results = []
-        root_path = Path(root or ".").resolve()
+        # The persistence root is code-owned. Request/server state may select
+        # only a validated relative target beneath the repository.
+        root_path = _REPO_ROOT
         for record in records:
-            target = root_path / str(record["target_memory_path"])
-            target.parent.mkdir(parents=True, exist_ok=True)
-            current = (
-                target.read_text(encoding="utf-8")
-                if target.exists()
-                else "# Project Memory\n"
-            )
             block = render_sequence_policy_memory_block(record)
-            target.write_text(current.rstrip() + "\n\n" + block, encoding="utf-8")
+            bytes_appended = _append_text_beneath_root(
+                root_path,
+                str(record["target_memory_path"]),
+                block,
+            )
             results.append({
                 "draft_id": record.get("draft_id"),
                 "target_memory_path": record.get("target_memory_path"),
                 "applied": True,
-                "bytes_appended": len(block.encode("utf-8")),
+                "bytes_appended": bytes_appended,
             })
         return results
 
@@ -9266,8 +9311,7 @@ def register_handlers(server):
             )
         elif apply_requested and operator_ack:
             status = "append_only_memory_write_applied"
-            root = data.get("root_path") or data.get("root") or "."
-            write_results = append_sequence_policy_memory_records(root, records)
+            write_results = append_sequence_policy_memory_records(records)
         else:
             status = "append_only_memory_write_dry_run_ready"
             blockers.append(
@@ -9292,8 +9336,8 @@ def register_handlers(server):
     async def handle_index_operator_proposal_apply_sequence_policy_memory(websocket, data):
         result = build_operator_proposal_apply_sequence_policy_memory_index(
             memory_text=data.get("memory_text"),
-            root=data.get("root_path") or data.get("root"),
-            target_memory_path=data.get("target_memory_path") or ".ai/memory/project.md",
+            root=_REPO_ROOT,
+            target_memory_path=".ai/memory/project.md",
         )
         result["handler"] = "index_operator_proposal_apply_sequence_policy_memory"
         await server.send_to_client(websocket, result)

@@ -153,7 +153,16 @@ class MixAgentBackendBridge:
         runtime_cls = self._autofoh["RuntimeState"]
         if isinstance(runtime_state, str):
             runtime_state = runtime_cls[runtime_state] if runtime_state in runtime_cls.__members__ else runtime_cls.SOURCE_LEARNING
-        result = BackendBridgeResult(proposed=list(actions), mode="apply" if apply else "suggest")
+        result = BackendBridgeResult(proposed=list(actions), mode="suggest")
+        if apply:
+            result.blocked.extend(
+                {
+                    "action": action.to_dict(),
+                    "reason": "legacy_mix_agent_apply_quarantined",
+                }
+                for action in result.proposed
+            )
+            return result
         for action in result.proposed:
             typed, blocked = self.translate_action(action)
             if blocked is not None:

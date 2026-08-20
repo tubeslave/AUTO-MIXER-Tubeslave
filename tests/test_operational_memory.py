@@ -92,6 +92,35 @@ def test_replay_write_intents_are_copied_into_operational_memory(tmp_path: Path)
     assert snapshot["write_intents"][0]["payload"]["metadata"]["scene_id"] == "intro"
 
 
+def test_operational_memory_recursively_redacts_credentials_before_any_view_is_written(tmp_path: Path):
+    store = OperationalMemoryStore(tmp_path / "memory")
+    raw_secret = "sk-super-secret-value-1234567890"
+    telegram_secret = "123456789:abcdefghijklmnopqrstuvwxyzABCDE"
+
+    event = store.record_event(
+        "security-test",
+        {
+            "metadata": {
+                "openai_api_key": raw_secret,
+                "nested": [{"password": "do-not-store"}],
+                "authorization_header": f"Bearer {raw_secret}",
+                "free_text": f"token accidentally embedded: {telegram_secret}",
+            }
+        },
+        summary=f"Bearer {raw_secret}",
+    )
+
+    assert event["payload"]["metadata"]["openai_api_key"] == "[REDACTED]"
+    assert event["payload"]["metadata"]["nested"][0]["password"] == "[REDACTED]"
+    persisted = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (store.events_path, store.snapshot_path, store.summary_path)
+    )
+    assert raw_secret not in persisted
+    assert telegram_secret not in persisted
+    assert "do-not-store" not in persisted
+
+
 def test_wing_telemetry_recorder_captures_start_and_stop_in_operational_memory(tmp_path: Path):
     store = OperationalMemoryStore(tmp_path / "memory")
     recorder = WingTelemetryRecorder(

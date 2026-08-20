@@ -64,4 +64,4 @@ def test_rest_client_blocks_write_without_configured_endpoint():
     )
 
     assert result.success is False
-    assert "write endpoint is not configured" in result.error
+    assert result.error == "mixing_station_authenticated_ipc_required"

@@ -171,6 +171,10 @@ bool CoreAudioCapture::initialize(uint32_t device_id, int num_channels, double s
     last_error_ = "CoreAudio is only available on macOS";
     return false;
 #else
+    if (block_size <= 0 || block_size > 1048576) {
+        last_error_ = "Invalid CoreAudio block size";
+        return false;
+    }
     block_size_ = block_size;
     
     // Get default input device if device_id is 0
@@ -361,18 +365,22 @@ bool CoreAudioCapture::initialize(uint32_t device_id, int num_channels, double s
         calloc(1, sizeof(AudioBufferList) + sizeof(AudioBuffer) * (actual_channels_ - 1)));
     buffer_list_->mNumberBuffers = actual_channels_;
     
-    UInt32 max_frames = block_size_ * 2;  // Extra room for variable buffer sizes
+    allocated_frame_capacity_ = static_cast<UInt32>(block_size_) * 2U;
     for (int i = 0; i < actual_channels_; ++i) {
         buffer_list_->mBuffers[i].mNumberChannels = 1;
-        buffer_list_->mBuffers[i].mDataByteSize = max_frames * sizeof(float);
-        buffer_list_->mBuffers[i].mData = calloc(max_frames, sizeof(float));
+        buffer_list_->mBuffers[i].mDataByteSize = allocated_frame_capacity_ * sizeof(float);
+        buffer_list_->mBuffers[i].mData = calloc(allocated_frame_capacity_, sizeof(float));
+        if (!buffer_list_->mBuffers[i].mData) {
+            last_error_ = "Could not allocate CoreAudio render buffer";
+            return false;
+        }
     }
     
     // Allocate channel buffers for deinterleaving
     channel_buffers_.resize(actual_channels_);
     channel_ptrs_.resize(actual_channels_);
     for (int i = 0; i < actual_channels_; ++i) {
-        channel_buffers_[i].resize(max_frames, 0.0f);
+        channel_buffers_[i].resize(allocated_frame_capacity_, 0.0f);
         channel_ptrs_[i] = channel_buffers_[i].data();
     }
     
@@ -440,9 +448,20 @@ OSStatus CoreAudioCapture::renderCallback(
     if (!self->running_.load() || !self->callback_) {
         return noErr;
     }
+
+    // CoreAudio controls inNumberFrames. Never advertise or render more bytes
+    // than were allocated during initialize().
+    if (!self->buffer_list_ || self->allocated_frame_capacity_ == 0 ||
+        inNumberFrames > self->allocated_frame_capacity_ ||
+        self->buffer_list_->mNumberBuffers != static_cast<UInt32>(self->actual_channels_)) {
+        return kAudio_ParamError;
+    }
     
     // Update buffer sizes for this callback
     for (UInt32 i = 0; i < self->buffer_list_->mNumberBuffers; ++i) {
+        if (!self->buffer_list_->mBuffers[i].mData) {
+            return kAudio_ParamError;
+        }
         self->buffer_list_->mBuffers[i].mDataByteSize = inNumberFrames * sizeof(float);
     }
     

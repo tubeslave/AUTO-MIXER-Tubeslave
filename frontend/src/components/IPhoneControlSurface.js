@@ -47,6 +47,9 @@ function IPhoneControlSurface({
   const [mixerType, setMixerType] = useState('wing');
   const [mixingStationRestPort, setMixingStationRestPort] = useState(8080);
   const [dliveTls, setDliveTls] = useState(false);
+  const [dliveEndpoint, setDliveEndpoint] = useState('surface');
+  const [dliveMidiBaseChannel, setDliveMidiBaseChannel] = useState(11);
+  const [dliveUserProfile, setDliveUserProfile] = useState(0);
   const [agentStatus, setAgentStatus] = useState({ is_running: false });
   const [pendingActions, setPendingActions] = useState([]);
   const [history, setHistory] = useState([]);
@@ -187,7 +190,14 @@ function IPhoneControlSurface({
     }
 
     if (mixerType === 'dlive') {
-      websocketService.connectDLive(mixerIp, mixerPortValue, dliveTls);
+      websocketService.connectDLive(
+        mixerIp,
+        mixerPortValue,
+        dliveTls,
+        dliveMidiBaseChannel,
+        dliveEndpoint,
+        dliveUserProfile
+      );
       setMessage('Подключаю dLive...');
       return;
     }
@@ -448,6 +458,13 @@ function IPhoneControlSurface({
                 onChange={event => {
                   const next = event.target.value;
                   setMixerType(next);
+                  if (next === 'dlive') {
+                    setDliveEndpoint('surface');
+                    setDliveTls(false);
+                    setDliveMidiBaseChannel(11);
+                    setDliveUserProfile(0);
+                    onMixerIpChange('192.168.3.71');
+                  }
                   onMixerPortChange(MIXER_DEFAULTS[next].port);
                 }}
               >
@@ -476,17 +493,57 @@ function IPhoneControlSurface({
             )}
 
             {mixerType === 'dlive' && (
-              <label className="iphone-checkbox">
-                <input type="checkbox" checked={dliveTls} onChange={event => setDliveTls(event.target.checked)} />
-                <span>TLS для dLive</span>
-              </label>
+              <>
+                <div className="iphone-field">
+                  <label>dLive endpoint</label>
+                  <select value={dliveEndpoint} onChange={event => {
+                    const endpoint = event.target.value;
+                    setDliveEndpoint(endpoint);
+                    onMixerIpChange(endpoint === 'mixrack' ? '192.168.3.70' : '192.168.3.71');
+                    onMixerPortChange(endpoint === 'mixrack'
+                      ? (dliveTls ? 51327 : 51325)
+                      : (dliveTls ? 51329 : 51328));
+                  }}>
+                    <option value="surface">Surface</option>
+                    <option value="mixrack">MixRack</option>
+                  </select>
+                </div>
+                <div className="iphone-field two">
+                  <div>
+                    <label>MIDI Base Ch</label>
+                    <input type="number" min="0" max="11" value={dliveMidiBaseChannel}
+                      onChange={event => setDliveMidiBaseChannel(Number(event.target.value))} />
+                  </div>
+                  <div>
+                    <label>User Profile</label>
+                    <input type="number" min="0" max="31" value={dliveUserProfile}
+                      onChange={event => setDliveUserProfile(Number(event.target.value))} />
+                  </div>
+                </div>
+                <label className="iphone-checkbox">
+                  <input type="checkbox" checked={dliveTls} onChange={event => {
+                    const tls = event.target.checked;
+                    setDliveTls(tls);
+                    onMixerPortChange(dliveEndpoint === 'mixrack'
+                      ? (tls ? 51327 : 51325)
+                      : (tls ? 51329 : 51328));
+                  }} />
+                  <span>TLS для dLive</span>
+                </label>
+              </>
             )}
 
             <div className="iphone-inline-actions">
               <button type="button" onClick={connectMixer} disabled={!serverConnected || connecting}>
                 {mixerConnected ? 'Отключить' : 'Подключить'}
               </button>
-              <button type="button" onClick={() => websocketService.autoConnectMixer(mixerType, mixerIp, false)}>
+              <button type="button" onClick={() => websocketService.autoConnectMixer(
+                mixerType,
+                mixerIp,
+                false,
+                dliveMidiBaseChannel,
+                dliveUserProfile
+              )}>
                 Auto
               </button>
             </div>

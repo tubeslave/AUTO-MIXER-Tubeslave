@@ -9,6 +9,20 @@ import { BaseWebSocketTransport, inferWebSocketUrl } from '../websocketCore.mjs'
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcRoot = path.resolve(__dirname, '../..');
 
+test('dLive UI and websocket preserve attended console identity fields', () => {
+  const websocketSource = fs.readFileSync(path.join(srcRoot, 'services/websocket.js'), 'utf8');
+  const mobileSource = fs.readFileSync(path.join(srcRoot, 'components/IPhoneControlSurface.js'), 'utf8');
+  const settingsSource = fs.readFileSync(path.join(srcRoot, 'components/SettingsTab.js'), 'utf8');
+
+  assert.match(websocketSource, /user_profile: userProfile/);
+  assert.match(websocketSource, /midi_base_channel: midiBaseChannel/);
+  assert.match(mobileSource, /dliveMidiBaseChannel/);
+  assert.match(mobileSource, /dliveUserProfile/);
+  assert.doesNotMatch(mobileSource, /connectDLive\([^;]*dliveTls,\s*0,\s*dliveEndpoint/s);
+  assert.match(settingsSource, /dliveIp: '192\.168\.3\.71'/);
+  assert.match(settingsSource, /dliveMidiChannel: 11/);
+});
+
 class FakeWebSocket {
   static CONNECTING = 0;
   static OPEN = 1;

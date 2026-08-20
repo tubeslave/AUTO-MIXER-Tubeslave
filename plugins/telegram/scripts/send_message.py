@@ -18,7 +18,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Send a Telegram message with a bot token."
     )
-    parser.add_argument("--token", help="Telegram bot token. Defaults to TELEGRAM_BOT_TOKEN.")
     parser.add_argument(
         "--chat-id",
         help="Target chat ID. Defaults to TELEGRAM_CHAT_ID.",
@@ -83,9 +82,9 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
 
-    token = args.token or os.getenv("TELEGRAM_BOT_TOKEN")
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
     if not token:
-        return fail("Missing Telegram bot token. Set TELEGRAM_BOT_TOKEN or pass --token.")
+        return fail("Missing Telegram bot token. Set TELEGRAM_BOT_TOKEN.")
 
     chat_id = args.chat_id or os.getenv("TELEGRAM_CHAT_ID")
     if not chat_id:

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from ai_mixing_pipeline.numeric_safety import finite_float
+
 
 DEFAULT_WEIGHTS = {
     "muq_eval": 0.30,
@@ -23,9 +25,8 @@ ALIASES = {
 
 
 def normalize_score(name: str, raw_score: Any) -> float:
-    try:
-        value = float(raw_score)
-    except (TypeError, ValueError):
+    value = finite_float(raw_score)
+    if value is None:
         return 0.0
     if name == "safety":
         return max(0.0, min(1.0, value))
@@ -33,10 +34,11 @@ def normalize_score(name: str, raw_score: Any) -> float:
 
 
 def normalize_delta(before: Any, after: Any) -> float:
-    try:
-        return max(-1.0, min(1.0, float(after) - float(before)))
-    except (TypeError, ValueError):
+    before_value = finite_float(before)
+    after_value = finite_float(after)
+    if before_value is None or after_value is None:
         return 0.0
+    return max(-1.0, min(1.0, after_value - before_value))
 
 
 def configured_weights(config: dict[str, Any] | None = None) -> dict[str, float]:
@@ -46,7 +48,10 @@ def configured_weights(config: dict[str, Any] | None = None) -> dict[str, float]
     for key, value in critics.items():
         canonical = ALIASES.get(key, key)
         if isinstance(value, dict) and bool(value.get("enabled", True)):
-            weights[canonical] = float(value.get("weight", weights.get(canonical, 0.0)))
+            weight = finite_float(value.get("weight", weights.get(canonical, 0.0)))
+            if weight is None or weight < 0.0:
+                raise ValueError(f"critic weight for {canonical} must be finite and non-negative")
+            weights[canonical] = weight
     return weights
 
 
@@ -59,11 +64,14 @@ def extract_signal(critic_name: str, result: dict[str, Any]) -> float | None:
             return normalize_score(critic_name, delta[key])
     scores = result.get("scores", {}) or {}
     if critic_name == "panns_or_beats":
-        values = [
-            float(scores[key])
+        present = [
+            scores[key]
             for key in ("identity_confidence", "bleed_score", "activity_score")
-            if isinstance(scores.get(key), (int, float))
+            if key in scores
         ]
+        values = [finite_float(value) for value in present]
+        if any(value is None for value in values):
+            return None
         if values:
             return max(0.0, min(1.0, sum(values) / len(values)))
     if isinstance(scores.get("overall"), (int, float)):
@@ -91,8 +99,13 @@ def aggregate_scores(
     values: dict[str, float] = {}
     effective_weights: dict[str, float] = {}
     weight_sources: dict[str, str] = {}
-    proxy_weight_multiplier = max(0.0, float(proxy_weight_multiplier))
+    proxy_multiplier = finite_float(proxy_weight_multiplier)
+    proxy_weight_multiplier = max(0.0, proxy_multiplier) if proxy_multiplier is not None else 0.0
     for name, weight in weights.items():
+        safe_weight = finite_float(weight)
+        if safe_weight is None or safe_weight < 0.0:
+            continue
+        weight = safe_weight
         if name == "safety":
             safety = scores.get("safety", {})
             value = safety.get("safety_score")
@@ -122,6 +135,8 @@ def aggregate_scores(
         }
     normalized = {name: weight / total for name, weight in available.items()}
     final_score = sum(values[name] * normalized[name] for name in normalized)
+    if finite_float(final_score) is None:
+        final_score = 0.0
     return {
         "final_score": float(final_score),
         "normalized_weights": normalized,

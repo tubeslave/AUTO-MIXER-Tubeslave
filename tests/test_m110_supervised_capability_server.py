@@ -1684,7 +1684,7 @@ async def test_main_mute_checkpoint_rejects_non_exact_numeric_readback(
 
 
 @pytest.mark.asyncio
-async def test_main_mute_checkpoint_accepts_two_exact_physical_round_trips(
+async def test_main_mute_checkpoint_rejects_unauthenticated_osc_round_trips(
     m110_server,
 ):
     server = m110_server
@@ -1706,8 +1706,10 @@ async def test_main_mute_checkpoint_accepts_two_exact_physical_round_trips(
         expected_muted=True,
     )
 
-    assert result["verified"] is True
+    assert result["verified"] is False
+    assert result["reason"] == "m110_main_mute_physical_readback_mismatch"
     assert [row["normalized_value"] for row in result["passes"]] == [1, 1]
+    assert all(row["verified"] is False for row in result["passes"])
     assert query.await_count == 2
     server.mixer_client.send.assert_not_called()
 

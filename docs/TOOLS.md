@@ -78,41 +78,74 @@ WING_RATIO_STRINGS = ["1.1", "1.2", "1.3", "1.5", "1.7", "2.0", "2.5", "3.0", "3
 
 ### Подключение
 ```
-TCP socket на port 51328 (plain) или 51329 (TLS)
+MixRack: TCP 51325 (plain) или 51327 (TLS)
+Surface: TCP 51328 (plain) или 51329 (TLS)
 Протокол: стандартный MIDI поверх TCP stream
 SysEx header: F0 00 00 1A 50 10 01 00
 SysEx end: F7
 ```
 
-### Маппинг фейдеров (NRPN 14-bit)
+Открытый TCP-порт означает только endpoint candidate. Подтверждение модели,
+firmware, show и MIDI base channel выполняет оператор. Обычное подключение
+AUTO-MIXER остаётся read-only.
+
+В `Utility / Control / MIDI` отдельно проверяются `Send MIDI` и `Receive MIDI`.
+Для plain TCP соответствующая страница `MixRack / Surface Security` должна
+быть в режиме `No Security`; `SSL TCP MIDI` требует TLS-порт и аутентификацию,
+а `Disable TCP MIDI` запрещает управление. По документации Allen & Heath
+изменение security level вступает в силу только после перезапуска
+соответствующего MixRack или Surface. Успешный GET не доказывает, что SET
+разрешён: эти направления проверяются отдельно.
+
+### Attended restore-only fader proof
+
+После принятого read-only artifact единственный первый write-путь:
+`tools/dlive_attended_fader_restore_proof.py`. Он не подключён к normal server,
+разрешает только один bounded downward input-fader apply и exact-preimage
+rollback, использует общий с WING `~/.automixer/runtime/console_writer.lock`
+и durable WAL `~/.automixer/runtime/dlive/fader_restore_proof_wal.jsonl`.
+
+Незавершённая WAL-транзакция блокирует новый proof. Recovery выполняется через
+`tools/dlive_recover_fader_restore.py`: target никогда не переигрывается,
+допустим только zero-send readback уже восстановленного preimage либо exact
+rollback при свежем CAS `current == WAL target`.
+
+### Маппинг фейдеров (NRPN 7-bit, parameter `17`)
 ```
-0x0000 (0)     = -∞
-0x2AAA (10922) = 0 dB
-0x3FFF (16383) = +10 dB
+0x00 (0)   = -∞
+0x43 (67)  = -20 dB
+0x61 (97)  = -5 dB
+0x6B (107) = 0 dB
+0x7F (127) = +10 dB
 ```
 
 ### NRPN: EQ (Input channels)
 ```
-Band 1: freq=0x40, gain=0x41, Q=0x42
-Band 2: freq=0x44, gain=0x45, Q=0x46
-Band 3: freq=0x48, gain=0x49, Q=0x4A
-Band 4: freq=0x4C, gain=0x4D, Q=0x4E
-HPF:    freq=0x50, on/off=0x51
+Band 1: type=0x1A, freq=0x1B, width=0x1C, gain=0x1D
+Band 2: type=0x1E, freq=0x1F, width=0x20, gain=0x21
+Band 3: type=0x22, freq=0x23, width=0x24, gain=0x25
+Band 4: type=0x26, freq=0x27, width=0x28, gain=0x29
+HPF:    freq=0x30, on/off=0x31
 ```
+
+Эти DSP-записи пока заблокированы: правильная таблица байтов не заменяет
+attended apply/readback/rollback proof.
 
 ### Channel Types → MIDI channel offset
 ```python
 CHANNEL_TYPE_OFFSET = {
     "input": 0,
     "mono_group": 1, "stereo_group": 1,
-    "mono_aux": 2, "stereo_aux": 2, "mono_fx_send": 2, "stereo_fx_send": 2,
+    "mono_aux": 2, "stereo_aux": 2,
     "mono_matrix": 3, "stereo_matrix": 3,
-    "dca": 4,
+    "mono_fx_send": 4, "stereo_fx_send": 4, "fx_return": 4,
+    "main": 4, "dca": 4, "mute_group": 4,
 }
 ```
 
 ### Документация
-`Docs/` — Allen & Heath dLive MIDI Over TCP Protocol V2.0
+`Docs/Allen_Heath_DLive/DLIVE_MIDI_TCP_V2_GOLDEN_VECTORS.md` — pinned source,
+точные тестовые векторы и граница полномочий.
 
 ---
 

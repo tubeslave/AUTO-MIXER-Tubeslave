@@ -15112,14 +15112,25 @@ def validate_supervised_proof_report_gain_dry_run(report_path: Path) -> CheckRes
             if "physical_proof_required_for_promotion" not in blockers:
                 violations.append("gain_dry_run_physical_proof_blocker_missing")
             evidence = row.get("evidence") if isinstance(row.get("evidence"), Mapping) else {}
+            fake_rejection = (
+                evidence.get("fake_physical_proof_rejection_status")
+                == "verified"
+                and evidence.get("physical_proof_claimed") is False
+            )
             expected_sources = {
                 "pre_read_source": "fake_mixer",
                 "readback_source": "fake_mixer",
-                "rollback_readback_source": "fake_mixer",
+                "rollback_readback_source": (
+                    "not_attempted" if fake_rejection else "fake_mixer"
+                ),
             }
             for key, expected in expected_sources.items():
                 if evidence.get(key) != expected:
-                    violations.append(f"gain_dry_run_{key}_not_fake_mixer")
+                    violations.append(
+                        f"gain_dry_run_{key}_unexpected_source"
+                    )
+            if fake_rejection and evidence.get("rollback_readback_status") != "not_attempted":
+                violations.append("gain_dry_run_fake_rejection_rollback_attempted")
             if evidence.get("operator_approval_recorded") is not True:
                 violations.append("gain_dry_run_operator_approval_missing")
             if evidence.get("idempotency_key_present") is not True:
