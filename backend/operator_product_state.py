@@ -7,11 +7,16 @@ changes. They translate the backend runtime into stable UI contracts.
 from __future__ import annotations
 
 import json
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from dante_routing_config import get_module_signal_info, get_routing_as_dict
+try:
+    from instrument_space import InstrumentSpaceHistory, build_instrument_space
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.instrument_space import InstrumentSpaceHistory, build_instrument_space
 try:
     from gain_fader_runtime import build_gain_fader_runtime_summary
 except ImportError:  # pragma: no cover - compatibility for older integration branches
@@ -279,6 +284,10 @@ def _connection_summary(server: Any) -> Dict[str, Any]:
         "port": getattr(client, "port", None)
         or getattr(client, "send_port", None)
         or getattr(client, "osc_port", None),
+        "endpoint": getattr(client, "endpoint", None),
+        "tls": bool(getattr(client, "tls", False)),
+        "midi_base_channel": getattr(client, "midi_base_channel", None),
+        "user_profile": getattr(client, "user_profile", None),
         "state": state if isinstance(state, dict) else {},
     }
 
@@ -660,12 +669,22 @@ def _meter_for_channel(capture: Any, channel: int) -> Dict[str, Any]:
     dynamic = None
     if rms is not None and peak is not None:
         dynamic = round(max(0.0, peak - rms), 1)
+    spectral: Dict[str, Any] = {
+        "available": False,
+        "reason": "spectral_cache_unavailable",
+    }
+    spectral_getter = getattr(capture, "get_spectral_metrics", None)
+    if callable(spectral_getter):
+        spectral_result = _safe_call(spectral_getter, channel, default={})
+        if isinstance(spectral_result, Mapping):
+            spectral = dict(spectral_result)
     return {
         "available": True,
         "rms_db": rms,
         "peak_db": peak,
         "lufs": lufs,
         "dynamic_range_db": dynamic,
+        "spectral": spectral,
     }
 
 
@@ -908,6 +927,50 @@ def _channel_inventory_cache_addresses(total_channels: int) -> List[str]:
     return addresses
 
 
+def _instrument_space_source_context(
+    connection: Mapping[str, Any],
+    audio_capture: Mapping[str, Any],
+    *,
+    total_channels: int,
+) -> Dict[str, Any]:
+    """Build a non-secret identity boundary for temporal scene comparison."""
+
+    def safe_scalar(value: Any) -> Any:
+        return value if value is None or isinstance(value, (str, int, float, bool)) else None
+
+    connection_mode = safe_scalar(connection.get("connection_mode"))
+    client_type = safe_scalar(connection.get("client_type"))
+    ip = safe_scalar(connection.get("ip"))
+    port = safe_scalar(connection.get("port"))
+    endpoint = safe_scalar(connection.get("endpoint"))
+    audio_source_type = safe_scalar(audio_capture.get("source_type"))
+    audio_device = safe_scalar(
+        audio_capture.get("device_name") or audio_capture.get("resolved_device_name")
+    )
+    identity_parts = (
+        str(connection_mode or "offline"),
+        str(client_type or "no_client"),
+        str(ip or "no_ip"),
+        str(port or "no_port"),
+        str(endpoint or "default_endpoint"),
+        str(audio_source_type or "no_audio_source"),
+        str(audio_device or "default_device"),
+        str(total_channels),
+    )
+    return {
+        "identity": "|".join(identity_parts),
+        "connection_mode": connection_mode,
+        "client_type": client_type,
+        "endpoint": endpoint,
+        "audio_source_type": audio_source_type,
+        "audio_device": audio_device,
+        "channel_count": total_channels,
+        "read_only": True,
+        "live_write": False,
+        "live_authority_granted": False,
+    }
+
+
 def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_COUNT) -> Dict[str, Any]:
     total_channels = max(1, min(int(total_channels or DEFAULT_CHANNEL_COUNT), DEFAULT_DANTE_CHANNEL_COUNT))
     client = getattr(server, "mixer_client", None)
@@ -926,6 +989,7 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
         routing_role = str(routing_item.get("role") or "unknown")
         inferred = _infer_role_and_group(name, routing_role, channel)
         meter = _meter_for_channel(capture, channel)
+        spectral = meter.get("spectral") if isinstance(meter.get("spectral"), Mapping) else {}
         rms = meter.get("rms_db")
         active = bool(meter.get("available") and rms is not None and rms > MIN_ACTIVE_DB)
         if active:
@@ -977,6 +1041,17 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
                 "peak_db": meter.get("peak_db"),
                 "lufs": meter.get("lufs"),
                 "dynamic_range_db": meter.get("dynamic_range_db"),
+                "spectral_centroid_hz": (
+                    spectral.get("centroid_hz")
+                    if spectral.get("available") is True
+                    else None
+                ),
+                "brightness": (
+                    spectral.get("brightness")
+                    if spectral.get("available") is True
+                    else None
+                ),
+                "spectral": spectral,
                 "read_coverage": read_coverage,
                 "control_state": {
                     "fader_db": _cached_numeric(client, f"/ch/{channel}/fdr"),
@@ -1008,13 +1083,31 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
         client,
         _channel_inventory_cache_addresses(total_channels),
     )
+    generated_at = _utc_now()
+    connection = _connection_summary(server)
+    audio_capture = _audio_capture_status(server)
+    source_context = _instrument_space_source_context(
+        connection,
+        audio_capture,
+        total_channels=total_channels,
+    )
+    instrument_space_history = getattr(server, "_instrument_space_history", None)
+    if not isinstance(instrument_space_history, InstrumentSpaceHistory):
+        instrument_space_history = InstrumentSpaceHistory()
+        setattr(server, "_instrument_space_history", instrument_space_history)
+    instrument_space = build_instrument_space(
+        channels,
+        generated_at=generated_at,
+        source_context=source_context,
+        history=instrument_space_history,
+    )
     return {
         "type": "channel_inventory",
-        "generated_at": _utc_now(),
+        "generated_at": generated_at,
         "source": "runtime_cached_state",
         "available": True,
-        "connection": _connection_summary(server),
-        "audio_capture": _audio_capture_status(server),
+        "connection": connection,
+        "audio_capture": audio_capture,
         "summary": {
             "total_channels": total_channels,
             "active_channels": active_count,
@@ -1029,6 +1122,7 @@ def build_channel_inventory(server: Any, total_channels: int = DEFAULT_CHANNEL_C
         "read_coverage": inventory_read_coverage,
         "cache_freshness": cache_freshness,
         "channels": channels,
+        "instrument_space": instrument_space,
         "routing_scheme": routing,
     }
 
@@ -7279,11 +7373,21 @@ def build_supervised_proof_evidence_snapshot(server: Any) -> Dict[str, Any]:
     }
 
 
-def _read_jsonl_file(path: Path) -> List[Dict[str, Any]]:
-    rows: List[Dict[str, Any]] = []
+def _read_jsonl_file(
+    path: Path,
+    *,
+    limit: int = 200,
+    max_line_bytes: int = 256_000,
+    severity_counts: Dict[str, int] | None = None,
+) -> List[Dict[str, Any]]:
+    """Read a bounded tail inventory without retaining every JSONL object."""
+    bounded_limit = _bounded_int_value(limit, default=200, minimum=1, maximum=1000)
+    rows = deque(maxlen=bounded_limit)
     try:
         with path.open(encoding="utf-8") as handle:
             for line in handle:
+                if len(line.encode("utf-8", errors="replace")) > max_line_bytes:
+                    continue
                 line = line.strip()
                 if not line:
                     continue
@@ -7293,9 +7397,12 @@ def _read_jsonl_file(path: Path) -> List[Dict[str, Any]]:
                     continue
                 if isinstance(value, dict):
                     rows.append(value)
+                    if severity_counts is not None:
+                        severity = str(value.get("severity") or "info").lower()
+                        severity_counts[severity if severity in severity_counts else "info"] += 1
     except OSError:
         return []
-    return rows
+    return list(rows)
 
 
 def _severity_counts(alerts: Iterable[Dict[str, Any]]) -> Dict[str, int]:
@@ -7399,6 +7506,7 @@ def build_telemetry_alerts_snapshot(
 
     sessions: List[Dict[str, Any]] = []
     alerts: List[Dict[str, Any]] = []
+    total_severity = {"critical": 0, "warning": 0, "info": 0}
     for session_dir in session_dirs:
         alerts_dir = session_dir / "alerts"
         summary_path = alerts_dir / "summary.json"
@@ -7410,7 +7518,11 @@ def build_telemetry_alerts_snapshot(
         session_id = str(summary.get("session_id") or session_dir.name)
         rows = [
             _telemetry_alert_row(row, session_id)
-            for row in _read_jsonl_file(alerts_path)
+            for row in _read_jsonl_file(
+                alerts_path,
+                limit=limit,
+                severity_counts=total_severity,
+            )
         ]
         alerts.extend(rows)
         sessions.append(
@@ -7430,7 +7542,6 @@ def build_telemetry_alerts_snapshot(
             break
 
     alerts.sort(key=lambda row: _safe_int_value(row.get("timestamp_ms")), reverse=True)
-    severity = _severity_counts(alerts)
     latest_session_id = sessions[0]["session_id"] if sessions else None
     artifact_available = bool(sessions)
     return {
@@ -7447,9 +7558,9 @@ def build_telemetry_alerts_snapshot(
         "summary": {
             "session_count": len(session_dirs),
             "artifact_session_count": len(sessions),
-            "alert_count": len(alerts),
-            "critical_count": severity["critical"],
-            "warning_count": severity["warning"],
+            "alert_count": sum(int(item.get("alert_count") or 0) for item in sessions),
+            "critical_count": total_severity["critical"],
+            "warning_count": total_severity["warning"],
             "latest_session_id": latest_session_id,
         },
         "sessions": sessions,

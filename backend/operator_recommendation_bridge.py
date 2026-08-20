@@ -30,6 +30,15 @@ try:
 except ImportError:  # pragma: no cover - package import compatibility
     from backend.processing_proposal_adapters import build_operator_correction_payload
 
+try:
+    from instrument_space_decision_support import (
+        annotate_operator_proposals_with_instrument_space,
+    )
+except ImportError:  # pragma: no cover - package import compatibility
+    from backend.instrument_space_decision_support import (
+        annotate_operator_proposals_with_instrument_space,
+    )
+
 
 SAFE_GAIN_SOURCE = "safe_gain_calibrator"
 SOUNDCHECK_SOURCE = "soundcheck_recommendation_bundle"
@@ -939,7 +948,10 @@ def build_soundcheck_operator_proposals(
                     "transport_policy": "proposal_only",
                 }
             )
-    return proposals
+    return annotate_operator_proposals_with_instrument_space(
+        proposals,
+        bundle.get("instrument_space_decision_support"),
+    )
 
 
 def import_operator_proposals(

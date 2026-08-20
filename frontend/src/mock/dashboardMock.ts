@@ -1,6 +1,6 @@
 import type { Tone } from '../types';
 
-export type DashboardTab = 'Channels' | 'Overview' | 'EQ Match' | 'Dynamics' | 'Sends' | 'Main Bus';
+export type DashboardTab = 'Channels' | 'Instrument Space' | 'Overview' | 'EQ Match' | 'Dynamics' | 'Sends' | 'Main Bus';
 
 export interface DashboardMetricSpec {
   id: string;
@@ -82,6 +82,7 @@ export const dashboardMockSafetyContract: DashboardMockSafetyContract = {
 
 export const dashboardTabs: DashboardTab[] = [
   'Channels',
+  'Instrument Space',
   'Overview',
   'EQ Match',
   'Dynamics',

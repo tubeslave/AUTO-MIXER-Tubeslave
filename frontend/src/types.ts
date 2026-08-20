@@ -553,6 +553,113 @@ export interface Channel {
   dataSource?: 'backend' | 'mock';
 }
 
+export interface InstrumentSpaceEvidenceValue {
+  available: boolean;
+  value: number | null;
+  unit: string;
+  source: string;
+  ageSec: number | null;
+  freshnessStatus: string;
+  reason: string;
+}
+
+export interface InstrumentSpaceObject {
+  id: string;
+  channelId: number;
+  label: string;
+  role: string;
+  group: string;
+  status: string;
+  xPan: number | null;
+  yFrequency: number | null;
+  zLevel: number | null;
+  pan: InstrumentSpaceEvidenceValue;
+  frequency: InstrumentSpaceEvidenceValue;
+  level: InstrumentSpaceEvidenceValue;
+  confidencePercent: number | null;
+  freshnessStatus: string;
+}
+
+export interface InstrumentSpaceRelation {
+  id: string;
+  status: string;
+  channelIds: number[];
+  labels: string[];
+  score: number;
+  recommendedNextAnalyzers: string[];
+  blockers: string[];
+  measurements: {
+    panDistance: number | null;
+    centroidDistanceOctaves: number | null;
+    levelDeltaDb: number | null;
+  };
+  evidenceSources: string[];
+  sourceGeneratedAt: string;
+  explanation: string;
+}
+
+export interface InstrumentSpaceDriftChange {
+  id: string;
+  channelId: number;
+  label: string;
+  changedAxes: string[];
+  deltas: Record<string, number | null>;
+}
+
+export interface InstrumentSpaceDrift {
+  status: string;
+  reason: string;
+  baselineGeneratedAt: string;
+  currentGeneratedAt: string;
+  changes: InstrumentSpaceDriftChange[];
+}
+
+export interface InstrumentSpaceHistory {
+  available: boolean;
+  contractValid: boolean;
+  status: string;
+  reason: string;
+  snapshotCount: number;
+  maxSnapshots: number;
+  sourceChanged: boolean;
+  currentSnapshotId: string;
+  baselineSnapshotId: string;
+}
+
+export interface InstrumentSpaceDecisionSupport {
+  available: boolean;
+  contractValid: boolean;
+  schemaVersion: string;
+  status: string;
+  reviewRequiredCount: number;
+  watchCount: number;
+  centroidIsTriageNotEqProof: boolean;
+  readOnly: true;
+  liveWrite: false;
+  queueImportAllowed: false;
+  canApplyToConsole: false;
+  liveAuthorityGranted: false;
+  relations: InstrumentSpaceRelation[];
+  drift: InstrumentSpaceDrift;
+}
+
+export interface InstrumentSpace {
+  available: boolean;
+  contractValid: boolean;
+  schemaVersion: string;
+  generatedAt: string;
+  readOnly: true;
+  liveWrite: false;
+  canApplyToConsole: false;
+  physicalLocalization: false;
+  objectCount: number;
+  completeObjectCount: number;
+  missingFrequencyCount: number;
+  objects: InstrumentSpaceObject[];
+  history: InstrumentSpaceHistory;
+  decisionSupport: InstrumentSpaceDecisionSupport;
+}
+
 export interface BusRecord {
   name: string;
   role: string;

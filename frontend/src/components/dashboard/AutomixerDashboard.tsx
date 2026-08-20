@@ -7,7 +7,7 @@ import {
   spectrumBins
 } from '../../mock/dashboardMock';
 import type { AnalysisCardMock, ChannelDashboardTelemetry, DashboardTab } from '../../mock/dashboardMock';
-import type { Channel, DashboardRuntime, Tone, UiActions, UiState } from '../../types';
+import type { Channel, DashboardRuntime, InstrumentSpace, InstrumentSpaceObject, Tone, UiActions, UiState } from '../../types';
 import { dashboardAnalysisCards, dashboardSpectrumTrace, dashboardTelemetryForChannel } from './dashboardTelemetryModel';
 
 const toneColors: Record<Tone, string> = {
@@ -378,7 +378,138 @@ function ViewChip({ label, onInfo }: { label: string; onInfo?: (message: string)
   );
 }
 
-function MixerArea({ channels, runtime, ui, actions }: { channels: Channel[]; runtime: DashboardRuntime; ui: UiState; actions: UiActions }) {
+function instrumentColor(object: InstrumentSpaceObject) {
+  const token = `${object.group} ${object.role}`.toUpperCase();
+  if (token.includes('DRUM')) return '#1687ff';
+  if (token.includes('BASS')) return '#ff9f1a';
+  if (token.includes('VOCAL')) return '#a855f7';
+  if (token.includes('GUITAR')) return '#00d26a';
+  if (token.includes('KEY')) return '#37c7d9';
+  return '#8493a3';
+}
+
+function instrumentTooltip(object: InstrumentSpaceObject) {
+  const pan = object.pan.available ? `${object.pan.value}%` : 'unknown';
+  const frequency = object.frequency.available ? `${object.frequency.value} Hz` : 'not measured';
+  const level = object.level.available ? `${object.level.value} dBFS` : 'not measured';
+  return `${object.label} · pan ${pan} · spectral centroid ${frequency} · level ${level}`;
+}
+
+function InstrumentSpacePanel({ scene }: { scene: InstrumentSpace }) {
+  if (!scene.available) {
+    return (
+      <div className="grid h-full place-items-center p-5 text-center">
+        <div className="max-w-lg">
+          <div className="text-[12px] font-black uppercase tracking-[0.1em] text-muted">Instrument Space unavailable</div>
+          <p className="mt-2 text-[10px] leading-relaxed text-dim">
+            {scene.contractValid
+              ? 'No channel scene evidence has arrived from the read-only Product Layer.'
+              : 'The backend has not supplied a valid read-only scene contract.'}
+          </p>
+          <p className="mt-1 text-[8px] uppercase tracking-[0.06em] text-warn">No demo coordinates are substituted.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const objects = scene.objects.slice(0, 24);
+  return (
+    <div className="grid h-full min-h-0 grid-cols-[minmax(0,1fr)_170px] gap-2 p-2">
+      <section className="relative min-h-0 overflow-hidden rounded-[7px] border border-line bg-[#050b12]">
+        <div className="pointer-events-none absolute inset-x-2 top-2 z-10 flex items-start justify-between text-[7px] font-black uppercase tracking-[0.08em] text-dim">
+          <span>High centroid / bright</span>
+          <span className="rounded border border-online/35 bg-online/10 px-1.5 py-0.5 text-online">Read-only</span>
+          <span>X = pan</span>
+        </div>
+        <svg aria-label="Read-only instrument space" className="h-full w-full" role="img" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="instrument-space-depth" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0" stopColor="#14263a" stopOpacity="0.22" />
+              <stop offset="1" stopColor="#020508" stopOpacity="0.92" />
+            </linearGradient>
+          </defs>
+          <rect fill="url(#instrument-space-depth)" height="100" width="100" />
+          {[10, 30, 50, 70, 90].map(x => <line key={`x-${x}`} stroke="#263848" strokeOpacity="0.48" strokeWidth="0.25" x1={x} x2={x} y1="8" y2="74" />)}
+          {[18, 32, 46, 60, 74].map(y => <line key={`y-${y}`} stroke="#263848" strokeOpacity="0.48" strokeWidth="0.25" x1="4" x2="96" y1={y} y2={y} />)}
+          <line stroke="#ff9f1a" strokeDasharray="1.5 1.5" strokeOpacity="0.55" strokeWidth="0.35" x1="4" x2="96" y1="78" y2="78" />
+          {objects.map((object, index) => {
+            const x = object.xPan === null ? 50 : 6 + ((object.xPan + 1) / 2) * 88;
+            const y = object.yFrequency === null ? 84 + (index % 2) * 7 : 72 - object.yFrequency * 56;
+            const radius = object.zLevel === null ? 3.3 : 3.2 + object.zLevel * 5.8;
+            const color = instrumentColor(object);
+            const opacity = object.level.available ? 0.78 : 0.42;
+            return (
+              <g key={object.id}>
+                <title>{instrumentTooltip(object)}</title>
+                <circle cx={x} cy={y} fill={color} fillOpacity={opacity * 0.22} r={radius * 1.8} />
+                <circle cx={x} cy={y} fill={color} fillOpacity={opacity} r={radius} stroke="#edf6ff" strokeOpacity="0.65" strokeWidth="0.35" />
+                <text fill="#f2f6fa" fontSize="2.8" fontWeight="800" textAnchor="middle" x={x} y={y + 0.9}>{object.channelId}</text>
+              </g>
+            );
+          })}
+          <text fill="#8493a3" fontSize="2.4" x="5" y="73">LOW CENTROID / DARK</text>
+          <text fill="#ffb020" fontSize="2.5" fontWeight="700" x="5" y="81">SPECTRAL Y NOT MEASURED</text>
+          <text fill="#8493a3" fontSize="2.5" x="4" y="97">LEFT</text>
+          <text fill="#8493a3" fontSize="2.5" textAnchor="middle" x="50" y="97">PAN</text>
+          <text fill="#8493a3" fontSize="2.5" textAnchor="end" x="96" y="97">RIGHT</text>
+        </svg>
+      </section>
+
+      <aside className="am-scrollbar min-h-0 overflow-y-auto rounded-[7px] border border-line bg-panel2 p-2">
+        <h3 className="text-[9px] font-black uppercase tracking-[0.08em] text-text">Visual evidence</h3>
+        <p className="mt-1 text-[7.5px] leading-relaxed text-dim">X = pan · Y = measured centroid · size = level. This is a mix map, not physical 3D localization.</p>
+        <div className="mt-2 grid grid-cols-2 gap-1 text-[7px]">
+          <span className="rounded border border-line px-1 py-1 text-muted">Objects <b className="float-right text-text">{scene.objectCount}</b></span>
+          <span className="rounded border border-line px-1 py-1 text-muted">XYZ <b className="float-right text-text">{scene.completeObjectCount}</b></span>
+          <span className="col-span-2 rounded border border-warn/30 bg-warn/5 px-1 py-1 text-warn">Missing spectral Y <b className="float-right">{scene.missingFrequencyCount}</b></span>
+        </div>
+        <div className="mt-2 rounded border border-line bg-[#08101a] p-1.5">
+          <div className="flex items-center justify-between text-[7px] font-black uppercase tracking-[0.06em]">
+            <span className="text-text">Decision support</span>
+            <span className={scene.decisionSupport.reviewRequiredCount ? 'text-warn' : 'text-online'}>
+              {scene.decisionSupport.available ? scene.decisionSupport.status : 'unavailable'}
+            </span>
+          </div>
+          <p className="mt-1 text-[6.5px] leading-relaxed text-dim">
+            Coarse triage only. Centroid proximity never selects an EQ, pan or fader value.
+          </p>
+          <div className="mt-1 flex items-center justify-between font-mono text-[6px] text-dim">
+            <span>history {scene.history.available ? `${scene.history.snapshotCount}/${scene.history.maxSnapshots}` : 'unavailable'}</span>
+            <span>drift {scene.decisionSupport.drift.status}</span>
+          </div>
+          {scene.decisionSupport.drift.changes.slice(0, 3).map(change => (
+            <div className="mt-1 rounded border border-warn/25 bg-warn/5 px-1 py-0.5" key={change.id}>
+              <div className="truncate text-[6.5px] font-bold text-warn">{change.channelId}. {change.label} · drift {change.changedAxes.join(', ')}</div>
+              <div className="truncate font-mono text-[5.5px] text-dim">baseline {scene.decisionSupport.drift.baselineGeneratedAt || 'pending'}</div>
+            </div>
+          ))}
+          {scene.decisionSupport.relations.slice(0, 4).map(relation => (
+            <div className="mt-1 border-t border-line/60 pt-1" key={relation.id}>
+              <div className="truncate text-[7px] font-bold text-warn">{relation.labels.join(' ↔ ')} · {Math.round(relation.score * 100)}%</div>
+              <div className="truncate font-mono text-[6px] text-dim">next: {relation.recommendedNextAnalyzers.join(', ') || 'more evidence'}</div>
+              <div className="truncate font-mono text-[5.5px] text-dim">
+                pan Δ {relation.measurements.panDistance ?? '—'} · oct Δ {relation.measurements.centroidDistanceOctaves ?? '—'} · level Δ {relation.measurements.levelDeltaDb ?? '—'} dB
+              </div>
+              <div className="truncate font-mono text-[5.5px] text-dim" title={relation.evidenceSources.join(', ')}>evidence: {relation.evidenceSources.join(', ') || 'missing provenance'}</div>
+              {relation.blockers.length > 0 && <div className="truncate font-mono text-[5.5px] text-warn">blocked: {relation.blockers.join(', ')}</div>}
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 space-y-1">
+          {objects.map(object => (
+            <div className="rounded border border-line/70 bg-[#08101a] px-1.5 py-1" key={`legend-${object.id}`} title={instrumentTooltip(object)}>
+              <div className="flex items-center gap-1 text-[7.5px]"><i className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: instrumentColor(object) }} /><b className="min-w-0 flex-1 truncate text-text">{object.channelId}. {object.label}</b><span className="text-dim">{object.freshnessStatus}</span></div>
+              <div className="mt-0.5 truncate font-mono text-[6.5px] text-dim">pan {object.pan.available ? `${object.pan.value}%` : '—'} · Hz {object.frequency.available ? object.frequency.value : '—'} · dB {object.level.available ? object.level.value : '—'}</div>
+              {object.frequency.freshnessStatus !== 'unknown' && <div className={`mt-0.5 truncate font-mono text-[6px] ${object.frequency.available ? 'text-online' : 'text-warn'}`}>spectral {object.frequency.freshnessStatus}{object.frequency.ageSec === null ? '' : ` · ${object.frequency.ageSec.toFixed(2)}s`}{object.frequency.reason ? ` · ${object.frequency.reason}` : ''}</div>}
+            </div>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function MixerArea({ channels, instrumentSpace, runtime, ui, actions }: { channels: Channel[]; instrumentSpace: InstrumentSpace; runtime: DashboardRuntime; ui: UiState; actions: UiActions }) {
   const [activeTab, setActiveTab] = useState<DashboardTab>('Channels');
   const visibleChannels = channels.slice(0, 14);
   const selectedChannel = visibleChannels.find(channel => channel.id === ui.selectedChannelId) ?? visibleChannels[0];
@@ -413,17 +544,19 @@ function MixerArea({ channels, runtime, ui, actions }: { channels: Channel[]; ru
         </div>
       </header>
 
-      <div className="am-scrollbar grid h-[calc(100%-38px)] min-w-0 grid-flow-col auto-cols-[minmax(68px,1fr)] gap-1 overflow-x-auto p-1">
-        {visibleChannels.map(channel => (
-          <DashboardChannelStrip
-            channel={channel}
-            key={channel.id}
-            onSelect={actions.selectChannel}
-            selected={channel.id === ui.selectedChannelId}
-            telemetry={dashboardTelemetryForChannel(channel, channelTelemetryById[channel.id] ?? channelTelemetryById[1], { suppressMockSolo })}
-          />
-        ))}
-      </div>
+      {activeTab === 'Instrument Space'
+        ? <div className="h-[calc(100%-38px)] min-w-0"><InstrumentSpacePanel scene={instrumentSpace} /></div>
+        : <div className="am-scrollbar grid h-[calc(100%-38px)] min-w-0 grid-flow-col auto-cols-[minmax(68px,1fr)] gap-1 overflow-x-auto p-1">
+          {visibleChannels.map(channel => (
+            <DashboardChannelStrip
+              channel={channel}
+              key={channel.id}
+              onSelect={actions.selectChannel}
+              selected={channel.id === ui.selectedChannelId}
+              telemetry={dashboardTelemetryForChannel(channel, channelTelemetryById[channel.id] ?? channelTelemetryById[1], { suppressMockSolo })}
+            />
+          ))}
+        </div>}
     </section>
   );
 }
@@ -586,11 +719,13 @@ function AnalysisRow({ runtime }: { runtime: DashboardRuntime }) {
 
 export function AutomixerDashboard({
   channels,
+  instrumentSpace,
   runtime,
   ui,
   actions
 }: {
   channels: Channel[];
+  instrumentSpace: InstrumentSpace;
   runtime: DashboardRuntime;
   ui: UiState;
   actions: UiActions;
@@ -600,7 +735,7 @@ export function AutomixerDashboard({
   return (
     <div className="grid h-full min-h-0 grid-rows-[150px_minmax(0,1fr)_128px] gap-1.5">
       <AnalyticsRow channels={normalizedChannels} runtime={runtime} />
-      <MixerArea actions={actions} channels={normalizedChannels} runtime={runtime} ui={ui} />
+      <MixerArea actions={actions} channels={normalizedChannels} instrumentSpace={instrumentSpace} runtime={runtime} ui={ui} />
       <AnalysisRow runtime={runtime} />
     </div>
   );

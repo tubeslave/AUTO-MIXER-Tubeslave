@@ -83,6 +83,53 @@ const fallbackDirectorRuntime: DirectorRuntime = {
 function fallbackViewData(): OperatorViewData {
   return {
     channels,
+    instrumentSpace: {
+      available: false,
+      contractValid: false,
+      schemaVersion: '',
+      generatedAt: '',
+      readOnly: true,
+      liveWrite: false,
+      canApplyToConsole: false,
+      physicalLocalization: false,
+      objectCount: 0,
+      completeObjectCount: 0,
+      missingFrequencyCount: 0,
+      objects: [],
+      history: {
+        available: false,
+        contractValid: false,
+        status: 'unavailable',
+        reason: 'mock_frontend_only',
+        snapshotCount: 0,
+        maxSnapshots: 0,
+        sourceChanged: false,
+        currentSnapshotId: '',
+        baselineSnapshotId: ''
+      },
+      decisionSupport: {
+        available: false,
+        contractValid: false,
+        schemaVersion: '',
+        status: 'unavailable',
+        reviewRequiredCount: 0,
+        watchCount: 0,
+        centroidIsTriageNotEqProof: true,
+        readOnly: true,
+        liveWrite: false,
+        queueImportAllowed: false,
+        canApplyToConsole: false,
+        liveAuthorityGranted: false,
+        relations: [],
+        drift: {
+          status: 'unavailable',
+          reason: 'mock_frontend_only',
+          baselineGeneratedAt: '',
+          currentGeneratedAt: '',
+          changes: []
+        }
+      }
+    },
     buses,
     agents,
     tasks,

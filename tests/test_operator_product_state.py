@@ -381,7 +381,54 @@ def test_channel_inventory_uses_cached_runtime_state_without_scanning(server):
     assert inventory["channels"][1]["name"] == "Lead Vocal"
     assert inventory["channels"][1]["group"] == "VOCALS"
     assert inventory["channels"][1]["control_state"]["fader_db"] == -8.0
+    assert inventory["instrument_space"]["read_only"] is True
+    assert inventory["instrument_space"]["decision_support"]["read_only"] is True
+    assert inventory["instrument_space"]["decision_support"]["live_write"] is False
+    assert inventory["instrument_space"]["decision_support"]["queue_import_allowed"] is False
+    assert inventory["instrument_space"]["decision_support"]["live_authority_granted"] is False
+    assert inventory["instrument_space"]["history"]["status"] == "baseline_required"
     mixer.get_all_channel_names.assert_not_called()
+
+
+def test_channel_inventory_retains_bounded_in_memory_instrument_space_drift(server):
+    class DriftCapture(FakeAudioCapture):
+        def __init__(self):
+            self.levels = {1: -30.0, 2: -24.0}
+
+        def get_rms(self, channel):
+            return self.levels.get(channel, -100.0)
+
+        def get_spectral_metrics(self, channel):
+            return {
+                "available": True,
+                "centroid_hz": 1_000.0 + channel * 50.0,
+                "brightness": 0.4,
+                "source": "audio_capture_spectral_cache",
+                "freshness_status": "fresh",
+                "age_sec": 0.1,
+            }
+
+    mixer = CachedMixer()
+    mixer.state.update({"/ch/1/pan": 0.5, "/ch/2/pan": 0.55})
+    capture = DriftCapture()
+    server.connection_mode = "wing"
+    server.mixer_client = mixer
+    server.audio_capture = capture
+
+    first = build_channel_inventory(server, total_channels=2)
+    mixer.state["/ch/1/pan"] = 0.9
+    capture.levels[1] = -10.0
+    second = build_channel_inventory(server, total_channels=2)
+
+    first_scene = first["instrument_space"]
+    second_scene = second["instrument_space"]
+    assert first_scene["history"]["snapshot_count"] == 1
+    assert second_scene["history"]["snapshot_count"] == 2
+    assert second_scene["history"]["baseline_snapshot_id"] == first_scene["history"]["current_snapshot_id"]
+    assert second_scene["decision_support"]["drift"]["status"] == "review_required"
+    assert second_scene["decision_support"]["drift"]["changes"][0]["channel_id"] == 1
+    assert second_scene["decision_support"]["live_authority_granted"] is False
+    mixer.send.assert_not_called()
 
 
 def test_channel_inventory_publishes_cached_channel_detail_readback_only(server):

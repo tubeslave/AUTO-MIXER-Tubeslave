@@ -14,6 +14,9 @@ import type {
   GoalCapabilityObjectiveReadinessByGoalArea,
   GoalCapabilityObjectiveReadinessHotspot,
   GoalCapabilityObjectiveReadinessPriority,
+  InstrumentSpace,
+  InstrumentSpaceEvidenceValue,
+  InstrumentSpaceObject,
   ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
@@ -872,6 +875,183 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
       dataSource: 'backend'
     };
   });
+}
+
+function instrumentSpaceEvidence(value: unknown): InstrumentSpaceEvidenceValue {
+  const row = asRecord(value);
+  const numeric = finiteMetric(row.value) ? Number(row.value) : null;
+  return {
+    available: row.available === true && numeric !== null,
+    value: numeric,
+    unit: str(row.unit),
+    source: str(row.source, 'unavailable'),
+    ageSec: finiteMetric(row.age_sec) ? Number(row.age_sec) : null,
+    freshnessStatus: str(row.freshness_status, 'unknown'),
+    reason: str(row.reason)
+  };
+}
+
+export function adaptInstrumentSpace(payload: unknown): InstrumentSpace {
+  const inventory = asRecord(payload);
+  const scene = asRecord(inventory.instrument_space);
+  const contractValid = scene.read_only === true
+    && scene.live_write === false
+    && scene.queue_mutation === false
+    && scene.can_import_to_queue === false
+    && scene.queue_import_allowed === false
+    && scene.can_apply_to_console === false
+    && scene.live_apply_allowed === false
+    && scene.live_authority_granted === false
+    && scene.readiness_closure_allowed === false
+    && scene.mutates_mixer === false
+    && scene.physical_localization === false;
+  const summary = asRecord(scene.summary);
+  const support = asRecord(scene.decision_support);
+  const supportContractValid = support.read_only === true
+    && support.live_write === false
+    && support.queue_mutation === false
+    && support.can_import_to_queue === false
+    && support.queue_import_allowed === false
+    && support.can_apply_to_console === false
+    && support.live_apply_allowed === false
+    && support.live_authority_granted === false
+    && support.readiness_closure_allowed === false
+    && support.mutates_mixer === false;
+  const supportSummary = asRecord(support.summary);
+  const supportRelations = supportContractValid
+    ? asArray(support.review_candidates).map((raw, index) => {
+      const measurements = asRecord(raw.measurements);
+      const provenance = asRecord(raw.evidence_provenance);
+      const evidenceSources = Array.from(new Set(
+        asArray(provenance.channels).flatMap(channel => {
+          const row = asRecord(channel);
+          return [row.pan_source, row.frequency_source, row.level_source, row.recognition_source]
+            .map(value => str(value))
+            .filter(value => value && value !== 'unavailable');
+        }),
+      ));
+      return {
+        id: str(raw.id, `instrument-space:relation:${index + 1}`),
+        status: str(raw.status, 'unknown'),
+        channelIds: Array.isArray(raw.channel_ids)
+          ? raw.channel_ids.map(value => Math.trunc(metricNum(value, 0))).filter(value => value > 0)
+          : [],
+        labels: Array.isArray(raw.labels) ? raw.labels.map(value => str(value)).filter(Boolean) : [],
+        score: metricNum(raw.score, 0),
+        recommendedNextAnalyzers: Array.isArray(raw.recommended_next_analyzers)
+          ? raw.recommended_next_analyzers.map(value => str(value)).filter(Boolean)
+          : [],
+        blockers: Array.isArray(raw.blockers) ? raw.blockers.map(value => str(value)).filter(Boolean) : [],
+        measurements: {
+          panDistance: finiteMetric(measurements.pan_distance) ? Number(measurements.pan_distance) : null,
+          centroidDistanceOctaves: finiteMetric(measurements.centroid_distance_octaves) ? Number(measurements.centroid_distance_octaves) : null,
+          levelDeltaDb: finiteMetric(measurements.level_delta_db) ? Number(measurements.level_delta_db) : null,
+        },
+        evidenceSources,
+        sourceGeneratedAt: str(raw.source_generated_at, str(support.source_generated_at)),
+        explanation: str(raw.explanation),
+      };
+    })
+    : [];
+  const drift = asRecord(support.drift);
+  const driftChanges = supportContractValid
+    ? asArray(drift.changes).map((raw, index) => ({
+      id: str(raw.id, `instrument-space:drift:${index + 1}`),
+      channelId: Math.trunc(metricNum(raw.channel_id, 0)),
+      label: str(raw.label, `Ch ${index + 1}`),
+      changedAxes: Array.isArray(raw.changed_axes) ? raw.changed_axes.map(value => str(value)).filter(Boolean) : [],
+      deltas: Object.fromEntries(
+        Object.entries(asRecord(raw.deltas)).map(([axis, value]) => [
+          axis,
+          finiteMetric(value) ? Number(value) : null,
+        ]),
+      ),
+    }))
+    : [];
+  const history = asRecord(scene.history);
+  const historyContractValid = history.read_only === true
+    && history.live_write === false
+    && history.queue_mutation === false
+    && history.can_import_to_queue === false
+    && history.queue_import_allowed === false
+    && history.can_apply_to_console === false
+    && history.live_apply_allowed === false
+    && history.live_authority_granted === false
+    && history.readiness_closure_allowed === false
+    && history.mutates_mixer === false;
+  const objects: InstrumentSpaceObject[] = contractValid
+    ? asArray(scene.objects).map((raw, index) => {
+      const coordinates = asRecord(raw.coordinates);
+      const evidence = asRecord(raw.evidence);
+      const recognition = asRecord(evidence.recognition);
+      return {
+        id: str(raw.id, `channel:${index + 1}`),
+        channelId: Math.trunc(metricNum(raw.channel_id, index + 1)),
+        label: str(raw.label, `Ch ${index + 1}`),
+        role: str(raw.role, 'Unknown'),
+        group: str(raw.group, 'CHANNELS'),
+        status: str(raw.status, 'unknown'),
+        xPan: finiteMetric(coordinates.x_pan) ? Number(coordinates.x_pan) : null,
+        yFrequency: finiteMetric(coordinates.y_frequency) ? Number(coordinates.y_frequency) : null,
+        zLevel: finiteMetric(coordinates.z_level) ? Number(coordinates.z_level) : null,
+        pan: instrumentSpaceEvidence(evidence.pan),
+        frequency: instrumentSpaceEvidence(evidence.frequency),
+        level: instrumentSpaceEvidence(evidence.level),
+        confidencePercent: finiteMetric(recognition.confidence_percent)
+          ? Number(recognition.confidence_percent)
+          : null,
+        freshnessStatus: str(evidence.read_coverage_status, 'unknown')
+      };
+    })
+    : [];
+
+  return {
+    available: Boolean(Object.keys(scene).length) && contractValid,
+    contractValid,
+    schemaVersion: str(scene.schema_version),
+    generatedAt: str(scene.generated_at),
+    readOnly: true,
+    liveWrite: false,
+    canApplyToConsole: false,
+    physicalLocalization: false,
+    objectCount: Math.trunc(metricNum(summary.object_count, objects.length)),
+    completeObjectCount: Math.trunc(metricNum(summary.complete_object_count, 0)),
+    missingFrequencyCount: Math.trunc(metricNum(summary.missing_frequency_count, objects.length)),
+    objects,
+    history: {
+      available: Boolean(Object.keys(history).length) && historyContractValid,
+      contractValid: historyContractValid,
+      status: historyContractValid ? str(history.status, 'unknown') : 'unavailable',
+      reason: historyContractValid ? str(history.reason) : 'instrument_space_history_contract_rejected',
+      snapshotCount: historyContractValid ? Math.trunc(metricNum(history.snapshot_count, 0)) : 0,
+      maxSnapshots: historyContractValid ? Math.trunc(metricNum(history.max_snapshots, 0)) : 0,
+      sourceChanged: historyContractValid && history.source_changed === true,
+      currentSnapshotId: historyContractValid ? str(history.current_snapshot_id) : '',
+      baselineSnapshotId: historyContractValid ? str(history.baseline_snapshot_id) : '',
+    },
+    decisionSupport: {
+      available: Boolean(Object.keys(support).length) && supportContractValid,
+      contractValid: supportContractValid,
+      schemaVersion: str(support.schema_version),
+      status: supportContractValid ? str(support.status, 'unknown') : 'unavailable',
+      reviewRequiredCount: supportContractValid ? Math.trunc(metricNum(supportSummary.review_required_count, 0)) : 0,
+      watchCount: supportContractValid ? Math.trunc(metricNum(supportSummary.watch_count, 0)) : 0,
+      centroidIsTriageNotEqProof: support.centroid_is_triage_not_eq_proof === true,
+      readOnly: true,
+      liveWrite: false,
+      queueImportAllowed: false,
+      canApplyToConsole: false,
+      liveAuthorityGranted: false,
+      relations: supportRelations,
+      drift: {
+        status: supportContractValid ? str(drift.status, 'unavailable') : 'unavailable',
+        reason: supportContractValid ? str(drift.reason) : 'instrument_space_decision_support_contract_rejected',
+        baselineGeneratedAt: supportContractValid ? str(drift.baseline_generated_at) : '',
+        currentGeneratedAt: supportContractValid ? str(drift.current_generated_at) : '',
+        changes: driftChanges,
+      },
+    }
+  };
 }
 
 export function adaptModuleStatusRecords(payload: unknown): ModuleStatusRecord[] {

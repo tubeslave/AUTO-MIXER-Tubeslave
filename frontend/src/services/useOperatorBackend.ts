@@ -7,6 +7,7 @@ import {
   adaptBusesSnapshot,
   adaptChannelIntelligence,
   adaptChannels,
+  adaptInstrumentSpace,
   adaptCommunicationsSnapshot,
   adaptDashboardRuntime,
   adaptDecisionQueueV2,
@@ -85,6 +86,7 @@ import type {
   DirectorRuntime,
   EmergencyStopUiState,
   FeedbackAlertRecord,
+  InstrumentSpace,
   ChannelIntelligenceRecord,
   LogRecord,
   MemoryRecord,
@@ -445,6 +447,7 @@ type ProductLayerPayloads = {
 
 export interface OperatorViewData {
   channels: Channel[];
+  instrumentSpace: InstrumentSpace;
   buses: BusRecord[];
   agents: Agent[];
   tasks: Task[];
@@ -2239,6 +2242,7 @@ export function useOperatorBackend() {
 
   const viewData: OperatorViewData = useMemo(() => {
     const channels = adaptChannels(payloads.channels, mockChannels);
+    const instrumentSpace = adaptInstrumentSpace(payloads.channels);
     const derivedBuses = adaptBusesFromChannels(channels, mockBuses);
     const buses = adaptBusesSnapshot(payloads.groups, derivedBuses);
     const agents = adaptAgents(payloads.agents, mockAgents);
@@ -2275,6 +2279,7 @@ export function useOperatorBackend() {
     const rules = adaptRulesSnapshot(payloads.rules, []);
     return {
       channels,
+      instrumentSpace,
       buses,
       agents,
       tasks,

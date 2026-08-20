@@ -9,6 +9,6 @@ export function Dashboard(ui: UiState, actions: UiActions, data: OperatorViewDat
     subtitle: 'Dashboard · Live in Club · Soundcheck',
     runtime: data.directorRuntime,
     rightPanel: <RightDirectorPanel actions={actions} runtime={data.directorRuntime} taskRows={data.tasks} />,
-    content: <DashboardWorkspace actions={actions} channels={data.channels} runtime={data.dashboardRuntime} ui={ui} />
+    content: <DashboardWorkspace actions={actions} channels={data.channels} instrumentSpace={data.instrumentSpace} runtime={data.dashboardRuntime} ui={ui} />
   };
 }
