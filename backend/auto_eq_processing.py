@@ -141,6 +141,9 @@ class EQLimiter:
         Returns:
             Ограниченное значение gain (dB)
         """
+        if not np.isfinite(target_gain):
+            return float(self._last_output)
+
         # Ограничиваем диапазон
         target_gain = np.clip(target_gain, self.min_gain, self.max_gain)
         

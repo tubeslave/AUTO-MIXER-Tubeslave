@@ -98,14 +98,10 @@ class HPFNode(ProcessingNode):
         if self.bypass or data.size == 0 or not self._ensure_filter(sr):
             return data.copy()
         if HAS_SCIPY and self._sos is not None:
-            if data.ndim != 1:
-                # Nodes before Pan are expected to be mono. Process columns
-                # independently for robustness when reused elsewhere.
-                channels = [self.process(data[:, idx], sr) for idx in range(data.shape[1])]
-                return np.column_stack(channels)
-            if self._zi is None:
-                self._zi = np.zeros((self._sos.shape[0], 2), dtype=np.float64)
-            out, self._zi = sosfilt(self._sos, data, zi=self._zi)
+            shape = (self._sos.shape[0], 2) + data.shape[1:]
+            if self._zi is None or self._zi.shape != shape:
+                self._zi = np.zeros(shape, dtype=np.float64)
+            out, self._zi = sosfilt(self._sos, data, axis=0, zi=self._zi)
             return np.nan_to_num(out)
 
         rc = 1.0 / (2.0 * math.pi * self.cutoff_hz)

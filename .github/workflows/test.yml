@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: false
       - name: Archive tested source
-        run: git archive --format=zip --output=automixer-audit-source.zip HEAD backend tests mix_agent .github/workflows
+        run: git archive --format=zip --output=automixer-audit-source.zip HEAD backend tests mix_agent .github/workflows src scripts config docs/SHADOW_PIPELINE.md
       - uses: actions/upload-artifact@v4
         with:
           name: automixer-audit-source
@@ -31,6 +31,7 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
+        stack: [core, full]
 
     steps:
       - uses: actions/checkout@v4
@@ -48,8 +49,16 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r backend/requirements.txt
-          pip install pytest pytest-asyncio
+          if [ "${{ matrix.stack }}" = "full" ]; then
+            pip install 'torch>=2.0.0' --index-url https://download.pytorch.org/whl/cpu
+            pip install -r backend/requirements.txt
+          else
+            pip install -r backend/requirements-core.txt -r backend/requirements-dev.txt
+          fi
+
+      - name: Confirm optional ML is absent from core
+        if: matrix.stack == 'core'
+        run: python -c "import importlib.util; assert importlib.util.find_spec('torch') is None"
 
       - name: Verify backend compilation
         run: python -m compileall -q backend mix_agent

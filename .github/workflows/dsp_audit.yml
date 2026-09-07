@@ -42,4 +42,6 @@ jobs:
             tests/test_mix_agent_dsp_overhaul.py \
             tests/test_dsp_invariants_extended.py \
             tests/test_feedback_dsp_invariants.py \
+            tests/test_shadow_pipeline.py \
+            tests/test_shadow_regressions.py \
             --tb=short -q

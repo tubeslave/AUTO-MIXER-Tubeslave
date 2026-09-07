@@ -7,7 +7,9 @@ programme window rather than on the first FFT frame of raw inputs.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from copy import deepcopy
+
+from dataclasses import dataclass, field, replace
 import math
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -452,6 +454,9 @@ def _routing_audit(channels: Sequence[LiveSharedMixChannel], config: LiveSharedM
 
 def build_live_shared_mix_plan(channels: Sequence[LiveSharedMixChannel], sample_rate: int, *, config: Optional[LiveSharedMixConfig] = None, master_audio: Optional[np.ndarray] = None, master_current_fader_db: Optional[float] = None) -> LiveSharedMixPlan:
     config = config or LiveSharedMixConfig()
+    # Proposals must not mutate the caller's readback or signal buffers.
+    channels = [replace(ch, current_eq_gain=dict(ch.current_eq_gain),
+                        raw_settings=deepcopy(ch.raw_settings)) for ch in channels]
     if not config.enabled:
         return LiveSharedMixPlan(report={"enabled": False, "reason": "disabled"})
     active = [ch for ch in channels if np.asarray(ch.audio).size and not ch.muted and np.isfinite(ch.fader_db) and ch.fader_db > -90.0 and _peak_db(ch.audio) > -65.0]
@@ -498,7 +503,8 @@ def build_live_shared_mix_plan(channels: Sequence[LiveSharedMixChannel], sample_
     _apply_air_cleanup(active, start, end, actions, decisions, config)
     report["phases"].append(_phase_log("cymbal_air_layer", active, start, end))
     _mirror_eq(active, start, end, actions, decisions, report, config)
-    report["analysis_after"] = _phase_log("predicted_after", active, start, end)
+    report["analysis_after"] = _phase_log("fader_only_prediction", active, start, end)
+    report["analysis_after"]["eq_hpf_rendered"] = False
     _append_master(actions, report, master_audio, master_current_fader_db, config)
 
     ranked = sorted(enumerate(actions), key=lambda item: (_action_priority(item[1]), item[0]))
