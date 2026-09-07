@@ -28,6 +28,7 @@ jobs:
           python -m py_compile backend/live_shared_mix.py
           python -m py_compile backend/auto_phase_gcc_phat.py
           python -m py_compile backend/auto_mastering.py
+          python -m py_compile backend/feedback_detector.py
           python -m py_compile backend/ml/processing_graph.py
           python -m py_compile mix_agent/analysis/dsp_utils.py
           python -m py_compile mix_agent/analysis/loudness.py
@@ -40,4 +41,5 @@ jobs:
             tests/test_signal_metrics_overhaul.py \
             tests/test_mix_agent_dsp_overhaul.py \
             tests/test_dsp_invariants_extended.py \
+            tests/test_feedback_dsp_invariants.py \
             --tb=short -q
