@@ -1,0 +1,30 @@
+name: DSP Audit
+
+on:
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+jobs:
+  synthetic-dsp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONPATH: backend
+      OSC_DISABLED: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install DSP test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install numpy scipy pyloudnorm pytest
+      - name: Compile DSP modules
+        run: |
+          python -m py_compile backend/lufs_gain_staging.py
+          python -m py_compile backend/signal_metrics.py
+          python -m py_compile backend/live_shared_mix.py
+      - name: Run DSP invariants
+        run: python -m pytest tests/test_dsp_invariants_audit.py --tb=short -q
