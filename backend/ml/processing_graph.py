@@ -1,127 +1,146 @@
+"""Stateful modular audio processing graph used by offline/ML experiments.
+
+The original node implementations recreated filter/envelope state on every
+``process`` call, so the same signal produced different output depending on host
+buffer boundaries.  This version preserves state explicitly, sanitizes invalid
+samples, and keeps the existing public classes/parameter API.
+
+This module processes numpy audio only.  It has no mixer, OSC or MIDI write path.
 """
-Processing Graph - Modular audio processing chain
-===================================================
-Defines a directed processing graph of audio nodes (HPF, Gate, EQ, Compressor,
-Fader, Pan, BusSend) with configurable parameters.  Each node processes audio
-in numpy.  An optional gradient-based interface (via PyTorch) allows optimizing
-the graph parameters to match a target output.
-"""
+
+from __future__ import annotations
 
 import abc
 import logging
 import math
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
 try:
-    import torch
-    import torch.nn as nn
-
-    HAS_TORCH = True
-except ImportError:
-    HAS_TORCH = False
-
-try:
-    from scipy.signal import butter, sosfilt, lfilter
-
+    from scipy.signal import butter, lfilter, sosfilt, sosfilt_zi
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
 
+try:
+    import torch
+    HAS_TORCH = True
+except ImportError:
+    torch = None
+    HAS_TORCH = False
+
 logger = logging.getLogger(__name__)
+EPS = 1e-12
 
 
-# ============================================================================
-# Base processing node
-# ============================================================================
+def _finite(audio: np.ndarray) -> np.ndarray:
+    return np.nan_to_num(np.asarray(audio, dtype=np.float64), nan=0.0, posinf=0.0, neginf=0.0)
 
 
 class ProcessingNode(abc.ABC):
-    """
-    Abstract base class for all processing nodes in the graph.
-    Each node takes mono audio (numpy float64) and returns processed audio.
-    """
-
     def __init__(self, name: str = "", bypass: bool = False):
         self.name = name or self.__class__.__name__
-        self.bypass = bypass
+        self.bypass = bool(bypass)
 
     @abc.abstractmethod
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        """Process audio through this node.
+        raise NotImplementedError
 
-        Args:
-            audio: Mono audio signal as float64 numpy array.
-            sr: Sample rate in Hz.
-
-        Returns:
-            Processed audio as float64 numpy array.
-        """
-        ...
+    def reset_state(self) -> None:
+        """Reset streaming state without changing parameters."""
 
     def get_params(self) -> Dict[str, float]:
-        """Return current parameters as a dict."""
         return {}
 
     def set_params(self, params: Dict[str, float]) -> None:
-        """Set parameters from a dict."""
-        pass
+        del params
 
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}(name={self.name!r}, bypass={self.bypass})"
 
 
-# ============================================================================
-# Concrete processing nodes
-# ============================================================================
-
-
 class HPFNode(ProcessingNode):
-    """High-pass filter node using a second-order Butterworth filter."""
+    """Stateful Butterworth high-pass filter."""
 
     def __init__(self, cutoff_hz: float = 80.0, order: int = 2, **kwargs: Any):
         super().__init__(**kwargs)
-        self.cutoff_hz = cutoff_hz
-        self.order = order
+        self.cutoff_hz = float(cutoff_hz)
+        self.order = int(order)
+        self._design_key: Optional[Tuple[int, float, int]] = None
+        self._sos: Optional[np.ndarray] = None
+        self._zi: Optional[np.ndarray] = None
+        self._fallback_prev_x = 0.0
+        self._fallback_prev_y = 0.0
+
+    def reset_state(self) -> None:
+        self._zi = None
+        self._fallback_prev_x = 0.0
+        self._fallback_prev_y = 0.0
+
+    def _ensure_filter(self, sr: int) -> bool:
+        nyquist = float(sr) * 0.5
+        if self.cutoff_hz <= 0.0 or self.cutoff_hz >= nyquist:
+            return False
+        key = (int(sr), round(float(self.cutoff_hz), 9), int(self.order))
+        if key != self._design_key:
+            self._design_key = key
+            self.reset_state()
+            if HAS_SCIPY:
+                self._sos = butter(self.order, self.cutoff_hz / nyquist, btype="high", output="sos")
+            else:
+                self._sos = None
+        return True
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        if self.bypass or self.cutoff_hz <= 0:
-            return audio
+        data = _finite(audio)
+        if self.bypass or data.size == 0 or not self._ensure_filter(sr):
+            return data.copy()
+        if HAS_SCIPY and self._sos is not None:
+            if data.ndim != 1:
+                # Nodes before Pan are expected to be mono. Process columns
+                # independently for robustness when reused elsewhere.
+                channels = [self.process(data[:, idx], sr) for idx in range(data.shape[1])]
+                return np.column_stack(channels)
+            if self._zi is None:
+                self._zi = np.zeros((self._sos.shape[0], 2), dtype=np.float64)
+            out, self._zi = sosfilt(self._sos, data, zi=self._zi)
+            return np.nan_to_num(out)
 
-        nyquist = sr / 2.0
-        normalized_cutoff = self.cutoff_hz / nyquist
-        if normalized_cutoff >= 1.0 or normalized_cutoff <= 0.0:
-            return audio
-
-        if HAS_SCIPY:
-            sos = butter(self.order, normalized_cutoff, btype="high", output="sos")
-            return sosfilt(sos, audio)
-        else:
-            # Manual single-pole HPF fallback
-            rc = 1.0 / (2.0 * math.pi * self.cutoff_hz)
-            dt = 1.0 / sr
-            alpha = rc / (rc + dt)
-            output = np.zeros_like(audio)
-            if len(audio) > 0:
-                output[0] = audio[0]
-            for i in range(1, len(audio)):
-                output[i] = alpha * (output[i - 1] + audio[i] - audio[i - 1])
-            return output
+        rc = 1.0 / (2.0 * math.pi * self.cutoff_hz)
+        dt = 1.0 / float(sr)
+        alpha = rc / (rc + dt)
+        out = np.empty_like(data)
+        prev_x = self._fallback_prev_x
+        prev_y = self._fallback_prev_y
+        for i, x in enumerate(data):
+            y = alpha * (prev_y + float(x) - prev_x)
+            out[i] = y
+            prev_x, prev_y = float(x), y
+        self._fallback_prev_x, self._fallback_prev_y = prev_x, prev_y
+        return out
 
     def get_params(self) -> Dict[str, float]:
         return {"cutoff_hz": self.cutoff_hz, "order": float(self.order)}
 
     def set_params(self, params: Dict[str, float]) -> None:
+        changed = False
         if "cutoff_hz" in params:
-            self.cutoff_hz = max(20.0, min(2000.0, params["cutoff_hz"]))
+            value = max(20.0, min(2000.0, float(params["cutoff_hz"])))
+            changed |= value != self.cutoff_hz
+            self.cutoff_hz = value
         if "order" in params:
-            self.order = max(1, min(8, int(params["order"])))
+            value = max(1, min(8, int(params["order"])))
+            changed |= value != self.order
+            self.order = value
+        if changed:
+            self._design_key = None
+            self.reset_state()
 
 
 class GateNode(ProcessingNode):
-    """Noise gate with threshold, attack, hold, and release."""
+    """Stateful gate with peak envelope, attack, hold and release."""
 
     def __init__(
         self,
@@ -133,58 +152,55 @@ class GateNode(ProcessingNode):
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
-        self.threshold_db = threshold_db
-        self.attack_ms = attack_ms
-        self.hold_ms = hold_ms
-        self.release_ms = release_ms
-        self.range_db = range_db
+        self.threshold_db = float(threshold_db)
+        self.attack_ms = float(attack_ms)
+        self.hold_ms = float(hold_ms)
+        self.release_ms = float(release_ms)
+        self.range_db = float(range_db)
+        self._gain = 10.0 ** (self.range_db / 20.0)
+        self._hold_remaining = 0
+
+    def reset_state(self) -> None:
+        self._gain = 10.0 ** (self.range_db / 20.0)
+        self._hold_remaining = 0
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        if self.bypass:
-            return audio
-
-        threshold_linear = 10.0 ** (self.threshold_db / 20.0)
-        range_linear = 10.0 ** (self.range_db / 20.0)
-
-        attack_samples = max(1, int(self.attack_ms * sr / 1000.0))
-        hold_samples = max(1, int(self.hold_ms * sr / 1000.0))
-        release_samples = max(1, int(self.release_ms * sr / 1000.0))
-
-        # Compute envelope
-        envelope = np.abs(audio)
-
-        # Smooth envelope with a small window
-        window = max(1, int(0.002 * sr))  # 2ms
-        if window > 1 and len(envelope) > window:
-            kernel = np.ones(window) / window
-            envelope = np.convolve(envelope, kernel, mode="same")
-
-        output = audio.copy()
-        gate_gain = range_linear  # Start closed
-        hold_counter = 0
-
-        for i in range(len(audio)):
-            if envelope[i] >= threshold_linear:
-                hold_counter = hold_samples
-                # Attack: ramp up
+        data = _finite(audio)
+        if self.bypass or data.size == 0:
+            return data.copy()
+        if data.ndim != 1:
+            # Use linked detector across channels, then apply same gain.
+            detector = np.max(np.abs(data), axis=1)
+        else:
+            detector = np.abs(data)
+        threshold = 10.0 ** (self.threshold_db / 20.0)
+        floor_gain = 10.0 ** (self.range_db / 20.0)
+        attack_samples = max(1.0, self.attack_ms * sr / 1000.0)
+        release_samples = max(1.0, self.release_ms * sr / 1000.0)
+        attack_coeff = math.exp(-1.0 / attack_samples)
+        release_coeff = math.exp(-1.0 / release_samples)
+        hold_samples = max(0, int(round(self.hold_ms * sr / 1000.0)))
+        gains = np.empty(detector.size, dtype=np.float64)
+        gain = float(np.clip(self._gain, floor_gain, 1.0))
+        hold = int(self._hold_remaining)
+        for i, env in enumerate(detector):
+            if env >= threshold:
+                hold = hold_samples
                 target = 1.0
-                coeff = 1.0 / attack_samples
-            elif hold_counter > 0:
-                hold_counter -= 1
+            elif hold > 0:
+                hold -= 1
                 target = 1.0
-                coeff = 0.0  # Hold steady
             else:
-                # Release: ramp down
-                target = range_linear
-                coeff = 1.0 / release_samples
-
-            if coeff > 0:
-                gate_gain += coeff * (target - gate_gain)
-
-            gate_gain = max(range_linear, min(1.0, gate_gain))
-            output[i] = audio[i] * gate_gain
-
-        return output
+                target = floor_gain
+            coeff = attack_coeff if target > gain else release_coeff
+            gain = target + coeff * (gain - target)
+            gain = float(np.clip(gain, floor_gain, 1.0))
+            gains[i] = gain
+        self._gain = gain
+        self._hold_remaining = hold
+        if data.ndim == 1:
+            return data * gains
+        return data * gains[:, None]
 
     def get_params(self) -> Dict[str, float]:
         return {
@@ -197,26 +213,24 @@ class GateNode(ProcessingNode):
 
     def set_params(self, params: Dict[str, float]) -> None:
         if "threshold_db" in params:
-            self.threshold_db = max(-96.0, min(0.0, params["threshold_db"]))
+            self.threshold_db = max(-96.0, min(0.0, float(params["threshold_db"])))
         if "attack_ms" in params:
-            self.attack_ms = max(0.01, min(100.0, params["attack_ms"]))
+            self.attack_ms = max(0.01, min(100.0, float(params["attack_ms"])))
         if "hold_ms" in params:
-            self.hold_ms = max(0.0, min(2000.0, params["hold_ms"]))
+            self.hold_ms = max(0.0, min(2000.0, float(params["hold_ms"])))
         if "release_ms" in params:
-            self.release_ms = max(1.0, min(5000.0, params["release_ms"]))
+            self.release_ms = max(1.0, min(5000.0, float(params["release_ms"])))
         if "range_db" in params:
-            self.range_db = max(-96.0, min(0.0, params["range_db"]))
+            self.range_db = max(-96.0, min(0.0, float(params["range_db"])))
+        self._gain = float(np.clip(self._gain, 10.0 ** (self.range_db / 20.0), 1.0))
 
 
 class EQNode(ProcessingNode):
-    """
-    Parametric EQ node with configurable bands.
-    Each band is a biquad filter (peak, low_shelf, or high_shelf).
-    """
+    """Stateful RBJ-style parametric EQ."""
 
     @dataclass
     class Band:
-        band_type: str = "peak"  # "peak", "low_shelf", "high_shelf"
+        band_type: str = "peak"
         frequency: float = 1000.0
         gain_db: float = 0.0
         q: float = 1.0
@@ -224,82 +238,98 @@ class EQNode(ProcessingNode):
     def __init__(self, bands: Optional[List[Dict[str, Any]]] = None, **kwargs: Any):
         super().__init__(**kwargs)
         self.bands: List[EQNode.Band] = []
-        if bands:
-            for b in bands:
-                self.bands.append(
-                    EQNode.Band(
-                        band_type=b.get("band_type", "peak"),
-                        frequency=b.get("frequency", 1000.0),
-                        gain_db=b.get("gain_db", 0.0),
-                        q=b.get("q", 1.0),
-                    )
+        for item in bands or []:
+            self.bands.append(
+                EQNode.Band(
+                    band_type=str(item.get("band_type", "peak")),
+                    frequency=float(item.get("frequency", 1000.0)),
+                    gain_db=float(item.get("gain_db", 0.0)),
+                    q=float(item.get("q", 1.0)),
                 )
+            )
+        self._states: Dict[Tuple[int, int], np.ndarray] = {}
+        self._coeff_keys: Dict[int, Tuple[Any, ...]] = {}
+        self._coeffs: Dict[int, Tuple[np.ndarray, np.ndarray]] = {}
+
+    def reset_state(self) -> None:
+        self._states.clear()
+
+    @staticmethod
+    def _coefficients(band: "EQNode.Band", sr: int) -> Tuple[np.ndarray, np.ndarray]:
+        freq = float(np.clip(band.frequency, 10.0, sr * 0.49))
+        q = max(0.1, float(band.q))
+        A = 10.0 ** (float(band.gain_db) / 40.0)
+        omega = 2.0 * math.pi * freq / sr
+        sin_o = math.sin(omega)
+        cos_o = math.cos(omega)
+        alpha = sin_o / (2.0 * q)
+        kind = band.band_type
+        if kind == "peak":
+            b0, b1, b2 = 1 + alpha * A, -2 * cos_o, 1 - alpha * A
+            a0, a1, a2 = 1 + alpha / A, -2 * cos_o, 1 - alpha / A
+        else:
+            sqrt_a = math.sqrt(max(A, EPS))
+            if kind == "low_shelf":
+                b0 = A * ((A + 1) - (A - 1) * cos_o + 2 * sqrt_a * alpha)
+                b1 = 2 * A * ((A - 1) - (A + 1) * cos_o)
+                b2 = A * ((A + 1) - (A - 1) * cos_o - 2 * sqrt_a * alpha)
+                a0 = (A + 1) + (A - 1) * cos_o + 2 * sqrt_a * alpha
+                a1 = -2 * ((A - 1) + (A + 1) * cos_o)
+                a2 = (A + 1) + (A - 1) * cos_o - 2 * sqrt_a * alpha
+            elif kind == "high_shelf":
+                b0 = A * ((A + 1) + (A - 1) * cos_o + 2 * sqrt_a * alpha)
+                b1 = -2 * A * ((A - 1) + (A + 1) * cos_o)
+                b2 = A * ((A + 1) + (A - 1) * cos_o - 2 * sqrt_a * alpha)
+                a0 = (A + 1) - (A - 1) * cos_o + 2 * sqrt_a * alpha
+                a1 = 2 * ((A - 1) - (A + 1) * cos_o)
+                a2 = (A + 1) - (A - 1) * cos_o - 2 * sqrt_a * alpha
+            else:
+                return np.array([1.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0])
+        return (
+            np.array([b0 / a0, b1 / a0, b2 / a0], dtype=np.float64),
+            np.array([1.0, a1 / a0, a2 / a0], dtype=np.float64),
+        )
+
+    def _apply_channel(self, data: np.ndarray, sr: int, channel_index: int) -> np.ndarray:
+        out = data.astype(np.float64, copy=True)
+        for band_index, band in enumerate(self.bands):
+            if abs(band.gain_db) < 0.001:
+                continue
+            key = (sr, band.band_type, round(band.frequency, 8), round(band.gain_db, 8), round(band.q, 8))
+            if self._coeff_keys.get(band_index) != key:
+                self._coeff_keys[band_index] = key
+                self._coeffs[band_index] = self._coefficients(band, sr)
+                # Parameter jumps intentionally reset this band to avoid using
+                # state generated by a different transfer function.
+                for state_key in [k for k in self._states if k[0] == band_index]:
+                    self._states.pop(state_key, None)
+            b, a = self._coeffs[band_index]
+            state_key = (band_index, channel_index)
+            zi = self._states.get(state_key, np.zeros(2, dtype=np.float64))
+            if HAS_SCIPY:
+                out, zf = lfilter(b, a, out, zi=zi)
+            else:
+                z1, z2 = float(zi[0]), float(zi[1])
+                result = np.empty_like(out)
+                for i, x in enumerate(out):
+                    y = b[0] * x + z1
+                    z1 = b[1] * x - a[1] * y + z2
+                    z2 = b[2] * x - a[2] * y
+                    result[i] = y
+                out, zf = result, np.array([z1, z2])
+            self._states[state_key] = np.asarray(zf, dtype=np.float64)
+        return np.nan_to_num(out)
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        if self.bypass or not self.bands:
-            return audio
-
-        output = audio.copy()
-        for band in self.bands:
-            if abs(band.gain_db) < 0.01:
-                continue
-            output = self._apply_biquad(output, band, sr)
-        return output
-
-    def _apply_biquad(self, audio: np.ndarray, band: "EQNode.Band", sr: int) -> np.ndarray:
-        """Apply a biquad filter for a single EQ band."""
-        A = 10.0 ** (band.gain_db / 40.0)
-        omega = 2.0 * math.pi * band.frequency / sr
-        sin_omega = math.sin(omega)
-        cos_omega = math.cos(omega)
-        alpha = sin_omega / (2.0 * max(0.1, band.q))
-
-        if band.band_type == "peak":
-            b0 = 1.0 + alpha * A
-            b1 = -2.0 * cos_omega
-            b2 = 1.0 - alpha * A
-            a0 = 1.0 + alpha / A
-            a1 = -2.0 * cos_omega
-            a2 = 1.0 - alpha / A
-        elif band.band_type == "low_shelf":
-            sqrt_a = math.sqrt(max(0.001, A))
-            b0 = A * ((A + 1) - (A - 1) * cos_omega + 2 * sqrt_a * alpha)
-            b1 = 2 * A * ((A - 1) - (A + 1) * cos_omega)
-            b2 = A * ((A + 1) - (A - 1) * cos_omega - 2 * sqrt_a * alpha)
-            a0 = (A + 1) + (A - 1) * cos_omega + 2 * sqrt_a * alpha
-            a1 = -2 * ((A - 1) + (A + 1) * cos_omega)
-            a2 = (A + 1) + (A - 1) * cos_omega - 2 * sqrt_a * alpha
-        elif band.band_type == "high_shelf":
-            sqrt_a = math.sqrt(max(0.001, A))
-            b0 = A * ((A + 1) + (A - 1) * cos_omega + 2 * sqrt_a * alpha)
-            b1 = -2 * A * ((A - 1) + (A + 1) * cos_omega)
-            b2 = A * ((A + 1) + (A - 1) * cos_omega - 2 * sqrt_a * alpha)
-            a0 = (A + 1) - (A - 1) * cos_omega + 2 * sqrt_a * alpha
-            a1 = 2 * ((A - 1) - (A + 1) * cos_omega)
-            a2 = (A + 1) - (A - 1) * cos_omega - 2 * sqrt_a * alpha
-        else:
-            return audio
-
-        # Normalize
-        b = np.array([b0 / a0, b1 / a0, b2 / a0])
-        a = np.array([1.0, a1 / a0, a2 / a0])
-
-        if HAS_SCIPY:
-            return lfilter(b, a, audio)
-        else:
-            # Manual Direct Form II transposed
-            output = np.zeros_like(audio)
-            z1, z2 = 0.0, 0.0
-            for i in range(len(audio)):
-                x = audio[i]
-                y = b[0] * x + z1
-                z1 = b[1] * x - a[1] * y + z2
-                z2 = b[2] * x - a[2] * y
-                output[i] = y
-            return output
+        data = _finite(audio)
+        if self.bypass or not self.bands or data.size == 0:
+            return data.copy()
+        if data.ndim == 1:
+            return self._apply_channel(data, sr, 0)
+        return np.column_stack([self._apply_channel(data[:, ch], sr, ch) for ch in range(data.shape[1])])
 
     def get_params(self) -> Dict[str, float]:
-        params = {}
+        params: Dict[str, float] = {}
         for i, band in enumerate(self.bands):
             params[f"band{i}_freq"] = band.frequency
             params[f"band{i}_gain"] = band.gain_db
@@ -308,22 +338,16 @@ class EQNode(ProcessingNode):
 
     def set_params(self, params: Dict[str, float]) -> None:
         for i, band in enumerate(self.bands):
-            key_freq = f"band{i}_freq"
-            key_gain = f"band{i}_gain"
-            key_q = f"band{i}_q"
-            if key_freq in params:
-                band.frequency = max(20.0, min(20000.0, params[key_freq]))
-            if key_gain in params:
-                band.gain_db = max(-24.0, min(24.0, params[key_gain]))
-            if key_q in params:
-                band.q = max(0.1, min(30.0, params[key_q]))
+            if f"band{i}_freq" in params:
+                band.frequency = max(20.0, min(20000.0, float(params[f"band{i}_freq"])))
+            if f"band{i}_gain" in params:
+                band.gain_db = max(-24.0, min(24.0, float(params[f"band{i}_gain"])))
+            if f"band{i}_q" in params:
+                band.q = max(0.1, min(30.0, float(params[f"band{i}_q"])))
 
 
 class CompressorNode(ProcessingNode):
-    """
-    Dynamic range compressor with threshold, ratio, knee, attack, release,
-    and makeup gain.
-    """
+    """Stateful linked peak compressor with soft knee."""
 
     def __init__(
         self,
@@ -336,58 +360,47 @@ class CompressorNode(ProcessingNode):
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
-        self.threshold_db = threshold_db
-        self.ratio = ratio
-        self.attack_ms = attack_ms
-        self.release_ms = release_ms
-        self.knee_db = knee_db
-        self.makeup_db = makeup_db
+        self.threshold_db = float(threshold_db)
+        self.ratio = float(ratio)
+        self.attack_ms = float(attack_ms)
+        self.release_ms = float(release_ms)
+        self.knee_db = float(knee_db)
+        self.makeup_db = float(makeup_db)
+        self._envelope_db = -120.0
+
+    def reset_state(self) -> None:
+        self._envelope_db = -120.0
+
+    def _gain_reduction(self, level_db: float) -> float:
+        ratio = max(1.0, self.ratio)
+        over = level_db - self.threshold_db
+        half = max(0.0, self.knee_db) * 0.5
+        if self.knee_db > 0.0 and -half < over < half:
+            x = over + half
+            return (1.0 - 1.0 / ratio) * x * x / (2.0 * self.knee_db)
+        if over > half or (self.knee_db <= 0.0 and over > 0.0):
+            return over * (1.0 - 1.0 / ratio)
+        return 0.0
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        if self.bypass:
-            return audio
-
-        eps = 1e-10
-        attack_coeff = math.exp(-1.0 / max(1, self.attack_ms * sr / 1000.0))
-        release_coeff = math.exp(-1.0 / max(1, self.release_ms * sr / 1000.0))
-
-        output = np.zeros_like(audio)
-        envelope_db = -96.0
-        half_knee = self.knee_db / 2.0
-
-        for i in range(len(audio)):
-            # Level detection
-            level = abs(audio[i])
-            if level > eps:
-                level_db = 20.0 * math.log10(level)
-            else:
-                level_db = -96.0
-
-            # Envelope follower
-            if level_db > envelope_db:
-                envelope_db = attack_coeff * envelope_db + (1.0 - attack_coeff) * level_db
-            else:
-                envelope_db = release_coeff * envelope_db + (1.0 - release_coeff) * level_db
-
-            # Gain computation with soft knee
-            overshoot = envelope_db - self.threshold_db
-
-            if self.knee_db > 0.01 and abs(overshoot) < half_knee:
-                # Soft knee region
-                knee_factor = (overshoot + half_knee) / self.knee_db
-                gain_reduction = (1.0 - 1.0 / self.ratio) * (overshoot + half_knee) ** 2 / (2.0 * self.knee_db)
-            elif overshoot > 0:
-                # Above threshold
-                gain_reduction = overshoot * (1.0 - 1.0 / self.ratio)
-            else:
-                gain_reduction = 0.0
-
-            # Apply gain reduction + makeup
-            total_gain_db = -gain_reduction + self.makeup_db
-            gain_linear = 10.0 ** (total_gain_db / 20.0)
-            output[i] = audio[i] * gain_linear
-
-        return output
+        data = _finite(audio)
+        if self.bypass or data.size == 0:
+            return data.copy()
+        detector = np.max(np.abs(data), axis=1) if data.ndim > 1 else np.abs(data)
+        attack = math.exp(-1.0 / max(1.0, self.attack_ms * sr / 1000.0))
+        release = math.exp(-1.0 / max(1.0, self.release_ms * sr / 1000.0))
+        env = float(self._envelope_db)
+        gains = np.empty(detector.size, dtype=np.float64)
+        for i, level in enumerate(detector):
+            level_db = max(-120.0, 20.0 * math.log10(max(float(level), EPS)))
+            coeff = attack if level_db > env else release
+            env = level_db + coeff * (env - level_db)
+            reduction = max(0.0, self._gain_reduction(env))
+            gains[i] = 10.0 ** ((self.makeup_db - reduction) / 20.0)
+        self._envelope_db = env
+        if data.ndim == 1:
+            return data * gains
+        return data * gains[:, None]
 
     def get_params(self) -> Dict[str, float]:
         return {
@@ -401,102 +414,85 @@ class CompressorNode(ProcessingNode):
 
     def set_params(self, params: Dict[str, float]) -> None:
         if "threshold_db" in params:
-            self.threshold_db = max(-60.0, min(0.0, params["threshold_db"]))
+            self.threshold_db = max(-60.0, min(0.0, float(params["threshold_db"])))
         if "ratio" in params:
-            self.ratio = max(1.0, min(20.0, params["ratio"]))
+            self.ratio = max(1.0, min(20.0, float(params["ratio"])))
         if "attack_ms" in params:
-            self.attack_ms = max(0.01, min(200.0, params["attack_ms"]))
+            self.attack_ms = max(0.01, min(200.0, float(params["attack_ms"])))
         if "release_ms" in params:
-            self.release_ms = max(1.0, min(5000.0, params["release_ms"]))
+            self.release_ms = max(1.0, min(5000.0, float(params["release_ms"])))
         if "knee_db" in params:
-            self.knee_db = max(0.0, min(24.0, params["knee_db"]))
+            self.knee_db = max(0.0, min(24.0, float(params["knee_db"])))
         if "makeup_db" in params:
-            self.makeup_db = max(-12.0, min(24.0, params["makeup_db"]))
+            self.makeup_db = max(-12.0, min(24.0, float(params["makeup_db"])))
 
 
 class FaderNode(ProcessingNode):
-    """Simple gain / fader node."""
-
     def __init__(self, gain_db: float = 0.0, **kwargs: Any):
         super().__init__(**kwargs)
-        self.gain_db = gain_db
+        self.gain_db = float(gain_db)
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
+        del sr
+        data = _finite(audio)
         if self.bypass:
-            return audio
-        gain_linear = 10.0 ** (self.gain_db / 20.0)
-        return audio * gain_linear
+            return data.copy()
+        return data * (10.0 ** (self.gain_db / 20.0))
 
     def get_params(self) -> Dict[str, float]:
         return {"gain_db": self.gain_db}
 
     def set_params(self, params: Dict[str, float]) -> None:
         if "gain_db" in params:
-            self.gain_db = max(-96.0, min(24.0, params["gain_db"]))
+            self.gain_db = max(-96.0, min(24.0, float(params["gain_db"])))
 
 
 class PanNode(ProcessingNode):
-    """
-    Panning node: takes mono input and returns stereo (N, 2).
-    Uses constant-power panning law.
-    """
+    """Constant-power mono panner."""
 
     def __init__(self, pan: float = 0.0, **kwargs: Any):
-        """
-        Args:
-            pan: Pan position from -1.0 (full left) to 1.0 (full right).
-        """
         super().__init__(**kwargs)
-        self.pan = pan
+        self.pan = float(pan)
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
+        del sr
+        data = _finite(audio)
+        if data.ndim > 1:
+            # Already stereo/multichannel: leave topology intact.
+            return data.copy()
         if self.bypass:
-            # Return stereo centered
-            return np.column_stack([audio, audio])
-
-        # Constant power panning
-        # pan: -1 = left, 0 = center, 1 = right
-        angle = (self.pan + 1.0) * math.pi / 4.0  # 0..pi/2
-        left_gain = math.cos(angle)
-        right_gain = math.sin(angle)
-
-        left = audio * left_gain
-        right = audio * right_gain
-
-        return np.column_stack([left, right])
+            return np.column_stack([data / math.sqrt(2.0), data / math.sqrt(2.0)])
+        angle = (float(np.clip(self.pan, -1.0, 1.0)) + 1.0) * math.pi / 4.0
+        return np.column_stack([data * math.cos(angle), data * math.sin(angle)])
 
     def get_params(self) -> Dict[str, float]:
         return {"pan": self.pan}
 
     def set_params(self, params: Dict[str, float]) -> None:
         if "pan" in params:
-            self.pan = max(-1.0, min(1.0, params["pan"]))
+            self.pan = max(-1.0, min(1.0, float(params["pan"])))
 
 
 class BusSendNode(ProcessingNode):
-    """
-    Bus send node: creates a copy of the signal at a specified level.
-    Returns the original signal unchanged; the send signal is stored
-    for retrieval.
-    """
-
     def __init__(self, send_level_db: float = -10.0, bus_name: str = "bus1", **kwargs: Any):
         super().__init__(**kwargs)
-        self.send_level_db = send_level_db
-        self.bus_name = bus_name
+        self.send_level_db = float(send_level_db)
+        self.bus_name = str(bus_name)
         self.last_send: Optional[np.ndarray] = None
 
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
+        del sr
+        data = _finite(audio)
         if self.bypass:
-            self.last_send = np.zeros_like(audio)
-            return audio
+            self.last_send = np.zeros_like(data)
+        else:
+            self.last_send = data * (10.0 ** (self.send_level_db / 20.0))
+        return data.copy()
 
-        send_gain = 10.0 ** (self.send_level_db / 20.0)
-        self.last_send = audio * send_gain
-        return audio  # Pass through unchanged
+    def reset_state(self) -> None:
+        self.last_send = None
 
     def get_send(self) -> Optional[np.ndarray]:
-        """Retrieve the last computed send signal."""
         return self.last_send
 
     def get_params(self) -> Dict[str, float]:
@@ -504,37 +500,17 @@ class BusSendNode(ProcessingNode):
 
     def set_params(self, params: Dict[str, float]) -> None:
         if "send_level_db" in params:
-            self.send_level_db = max(-96.0, min(10.0, params["send_level_db"]))
-
-
-# ============================================================================
-# Processing Graph
-# ============================================================================
+            self.send_level_db = max(-96.0, min(10.0, float(params["send_level_db"])))
 
 
 class ProcessingGraph:
-    """
-    A chain of ProcessingNodes forming a complete channel strip.
-
-    Default chain: HPF -> Gate -> EQ -> Compressor -> Fader -> Pan -> BusSend
-
-    Supports gradient-based optimization when PyTorch is available.
-    """
+    """Ordered channel-strip graph with explicit streaming-state reset."""
 
     def __init__(self, nodes: Optional[List[ProcessingNode]] = None):
-        """
-        Args:
-            nodes: List of ProcessingNode instances. If None, creates a
-                   default channel strip chain.
-        """
-        if nodes is not None:
-            self.nodes = nodes
-        else:
-            self.nodes = self._default_chain()
+        self.nodes = list(nodes) if nodes is not None else self._default_chain()
 
     @staticmethod
     def _default_chain() -> List[ProcessingNode]:
-        """Create the default processing chain: HPF->Gate->EQ->Comp->Fader->Pan->BusSend."""
         return [
             HPFNode(cutoff_hz=80.0, name="hpf"),
             GateNode(threshold_db=-50.0, name="gate"),
@@ -554,84 +530,67 @@ class ProcessingGraph:
             BusSendNode(send_level_db=-96.0, bus_name="fx1", name="bus_send"),
         ]
 
+    def reset_state(self) -> None:
+        for node in self.nodes:
+            node.reset_state()
+
     def process(self, audio: np.ndarray, sr: int = 48000) -> np.ndarray:
-        """
-        Run audio through the entire processing chain.
-
-        Args:
-            audio: Input mono audio (float64).
-            sr: Sample rate.
-
-        Returns:
-            Processed audio. May be stereo (N, 2) if a PanNode is in the chain.
-        """
-        signal = audio.astype(np.float64)
+        signal = _finite(audio)
         for node in self.nodes:
             signal = node.process(signal, sr)
-        return signal
+        return np.nan_to_num(signal)
 
     def get_node(self, name: str) -> Optional[ProcessingNode]:
-        """Find a node by name."""
-        for node in self.nodes:
-            if node.name == name:
-                return node
-        return None
+        return next((node for node in self.nodes if node.name == name), None)
 
     def get_params(self) -> Dict[str, Dict[str, float]]:
-        """Get all parameters from all nodes."""
         return {node.name: node.get_params() for node in self.nodes}
 
     def set_params(self, params: Dict[str, Dict[str, float]]) -> None:
-        """Set parameters for nodes by name."""
         for node in self.nodes:
             if node.name in params:
                 node.set_params(params[node.name])
 
     def get_params_flat(self) -> np.ndarray:
-        """
-        Flatten all parameters into a single numpy array.
-        Used as the interface for gradient-based optimization.
-
-        Returns:
-            1D numpy array of all parameter values.
-        """
-        values = []
+        values: List[float] = []
         for node in self.nodes:
-            p = node.get_params()
-            for key in sorted(p.keys()):
-                values.append(p[key])
-        return np.array(values, dtype=np.float64)
+            for key in sorted(node.get_params()):
+                values.append(float(node.get_params()[key]))
+        return np.asarray(values, dtype=np.float64)
 
     def set_params_flat(self, flat_params: np.ndarray) -> None:
-        """
-        Set all parameters from a flattened array.
-
-        Args:
-            flat_params: 1D array matching the shape from get_params_flat().
-        """
-        idx = 0
+        values = np.asarray(flat_params, dtype=np.float64).reshape(-1)
+        index = 0
         for node in self.nodes:
-            p = node.get_params()
-            new_params = {}
-            for key in sorted(p.keys()):
-                if idx < len(flat_params):
-                    new_params[key] = float(flat_params[idx])
-                    idx += 1
-            node.set_params(new_params)
+            current = node.get_params()
+            update: Dict[str, float] = {}
+            for key in sorted(current):
+                if index >= values.size:
+                    break
+                update[key] = float(values[index])
+                index += 1
+            node.set_params(update)
 
-    def gradient_interface(self) -> Tuple[np.ndarray, "ProcessingGraph"]:
-        """
-        Return (params_tensor, self) for optimization.
-
-        When PyTorch is available, returns a torch tensor with requires_grad.
-        Otherwise returns a numpy array.
-        """
+    def gradient_interface(self):
         params = self.get_params_flat()
         if HAS_TORCH:
-            tensor = torch.tensor(params, dtype=torch.float64, requires_grad=True)
-            return tensor, self
-        else:
-            return params, self
+            return torch.tensor(params, dtype=torch.float64, requires_grad=True), self
+        return params, self
+
+    @staticmethod
+    def _mono(output: np.ndarray) -> np.ndarray:
+        data = np.asarray(output, dtype=np.float64)
+        return np.mean(data, axis=1) if data.ndim > 1 else data
+
+    def _loss(self, params: np.ndarray, input_audio: np.ndarray, target_audio: np.ndarray, sr: int) -> float:
+        self.set_params_flat(params)
+        self.reset_state()
+        output = self._mono(self.process(input_audio, sr))
+        target = self._mono(target_audio)
+        n = min(output.size, target.size)
+        if n == 0:
+            return float("inf")
+        return float(np.mean(np.square(output[:n] - target[:n])))
 
     def optimize(
         self,
@@ -641,153 +600,40 @@ class ProcessingGraph:
         lr: float = 0.01,
         steps: int = 100,
     ) -> Dict[str, Dict[str, float]]:
-        """
-        Optimize processing parameters to make the graph output match a target.
-
-        Uses gradient descent when PyTorch is available; otherwise falls back to
-        coordinate descent (Nelder-Mead-style perturbation).
-
-        Args:
-            target_audio: Target output audio (mono, float64).
-            input_audio: Input audio to process.
-            sr: Sample rate.
-            lr: Learning rate (for gradient descent) or step size (for coordinate descent).
-            steps: Number of optimization iterations.
-
-        Returns:
-            Optimized parameters dict.
-        """
-        if HAS_TORCH:
-            return self._optimize_torch(target_audio, input_audio, sr, lr, steps)
-        else:
-            return self._optimize_numpy(target_audio, input_audio, sr, lr, steps)
-
-    def _optimize_torch(
-        self,
-        target_audio: np.ndarray,
-        input_audio: np.ndarray,
-        sr: int,
-        lr: float,
-        steps: int,
-    ) -> Dict[str, Dict[str, float]]:
-        """Gradient-based optimization using PyTorch."""
-        target = torch.tensor(target_audio[:, 0] if target_audio.ndim == 2 else target_audio, dtype=torch.float64)
-
-        params_np = self.get_params_flat()
-        params_tensor = torch.tensor(params_np, dtype=torch.float64, requires_grad=True)
-        optimizer = torch.optim.Adam([params_tensor], lr=lr)
-
-        best_loss = float("inf")
-        best_params = params_np.copy()
-
-        for step in range(steps):
-            optimizer.zero_grad()
-
-            # Set params from tensor (detach for numpy processing)
-            self.set_params_flat(params_tensor.detach().numpy())
-
-            # Forward pass through graph
-            output = self.process(input_audio, sr)
-            if output.ndim == 2:
-                output_mono = output[:, 0]
-            else:
-                output_mono = output
-
-            # Compute loss: MSE + spectral loss
-            min_len = min(len(output_mono), len(target))
-            output_t = torch.tensor(output_mono[:min_len], dtype=torch.float64)
-            target_t = target[:min_len]
-
-            loss = torch.nn.functional.mse_loss(output_t, target_t)
-
-            # Numerical gradient via finite differences
-            grad = torch.zeros_like(params_tensor)
-            delta = 1e-4
-            base_loss_val = loss.item()
-
-            for i in range(len(params_tensor)):
-                perturbed = params_tensor.detach().clone()
-                perturbed[i] += delta
-                self.set_params_flat(perturbed.numpy())
-                out_p = self.process(input_audio, sr)
-                if out_p.ndim == 2:
-                    out_p = out_p[:, 0]
-                out_pt = torch.tensor(out_p[:min_len], dtype=torch.float64)
-                loss_p = torch.nn.functional.mse_loss(out_pt, target_t).item()
-                grad[i] = (loss_p - base_loss_val) / delta
-
-            # Update params
-            with torch.no_grad():
-                params_tensor -= lr * grad
-
-            current_loss = base_loss_val
-            if current_loss < best_loss:
-                best_loss = current_loss
-                best_params = params_tensor.detach().numpy().copy()
-
-            if step % 20 == 0:
-                logger.debug(f"Optimization step {step}: loss={current_loss:.6f}")
-
-        self.set_params_flat(best_params)
-        logger.info(f"Optimization complete: best loss={best_loss:.6f}")
-        return self.get_params()
-
-    def _optimize_numpy(
-        self,
-        target_audio: np.ndarray,
-        input_audio: np.ndarray,
-        sr: int,
-        lr: float,
-        steps: int,
-    ) -> Dict[str, Dict[str, float]]:
-        """Coordinate descent optimization using only numpy."""
-        target_mono = target_audio[:, 0] if target_audio.ndim == 2 else target_audio
-
+        # Deterministic coordinate descent is used even when torch is present.
+        # The graph contains numpy/scipy operators, so pretending gradients flow
+        # through a detached numpy render is misleading.
         params = self.get_params_flat()
-        best_params = params.copy()
-
-        def compute_loss(p: np.ndarray) -> float:
-            self.set_params_flat(p)
-            output = self.process(input_audio, sr)
-            out_mono = output[:, 0] if output.ndim == 2 else output
-            min_len = min(len(out_mono), len(target_mono))
-            return float(np.mean((out_mono[:min_len] - target_mono[:min_len]) ** 2))
-
-        best_loss = compute_loss(params)
-        delta = lr
-
-        for step in range(steps):
+        best = params.copy()
+        best_loss = self._loss(best, input_audio, target_audio, sr)
+        step_size = max(float(lr), 1e-5)
+        for _ in range(max(0, int(steps))):
             improved = False
-            for i in range(len(params)):
-                # Try positive perturbation
-                params[i] += delta
-                loss_plus = compute_loss(params)
-                if loss_plus < best_loss:
-                    best_loss = loss_plus
-                    best_params = params.copy()
-                    improved = True
-                    continue
-
-                # Try negative perturbation
-                params[i] -= 2 * delta
-                loss_minus = compute_loss(params)
-                if loss_minus < best_loss:
-                    best_loss = loss_minus
-                    best_params = params.copy()
-                    improved = True
-                    continue
-
-                # Revert
-                params[i] += delta
-
+            for idx in range(params.size):
+                origin = params[idx]
+                for direction in (1.0, -1.0):
+                    candidate = params.copy()
+                    candidate[idx] = origin + direction * step_size
+                    loss = self._loss(candidate, input_audio, target_audio, sr)
+                    if loss < best_loss:
+                        best_loss = loss
+                        best = candidate.copy()
+                        params = candidate
+                        improved = True
+                        break
+                if not improved:
+                    params[idx] = origin
             if not improved:
-                delta *= 0.5
-                if delta < 1e-8:
+                step_size *= 0.5
+                if step_size < 1e-8:
                     break
-
-            if step % 20 == 0:
-                logger.debug(f"Optimization step {step}: loss={best_loss:.6f}, delta={delta:.6f}")
-
-        self.set_params_flat(best_params)
-        logger.info(f"Numpy optimization complete: best loss={best_loss:.6f}")
+        self.set_params_flat(best)
+        self.reset_state()
         return self.get_params()
+
+    # Compatibility names retained for callers from earlier revisions.
+    def _optimize_numpy(self, target_audio, input_audio, sr, lr, steps):
+        return self.optimize(target_audio, input_audio, sr, lr, steps)
+
+    def _optimize_torch(self, target_audio, input_audio, sr, lr, steps):
+        return self.optimize(target_audio, input_audio, sr, lr, steps)
