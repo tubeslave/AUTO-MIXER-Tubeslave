@@ -7,7 +7,25 @@ on:
     branches: [master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
+  audit-source:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+      - name: Archive tested source
+        run: git archive --format=zip --output=automixer-audit-source.zip HEAD backend tests mix_agent .github/workflows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: automixer-audit-source
+          path: automixer-audit-source.zip
+          retention-days: 3
+
   test:
     runs-on: ubuntu-latest
     strategy:
