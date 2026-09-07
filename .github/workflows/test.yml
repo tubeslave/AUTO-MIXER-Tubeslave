@@ -17,7 +17,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: false
-          persist-credentials: false
       - name: Archive tested source
         run: git archive --format=zip --output=automixer-audit-source.zip HEAD backend tests mix_agent .github/workflows
       - uses: actions/upload-artifact@v4
