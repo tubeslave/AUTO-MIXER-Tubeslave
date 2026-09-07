@@ -1,433 +1,342 @@
-"""
-Auto Phase Alignment Module - GCC-PHAT Implementation
+"""Robust GCC-PHAT time alignment for AutoMixer.
 
-Based on Intelligent Music Production (De Man, Stables, Reiss)
-Section 8.2.3: Time Alignment using GCC-PHAT
-
-Method:
-1. Compute GCC-PHAT between reference and target channel
-2. Find delay from peak of inverse FFT
-3. Apply parabolic interpolation for sub-sample accuracy
-4. Send OSC delay command to mixer
+The analyzer is deliberately split into measurement and actuation. Measurement
+is hardware independent and can be regression-tested with synthetic signals;
+AutoPhaseAligner keeps the existing bounded mixer-client hook.
 """
+from __future__ import annotations
+
+from collections import deque
+from dataclasses import dataclass
+import logging
+import math
+import time
+from typing import Dict, List, Optional
 
 import numpy as np
-import logging
-from typing import Dict, List, Optional, Tuple
-from collections import deque
-from scipy.fft import fft, ifft
-from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+EPS = 1e-12
 
 
 @dataclass
 class DelayMeasurement:
-    """Result of delay measurement between two channels."""
-    delay_ms: float          # Estimated delay in milliseconds
-    delay_samples: float     # Estimated delay in samples (sub-sample precision)
-    correlation_peak: float  # Peak correlation value (0-1)
-    psr: float              # Peak-to-Sidelobe Ratio
-    snr_db: float           # Signal-to-Noise Ratio in dB
-    confidence: float       # Overall confidence (0-1)
-    coherence: float        # Magnitude squared coherence
-    
+    delay_ms: float
+    delay_samples: float
+    correlation_peak: float
+    psr: float
+    snr_db: float
+    confidence: float
+    coherence: float
+
     def is_valid(self, min_correlation: float = 0.5, min_psr: float = 5.0) -> bool:
-        """Check if measurement is valid based on thresholds."""
-        return (self.correlation_peak >= min_correlation and 
-                self.psr >= min_psr and
-                self.confidence > 0.6)
+        values = (
+            self.delay_ms,
+            self.delay_samples,
+            self.correlation_peak,
+            self.psr,
+            self.snr_db,
+            self.confidence,
+            self.coherence,
+        )
+        return (
+            all(np.isfinite(v) for v in values)
+            and self.correlation_peak >= min_correlation
+            and self.psr >= min_psr
+            and self.confidence > 0.6
+        )
+
+
+def _sanitize(signal: np.ndarray) -> np.ndarray:
+    data = np.asarray(signal, dtype=np.float64).reshape(-1)
+    return np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def _next_pow_two(value: int) -> int:
+    return 1 << max(1, int(value - 1).bit_length())
+
+
+def _aligned_views(ref: np.ndarray, tgt: np.ndarray, lag: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return overlapping samples; positive lag means the target arrives late."""
+    n = min(ref.size, tgt.size)
+    ref = ref[:n]
+    tgt = tgt[:n]
+    if lag > 0:
+        if lag >= n:
+            return ref[:0], tgt[:0]
+        return ref[:-lag], tgt[lag:]
+    if lag < 0:
+        shift = -lag
+        if shift >= n:
+            return ref[:0], tgt[:0]
+        return ref[shift:], tgt[:-shift]
+    return ref, tgt
+
+
+def _normalized_correlation(a: np.ndarray, b: np.ndarray) -> float:
+    if a.size < 32 or b.size < 32:
+        return 0.0
+    a = a - float(np.mean(a))
+    b = b - float(np.mean(b))
+    denom = math.sqrt(float(np.dot(a, a)) * float(np.dot(b, b)))
+    if denom <= EPS:
+        return 0.0
+    return float(np.clip(abs(float(np.dot(a, b))) / denom, 0.0, 1.0))
+
+
+def _welch_coherence(ref: np.ndarray, tgt: np.ndarray, frame_size: int, hop: int) -> float:
+    n = min(ref.size, tgt.size)
+    if n < 64:
+        return 0.0
+    frame = min(max(64, frame_size), n)
+    hop = max(1, min(hop, frame))
+    window = np.hanning(frame)
+    pxx = None
+    pyy = None
+    pxy = None
+    count = 0
+    starts = list(range(0, max(1, n - frame + 1), hop))
+    if not starts or starts[-1] != n - frame:
+        starts.append(max(0, n - frame))
+    for start in starts:
+        xr = ref[start:start + frame]
+        yr = tgt[start:start + frame]
+        if xr.size != frame or yr.size != frame:
+            continue
+        X = np.fft.rfft(xr * window)
+        Y = np.fft.rfft(yr * window)
+        xx = np.abs(X) ** 2
+        yy = np.abs(Y) ** 2
+        xy = X * np.conj(Y)
+        pxx = xx if pxx is None else pxx + xx
+        pyy = yy if pyy is None else pyy + yy
+        pxy = xy if pxy is None else pxy + xy
+        count += 1
+    if count == 0:
+        return 0.0
+    coh = np.abs(pxy) ** 2 / (pxx * pyy + EPS)
+    finite = coh[np.isfinite(coh)]
+    if finite.size == 0:
+        return 0.0
+    return float(np.clip(np.median(finite), 0.0, 1.0))
 
 
 class GCCPHATAnalyzer:
-    """
-    GCC-PHAT analyzer for time delay estimation.
-    
-    Based on:
-    - Knapp and Carter (1976) "The Generalized Correlation Method for Estimation of Time Delay"
-    - Section 8.2.3 from "Intelligent Music Production" (De Man et al.)
-    """
-    
-    def __init__(self, 
-                 sample_rate: int = 48000,
-                 fft_size: int = 4096,
-                 hop_size: int = 2048,
-                 max_delay_ms: float = 50.0):
-        """
-        Args:
-            sample_rate: Audio sample rate in Hz
-            fft_size: FFT size for analysis (larger = better frequency resolution)
-            hop_size: Hop size between frames (overlap = fft_size - hop_size)
-            max_delay_ms: Maximum delay to search for (ms)
-        """
-        self.sample_rate = sample_rate
-        self.fft_size = fft_size
-        self.hop_size = hop_size
-        self.max_delay_samples = int(max_delay_ms * sample_rate / 1000.0)
-        
-        # Pre-compute window
-        self.window = np.hanning(fft_size)
-        
-        # Circular buffer for audio
-        self.buffer_size = fft_size * 8  # Large enough for test signals
-        self.ref_buffer = np.zeros(self.buffer_size)
-        self.tgt_buffer = np.zeros(self.buffer_size)
+    """Estimate inter-channel delay from all representative material available."""
+
+    def __init__(
+        self,
+        sample_rate: int = 48000,
+        fft_size: int = 4096,
+        hop_size: int = 2048,
+        max_delay_ms: float = 50.0,
+    ):
+        self.sample_rate = int(sample_rate)
+        self.fft_size = int(max(256, fft_size))
+        self.hop_size = int(max(64, hop_size))
+        self.max_delay_samples = int(max(0.0, max_delay_ms) * self.sample_rate / 1000.0)
+        self.buffer_size = self.fft_size * 8
+        self.ref_buffer = np.zeros(self.buffer_size, dtype=np.float64)
+        self.tgt_buffer = np.zeros(self.buffer_size, dtype=np.float64)
         self.buffer_idx = 0
-        
-        # Temporal smoothing
-        self.delay_history: deque = deque(maxlen=10)
-        self.confidence_history: deque = deque(maxlen=10)
-        
-        logger.info(f"GCC-PHAT Analyzer initialized: {fft_size} FFT, {sample_rate}Hz")
-    
-    def add_frames(self, ref_frame: np.ndarray, tgt_frame: np.ndarray):
-        """Add new audio frames to circular buffer."""
-        frame_size = len(ref_frame)
-        
-        # Add to circular buffer
-        end_idx = self.buffer_idx + frame_size
-        if end_idx <= self.buffer_size:
-            self.ref_buffer[self.buffer_idx:end_idx] = ref_frame
-            self.tgt_buffer[self.buffer_idx:end_idx] = tgt_frame
+        self.valid_samples = 0
+        self.delay_history: deque[float] = deque(maxlen=10)
+        self.confidence_history: deque[float] = deque(maxlen=10)
+
+    def add_frames(self, ref_frame: np.ndarray, tgt_frame: np.ndarray) -> None:
+        ref = _sanitize(ref_frame)
+        tgt = _sanitize(tgt_frame)
+        n = min(ref.size, tgt.size)
+        if n == 0:
+            return
+        ref = ref[:n]
+        tgt = tgt[:n]
+        if n >= self.buffer_size:
+            self.ref_buffer[:] = ref[-self.buffer_size:]
+            self.tgt_buffer[:] = tgt[-self.buffer_size:]
+            self.buffer_idx = 0
+            self.valid_samples = self.buffer_size
+            return
+        first = min(n, self.buffer_size - self.buffer_idx)
+        self.ref_buffer[self.buffer_idx:self.buffer_idx + first] = ref[:first]
+        self.tgt_buffer[self.buffer_idx:self.buffer_idx + first] = tgt[:first]
+        remaining = n - first
+        if remaining:
+            self.ref_buffer[:remaining] = ref[first:]
+            self.tgt_buffer[:remaining] = tgt[first:]
+        self.buffer_idx = (self.buffer_idx + n) % self.buffer_size
+        self.valid_samples = min(self.buffer_size, self.valid_samples + n)
+
+    def _buffer_view(self, buffer: np.ndarray) -> np.ndarray:
+        if self.valid_samples <= 0:
+            return buffer[:0]
+        if self.valid_samples < self.buffer_size:
+            return buffer[:self.valid_samples].copy()
+        if self.buffer_idx == 0:
+            return buffer.copy()
+        return np.concatenate((buffer[self.buffer_idx:], buffer[:self.buffer_idx]))
+
+    def compute_delay(
+        self,
+        ref_signal: Optional[np.ndarray] = None,
+        tgt_signal: Optional[np.ndarray] = None,
+    ) -> DelayMeasurement:
+        ref = _sanitize(ref_signal) if ref_signal is not None else self._buffer_view(self.ref_buffer)
+        tgt = _sanitize(tgt_signal) if tgt_signal is not None else self._buffer_view(self.tgt_buffer)
+        n = min(ref.size, tgt.size)
+        if n < max(256, min(self.fft_size, 1024)):
+            return DelayMeasurement(0.0, 0.0, 0.0, 0.0, -120.0, 0.0, 0.0)
+        ref = ref[:n]
+        tgt = tgt[:n]
+
+        ref_rms = math.sqrt(float(np.mean(ref * ref)) + EPS)
+        tgt_rms = math.sqrt(float(np.mean(tgt * tgt)) + EPS)
+        if ref_rms < 1e-8 or tgt_rms < 1e-8:
+            return DelayMeasurement(0.0, 0.0, 0.0, 0.0, -120.0, 0.0, 0.0)
+
+        nfft = _next_pow_two(2 * n - 1)
+        R = np.fft.rfft(ref, n=nfft)
+        T = np.fft.rfft(tgt, n=nfft)
+        cross = T * np.conj(R)
+        phat = cross / np.maximum(np.abs(cross), EPS)
+        gcc = np.fft.irfft(phat, n=nfft)
+        gcc = np.concatenate((gcc[-(n - 1):], gcc[:n]))
+        lags = np.arange(-(n - 1), n, dtype=np.int64)
+
+        max_delay = min(self.max_delay_samples, n - 1)
+        allowed = np.abs(lags) <= max_delay
+        region = gcc[allowed]
+        region_lags = lags[allowed]
+        if region.size == 0:
+            return DelayMeasurement(0.0, 0.0, 0.0, 0.0, -120.0, 0.0, 0.0)
+
+        magnitude = np.abs(region)
+        peak_index = int(np.argmax(magnitude))
+        lag = float(region_lags[peak_index])
+        peak_mag = float(magnitude[peak_index])
+        if 0 < peak_index < magnitude.size - 1:
+            left, center, right = float(magnitude[peak_index - 1]), peak_mag, float(magnitude[peak_index + 1])
+            denom = left - 2.0 * center + right
+            if abs(denom) > EPS:
+                lag += float(np.clip(0.5 * (left - right) / denom, -0.5, 0.5))
+
+        integer_lag = int(round(lag))
+        aligned_ref, aligned_tgt = _aligned_views(ref, tgt, integer_lag)
+        correlation = _normalized_correlation(aligned_ref, aligned_tgt)
+
+        excluded = magnitude.copy()
+        radius = max(3, int(round(0.00025 * self.sample_rate)))
+        lo = max(0, peak_index - radius)
+        hi = min(excluded.size, peak_index + radius + 1)
+        excluded[lo:hi] = 0.0
+        sidelobe = float(np.max(excluded)) if excluded.size else 0.0
+        psr = float(np.clip(20.0 * math.log10((peak_mag + EPS) / (sidelobe + EPS)), 0.0, 120.0))
+
+        if aligned_ref.size >= 32:
+            gain = float(np.dot(aligned_tgt, aligned_ref) / (np.dot(aligned_ref, aligned_ref) + EPS))
+            residual = aligned_tgt - gain * aligned_ref
+            signal_power = float(np.mean((gain * aligned_ref) ** 2))
+            noise_power = float(np.mean(residual ** 2)) + EPS
+            snr_db = float(np.clip(10.0 * math.log10((signal_power + EPS) / noise_power), -120.0, 120.0))
         else:
-            # Wrap around
-            first_part = self.buffer_size - self.buffer_idx
-            self.ref_buffer[self.buffer_idx:] = ref_frame[:first_part]
-            self.tgt_buffer[self.buffer_idx:] = tgt_frame[:first_part]
-            second_part = end_idx - self.buffer_size
-            self.ref_buffer[:second_part] = ref_frame[first_part:first_part + second_part]
-            self.tgt_buffer[:second_part] = tgt_frame[first_part:first_part + second_part]
-        
-        self.buffer_idx = end_idx % self.buffer_size
-    
-    def compute_delay(self, 
-                     ref_signal: Optional[np.ndarray] = None,
-                     tgt_signal: Optional[np.ndarray] = None) -> DelayMeasurement:
-        """
-        Compute delay between reference and target signals using GCC-PHAT.
-        
-        Args:
-            ref_signal: Reference signal (if None, uses buffer)
-            tgt_signal: Target signal (if None, uses buffer)
-            
-        Returns:
-            DelayMeasurement with estimated delay and quality metrics
-        """
-        # Use buffer if signals not provided
-        if ref_signal is None:
-            ref_signal = self.ref_buffer
-        if tgt_signal is None:
-            tgt_signal = self.tgt_buffer
-        
-        # Ensure we have enough samples
-        if len(ref_signal) < self.fft_size:
-            logger.warning(f"Signal too short: {len(ref_signal)} < {self.fft_size}")
-            return DelayMeasurement(0, 0, 0, 0, -60, 0, 0)
-        
-        # Extract frames with windowing
-        ref_frame = ref_signal[:self.fft_size] * self.window
-        tgt_frame = tgt_signal[:self.fft_size] * self.window
-        
-        # Compute FFT
-        Ref = fft(ref_frame)
-        Tgt = fft(tgt_frame)
-        
-        # Compute Cross-Power Spectrum
-        CrossSpectrum = Ref.conj() * Tgt
-        
-        # PHAT normalization (whitening)
-        # This makes the method robust to spectral coloring
-        eps = 1e-10  # Prevent division by zero
-        PHAT = CrossSpectrum / (np.abs(CrossSpectrum) + eps)
-        
-        # Inverse FFT to get GCC
-        gcc = ifft(PHAT).real
-        
-        # Circular shift to center zero delay
-        gcc = np.fft.fftshift(gcc)
-        
-        # Limit search range to max_delay_samples
-        center = len(gcc) // 2
-        search_start = max(0, center - self.max_delay_samples)
-        search_end = min(len(gcc), center + self.max_delay_samples + 1)
-        gcc_limited = gcc[search_start:search_end]
-        
-        # Find peak
-        peak_idx = np.argmax(np.abs(gcc_limited))
-        peak_value = gcc_limited[peak_idx]
-        
-        # Parabolic interpolation for sub-sample precision
-        if 0 < peak_idx < len(gcc_limited) - 1:
-            alpha = gcc_limited[peak_idx - 1]
-            beta = gcc_limited[peak_idx]
-            gamma = gcc_limited[peak_idx + 1]
-            
-            # Parabolic interpolation formula
-            p = 0.5 * (alpha - gamma) / (alpha - 2*beta + gamma)
-            interpolated_peak_idx = peak_idx + p
-            interpolated_peak_value = beta - 0.25 * (alpha - gamma) * p
-        else:
-            interpolated_peak_idx = peak_idx
-            interpolated_peak_value = peak_value
-        
-        # Convert to delay in samples
-        delay_samples = interpolated_peak_idx - (len(gcc_limited) // 2)
-        delay_ms = delay_samples * 1000.0 / self.sample_rate
-        
-        # Compute quality metrics
-        # C-08 FIX: Original denominator could be 0.0 (silent frames) producing
-        # NaN / Inf.  Add epsilon and clamp result to [0, 1] for safety.
-        energy_product = np.sqrt(np.sum(ref_frame ** 2) * np.sum(tgt_frame ** 2))
-        correlation_peak = float(np.clip(
-            np.abs(interpolated_peak_value) / (energy_product + eps), 0.0, 1.0
-        ))
-        
-        # Peak-to-Sidelobe Ratio (PSR)
-        # Find second highest peak (outside immediate vicinity)
-        vicinity = 5
-        gcc_excluded = gcc_limited.copy()
-        start_excl = max(0, peak_idx - vicinity)
-        end_excl = min(len(gcc_excluded), peak_idx + vicinity + 1)
-        gcc_excluded[start_excl:end_excl] = 0
-        second_peak = np.max(np.abs(gcc_excluded))
-        psr = 20 * np.log10(np.abs(interpolated_peak_value) / (second_peak + eps))
-        
-        # SNR estimation
-        signal_power = np.mean(ref_frame**2)
-        # Estimate noise from correlation floor
-        noise_floor = np.mean(np.abs(gcc_limited)**2)
-        snr_db = 10 * np.log10(signal_power / (noise_floor + eps))
-        
-        # Coherence (magnitude squared)
-        coherence = np.abs(CrossSpectrum)**2 / (
-            (np.abs(Ref)**2 + eps) * (np.abs(Tgt)**2 + eps)
-        )
-        coherence = np.mean(coherence[:self.fft_size//2])
-        
-        # Overall confidence
-        confidence = (
-            0.4 * min(1.0, correlation_peak / 0.8) +
-            0.3 * min(1.0, psr / 10.0) +
-            0.2 * min(1.0, max(0, snr_db) / 40.0) +
-            0.1 * coherence
-        )
-        
-        # Temporal smoothing
-        self.delay_history.append(delay_samples)
+            snr_db = -120.0
+
+        coherence = _welch_coherence(aligned_ref, aligned_tgt, self.fft_size, self.hop_size)
+        psr_score = float(np.clip(psr / 12.0, 0.0, 1.0))
+        snr_score = float(np.clip((snr_db + 6.0) / 36.0, 0.0, 1.0))
+        confidence = float(np.clip(0.50 * correlation + 0.25 * psr_score + 0.15 * coherence + 0.10 * snr_score, 0.0, 1.0))
+
+        self.delay_history.append(lag)
         self.confidence_history.append(confidence)
-        
-        # Use median of recent measurements if confidence is high enough
-        if len(self.delay_history) >= 3 and np.mean(self.confidence_history) > 0.5:
-            smoothed_delay = np.median(self.delay_history)
-            # Blend current and smoothed based on confidence
-            alpha = min(1.0, confidence * 1.5)
-            delay_samples = alpha * delay_samples + (1 - alpha) * smoothed_delay
-            delay_ms = delay_samples * 1000.0 / self.sample_rate
-        
-        return DelayMeasurement(
-            delay_ms=delay_ms,
-            delay_samples=delay_samples,
-            correlation_peak=correlation_peak,
-            psr=psr,
-            snr_db=snr_db,
-            confidence=confidence,
-            coherence=coherence
-        )
-    
-    def reset(self):
-        """Reset analyzer state."""
-        self.ref_buffer.fill(0)
-        self.tgt_buffer.fill(0)
+        if len(self.delay_history) >= 3 and float(np.mean(self.confidence_history)) > 0.65:
+            median = float(np.median(np.asarray(self.delay_history, dtype=np.float64)))
+            if abs(lag - median) > max(2.0, 0.00025 * self.sample_rate):
+                lag = median
+
+        delay_ms = float(lag * 1000.0 / self.sample_rate)
+        return DelayMeasurement(delay_ms, float(lag), correlation, psr, snr_db, confidence, coherence)
+
+    def reset(self) -> None:
+        self.ref_buffer.fill(0.0)
+        self.tgt_buffer.fill(0.0)
         self.buffer_idx = 0
+        self.valid_samples = 0
         self.delay_history.clear()
         self.confidence_history.clear()
 
 
 class AutoPhaseAligner:
-    """
-    Automatic phase alignment controller.
-    
-    Manages delay estimation and OSC command sending for multiple channels.
-    """
-    
-    def __init__(self,
-                 mixer_client=None,
-                 sample_rate: int = 48000,
-                 fft_size: int = 4096):
-        """
-        Args:
-            mixer_client: OSC mixer client
-            sample_rate: Audio sample rate
-            fft_size: FFT size for GCC-PHAT
-        """
+    """Bounded controller around GCCPHATAnalyzer."""
+
+    def __init__(self, mixer_client=None, sample_rate: int = 48000, fft_size: int = 4096):
         self.mixer_client = mixer_client
-        self.sample_rate = sample_rate
-        
-        # Create analyzer
-        self.analyzer = GCCPHATAnalyzer(
-            sample_rate=sample_rate,
-            fft_size=fft_size
-        )
-        
-        # Channel management
+        self.sample_rate = int(sample_rate)
+        self.analyzer = GCCPHATAnalyzer(sample_rate=self.sample_rate, fft_size=fft_size)
         self.reference_channel: Optional[int] = None
         self.channels_to_align: List[int] = []
         self.channel_analyzers: Dict[int, GCCPHATAnalyzer] = {}
-        
-        # State
         self.is_running = False
         self.measurements: Dict[int, DelayMeasurement] = {}
         self.last_update_time: Dict[int, float] = {}
-        
-        # Settings
-        self.min_update_interval_ms = 100  # Rate limiting
+        self.min_update_interval_ms = 100
         self.correlation_threshold = 0.5
         self.psr_threshold = 5.0
-        
-        logger.info("AutoPhaseAligner initialized")
-    
-    def set_reference_channel(self, channel: int):
-        """Set the reference channel."""
+
+    def set_reference_channel(self, channel: int) -> None:
         self.reference_channel = channel
-        logger.info(f"Reference channel set to {channel}")
-    
-    def add_channel(self, channel: int):
-        """Add a channel to align."""
+
+    def add_channel(self, channel: int) -> None:
         if channel not in self.channels_to_align:
             self.channels_to_align.append(channel)
-            self.channel_analyzers[channel] = GCCPHATAnalyzer(
-                sample_rate=self.sample_rate
-            )
-            logger.info(f"Added channel {channel} for alignment")
-    
-    def remove_channel(self, channel: int):
-        """Remove a channel from alignment."""
+            self.channel_analyzers[channel] = GCCPHATAnalyzer(sample_rate=self.sample_rate)
+
+    def remove_channel(self, channel: int) -> None:
         if channel in self.channels_to_align:
             self.channels_to_align.remove(channel)
-            del self.channel_analyzers[channel]
-            logger.info(f"Removed channel {channel}")
-    
-    def process_audio(self, channel: int, ref_audio: np.ndarray, tgt_audio: np.ndarray):
-        """
-        Process audio frames and compute delay.
-        
-        Args:
-            channel: Target channel ID
-            ref_audio: Reference channel audio
-            tgt_audio: Target channel audio
-        """
-        if channel not in self.channel_analyzers:
+            self.channel_analyzers.pop(channel, None)
+
+    def process_audio(self, channel: int, ref_audio: np.ndarray, tgt_audio: np.ndarray) -> None:
+        analyzer = self.channel_analyzers.get(channel)
+        if analyzer is None:
             return
-        
-        analyzer = self.channel_analyzers[channel]
-        # C-07 FIX: Original call passed (tgt_audio, ref_audio) which swapped
-        # reference and target, flipping the sign of the measured delay.
         analyzer.add_frames(ref_audio, tgt_audio)
-        
-        # Rate limiting
-        current_time = time.time() * 1000
-        if channel in self.last_update_time:
-            if current_time - self.last_update_time[channel] < self.min_update_interval_ms:
-                return
-        
-        # Compute delay
+        now_ms = time.time() * 1000.0
+        last = self.last_update_time.get(channel)
+        if last is not None and now_ms - last < self.min_update_interval_ms:
+            return
         measurement = analyzer.compute_delay()
         self.measurements[channel] = measurement
-        
-        # Check if valid
         if measurement.is_valid(self.correlation_threshold, self.psr_threshold):
-            # Send OSC command if mixer client available
-            if self.mixer_client and abs(measurement.delay_ms) > 0.1:
+            if self.mixer_client is not None and abs(measurement.delay_ms) > 0.1:
                 self._send_delay_command(channel, measurement)
-        
-        self.last_update_time[channel] = current_time
-    
-    def _send_delay_command(self, channel: int, measurement: DelayMeasurement):
-        """Send OSC delay command to mixer."""
+        self.last_update_time[channel] = now_ms
+
+    def _send_delay_command(self, channel: int, measurement: DelayMeasurement) -> None:
         try:
-            # Round to mixer precision (typically 0.02ms @ 48kHz)
-            delay_ms = round(measurement.delay_ms * 50) / 50  # 0.02ms resolution
-            
-            # Only apply if delay is positive (add delay to faster channel)
-            if delay_ms > 0:
+            delay_ms = round(float(measurement.delay_ms) * 50.0) / 50.0
+            if delay_ms > 0.0 and np.isfinite(delay_ms):
                 self.mixer_client.set_channel_delay(channel, delay_ms)
-                logger.debug(f"Set delay for channel {channel}: {delay_ms:.2f}ms "
-                           f"(confidence: {measurement.confidence:.2f})")
-        except Exception as e:
-            logger.error(f"Failed to send delay command: {e}")
-    
+        except Exception as exc:
+            logger.error("Failed to send delay command: %s", exc)
+
     def get_status(self) -> Dict:
-        """Get current alignment status."""
         return {
-            'reference_channel': self.reference_channel,
-            'channels': self.channels_to_align,
-            'measurements': {
+            "reference_channel": self.reference_channel,
+            "channels": self.channels_to_align,
+            "measurements": {
                 ch: {
-                    'delay_ms': m.delay_ms,
-                    'confidence': m.confidence,
-                    'correlation': m.correlation_peak,
-                    'valid': m.is_valid()
+                    "delay_ms": m.delay_ms,
+                    "confidence": m.confidence,
+                    "correlation": m.correlation_peak,
+                    "valid": m.is_valid(self.correlation_threshold, self.psr_threshold),
                 }
                 for ch, m in self.measurements.items()
-            }
+            },
         }
-    
-    def reset(self):
-        """Reset all analyzers."""
+
+    def reset(self) -> None:
         self.analyzer.reset()
         for analyzer in self.channel_analyzers.values():
             analyzer.reset()
         self.measurements.clear()
         self.last_update_time.clear()
-
-
-import time
-
-
-# Test function
-if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    
-    print("=" * 60)
-    print("GCC-PHAT Auto Phase Alignment Test")
-    print("=" * 60)
-    
-    # Test parameters
-    sample_rate = 48000
-    test_delays = [0, 10, 25, 50, 100]  # ms
-    
-    for true_delay_ms in test_delays:
-        print(f"\nTest: True delay = {true_delay_ms} ms")
-        
-        # Create test signals
-        duration = 0.5  # seconds
-        t = np.linspace(0, duration, int(sample_rate * duration))
-        
-        # Reference: pink noise
-        ref_signal = np.random.randn(len(t))
-        ref_signal = np.convolve(ref_signal, [0.5, 0.5], mode='same')  # Simple pink
-        
-        # Target: delayed version
-        delay_samples = int(true_delay_ms * sample_rate / 1000)
-        tgt_signal = np.zeros_like(ref_signal)
-        if delay_samples > 0:
-            tgt_signal[delay_samples:] = ref_signal[:-delay_samples]
-        else:
-            tgt_signal = ref_signal
-        
-        # Analyze
-        analyzer = GCCPHATAnalyzer(sample_rate=sample_rate)
-        analyzer.add_frames(ref_signal, tgt_signal)
-        measurement = analyzer.compute_delay()
-        
-        print(f"  Estimated delay: {measurement.delay_ms:.2f} ms "
-              f"({measurement.delay_samples:.1f} samples)")
-        print(f"  Error: {abs(measurement.delay_ms - true_delay_ms):.3f} ms")
-        print(f"  Correlation: {measurement.correlation_peak:.3f}")
-        print(f"  PSR: {measurement.psr:.1f} dB")
-        print(f"  Confidence: {measurement.confidence:.2f}")
-        print(f"  Valid: {'✓' if measurement.is_valid() else '✗'}")
-    
-    print("\n" + "=" * 60)
-    print("Test complete!")
-    print("=" * 60)
