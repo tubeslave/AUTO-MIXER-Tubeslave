@@ -347,9 +347,14 @@ class TruePeakMeter:
     
     def _design_interpolation_filter(self):
         """Проектирование low-pass фильтра для интерполяции."""
-        # FIR фильтр для 4x oversampling
+        # FIR фильтр для 4x oversampling.
+        # firwin нормирует cutoff к Nyquist ПЕРЕДискретизированного сигнала
+        # (fs*oversample). Анти-имиджинг ФНЧ должен стоять на исходном Nyquist
+        # fs/2, то есть cutoff = (fs/2)/(fs*oversample/2) = 1/oversample.
+        # Значение 0.5/oversample сажало фильтр на fs/4 (12 кГц вместо 24 кГц)
+        # и занижало true-peak ВЧ-источников (тарелки/сибилянты) до ~12 дБ.
         num_taps = 49
-        cutoff = 0.5 / self.oversample_factor
+        cutoff = 1.0 / self.oversample_factor
         self.interp_filter = signal.firwin(num_taps, cutoff)
         self.filter_delay = (num_taps - 1) // 2
     

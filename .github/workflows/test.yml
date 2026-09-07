@@ -2,14 +2,16 @@ name: Tests
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   test:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12"]
 
@@ -32,27 +34,11 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest pytest-asyncio
 
-      - name: Verify Python compilation
-        run: |
-          python -m py_compile backend/signal_analysis.py
-          python -m py_compile backend/auto_phase_gcc_phat.py
-          python -m py_compile backend/feedback_detector.py
-          python -m py_compile backend/thread_safety.py
-          python -m py_compile backend/osc_manager.py
-          python -m py_compile backend/mixer_state.py
-          python -m py_compile backend/routing.py
-          python -m py_compile backend/session_manager.py
-          python -m py_compile backend/audio_capture.py
-          python -m py_compile backend/auth.py
-          python -m py_compile backend/auto_mastering.py
-          python -m py_compile backend/logging_config.py
-          python -m py_compile backend/metrics.py
-          python -m py_compile backend/config_manager.py
-          python -m py_compile backend/neural_mix_extractor.py
-          python -m py_compile backend/style_transfer.py
-          python -m py_compile backend/processing_graph.py
+      - name: Verify backend compilation
+        run: python -m compileall -q backend mix_agent
 
       - name: Run tests
         run: python -m pytest tests/ -x --tb=short -q
         env:
           PYTHONPATH: backend
+          OSC_DISABLED: "true"

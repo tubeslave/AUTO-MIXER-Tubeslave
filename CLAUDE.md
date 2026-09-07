@@ -117,6 +117,23 @@ python virtual_mixer/virtual_mixer.py
 
 CI: GitHub Actions — Python 3.10, 3.11, 3.12. Все PR должны пройти `pytest`.
 
+## Claude Code инфраструктура (.claude/)
+
+- **Hook** `py_safety_check.py` (PostToolUse) — автоматически проверяет каждый
+  отредактированный .py: синтаксис, fader > 0 dBFS, json.dumps+NumPy без
+  convert_numpy_types, вызовы gcc_phat/load_snap, секреты. Sweep-режим:
+  `python3 .claude/hooks/py_safety_check.py --sweep`
+- **/verify** — полная верификация перед коммитом (pytest + safety sweep + секреты + diff)
+- **/learn** — извлечение паттернов сессии в «Зафиксированные правила» (черновик → подтверждение оператора)
+- **/eval** — критерии успеха до кода: DSP-эвалы на синтетике, mixing-rule эвалы
+  с пробой на WING и вердиктом оператора (`.claude/evals/`)
+- **Агент dsp-safety-reviewer** — доменное ревью изменений backend (safety → DSP → код)
+- **MCP** (`.mcp.json`): perplexity, playwright, firecrawl, glif, chrome-devtools.
+  API-ключи только через env (PERPLEXITY_API_KEY, FIRECRAWL_API_KEY, GLIF_API_TOKEN) —
+  НЕ вписывать в конфиги
+- При добавлении нового правила в «Зафиксированные правила» — если оно проверяется
+  статически, добавить проверку и в `py_safety_check.py`
+
 ## Workflow для агента
 
 1. Перед началом работы — прочитать этот файл и `.cursorrules`

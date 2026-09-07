@@ -51,6 +51,28 @@ class TestTruePeakMeter:
             f"True peak of -6 dBFS sine should be near -6, got {true_peak_dbtp:.2f}"
         )
 
+    @pytest.mark.parametrize("freq", [8000.0, 12000.0, 16000.0])
+    def test_true_peak_high_frequency_not_underread(self, sample_rate, freq):
+        """A full-scale HF sine below Nyquist must read near 0 dBTP.
+
+        Regression: the interpolation LPF cutoff must sit at the original
+        Nyquist (fs/2), not fs/4. A cutoff of 0.5/oversample put it at ~12 kHz
+        and under-read bright sources (cymbals/sibilants) by up to ~12 dB
+        (16 kHz measured at ~-11.9 dBTP), which would let AGC/gain-correction
+        push the real signal past 0 dBFS into converter clipping.
+        """
+        meter = TruePeakMeter(sample_rate=sample_rate)
+        duration = 0.5
+        t = np.arange(int(sample_rate * duration)) / sample_rate
+        signal = np.sin(2 * np.pi * freq * t).astype(np.float32)
+
+        true_peak_dbtp = meter.process(signal)
+
+        assert -2.0 < true_peak_dbtp < 2.0, (
+            f"Full-scale {freq:.0f} Hz sine should read ~0 dBTP, got "
+            f"{true_peak_dbtp:.2f} (HF under-read invalidates dBTP safety checks)"
+        )
+
     def test_true_peak_silence(self, sample_rate, test_audio_silence):
         """Silence should produce a very low true peak."""
         meter = TruePeakMeter(sample_rate=sample_rate)
