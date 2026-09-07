@@ -8,7 +8,7 @@ on:
 jobs:
   synthetic-dsp:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     env:
       PYTHONPATH: backend
       OSC_DISABLED: true
@@ -26,5 +26,14 @@ jobs:
           python -m py_compile backend/lufs_gain_staging.py
           python -m py_compile backend/signal_metrics.py
           python -m py_compile backend/live_shared_mix.py
+          python -m py_compile mix_agent/analysis/dsp_utils.py
+          python -m py_compile mix_agent/analysis/loudness.py
+          python -m py_compile mix_agent/analysis/spectral.py
+          python -m py_compile mix_agent/analysis/stereo.py
       - name: Run DSP invariants
-        run: python -m pytest tests/test_dsp_invariants_audit.py --tb=short -q
+        run: |
+          python -m pytest \
+            tests/test_dsp_invariants_audit.py \
+            tests/test_signal_metrics_overhaul.py \
+            tests/test_mix_agent_dsp_overhaul.py \
+            --tb=short -q
