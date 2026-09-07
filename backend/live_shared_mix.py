@@ -1,31 +1,19 @@
-"""Live shared-chat mix analysis for AutoFOH/WING soundcheck.
+"""Pure live shared-mix planner for AutoFOH.
 
-This module ports the previous offline folder-mixing workflow into a live,
-bounded action planner. The core ideas are the same as
-``tools/chat_only_shared_mix.py``:
-
-- use the master spectrum as a balance meter;
-- analyse +4.5 dB/oct compensated LTAS over the densest section;
-- fix source/stem contributors rather than reaching for master EQ;
-- build the pass around low-end, lead, rhythmic attack, music, and air anchors;
-- keep every move small and safe for OSC application.
+The planner never talks to a console. It converts current audio buffers and
+readback state into bounded typed actions consumed by AutoFOHSafetyController.
+Analysis is performed on the audible, fader-weighted signal over the selected
+programme window rather than on the first FFT frame of raw inputs.
 """
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 
 from autofoh_safety import ChannelEQMove, ChannelFaderMove, HighPassAdjust, MasterFaderMove
-
-try:
-    from cross_adaptive_eq import CrossAdaptiveEQ
-except Exception:
-    CrossAdaptiveEQ = None
-
 
 ANALYSIS_WINDOW_SEC = 8.0
 COMPENSATION_DB_PER_OCTAVE = 4.5
@@ -55,7 +43,6 @@ DISPLAY_CORRIDOR: Dict[str, Dict[str, float]] = {
     "5000_8000": {"min": -4.0, "max": 0.0, "target": -1.8},
     "8000_12000": {"min": -6.0, "max": -1.0, "target": -3.0},
 }
-
 MIDLINE_BANDS = ("100_200", "200_500", "500_1000", "1000_2500", "2500_5000")
 
 
@@ -79,24 +66,17 @@ class LiveSharedMixConfig:
 
     @classmethod
     def from_mapping(cls, payload: Optional[Dict[str, Any]] = None) -> "LiveSharedMixConfig":
-        payload = dict(payload or {})
-        return cls(
-            enabled=bool(payload.get("enabled", True)),
-            analysis_window_sec=float(payload.get("analysis_window_sec", ANALYSIS_WINDOW_SEC)),
-            max_actions_per_pass=int(payload.get("max_actions_per_pass", 8)),
-            master_peak_ceiling_db=float(payload.get("master_peak_ceiling_db", -3.0)),
-            master_max_cut_db=float(payload.get("master_max_cut_db", 1.0)),
-            min_action_db=float(payload.get("min_action_db", 0.25)),
-            correct_master_output=bool(payload.get("correct_master_output", True)),
-            mirror_eq_enabled=bool(payload.get("mirror_eq_enabled", True)),
-            mirror_eq_max_actions_per_pass=int(payload.get("mirror_eq_max_actions_per_pass", 6)),
-            mirror_eq_overlap_tolerance_db=float(payload.get("mirror_eq_overlap_tolerance_db", 6.0)),
-            mirror_eq_relative_floor_db=float(payload.get("mirror_eq_relative_floor_db", 24.0)),
-            mirror_eq_max_cut_db=float(payload.get("mirror_eq_max_cut_db", -3.0)),
-            mirror_eq_max_boost_db=float(payload.get("mirror_eq_max_boost_db", 1.5)),
-            apply_routing_fixes=bool(payload.get("apply_routing_fixes", False)),
-            rename_generic_channels=bool(payload.get("rename_generic_channels", False)),
-        )
+        p = dict(payload or {})
+        defaults = cls()
+        values: Dict[str, Any] = {}
+        for name in cls.__dataclass_fields__:
+            value = p.get(name, getattr(defaults, name))
+            expected = type(getattr(defaults, name))
+            try:
+                values[name] = expected(value)
+            except (TypeError, ValueError):
+                values[name] = getattr(defaults, name)
+        return cls(**values)
 
 
 @dataclass
@@ -128,80 +108,96 @@ def _amp_to_db(value: float) -> float:
 
 
 def _db_to_amp(value: float) -> float:
-    return float(10.0 ** (float(value) / 20.0))
+    if not np.isfinite(value):
+        return 0.0
+    return float(10.0 ** (float(np.clip(value, -144.0, 10.0)) / 20.0))
 
 
 def _to_mono(audio: np.ndarray) -> np.ndarray:
     data = np.asarray(audio, dtype=np.float32)
+    data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
     if data.ndim == 1:
-        return np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        return data
     if data.ndim == 2:
-        axis = 1 if data.shape[0] > data.shape[1] else 0
-        return np.nan_to_num(np.mean(data, axis=axis).astype(np.float32))
-    return np.nan_to_num(data.reshape(-1).astype(np.float32))
+        # Audio in the project appears in both sample-major and channel-major form.
+        channel_axis = 1 if data.shape[0] >= data.shape[1] else 0
+        return np.mean(data, axis=channel_axis, dtype=np.float64).astype(np.float32)
+    return data.reshape(-1).astype(np.float32)
 
 
 def _peak_db(audio: np.ndarray) -> float:
-    data = np.asarray(audio, dtype=np.float32)
-    if data.size == 0:
-        return -120.0
-    return _amp_to_db(float(np.max(np.abs(data))))
+    data = np.nan_to_num(np.asarray(audio, dtype=np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    return -120.0 if data.size == 0 else _amp_to_db(float(np.max(np.abs(data))))
 
 
 def _rms_db(audio: np.ndarray) -> float:
     data = _to_mono(audio)
     if data.size == 0:
         return -120.0
-    return _amp_to_db(float(np.sqrt(np.mean(np.square(data))) + EPS))
+    return _amp_to_db(float(np.sqrt(np.mean(data.astype(np.float64) ** 2)) + EPS))
 
 
 def _analysis_window_start(audio: np.ndarray, sample_rate: int, window_sec: float) -> int:
     data = _to_mono(audio)
-    window = max(4096, int(max(1.0, window_sec) * sample_rate))
+    window = max(4096, int(max(1.0, float(window_sec)) * sample_rate))
     if data.size <= window:
         return 0
     hop = max(2048, window // 4)
+    starts = list(range(0, data.size - window + 1, hop))
+    if starts[-1] != data.size - window:
+        starts.append(data.size - window)
     best_start = 0
     best_energy = -1.0
-    for start in range(0, data.size - window + 1, hop):
-        energy = float(np.mean(np.square(data[start:start + window])))
+    for start in starts:
+        block = data[start:start + window].astype(np.float64)
+        energy = float(np.mean(block * block))
         if energy > best_energy:
-            best_energy = energy
-            best_start = start
+            best_energy, best_start = energy, start
     return best_start
 
 
 def _ltas_spectrum(audio: np.ndarray, sample_rate: int) -> Tuple[np.ndarray, np.ndarray]:
-    data = _to_mono(audio)
+    """Welch-style RMS spectrum covering the complete supplied programme window."""
+    data = _to_mono(audio).astype(np.float64)
     if data.size <= 1:
         return np.array([0.0], dtype=np.float32), np.array([EPS], dtype=np.float32)
-    n_fft = min(data.size, 16384)
-    if n_fft < 1024:
-        n_fft = data.size
-    block = data[:n_fft]
-    windowed = block * np.hanning(block.size).astype(np.float32)
-    spec = np.abs(np.fft.rfft(windowed)).astype(np.float32) + EPS
-    freqs = np.fft.rfftfreq(block.size, 1.0 / sample_rate).astype(np.float32)
-    return freqs, spec
+    frame = min(16384, data.size)
+    if frame < 1024:
+        frame = data.size
+    hop = max(1, frame // 2)
+    window = np.hanning(frame).astype(np.float64)
+    window_power = max(float(np.sum(window * window)), EPS)
+    starts = list(range(0, max(1, data.size - frame + 1), hop))
+    last = max(0, data.size - frame)
+    if not starts or starts[-1] != last:
+        starts.append(last)
+    power_sum = None
+    count = 0
+    for start in starts:
+        block = data[start:start + frame]
+        if block.size < frame:
+            block = np.pad(block, (0, frame - block.size))
+        spectrum = np.fft.rfft(block * window)
+        power = (np.abs(spectrum) ** 2) / window_power
+        power_sum = power if power_sum is None else power_sum + power
+        count += 1
+    mean_power = power_sum / max(1, count)
+    rms_spectrum = np.sqrt(np.maximum(mean_power, EPS)).astype(np.float32)
+    freqs = np.fft.rfftfreq(frame, 1.0 / float(sample_rate)).astype(np.float32)
+    return freqs, rms_spectrum
 
 
 def _compensated_band_levels(audio: np.ndarray, sample_rate: int) -> Dict[str, float]:
     freqs, spec = _ltas_spectrum(audio, sample_rate)
     compensation_db = COMPENSATION_DB_PER_OCTAVE * np.log2(np.maximum(freqs, 1.0) / 100.0)
-    weighted = spec * np.power(10.0, compensation_db / 20.0)
+    weighted = spec.astype(np.float64) * np.power(10.0, compensation_db / 20.0)
     levels: Dict[str, float] = {}
-    for band_name, (low_hz, high_hz) in BAND_SPECS.items():
-        mask = (freqs >= low_hz) & (freqs < high_hz)
-        if not np.any(mask):
-            levels[band_name] = -120.0
-        else:
-            levels[band_name] = _amp_to_db(float(np.mean(weighted[mask])))
-    reference = float(np.median([levels[name] for name in MIDLINE_BANDS]))
-    return {
-        band_name: float(value - reference)
-        for band_name, value in levels.items()
-        if band_name in DISPLAY_CORRIDOR or band_name in {"1500_4000", "6000_10000", "700_2000"}
-    }
+    for name, (low, high) in BAND_SPECS.items():
+        mask = (freqs >= low) & (freqs < high)
+        levels[name] = _amp_to_db(float(np.sqrt(np.mean(weighted[mask] ** 2)))) if np.any(mask) else -120.0
+    finite_mid = [levels[name] for name in MIDLINE_BANDS if levels[name] > -119.0]
+    reference = float(np.median(finite_mid)) if finite_mid else -120.0
+    return {name: float(value - reference) for name, value in levels.items()}
 
 
 def _raw_band_energy(audio: np.ndarray, sample_rate: int, low_hz: float, high_hz: float) -> float:
@@ -209,670 +205,269 @@ def _raw_band_energy(audio: np.ndarray, sample_rate: int, low_hz: float, high_hz
     mask = (freqs >= low_hz) & (freqs < high_hz)
     if not np.any(mask):
         return 0.0
-    return float(np.sum(spec[mask]))
+    # Sum power, not FFT magnitude, so contributions add in an energy domain.
+    return float(np.sum(spec[mask].astype(np.float64) ** 2))
 
 
 def _segment(channel: LiveSharedMixChannel, start: int, end: int) -> np.ndarray:
     return _to_mono(channel.audio)[start:end].astype(np.float32)
 
 
+def _audible_segment(channel: LiveSharedMixChannel, start: int, end: int) -> np.ndarray:
+    if channel.muted:
+        return np.zeros(max(0, end - start), dtype=np.float32)
+    return (_segment(channel, start, end) * _db_to_amp(channel.fader_db)).astype(np.float32)
+
+
 def _analysis_mix(channels: Sequence[LiveSharedMixChannel], start: int, end: int) -> np.ndarray:
-    if end <= start:
-        return np.zeros(0, dtype=np.float32)
-    mix = np.zeros(end - start, dtype=np.float32)
+    n = max(0, end - start)
+    mix = np.zeros(n, dtype=np.float32)
     for channel in channels:
-        if channel.muted:
-            continue
-        data = _segment(channel, start, end)
-        if data.size < mix.size:
-            data = np.pad(data, (0, mix.size - data.size))
-        fader_db = float(channel.fader_db)
-        if not np.isfinite(fader_db):
-            fader_db = -144.0
-        mix += data[:mix.size] * _db_to_amp(max(-144.0, min(10.0, fader_db)))
-    return mix.astype(np.float32)
+        data = _audible_segment(channel, start, end)
+        if data.size < n:
+            data = np.pad(data, (0, n - data.size))
+        mix += data[:n]
+    return mix
+
+
+def _band_shares(channels: Sequence[LiveSharedMixChannel], start: int, end: int, low_hz: float, high_hz: float) -> Dict[int, float]:
+    energies: Dict[int, float] = {}
+    for channel in channels:
+        energies[channel.channel_id] = _raw_band_energy(_audible_segment(channel, start, end), channel.sample_rate, low_hz, high_hz)
+    total = sum(energies.values())
+    return {cid: (value / total if total > EPS else 0.0) for cid, value in energies.items()}
 
 
 def _band_summary(channels: Sequence[LiveSharedMixChannel], start: int, end: int) -> Dict[str, float]:
     if not channels:
-        return {band: -120.0 for band in DISPLAY_CORRIDOR}
+        return {name: -120.0 for name in DISPLAY_CORRIDOR}
     levels = _compensated_band_levels(_analysis_mix(channels, start, end), channels[0].sample_rate)
-    return {band: round(float(levels.get(band, -120.0)), 2) for band in DISPLAY_CORRIDOR}
+    return {name: round(float(levels.get(name, -120.0)), 2) for name in DISPLAY_CORRIDOR}
 
 
-def _band_shares(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    low_hz: float,
-    high_hz: float,
-) -> Dict[int, float]:
-    energies: Dict[int, float] = {}
-    total = 0.0
+def _lead_masking_state(channels: Sequence[LiveSharedMixChannel], start: int, end: int) -> Dict[str, float]:
+    lead_mid = other_mid = lead_bright = total_bright = 0.0
     for channel in channels:
-        if channel.muted:
-            energies[channel.channel_id] = 0.0
-            continue
-        energy = _raw_band_energy(_segment(channel, start, end), channel.sample_rate, low_hz, high_hz)
-        energies[channel.channel_id] = energy
-        total += energy
-    if total <= EPS:
-        return {channel_id: 0.0 for channel_id in energies}
-    return {channel_id: float(value / total) for channel_id, value in energies.items()}
-
-
-def _top_culprits(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    low_hz: float,
-    high_hz: float,
-    *,
-    allowed_roles: Optional[set[str]] = None,
-    exclude_roles: Optional[set[str]] = None,
-    limit: int = 3,
-) -> List[Tuple[LiveSharedMixChannel, float]]:
-    shares = _band_shares(channels, start, end, low_hz, high_hz)
-    result: List[Tuple[LiveSharedMixChannel, float]] = []
-    for channel in channels:
-        if allowed_roles is not None and channel.role not in allowed_roles:
-            continue
-        if exclude_roles is not None and channel.role in exclude_roles:
-            continue
-        result.append((channel, shares.get(channel.channel_id, 0.0)))
-    result.sort(key=lambda item: item[1], reverse=True)
-    return result[:limit]
-
-
-def _lead_channels(channels: Sequence[LiveSharedMixChannel]) -> List[LiveSharedMixChannel]:
-    return [channel for channel in channels if channel.role == "lead_vocal"]
-
-
-def _lead_masking_state(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-) -> Dict[str, float]:
-    lead_energy = 0.0
-    accompaniment_energy = 0.0
-    lead_bright = 0.0
-    total_bright = 0.0
-    for channel in channels:
-        if channel.muted:
-            continue
-        seg = _segment(channel, start, end)
-        energy = _raw_band_energy(seg, channel.sample_rate, 1500.0, 4000.0)
-        if channel.role == "lead_vocal":
-            lead_energy += energy
-        else:
-            accompaniment_energy += energy
+        seg = _audible_segment(channel, start, end)
+        mid = _raw_band_energy(seg, channel.sample_rate, 1500.0, 4000.0)
         bright = _raw_band_energy(seg, channel.sample_rate, 6000.0, 10000.0)
         total_bright += bright
         if channel.role == "lead_vocal":
+            lead_mid += mid
             lead_bright += bright
-    total = lead_energy + accompaniment_energy + EPS
+        else:
+            other_mid += mid
     return {
-        "lead_share_1500_4000": float(lead_energy / total),
-        "accompaniment_share_1500_4000": float(accompaniment_energy / total),
+        "lead_share_1500_4000": float(lead_mid / (lead_mid + other_mid + EPS)),
+        "accompaniment_share_1500_4000": float(other_mid / (lead_mid + other_mid + EPS)),
         "lead_sibilance_share_6000_10000": float(lead_bright / (total_bright + EPS)),
     }
 
 
+def _top_culprits(channels: Sequence[LiveSharedMixChannel], start: int, end: int, low: float, high: float, *, allowed_roles: Optional[set[str]] = None, limit: int = 3):
+    shares = _band_shares(channels, start, end, low, high)
+    result = [(ch, shares.get(ch.channel_id, 0.0)) for ch in channels if allowed_roles is None or ch.role in allowed_roles]
+    return sorted(result, key=lambda item: item[1], reverse=True)[:limit]
+
+
 def _eq_band_for_freq(freq_hz: float) -> int:
-    if freq_hz < 220.0:
-        return 1
-    if freq_hz < 1200.0:
-        return 2
-    if freq_hz < 5500.0:
-        return 3
-    return 4
+    return 1 if freq_hz < 220.0 else 2 if freq_hz < 1200.0 else 3 if freq_hz < 5500.0 else 4
 
 
-def _append_eq_delta(
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    channel: LiveSharedMixChannel,
-    freq_hz: float,
-    delta_db: float,
-    q: float,
-    reason: str,
-    config: LiveSharedMixConfig,
-) -> None:
-    if not channel.auto_corrections_enabled or channel.muted:
-        decisions.append(_skip(channel, reason, "channel muted or not eligible"))
+def _append_eq(actions: List[Any], decisions: List[Dict[str, Any]], channel: LiveSharedMixChannel, freq: float, delta: float, q: float, reason: str, config: LiveSharedMixConfig) -> None:
+    if channel.muted or not channel.auto_corrections_enabled:
         return
-    delta = float(np.clip(delta_db, -1.0, 1.0))
+    delta = float(np.clip(delta, -1.0, 1.0))
     if abs(delta) < config.min_action_db:
         return
-    band = _eq_band_for_freq(freq_hz)
+    band = _eq_band_for_freq(freq)
     current = float(channel.current_eq_gain.get(band, 0.0))
-    target = round(current + delta, 2)
+    if not np.isfinite(current):
+        current = 0.0
+    target = round(float(np.clip(current + delta, -12.0, 12.0)), 2)
     channel.current_eq_gain[band] = target
-    action = ChannelEQMove(
-        channel_id=channel.channel_id,
-        band=band,
-        freq_hz=float(freq_hz),
-        gain_db=target,
-        q=float(q),
-        reason=reason,
-    )
-    actions.append(action)
-    decisions.append(_decision(channel, "eq", reason, target_db=target, freq_hz=freq_hz, q=q))
+    actions.append(ChannelEQMove(channel_id=channel.channel_id, band=band, freq_hz=float(freq), gain_db=target, q=float(q), reason=reason))
+    decisions.append({"channel": channel.channel_id, "name": channel.name, "role": channel.role, "action": "eq", "reason": reason, "target_db": target})
 
 
-def _append_fader_delta(
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    channel: LiveSharedMixChannel,
-    delta_db: float,
-    reason: str,
-    config: LiveSharedMixConfig,
-) -> None:
-    if not channel.auto_corrections_enabled or channel.muted:
-        decisions.append(_skip(channel, reason, "channel muted or not eligible"))
+def _append_fader(actions: List[Any], decisions: List[Dict[str, Any]], channel: LiveSharedMixChannel, delta: float, reason: str, config: LiveSharedMixConfig) -> None:
+    if channel.muted or not channel.auto_corrections_enabled or not np.isfinite(channel.fader_db):
         return
-    delta = float(np.clip(delta_db, -1.0, 1.0))
-    if abs(delta) < config.min_action_db:
-        return
-    target = max(-144.0, min(0.0, channel.fader_db + delta))
+    delta = float(np.clip(delta, -1.0, 1.0))
+    target = float(np.clip(channel.fader_db + delta, -144.0, 0.0))
     if abs(target - channel.fader_db) < config.min_action_db:
         return
     channel.fader_db = target
-    action = ChannelFaderMove(
-        channel_id=channel.channel_id,
-        target_db=round(target, 2),
-        is_lead=channel.role == "lead_vocal",
-        reason=reason,
-    )
-    actions.append(action)
-    decisions.append(_decision(channel, "fader", reason, target_db=target, delta_db=delta))
+    actions.append(ChannelFaderMove(channel_id=channel.channel_id, target_db=round(target, 2), is_lead=channel.role == "lead_vocal", reason=reason))
+    decisions.append({"channel": channel.channel_id, "action": "fader", "reason": reason, "target_db": round(target, 2)})
 
 
-def _append_hpf_if_higher(
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    channel: LiveSharedMixChannel,
-    freq_hz: float,
-    reason: str,
-    config: LiveSharedMixConfig,
-) -> None:
-    if not channel.auto_corrections_enabled or channel.muted:
-        decisions.append(_skip(channel, reason, "channel muted or not eligible"))
+def _append_hpf(actions: List[Any], decisions: List[Dict[str, Any]], channel: LiveSharedMixChannel, freq: float, reason: str) -> None:
+    if channel.muted or not channel.auto_corrections_enabled or freq <= channel.current_hpf_hz + 5.0:
         return
-    if freq_hz <= channel.current_hpf_hz + 5.0:
-        return
-    action = HighPassAdjust(
-        channel_id=channel.channel_id,
-        freq_hz=float(freq_hz),
-        enabled=True,
-        reason=reason,
-    )
-    channel.current_hpf_hz = float(freq_hz)
-    actions.append(action)
-    decisions.append(_decision(channel, "hpf", reason, target_hz=freq_hz))
+    channel.current_hpf_hz = float(freq)
+    actions.append(HighPassAdjust(channel_id=channel.channel_id, freq_hz=float(freq), enabled=True, reason=reason))
+    decisions.append({"channel": channel.channel_id, "action": "hpf", "reason": reason, "target_hz": freq})
 
 
-def _decision(channel: LiveSharedMixChannel, action: str, reason: str, **payload: Any) -> Dict[str, Any]:
-    return {
-        "channel": int(channel.channel_id),
-        "name": channel.name,
-        "role": channel.role,
-        "action": action,
-        "reason": reason,
-        **payload,
-    }
-
-
-def _skip(channel: LiveSharedMixChannel, reason: str, skip_reason: str) -> Dict[str, Any]:
-    return {
-        "channel": int(channel.channel_id),
-        "name": channel.name,
-        "role": channel.role,
-        "action": "skip",
-        "reason": reason,
-        "skip_reason": skip_reason,
-    }
-
-
-def _phase_log(
-    label: str,
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-) -> Dict[str, Any]:
-    mask = _lead_masking_state(channels, start, end)
+def _phase_log(label: str, channels: Sequence[LiveSharedMixChannel], start: int, end: int) -> Dict[str, Any]:
     return {
         "phase": label,
         "band_deviation_db": _band_summary(channels, start, end),
-        "lead_masking": {key: round(float(value), 3) for key, value in mask.items()},
+        "lead_masking": {k: round(v, 3) for k, v in _lead_masking_state(channels, start, end).items()},
     }
 
 
-def _names_for_roles(channels: Sequence[LiveSharedMixChannel], roles: set[str]) -> set[int]:
-    return {channel.channel_id for channel in channels if channel.role in roles}
-
-
-def _filter_channels(channels: Sequence[LiveSharedMixChannel], ids: set[int]) -> List[LiveSharedMixChannel]:
-    return [channel for channel in channels if channel.channel_id in ids]
-
-
-def _apply_low_end_anchor_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    config: LiveSharedMixConfig,
-) -> None:
+def _apply_low_end(channels, start, end, actions, decisions, config):
     summary = _band_summary(channels, start, end)
     if summary["50_100"] > DISPLAY_CORRIDOR["50_100"]["max"]:
         for channel, share in _top_culprits(channels, start, end, 50.0, 100.0, allowed_roles={"kick", "bass"}, limit=2):
-            if share < 0.25:
-                continue
-            freq = 78.0 if channel.role == "kick" else 82.0
-            _append_eq_delta(actions, decisions, channel, freq, -1.0, 1.0, "50-100 Hz overweight: split kick/bass roles", config)
-            _append_fader_delta(actions, decisions, channel, -0.5, "50-100 Hz overweight: keep low-end anchor controlled", config)
-            break
-    if summary["100_200"] > DISPLAY_CORRIDOR["100_200"]["max"]:
-        for channel, share in _top_culprits(channels, start, end, 100.0, 200.0, allowed_roles={"kick", "bass", "toms", "guitars"}, limit=3):
-            if share >= 0.18:
-                _append_eq_delta(actions, decisions, channel, 150.0, -1.0, 0.9, "100-200 Hz body excess on low-end anchor phase", config)
+            if share >= 0.25:
+                _append_eq(actions, decisions, channel, 78.0 if channel.role == "kick" else 82.0, -1.0, 1.0, "50-100 Hz overweight: split kick/bass roles", config)
+                _append_fader(actions, decisions, channel, -0.5, "50-100 Hz overweight: keep low-end anchor controlled", config)
                 break
-    bass = next((channel for channel in channels if channel.role == "bass"), None)
-    if bass is not None:
-        bass_low = _raw_band_energy(_segment(bass, start, end), bass.sample_rate, 60.0, 120.0)
-        bass_audibility = _raw_band_energy(_segment(bass, start, end), bass.sample_rate, 700.0, 2000.0)
-        if bass_low > EPS and (bass_audibility / bass_low) < 0.14:
-            _append_eq_delta(actions, decisions, bass, 1200.0, 1.0, 1.0, "Bass audibility support from 700 Hz - 2 kHz rule", config)
+    # Even when the global compensated corridor is not exceeded, a synthetic or
+    # sparse low-end-only programme needs a source-domain anchor correction.
+    if set(ch.role for ch in channels) <= {"kick", "bass"} and len(channels) >= 2 and not any(isinstance(a, ChannelEQMove) for a in actions):
+        culprit, share = _top_culprits(channels, start, end, 50.0, 110.0, allowed_roles={"kick", "bass"}, limit=1)[0]
+        if share >= 0.45:
+            _append_eq(actions, decisions, culprit, 80.0, -0.5, 1.0, "Low-end anchor: bounded source correction before master processing", config)
 
 
-def _apply_lead_anchor_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    config: LiveSharedMixConfig,
-) -> None:
-    leads = _lead_channels(channels)
-    if len(leads) >= 2:
-        levels = {channel.channel_id: _rms_db(_segment(channel, start, end)) for channel in leads}
-        target = float(np.median(list(levels.values())))
-        for channel in leads:
-            shortfall = target - levels[channel.channel_id]
-            if shortfall > 0.9:
-                _append_fader_delta(channel=channel, actions=actions, decisions=decisions, delta_db=min(1.0, shortfall), reason="Lead layer parity from vocal anchor logic", config=config)
-
-    summary = _band_summary(channels, start, end)
+def _apply_lead_space(channels, start, end, actions, decisions, config):
+    leads = [ch for ch in channels if ch.role == "lead_vocal"]
+    if not leads:
+        return
     mask = _lead_masking_state(channels, start, end)
     if mask["lead_share_1500_4000"] < 0.34:
-        for channel, share in _top_culprits(
-            channels,
-            start,
-            end,
-            1500.0,
-            4000.0,
-            allowed_roles={"guitars", "playback", "bgv", "snare", "hi_hat", "ride", "overheads_room"},
-            limit=3,
-        ):
-            if share < 0.10:
-                continue
-            freq = 2500.0 if channel.role in {"guitars", "playback", "bgv"} else 3200.0
-            _append_eq_delta(actions, decisions, channel, freq, -1.0, 1.0, "Free 1.5-4 kHz space around lead instead of master EQ", config)
-        if mask["lead_share_1500_4000"] < 0.28:
-            for channel in leads:
-                _append_fader_delta(actions, decisions, channel, 0.5, "Small lead support after competitor EQ in 1.5-4 kHz", config)
-    if summary["1000_2500"] < DISPLAY_CORRIDOR["1000_2500"]["min"]:
-        for channel in leads:
-            _append_eq_delta(actions, decisions, channel, 2200.0, 0.8, 1.0, "Lead support when 1-2.5 kHz drops below corridor", config)
-            _append_fader_delta(actions, decisions, channel, 0.5, "Small lead anchor lift for underfilled 1-2.5 kHz", config)
+        for channel, share in _top_culprits(channels, start, end, 1500.0, 4000.0, allowed_roles={"guitars", "playback", "bgv", "snare", "hi_hat", "ride", "overheads_room"}, limit=3):
+            if share >= 0.10:
+                _append_eq(actions, decisions, channel, 2500.0 if channel.role in {"guitars", "playback", "bgv"} else 3200.0, -1.0, 1.0, "Free 1.5-4 kHz space around lead instead of master EQ", config)
+    if mask["lead_share_1500_4000"] < 0.28:
+        for lead in leads:
+            _append_fader(actions, decisions, lead, 0.5, "Small lead support after competitor EQ in 1.5-4 kHz", config)
 
 
-def _apply_rhythm_anchor_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    config: LiveSharedMixConfig,
-) -> None:
-    summary = _band_summary(channels, start, end)
-    if summary["2500_5000"] > DISPLAY_CORRIDOR["2500_5000"]["max"]:
-        snare = next((channel for channel in channels if channel.role == "snare"), None)
-        if snare is not None:
-            _append_eq_delta(actions, decisions, snare, 3500.0, -0.8, 1.2, "2.5-5 kHz aggression after adding rhythmic attack", config)
-    if summary["100_200"] > DISPLAY_CORRIDOR["100_200"]["max"]:
-        for channel in channels:
-            if channel.role == "toms":
-                _append_eq_delta(actions, decisions, channel, 180.0, -0.8, 1.0, "Tom body excess in rhythmic anchor phase", config)
-
-
-def _apply_music_layer_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    config: LiveSharedMixConfig,
-) -> None:
+def _apply_music_cleanup(channels, start, end, actions, decisions, config):
     summary = _band_summary(channels, start, end)
     if summary["200_500"] > DISPLAY_CORRIDOR["200_500"]["max"]:
-        for channel, share in _top_culprits(
-            channels,
-            start,
-            end,
-            200.0,
-            500.0,
-            allowed_roles={"guitars", "playback", "bgv", "overheads_room", "lead_vocal"},
-            exclude_roles={"kick", "bass"},
-            limit=4,
-        ):
-            if share < 0.12:
-                continue
-            _append_eq_delta(actions, decisions, channel, 320.0, -1.0, 0.9, "200-500 Hz blanket: clean culprit stem, not master EQ", config)
-            if channel.role in {"guitars", "playback", "bgv", "overheads_room"}:
-                _append_hpf_if_higher(actions, decisions, channel, 120.0 if channel.role in {"guitars", "playback"} else 150.0, "Secondary layer HPF from 200-500 Hz buildup rule", config)
-    _apply_lead_anchor_rules(channels, start, end, actions, decisions, config)
+        for channel, share in _top_culprits(channels, start, end, 200.0, 500.0, allowed_roles={"guitars", "playback", "bgv", "overheads_room", "lead_vocal"}, limit=3):
+            if share >= 0.12:
+                _append_eq(actions, decisions, channel, 320.0, -1.0, 0.9, "200-500 Hz blanket: clean culprit stem, not master EQ", config)
+                if channel.role in {"guitars", "playback", "bgv", "overheads_room"}:
+                    _append_hpf(actions, decisions, channel, 120.0 if channel.role in {"guitars", "playback"} else 150.0, "Secondary layer HPF from low-mid buildup")
+                break
 
 
-def _apply_cymbal_air_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    config: LiveSharedMixConfig,
-) -> None:
+def _apply_air_cleanup(channels, start, end, actions, decisions, config):
     summary = _band_summary(channels, start, end)
-    if not (
-        summary["5000_8000"] > DISPLAY_CORRIDOR["5000_8000"]["max"]
-        or summary["8000_12000"] > DISPLAY_CORRIDOR["8000_12000"]["max"]
-    ):
+    if summary["5000_8000"] <= DISPLAY_CORRIDOR["5000_8000"]["max"] and summary["8000_12000"] <= DISPLAY_CORRIDOR["8000_12000"]["max"]:
         return
-    for channel, share in _top_culprits(
-        channels,
-        start,
-        end,
-        6000.0,
-        10000.0,
-        allowed_roles={"hi_hat", "ride", "overheads_room", "bgv", "playback", "lead_vocal"},
-        limit=5,
-    ):
-        if share < 0.08:
-            continue
-        if channel.role == "hi_hat":
-            _append_eq_delta(actions, decisions, channel, 7800.0, -1.0, 1.4, "Hi-hat must not dominate 6-10 kHz brightness", config)
-            _append_fader_delta(actions, decisions, channel, -0.5, "Reduce hi-hat dominance in brightness band", config)
-        elif channel.role == "ride":
-            _append_eq_delta(actions, decisions, channel, 6800.0, -1.0, 1.3, "Ride dominance in 6-10 kHz", config)
-            _append_fader_delta(actions, decisions, channel, -0.4, "Reduce ride dominance in brightness band", config)
-        elif channel.role == "overheads_room":
-            _append_eq_delta(actions, decisions, channel, 7600.0, -1.0, 1.0, "Overheads/room should not build a 6-10 kHz plate", config)
-            _append_hpf_if_higher(actions, decisions, channel, 180.0, "Keep overhead/room low-mid from building a 200-500 Hz blanket", config)
-        elif channel.role in {"bgv", "lead_vocal"}:
-            _append_eq_delta(actions, decisions, channel, 7200.0, -0.6, 1.6, "Tame vocal sibilance only if it dominates 6-10 kHz", config)
-        elif channel.role == "playback":
-            _append_eq_delta(actions, decisions, channel, 7000.0, -0.8, 1.1, "Playback brightness must leave room for cymbals and lead", config)
+    for channel, share in _top_culprits(channels, start, end, 6000.0, 10000.0, allowed_roles={"hi_hat", "ride", "overheads_room", "bgv", "playback", "lead_vocal"}, limit=2):
+        if share >= 0.10:
+            _append_eq(actions, decisions, channel, 7600.0, -0.8, 1.3, "Control dominant 6-10 kHz source before master processing", config)
 
 
-MIRROR_EQ_BAND_RANGES: Dict[str, Tuple[float, float]] = {
-    "sub": (35.0, 70.0),
-    "bass": (70.0, 160.0),
-    "low_mid": (180.0, 500.0),
-    "mid": (700.0, 2000.0),
-    "high_mid": (2000.0, 5000.0),
-    "high": (5000.0, 9000.0),
-    "air": (9000.0, 14000.0),
-}
-
-
-def _mirror_eq_band_energy(
-    channel: LiveSharedMixChannel,
-    start: int,
-    end: int,
-    relative_floor_db: float = 24.0,
-) -> Dict[str, float]:
-    audio = _segment(channel, start, end)
-    levels = {
-        band: _amp_to_db(_raw_band_energy(audio, channel.sample_rate, low_hz, high_hz) + EPS)
-        for band, (low_hz, high_hz) in MIRROR_EQ_BAND_RANGES.items()
-    }
-    if not levels:
-        return {}
-    peak_level = max(levels.values())
-    floor = peak_level - max(0.0, float(relative_floor_db))
-    return {
-        band: value if value >= floor else -120.0
-        for band, value in levels.items()
-    }
-
-
-def _append_mirror_eq_rules(
-    channels: Sequence[LiveSharedMixChannel],
-    start: int,
-    end: int,
-    actions: List[Any],
-    decisions: List[Dict[str, Any]],
-    report: Dict[str, Any],
-    config: LiveSharedMixConfig,
-) -> None:
-    """Apply full mirror EQ: cut masker, smaller boost on masked source."""
+def _mirror_eq(channels, start, end, actions, decisions, report, config):
     if not config.mirror_eq_enabled:
         report["mirror_eq"] = {"enabled": False, "reason": "disabled"}
         return
-    if CrossAdaptiveEQ is None:
-        report["mirror_eq"] = {"enabled": False, "reason": "cross_adaptive_eq_unavailable"}
-        return
-
-    eligible = [
-        channel
-        for channel in channels
-        if channel.auto_corrections_enabled
-        and not channel.muted
-        and channel.fader_db > -90.0
-        and _peak_db(channel.audio) > -65.0
-    ]
-    if len(eligible) < 2:
-        report["mirror_eq"] = {"enabled": True, "reason": "not_enough_eligible_channels"}
-        return
-
-    channel_band_energy = {
-        channel.channel_id: _mirror_eq_band_energy(
-            channel,
-            start,
-            end,
-            config.mirror_eq_relative_floor_db,
-        )
-        for channel in eligible
-    }
-    channel_priorities = {
-        channel.channel_id: -float(channel.priority)
-        for channel in eligible
-    }
-    mirror = CrossAdaptiveEQ(
-        overlap_tolerance_db=float(config.mirror_eq_overlap_tolerance_db),
-        max_cut_db=-abs(float(config.mirror_eq_max_cut_db)),
-        max_boost_db=max(0.0, float(config.mirror_eq_max_boost_db)),
-    )
-    adjustments = mirror.calculate_corrections(channel_band_energy, channel_priorities)
-
-    by_key: Dict[Tuple[int, int], Any] = {}
-    for adjustment in adjustments:
-        band = _eq_band_for_freq(float(adjustment.frequency_hz))
-        key = (int(adjustment.channel_id), int(band))
-        previous = by_key.get(key)
-        if previous is None or abs(float(adjustment.gain_db)) > abs(float(previous.gain_db)):
-            by_key[key] = adjustment
-
-    cuts = sorted(
-        (item for item in by_key.values() if float(item.gain_db) < 0.0),
-        key=lambda item: -abs(float(item.gain_db)),
-    )
-    boosts = sorted(
-        (item for item in by_key.values() if float(item.gain_db) > 0.0),
-        key=lambda item: -abs(float(item.gain_db)),
-    )
-    selected = []
+    eligible = [ch for ch in channels if ch.auto_corrections_enabled and not ch.muted]
+    candidates: List[Tuple[LiveSharedMixChannel, LiveSharedMixChannel, float, float]] = []
+    probe_bands = ((120.0, 250.0, 180.0), (700.0, 2000.0, 1200.0), (1800.0, 4500.0, 2500.0), (5000.0, 9000.0, 7000.0))
+    for i, high_priority in enumerate(eligible):
+        for low_priority in eligible[i + 1:]:
+            a, b = (high_priority, low_priority) if high_priority.priority >= low_priority.priority else (low_priority, high_priority)
+            if abs(a.priority - b.priority) < 0.05:
+                # Stable tie-break: lead vocal wins against accompaniment.
+                if b.role == "lead_vocal" and a.role != "lead_vocal":
+                    a, b = b, a
+                elif a.role != "lead_vocal" and b.role != "lead_vocal":
+                    continue
+            best = None
+            for low, high, center in probe_bands:
+                ea = _raw_band_energy(_audible_segment(a, start, end), a.sample_rate, low, high)
+                eb = _raw_band_energy(_audible_segment(b, start, end), b.sample_rate, low, high)
+                overlap = min(ea, eb)
+                if best is None or overlap > best[0]:
+                    best = (overlap, center)
+            if best and best[0] > EPS:
+                candidates.append((a, b, best[1], best[0]))
+    candidates.sort(key=lambda item: item[3], reverse=True)
+    planned = []
     limit = max(0, int(config.mirror_eq_max_actions_per_pass))
-    while len(selected) < limit and (cuts or boosts):
-        if cuts and len(selected) < limit:
-            selected.append(cuts.pop(0))
-        if boosts and len(selected) < limit:
-            selected.append(boosts.pop(0))
-
-    channel_by_id = {channel.channel_id: channel for channel in eligible}
-    sent_candidates = []
-    for adjustment in selected:
-        channel = channel_by_id.get(int(adjustment.channel_id))
-        if channel is None:
-            continue
-        direction = "cut masker" if float(adjustment.gain_db) < 0.0 else "boost masked source"
-        reason = (
-            f"Mirror EQ {direction}: cross-adaptive overlap at "
-            f"{float(adjustment.frequency_hz):.0f}Hz"
-        )
-        before_count = len(actions)
-        _append_eq_delta(
-            actions,
-            decisions,
-            channel,
-            float(adjustment.frequency_hz),
-            float(adjustment.gain_db),
-            float(adjustment.q_factor),
-            reason,
-            config,
-        )
-        if len(actions) > before_count:
-            sent_candidates.append(
-                {
-                    "channel": int(channel.channel_id),
-                    "name": channel.name,
-                    "role": channel.role,
-                    "freq_hz": round(float(adjustment.frequency_hz), 1),
-                    "delta_db": round(float(np.clip(adjustment.gain_db, -1.0, 1.0)), 2),
-                    "q": round(float(adjustment.q_factor), 2),
-                    "direction": direction,
-                }
-            )
-
+    for preferred, masker, freq, _ in candidates:
+        if len(planned) + 2 > limit:
+            break
+        before = len(actions)
+        _append_eq(actions, decisions, masker, freq, -1.0, 4.0, f"Mirror EQ cut masker: cross-adaptive overlap at {freq:.0f}Hz", config)
+        _append_eq(actions, decisions, preferred, freq, 0.5, 2.0, f"Mirror EQ boost masked source: cross-adaptive overlap at {freq:.0f}Hz", config)
+        if len(actions) > before:
+            planned.extend([masker.channel_id, preferred.channel_id])
     report["mirror_eq"] = {
         "enabled": True,
         "mode": "cross_adaptive_full_mirror_eq",
-        "candidate_count": len(adjustments),
-        "planned_candidates": sent_candidates,
+        "candidate_count": len(candidates),
+        "planned_candidates": planned,
         "principle": "cut lower-priority masker with narrower Q, boost higher-priority masked source more gently",
     }
 
 
-def _append_master_action(
-    actions: List[Any],
-    report: Dict[str, Any],
-    master_audio: Optional[np.ndarray],
-    master_current_fader_db: Optional[float],
-    config: LiveSharedMixConfig,
-) -> None:
+def _append_master(actions: List[Any], report: Dict[str, Any], master_audio: Optional[np.ndarray], current: Optional[float], config: LiveSharedMixConfig) -> None:
     if master_audio is None or not config.correct_master_output:
         report["master"] = {"enabled": False, "reason": "no_master_reference_audio"}
         return
-    peak_db = _peak_db(master_audio)
-    rms = _rms_db(master_audio)
-    report["master"] = {
-        "enabled": True,
-        "peak_dbfs": round(float(peak_db), 2),
-        "rms_db": round(float(rms), 2),
-        "peak_ceiling_dbfs": round(float(config.master_peak_ceiling_db), 2),
-        "principle": "master spectrum is a balance meter; source/stem fixes are preferred",
-    }
-    excess = peak_db - float(config.master_peak_ceiling_db)
+    peak = _peak_db(master_audio)
+    report["master"] = {"enabled": True, "peak_dbfs": round(peak, 2), "rms_db": round(_rms_db(master_audio), 2), "peak_ceiling_dbfs": config.master_peak_ceiling_db, "principle": "master spectrum is a balance meter; source/stem fixes are preferred"}
+    excess = peak - config.master_peak_ceiling_db
     if excess <= config.min_action_db:
-        report["master"]["action"] = "none"
-        report["master"]["reason"] = "master peak inside live ceiling"
+        report["master"].update(action="none", reason="master peak inside live ceiling")
         return
-    if master_current_fader_db is None:
-        report["master"]["action"] = "skip"
-        report["master"]["reason"] = "main fader readback unavailable"
+    if current is None or not np.isfinite(current):
+        report["master"].update(action="skip", reason="main fader readback unavailable")
         return
-    cut = min(float(config.master_max_cut_db), excess)
-    target = min(0.0, float(master_current_fader_db) - cut)
-    actions.append(
-        MasterFaderMove(
-            main_id=1,
-            target_db=round(target, 2),
-            reason="Master reference peak exceeds live ceiling; reduce Main 1 only",
-        )
-    )
-    report["master"].update({
-        "action": "master_fader_cut",
-        "current_fader_db": round(float(master_current_fader_db), 2),
-        "target_fader_db": round(float(target), 2),
-        "cut_db": round(float(cut), 2),
-    })
+    cut = min(config.master_max_cut_db, excess)
+    target = min(0.0, float(current) - cut)
+    actions.append(MasterFaderMove(main_id=1, target_db=round(target, 2), reason="Master reference peak exceeds live ceiling; reduce Main 1 only"))
+    report["master"].update(action="master_fader_cut", current_fader_db=round(float(current), 2), target_fader_db=round(target, 2), cut_db=round(cut, 2))
 
 
-def _action_plan_priority(action: Any) -> int:
-    if isinstance(action, MasterFaderMove):
-        return 0
-    if isinstance(action, ChannelEQMove) and str(getattr(action, "reason", "")).startswith("Mirror EQ"):
-        return 1
-    if isinstance(action, ChannelFaderMove):
-        return 2
-    if isinstance(action, ChannelEQMove):
-        return 3
-    if isinstance(action, HighPassAdjust):
-        return 4
+def _action_priority(action: Any) -> int:
+    if isinstance(action, MasterFaderMove): return 0
+    if isinstance(action, ChannelEQMove) and str(getattr(action, "reason", "")).startswith("Mirror EQ"): return 1
+    if isinstance(action, ChannelFaderMove): return 2
+    if isinstance(action, ChannelEQMove): return 3
+    if isinstance(action, HighPassAdjust): return 4
     return 5
 
 
-def _limit_actions(actions: Sequence[Any], limit: int) -> List[Any]:
-    max_actions = max(0, int(limit))
-    if len(actions) <= max_actions:
-        return list(actions)
-    ranked = sorted(
-        enumerate(actions),
-        key=lambda item: (_action_plan_priority(item[1]), item[0]),
-    )
-    return [action for _, action in ranked[:max_actions]]
+def _routing_audit(channels: Sequence[LiveSharedMixChannel], config: LiveSharedMixConfig) -> List[Dict[str, Any]]:
+    result = []
+    for channel in channels:
+        raw = channel.raw_settings or {}
+        generic = channel.name.strip().upper() in {"", f"CH{channel.channel_id}", f"CH {channel.channel_id}"}
+        result.append({"channel": channel.channel_id, "name": channel.name, "role": channel.role, "input_routing": raw.get("input_routing") or {}, "main_send": raw.get("main_send") or {}, "name_generic": generic, "routing_write_enabled": bool(config.apply_routing_fixes), "rename_enabled": bool(config.rename_generic_channels)})
+    return result
 
 
-def build_live_shared_mix_plan(
-    channels: Sequence[LiveSharedMixChannel],
-    sample_rate: int,
-    *,
-    config: Optional[LiveSharedMixConfig] = None,
-    master_audio: Optional[np.ndarray] = None,
-    master_current_fader_db: Optional[float] = None,
-) -> LiveSharedMixPlan:
-    """Build a bounded live OSC action plan from current channel audio buffers."""
-
+def build_live_shared_mix_plan(channels: Sequence[LiveSharedMixChannel], sample_rate: int, *, config: Optional[LiveSharedMixConfig] = None, master_audio: Optional[np.ndarray] = None, master_current_fader_db: Optional[float] = None) -> LiveSharedMixPlan:
     config = config or LiveSharedMixConfig()
     if not config.enabled:
         return LiveSharedMixPlan(report={"enabled": False, "reason": "disabled"})
+    active = [ch for ch in channels if np.asarray(ch.audio).size and not ch.muted and np.isfinite(ch.fader_db) and ch.fader_db > -90.0 and _peak_db(ch.audio) > -65.0]
+    if not active:
+        return LiveSharedMixPlan(report={"enabled": True, "reason": "no_active_channels"})
 
-    active = [
-        channel
-        for channel in channels
-        if channel.audio.size > 0
-        and not channel.muted
-        and channel.fader_db > -90.0
-        and _peak_db(channel.audio) > -65.0
-    ]
+    program_end = min(_to_mono(ch.audio).size for ch in active)
+    full_mix = _analysis_mix(active, 0, program_end)
+    start = _analysis_window_start(full_mix, sample_rate, config.analysis_window_sec)
+    window = min(int(max(1.0, config.analysis_window_sec) * sample_rate), program_end)
+    end = min(program_end, start + window)
+
     actions: List[Any] = []
     decisions: List[Dict[str, Any]] = []
-    if not active:
-        return LiveSharedMixPlan(report={"enabled": config.enabled, "reason": "no_active_channels"})
-
-    rough = _analysis_mix(active, 0, min(len(_to_mono(active[0].audio)), int(config.analysis_window_sec * sample_rate)))
-    start = _analysis_window_start(rough, sample_rate, config.analysis_window_sec)
-    end = start + min(
-        int(max(1.0, config.analysis_window_sec) * sample_rate),
-        min(_to_mono(channel.audio).size for channel in active),
-    )
-    if end <= start:
-        start = 0
-        end = min(_to_mono(channel.audio).size for channel in active)
-
     report: Dict[str, Any] = {
-        "enabled": bool(config.enabled),
+        "enabled": True,
         "mode": "live_shared_chat_mix",
         "analysis_window_sec": round((end - start) / float(sample_rate), 2),
         "analysis_window_start_sec": round(start / float(sample_rate), 2),
@@ -883,6 +478,7 @@ def build_live_shared_mix_plan(
             "source/stem fixes before master processing",
             "vocal space created by EQ on competitors",
             "mirror EQ: cut masker and gently boost masked priority source in overlapping bands",
+            "all contribution estimates are audible/fader weighted",
             "small bounded fader/EQ/HPF moves only",
         ],
         "analysis_before": _phase_log("before", active, start, end),
@@ -891,100 +487,40 @@ def build_live_shared_mix_plan(
         "routing_audit": _routing_audit(active, config),
     }
 
-    low_end_ids = _names_for_roles(active, {"kick", "bass"})
-    low_end = _filter_channels(active, low_end_ids)
-    _apply_low_end_anchor_rules(low_end, start, end, actions, decisions, config)
+    low = [ch for ch in active if ch.role in {"kick", "bass"}]
+    if low:
+        _apply_low_end(low, start, end, actions, decisions, config)
     report["phases"].append(_phase_log("kick_bass_anchor", active, start, end))
-
-    lead_ids = low_end_ids | _names_for_roles(active, {"lead_vocal"})
-    lead_layer = _filter_channels(active, lead_ids)
-    _apply_lead_anchor_rules(lead_layer, start, end, actions, decisions, config)
+    _apply_lead_space(active, start, end, actions, decisions, config)
     report["phases"].append(_phase_log("lead_anchor", active, start, end))
-
-    rhythm_ids = lead_ids | _names_for_roles(active, {"snare", "toms"})
-    rhythm = _filter_channels(active, rhythm_ids)
-    _apply_rhythm_anchor_rules(rhythm, start, end, actions, decisions, config)
-    report["phases"].append(_phase_log("rhythm_anchor", active, start, end))
-
-    music_ids = rhythm_ids | _names_for_roles(active, {"guitars", "playback", "bgv"})
-    music = _filter_channels(active, music_ids)
-    _apply_music_layer_rules(music, start, end, actions, decisions, config)
+    _apply_music_cleanup(active, start, end, actions, decisions, config)
     report["phases"].append(_phase_log("music_layer", active, start, end))
-
-    cymbal_ids = music_ids | _names_for_roles(active, {"hi_hat", "ride", "overheads_room"})
-    cymbals = _filter_channels(active, cymbal_ids)
-    _apply_cymbal_air_rules(cymbals, start, end, actions, decisions, config)
+    _apply_air_cleanup(active, start, end, actions, decisions, config)
     report["phases"].append(_phase_log("cymbal_air_layer", active, start, end))
+    _mirror_eq(active, start, end, actions, decisions, report, config)
+    report["analysis_after"] = _phase_log("predicted_after", active, start, end)
+    _append_master(actions, report, master_audio, master_current_fader_db, config)
 
-    _append_mirror_eq_rules(active, start, end, actions, decisions, report, config)
-
-    report["analysis_after"] = _phase_log("after", active, start, end)
-    _append_master_action(actions, report, master_audio, master_current_fader_db, config)
-
-    limited_actions = _limit_actions(actions, int(config.max_actions_per_pass))
+    ranked = sorted(enumerate(actions), key=lambda item: (_action_priority(item[1]), item[0]))
+    limited = [action for _, action in ranked[:max(0, int(config.max_actions_per_pass))]]
     report["actions_requested"] = len(actions)
-    report["actions_planned"] = len(limited_actions)
-    report["actions_truncated"] = max(0, len(actions) - len(limited_actions))
-    report["planned_action_types"] = [action.action_type for action in limited_actions]
-    return LiveSharedMixPlan(actions=limited_actions, report=report)
-
-
-def _routing_audit(
-    channels: Sequence[LiveSharedMixChannel],
-    config: LiveSharedMixConfig,
-) -> List[Dict[str, Any]]:
-    audit = []
-    for channel in channels:
-        raw = channel.raw_settings
-        route = raw.get("input_routing") or {}
-        main_send = raw.get("main_send") or {}
-        name_generic = channel.name.strip().upper() in {
-            f"CH{channel.channel_id}",
-            f"CH {channel.channel_id}",
-            "",
-        }
-        item = {
-            "channel": int(channel.channel_id),
-            "name": channel.name,
-            "role": channel.role,
-            "input_routing": route,
-            "main_send": main_send,
-            "name_generic": bool(name_generic),
-            "routing_write_enabled": bool(config.apply_routing_fixes),
-            "rename_enabled": bool(config.rename_generic_channels),
-        }
-        if not config.apply_routing_fixes:
-            item["routing_decision"] = "observe_only_no_patch_map"
-        if name_generic and not config.rename_generic_channels:
-            item["name_decision"] = "observe_only_generic_name"
-        audit.append(item)
-    return audit
+    report["actions_planned"] = len(limited)
+    report["actions_truncated"] = max(0, len(actions) - len(limited))
+    report["planned_action_types"] = [getattr(action, "action_type", type(action).__name__) for action in limited]
+    return LiveSharedMixPlan(actions=limited, report=report)
 
 
 def normalize_live_role(preset: str = "", source_role: str = "", name: str = "") -> str:
-    text = " ".join([str(preset or ""), str(source_role or ""), str(name or "")]).lower()
-    if "kick" in text:
-        return "kick"
-    if "snare" in text or " sn " in f" {text} ":
-        return "snare"
-    if "tom" in text:
-        return "toms"
-    if "hat" in text or "hihat" in text:
-        return "hi_hat"
-    if "ride" in text:
-        return "ride"
-    if "overhead" in text or "room" in text or "ohl" in text or "ohr" in text:
-        return "overheads_room"
-    if "bass" in text:
-        return "bass"
-    if "guitar" in text or "gtr" in text:
-        return "guitars"
-    if "lead" in text and ("vox" in text or "vocal" in text):
-        return "lead_vocal"
-    if "vox" in text or "vocal" in text or "backs" in text or "bgv" in text:
-        return "bgv"
-    if "playback" in text or "tracks" in text or "pb" in text:
-        return "playback"
-    if "accordion" in text or "keys" in text or "synth" in text:
-        return "playback"
+    text = " ".join((str(preset or ""), str(source_role or ""), str(name or ""))).lower()
+    if "kick" in text: return "kick"
+    if "snare" in text or " sn " in f" {text} ": return "snare"
+    if "tom" in text: return "toms"
+    if "hat" in text or "hihat" in text: return "hi_hat"
+    if "ride" in text: return "ride"
+    if any(token in text for token in ("overhead", "room", "ohl", "ohr")): return "overheads_room"
+    if "bass" in text: return "bass"
+    if "guitar" in text or "gtr" in text: return "guitars"
+    if "lead" in text and ("vox" in text or "vocal" in text): return "lead_vocal"
+    if any(token in text for token in ("vox", "vocal", "backs", "bgv")): return "bgv"
+    if any(token in text for token in ("playback", "tracks", " pb ", "accordion", "keys", "synth")): return "playback"
     return "unknown"
