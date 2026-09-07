@@ -1,0 +1,69 @@
+name: Import reviewed shadow-plan blobs
+
+on:
+  push:
+    branches: [gpt/dsp-audit-overhaul-20260907]
+    paths:
+      - '.ci/shadow-plan-part-*.bin'
+      - '.github/workflows/import_shadow_plan.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.repository == 'tubeslave/AUTO-MIXER-Tubeslave'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+          fetch-depth: 2
+      - name: Validate reviewed patch and create immutable blobs only
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import base64, gzip, hashlib, json, os, pathlib, subprocess, urllib.request
+          BASE = "e0d8fc1f1e9f293b06d515ddaa440aaca78d19c3"
+          DIGEST = "cdac604634b351a2ab5c8daf31c702048abf36b1e76d2872679eed42dadedd3a"
+          REPO = "tubeslave/AUTO-MIXER-Tubeslave"
+          assert os.environ["GITHUB_REPOSITORY"] == REPO
+          assert subprocess.check_output(["git", "rev-parse", "HEAD^"], text=True).strip() == BASE
+          expected = {".github/workflows/dsp_audit.yml": "87fd8432f7c5b0ea927e644141e3c3f2802120ee157b10a0b9d7caf7741e56c2", ".github/workflows/test.yml": "2933208bd95cb2569924f50b88d257a730dd9802b951692a7cc56ac81fc2872f", "backend/auto_eq_processing.py": "49c20f0b32b1d3ecba7cc5523fa44a49a9339dc16b9af49b34f3f720fc47cd38", "backend/auto_soundcheck_engine.py": "8230dbc43f169395d0c607972d081f099f05160697bc76dcbc1978c8dc2f055f", "backend/autofoh_safety.py": "d5d54b65b40b5db811b08e78f35f7be4b4bbee2753ef4c0af164cf47548ec20c", "backend/decision_guard.py": "b1cbb162d8589f2ff17b8266f5a1c787bd239f8c319aab392061d1d73f03d300", "backend/guarded_mixer.py": "ce3faa24752288d65adacf6b6937cffca58516c1750266a23b4028b7b9505c1b", "backend/live_shared_mix.py": "a501af9ee7eaf22f3ab9ccedce2e1677558c1d858530a0ffda3c4d6eecb50fd6", "backend/ml/processing_graph.py": "8a8751b450f95d5f0c6cf2fd67ae0b88e7c8b01df96be309789ef692fc58b0ac", "backend/observation_mixer.py": "e757ab5111beb7519bbbb301a893791eab845be9d6c0ccd66ee900c4b90b9bf6", "backend/requirements-core.txt": "97d32076a86a9a917fe2b9a1b9d25aa47d679d50a53edc970d80efb95de96a99", "backend/requirements-dev.txt": "e6fa0cf13d1de8cc9722fe34daf02e73d234fccf42d88a54b0e1862feba10b31", "backend/requirements-extras.txt": "37d5439393415fae9d5819c7ad77f5b17334c7d9514864777cabb6920d41a3d3", "backend/requirements-ml.txt": "f39a5308e7f3d1fa970e34cd246fa4b81fe228e0f240df060fc67d0e380a8a7c", "backend/requirements.txt": "dde34819cf64fcb4495c7dbcb6d7bb020d90cfa6daafcee19e2b586dd8d91af6", "backend/shadow_mix_cli.py": "d45c28d36ec8b5efff68ff4cbec17934ff74b9febcf0c6a60c7e4b35e92ff624", "backend/shadow_pipeline.py": "66225530c136988265760c6f09fbfe0ee251135e66f0b5a55d312a43b08e569d", "backend/shadow_renderer.py": "63c292292e8350f0c24835ab79f2baf0f6d857adf0e788e331ce94d62b5916b0", "backend/target_corridor.py": "356bd4168d1c2ff53781eaacb154010dc547f23f436b4050abe0540d3f2e83ca", "config/autofoh-shadow.example.yaml": "a54352f4bc694c183413aef77fec49b6dd06adb4c85c8265e3a2efd622aa24ae", "docs/SHADOW_PIPELINE.md": "195f1f399d0d80038bbda4f0ef23ac84c5d3a3a9cbec2247d0be2eb000114bac", "tests/test_shadow_engine_wiring.py": "9c4b67e3ff41e349d2a2a7d588ebc652ac0e286712e3ced0929b4efe8add2052", "tests/test_shadow_pipeline.py": "97e23784301fe5deed41ec1b856a12b093cccf2e8225be07b2abd4a8501b77a4", "tests/test_shadow_regressions.py": "b5292ff878e9a36a76b91617d52692f1449c0967f21b7587649004b6f87959bc"}
+          root = pathlib.Path.cwd().resolve()
+          data = b"".join((root / f".ci/shadow-plan-part-{i}.bin").read_bytes() for i in range(1, 5))
+          patch = gzip.decompress(data)
+          assert len(patch) == 100571 and hashlib.sha256(patch).hexdigest() == DIGEST
+          stats = subprocess.check_output(["git", "apply", "--numstat"], input=patch).decode()
+          paths = [line.split("\t", 2)[2] for line in stats.splitlines()]
+          assert set(paths) == set(expected) and len(paths) == len(expected)
+          subprocess.run(["git", "apply", "--check"], input=patch, check=True)
+          subprocess.run(["git", "apply"], input=patch, check=True)
+          files = []
+          for path in sorted(paths):
+              p = root / path
+              assert not p.is_symlink() and root in p.resolve().parents
+              content = p.read_bytes()
+              digest = hashlib.sha256(content).hexdigest()
+              assert digest == expected[path], path
+              payload = json.dumps({"encoding": "base64", "content": base64.b64encode(content).decode()}).encode()
+              req = urllib.request.Request(
+                  f"https://api.github.com/repos/{REPO}/git/blobs", data=payload,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                           "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
+                           "Content-Type": "application/json"}, method="POST")
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  blob = json.load(response)
+              expected_sha = hashlib.sha1(b"blob " + str(len(content)).encode() + b"\0" + content).hexdigest()
+              assert blob["sha"] == expected_sha
+              files.append({"path": path, "sha": blob["sha"], "mode": "100644", "type": "blob", "sha256": digest})
+              print(path, blob["sha"])
+          pathlib.Path("shadow-plan-blobs.json").write_text(json.dumps(
+              {"base_sha": BASE, "patch_sha256": DIGEST, "files": files}, indent=2) + "\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shadow-plan-blobs
+          path: shadow-plan-blobs.json
+          retention-days: 3
