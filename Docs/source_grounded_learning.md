@@ -85,7 +85,6 @@ layer.stop()
 - `channel`
 - `instrument`
 - `problem`
-- `context`
 - `candidate_rule_ids`
 - `selected_rule_ids`
 - `source_ids`
