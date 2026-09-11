@@ -1,0 +1,994 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "patch_id": "ml-spatial-2026-09-11-155446",
+  "update_id": "ML-SPATIAL-2026-09-11-155446",
+  "created_at": "2026-09-11T15:54:46+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "on_demand_topic_study",
+  "topic": "instrument_spatial_placement_in_stereo_rock_mixing",
+  "mode": "additive",
+  "base_materials_read": [
+    {
+      "file_name": "Mixing_Learning_Patch_2026-09-10_1800.json",
+      "update_id": "mixing-learning-2026-09-10-1800",
+      "sha256": "1170940c8fdf991999cd05551bbac7f29757b3a98cc6a664cd5707f9da275182",
+      "read_scope": "JSON source/card/rule/experiment registries; not a verified master manifest"
+    },
+    {
+      "file_name": "Mixing_Learning_Patch_2026-09-11_0900.json",
+      "update_id": "ML-2026-09-11-0900",
+      "sha256": "3169eff3cbb3caad016bcf8c6b7dc3c2edbed1f035549276da8ae2546f3bad5c",
+      "read_scope": "JSON source/card/rule/experiment registries; not a verified master manifest"
+    },
+    {
+      "file_name": "Mixing_Learning_Patch_2026-09-11_1200.json",
+      "update_id": "ML-2026-09-11-1200",
+      "sha256": "6b644f480ace7c14c1f8cac1c6335e64fa849380f1e6090ad1e81bdcfc355fee",
+      "read_scope": "JSON source/card/rule/experiment registries; not a verified master manifest"
+    },
+    {
+      "file_name": "Mixing_Learning_Patch_2026-09-11_1500.json",
+      "update_id": "ML-2026-09-11-1500",
+      "sha256": "b5d9279b68e648cdac32b7369912dd4d05cc4454c17cb7f4ca32777aff47cd34",
+      "read_scope": "JSON source/card/rule/experiment registries; not a verified master manifest"
+    }
+  ],
+  "base_manifest_sha256": null,
+  "base_version_verified": false,
+  "new_since_previous_search": null,
+  "novelty_note": "Нет подтверждённой публикации, вышедшей после предыдущего запуска 15:00 MSK. Это тематическое дополнение более ранними работами. Полная дедупликация master невозможна без manifest.",
+  "source_cards": [
+    {
+      "id": "S-SP-20260911-155446-01",
+      "title": "Neuronal Representation of Auditory Distance Percepts vs. Cues in Human Auditory Cortex",
+      "url": "https://link.springer.com/article/10.1007/s10162-025-01026-8",
+      "doi": "10.1007/s10162-025-01026-8",
+      "publication_date": "2026-01-30",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "full_text_sections_introduction_methods_results_and_selected_discussion",
+      "kind": "primary_experiment",
+      "bounded_summary": "При различении близких боковых виртуальных источников согласованные DRR и ILD обеспечивали более выраженное различение дистанции, чем конфликтующие признаки. DRR рассматривается также как представитель связанных реверберационных признаков, а не обязательно непосредственно вычисляемая мозгом величина.",
+      "limitations": [
+        "Шумовые импульсы, а не музыкальные миксы.",
+        "Одна неиндивидуальная BRIR-серия, боковые источники на расстояниях 15–100 cm.",
+        "В каждой из двух выборок 15 набранных, 13 анализируемых участников после исключений.",
+        "Нет DRR-only условия; обратная связь отличалась между условиями; абсолютные расстояния и рок-миксы не валидированы.",
+        "Не переносить естественный near-field ILD на регулятор pan как управление дистанцией."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Keerthi Kumar Doreswamy",
+        "Jyrki Ahveninen",
+        "Samantha Huang",
+        "Stephanie Rossi",
+        "Norbert Kopčo"
+      ]
+    },
+    {
+      "id": "S-SP-20260911-155446-02",
+      "title": "Reverberation cues underlying virtual auditory distance perception for a frontal source",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/40928551/",
+      "doi": "10.1121/10.0039251",
+      "publication_date": "2025-09-01",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "abstract_and_metadata_only_consensus_fetch_and_public_record",
+      "kind": "primary_experiment",
+      "bounded_summary": "При выровненном широкополосном уровне расстояние фронтального источника различалось по реверберационным/спектральным признакам. В abstract DRR имеет наибольшую корреляцию с оценками дистанции; различия между речью и шумами объяснены не полностью.",
+      "limitations": [
+        "Полный текст не прочитан.",
+        "Наушники; речь и розовый/белый шум; виртуальные 0.5–10 m, не рок.",
+        "Корреляция не доказывает единственный механизм или универсальные настройки send."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Mathieu Lavandier",
+        "Luna Prud’homme"
+      ]
+    },
+    {
+      "id": "S-SP-20260911-155446-03",
+      "title": "Influence of Recording Technique and Ensemble Size on Apparent Source Width",
+      "url": "https://repository.gatech.edu/entities/publication/36a87ff5-233a-48fb-9155-7a719f46185a",
+      "doi": null,
+      "publication_date": "2024-06",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_repository_abstract_and_metadata_only",
+      "kind": "primary_conference_experiment",
+      "bounded_summary": "В abstract сообщается зависимость кажущейся ширины оркестра от техники записи и различие механизмов оценки на колонках и в наушниках. Изменение физической ширины ансамбля не давало простого однонаправленного изменения впечатления.",
+      "limitations": [
+        "Полный PDF не прочитан.",
+        "Оркестр/WFS, не рок-микс и не проверка конкретного stereo-imager."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Renzhi Guo (as listed in repository)"
+      ],
+      "persistent_id": "hdl:1853/76301"
+    },
+    {
+      "id": "S-SP-20260911-155446-04",
+      "title": "Apparent source width and listener envelopment in relation to source-listener distance",
+      "url": "https://pure.hud.ac.uk/en/publications/apparent-source-width-and-listener-envelopment-in-relation-to-sou/",
+      "doi": null,
+      "publication_date": "2013",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_author_repository_abstract_and_metadata_only",
+      "kind": "primary_conference_experiment",
+      "bounded_summary": "Работа различает apparent source width и listener envelopment. В конкретном BRIR-опыте ранняя и поздняя энергия предсказывали эти оценки лучше ряда привычных пространственных метрик.",
+      "limitations": [
+        "Только abstract; 12 участников, труба/конга и ограниченный набор BRIR.",
+        "Не обобщать направление изменения ширины с расстоянием на любой искусственный микс.",
+        "Не трактовать IACC как обычную корреляцию электрических L/R каналов."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Hyunkook Lee"
+      ],
+      "date_note": "Repository uses Jan 1 placeholder; conference held Sep 2–4, 2013."
+    },
+    {
+      "id": "S-SP-20260911-155446-05",
+      "title": "FabFilter Pro-R 2 Help: Main controls",
+      "url": "https://www.fabfilter.com/help/pro-r/using/maincontrols",
+      "doi": null,
+      "publication_date": null,
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_documentation_main_controls_body",
+      "kind": "official_documentation",
+      "bounded_summary": "Distance, pre-delay, decay и stereo width имеют разные назначения. У Width конкретная алгоритмическая семантика: mono, crossfeed, independent channels и затем Side boost; проценты нельзя переносить между плагинами.",
+      "limitations": [
+        "Документация одного продукта, не доказательство оптимальной эстетики.",
+        "Дата публикации страницы не указана; просмотрено в дату запуска."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "parameter_provenance": [
+        {
+          "parameter": "Width",
+          "values_percent": [
+            0,
+            50,
+            100
+          ],
+          "meaning": [
+            "mono",
+            "maximum crossfeed",
+            "independent-channel multi-mono"
+          ],
+          "origin": "official_manual",
+          "is_recommended_preset": false
+        }
+      ]
+    },
+    {
+      "id": "S-SP-20260911-155446-06",
+      "title": "Ableton Live: Mixing / Split Stereo Pan Mode",
+      "url": "https://www.ableton.com/en/live-manual/12/mixing/",
+      "doi": null,
+      "publication_date": null,
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_manual_mixer_pan_and_returns_sections_plus_complete_short_support_article",
+      "kind": "official_documentation",
+      "bounded_summary": "Default pan и раздельное панорамирование L/R имеют разные операции. Split Stereo Pan позволяет размещать два входных канала независимо. Для перемещения стереосцены нельзя без проверки заменять это изменением баланса каналов.",
+      "limitations": [
+        "Поведение зависит от режима DAW; pan-law и компенсацию уровня нужно проверить в конкретной сессии."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "support_url": "https://help.ableton.com/hc/en-us/articles/360000103324-Split-Stereo-Pan-Mode"
+    },
+    {
+      "id": "S-SP-20260911-155446-07",
+      "title": "How to use reverb?",
+      "url": "https://www.fabfilter.com/learn/reverb/how-to-use-reverb",
+      "doi": null,
+      "publication_date": "2022-02-15",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "full_official_tutorial_article_body",
+      "kind": "engineer_tutorial",
+      "bounded_summary": "Автор рекомендует оценивать реверберацию в полном миксе, ограничивать мешающие хвосты и в основном согласовывать панораму эффекта с источником. Это практика упорядочивания сцены, а не закон.",
+      "limitations": [
+        "Стилистические рекомендации; не контролируемый научный опыт.",
+        "Советы о более дальней/узкой/тёмной сцене не превращать в обязательную связку."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Maarten de Boer"
+      ]
+    },
+    {
+      "id": "S-SP-20260911-155446-08",
+      "title": "5 Quick Panning Mixing Tricks",
+      "url": "https://producelikeapro.com/blog/5-quick-panning-mixing-tricks/",
+      "doi": null,
+      "publication_date": "2018-03-19",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "full_official_companion_article_body_not_video",
+      "kind": "engineer_tutorial",
+      "bounded_summary": "Warren Huart предлагает эффект с противоположной стороны от одиночной гитары и автоматизацию ширины гармоний по секциям. Он предупреждает о риске короткой задержки для фазы и грува.",
+      "limitations": [
+        "Текст статьи, не транскрипт видео.",
+        "Конкретная задержка не указана; pitch change не гарантирует совместимость с mono."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Warren Huart"
+      ],
+      "related_video_id": "JD26MxAvues"
+    },
+    {
+      "id": "S-SP-20260911-155446-09",
+      "title": "The Mystery of Predelay, SOLVED! — Marc Daniel Nelson",
+      "url": "https://producelikeapro.com/blog/the-mystery-of-predelay-solved/",
+      "doi": null,
+      "publication_date": "2021-03-11",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "full_official_companion_article_body_not_video",
+      "kind": "engineer_tutorial",
+      "bounded_summary": "Сопровождающая статья описывает отделение dry-источника от более позднего хвоста. Пример 100 ms относится к вокальному send; он не становится общим пресетом или единицей расстояния.",
+      "limitations": [
+        "Видео/транскрипт не получены.",
+        "Число дано текстом companion-статьи, не сверено с изображением или произнесённой фразой."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "parameter_provenance": [
+        {
+          "parameter": "pre_delay_ms",
+          "value": 100,
+          "origin": "official_companion_article",
+          "context": "vocal send example",
+          "is_recommended_preset": false
+        }
+      ]
+    },
+    {
+      "id": "S-SP-20260911-155446-10",
+      "title": "L C R Panning and Mixing In Mono?",
+      "url": "https://producelikeapro.com/blog/l-c-r-panning-and-mixing-in-mono",
+      "doi": null,
+      "publication_date": "2018-05-14",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_companion_article_core_text_not_video",
+      "kind": "engineer_tutorial",
+      "bounded_summary": "Описана LCR-раскладка для плотного гитарного микса: устойчивый центр и вынесенные к краям крупные среднечастотные слои. Для проекта это одна стартовая художественная альтернатива, не правило обязательного центра для вокала.",
+      "limitations": [
+        "Заявления о том, что делают все профессионалы, не приняты как доказательства.",
+        "Видео не изучено.",
+        "Связанный курс платный; покупка и загрузка не выполнялись."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Warren Huart"
+      ],
+      "related_video_id": "nfnnTaJyTxY"
+    },
+    {
+      "id": "S-SP-20260911-155446-11",
+      "title": "Reverb Mixing Tricks to Elevate Your Mix",
+      "url": "https://producelikeapro.com/blog/reverb-mixing-tricks/",
+      "doi": null,
+      "publication_date": "2021-07-15",
+      "discovered_at": "2026-09-11T15:54:46+03:00",
+      "read_depth": "official_companion_article_selected_sections",
+      "kind": "engineer_tutorial",
+      "bounded_summary": "Прочитаны разделы о фильтрации возвратов, противоположной панораме реверберации и ducking. Фильтрацию wet следует подбирать под мешающие компоненты, не переносить числовой пример автоматически.",
+      "limitations": [
+        "Не весь длинный материал про reverse reverb прочитан.",
+        "Видео не изучено; статья не подтверждает его точные параметры/таймкоды."
+      ],
+      "novelty": "not_present_in_four_accessible_patch_source_registries; full_database_dedup_pending",
+      "authors": [
+        "Max McAllister"
+      ],
+      "related_video_id": "XIkii9fF2Sg"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-SP-20260911-155446-01",
+      "title": "Разделять положение, ширину, глубину и окружение",
+      "claim": "Описать dry_pan, source_width, relative_depth, early/late ambience и художественную роль отдельно; не выводить одни координаты жёстко из других.",
+      "source_ids": [
+        "S-SP-20260911-155446-01",
+        "S-SP-20260911-155446-04",
+        "S-SP-20260911-155446-05"
+      ],
+      "rule_id": "R-SP-20260911-155446-01",
+      "confidence": "medium_as_architecture_low_until_music_validation",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-02",
+      "title": "Глубина не равна уровню или одному send",
+      "claim": "Сравнить разные отношения dry/early/late при неизменных pan и тембре; спектр и огибающую добавлять отдельными факторами. Не считать реальный DRR автоматически равным ручке send.",
+      "source_ids": [
+        "S-SP-20260911-155446-01",
+        "S-SP-20260911-155446-02"
+      ],
+      "rule_id": "R-SP-20260911-155446-02",
+      "confidence": "high_for_limited_psychophysical_principle_medium_low_for_rock_translation",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-03",
+      "title": "Отделять pre-delay от дистанции источника",
+      "claim": "Оставить dry на месте; исследовать pre-delay возврата отдельно от wet level и decay. Pre-delay — не переводчик ms в метры.",
+      "source_ids": [
+        "S-SP-20260911-155446-05",
+        "S-SP-20260911-155446-09"
+      ],
+      "rule_id": "R-SP-20260911-155446-03",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-04",
+      "title": "Сначала семантика pan/width, затем параметры",
+      "claim": "Указать тип операции: balance, independent-channel pan, M/S gain или decorrelator. Не переносить проценты между алгоритмами.",
+      "source_ids": [
+        "S-SP-20260911-155446-05",
+        "S-SP-20260911-155446-06"
+      ],
+      "rule_id": "R-SP-20260911-155446-04",
+      "confidence": "high_for_operator_definition_medium_for_mix_application",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-05",
+      "title": "Панорама wet выбирается по задаче",
+      "claim": "Сравнить wet возле dry, противоположный mono wet и сдержанный stereo wet. Первое — кандидат для устойчивой локализации, второе — для художественного противовеса, не обязательное улучшение.",
+      "source_ids": [
+        "S-SP-20260911-155446-07",
+        "S-SP-20260911-155446-08",
+        "S-SP-20260911-155446-11"
+      ],
+      "rule_id": "R-SP-20260911-155446-05",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-06",
+      "title": "Delayed copy не считать независимым дублем",
+      "claim": "По умолчанию оставить bypass; оценивать такую обработку только как эффект, с проверкой mono. Независимые исполнения не заменять копиями без отдельного творческого решения.",
+      "source_ids": [
+        "S-SP-20260911-155446-08"
+      ],
+      "rule_id": "R-SP-20260911-155446-06",
+      "confidence": "high_for_algebra_medium_for_artistic_choice",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-07",
+      "title": "Роль и контраст секции определяют ширину",
+      "claim": "Сравнить статическую сцену с умеренной автоматизацией ширины/возвратов; фокус следует роли, не классу vocal. Плотный припев не обязан получать больше длинной реверберации.",
+      "source_ids": [
+        "S-SP-20260911-155446-07",
+        "S-SP-20260911-155446-08",
+        "S-SP-20260911-155446-10"
+      ],
+      "rule_id": "R-SP-20260911-155446-07",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-SP-20260911-155446-08",
+      "title": "Проверять ширину на нескольких способах воспроизведения",
+      "claim": "При наличии аудио разделить проверки: колонки, наушники, mono. Электрическую L/R correlation не приравнивать к IACC у ушей; не максимизировать ширину или Side энергию.",
+      "source_ids": [
+        "S-SP-20260911-155446-03",
+        "S-SP-20260911-155446-04"
+      ],
+      "rule_id": "R-SP-20260911-155446-08",
+      "confidence": "medium_for_playback_guard_low_for_any_absolute_threshold",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "R-SP-20260911-155446-01",
+      "title": "Разделять положение, ширину, глубину и окружение",
+      "source_ids": [
+        "S-SP-20260911-155446-01",
+        "S-SP-20260911-155446-04",
+        "S-SP-20260911-155446-05"
+      ],
+      "claim_type": "engineering_hypothesis",
+      "applies_to": {
+        "instrument": "any",
+        "section": "explicitly_named_section"
+      },
+      "when_apply": "Нужно предложить пространственную сцену, а не только pan.",
+      "change": "Описать dry_pan, source_width, relative_depth, early/late ambience и художественную роль отдельно; не выводить одни координаты жёстко из других.",
+      "range": {
+        "relative_depth": [
+          "front",
+          "middle",
+          "rear"
+        ],
+        "origin": "project_design_not_measured_meters",
+        "default_dsp_values": null
+      },
+      "protect": [
+        "иерархия секции",
+        "идентичность источника",
+        "задуманный размер",
+        "существующее пространство записи"
+      ],
+      "verify": "Слепо сравнить сцены в одинаковой секции и громкости; отдельно оценить локализацию, глубину, ширину и фокус.",
+      "cancel_if": "Координаты создают ложную точность, неотличимые варианты или противоречат заданной роли.",
+      "confidence": "medium_as_architecture_low_until_music_validation",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-02",
+      "title": "Глубина не равна уровню или одному send",
+      "source_ids": [
+        "S-SP-20260911-155446-01",
+        "S-SP-20260911-155446-02"
+      ],
+      "claim_type": "bounded_research_inference",
+      "applies_to": {
+        "instrument": "any_dry_plus_wet_source",
+        "section": "verse_or_chorus_tested_separately"
+      },
+      "when_apply": "Источник нужно отодвинуть или приблизить без простой подмены громкостью.",
+      "change": "Сравнить разные отношения dry/early/late при неизменных pan и тембре; спектр и огибающую добавлять отдельными факторами. Не считать реальный DRR автоматически равным ручке send.",
+      "range": {
+        "wet_gain_relative_db": [
+          -3,
+          0,
+          3
+        ],
+        "origin": "proposed_local_AB_grid_not_paper",
+        "absolute_distance_m": null
+      },
+      "protect": [
+        "атака",
+        "тональный вес",
+        "грув",
+        "читаемость роли"
+      ],
+      "verify": "Общий компенсационный gain после рендера для level-matched A/B, не независимая нормализация dry и wet; субъективная оценка дистанции.",
+      "cancel_if": "Получается только более тихий, глухой или размытый звук без предпочтительного места в сцене.",
+      "confidence": "high_for_limited_psychophysical_principle_medium_low_for_rock_translation",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-03",
+      "title": "Отделять pre-delay от дистанции источника",
+      "source_ids": [
+        "S-SP-20260911-155446-05",
+        "S-SP-20260911-155446-09"
+      ],
+      "claim_type": "engineering_hypothesis",
+      "applies_to": {
+        "instrument": [
+          "snare",
+          "lead_guitar",
+          "lead_vocal",
+          "other_foreground_source"
+        ],
+        "section": "foreground_role_confirmed"
+      },
+      "when_apply": "Нужен близкий фокус при слышимом окружающем пространстве.",
+      "change": "Оставить dry на месте; исследовать pre-delay возврата отдельно от wet level и decay. Pre-delay — не переводчик ms в метры.",
+      "range": {
+        "pre_delay_ms": [
+          0,
+          20,
+          40,
+          80
+        ],
+        "origin": "local_experiment_grid_not_source_preset",
+        "source_example_ms": 100,
+        "source_example_origin": "companion_article_vocal_example_not_transcript"
+      },
+      "protect": [
+        "начало атаки",
+        "слитность образа",
+        "ритм",
+        "отсутствие нежелательного slap"
+      ],
+      "verify": "Один алгоритм/decay/wet energy, одинаковая секция; level-matched blind A/B.",
+      "cancel_if": "Хвост воспринимается как отдельный запаздывающий удар, ломает грув или не улучшает фокус.",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-04",
+      "title": "Сначала семантика pan/width, затем параметры",
+      "source_ids": [
+        "S-SP-20260911-155446-05",
+        "S-SP-20260911-155446-06"
+      ],
+      "claim_type": "documented_control_semantics",
+      "applies_to": {
+        "instrument": "stereo_track_or_return",
+        "section": "all"
+      },
+      "when_apply": "Меняется положение или ширина двухканального материала.",
+      "change": "Указать тип операции: balance, independent-channel pan, M/S gain или decorrelator. Не переносить проценты между алгоритмами.",
+      "range": {
+        "operator": [
+          "balance",
+          "split_pan",
+          "mid_side",
+          "decorrelation"
+        ],
+        "origin": "documented_operator_distinctions",
+        "universal_width_percent": null
+      },
+      "protect": [
+        "содержимое обоих каналов",
+        "фаза stereo pair",
+        "сохранность тембра",
+        "уровень"
+      ],
+      "verify": "Сначала L-only/R-only диагностический сигнал в отдельном тесте; затем track/full-mix и mono проверка.",
+      "cancel_if": "Один канал непреднамеренно ослаблен/утерян, изменены маршрутизация или баланс вместо перемещения.",
+      "confidence": "high_for_operator_definition_medium_for_mix_application",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-05",
+      "title": "Панорама wet выбирается по задаче",
+      "source_ids": [
+        "S-SP-20260911-155446-07",
+        "S-SP-20260911-155446-08",
+        "S-SP-20260911-155446-11"
+      ],
+      "claim_type": "engineering_hypothesis",
+      "applies_to": {
+        "instrument": [
+          "single_guitar",
+          "rhythm_guitar_pair",
+          "mono_instrument"
+        ],
+        "section": "sparse_and_dense_contexts_separately"
+      },
+      "when_apply": "Выбирается связь между положением dry и возврата.",
+      "change": "Сравнить wet возле dry, противоположный mono wet и сдержанный stereo wet. Первое — кандидат для устойчивой локализации, второе — для художественного противовеса, не обязательное улучшение.",
+      "range": {
+        "wet_pan_strategy": [
+          "follow_source",
+          "opposite_source",
+          "stereo_return"
+        ],
+        "origin": "contrasting_engineer_practices"
+      },
+      "protect": [
+        "локализация",
+        "свободное место для соседей",
+        "грув",
+        "mono тон"
+      ],
+      "verify": "Сохранять dry, decay и wet energy; оценить полную секцию, не только solo.",
+      "cancel_if": "Образ распадается, смешивает противоположный инструмент или увеличивает мутность.",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-06",
+      "title": "Delayed copy не считать независимым дублем",
+      "source_ids": [
+        "S-SP-20260911-155446-08"
+      ],
+      "claim_type": "mathematical_identity_plus_engineering_guard",
+      "applies_to": {
+        "instrument": [
+          "guitar",
+          "vocal",
+          "keys",
+          "effect_return"
+        ],
+        "section": "where_pseudo_stereo_is_proposed"
+      },
+      "when_apply": "Предложена ширина копированием сигнала с задержкой или противофазной компонентой.",
+      "change": "По умолчанию оставить bypass; оценивать такую обработку только как эффект, с проверкой mono. Независимые исполнения не заменять копиями без отдельного творческого решения.",
+      "range": {
+        "safe_delay_ms": null,
+        "origin": "no_universal_safe_delay; algebra_of_equal_gain_delayed_copy",
+        "illustrative_delay_ms": 10,
+        "illustrative_first_notch_hz": 50
+      },
+      "protect": [
+        "mono тембр",
+        "атака",
+        "центр",
+        "ритм",
+        "читаемость нот"
+      ],
+      "verify": "Stereo и mono A/B с корректной компенсацией уровня; при наличии файлов — частотно-зависимая проверка mono transfer, а не один correlation score.",
+      "cancel_if": "Слышны гребёнка, потеря тела/ноты, фазовый окрас или ритмическое двоение.",
+      "confidence": "high_for_algebra_medium_for_artistic_choice",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-07",
+      "title": "Роль и контраст секции определяют ширину",
+      "source_ids": [
+        "S-SP-20260911-155446-07",
+        "S-SP-20260911-155446-08",
+        "S-SP-20260911-155446-10"
+      ],
+      "claim_type": "engineering_hypothesis",
+      "applies_to": {
+        "instrument": "role_dependent",
+        "section": [
+          "verse",
+          "chorus",
+          "solo",
+          "transition"
+        ]
+      },
+      "when_apply": "Меняется плотность аранжировки или ведущий музыкальный элемент.",
+      "change": "Сравнить статическую сцену с умеренной автоматизацией ширины/возвратов; фокус следует роли, не классу vocal. Плотный припев не обязан получать больше длинной реверберации.",
+      "range": {
+        "amount": null,
+        "origin": "creative_project_decision_and_engineer_practice_not_scientific_target"
+      },
+      "protect": [
+        "ритм-гитарная основа",
+        "ведущая тема секции",
+        "контраст",
+        "непрерывность сцены"
+      ],
+      "verify": "Переход куплет→припев в слепом A/B при сравнимой громкости; отдельная оценка поддержки/лидерства.",
+      "cancel_if": "Лид подавляет основу при поддерживающей роли, внимание отвлекается движением или контраст исчезает.",
+      "confidence": "medium",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-SP-20260911-155446-08",
+      "title": "Проверять ширину на нескольких способах воспроизведения",
+      "source_ids": [
+        "S-SP-20260911-155446-03",
+        "S-SP-20260911-155446-04"
+      ],
+      "claim_type": "bounded_research_inference",
+      "applies_to": {
+        "instrument": "full_mix_and_spatial_groups",
+        "section": "held_out_sections"
+      },
+      "when_apply": "Пространственный вариант кажется лучше только по width/correlation метрике.",
+      "change": "При наличии аудио разделить проверки: колонки, наушники, mono. Электрическую L/R correlation не приравнивать к IACC у ушей; не максимизировать ширину или Side энергию.",
+      "range": {
+        "universal_correlation_target": null,
+        "origin": "no_general_threshold_supported_by_read_sources"
+      },
+      "protect": [
+        "переносимость",
+        "фокус",
+        "панч",
+        "осмысленная ширина"
+      ],
+      "verify": "Согласованность предпочтения Дмитрия в полном миксе; метрики только диагностика и только из реального аудио.",
+      "cancel_if": "Улучшение есть только на одном индикаторе или важный элемент пропадает/меняет тембр в mono.",
+      "confidence": "medium_for_playback_guard_low_for_any_absolute_threshold",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "contradictions": [
+    {
+      "id": "C-SP-20260911-155446-01",
+      "topic": "wet_pan",
+      "source_ids": [
+        "S-SP-20260911-155446-07",
+        "S-SP-20260911-155446-08",
+        "S-SP-20260911-155446-11"
+      ],
+      "positions": [
+        "согласовывать направление dry и reverb",
+        "размещать эффект с противоположной стороны"
+      ],
+      "resolution": "Контекстные альтернативы: стабильная локализация/плотная аранжировка против художественного противовеса. Разрешить контролируемым A/B, а не голосованием авторитетов."
+    },
+    {
+      "id": "C-SP-20260911-155446-02",
+      "topic": "distance_width_decay",
+      "source_ids": [
+        "S-SP-20260911-155446-01",
+        "S-SP-20260911-155446-04",
+        "S-SP-20260911-155446-05",
+        "S-SP-20260911-155446-09"
+      ],
+      "resolution": "Не превращать длинный decay, яркость, source width или pre-delay в однозначное расстояние. Реальная комната, искусственная сцена и художественные ожидания различаются."
+    }
+  ],
+  "existing_card_links": [
+    {
+      "existing_id": "R-20260911-1200-01",
+      "relation": "complements",
+      "note": "Не дублировать EDC/echo-density rule; добавить перцептивную задачу dry/early/late и правильной роли."
+    },
+    {
+      "existing_id": "R-20260911-1200-02",
+      "relation": "complements",
+      "note": "Не заменять частотно-зависимый decay фильтром на всём сухом источнике."
+    },
+    {
+      "existing_id": "R-20260911-1500-04",
+      "relation": "reuse",
+      "note": "Для OH/room и нескольких микрофонов одного дубля сохранять контекстные polarity/phase guards, не выравнивать всё ради корреляции."
+    },
+    {
+      "existing_id": "R-20260911-1500-05",
+      "relation": "reuse",
+      "note": "Увеличение пространственного room не должно автоматически поднимать cymbal wash."
+    }
+  ],
+  "reference_cards": [],
+  "video_source_cards": [
+    {
+      "id": "VSC-SP-20260911-155446-01",
+      "video_id": "JD26MxAvues",
+      "url": "https://www.youtube.com/watch?v=JD26MxAvues",
+      "title": "5 Quick Panning Mixing Tricks — Warren Huart: Produce Like A Pro",
+      "channel": "Produce Like A Pro",
+      "metadata_origin": "official_channel_companion_page_embedded_video_link; direct_watch_fetch_failed",
+      "metadata_depth": "partial",
+      "video_publication_date": null,
+      "companion_publication_date": "2018-03-19",
+      "duration_seconds": null,
+      "status": "queued_source",
+      "transcript_studied": false,
+      "transcript_status": "not_retrieved",
+      "reason": "YouTube watch fetch returned Internal Error; no callable Learning Bridge found in plugin search",
+      "content_claims_extracted_from_video": false,
+      "timestamps": [],
+      "numeric_parameters_from_video": [],
+      "related_companion_source_id": "S-SP-20260911-155446-08",
+      "companion_is_not_video_evidence": true
+    },
+    {
+      "id": "VSC-SP-20260911-155446-02",
+      "video_id": "nfnnTaJyTxY",
+      "url": "https://www.youtube.com/watch?v=nfnnTaJyTxY",
+      "title": "L C R Panning & Mixing in Mono — Warren Huart: Produce Like A Pro",
+      "channel": "Produce Like A Pro",
+      "metadata_origin": "official_channel_companion_page_embedded_video_link; direct_watch_fetch_failed",
+      "metadata_depth": "partial",
+      "video_publication_date": null,
+      "companion_publication_date": "2018-05-14",
+      "duration_seconds": null,
+      "status": "queued_source",
+      "transcript_studied": false,
+      "transcript_status": "not_retrieved",
+      "reason": "YouTube watch fetch returned Internal Error; no callable Learning Bridge found in plugin search",
+      "content_claims_extracted_from_video": false,
+      "timestamps": [],
+      "numeric_parameters_from_video": [],
+      "related_companion_source_id": "S-SP-20260911-155446-10",
+      "companion_is_not_video_evidence": true
+    },
+    {
+      "id": "VSC-SP-20260911-155446-03",
+      "video_id": "XIkii9fF2Sg",
+      "url": "https://www.youtube.com/watch?v=XIkii9fF2Sg",
+      "title": "5 Quick Reverb Mixing Tricks — Warren Huart: Produce Like A Pro",
+      "channel": "Produce Like A Pro",
+      "metadata_origin": "official_channel_companion_page_embedded_video_link; direct_watch_fetch_failed",
+      "metadata_depth": "partial",
+      "video_publication_date": null,
+      "companion_publication_date": "2021-07-15",
+      "duration_seconds": null,
+      "status": "queued_source",
+      "transcript_studied": false,
+      "transcript_status": "not_retrieved",
+      "reason": "YouTube watch fetch returned Internal Error; no callable Learning Bridge found in plugin search",
+      "content_claims_extracted_from_video": false,
+      "timestamps": [],
+      "numeric_parameters_from_video": [],
+      "related_companion_source_id": "S-SP-20260911-155446-11",
+      "companion_is_not_video_evidence": true
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-SP-20260911-155446-01",
+      "title": "Независимость wet ratio и pre-delay при построении глубины",
+      "status": "not_run",
+      "priority": 1,
+      "requires_separate_audio_authorization": true,
+      "material": "Разрешённые дорожки и актуальный одобренный mix; по 30–45 s разреженной и плотной секции. Наличие актуальных аудиофайлов этим запуском не проверялось.",
+      "design": "Этап A: wet contribution -3/0/+3 dB относительно baseline, остальные параметры фиксированы. Этап B: для выбранного отношения pre-delay 0/20/40/80 ms при фиксированной остальной цепи. Это последовательный поисковый тест, не полный факторный эксперимент.",
+      "numeric_origin": "all grids are local engineering design, not paper prescriptions",
+      "controls": [
+        "unchanged dry pan/level/EQ/dynamics",
+        "same reverb algorithm and decay",
+        "same excerpt and tail capture",
+        "common post-render gain for loudness match without changing dry/wet ratio",
+        "blind randomized presentation",
+        "existing room-only creative constraints respected"
+      ],
+      "success": [
+        "предпочтительная глубина при сравнимой громкости",
+        "сохранение атаки и роли",
+        "нет slap/новых артефактов"
+      ],
+      "acceptance": "Dmitry blind rating; not a claim of population-level validation",
+      "linked_rules": [
+        "R-SP-20260911-155446-02",
+        "R-SP-20260911-155446-03"
+      ]
+    },
+    {
+      "id": "EXP-SP-20260911-155446-02",
+      "title": "Wet рядом с источником против opposite wet",
+      "status": "not_run",
+      "requires_separate_audio_authorization": true,
+      "arms": [
+        "follow-source mono return",
+        "opposite-source mono return",
+        "stereo return"
+      ],
+      "controls": [
+        "same dry",
+        "same wet energy and decay",
+        "sparse and dense sections",
+        "level-matched full mix"
+      ],
+      "criteria": [
+        "устойчивость локализации",
+        "пространственное противовесное заполнение",
+        "маскировка соседей",
+        "mono тембр"
+      ],
+      "linked_rules": [
+        "R-SP-20260911-155446-05"
+      ]
+    },
+    {
+      "id": "EXP-SP-20260911-155446-03",
+      "title": "Семантика panner и mono fold-down",
+      "status": "not_run",
+      "requires_separate_audio_authorization": true,
+      "design": "На отдельном тестовом проекте L-only/R-only сигналы; затем сравнить balance, independent pan и задержанную копию. Не менять концертный пульт или актуальный DSP.",
+      "controls": [
+        "documented pan law",
+        "consistent mono summing gain",
+        "no loudness advantage"
+      ],
+      "criteria": [
+        "оба входа сохраняются при нужном перемещении",
+        "нет нежелательной гребёнки",
+        "ясная связь параметров с операцией"
+      ],
+      "linked_rules": [
+        "R-SP-20260911-155446-04",
+        "R-SP-20260911-155446-06"
+      ]
+    },
+    {
+      "id": "EXP-SP-20260911-155446-04",
+      "title": "Статическая сцена против секционной ширины",
+      "status": "not_run",
+      "requires_separate_audio_authorization": true,
+      "arms": [
+        "current scene",
+        "role-conditioned width/return automation"
+      ],
+      "controls": [
+        "same performances",
+        "unchanged compulsory center anchors unless authorized",
+        "matched comparison loudness",
+        "no forced vocal priority"
+      ],
+      "criteria": [
+        "ритм-гитары остаются основой когда это замысел",
+        "solo получает фокус только в своей секции",
+        "колонки/наушники/mono",
+        "Dmitry preference"
+      ],
+      "linked_rules": [
+        "R-SP-20260911-155446-01",
+        "R-SP-20260911-155446-07",
+        "R-SP-20260911-155446-08"
+      ]
+    }
+  ],
+  "mathematical_notes": [
+    {
+      "id": "D-SP-20260911-155446-01",
+      "kind": "analytic_identity_not_audio_experiment",
+      "assumptions": "Identical copies, equal gain, pure constant delay, summed to mono; no filtering or pitch modulation.",
+      "formula": "y(t)=x(t)+x(t-tau); |H(f)|=2*|cos(pi*f*tau)|; first zero f=1/(2*tau).",
+      "illustrative_input_tau_seconds": 0.01,
+      "illustrative_first_zero_hz": 50,
+      "measurement_status": "not_a_measurement",
+      "musical_implication": "Нет универсального ненулевого безопасного delay для любой широкополосной копии. Независимые исполнения не подчиняются этому fixed-comb тождеству."
+    }
+  ],
+  "spatial_scene_spec": {
+    "status": "design_proposal_only",
+    "fields": [
+      "section_id",
+      "artistic_role",
+      "source_type",
+      "dry_pan_operator",
+      "dry_pan",
+      "source_width",
+      "relative_depth_rank",
+      "early_reflection_route",
+      "late_reverb_route",
+      "wet_pan_operator",
+      "wet_width",
+      "protected_qualities"
+    ],
+    "relative_depth_units": "ordinal_not_meters",
+    "default_dsp_parameters": null,
+    "requires_actual_routing_and_audio_readback": true,
+    "auto_apply": false
+  },
+  "constraints": {
+    "auto_apply": false,
+    "audio_modified": false,
+    "dsp_modified": false,
+    "repository_modified": false,
+    "paid_services_used": false,
+    "external_audio_uploaded": false,
+    "commercial_audio_downloaded": false,
+    "dsp_metrics_computed": false
+  },
+  "tool_status": {
+    "Consensus": "search and one abstract/metadata fetch succeeded",
+    "Scite": "actual call failed: free monthly limit reached; no new citation-context verification",
+    "Reference_Hub_and_YouTube_Bridge": "not found as callable tools in available tool list/plugin directory search",
+    "Google_Drive": "search Mixing Learning returned empty; broadened MIXING returned unrelated files; intended shared destination not identified",
+    "GitHub": "not invoked: no code/repo action required by this focused study",
+    "Context7": "not invoked: no library/API implementation required",
+    "Hugging_Face": "not invoked; no claim of working search/metadata",
+    "arXiv_Freesound_Zotero_MCP": "not verified as connected",
+    "web": "public scientific/official pages used; YouTube watch fetch failed",
+    "project_shared_writer": "not exposed/identified"
+  },
+  "persistence": {
+    "artifact_export_created": true,
+    "storage_scope": "downloadable_sandbox_exports_only",
+    "shared_project_update_applied": false,
+    "master_updated": false,
+    "other_chat_notified": false,
+    "delivery_confirmed": false
+  },
+  "apply_instructions": {
+    "status": "unapplied_proposal",
+    "target": "existing Mixing Learning source-grounded registries after current manifest is available",
+    "procedure": [
+      "Read current manifest and registries; compare base versions and deduplicate DOI/canonical URL/video_id.",
+      "Upsert source_cards, knowledge_cards, candidate_rules, video_source_cards, experiments by stable ID; preserve provenance and old feedback.",
+      "Attach existing_card_links and contradictions without replacing prior rules or creative constraints.",
+      "Map source_cards/candidate_rules to the existing registry names; fail on schema conflict rather than silently replacing files.",
+      "Preserve candidate, auto_apply:false, not_run. Confirm shared file IDs/revision only after a real successful write."
+    ],
+    "automatic_repository_write_authorized": false
+  },
+  "summary": {
+    "scientific_full_text_section_sources": 1,
+    "scientific_abstract_only_sources": 3,
+    "documentation_sources": 2,
+    "engineer_article_sources": 5,
+    "knowledge_cards_proposed": 8,
+    "candidate_rules_proposed": 8,
+    "video_cards_queued": 3,
+    "videos_transcript_studied": 0,
+    "reference_cards_added": 0,
+    "multitracks_downloaded": 0,
+    "experiments_planned": 4,
+    "experiments_run": 0
+  },
+  "handoff": "ML-SPATIAL-2026-09-11-155446: положение dry, ширину источника, относительную глубину и окружение хранить отдельно. Pre-delay не равен расстоянию. Сначала определить тип pan/width и роль секции; wet-pan выбирать по контексту; проверять mono, колонки и наушники. Новые правила candidate/auto_apply:false. Следующий тест EXP-SP-20260911-155446-01, not_run. Патч не применён к общей базе; доставка другим агентам не подтверждена."
+}

@@ -118,3 +118,16 @@ Attach real operator listening feedback after each offline render, then use the
 paired source rules, metrics, actions, and feedback as training rows for future
 reward/evaluator work. MERT/Codex can later score the same logged rows without
 becoming the authority source.
+
+## Shared research packages
+
+Read the [Mixing Learning shared research index](mixing_learning_updates/README.md)
+for versioned studies that have not been promoted into runtime rules.
+
+The spatial placement package [ML-SPATIAL-2026-09-11-155446](mixing_learning_updates/ML-SPATIAL-2026-09-11-155446.publication.json)
+contains the original report, 11 source cards, 8 Knowledge Cards, 8 bounded
+candidate rules, 3 queued videos and 4 experiments marked `not_run`.
+Its original files retain pre-publication metadata for provenance. Publication
+is not automatic DSP application or proof that another agent has read the update.
+The raw research JSON is not a drop-in replacement for `SourceRule` records;
+reviewed schema adaptation and source-registry deduplication remain separate.
