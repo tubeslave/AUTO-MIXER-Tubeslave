@@ -1,0 +1,8 @@
+{
+  "validated_at": "2026-09-11T16:11:31+03:00",
+  "checks_passed": 19,
+  "checks": ["update_id", "unique_sources", "unique_rules", "unique_knowledge_cards", "all_rule_source_links", "all_card_rule_links", "candidate_only", "all_rule_bound_fields", "all_experiments_not_run", "all_experiment_rule_links", "videos_queued", "no_video_invented_numbers", "scope_guards", "no_reference_audio", "source_read_depth_preserved", "example_is_not_metric", "mathematical_example", "remote_blob_matches_.json", "remote_blob_matches_.md"],
+  "scope": "artifact structure, referential integrity and exact uploaded blob equality; not audio or runtime tests",
+  "audio_experiments": "not_run",
+  "full_repository_pytest": "not_run_locally; repository clone failed due unavailable container DNS"
+}

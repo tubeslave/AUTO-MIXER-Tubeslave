@@ -1,0 +1,44 @@
+{
+  "schema_version": "mixing-learning-publication/1.0",
+  "update_id": "ML-SPATIAL-2026-09-11-155446",
+  "package_version": "0.1.0",
+  "publication_prepared_at": "2026-09-11T16:11:31+03:00",
+  "timezone": "Europe/Moscow",
+  "repository": "tubeslave/AUTO-MIXER-Tubeslave",
+  "target_branch": "master",
+  "base_commit": "b8f92dc6ad496c9e46a986cf063873aafef289e8",
+  "authorization": "Explicit user request: Перенеси в общую базу майн.",
+  "publication_scope": "shared_research_knowledge_package",
+  "runtime_registry_integration": "not_performed; raw candidate schema is not SourceRule schema",
+  "files": [
+    {
+      "path": "Docs/mixing_learning_updates/ML-SPATIAL-2026-09-11-155446.md",
+      "original_filename": "Mixing_Learning_Spatial_2026-09-11_155446.md",
+      "bytes": 42605,
+      "sha256": "03e85bfcb8d2077818afb4ce497f36c1a2cdd343840f799f123f58b74c849ac6",
+      "git_blob_sha": "2cc3d16109880718493e822c6d7f3d1f21535a77"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-SPATIAL-2026-09-11-155446.json",
+      "original_filename": "Mixing_Learning_Spatial_Patch_2026-09-11_155446.json",
+      "bytes": 52492,
+      "sha256": "f71d5928540fca744ce8c3a0708654fa369f574ad851a5ddd8f8fd09c39abdc8",
+      "git_blob_sha": "9c465ea4cb0a2951693dd4eb830bee983f96acd4"
+    }
+  ],
+  "registries": {
+    "source_cards": "ML-SPATIAL-2026-09-11-155446.json#/source_cards",
+    "knowledge_cards": "ML-SPATIAL-2026-09-11-155446.json#/knowledge_cards",
+    "candidate_rules": "ML-SPATIAL-2026-09-11-155446.json#/candidate_rules",
+    "video_source_cards": "ML-SPATIAL-2026-09-11-155446.json#/video_source_cards",
+    "experiments": "ML-SPATIAL-2026-09-11-155446.json#/experiments",
+    "contradictions": "ML-SPATIAL-2026-09-11-155446.json#/contradictions"
+  },
+  "counts": {"source_cards": 11, "knowledge_cards": 8, "candidate_rules": 8, "video_source_cards": 3, "experiments": 4, "contradictions": 2},
+  "deduplication_scope": "Additive package with stable namespaced IDs; does not replace existing rules or feedback. Full cross-registry semantic deduplication remains a prerequisite for runtime schema integration.",
+  "historical_metadata_note": "The byte-preserved originals describe the research run before publication. Their persistence=false and no-write fields are historical, not the publication state. Publication is confirmed by this package appearing on the target branch and its Git history, not by mutating the original evidence.",
+  "safety": {"auto_apply": false, "candidate_status": "candidate", "audio_experiments": "not_run", "dsp_changed": false, "audio_changed": false, "runtime_config_changed": false, "paid_services_started": false, "audio_uploaded": false},
+  "validation": {"artifact_checks_passed": 19, "artifact_checks_failed": 0, "exact_uploaded_blob_match": true, "full_repository_tests": "not_run_locally; use PR checks", "audio_validation": "not_run"},
+  "other_chat_delivery_confirmed": false,
+  "agent_readback_confirmed": false
+}
