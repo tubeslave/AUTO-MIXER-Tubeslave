@@ -1,0 +1,483 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "patch_id": "ml-2026-09-11-1800",
+  "update_id": "ML-2026-09-11-1800",
+  "created_at": "2026-09-11T18:02:20+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "topic": "reference_conditioned_automatic_mixing_effect_topology_and_evaluation",
+  "mode": "additive",
+  "base_materials_read": [
+    {
+      "path": "Docs/mixing_learning_updates/README.md",
+      "ref": "master",
+      "sha": "367a9822e2190c3e8e48925b217ce62d093c577b"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/2026-09-10_1500.md",
+      "ref": "master",
+      "sha": "431b42566b89e7400116a55d8220571d890694ce"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-SPATIAL-2026-09-11-155446.json",
+      "ref": "master",
+      "sha": "9c465ea4cb0a2951693dd4eb830bee983f96acd4"
+    }
+  ],
+  "duplicate_check": {
+    "queries": [
+      "MEGAMI",
+      "Beyond Dry References Learning Relative Audio Effects",
+      "StemFX",
+      "2608.10573",
+      "2607.15634"
+    ],
+    "result": "no_matching_source_records_in_master_at_run_start",
+    "existing_related_not_duplicated": [
+      "Diff-MST",
+      "Reverse Engineering of Music Mixing Graphs",
+      "Diff2Mix",
+      "SonicMaster",
+      "ITO-Master"
+    ]
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260911-1800-01",
+      "title": "Automatic Music Mixing using a Generative Model of Effect Embeddings (MEGAMI)",
+      "url": "https://arxiv.org/html/2511.08040",
+      "publication_date": "2025-11-11",
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "research_preprint",
+      "authors": [
+        "Eloi Moliner",
+        "Marco A. Martínez-Ramírez",
+        "Junghyun Koo",
+        "Wei-Hsiang Liao",
+        "Kin Wai Cheuk",
+        "Joan Serrà",
+        "Vesa Välimäki",
+        "Yuki Mitsufuji"
+      ],
+      "read_depth": "full_html_introduction_method_experiments_results_limitations",
+      "bounded_summary": "Automatic mixing is modeled as a conditional distribution of plausible professional decisions rather than one deterministic target. The system generates coordinated per-track effect embeddings, augments them with track-level dynamics and stereo descriptors, and evaluates generative outputs with distributional distances plus a listening test.",
+      "limitations": [
+        "The main listening test used 12 volunteers, only seven songs, and wide song-dependent confidence intervals.",
+        "The evaluated model assumes time-invariant track-level embeddings and no master-bus effects.",
+        "Some training and evaluation data are internal; results do not establish production readiness for live rock.",
+        "Study-reported KAD and listening scores are not universal acceptance thresholds."
+      ],
+      "consensus_record_id": "faa9d17115ac5a7b866db2e008fad245",
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260911-1800-02",
+      "title": "MEGAMI official implementation",
+      "url": "https://github.com/SonyResearch/MEGAMI",
+      "publication_date": null,
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "official_reproducible_code",
+      "read_depth": "repository_metadata_and_readme",
+      "bounded_summary": "Public research implementation, inference scripts and checkpoints are available. The repository documents 44.1 kHz dry-track input and a noncommercial CC BY-NC-SA 4.0 license.",
+      "limitations": [
+        "Research code; license is noncommercial.",
+        "No local inference or audio evaluation was run in this update."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260911-1800-03",
+      "title": "Beyond Dry References: Learning Relative Audio Effects Representations via Contrastive Distance Learning (RelFx)",
+      "url": "https://arxiv.org/html/2608.10573v1",
+      "doi": "10.48550/arXiv.2608.10573",
+      "publication_date": "2026-08-11",
+      "venue": "ISMIR 2026",
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "accepted_conference_preprint",
+      "authors": [
+        "Xinlu Liu",
+        "Huibin Lin",
+        "Weixing Wei",
+        "Zhenhai Yan"
+      ],
+      "read_depth": "full_html_introduction_method_training_experiments_ablation_limitations",
+      "bounded_summary": "RelFx learns the direction and distance of an effect transformation between ordered audio pairs without requiring a truly dry reference. Same-section cross-segment sampling reduced content shortcuts; retrieval accuracy alone did not reliably track style-transfer performance.",
+      "limitations": [
+        "Overall transformations are modeled, but source-specific effects inside a full mixture are not separated.",
+        "Unseen chain order and real production chains remain future work.",
+        "The principal style-transfer score is an embedding-guided/MRSTFT protocol; no broad rock-production listening study was reported.",
+        "Training used licensed internal audio plus MoisesDB and substantial GPU compute."
+      ],
+      "consensus_record_id": "ac645b1fcfc452c3933755842e6cce10",
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260911-1800-04",
+      "title": "StemFX: Learning Mixing Style Representations via Autoregressive FX Chain Prediction on Source-Separated Stems",
+      "url": "https://arxiv.org/html/2607.15634v2",
+      "doi": "10.48550/arXiv.2607.15634",
+      "publication_date": "2026-07-24",
+      "venue": "ISMIR 2026",
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "accepted_conference_preprint",
+      "authors": [
+        "Yuan-Chiao Cheng",
+        "Jui-Te Wu",
+        "Brian Chen",
+        "Yen-Tung Yeh",
+        "Yu-Hua Chen",
+        "Yi-Hsuan Yang"
+      ],
+      "read_depth": "full_html_introduction_method_experiments_ablation_limitations",
+      "bounded_summary": "StemFX predicts variable-length, ordered, per-stem effect chains rather than forcing every target through a universal fixed chain. In the paper's real-mix test, fixed-chain methods often introduced distortion or modulation absent from the target; blind listeners preferred the sparse structure-selecting approach over the tested fixed-chain baselines.",
+      "limitations": [
+        "The system is limited to four separated stems and effect types present in training.",
+        "Pseudo-stems inherit separator artifacts, whose propagation was not quantified.",
+        "Random training chains may not capture genre-dependent engineering practice.",
+        "The listening study used 20 music-production participants and study-specific material; reported scores are not universal targets."
+      ],
+      "consensus_record_id": "d2cf28afb6585091949e45fbc7192ff5",
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260911-1800-05",
+      "title": "StemFX official implementation",
+      "url": "https://github.com/barry-mir/stemfx",
+      "publication_date": null,
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "official_reproducible_code",
+      "read_depth": "repository_metadata_and_readme",
+      "bounded_summary": "MIT-licensed code, model interface, evaluation scripts and paper checkpoint links are available. The API can accept a mixture or four pre-separated stems and returns an inspectable per-stem chain.",
+      "limitations": [
+        "No code, model, weights or audio were executed in this update.",
+        "The paper workflow expects 44.1 kHz and GPU-oriented research tooling."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260911-1800-06",
+      "title": "MultiAFx official implementation",
+      "url": "https://github.com/barry-mir/multiafx",
+      "publication_date": null,
+      "discovered_at": "2026-09-11T18:02:20+03:00",
+      "kind": "official_reproducible_code",
+      "read_depth": "repository_metadata_and_readme",
+      "bounded_summary": "MIT-licensed Python wrapper exposing a serializable chain format and 85 effects from seven libraries, with parameterized min/mid/max tests described in the repository.",
+      "limitations": [
+        "Parameter ranges are research/tool defaults, not musical presets.",
+        "Compatibility, numerical equivalence and real-time safety for Automixer were not tested."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260911-1800-01",
+      "title": "Automatic mixing is one-to-many",
+      "claim": "A single set of dry tracks can support multiple valid professional mixes; deterministic regression can collapse toward an over-conservative average.",
+      "scope": [
+        "offline_automatic_mixing",
+        "candidate_generation"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-01"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "id": "KC-ML-20260911-1800-02",
+      "title": "Relative effect change can be learned without a truly dry reference",
+      "claim": "For reference matching, modeling the ordered transformation from current sound to target may be more robust than treating the target as an absolute effect state.",
+      "scope": [
+        "reference_matching",
+        "fx_style_transfer"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-03"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "id": "KC-ML-20260911-1800-03",
+      "title": "Match musical section when learning or measuring change",
+      "claim": "Adjacent, non-overlapping clips from the same section reduced content shortcuts in RelFx; verse-to-chorus comparisons can confound production change with arrangement change.",
+      "scope": [
+        "section_aware_analysis",
+        "reference_matching"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-03"
+      ],
+      "confidence": 0.87
+    },
+    {
+      "id": "KC-ML-20260911-1800-04",
+      "title": "Select processor topology before fine parameter search",
+      "claim": "A universal chain with all processors nominally bypassable can still create artifacts; choosing which effects and their order is a distinct problem from estimating parameter values.",
+      "scope": [
+        "fx_chain_design",
+        "automatic_mixing"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "KC-ML-20260911-1800-05",
+      "title": "Stem-aware representations help but inherit separation errors",
+      "claim": "Per-stem input improved the study's representation results, but pseudo-stem artifacts were not quantified and must be treated as a confound.",
+      "scope": [
+        "stem_reference_matching",
+        "source_separation"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "KC-ML-20260911-1800-06",
+      "title": "One objective metric is not a sufficient acceptance gate",
+      "claim": "In RelFx ablations, retrieval accuracy sometimes improved while style-transfer loss worsened; automatic mixing evaluation needs independent metrics and level-matched listening.",
+      "scope": [
+        "evaluation",
+        "objective_metrics"
+      ],
+      "evidence": [
+        "S-ML-20260911-1800-01",
+        "S-ML-20260911-1800-03",
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.93
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "V-ML-20260911-1800-01",
+      "title": "Must-Know Mastering Tips for Rock Music | Are You Listening? Season 6, Ep 6",
+      "channel": "iZotope, Inc.",
+      "url": "https://www.youtube.com/watch?v=QSj2m9oUJno",
+      "duration": "40:40",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_duration_verified_in_visible_youtube_page",
+      "transcript_status": "visible_transcript_panel_not_available_after_expanding_description",
+      "learned_content": false
+    },
+    {
+      "id": "V-ML-20260911-1800-02",
+      "title": "My COMPLETE Mastering Chain for LOUD & Punchy Rock and Metal Masters",
+      "channel": "Raytown Productions",
+      "url": "https://www.youtube.com/watch?v=qfY5jnmUvBs",
+      "duration": "33:50",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_duration_verified_after_target_video_loaded",
+      "transcript_status": "visible_transcript_panel_not_available_after_expanding_description",
+      "learned_content": false
+    }
+  ],
+  "reference_cards": [],
+  "candidate_rules": [
+    {
+      "id": "R-ML-20260911-1800-01",
+      "summary": "Generate and rank several bounded mix candidates instead of assuming one deterministic optimum.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Offline automatic mixing or creative reference matching.",
+      "what_to_change": "Sample several coordinated candidate control sets inside existing safety bounds; retain explicit controls and human override.",
+      "do_not_damage": "Source identity, section hierarchy, transients, mono compatibility, editability.",
+      "how_to_verify": "Level-match candidates; compare independent spectral/dynamic/spatial descriptors; run blind listening against current baseline.",
+      "cancel_if": "Reject candidate generation if variants collapse to the same mix, become unstable, or only improve one metric.",
+      "source_ids": [
+        "S-ML-20260911-1800-01"
+      ],
+      "confidence": 0.84
+    },
+    {
+      "id": "R-ML-20260911-1800-02",
+      "summary": "Compare current-to-target change, not only absolute target descriptors.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Reference matching when the input is already processed or no truly dry reference exists.",
+      "what_to_change": "Estimate a directional delta per comparable section and stem; apply a bounded fraction of that delta before remeasurement.",
+      "do_not_damage": "Musical content, phase, groove, timbral identity, existing useful processing.",
+      "how_to_verify": "Use same-section clips, loudness-match, verify whether the target distance closes on more than one independent descriptor, then listen blind.",
+      "cancel_if": "Cancel if the delta reverses on a repeat measurement, depends strongly on section content, or increases artifacts.",
+      "source_ids": [
+        "S-ML-20260911-1800-03"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "id": "R-ML-20260911-1800-03",
+      "summary": "Keep reference comparisons section-aware.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Any reference or style comparison across songs or mix versions.",
+      "what_to_change": "Compare chorus with chorus and verse with verse; use adjacent non-overlapping windows when possible; aggregate only after section-level checks.",
+      "do_not_damage": "Arrangement contrast, transient shape, role hierarchy.",
+      "how_to_verify": "Repeat with several windows inside each section and check sign consistency of the inferred changes.",
+      "cancel_if": "Do not generalize a change when its direction flips across comparable windows or when sections are structurally dissimilar.",
+      "source_ids": [
+        "S-ML-20260911-1800-03"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "id": "R-ML-20260911-1800-04",
+      "summary": "Choose a sparse processor topology and order before optimizing exact parameters.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Offline chain inference, reference transfer, or automatic correction proposals.",
+      "what_to_change": "First decide bypass/effect/order candidates; then optimize parameters only for the retained processors.",
+      "do_not_damage": "Clean transients, absence of unintended distortion/modulation, latency budget, interpretability.",
+      "how_to_verify": "A/B topology-first, universal fixed-chain, and current manual baseline with equal loudness; inspect every active processor and null/bypass behavior.",
+      "cancel_if": "Remove any processor whose activation does not create a repeatable perceptual or target-distance improvement.",
+      "source_ids": [
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "R-ML-20260911-1800-05",
+      "summary": "Gate stem-based reference matching on separation quality.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Using separated commercial references or pseudo-stems for analysis.",
+      "what_to_change": "Run the same separator on candidate and reference, track artifact confidence per stem, and down-weight bands/segments dominated by leakage or separation residue.",
+      "do_not_damage": "Cymbal detail, guitar texture, vocal sibilance, phase, instrument identity.",
+      "how_to_verify": "On a legal true-multitrack benchmark, compare clean-stem deltas with pseudo-stem deltas; require agreement before promotion.",
+      "cancel_if": "Cancel or fall back to mixture-level analysis when pseudo-stem and clean-stem directions disagree materially.",
+      "source_ids": [
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "id": "R-ML-20260911-1800-06",
+      "summary": "Do not promote a reference-matching rule from retrieval or spectral loss alone.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Evaluation of learned effect representations or automatic mixes.",
+      "what_to_change": "Use at least one signal metric, one perceptual/embedding metric not used for optimization, and level-matched blind listening.",
+      "do_not_damage": "Musical preference, dynamics, artifacts, translation.",
+      "how_to_verify": "Pre-register success and cancellation criteria; keep optimizer metric separate from final acceptance gates.",
+      "cancel_if": "Reject if metric gains do not survive listening or create protected-quality regressions.",
+      "source_ids": [
+        "S-ML-20260911-1800-01",
+        "S-ML-20260911-1800-03",
+        "S-ML-20260911-1800-04"
+      ],
+      "confidence": 0.94
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260911-1800-01",
+      "title": "Relative vs absolute stem-reference matching",
+      "status": "not_run",
+      "material": "One legal four-stem rock multitrack plus one separated reference; later repeat on Premiera only locally.",
+      "conditions": [
+        "absolute target descriptors",
+        "directional current-to-target delta"
+      ],
+      "controls": [
+        "same separator",
+        "same section",
+        "same starting mix",
+        "bounded changes",
+        "post-render loudness match"
+      ],
+      "evaluate": [
+        "blind preference",
+        "artifact count",
+        "section role",
+        "multi-axis target distance"
+      ],
+      "success": "Directional method wins preference and reduces at least two independent distances without protected regressions."
+    },
+    {
+      "id": "EXP-ML-20260911-1800-02",
+      "title": "Topology-first vs universal fixed chain",
+      "status": "not_run",
+      "material": "Legal rock multitrack.",
+      "conditions": [
+        "current baseline",
+        "universal bypassable chain",
+        "sparse topology-first chain"
+      ],
+      "controls": [
+        "same processors where shared",
+        "equal loudness",
+        "same render precision"
+      ],
+      "evaluate": [
+        "unintended distortion/modulation",
+        "transient integrity",
+        "target similarity",
+        "inspectability"
+      ],
+      "success": "Sparse chain matches or beats target similarity while activating fewer processors and causing fewer artifacts."
+    },
+    {
+      "id": "EXP-ML-20260911-1800-03",
+      "title": "One deterministic mix vs four bounded candidates",
+      "status": "not_run",
+      "material": "One chorus and one verse from a legal rock multitrack.",
+      "conditions": [
+        "single deterministic proposal",
+        "four coordinated bounded variants"
+      ],
+      "controls": [
+        "identical safety limits",
+        "no master-bus change",
+        "level matched"
+      ],
+      "evaluate": [
+        "blind ranking",
+        "diversity without failure",
+        "role hierarchy",
+        "translation"
+      ],
+      "success": "At least one variant clearly beats the deterministic baseline and candidate diversity is musically meaningful."
+    },
+    {
+      "id": "EXP-ML-20260911-1800-04",
+      "title": "Separator robustness gate",
+      "status": "not_run",
+      "material": "Legal dataset with true stems.",
+      "conditions": [
+        "true stems",
+        "pseudo-stems from the same mix",
+        "mixture only"
+      ],
+      "controls": [
+        "same sections",
+        "same metrics",
+        "no external upload"
+      ],
+      "evaluate": [
+        "sign agreement of proposed corrections",
+        "bandwise leakage",
+        "artifact-sensitive listening"
+      ],
+      "success": "Define confidence thresholds where pseudo-stem recommendations remain directionally consistent with true stems."
+    }
+  ],
+  "tool_notes": {
+    "consensus": "search_and_required_fetch_succeeded_for_three_papers",
+    "scite": "unavailable_in_this_run_due_free_monthly_call_limit; no paid upgrade requested",
+    "github": "official repositories and README files inspected; no code executed",
+    "youtube": "two candidate pages inspected through visible YouTube UI; no transcript content obtained",
+    "context7": "not needed; no library API claim required",
+    "hugging_face": "not used; no model or dataset download",
+    "external_audio_upload": false
+  },
+  "changes_not_made": [
+    "No DSP or audio changed.",
+    "No runtime rules changed.",
+    "No repository code changed outside this research package and index.",
+    "No paid compute or subscription used."
+  ],
+  "handoff": "ML-2026-09-11-1800: reference matching should estimate section-matched current-to-target deltas, select sparse effect topology/order before parameter search, and gate pseudo-stem advice on separation quality. All rules remain candidate/auto_apply:false."
+}
