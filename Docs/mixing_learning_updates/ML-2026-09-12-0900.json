@@ -435,7 +435,7 @@
       "title": "Multi-mic drum edit and alignment comparison",
       "status": "not_run",
       "material": "Legally cleared raw multi-mic rock drum passage.",
-      "conditions_conditions": [
+      "conditions": [
         "original",
         "grouped slice edit",
         "Phase-Coherent AudioWarp",
