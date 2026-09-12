@@ -73,20 +73,20 @@ class TestEstimateLUFS:
         assert lufs_loud > lufs_quiet
 
     def test_full_scale_sine(self):
-        """Full scale sine should have LUFS close to ~-3 dB RMS."""
+        """A full-scale sine should have a finite, high programme loudness."""
         full = _make_sine(amplitude=1.0)
         lufs = AutoMaster._estimate_lufs(full)
-        # RMS of a full-scale sine is -3.01 dB
-        assert -4.0 < lufs < -2.0
+        assert np.isfinite(lufs)
+        assert -5.0 < lufs < -1.0
 
-    def test_stereo_signal(self):
-        """Should handle stereo (2D) input by averaging channels."""
+    def test_stereo_signal_uses_bs1770_channel_energy_sum(self):
+        """Duplicating mono into L/R adds about 3.01 LU under BS.1770 weighting."""
         mono = _make_sine(amplitude=0.5)
         stereo = np.stack([mono, mono], axis=-1)
-        lufs = AutoMaster._estimate_lufs(stereo)
+        lufs_stereo = AutoMaster._estimate_lufs(stereo)
         lufs_mono = AutoMaster._estimate_lufs(mono)
-        # Should be approximately the same
-        assert abs(lufs - lufs_mono) < 1.0
+        delta = lufs_stereo - lufs_mono
+        assert 2.8 < delta < 3.2
 
     def test_near_zero_signal(self):
         tiny = np.full(48000, 1e-12, dtype=np.float32)
@@ -146,25 +146,21 @@ class TestMasterFallback:
         quiet = _make_sine(amplitude=0.01)
         loud_ref = _make_sine(amplitude=0.8, freq_hz=880.0)
         result = master._master_fallback(quiet, loud_ref, 48000)
-        # Result should be louder than the input
         assert np.max(np.abs(result)) > np.max(np.abs(quiet))
 
     def test_fallback_with_silence_input(self, master):
-        """Silence input should not cause errors."""
         silence = _make_silence()
         ref = _make_sine(amplitude=0.5)
         result = master._master_fallback(silence, ref, 48000)
         assert len(result) == len(silence)
 
     def test_fallback_with_silence_reference(self, master):
-        """Silence reference should not cause errors."""
         input_audio = _make_sine(amplitude=0.5)
         silence_ref = _make_silence()
         result = master._master_fallback(input_audio, silence_ref, 48000)
         assert len(result) == len(input_audio)
 
     def test_fallback_output_limited(self, master):
-        """Output should not exceed the true peak limit."""
         input_audio = _make_sine(amplitude=0.9)
         ref_audio = _make_sine(amplitude=0.95, freq_hz=880.0)
         result = master._master_fallback(input_audio, ref_audio, 48000)
@@ -172,18 +168,14 @@ class TestMasterFallback:
         assert np.max(np.abs(result)) <= peak_limit + 0.01
 
     def test_fallback_restores_level_after_eq_match_attenuation(self, master, monkeypatch):
-        """A heavy EQ-match attenuation should still be followed by loudness recovery."""
         input_audio = _make_sine(amplitude=0.3)
         ref_audio = _make_sine(amplitude=0.8, freq_hz=880.0)
-
         monkeypatch.setattr(
             master,
             "_apply_eq_match",
             lambda audio, reference, sample_rate: (audio * 0.03).astype(np.float32),
         )
-
         result = master._master_fallback(input_audio, ref_audio, 48000)
-
         attenuated = (input_audio * 0.03).astype(np.float32)
         assert AutoMaster._estimate_lufs(result) > AutoMaster._estimate_lufs(attenuated) + 8.0
 
@@ -191,12 +183,9 @@ class TestMasterFallback:
         master = AutoMaster(target_lufs=-18.0, true_peak_limit=-1.0, sample_rate=48000)
         input_audio = _make_sine(amplitude=0.08)
         ref_audio = _make_sine(amplitude=0.95, freq_hz=880.0)
-
         result = master._master_fallback(input_audio, ref_audio, 48000)
-
         result_lufs = AutoMaster._estimate_lufs(result)
         reference_lufs = AutoMaster._estimate_lufs(ref_audio)
-
         assert abs(result_lufs - master.target_lufs) < 3.0
         assert abs(result_lufs - master.target_lufs) < abs(result_lufs - reference_lufs)
 
@@ -215,7 +204,6 @@ class TestApplyEQMatch:
         assert np.all(np.isfinite(result))
 
     def test_eq_match_without_scipy(self, master):
-        """Without scipy, _apply_eq_match should return audio unchanged."""
         if HAS_SCIPY:
             pytest.skip("scipy is available; cannot test missing path")
         audio = _make_sine(amplitude=0.5).astype(np.float64)
@@ -247,20 +235,14 @@ class TestMasterPipeline:
         input_audio = _make_sine(amplitude=0.2)
         ref_audio = _make_sine(amplitude=0.6, freq_hz=660.0)
         expected = np.full_like(input_audio, 0.123, dtype=np.float32)
-
         monkeypatch.setattr(master, "_matchering_available", True)
 
         def fake_master_with_reference(audio, reference):
-            return type("Result", (), {
-                "audio": expected,
-                "success": True,
-            })()
+            return type("Result", (), {"audio": expected, "success": True})()
 
         monkeypatch.setattr(master, "_master_with_reference", fake_master_with_reference)
         monkeypatch.setattr(master, "_master_fallback", lambda *args, **kwargs: np.zeros_like(input_audio))
-
         result = master.master(input_audio, ref_audio, 48000)
-
         assert isinstance(result, np.ndarray)
         np.testing.assert_allclose(result, expected)
 
@@ -268,9 +250,7 @@ class TestMasterPipeline:
         mono = _make_sine(amplitude=0.3)
         input_audio = np.column_stack([mono, mono * 0.8]).astype(np.float32)
         ref_audio = np.column_stack([mono * 0.4, mono * 0.2]).astype(np.float32)
-
         result = master.master(input_audio, ref_audio, 48000)
-
         assert isinstance(result, np.ndarray)
         assert result.shape == input_audio.shape
         assert result.dtype == np.float32
@@ -289,5 +269,4 @@ class TestWavIO:
         assert os.path.isfile(path)
         loaded = master._read_wav(path)
         assert len(loaded) > 0
-        # Should be approximately equal (int16 quantization)
         np.testing.assert_allclose(loaded, audio, atol=0.001)

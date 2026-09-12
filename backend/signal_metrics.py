@@ -1,123 +1,171 @@
-"""
-Comprehensive signal metrics framework for auto-mixing.
+"""Finite streaming signal metrics for automatic soundcheck.
 
-Provides per-channel multi-dimensional signal analysis:
-- Level metrics: momentary/short-term/integrated LUFS, true peak, RMS, crest factor
-- Dynamics: dynamic range, ADSR envelope, transient density/strength/regularity
-- Spectral: centroid, rolloff, flatness, tilt, 7-band energy, flux, brightness
-- Inter-channel: cross-correlation, coherence, spectral similarity, level difference
-
-All LUFS measurements use K-weighting per ITU-R BS.1770-4.
-True peak uses 4× oversampling per ITU-R BS.1770-4.
+This module keeps the public API used by ``auto_soundcheck_engine`` while
+replacing the legacy metric internals with deterministic, finite calculations.
+It performs analysis only and contains no mixer/OSC/MIDI write path.
 """
 
-import numpy as np
-import logging
+from __future__ import annotations
+
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Tuple
-from collections import deque
 
-logger = logging.getLogger(__name__)
+import numpy as np
 
 try:
-    from lufs_gain_staging import LUFSMeter, TruePeakMeter, KWeightingFilter
+    from lufs_gain_staging import KWeightingFilter, LUFSMeter
     HAS_LUFS_METERS = True
 except ImportError:
+    KWeightingFilter = None
+    LUFSMeter = None
     HAS_LUFS_METERS = False
 
+EPS = 1e-12
 
-# ── K-weighting filter (standalone, for when lufs_gain_staging unavailable) ──
+FREQ_BANDS = {
+    "sub": (20.0, 60.0),
+    "bass": (60.0, 250.0),
+    "low_mid": (250.0, 500.0),
+    "mid": (500.0, 2000.0),
+    "high_mid": (2000.0, 4000.0),
+    "presence": (4000.0, 8000.0),
+    "air": (8000.0, 20000.0),
+}
+
+
+def _finite_mono(samples: np.ndarray) -> np.ndarray:
+    data = np.asarray(samples, dtype=np.float32)
+    if data.ndim == 0:
+        data = data.reshape(1)
+    if data.ndim > 1:
+        if data.shape[0] <= 8 and data.shape[1] > data.shape[0] * 4:
+            data = data.T
+        data = np.mean(data, axis=1, dtype=np.float32)
+    return np.nan_to_num(data.reshape(-1), nan=0.0, posinf=0.0, neginf=0.0)
+
+
+def _amp_db(value: float) -> float:
+    value = float(value)
+    if not np.isfinite(value) or value <= 0.0:
+        return -100.0
+    return float(max(-100.0, 20.0 * np.log10(value)))
+
 
 def _k_weight(samples: np.ndarray, sample_rate: int = 48000) -> np.ndarray:
-    """Apply K-weighting filter (ITU-R BS.1770-4) to samples."""
-    if HAS_LUFS_METERS:
-        kw = KWeightingFilter(sample_rate)
-        return kw.process(samples)
+    data = _finite_mono(samples)
+    if data.size == 0:
+        return data
+    if HAS_LUFS_METERS and KWeightingFilter is not None:
+        return np.nan_to_num(KWeightingFilter(sample_rate).process(data), nan=0.0, posinf=0.0, neginf=0.0)
+    try:
+        from scipy.signal import lfilter
 
-    from scipy.signal import lfilter
-    # Stage 1: Pre-filter (high shelf +4dB @ ~1681 Hz)
-    if sample_rate == 48000:
-        b1 = np.array([1.53512485958697, -2.69169618940638, 1.19839281085285])
-        a1 = np.array([1.0, -1.69065929318241, 0.73248077421585])
-    else:
-        # Approximate for other sample rates
-        b1 = np.array([1.0, 0.0, 0.0])
-        a1 = np.array([1.0, 0.0, 0.0])
-    y = lfilter(b1, a1, samples)
-
-    # Stage 2: High-pass ~38 Hz
-    if sample_rate == 48000:
-        b2 = np.array([1.0, -2.0, 1.0])
-        a2 = np.array([1.0, -1.99004745483398, 0.99007225036621])
-    else:
-        b2 = np.array([1.0, -2.0, 1.0])
-        a2 = np.array([1.0, -1.99, 0.99])
-    return lfilter(b2, a2, y)
+        if sample_rate == 48000:
+            b1 = np.array([1.53512485958697, -2.69169618940638, 1.19839281085285])
+            a1 = np.array([1.0, -1.69065929318241, 0.73248077421585])
+            b2 = np.array([1.0, -2.0, 1.0])
+            a2 = np.array([1.0, -1.99004745483398, 0.99007225036621])
+            return np.nan_to_num(lfilter(b2, a2, lfilter(b1, a1, data)))
+    except Exception:
+        pass
+    return data
 
 
-# ── Data classes ─────────────────────────────────────────────────
+def _true_peak_with_overlap(samples: np.ndarray, previous_tail: np.ndarray) -> Tuple[float, np.ndarray]:
+    data = _finite_mono(samples)
+    if data.size == 0:
+        return -100.0, previous_tail
+    overlap = np.concatenate([previous_tail, data]) if previous_tail.size else data
+    try:
+        from scipy.signal import resample_poly
+
+        reconstructed = resample_poly(overlap, 4, 1)
+        peak_db = _amp_db(float(np.max(np.abs(reconstructed))))
+    except Exception:
+        peak_db = _amp_db(float(np.max(np.abs(overlap))))
+    tail_len = min(64, data.size)
+    return peak_db, data[-tail_len:].copy()
+
+
+def _gated_integrated_lufs(values: List[float]) -> float:
+    blocks = np.asarray([x for x in values if np.isfinite(x) and x > -70.0], dtype=np.float64)
+    if blocks.size == 0:
+        return -100.0
+    energies = np.power(10.0, blocks / 10.0)
+    ungated = float(10.0 * np.log10(max(float(np.mean(energies)), EPS)))
+    kept = blocks[blocks >= ungated - 10.0]
+    if kept.size == 0:
+        return ungated
+    return float(10.0 * np.log10(max(float(np.mean(np.power(10.0, kept / 10.0))), EPS)))
+
+
+def _append_ring(blocks: deque, samples: np.ndarray, current_count: int, max_count: int) -> int:
+    block = np.asarray(samples, dtype=np.float32).copy()
+    blocks.append(block)
+    current_count += block.size
+    while blocks and current_count > max_count:
+        removed = blocks.popleft()
+        current_count -= removed.size
+    return current_count
+
 
 @dataclass
 class LevelMetrics:
-    """Loudness and level measurements."""
     peak_db: float = -100.0
     true_peak_dbtp: float = -100.0
     rms_db: float = -100.0
-    lufs_momentary: float = -100.0     # 400ms window
-    lufs_short_term: float = -100.0    # 3s window
-    lufs_integrated: float = -100.0    # Full duration with gating
-    crest_factor_db: float = 0.0       # true_peak - rms
-    loudness_range_lu: float = 0.0     # EBU R128 LRA
+    lufs_momentary: float = -100.0
+    lufs_short_term: float = -100.0
+    lufs_integrated: float = -100.0
+    crest_factor_db: float = 0.0
+    loudness_range_lu: float = 0.0
 
 
 @dataclass
 class DynamicsMetrics:
-    """Dynamics and envelope analysis."""
     dynamic_range_db: float = 0.0
     attack_time_ms: float = 0.0
     decay_time_ms: float = 0.0
     sustain_level_db: float = -100.0
     release_time_ms: float = 0.0
     envelope_variance: float = 0.0
-    transient_density: float = 0.0     # Transients per second
+    transient_density: float = 0.0
     transient_strength_db: float = 0.0
-    transient_regularity: float = 0.0  # 0-1, rhythmic consistency
+    transient_regularity: float = 0.0
     peak_to_rms_ratio: float = 0.0
 
 
 @dataclass
 class SpectralMetrics:
-    """Spectral analysis results."""
     centroid_hz: float = 0.0
     rolloff_hz: float = 0.0
-    flatness: float = 0.0             # 0=tonal, 1=noise-like
-    spectral_tilt_db: float = 0.0     # Slope of spectrum (positive=bright)
-    brightness: float = 0.0           # Energy ratio above 4kHz
-    warmth: float = 0.0               # Energy ratio 200-800Hz
-    mud_ratio: float = 0.0            # Energy ratio 200-500Hz vs total
-    presence_ratio: float = 0.0       # Energy ratio 2-5kHz vs total
-    flux: float = 0.0                 # Frame-to-frame spectral change
+    flatness: float = 0.0
+    spectral_tilt_db: float = 0.0
+    brightness: float = 0.0
+    warmth: float = 0.0
+    mud_ratio: float = 0.0
+    presence_ratio: float = 0.0
+    flux: float = 0.0
     band_energy: Dict[str, float] = field(default_factory=dict)
 
 
 @dataclass
 class InterChannelMetrics:
-    """Comparison metrics between two channels."""
     channel_a: int = 0
     channel_b: int = 0
-    cross_correlation: float = 0.0     # -1..+1
+    cross_correlation: float = 0.0
     delay_samples: int = 0
     delay_ms: float = 0.0
-    coherence: float = 0.0            # Magnitude-squared coherence (avg)
-    spectral_similarity: float = 0.0  # Cosine similarity of spectra
-    level_difference_db: float = 0.0  # LUFS difference
+    coherence: float = 0.0
+    spectral_similarity: float = 0.0
+    level_difference_db: float = 0.0
     phase_inverted: bool = False
 
 
 @dataclass
 class ChannelMetrics:
-    """Complete metrics for a single channel."""
     channel: int
     timestamp: float = 0.0
     level: LevelMetrics = field(default_factory=LevelMetrics)
@@ -125,389 +173,285 @@ class ChannelMetrics:
     spectral: SpectralMetrics = field(default_factory=SpectralMetrics)
 
     def to_dict(self) -> Dict:
-        """Serialize all metrics to a flat dict for JSON/logging."""
-        d = {"channel": self.channel, "timestamp": self.timestamp}
-        for obj_name, obj in [("level", self.level), ("dynamics", self.dynamics),
-                               ("spectral", self.spectral)]:
-            for k, v in obj.__dict__.items():
-                if isinstance(v, dict):
-                    for bk, bv in v.items():
-                        d[f"{obj_name}_{k}_{bk}"] = round(bv, 2) if isinstance(bv, float) else bv
-                elif isinstance(v, float):
-                    d[f"{obj_name}_{k}"] = round(v, 2)
+        result = {"channel": self.channel, "timestamp": self.timestamp}
+        for name, obj in (("level", self.level), ("dynamics", self.dynamics), ("spectral", self.spectral)):
+            for key, value in obj.__dict__.items():
+                if isinstance(value, dict):
+                    for band, band_value in value.items():
+                        result[f"{name}_{key}_{band}"] = round(float(band_value), 2)
+                elif isinstance(value, float):
+                    result[f"{name}_{key}"] = round(value, 2)
                 else:
-                    d[f"{obj_name}_{k}"] = v
-        return d
+                    result[f"{name}_{key}"] = value
+        return result
 
-
-FREQ_BANDS = {
-    'sub': (20, 60),
-    'bass': (60, 250),
-    'low_mid': (250, 500),
-    'mid': (500, 2000),
-    'high_mid': (2000, 4000),
-    'presence': (4000, 8000),
-    'air': (8000, 20000),
-}
-
-
-# ── Signal Analyzer ─────────────────────────────────────────────
 
 class SignalAnalyzer:
-    """Per-channel signal analyzer computing all metrics.
+    """Streaming per-channel analyzer with bounded memory and finite outputs."""
 
-    Feed audio blocks via ``process()``; retrieve accumulated metrics
-    via ``get_metrics()`` at any time.
-    """
-
-    def __init__(self, channel: int, sample_rate: int = 48000,
-                 block_size: int = 1024):
-        self.channel = channel
-        self.sample_rate = sample_rate
-        self.block_size = block_size
-
-        # LUFS meters
-        self._lufs_meter = LUFSMeter(sample_rate) if HAS_LUFS_METERS else None
-        self._tp_meter = TruePeakMeter(sample_rate) if HAS_LUFS_METERS else None
-
-        # Buffers for integrated/short-term LUFS
-        self._momentary_window = int(sample_rate * 0.4)  # 400ms
-        self._short_term_window = int(sample_rate * 3.0)  # 3s
-        self._integrated_blocks: List[float] = []
-        self._short_term_buffer = deque(maxlen=self._short_term_window)
-        self._k_buffer = deque(maxlen=self._short_term_window)
-
-        # Envelope / dynamics
-        self._envelope_db = deque(maxlen=int(sample_rate * 5 / block_size))
-        self._level_history = deque(maxlen=int(sample_rate * 10 / block_size))
-        self._last_env_db = -100.0
-        self._time_sec = 0.0
-
-        # Transient tracking
-        self._transient_times: List[float] = []
-        self._transient_strengths: List[float] = []
-
-        # ADSR state machine
-        self._adsr_state = "idle"  # idle, attack, sustain, release
-        self._adsr_attack_start = -100.0
-        self._adsr_attack_start_time = 0.0
-        self._adsr_peak_db = -100.0
-        self._adsr_peak_time = 0.0
-        self._adsr_sustain_levels: List[float] = []
-        self._adsr_release_start_time = 0.0
-        self._adsr_release_start_db = -100.0
-
-        self._attack_ms = 0.0
-        self._decay_ms = 0.0
-        self._sustain_db = -100.0
-        self._release_ms = 0.0
-
-        # Spectral
-        self._fft_size = max(2048, block_size)
-        self._window = np.hanning(self._fft_size)
-        self._freqs = np.fft.rfftfreq(self._fft_size, 1.0 / sample_rate)
-        self._prev_spectrum: Optional[np.ndarray] = None
-
-        # Accumulated peak metrics
+    def __init__(self, channel: int, sample_rate: int = 48000, block_size: int = 1024):
+        self.channel = int(channel)
+        self.sample_rate = int(sample_rate)
+        self.block_size = int(block_size)
+        self._lufs_meter = LUFSMeter(sample_rate) if HAS_LUFS_METERS and LUFSMeter is not None else None
+        self._stream_k_filter = KWeightingFilter(sample_rate) if HAS_LUFS_METERS and KWeightingFilter is not None else None
+        self._history: deque[np.ndarray] = deque()
+        self._history_samples = 0
+        self._max_history_samples = max(self.sample_rate * 3, self.block_size * 4)
+        self._k_history: deque[np.ndarray] = deque()
+        self._k_history_samples = 0
+        self._lufs_blocks: List[float] = []
+        self._rms_linear: deque[float] = deque(maxlen=256)
+        self._level_history: deque[float] = deque(maxlen=512)
         self._max_peak = -100.0
         self._max_true_peak = -100.0
-        self._all_rms: List[float] = []
+        self._momentary_lufs = -100.0
+        self._time_sec = 0.0
+        self._tp_tail = np.zeros(0, dtype=np.float32)
+        self._transient_times: deque[float] = deque(maxlen=256)
+        self._transient_strengths: deque[float] = deque(maxlen=256)
+        self._last_level_db = -100.0
+        self._prev_norm_spectrum: Optional[np.ndarray] = None
+        self._flux = 0.0
 
     def reset(self):
-        """Reset all accumulated state."""
-        if self._lufs_meter:
+        if self._lufs_meter is not None:
             self._lufs_meter.reset()
-        if self._tp_meter:
-            self._tp_meter.reset()
-        self._integrated_blocks.clear()
-        self._short_term_buffer.clear()
-        self._k_buffer.clear()
-        self._envelope_db.clear()
+        if self._stream_k_filter is not None:
+            self._stream_k_filter.reset()
+        self._history.clear()
+        self._history_samples = 0
+        self._k_history.clear()
+        self._k_history_samples = 0
+        self._lufs_blocks.clear()
+        self._rms_linear.clear()
         self._level_history.clear()
-        self._transient_times.clear()
-        self._transient_strengths.clear()
-        self._prev_spectrum = None
-        self._time_sec = 0.0
-        self._last_env_db = -100.0
         self._max_peak = -100.0
         self._max_true_peak = -100.0
-        self._all_rms.clear()
-        self._adsr_state = "idle"
-        self._attack_ms = 0.0
-        self._decay_ms = 0.0
-        self._sustain_db = -100.0
-        self._release_ms = 0.0
+        self._momentary_lufs = -100.0
+        self._time_sec = 0.0
+        self._tp_tail = np.zeros(0, dtype=np.float32)
+        self._transient_times.clear()
+        self._transient_strengths.clear()
+        self._last_level_db = -100.0
+        self._prev_norm_spectrum = None
+        self._flux = 0.0
 
     def process(self, samples: np.ndarray):
-        """Process a block of audio samples."""
-        if len(samples) == 0:
+        data = _finite_mono(samples)
+        if data.size == 0:
             return
-        samples = np.asarray(samples, dtype=np.float32)
-        self._time_sec += len(samples) / self.sample_rate
+        self._time_sec += data.size / float(self.sample_rate)
+        self._history_samples = _append_ring(
+            self._history, data, self._history_samples, self._max_history_samples
+        )
 
-        # ── Level metrics ────────────────────────────────────
-        peak_linear = float(np.max(np.abs(samples)))
-        peak_db = 20.0 * np.log10(peak_linear + 1e-10)
+        peak_db = _amp_db(float(np.max(np.abs(data))))
         self._max_peak = max(self._max_peak, peak_db)
+        rms = float(np.sqrt(np.mean(np.square(data, dtype=np.float64)) + EPS))
+        self._rms_linear.append(rms)
+        rms_db = _amp_db(rms)
 
-        rms = float(np.sqrt(np.mean(samples ** 2) + 1e-12))
-        rms_db = 20.0 * np.log10(rms + 1e-10)
-        self._all_rms.append(rms_db)
+        if self._lufs_meter is not None:
+            value = float(self._lufs_meter.process(data))
+            self._momentary_lufs = value if np.isfinite(value) else -100.0
+        else:
+            weighted = _k_weight(data, self.sample_rate)
+            ms = float(np.mean(np.square(weighted, dtype=np.float64)) + EPS)
+            self._momentary_lufs = float(-0.691 + 10.0 * np.log10(ms))
+        if self._momentary_lufs > -70.0:
+            self._lufs_blocks.append(self._momentary_lufs)
 
-        # Momentary LUFS (400ms K-weighted)
-        lufs_m = -100.0
-        if self._lufs_meter:
-            lufs_m = self._lufs_meter.process(samples)
+        if self._stream_k_filter is not None:
+            weighted_block = np.nan_to_num(
+                self._stream_k_filter.process(data), nan=0.0, posinf=0.0, neginf=0.0
+            )
+        else:
+            weighted_block = _k_weight(data, self.sample_rate)
+        self._k_history_samples = _append_ring(
+            self._k_history,
+            weighted_block,
+            self._k_history_samples,
+            max(self.sample_rate * 3, self.block_size),
+        )
 
-        # True peak
-        tp_db = -100.0
-        if self._tp_meter:
-            tp_db = self._tp_meter.process(samples)
-            self._max_true_peak = max(self._max_true_peak, tp_db)
+        tp_db, self._tp_tail = _true_peak_with_overlap(data, self._tp_tail)
+        self._max_true_peak = max(self._max_true_peak, tp_db)
 
-        # Store for integrated LUFS
-        if lufs_m > -70.0:
-            self._integrated_blocks.append(lufs_m)
-
-        # K-weighted samples for short-term LUFS
-        k_samples = _k_weight(samples, self.sample_rate)
-        self._k_buffer.extend(k_samples.tolist())
-
-        # ── Envelope / ADSR ──────────────────────────────────
-        env_db = max(lufs_m, rms_db)
-        if env_db > -70:
-            self._envelope_db.append(env_db)
+        env_db = max(self._momentary_lufs, rms_db)
+        if np.isfinite(env_db) and env_db > -100.0:
             self._level_history.append(env_db)
-
-        self._update_adsr(env_db)
-        self._detect_transients(env_db)
-        self._last_env_db = env_db
-
-        # ── Spectral ─────────────────────────────────────────
-        self._analyze_spectrum(samples)
-
-    def _update_adsr(self, env_db: float):
-        """Simple ADSR state machine for envelope timing."""
-        threshold = -40.0
-        if self._adsr_state == "idle":
-            if env_db > threshold:
-                self._adsr_state = "attack"
-                self._adsr_attack_start = env_db
-                self._adsr_attack_start_time = self._time_sec
-                self._adsr_peak_db = env_db
-                self._adsr_peak_time = self._time_sec
-        elif self._adsr_state == "attack":
-            if env_db > self._adsr_peak_db:
-                self._adsr_peak_db = env_db
-                self._adsr_peak_time = self._time_sec
-            elif env_db < self._adsr_peak_db - 3.0:
-                # Peak passed, compute attack time
-                self._attack_ms = (self._adsr_peak_time - self._adsr_attack_start_time) * 1000
-                self._decay_ms = (self._time_sec - self._adsr_peak_time) * 1000
-                self._adsr_state = "sustain"
-                self._adsr_sustain_levels = [env_db]
-        elif self._adsr_state == "sustain":
-            if env_db > -70:
-                self._adsr_sustain_levels.append(env_db)
-                if len(self._adsr_sustain_levels) > 0:
-                    self._sustain_db = float(np.mean(self._adsr_sustain_levels[-50:]))
-            if env_db < threshold:
-                self._adsr_state = "release"
-                self._adsr_release_start_time = self._time_sec
-                self._adsr_release_start_db = env_db
-        elif self._adsr_state == "release":
-            if env_db < -60 or env_db > self._adsr_release_start_db + 6:
-                self._release_ms = (self._time_sec - self._adsr_release_start_time) * 1000
-                self._adsr_state = "idle"
-
-    def _detect_transients(self, env_db: float):
-        """Detect transients from envelope rise."""
-        if len(self._envelope_db) < 2:
-            return
-        rise = env_db - self._last_env_db
-        if rise > 3.0:
-            self._transient_times.append(self._time_sec)
-            self._transient_strengths.append(min(rise, 30.0))
+            rise = env_db - self._last_level_db
+            if self._last_level_db > -90.0 and rise > 3.0:
+                self._transient_times.append(self._time_sec)
+                self._transient_strengths.append(min(30.0, rise))
+            self._last_level_db = env_db
         cutoff = self._time_sec - 3.0
         while self._transient_times and self._transient_times[0] < cutoff:
-            self._transient_times.pop(0)
-            self._transient_strengths.pop(0)
+            self._transient_times.popleft()
+            if self._transient_strengths:
+                self._transient_strengths.popleft()
 
-    def _analyze_spectrum(self, samples: np.ndarray):
-        """Compute spectral metrics."""
-        if len(samples) < self._fft_size:
-            padded = np.zeros(self._fft_size, dtype=np.float32)
-            padded[:len(samples)] = samples
-            samples = padded
-        block = samples[-self._fft_size:] * self._window
-        spectrum = np.abs(np.fft.rfft(block)) + 1e-10
-        norm = np.sqrt(np.sum(spectrum ** 2))
-        self._current_spectrum = spectrum
-        self._current_norm_spectrum = spectrum / max(norm, 1e-10)
+        self._update_flux(data)
 
-        # Flux
-        if self._prev_spectrum is not None and len(self._prev_spectrum) == len(self._current_norm_spectrum):
-            diff = self._current_norm_spectrum - self._prev_spectrum
-            self._flux = float(np.sqrt(np.sum(diff ** 2)))
+    def _update_flux(self, data: np.ndarray):
+        n_fft = max(2048, self.block_size)
+        block = np.zeros(n_fft, dtype=np.float64)
+        take = min(n_fft, data.size)
+        block[-take:] = data[-take:]
+        spectrum = np.abs(np.fft.rfft(block * np.hanning(n_fft)))
+        norm = float(np.linalg.norm(spectrum))
+        current = spectrum / max(norm, EPS)
+        if self._prev_norm_spectrum is not None and self._prev_norm_spectrum.size == current.size:
+            self._flux = float(np.linalg.norm(current - self._prev_norm_spectrum))
         else:
             self._flux = 0.0
-        self._prev_spectrum = self._current_norm_spectrum.copy()
+        self._prev_norm_spectrum = current
+
+    def _history_array(self) -> np.ndarray:
+        if not self._history:
+            return np.zeros(0, dtype=np.float32)
+        return np.concatenate(list(self._history)).astype(np.float32, copy=False)
+
+    def _spectral_metrics(self, audio: np.ndarray) -> SpectralMetrics:
+        result = SpectralMetrics(flux=float(self._flux))
+        if audio.size == 0:
+            return result
+        n_fft = max(2048, self.block_size)
+        hop = n_fft // 2
+        window = np.hanning(n_fft)
+        powers = []
+        if audio.size < n_fft:
+            padded = np.zeros(n_fft, dtype=np.float64)
+            padded[: audio.size] = audio
+            audio = padded
+        starts = list(range(0, audio.size - n_fft + 1, hop)) or [0]
+        for start in starts:
+            frame = audio[start:start + n_fft]
+            if frame.size < n_fft:
+                padded = np.zeros(n_fft, dtype=np.float64)
+                padded[: frame.size] = frame
+                frame = padded
+            spec = np.fft.rfft(frame.astype(np.float64) * window)
+            powers.append(np.square(np.abs(spec)))
+        power = np.mean(np.asarray(powers), axis=0)
+        freqs = np.fft.rfftfreq(n_fft, 1.0 / self.sample_rate)
+        total = float(np.sum(power))
+        if total <= EPS:
+            return result
+        magnitude = np.sqrt(power)
+        mag_sum = float(np.sum(magnitude))
+        result.centroid_hz = float(np.sum(freqs * magnitude) / max(mag_sum, EPS))
+        cumsum = np.cumsum(power)
+        idx = int(np.searchsorted(cumsum, 0.85 * cumsum[-1]))
+        result.rolloff_hz = float(freqs[min(idx, freqs.size - 1)])
+        positive = magnitude[magnitude > EPS]
+        if positive.size >= 4:
+            result.flatness = float(np.exp(np.mean(np.log(positive))) / max(float(np.mean(positive)), EPS))
+        valid = (freqs >= 50.0) & (freqs <= min(18000.0, self.sample_rate / 2.0)) & (magnitude > EPS)
+        if np.sum(valid) > 4:
+            result.spectral_tilt_db = float(
+                np.polyfit(np.log2(freqs[valid]), 20.0 * np.log10(magnitude[valid]), 1)[0]
+            )
+        for name, (lo, hi) in FREQ_BANDS.items():
+            mask = (freqs >= lo) & (freqs < min(hi, self.sample_rate / 2.0 + 1.0))
+            energy = float(np.sum(power[mask])) if np.any(mask) else 0.0
+            result.band_energy[name] = float(10.0 * np.log10(max(energy, EPS)))
+        def ratio(lo: float, hi: float) -> float:
+            mask = (freqs >= lo) & (freqs < hi)
+            return float(np.sum(power[mask]) / total) if np.any(mask) else 0.0
+        result.brightness = ratio(4000.0, self.sample_rate / 2.0 + 1.0)
+        result.warmth = ratio(200.0, 800.0)
+        result.mud_ratio = ratio(200.0, 500.0)
+        result.presence_ratio = ratio(2000.0, 5000.0)
+        return result
 
     def get_metrics(self) -> ChannelMetrics:
-        """Compute and return all accumulated metrics."""
         metrics = ChannelMetrics(channel=self.channel, timestamp=time.time())
+        level = metrics.level
+        level.peak_db = float(self._max_peak)
+        level.true_peak_dbtp = float(self._max_true_peak)
+        if self._rms_linear:
+            mean_power = float(np.mean(np.square(np.asarray(self._rms_linear, dtype=np.float64))))
+            level.rms_db = _amp_db(np.sqrt(max(mean_power, EPS)))
+        level.lufs_momentary = float(self._momentary_lufs)
+        if self._k_history:
+            weighted = np.concatenate(list(self._k_history)).astype(np.float64, copy=False)
+            if weighted.size:
+                ms = float(np.mean(np.square(weighted)) + EPS)
+                level.lufs_short_term = float(-0.691 + 10.0 * np.log10(ms))
+        level.lufs_integrated = _gated_integrated_lufs(self._lufs_blocks)
+        if level.rms_db > -90.0 and level.true_peak_dbtp > -90.0:
+            level.crest_factor_db = max(0.0, level.true_peak_dbtp - level.rms_db)
+        gated = np.asarray([x for x in self._lufs_blocks if x > -70.0], dtype=np.float64)
+        if gated.size >= 10:
+            relative = level.lufs_integrated - 20.0
+            kept = gated[gated >= relative]
+            if kept.size >= 4:
+                level.loudness_range_lu = max(0.0, float(np.percentile(kept, 95) - np.percentile(kept, 10)))
 
-        # ── Level ────────────────────────────────────────────
-        lm = metrics.level
-        lm.peak_db = self._max_peak
-        lm.true_peak_dbtp = self._max_true_peak
-        if self._all_rms:
-            lm.rms_db = float(np.mean(self._all_rms[-100:]))
-
-        # Momentary (last value from meter)
-        if self._lufs_meter:
-            lm.lufs_momentary = self._lufs_meter._last_lufs if hasattr(self._lufs_meter, '_last_lufs') else -100.0
-            if self._integrated_blocks:
-                lm.lufs_momentary = self._integrated_blocks[-1]
-
-        # Short-term (3s K-weighted)
-        if len(self._k_buffer) >= self.sample_rate:
-            k_arr = np.array(list(self._k_buffer), dtype=np.float32)
-            ms = float(np.mean(k_arr ** 2) + 1e-12)
-            lm.lufs_short_term = -0.691 + 10 * np.log10(ms)
-
-        # Integrated (gated)
-        lm.lufs_integrated = self._compute_integrated_lufs()
-
-        # Crest factor
-        if lm.rms_db > -90:
-            lm.crest_factor_db = lm.true_peak_dbtp - lm.rms_db
-
-        # Loudness Range (simplified)
-        lm.loudness_range_lu = self._compute_loudness_range()
-
-        # ── Dynamics ─────────────────────────────────────────
-        dm = metrics.dynamics
-        if len(self._level_history) > 10:
-            valid = [x for x in self._level_history if x > -70]
-            if valid:
-                dm.dynamic_range_db = max(valid) - min(valid)
-
-        dm.attack_time_ms = self._attack_ms
-        dm.decay_time_ms = self._decay_ms
-        dm.sustain_level_db = self._sustain_db
-        dm.release_time_ms = self._release_ms
-
-        if len(self._envelope_db) > 5:
-            dm.envelope_variance = float(np.std(list(self._envelope_db)))
-
-        elapsed = max(1.0, self._time_sec)
-        dm.transient_density = len(self._transient_times) / min(3.0, elapsed)
-        dm.transient_strength_db = float(np.mean(self._transient_strengths)) if self._transient_strengths else 0.0
-
+        dynamics = metrics.dynamics
+        history = np.asarray(self._level_history, dtype=np.float64)
+        if history.size:
+            dynamics.dynamic_range_db = max(0.0, float(np.percentile(history, 95) - np.percentile(history, 10)))
+            dynamics.envelope_variance = float(np.std(history))
+            dynamics.sustain_level_db = float(np.median(history[-min(50, history.size):]))
+        elapsed = min(3.0, max(self._time_sec, EPS))
+        dynamics.transient_density = len(self._transient_times) / elapsed
+        if self._transient_strengths:
+            dynamics.transient_strength_db = float(np.mean(self._transient_strengths))
         if len(self._transient_times) >= 3:
-            intervals = np.diff(self._transient_times)
-            if len(intervals) > 0 and np.std(intervals) > 0:
-                dm.transient_regularity = 1.0 / (1.0 + float(np.std(intervals)))
+            intervals = np.diff(np.asarray(self._transient_times, dtype=np.float64))
+            mean_interval = float(np.mean(intervals))
+            if mean_interval > EPS:
+                cv = float(np.std(intervals) / mean_interval)
+                dynamics.transient_regularity = float(1.0 / (1.0 + cv))
+        if level.peak_db > -90.0 and level.rms_db > -90.0:
+            dynamics.peak_to_rms_ratio = max(0.0, level.peak_db - level.rms_db)
 
-        if lm.peak_db > -90 and lm.rms_db > -90:
-            dm.peak_to_rms_ratio = lm.peak_db - lm.rms_db
-
-        # ── Spectral ─────────────────────────────────────────
-        sm = metrics.spectral
-        if hasattr(self, '_current_spectrum'):
-            spectrum = self._current_spectrum
-            total_energy = float(np.sum(spectrum ** 2))
-
-            if total_energy > 1e-10:
-                sm.centroid_hz = float(np.sum(self._freqs * spectrum) / np.sum(spectrum))
-
-                cumsum = np.cumsum(spectrum)
-                idx85 = np.searchsorted(cumsum, 0.85 * cumsum[-1])
-                sm.rolloff_hz = float(self._freqs[min(idx85, len(self._freqs) - 1)])
-
-                geo_mean = np.exp(np.mean(np.log(spectrum + 1e-10)))
-                arith_mean = np.mean(spectrum)
-                sm.flatness = float(geo_mean / (arith_mean + 1e-10))
-
-                # Spectral tilt (linear regression slope on log-magnitude)
-                valid = self._freqs > 50
-                if np.any(valid):
-                    log_f = np.log10(self._freqs[valid] + 1)
-                    log_m = 20 * np.log10(spectrum[valid])
-                    if len(log_f) > 2:
-                        slope = float(np.polyfit(log_f, log_m, 1)[0])
-                        sm.spectral_tilt_db = slope
-
-                # Band energies and ratios
-                for name, (lo, hi) in FREQ_BANDS.items():
-                    mask = (self._freqs >= lo) & (self._freqs < hi)
-                    if np.any(mask):
-                        e = float(np.sum(spectrum[mask] ** 2))
-                        sm.band_energy[name] = 20.0 * np.log10(e + 1e-10)
-
-                # Brightness: energy above 4kHz / total
-                high_mask = self._freqs >= 4000
-                sm.brightness = float(np.sum(spectrum[high_mask] ** 2) / total_energy)
-
-                # Warmth: 200-800Hz / total
-                warm_mask = (self._freqs >= 200) & (self._freqs < 800)
-                sm.warmth = float(np.sum(spectrum[warm_mask] ** 2) / total_energy)
-
-                # Mud ratio: 200-500Hz / total
-                mud_mask = (self._freqs >= 200) & (self._freqs < 500)
-                sm.mud_ratio = float(np.sum(spectrum[mud_mask] ** 2) / total_energy)
-
-                # Presence ratio: 2-5kHz / total
-                pres_mask = (self._freqs >= 2000) & (self._freqs < 5000)
-                sm.presence_ratio = float(np.sum(spectrum[pres_mask] ** 2) / total_energy)
-
-            sm.flux = getattr(self, '_flux', 0.0)
-
+        metrics.spectral = self._spectral_metrics(self._history_array())
         return metrics
 
-    def _compute_integrated_lufs(self) -> float:
-        """Compute integrated LUFS with BS.1770-4 double gating."""
-        if not self._integrated_blocks:
-            return -100.0
 
-        blocks = np.array(self._integrated_blocks)
-
-        # Pass 1: absolute gate at -70 LUFS
-        pass1 = blocks[blocks > -70.0]
-        if len(pass1) == 0:
-            return -100.0
-
-        linear = 10.0 ** (pass1 / 10.0)
-        ungated_mean = 10.0 * np.log10(np.mean(linear))
-
-        # Pass 2: relative gate at ungated_mean - 10 LU
-        relative_threshold = ungated_mean - 10.0
-        pass2 = pass1[pass1 >= relative_threshold]
-        if len(pass2) == 0:
-            return float(ungated_mean)
-
-        linear2 = 10.0 ** (pass2 / 10.0)
-        return float(10.0 * np.log10(np.mean(linear2)))
-
-    def _compute_loudness_range(self) -> float:
-        """Compute simplified EBU R128 Loudness Range (LRA)."""
-        if len(self._integrated_blocks) < 10:
-            return 0.0
-
-        blocks = np.array(self._integrated_blocks)
-        # Gate at -70 LUFS
-        gated = blocks[blocks > -70.0]
-        if len(gated) < 10:
-            return 0.0
-
-        # Percentiles: 10th to 95th
-        p10 = float(np.percentile(gated, 10))
-        p95 = float(np.percentile(gated, 95))
-        return max(0.0, p95 - p10)
+def _align_for_lag(a: np.ndarray, b: np.ndarray, lag: int) -> Tuple[np.ndarray, np.ndarray]:
+    if lag > 0:
+        return a[lag:], b[:-lag] if lag < len(b) else b[:0]
+    if lag < 0:
+        shift = -lag
+        return a[:-shift] if shift < len(a) else a[:0], b[shift:]
+    return a, b
 
 
-# ── Inter-channel comparison ─────────────────────────────────────
+def _welch_coherence(a: np.ndarray, b: np.ndarray, block: int = 2048) -> float:
+    min_len = min(a.size, b.size)
+    if min_len < 64:
+        return 0.0
+    block = min(block, min_len)
+    hop = max(1, block // 2)
+    window = np.hanning(block)
+    pxx = None
+    pyy = None
+    pxy = None
+    count = 0
+    for start in range(0, min_len - block + 1, hop):
+        A = np.fft.rfft(a[start:start + block] * window)
+        B = np.fft.rfft(b[start:start + block] * window)
+        aa = np.abs(A) ** 2
+        bb = np.abs(B) ** 2
+        ab = A * np.conj(B)
+        pxx = aa if pxx is None else pxx + aa
+        pyy = bb if pyy is None else pyy + bb
+        pxy = ab if pxy is None else pxy + ab
+        count += 1
+    if count == 0 or pxx is None or pyy is None or pxy is None:
+        return 0.0
+    coherence = np.abs(pxy) ** 2 / np.maximum(pxx * pyy, EPS)
+    energy = pxx + pyy
+    valid = energy > np.max(energy) * 1e-6 if np.max(energy) > 0 else np.zeros_like(energy, dtype=bool)
+    if not np.any(valid):
+        return 0.0
+    return float(np.clip(np.mean(coherence[valid]), 0.0, 1.0))
+
 
 def compare_channels(
     samples_a: np.ndarray,
@@ -516,77 +460,56 @@ def compare_channels(
     ch_a: int = 0,
     ch_b: int = 0,
 ) -> InterChannelMetrics:
-    """Compute comparison metrics between two audio signals."""
+    """Compare two channels using GCC-PHAT, aligned correlation and Welch coherence."""
     result = InterChannelMetrics(channel_a=ch_a, channel_b=ch_b)
-
-    min_len = min(len(samples_a), len(samples_b))
+    a = _finite_mono(samples_a)
+    b = _finite_mono(samples_b)
+    min_len = min(a.size, b.size)
     if min_len < 1024:
         return result
+    a = a[:min_len].astype(np.float64, copy=False)
+    b = b[:min_len].astype(np.float64, copy=False)
 
-    a = samples_a[:min_len].astype(np.float32)
-    b = samples_b[:min_len].astype(np.float32)
-
-    # Cross-correlation (GCC-PHAT)
-    n = len(a)
     fft_size = 1
-    while fft_size < 2 * n:
-        fft_size *= 2
-
-    X1 = np.fft.rfft(a, n=fft_size)
-    X2 = np.fft.rfft(b, n=fft_size)
-
-    cross = np.conj(X2) * X1
-    magnitude = np.abs(cross) + 1e-10
-    phat = cross / magnitude
-    gcc = np.real(np.fft.irfft(phat, n=fft_size))
-
-    max_delay = int(sample_rate * 0.020)
+    while fft_size < 2 * min_len:
+        fft_size <<= 1
+    A = np.fft.rfft(a, n=fft_size)
+    B = np.fft.rfft(b, n=fft_size)
+    cross = A * np.conj(B)
+    phat = cross / np.maximum(np.abs(cross), EPS)
+    gcc = np.fft.irfft(phat, n=fft_size)
+    gcc = np.concatenate((gcc[-fft_size // 2 :], gcc[: fft_size // 2 + 1]))
     center = fft_size // 2
-    gcc_shifted = np.concatenate([gcc[fft_size - center:], gcc[:center + 1]])
-    search_start = max(0, center - max_delay)
-    search_end = min(len(gcc_shifted), center + max_delay + 1)
-    search_region = gcc_shifted[search_start:search_end]
+    max_delay = min(center - 1, int(sample_rate * 0.020))
+    region = gcc[center - max_delay : center + max_delay + 1]
+    local_index = int(np.argmax(np.abs(region)))
+    lag = local_index - max_delay
+    result.delay_samples = int(lag)
+    result.delay_ms = float(abs(lag) / sample_rate * 1000.0)
 
-    peak_idx = int(np.argmax(np.abs(search_region)))
-    peak_val = float(search_region[peak_idx])
-    delay = peak_idx - (center - search_start)
+    aa, bb = _align_for_lag(a, b, lag)
+    n = min(aa.size, bb.size)
+    if n >= 32:
+        aa = aa[:n]
+        bb = bb[:n]
+        std_a = float(np.std(aa))
+        std_b = float(np.std(bb))
+        if std_a > EPS and std_b > EPS:
+            corr = float(np.corrcoef(aa, bb)[0, 1])
+            result.cross_correlation = float(np.clip(corr if np.isfinite(corr) else 0.0, -1.0, 1.0))
+            result.phase_inverted = result.cross_correlation < -0.3
 
-    result.cross_correlation = peak_val
-    result.delay_samples = delay
-    result.delay_ms = abs(delay) / sample_rate * 1000
-    result.phase_inverted = peak_val < -0.3
+    result.coherence = _welch_coherence(a, b)
 
-    # Magnitude-squared coherence (averaged)
-    block = 2048
-    n_blocks = max(1, min_len // block)
-    coherence_sum = 0.0
-    for i in range(n_blocks):
-        s = i * block
-        ba = a[s:s + block]
-        bb = b[s:s + block]
-        if len(ba) < block:
-            break
-        Fa = np.fft.rfft(ba)
-        Fb = np.fft.rfft(bb)
-        Pab = Fa * np.conj(Fb)
-        Paa = np.abs(Fa) ** 2 + 1e-10
-        Pbb = np.abs(Fb) ** 2 + 1e-10
-        coh = np.abs(Pab) ** 2 / (Paa * Pbb)
-        coherence_sum += float(np.mean(coh))
-    result.coherence = coherence_sum / max(1, n_blocks)
+    window = np.hanning(min_len)
+    Sa = np.abs(np.fft.rfft(a * window))
+    Sb = np.abs(np.fft.rfft(b * window))
+    norm_a = float(np.linalg.norm(Sa))
+    norm_b = float(np.linalg.norm(Sb))
+    if norm_a > EPS and norm_b > EPS:
+        result.spectral_similarity = float(np.clip(np.dot(Sa, Sb) / (norm_a * norm_b), 0.0, 1.0))
 
-    # Spectral similarity (cosine)
-    Sa = np.abs(np.fft.rfft(a))
-    Sb = np.abs(np.fft.rfft(b))
-    dot = float(np.sum(Sa * Sb))
-    norm_a = float(np.sqrt(np.sum(Sa ** 2)))
-    norm_b = float(np.sqrt(np.sum(Sb ** 2)))
-    if norm_a > 1e-10 and norm_b > 1e-10:
-        result.spectral_similarity = dot / (norm_a * norm_b)
-
-    # Level difference
-    rms_a = float(np.sqrt(np.mean(a ** 2) + 1e-12))
-    rms_b = float(np.sqrt(np.mean(b ** 2) + 1e-12))
-    result.level_difference_db = 20.0 * np.log10(rms_a + 1e-10) - 20.0 * np.log10(rms_b + 1e-10)
-
+    rms_a = float(np.sqrt(np.mean(np.square(a)) + EPS))
+    rms_b = float(np.sqrt(np.mean(np.square(b)) + EPS))
+    result.level_difference_db = _amp_db(rms_a) - _amp_db(rms_b)
     return result

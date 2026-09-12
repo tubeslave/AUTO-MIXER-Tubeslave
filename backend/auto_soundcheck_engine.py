@@ -103,6 +103,9 @@ from signal_metrics import (
     InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
 )
 from observation_mixer import ObservationMixerClient
+from shadow_pipeline import ShadowPipeline
+from decision_guard import ReviewDecision
+from guarded_mixer import GuardedMixerClient
 
 try:
     from perceptual import PerceptualEvaluator
@@ -519,7 +522,13 @@ class AutoSoundcheckEngine:
         self.config_manager = ConfigManager(config_path=resolved_config_path)
         autofoh_config = self.config_manager.get_section("autofoh")
         self.classifier_config = autofoh_config.get("classifier", {})
-        autofoh_safety = autofoh_config.get("safety", {})
+        autofoh_safety = dict(autofoh_config.get("safety", {}))
+        self.shadow_pipeline = ShadowPipeline(autofoh_config.get("shadow", {}))
+        if self.shadow_pipeline.mode == "shadow":
+            self.observe_only = True
+            autofoh_safety["action_limits"] = {
+                **autofoh_safety.get("action_limits", {}), "shadow_live": True,
+            }
         autofoh_evaluation = autofoh_config.get("evaluation", {})
         autofoh_logging = autofoh_config.get("logging", {})
         autofoh_soundcheck_profile = autofoh_config.get("soundcheck_profile", {})
@@ -623,6 +632,7 @@ class AutoSoundcheckEngine:
         self.action_safety_config = AutoFOHSafetyConfig.from_config(
             autofoh_safety.get("action_limits", {})
         )
+        self.observe_only = self.observe_only or self.action_safety_config.shadow_live
         self.evaluation_policy = AutoFOHEvaluationPolicy.from_config(autofoh_evaluation)
         self.autofoh_logging_enabled = bool(autofoh_logging.get("enabled", False))
         self.autofoh_log_path = str(autofoh_logging.get("path", "") or "")
@@ -1702,7 +1712,30 @@ class AutoSoundcheckEngine:
         self._pending_action_evaluations = remaining
         return outcomes
 
+    def _review_shadow_action(self, action, runtime_state) -> ReviewDecision:
+        """Review exactly the bounded action, after all existing permissions."""
+        if (runtime_state == RuntimeState.ROLLBACK
+                or isinstance(action, (EmergencyFeedbackNotch, MasterFaderMove))):
+            # Emergency cuts/rollback keep priority; shadow still never writes.
+            return ReviewDecision(True, "emergency_or_rollback_exemption",
+                                  {"exemption": True})
+        verdict = self.shadow_pipeline.evaluate_live(
+            self._build_live_shared_mix_channels(), action, self.sample_rate,
+        )
+        self._log_autofoh_event("shadow_review", allowed=verdict.allowed,
+                               reason=verdict.reason, report=verdict.report)
+        return verdict
+
     def _activate_observation_mode(self):
+        if (self.shadow_pipeline.mode == "guarded" and not self.observe_only
+                and self.mixer_client is not None):
+            if not isinstance(self.mixer_client, GuardedMixerClient):
+                self.mixer_client = GuardedMixerClient(
+                    self.mixer_client,
+                    on_blocked=lambda method: self._log_autofoh_event(
+                        "unguarded_write_blocked", method=method),
+                )
+            return
         if not self.observe_only or not self.mixer_client:
             return
         if isinstance(self.mixer_client, ObservationMixerClient):
@@ -1873,6 +1906,7 @@ class AutoSoundcheckEngine:
             applied_action=decision.action,
             requested_runtime_state=effective_state.value,
             sent=decision.sent,
+            simulated=decision.simulated,
             allowed=decision.allowed,
             supported=decision.supported,
             bounded=decision.bounded,
@@ -2137,6 +2171,8 @@ class AutoSoundcheckEngine:
                 self.safety_controller = AutoFOHSafetyController(
                     mixer_client=self.mixer_client,
                     config=self.action_safety_config,
+                    reviewer=(self._review_shadow_action
+                              if self.shadow_pipeline.mode != "off" else None),
                 )
                 return True
             else:

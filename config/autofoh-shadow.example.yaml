@@ -1,0 +1,29 @@
+# Merge this section into the engine configuration. It is not auto-activated.
+autofoh:
+  shadow:
+    mode: shadow
+    context: rock:chorus
+    # Set the path AFTER fitting actual approved mixes with shadow_mix_cli.
+    corridor_path: null
+    journal_path: artifacts/shadow-decisions.jsonl
+    tap: post_input_pre_processing
+    # Keep these false until capture/routing/processing are actually verified.
+    aligned_complete_direct_sum: false
+    unmodelled_processing_bypassed: false
+    model_validated: false
+    # Explicit reference choices, not a claim about a console's current model.
+    hpf_order: 2
+    compressor_model: reference_linked_peak
+    protected_eq_bands: {}
+    true_peak_ceiling_dbtp: -1.25
+    max_render_age_sec: 2.0
+    model_uncertainty: 0.05
+    guard:
+      confirmations: 2
+      min_improvement: 0.02
+      uncertainty_penalty: 1.0
+      max_uncertainty: 0.5
+      reversal_hold_sec: 15.0
+      reversal_improvement_multiplier: 2.0
+      confirmation_window_sec: 10.0
+      max_keys: 2048
