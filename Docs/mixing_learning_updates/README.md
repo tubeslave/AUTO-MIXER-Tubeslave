@@ -12,6 +12,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-12-0900 | [Report](ML-2026-09-12-0900.md), [JSON patch](ML-2026-09-12-0900.json) | Pre-mix drum timing/phase: 8 source cards, 6 Knowledge Cards, 6 candidate rules, 3 queued videos, 1 license-blocked dataset, 3 unrun experiments |
 | ML-2026-09-12-1200 | [Report](ML-2026-09-12-1200.md), [JSON patch](ML-2026-09-12-1200.json) | Loud-rock peak control: 4 literature/documentation cards, 3 fully studied videos, 8 Knowledge Cards, 6 candidate rules, 4 unrun experiments |
 | ML-2026-09-12-1500 | [Report](ML-2026-09-12-1500.md), [JSON patch](ML-2026-09-12-1500.json) | Drum bleed/gating/room control: 4 literature/documentation cards, 3 studied and 2 queued videos, 1 legal educational multitrack, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-12-1800 | [Report](ML-2026-09-12-1800.md), [JSON patch](ML-2026-09-12-1800.json) | Bass/kick/heavy-guitar interaction: 3 literature/documentation cards, 2 studied and 2 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 
 ## Spatial package: reading and safety
 
@@ -35,6 +36,8 @@ ML-2026-09-12-0900: preserve multi-mic relations during editing; distinguish sam
 
 ML-2026-09-12-1200: do not optimise loudness with crest factor alone. Treat clipper→limiter chains, lookahead and oversampling as programme-dependent candidates. Match loudness and processing depth before comparison. Set true-peak ceiling from the delivery path, then check the decoded format. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
+ML-2026-09-12-1500: do not equate cleaner close microphones with a better drum sound. Select gate, expander, manual edit or joint debleeding by failure mode; preserve coincident hits, decay, overhead image and useful room. Begin with finite attenuation and reject SDR gains that damage transients or space. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+
 ## Latest handoff
 
-ML-2026-09-12-1500: do not equate cleaner close microphones with a better drum sound. Select gate, expander, manual edit or joint debleeding by failure mode; preserve coincident hits, decay, overhead image and useful room. Begin with finite attenuation and reject SDR gains that damage transients or space. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+ML-2026-09-12-1800: assign kick and bass roles by section before carving fixed frequency slots. If distorted bass loses drive among heavy guitars, test preserved DI/clean attack before adding saturation. Trigger dynamic EQ from an auditioned collision band. Treat semantic spectral targets and sensory-dissonance metrics as advisory only, never automatic objectives. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
