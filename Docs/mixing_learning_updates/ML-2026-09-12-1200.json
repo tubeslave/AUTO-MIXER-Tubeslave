@@ -1,0 +1,114 @@
+{
+  "update_id": "ML-2026-09-12-1200",
+  "run_at_msk": "2026-09-12T12:00:00+03:00",
+  "topic": "peak_control_limiting_true_peak_transient_preservation_in_loud_rock",
+  "safety": {
+    "auto_apply": false,
+    "dsp_changed": false,
+    "audio_processed": false,
+    "commercial_audio_downloaded": false
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260912-1200-01",
+      "type": "paper",
+      "title": "Increasing Loudness in Audio Signals: A Perceptually Motivated Approach to Preserve Audio Quality",
+      "authors": ["A. Jeannerot", "N. de Koeijer", "P. Martinez-Nuevo", "M. B. Moller", "J. Dyreby", "P. Prandoni"],
+      "publication_date": "2022-05-23",
+      "discovered_date": "2026-09-12",
+      "doi": "10.1109/ICASSP43922.2022.9747589",
+      "url": "https://arxiv.org/abs/2202.08183",
+      "read_depth": "full_text_5_pages",
+      "limitations": ["16 kick clips", "maximum 1 second", "downsampled to 1 kHz", "PEAQ rather than subjective listening", "full-band mastering not tested"]
+    },
+    {
+      "id": "SRC-ML-20260912-1200-02",
+      "type": "official_documentation",
+      "title": "FabFilter Pro-L 2 — Advanced settings",
+      "url": "https://www.fabfilter.com/help/pro-l/using/advancedsettings",
+      "read_depth": "full_page"
+    },
+    {
+      "id": "SRC-ML-20260912-1200-03",
+      "type": "official_documentation",
+      "title": "FabFilter Pro-L 2 — True peak limiting",
+      "url": "https://www.fabfilter.com/help/pro-l/using/truepeaklimiting",
+      "read_depth": "full_page"
+    },
+    {
+      "id": "SRC-ML-20260912-1200-04",
+      "type": "official_documentation",
+      "title": "FabFilter Pro-L 2 — Oversampling and recommended workflow",
+      "urls": ["https://www.fabfilter.com/help/pro-l/using/oversampling", "https://www.fabfilter.com/help/pro-l/using/recommendedworkflow"],
+      "read_depth": "two_full_pages"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260912-1200-01",
+      "title": "3 Modern Mastering Tips for Cleaner & Louder Tracks in 2026",
+      "channel": "Mix With Jerry",
+      "published": "2026-08-01",
+      "duration_seconds": 650,
+      "url": "https://www.youtube.com/watch?v=SybFj0Sf1L4",
+      "transcript": "complete_visible_timestamped_0_00_to_10_48",
+      "topics": ["clipping", "limiting", "saturation", "transient_control", "kick", "snare", "drum_bus", "bass", "lead_vocal", "mastering", "loudness", "crest"],
+      "numeric_claims_need_visual_verification": true
+    },
+    {
+      "id": "VID-ML-20260912-1200-02",
+      "title": "What the Pros Don't Want You to Know About Limiters!",
+      "channel": "White Sea Studio",
+      "published": "2026-05-09",
+      "duration_seconds": 950,
+      "url": "https://www.youtube.com/watch?v=ue_5Z7itovw",
+      "transcript": "complete_visible_timestamped_0_00_to_15_47",
+      "topics": ["limiting", "attack_release", "lookahead", "saturation", "transient_control", "spectral_balance", "bass", "mastering"],
+      "conflict": "categorical_minus_1_dbtp_claim_conflicts_with_official_documentation"
+    },
+    {
+      "id": "VID-ML-20260912-1200-03",
+      "title": "Inter-sample peaks and True Peak limiting — the devilish details — Ep 90",
+      "channel": "Production Advice",
+      "published": "2023-10-13",
+      "duration_seconds": 2812,
+      "url": "https://www.youtube.com/watch?v=2C_Ju3VM-PA",
+      "transcript": "complete_visible_timestamped_0_00_to_46_51",
+      "topics": ["true_peak", "inter_sample_peaks", "limiting", "oversampling", "aliasing", "sample_rate_conversion", "lossy_encoding", "loudness", "crest", "mastering"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260912-1200-01","claim":"Constrain peak reduction by perceptual error and musical role, not crest factor alone.","confidence":"medium","sources":["SRC-ML-20260912-1200-01"]},
+    {"id":"KC-ML-20260912-1200-02","claim":"Distributed peak control is a topology candidate, not automatically cleaner.","confidence":"medium","sources":["VID-ML-20260912-1200-01"]},
+    {"id":"KC-ML-20260912-1200-03","claim":"Lookahead trades transient retention and apparent loudness against distortion and pumping.","confidence":"medium_high","sources":["SRC-ML-20260912-1200-02","VID-ML-20260912-1200-02"]},
+    {"id":"KC-ML-20260912-1200-04","claim":"Oversampling and true-peak limiting solve distinct parts of nonlinear peak control.","confidence":"high","sources":["SRC-ML-20260912-1200-03","SRC-ML-20260912-1200-04","VID-ML-20260912-1200-03"]},
+    {"id":"KC-ML-20260912-1200-05","claim":"Choose the true-peak ceiling from delivery requirements and post-codec checks, not a global hardcoded number.","confidence":"high","sources":["SRC-ML-20260912-1200-04","VID-ML-20260912-1200-03"]},
+    {"id":"KC-ML-20260912-1200-06","claim":"Loudness-match limiter comparisons and equalise effective processing depth before judging quality.","confidence":"high","sources":["VID-ML-20260912-1200-03"]},
+    {"id":"KC-ML-20260912-1200-07","claim":"When stems are available, exceptional source peaks can be controlled upstream before final limiting if role and attack are preserved.","confidence":"medium","sources":["VID-ML-20260912-1200-01"]},
+    {"id":"KC-ML-20260912-1200-08","claim":"A streaming normalisation value is not a mastering target; loudness is an artistic decision bounded by artifacts and delivery.","confidence":"medium_high","sources":["VID-ML-20260912-1200-01","VID-ML-20260912-1200-03"]}
+  ],
+  "rule_candidates": [
+    {"id":"R-ML-20260912-1200-01","name":"distributed_peak_control_if_single_stage_fails","status":"candidate","auto_apply":false,"applies_to":["kick","snare","drum_bus","bass","vocal_bus","mix_bus"],"when":"final limiter audibly pumps, collapses transients or distorts at required delivery loudness","change":"test smaller source/bus/master contributions","protect":["punch","cymbal_clarity","bass_pitch","vocal_consonants","stereo_image"],"verify":["loudness_matched_blind_AB","sample_peak","true_peak","short_term_LUFS","crest","transient_shape","oversampled_spectrum"],"undo":"cumulative distortion, dullness or section imbalance increases","confidence":"medium"},
+    {"id":"R-ML-20260912-1200-02","name":"limiter_time_constants_by_artifact","status":"candidate","auto_apply":false,"applies_to":["drum_bus","mix_bus"],"when":"choosing limiter style, lookahead or release","change":"audition programme-dependent distortion versus transient-softening/pumping tradeoff","protect":["punch","clarity","low_frequency_stability"],"verify":["equal_loudness","equal_ceiling","chorus_and_sparse_section"],"undo":"punch loss, low-frequency modulation or non-harmonic harshness","confidence":"medium_high"},
+    {"id":"R-ML-20260912-1200-03","name":"oversample_nonlinear_peak_control","status":"candidate","auto_apply":false,"applies_to":["offline_mastering"],"when":"fast clipping or limiting is used","change":"compare native, 4x and 8x processing","protect":["transient_timing","brightness","live_latency_budget"],"verify":["alias_components","post_render_dBTP","level_matched_listening"],"undo":"pre-ringing, transient softening or instability outweighs benefit","confidence":"high_for_ProL2_medium_elsewhere"},
+    {"id":"R-ML-20260912-1200-04","name":"delivery_specific_true_peak","status":"candidate","auto_apply":false,"applies_to":["mix_bus","master_export"],"when":"export destination and codec are known","change":"derive ceiling and TP mode from delivery specification and decode test","protect":["punch","intended_loudness"],"verify":["PCM_true_peak","decoded_delivery_true_peak"],"undo":"specification changes or margin is unnecessary","confidence":"high"},
+    {"id":"R-ML-20260912-1200-05","name":"source_peak_fix_before_master","status":"candidate","auto_apply":false,"applies_to":["kick","snare","bass","lead_vocal","other_peak_driver"],"when":"one source repeatedly drives master gain reduction","change":"test clip gain, envelope, source or bus compression/clipping","protect":["groove","tone","instrument_identity","section_role"],"verify":["full_mix","mono","master_gain_reduction"],"undo":"source loses priority or master does not improve","confidence":"medium_high"},
+    {"id":"R-ML-20260912-1200-06","name":"perceptual_metric_is_advisory","status":"candidate","auto_apply":false,"applies_to":["automatic_peak_optimisation"],"when":"optimising crest or peak reduction","change":"combine technical metrics, perceptual-error estimate and human rating","protect":["transient_fidelity","groove","timbre","emotional_density"],"verify":["loudness_matched_AB","Dmitry_rating","multi_song_generalisation"],"undo":"metric improvement fails to predict preference","confidence":"medium"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260912-1200-01","title":"single limiter versus distributed peak control","conditions":["single_limiter","clipper_plus_limiter","clipper_plus_two_limiters"],"controls":["matched_integrated_and_sectional_loudness","matched_final_dBTP"],"ratings":["punch","cymbal_harshness","bass_definition","vocal_edge","fatigue"],"status":"not_run"},
+    {"id":"EXP-ML-20260912-1200-02","title":"lookahead and limiter style grid","lookahead_ms":[0.05,0.1,0.5,1,5],"styles":["transparent","dynamic","aggressive"],"origin_of_numbers":"FabFilter documentation and White Sea demonstration","status":"not_run"},
+    {"id":"EXP-ML-20260912-1200-03","title":"oversampling by true-peak matrix","oversampling":["native","4x","8x"],"true_peak":["off","on"],"material":["synthetic_high_frequency_transient","real_rock_master"],"controls":["matched_loudness","matched_effective_limiting_depth"],"status":"not_run"},
+    {"id":"EXP-ML-20260912-1200-04","title":"replicate perceptually constrained peak reduction at 48 kHz","baselines":["hard_clip","soft_clip","modern_limiter"],"material":["licensed_kick","licensed_full_drums"],"status":"not_run","blocker":"implementation_missing"}
+  ],
+  "multitracks_added": [],
+  "queued_sources": [],
+  "dataset_candidates": [
+    {"doi":"10.5281/zenodo.5828375","status":"license_unverified_not_ingested","reason":"Zenodo rate limited metadata access"}
+  ],
+  "tool_limits": [
+    "Consensus quota exhausted until 2026-10-01",
+    "Scite returned INVALID_ARGUMENT",
+    "Reference Hub, arXiv MCP, Freesound MCP and Zotero MCP not verified available"
+  ]
+}
