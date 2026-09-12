@@ -1,0 +1,528 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "patch_id": "ml-2026-09-12-0900",
+  "update_id": "ML-2026-09-12-0900",
+  "created_at": "2026-09-12T09:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "topic": "pre_mix_editing_phase_time_alignment_transient_fidelity_and_groove",
+  "mode": "additive",
+  "base_materials_read": [
+    {
+      "path": "Docs/mixing_learning_updates/README.md",
+      "ref": "master",
+      "sha": "988423eb976db2a8d93f1af9917dc71cf9cdf19a"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-11-1800.json",
+      "ref": "master",
+      "sha": "ef4e4597771a32bda82586172c789d30dc6acb44"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-11-1800.md",
+      "ref": "master",
+      "sha": "73692977ff2d77718155a62c78b8cd573edda087"
+    }
+  ],
+  "duplicate_check": {
+    "queries": [
+      "Automated Audio Time Alignment for Multi-Microphone Setups",
+      "Beyond SDR How Music Source Separation Reshapes Rhythm-Relevant Signal Properties",
+      "AAM Artificial Audio Multitracks",
+      "The Effect of Expert Performance Microtiming",
+      "Where Is the Beat in That Note"
+    ],
+    "result": "no_matching_source_records_in_master_at_run_start",
+    "related_existing": [
+      "ML-2026-09-11-1800 separator robustness gate",
+      "ML-SPATIAL-2026-09-11-155446 source width and temporal-spatial caution"
+    ]
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260912-0900-01",
+      "title": "Beyond SDR: How Music Source Separation Reshapes Rhythm-Relevant Signal Properties",
+      "url": "https://arxiv.org/html/2609.04224",
+      "doi": "10.48550/arXiv.2609.04224",
+      "publication_date": "2026-07-12",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "research_preprint",
+      "authors": [
+        "Chuxin Ding"
+      ],
+      "read_depth": "full_html_method_results_limitations_code_availability",
+      "bounded_summary": "Across four separators on MUSDB18-HQ, onset placement was substantially more robust than drum transient and dynamic shape. SI-SDR did not reliably rank attack/envelope fidelity, and input context altered transient rendering.",
+      "limitations": [
+        "No listening test linked measured attack distortion to perceived timing.",
+        "One checkpoint per architecture; MUSDB18-HQ and drums-centred analysis.",
+        "The transformer context result was marginal and fragile under leave-one-out analysis."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260912-0900-02",
+      "title": "MSS Drum Fidelity Evaluation",
+      "url": "https://github.com/dingchuxin/MSS_drum_fidelity_eval",
+      "publication_date": null,
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "official_reproducible_code_and_results",
+      "read_depth": "repository_metadata_readme_license",
+      "bounded_summary": "MIT-licensed pipeline exposes model/version/input provenance, cached separations, onset and dynamic-profile metrics, result tables, and scripts for reproducing the paper's benchmark and context-length sweep.",
+      "limitations": [
+        "Code and audio experiments were inspected but not run.",
+        "MUSDB18-HQ audio is not stored in the repository."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260912-0900-03",
+      "title": "Where Is the Beat in That Note? Effects of Attack, Duration, and Frequency on the Perceived Timing of Musical and Quasi-Musical Sounds",
+      "url": "https://pubmed.ncbi.nlm.nih.gov/30802130/",
+      "doi": "10.1037/xhp0000611",
+      "publication_date": "2019-03",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "peer_reviewed_psychoacoustics",
+      "authors": [
+        "Anne Danielsen",
+        "Kristian Nymoen",
+        "Evan Anderson",
+        "Guilherme Schmidt Câmara",
+        "Martin Torvik Langerød",
+        "Marc R. Thompson",
+        "Justin London"
+      ],
+      "read_depth": "abstract_and_author_manuscript_preview_not_copy_of_record_fulltext",
+      "bounded_summary": "Attack and duration were primary cues for P-centre location and variability; perceived rhythmic timing is a distribution shaped by envelope properties, not a single waveform-onset coordinate.",
+      "limitations": [
+        "Publisher version was not read in full.",
+        "Laboratory musical/quasi-musical sounds do not directly prescribe rock-drum edit amounts."
+      ],
+      "consensus_record_id": "c1514c4c5cd151bea4f834deb16b6461",
+      "novelty": "foundational_gap_not_found_in_master"
+    },
+    {
+      "id": "S-ML-20260912-0900-04",
+      "title": "The Effect of Expert Performance Microtiming on Listeners' Experience of Groove in Swing or Funk Music",
+      "url": "https://www.frontiersin.org/journals/psychology/articles/10.3389/fpsyg.2016.01487/full",
+      "doi": "10.3389/fpsyg.2016.01487",
+      "publication_date": "2016-10-05",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "peer_reviewed_open_access_experiment",
+      "authors": [
+        "Olivier Senn",
+        "Lorenz Kilchenmann",
+        "Richard von Georgi",
+        "Claudia Bullerjahn"
+      ],
+      "read_depth": "full_methods_results_discussion_limitations",
+      "bounded_summary": "In two performed bass/drum excerpts, fully quantized and original microtiming both received high groove ratings, whereas exaggerated deviations reduced ratings; experts were more sensitive.",
+      "limitations": [
+        "Only two 20-second funk/swing performances; not rock.",
+        "Self-report and bodily entrainment measures sometimes disagreed.",
+        "No universal milliseconds threshold follows from proportional manipulations."
+      ],
+      "consensus_record_id": "23007a93229b56ed814c610c114d8cc5",
+      "novelty": "foundational_gap_not_found_in_master"
+    },
+    {
+      "id": "S-ML-20260912-0900-05",
+      "title": "Automated Audio Time Alignment for Multi-Microphone Setups: An Open-Source Approach",
+      "url": "https://doi.org/10.23919/SPA59660.2023.10274430",
+      "doi": "10.23919/SPA59660.2023.10274430",
+      "publication_date": "2023",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "conference_paper",
+      "authors": [
+        "Jimmy Eadie"
+      ],
+      "read_depth": "metadata_and_abstract_only",
+      "bounded_summary": "Describes MATLAB and C++ VST tools for detecting/re-aligning multi-microphone delay and a MUSHRA evaluation of temporal realignment.",
+      "limitations": [
+        "Full paper was not freely readable in this run.",
+        "No study result or numerical threshold is promoted from abstract-only access."
+      ],
+      "consensus_record_id": "83b9ea649d445239ab2704be05fd844d",
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260912-0900-06",
+      "title": "Cubase Pro 15 Group Editing and Phase-Coherent AudioWarp documentation",
+      "url": "https://www.steinberg.help/r/cubase-pro/15.0/en/cubase_nuendo/topics/parts_events/parts_and_events_group_editing_mode_c.html",
+      "publication_date": null,
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "official_documentation",
+      "read_depth": "complete_group_editing_audiowarp_and_slice_rules_pages",
+      "bounded_summary": "Group Editing links matching events; Phase-Coherent AudioWarp must be explicitly enabled and requires matching event boundaries and common marker positions. Ordinary multi-track AudioWarp quantization does not maintain phase coherence.",
+      "limitations": [
+        "DAW documentation, not a perceptual study.",
+        "Phase-coherent operation does not guarantee a musically preferable edit."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260912-0900-07",
+      "title": "Sound Radix Auto-Align 2 product documentation and release notes",
+      "url": "https://www.soundradix.com/products/auto-align/",
+      "publication_date": "2026-03-03",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "vendor_official_documentation",
+      "read_depth": "product_page_and_release_notes",
+      "bounded_summary": "Documents time alignment, spectral-phase optimization, polarity/group controls and four comparison slots; current release listed as 2.2.2.",
+      "limitations": [
+        "Claims about punch, size and quality are vendor claims.",
+        "No independent listening result was obtained from these pages."
+      ],
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    },
+    {
+      "id": "S-ML-20260912-0900-08",
+      "title": "AAM: a dataset of Artificial Audio Multitracks for diverse music information retrieval tasks",
+      "url": "https://link.springer.com/article/10.1186/s13636-023-00278-7",
+      "doi": "10.1186/s13636-023-00278-7",
+      "publication_date": "2023-03-23",
+      "discovered_at": "2026-09-12T09:00:00+03:00",
+      "kind": "peer_reviewed_open_access_dataset_paper",
+      "authors": [
+        "Fabian Ostermann",
+        "Igor Vatolkin",
+        "Martin Ebeling"
+      ],
+      "read_depth": "full_article_dataset_design_case_studies_limitations_and_zenodo_record",
+      "bounded_summary": "AAM contains 3,000 synthetic Western-pop-oriented mixes, per-instrument tracks, MIDI and precise annotations, useful for controlled algorithm tests but not representative of real human performances.",
+      "limitations": [
+        "Synthetic composition and sampled instruments limit production realism.",
+        "Zenodo record license field was empty; audio reuse not approved here."
+      ],
+      "consensus_record_id": "8ef3b85bc25952df918631c677947ed3",
+      "novelty": "not_found_in_master_code_search_at_run_start"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260912-0900-01",
+      "title": "Onset fidelity is not transient fidelity",
+      "claim": "A separator can preserve detected drum onset positions while changing attack slope, crest and dynamic variation; SDR or onset-F alone cannot validate rhythm-critical signal shape.",
+      "scope": [
+        "source_separation",
+        "drum_analysis",
+        "objective_metrics"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-01",
+        "S-ML-20260912-0900-02"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "id": "KC-ML-20260912-0900-02",
+      "title": "Perceived time depends on envelope",
+      "claim": "Attack and duration contribute to a sound's perceptual centre and timing uncertainty, so sample-onset coincidence does not prove perceptual synchrony.",
+      "scope": [
+        "phase_time_alignment",
+        "transient_processing",
+        "psychoacoustics"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-03"
+      ],
+      "confidence": 0.9
+    },
+    {
+      "id": "KC-ML-20260912-0900-03",
+      "title": "Quantization amount is stylistic and contextual",
+      "claim": "Existing evidence does not support either mandatory microtiming or mandatory perfect quantization; exaggerated deviations are risky, but competent original and quantized timing can both groove.",
+      "scope": [
+        "pre_mix_editing",
+        "drums",
+        "bass",
+        "groove"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-04"
+      ],
+      "confidence": 0.82
+    },
+    {
+      "id": "KC-ML-20260912-0900-04",
+      "title": "Multi-mic edits must preserve channel relationships",
+      "claim": "For a drum performance captured through multiple microphones, timing edits should move corresponding material together and keep one shared marker/edit structure unless a deliberate perspective change is being tested.",
+      "scope": [
+        "multi_mic_drums",
+        "editing",
+        "phase"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-05",
+        "S-ML-20260912-0900-06"
+      ],
+      "confidence": 0.91
+    },
+    {
+      "id": "KC-ML-20260912-0900-05",
+      "title": "Phase-coherent AudioWarp is opt-in",
+      "claim": "Cubase ordinary multi-track AudioWarp quantization is not phase-coherent; the dedicated Phase-Coherent mode has explicit event and marker preconditions.",
+      "scope": [
+        "cubase_15",
+        "multi_track_quantization"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-06"
+      ],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260912-0900-06",
+      "title": "Synthetic multitracks need domain and license gates",
+      "claim": "Synthetic multitracks with exact annotations can test algorithms, but must not substitute for human rock performance validation; an empty repository license field blocks approval as a reusable audio reference.",
+      "scope": [
+        "datasets",
+        "evaluation",
+        "licensing"
+      ],
+      "evidence": [
+        "S-ML-20260912-0900-08"
+      ],
+      "confidence": 0.96
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "V-ML-20260912-0900-01",
+      "title": "Get a HUGE Drum Sound from Auto-Align 2 by Sound Radix",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=pMwkzIB5dEs",
+      "duration": "about 25 min",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_duration_verified_in_visible_youtube_page_or_recommendation",
+      "transcript_status": "no_usable_transcript_rows_in_chrome_session",
+      "learned_content": false
+    },
+    {
+      "id": "V-ML-20260912-0900-02",
+      "title": "How To Time Correct Drums The Right Way | Cubase Secrets with Dom",
+      "channel": "Cubase",
+      "url": "https://www.youtube.com/watch?v=yfpc5KXTW_8",
+      "duration": "about 15 min",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_duration_verified_in_visible_youtube_page_or_recommendation",
+      "transcript_status": "no_usable_transcript_rows_in_chrome_session",
+      "learned_content": false
+    },
+    {
+      "id": "V-ML-20260912-0900-03",
+      "title": "Sound Radix Auto-Align 2 — Do You Really Need Phase Alignment on Drums?",
+      "channel": "Production Expert",
+      "url": "https://www.youtube.com/watch?v=vqbFqY8rNRw",
+      "duration": "5:02",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_duration_verified_in_visible_youtube_recommendation",
+      "transcript_status": "no_usable_transcript_rows_in_chrome_session",
+      "learned_content": false
+    }
+  ],
+  "reference_cards": [],
+  "queued_datasets": [
+    {
+      "id": "QD-ML-20260912-0900-01",
+      "title": "AAM: Artificial Audio Multitracks Dataset",
+      "url": "https://zenodo.org/records/5794629",
+      "doi": "10.5281/zenodo.5794629",
+      "status": "queued_dataset",
+      "reason": "license_unresolved",
+      "evidence": "Zenodo record is public and labels the deposit Open, but the visible Rights/License field contains no license value.",
+      "audio_downloaded": false,
+      "approved_for_audio_experiment": false
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "R-ML-20260912-0900-01",
+      "summary": "Do not validate separated drum timing or dynamics from SDR/onset-F alone.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Any drum editing, groove, transient or dynamics analysis performed on a separated stem.",
+      "what_to_change": "Record separator name/version/input window; compare attack slope, crest and dynamic variation against legal ground truth or unseparated evidence before using the measurement.",
+      "do_not_damage": "Attack identity, dynamics, cymbal detail, perceived timing.",
+      "how_to_verify": "Repeat the same passage with fixed and varied context; compare onset-F and envelope descriptors; perform level-matched listening.",
+      "cancel_if": "Fall back to mixture/raw multitrack analysis when descriptor direction changes with model or input window.",
+      "source_ids": [
+        "S-ML-20260912-0900-01",
+        "S-ML-20260912-0900-02"
+      ],
+      "confidence": 0.94
+    },
+    {
+      "id": "R-ML-20260912-0900-02",
+      "summary": "Evaluate timing by perceptual centre as well as sample onset.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Aligning or transient-shaping kick, snare, bass or other rhythmic events.",
+      "what_to_change": "Keep onset, attack duration/slope and spectral-envelope context as separate measurements; audition corrections in the full rhythm section.",
+      "do_not_damage": "Natural attack, instrument identity, groove and punch.",
+      "how_to_verify": "Level-match; inspect waveform and envelope; blind-compare timing feel with full kit/bass.",
+      "cancel_if": "Undo if the edit makes attacks sound later/earlier, smaller or smeared despite closer onset coincidence.",
+      "source_ids": [
+        "S-ML-20260912-0900-03"
+      ],
+      "confidence": 0.88
+    },
+    {
+      "id": "R-ML-20260912-0900-03",
+      "summary": "Move all microphones of a performance together during timing edits.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Editing multi-mic drums or another source with shared bleed.",
+      "what_to_change": "Create one linked edit group and apply common slice/warp positions to all corresponding channels.",
+      "do_not_damage": "Inter-mic delay pattern, room perspective, overhead image, bleed continuity.",
+      "how_to_verify": "Check mono, polarity, correlation/lag stability and crossfades before and after; listen to the full kit.",
+      "cancel_if": "Undo if ambience moves, cymbals smear, mono thins or inter-channel lag becomes section-dependent.",
+      "source_ids": [
+        "S-ML-20260912-0900-05",
+        "S-ML-20260912-0900-06"
+      ],
+      "confidence": 0.92
+    },
+    {
+      "id": "R-ML-20260912-0900-04",
+      "summary": "In Cubase, use phase-coherent mode explicitly or prefer grouped slicing.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Quantizing multi-mic drums in Cubase 15.",
+      "what_to_change": "Ensure equal event boundaries; enable Group Editing; use Slice as baseline or explicitly enable Phase-Coherent AudioWarp with common marker positions.",
+      "do_not_damage": "Phase coherence, transient onset, crossfade continuity.",
+      "how_to_verify": "Confirm mode state and event eligibility; render a short test; compare full kit and mono against the unedited source.",
+      "cancel_if": "Use grouped slicing or manual edits if Cubase warns, bounces unexpectedly, or the phase-coherent constraints are not satisfied.",
+      "source_ids": [
+        "S-ML-20260912-0900-06"
+      ],
+      "confidence": 0.98
+    },
+    {
+      "id": "R-ML-20260912-0900-05",
+      "summary": "Correct obvious timing errors without making the grid a universal target.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Pre-mix editing of drums/bass where deviations distract from the intended pulse.",
+      "what_to_change": "Preserve coherent performer patterns; test bounded reduction of outliers and section-level feel before full quantization.",
+      "do_not_damage": "Groove, push/pull, fills, phrase transitions and kick-bass relationship.",
+      "how_to_verify": "Compare original, partial correction and grid versions blind with expert listening; keep all versions level-matched.",
+      "cancel_if": "Undo or reduce the edit when groove, movement or section contrast weakens.",
+      "source_ids": [
+        "S-ML-20260912-0900-04"
+      ],
+      "confidence": 0.8
+    },
+    {
+      "id": "R-ML-20260912-0900-06",
+      "summary": "Treat automatic phase alignment as an auditable candidate, not a guaranteed improvement.",
+      "status": "candidate",
+      "auto_apply": false,
+      "when_to_apply": "Stationary multi-microphone recordings with demonstrable shared content/bleed and comb filtering.",
+      "what_to_change": "Generate several alignment candidates including unchanged; store delay/polarity/spectral-phase choices and compare them.",
+      "do_not_damage": "Spatial intent, room depth, cymbal character, source directionality.",
+      "how_to_verify": "Use equal-loudness A/B, mono, full-band and band-limited checks; require repeatable preference across sections.",
+      "cancel_if": "Reject if benefit is section-specific, changes perspective, or depends only on louder low end.",
+      "source_ids": [
+        "S-ML-20260912-0900-05",
+        "S-ML-20260912-0900-07"
+      ],
+      "confidence": 0.78
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260912-0900-01",
+      "title": "Multi-mic drum edit and alignment comparison",
+      "status": "not_run",
+      "material": "Legally cleared raw multi-mic rock drum passage.",
+      "conditions_conditions": [
+        "original",
+        "grouped slice edit",
+        "Phase-Coherent AudioWarp",
+        "automatic alignment-tool proposal"
+      ],
+      "controls": [
+        "all microphones linked",
+        "same musical target",
+        "same section",
+        "equal loudness",
+        "same render precision"
+      ],
+      "evaluate": [
+        "inter-channel lag stability",
+        "mono comb filtering/nulls",
+        "attack slope",
+        "crest",
+        "onset-F",
+        "blind groove/punch/cymbal-smear/room-movement ratings"
+      ],
+      "success": "An edited condition is preferred without worse mono, altered kit perspective or transient damage."
+    },
+    {
+      "id": "EXP-ML-20260912-0900-02",
+      "title": "Onset match versus perceptual timing",
+      "status": "not_run",
+      "material": "Kick, snare and bass events from a legal multitrack.",
+      "conditions": [
+        "sample-onset aligned",
+        "envelope-aware bounded alignment",
+        "original"
+      ],
+      "controls": [
+        "equal loudness",
+        "unchanged tonal processing",
+        "full rhythm-section context"
+      ],
+      "evaluate": [
+        "sample onset delta",
+        "attack duration/slope",
+        "blind perceived synchrony",
+        "groove",
+        "punch"
+      ],
+      "success": "Envelope-aware or original condition is preferred and avoids transient damage even when sample-onset delta is not minimal."
+    },
+    {
+      "id": "EXP-ML-20260912-0900-03",
+      "title": "Separator transient-fidelity gate",
+      "status": "not_run",
+      "material": "Legal true-stem drum dataset; no external upload.",
+      "conditions": [
+        "raw stem",
+        "same separator with short context",
+        "medium context",
+        "full-track context"
+      ],
+      "controls": [
+        "fixed model/version/checkpoint",
+        "same fixed passage",
+        "deterministic settings"
+      ],
+      "evaluate": [
+        "onset-F",
+        "SI-SDR",
+        "crest",
+        "attack slope",
+        "dynamic variation",
+        "level-matched blind listening"
+      ],
+      "success": "Define contexts/metrics where transient and dynamics recommendations are stable; otherwise block them."
+    }
+  ],
+  "tool_notes": {
+    "consensus": "search_and_required_fetch_succeeded_for_three legacy/foundational papers plus Eadie abstract",
+    "scite": "free monthly MCP limit reached; resets 2026-10-01 UTC; no paid upgrade",
+    "github": "master updates read; reproducible code README and MIT license inspected",
+    "youtube": "Chrome-assisted checks on three public videos; no usable transcript rows, all queued",
+    "context7": "not_needed_no_software_API_claim_beyond_official_docs",
+    "hugging_face": "not_used",
+    "external_audio_upload": false
+  },
+  "changes_not_made": [
+    "No audio or DSP changed.",
+    "No runtime rules changed.",
+    "No external audio was downloaded or uploaded.",
+    "No paid compute or subscription used."
+  ],
+  "handoff": "ML-2026-09-12-0900: preserve multi-mic relations; distinguish waveform onset from transient envelope and P-centre; ordinary Cubase AudioWarp is not phase-coherent; gate separator-derived transient/dynamics measurements on model/version/input context. All rules candidate/auto_apply:false."
+}
