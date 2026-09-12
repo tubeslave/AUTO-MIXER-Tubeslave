@@ -127,6 +127,44 @@
   background: #21262d; color: #8b949e;
 }
 .step-chip.active { background: #00d4ff22; color: #00d4ff; }
+.muq-drift-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.muq-drift-chip {
+  display: inline-grid;
+  grid-template-columns: minmax(54px, auto) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #c9d1d9;
+  font-size: 0.78rem;
+}
+.muq-drift-chip.warn {
+  border-color: rgba(255, 193, 7, 0.45);
+  background: rgba(255, 193, 7, 0.12);
+}
+.muq-drift-chip.crit {
+  border-color: rgba(255, 86, 86, 0.55);
+  background: rgba(255, 86, 86, 0.14);
+}
+.muq-drift-stem {
+  color: #e6edf3;
+  font-weight: 600;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.muq-drift-state {
+  color: #f0f6fc;
+  font-weight: 700;
+}
+.muq-drift-metric { color: #8b949e; font-variant-numeric: tabular-nums; }
 .soundcheck-log {
   margin-top: 12px; padding: 8px; background: #0d1117; border-radius: 6px;
   max-height: 150px; overflow-y: auto; font-size: 0.78em;
