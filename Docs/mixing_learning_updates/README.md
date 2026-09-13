@@ -13,6 +13,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-12-1200 | [Report](ML-2026-09-12-1200.md), [JSON patch](ML-2026-09-12-1200.json) | Loud-rock peak control: 4 literature/documentation cards, 3 fully studied videos, 8 Knowledge Cards, 6 candidate rules, 4 unrun experiments |
 | ML-2026-09-12-1500 | [Report](ML-2026-09-12-1500.md), [JSON patch](ML-2026-09-12-1500.json) | Drum bleed/gating/room control: 4 literature/documentation cards, 3 studied and 2 queued videos, 1 legal educational multitrack, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-12-1800 | [Report](ML-2026-09-12-1800.md), [JSON patch](ML-2026-09-12-1800.json) | Bass/kick/heavy-guitar interaction: 3 literature/documentation cards, 2 studied and 2 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-13-0900 | [Report](ML-2026-09-13-0900.md), [JSON patch](ML-2026-09-13-0900.json) | Early/late reverb and rock spatial effects: 3 source/code cards, 3 fully studied videos, 8 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
 
 ## Spatial package: reading and safety
 
@@ -38,6 +39,8 @@ ML-2026-09-12-1200: do not optimise loudness with crest factor alone. Treat clip
 
 ML-2026-09-12-1500: do not equate cleaner close microphones with a better drum sound. Select gate, expander, manual edit or joint debleeding by failure mode; preserve coincident hits, decay, overhead image and useful room. Begin with finite attenuation and reject SDR gains that damage transients or space. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
+ML-2026-09-12-1800: assign kick and bass roles by section before carving fixed frequency slots. If distorted bass loses drive among heavy guitars, test preserved DI/clean attack before adding saturation. Trigger dynamic EQ from an auditioned collision band. Treat semantic spectral targets and sensory-dissonance metrics as advisory only, never automatic objectives. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+
 ## Latest handoff
 
-ML-2026-09-12-1800: assign kick and bass roles by section before carving fixed frequency slots. If distorted bass loses drive among heavy guitars, test preserved DI/clean attack before adding saturation. Trigger dynamic EQ from an auditioned collision band. Treat semantic spectral targets and sensory-dissonance metrics as advisory only, never automatic objectives. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflection shape separately from late decay, and select snare space with the full arrangement playing. Do not accept reverb matching from T60/EDC/EDP alone: require spectro-temporal and blind listening checks. Use send automation for selected-word throws; keep extreme width and parallel guitar distortion as dedicated, section-aware ear-candy layers. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
