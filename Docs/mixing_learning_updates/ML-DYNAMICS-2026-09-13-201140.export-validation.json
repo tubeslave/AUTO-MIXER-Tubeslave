@@ -1,0 +1,40 @@
+{
+  "update_id": "ML-DYNAMICS-2026-09-13-201140",
+  "validated_at": "2026-09-13T20:24:47+03:00",
+  "scope": "schema_integrity_and_analytic_arithmetic_not_audio_tests",
+  "checks_passed": 18,
+  "checks_failed": 0,
+  "checks": {
+    "json_roundtrip": true,
+    "unique_source_ids": true,
+    "unique_rule_ids": true,
+    "unique_experiment_ids": true,
+    "source_references_resolve": true,
+    "card_rule_links_resolve": true,
+    "experiment_rule_links_resolve": true,
+    "bounded_fields_present": true,
+    "candidate_no_auto_apply": true,
+    "experiments_not_run": true,
+    "videos_not_falsely_studied": true,
+    "no_fabricated_genre_targets": true,
+    "all_starting_ranges_labelled": true,
+    "analytic_silence_identity": true,
+    "analytic_ratio_identity": true,
+    "export_not_shared_claim": true,
+    "no_audio_measured_or_changed": true,
+    "report_nonempty": true
+  },
+  "files": [
+    {
+      "name": "Mixing_Learning_Dynamics_2026-09-13_201140.md",
+      "bytes": 51297,
+      "sha256": "e919dcba8df3371cadeba682b0e76f54e0a519e5a37b13224d906d1a97a05736"
+    },
+    {
+      "name": "Mixing_Learning_Dynamics_Patch_2026-09-13_201140.json",
+      "bytes": 68140,
+      "sha256": "be5522ad9e219b3eaa15ae88b54bdbfe7bf41dd88bc84a777a2974a00e9d447c"
+    }
+  ],
+  "shared_publication": false
+}

@@ -17,6 +17,11 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-13-1200 | [Report](ML-2026-09-13-1200.md), [JSON patch](ML-2026-09-13-1200.json) | Reference-conditioned automixing and rock compression: 3 source/code cards, 3 fully studied videos, 10 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-1500 | [Report](ML-2026-09-13-1500.md), [JSON patch](ML-2026-09-13-1500.json) | Stereo-image metrics and rhythm-guitar width: 4 source/code cards, 0 studied and 3 new queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-1800 | [Report](ML-2026-09-13-1800.md), [JSON patch](ML-2026-09-13-1800.json) | Lead-guitar role, de-masking and placement: 3 full-text sources, 0 studied and 5 queued videos, 1 legal educational multitrack, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-DYNAMICS-2026-09-13-201140 | [Guide](ML-DYNAMICS-2026-09-13-201140.md), [complete JSON](ML-DYNAMICS-2026-09-13-201140.json), [publication and validation](ML-DYNAMICS-2026-09-13-201140.publication.json) | Dynamics/compression: 14 source cards, 8 Knowledge Cards, 8 candidate rules, 4 queued videos, 1 metadata-only benchmark, 4 unrun experiments; no runtime rule promotion |
+
+## Dynamics package: publication and safety
+
+The dynamics JSON retains every original research value and ID; only whitespace serialization changed. Its guide is an editorial summary, not a byte-for-byte copy of the earlier Markdown export. The publication manifest records hashes, JSON pointers and 25 artifact checks. Original `unapplied_research_proposal`, `master_written:false` and export-validation status fields describe the research run before publication, not the current repository presence. All eight rules remain `candidate / auto_apply:false`, and all four experiments remain `not_run`. This is a shared research package, not runtime schema integration, audio validation, new measured genre targets or confirmed agent ingestion.
 
 ## Spatial package: reading and safety
 
@@ -50,8 +55,10 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-13-1800: treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+ML-DYNAMICS-2026-09-13-201140: distinguish event, performance and section dynamics. CF/PLR/PSR/LRA/GR are not interchangeable; record measurement windows, calibration, activity and articulation. Do not infer compression need from one number or genre. Keep no-DRC and level-only baselines. Next tests: EXP-DYN-20260913-201140-01 (meter contract) and EXP-DYN-20260913-201140-02 (snare attack/body), not_run. Rules remain candidate/auto_apply:false; no audio or runtime changes. Other-chat delivery and agent ingestion are unconfirmed.
 
-## Previous latest handoff
+## Previous latest handoffs
+
+ML-2026-09-13-1800: treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ML-2026-09-13-1500: do not optimize one global width/correlation value. Evaluate amplitude, phase/coherence, M/S and mono by band and section. For rhythm guitars compare independent doubles with transient-protected, frequency-dependent decorrelation; judge width, naturalness and quality separately. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.

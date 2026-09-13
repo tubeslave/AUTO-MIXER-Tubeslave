@@ -1,0 +1,101 @@
+{
+  "schema_version": "mixing-learning-publication/1.0",
+  "update_id": "ML-DYNAMICS-2026-09-13-201140",
+  "research_version": "0.1.0",
+  "publication_prepared_at": "2026-09-13T20:45:32+03:00",
+  "timezone": "Europe/Moscow",
+  "repository": "tubeslave/AUTO-MIXER-Tubeslave",
+  "target_branch": "master",
+  "base_commit": "ca2067fa8863f1f3dca9c5f7ced7f2e25b3b4c8a",
+  "base_index_blob_sha": "84902467f07e7e1e2fdaf21f18de7edabc83568a",
+  "authorization": "Explicit user request: Оформить в общей базе",
+  "scope": "shared_research_publication_only",
+  "runtime_registry_imported": false,
+  "sources_researched_again_in_publication_run": false,
+  "publication_confirmation": "Presence on master and Git history; final merge/readback reported separately",
+  "transformation": {
+    "json": "Compact JSON serialization only. Parsed values and structure equal the original export; no source, rule, confidence or experiment changes.",
+    "markdown": "Editorial publication guide derived from the original report and complete JSON, not a byte-identical copy of the original report.",
+    "export_validation": "Byte-preserved original validation record; shared_publication:false is historical."
+  },
+  "files": [
+    {
+      "path": "ML-DYNAMICS-2026-09-13-201140.json",
+      "bytes": 58362,
+      "sha256": "2eae5f8a46f6ac314b47b3fff8ad910a2fd586875f66de789931ee0804b5a7a1",
+      "git_blob_sha": "241c9bb8c94838b25f32ffd5cba2a40909dea310",
+      "original_filename": "Mixing_Learning_Dynamics_Patch_2026-09-13_201140.json",
+      "original_sha256": "be5522ad9e219b3eaa15ae88b54bdbfe7bf41dd88bc84a777a2974a00e9d447c",
+      "original_bytes": 68140,
+      "semantic_equality_verified": true
+    },
+    {
+      "path": "ML-DYNAMICS-2026-09-13-201140.md",
+      "bytes": 18657,
+      "sha256": "15288a32ae3636e7574b77344a404510edc58db24d046c01be19c89dbcba58b8",
+      "git_blob_sha": "e880994ccded91644e0fe9f052fc96fb08e5a0f3",
+      "original_report_filename": "Mixing_Learning_Dynamics_2026-09-13_201140.md",
+      "original_report_sha256": "e919dcba8df3371cadeba682b0e76f54e0a519e5a37b13224d906d1a97a05736",
+      "original_report_bytes": 51297,
+      "original_report_stored_byte_for_byte": false
+    },
+    {
+      "path": "ML-DYNAMICS-2026-09-13-201140.export-validation.json",
+      "bytes": 1305,
+      "sha256": "b3c00972695e8c242aca008c47ccc2b04f4ce8660e889664bc899c197c636609",
+      "git_blob_sha": "d32df2de8994c2c83b8657bed1032c8ad765e5e9"
+    }
+  ],
+  "registries": {
+    "source_cards": "ML-DYNAMICS-2026-09-13-201140.json#/source_cards",
+    "knowledge_cards": "ML-DYNAMICS-2026-09-13-201140.json#/knowledge_cards",
+    "candidate_rules": "ML-DYNAMICS-2026-09-13-201140.json#/candidate_rules",
+    "video_source_cards": "ML-DYNAMICS-2026-09-13-201140.json#/video_source_cards",
+    "reference_cards": "ML-DYNAMICS-2026-09-13-201140.json#/reference_cards",
+    "experiments": "ML-DYNAMICS-2026-09-13-201140.json#/experiments",
+    "metric_definitions": "ML-DYNAMICS-2026-09-13-201140.json#/metric_definitions",
+    "instrument_profiles": "ML-DYNAMICS-2026-09-13-201140.json#/instrument_profiles",
+    "genre_strategy_candidates": "ML-DYNAMICS-2026-09-13-201140.json#/genre_strategy_candidates"
+  },
+  "counts": {"source_cards": 14, "knowledge_cards": 8, "candidate_rules": 8, "video_source_cards": 4, "reference_cards": 1, "experiments": 4, "instrument_profiles": 11, "genre_strategy_candidates": 6, "videos_studied": 0, "audio_experiments_run": 0},
+  "historical_status_note": "The research JSON retains unapplied_research_proposal and persistence/master_written:false from the original study. Publication does not promote rules or claim runtime integration. Read this publication manifest and the current shared index for repository publication context.",
+  "deduplication": "Stable package ID was not found by targeted repository search and is absent from the refreshed shared index. Existing_knowledge_links preserve known overlap. Full runtime source/rule semantic deduplication remains pending; no existing cards, feedback or statuses are overwritten and no aggregate-new-source count is claimed.",
+  "validation": {
+    "validated_at": "2026-09-13T20:45:32+03:00",
+    "scope": "Artifact checks and analytical arithmetic, not audio or full repository tests",
+    "checks_passed": 25,
+    "checks_failed": 0,
+    "checks": {
+      "json_semantic_equality": true,
+      "sources_unique": true,
+      "knowledge_card_ids_unique": true,
+      "rules_unique": true,
+      "experiments_unique": true,
+      "video_ids_unique": true,
+      "rule_sources_resolve": true,
+      "card_sources_and_rules_resolve": true,
+      "experiment_rules_resolve": true,
+      "reference_sources_resolve": true,
+      "bounded_rule_fields": true,
+      "candidate_only": true,
+      "knowledge_cards_not_promoted": true,
+      "experiments_not_run": true,
+      "video_evidence_not_invented": true,
+      "no_genre_numeric_targets": true,
+      "settings_are_proposed_only": true,
+      "source_read_depth_preserved": true,
+      "metadata_dataset_not_audio": true,
+      "silence_padding_identity": true,
+      "static_ratio_identity": true,
+      "snapshot_safety_flags": true,
+      "original_validation_hashes_match": true,
+      "uploaded_json_matches_local": true,
+      "uploaded_md_matches_local": true
+    },
+    "full_repository_pytest": "not_run_locally; container public GitHub GET failed due DNS; PR CI results must be checked separately",
+    "audio_validation": "not_run"
+  },
+  "safety": {"auto_apply": false, "rules": "candidate", "audio_experiments": "not_run", "audio_modified": false, "dsp_modified": false, "runtime_configuration_modified": false, "runtime_rules_modified": false, "paid_services_started": false, "user_audio_uploaded": false},
+  "other_chat_delivery_confirmed": false,
+  "agent_ingestion_confirmed": false
+}
