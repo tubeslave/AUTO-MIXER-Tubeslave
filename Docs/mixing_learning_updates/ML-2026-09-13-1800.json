@@ -1,0 +1,184 @@
+{
+  "update_id": "ML-2026-09-13-1800",
+  "discovered_at": "2026-09-13T18:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "status": "candidate_only",
+  "auto_apply": false,
+  "audio_changed": false,
+  "dsp_changed": false,
+  "scope": ["lead_guitar_placement", "time_varying_lead_role", "masking", "dynamic_eq", "spatial_release_from_masking"],
+  "sources": [
+    {
+      "id": "SRC-ML-20260913-1800-01",
+      "type": "preprint",
+      "title": "Effects of HRTF Augmentation on Predicted Spatial Release from Masking in Music",
+      "authors": ["Jack Webb", "Christophe Lesimple", "Volker Kuehnel", "Lorenzo Picinali"],
+      "published": "2026-08-28",
+      "url": "https://arxiv.org/html/2608.28422v1",
+      "reading_depth": "full_open_html",
+      "evidence": ["MusicLarity and MedleyDB two-second target-plus-three-masker mixtures", "seven binaural rendering conditions", "25 individual HRTFs", "two auditory-model analyses", "frequency/geometry/hearing-profile-dependent predicted SRM"],
+      "limitations": ["auditory-model predictions only", "no behavioural listening test", "speech/complex-tone models omit musical structural cues", "binaural/headphone context is not conventional stereo-loudspeaker mixing"]
+    },
+    {
+      "id": "SRC-ML-20260913-1800-02",
+      "type": "paper",
+      "title": "Lead Instrument Detection from Multitrack Music",
+      "authors": ["Longshen Ou", "Yu Takahashi", "Ye Wang"],
+      "published": "2025-03-05",
+      "venue": "ICASSP 2025",
+      "url": "https://arxiv.org/html/2503.03232v1",
+      "reading_depth": "full_open_html_code_repository_unavailable",
+      "evidence": ["expert frame-level annotations", "MJN 7.10 h and MedleyDB 5.57 h", "track-wise attention improved reported F1 over mixture-only and averaged-track baselines", "cross-dataset and unseen-instrument tests"],
+      "limitations": ["assumes one lead at each timestep", "lead-class imbalance favors vocals", "MJN contains bleed", "mono normalized 5-second training clips", "detection metrics do not validate mix actions"]
+    },
+    {
+      "id": "SRC-ML-20260913-1800-03",
+      "type": "conference_paper",
+      "title": "Real-time Psychoacoustic Frequency Masking Compensation for Audio Signals with Overlapping Spectra",
+      "authors": ["Giorgio Presti", "Nicola Degiorgi", "Amedeo Fresia", "Antonio Servetti"],
+      "published": "2024",
+      "venue": "Sound and Music Computing Conference 2024",
+      "doi": "10.5281/zenodo.14361929",
+      "url": "https://air.unimi.it/retrieve/648a665b-e5ca-4aeb-abbb-79d139b8b0b0/SMC2024_paper_id126.pdf",
+      "license": "CC BY 3.0",
+      "reading_depth": "full_text_6_pages",
+      "evidence": ["32-band Bark-scale side-chain masking estimator", "dynamic EQ on the masked source", "level-only +3 dB baseline", "13 listeners with 10 retained after identity check", "intelligibility and mix-similarity ratings"],
+      "limitations": ["10 retained listeners", "two stimulus pairs", "voice-only target", "headphone test", "prototype parameters empirically tuned", "no lead-guitar target"]
+    }
+  ],
+  "videos": [],
+  "queued_sources": [
+    {"id": "QVID-ML-20260913-1800-01", "video_id": "W5rCAwoIuyw", "title": "How To EQ For CLARITY & SPACE In Your Mix", "channel": "Sumthins Recording", "published": "2023-11-28", "url": "https://www.youtube.com/watch?v=W5rCAwoIuyw", "status": "queued_source", "transcript_status": "unavailable_in_current_youtube_session", "conclusions_created": false},
+    {"id": "QVID-ML-20260913-1800-02", "video_id": "xIzkllBPxhs", "title": "How To mix HEAVY Guitars - Lead Guitar EQ and Compression Tips", "channel": "Frightbox Recording", "published": "2018-10-26", "url": "https://www.youtube.com/watch?v=xIzkllBPxhs", "status": "queued_source", "transcript_status": "unavailable_in_current_youtube_session", "conclusions_created": false},
+    {"id": "QVID-ML-20260913-1800-03", "video_id": "u5R3L71vNM8", "title": "How Pro Engineers Make Every Instrument Fit in a Mix", "channel": "Raytown Productions", "published": "2026-03-16", "url": "https://www.youtube.com/watch?v=u5R3L71vNM8", "status": "queued_source", "transcript_status": "unavailable_in_current_youtube_session", "conclusions_created": false},
+    {"id": "QVID-ML-20260913-1800-04", "video_id": "ajN2XZFlg60", "title": "Master Class with Dave Darlington: Mixing with Hybrid Plugins", "channel": "Waves Audio", "published": "2016-04-21", "url": "https://www.youtube.com/watch?v=ajN2XZFlg60", "status": "queued_source", "transcript_status": "unavailable_in_current_youtube_session", "conclusions_created": false},
+    {"id": "QVID-ML-20260913-1800-05", "video_id": "QSvdhuu2orQ", "title": "The 4 Fundamentals of a Good Mix (with Dan Worrall)", "channel": "Audio University", "published": "2023-07-06", "url": "https://www.youtube.com/watch?v=QSvdhuu2orQ", "status": "queued_source", "transcript_status": "unavailable_in_current_youtube_session", "conclusions_created": false}
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260913-1800-01", "title": "Lead status is time-varying", "confidence": "high"},
+    {"id": "KC-ML-20260913-1800-02", "title": "One-lead assumption is a dataset convention", "confidence": "high"},
+    {"id": "KC-ML-20260913-1800-03", "title": "Track-to-mixture context improves lead detection", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1800-04", "title": "Lead detection is not processing authority", "confidence": "high"},
+    {"id": "KC-ML-20260913-1800-05", "title": "Spatial release is spectrum geometry and listener dependent", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1800-06", "title": "Binaural predictions do not transfer directly to stereo mix rules", "confidence": "high"},
+    {"id": "KC-ML-20260913-1800-07", "title": "Level-only is required for de-masking evaluation", "confidence": "high"},
+    {"id": "KC-ML-20260913-1800-08", "title": "Dynamic de-masking may preserve apparent balance better than a level lift", "confidence": "medium"},
+    {"id": "KC-ML-20260913-1800-09", "title": "Prototype limits and timing are not universal settings", "confidence": "high"}
+  ],
+  "rules": [
+    {
+      "id": "RULE-ML-20260913-1800-01",
+      "source": "SRC-ML-20260913-1800-02",
+      "when_to_apply": "a guitar alternates among accompaniment hook fill and solo roles",
+      "what_to_change": "create a phrase/section role map and allow uncertain or co-lead states before proposing processing",
+      "suggested_range": "categorical role plus confidence; no automatic dB or EQ values",
+      "range_origin": "frame-level lead detection task and project safety policy",
+      "protect": ["intended hierarchy", "shared hooks", "rhythm foundation", "transitions"],
+      "verify": "compare with Dmitry's full-arrangement role annotations",
+      "undo_when": "activity or loudness is mistaken for leadership or co-leads are suppressed",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-02",
+      "source": "SRC-ML-20260913-1800-02",
+      "when_to_apply": "an analysis model labels a track as lead",
+      "what_to_change": "expose the label only as evidence and require a separate decision for every mix action",
+      "suggested_range": "none",
+      "range_origin": "detection-versus-control boundary",
+      "protect": ["creative intent", "vocal/instrument balance", "dynamics", "section contrast"],
+      "verify": "blind full-mix comparison with no-action and human-map baselines",
+      "undo_when": "a reviewed project-specific policy validates a narrow role-action link",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-03",
+      "source": "SRC-ML-20260913-1800-03",
+      "when_to_apply": "a foreground phrase is audible in solo but masked in the arrangement",
+      "what_to_change": "test the smallest section-local level move before spectral compensation and retain no-processing as a candidate",
+      "suggested_range": "ear-led sweep around current balance; study +3 dB is not a default",
+      "range_origin": "level-only study baseline and conservative test design",
+      "protect": ["mix balance", "rhythm-guitar mass", "hierarchy", "headroom"],
+      "verify": "loudness-matched full-mix A/B for intelligibility naturalness and balance similarity",
+      "undo_when": "the phrase becomes oversized section contrast collapses or limiter behaviour shifts",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-04",
+      "source": "SRC-ML-20260913-1800-03",
+      "when_to_apply": "level restores audibility but damages balance and target/masker tracks are separate",
+      "what_to_change": "compare bounded target-side dynamic de-masking with level-only and complementary masker-dip variants",
+      "suggested_range": "start at zero and stop at first stable preference; do not transplant prototype gain/timing values",
+      "range_origin": "SMC prototype plus project-controlled A/B design",
+      "protect": ["guitar identity", "pick attack", "vocal naturalness", "rhythm body", "automation continuity", "headroom"],
+      "verify": "section-specific equal-final-loudness blind A/B plus target and masker solo checks",
+      "undo_when": "tone is hyped modulation is audible silent bands rise or level-only performs equally",
+      "confidence": "medium",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-05",
+      "source": "SRC-ML-20260913-1800-01",
+      "when_to_apply": "pan interaural or HRTF processing is proposed for target-masker separation",
+      "what_to_change": "label the operator and playback domain and test stereo pan separately from binaural HRTF processing",
+      "suggested_range": "no source-backed pan angle or HRTF strength for rock mixing",
+      "range_origin": "auditory-model study boundary",
+      "protect": ["timbre", "localization", "mono", "center stability", "externalization", "listener accessibility"],
+      "verify": "separate headphone loudspeaker and mono listening with human ratings",
+      "undo_when": "benefit is playback-specific coloration appears or center/mono worsens",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-06",
+      "source": "SRC-ML-20260913-1800-01",
+      "when_to_apply": "a spatial cue change is proposed as a clarity intervention",
+      "what_to_change": "inspect whether the cue change overlaps useful target energy rather than optimizing broadband width or correlation",
+      "suggested_range": "reference-relative frequency- and section-resolved comparison; no global target",
+      "range_origin": "HRTF study discussion and prior stereo-card constraints",
+      "protect": ["lead tone", "low-frequency foundation", "transient localization", "mono"],
+      "verify": "bandwise diagnostics plus matched-loudness listening across positions and sections",
+      "undo_when": "clarity comes only from coloration level change or weakening a competing source",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1800-07",
+      "source": ["SRC-ML-20260913-1800-01", "SRC-ML-20260913-1800-02", "SRC-ML-20260913-1800-03"],
+      "when_to_apply": "lead guitar competes with rhythm guitars vocal or another foreground element",
+      "what_to_change": "evaluate role/arrangement then balance then section automation then bounded collision processing then playback-specific spatial option",
+      "suggested_range": "one controlled variable per comparison; no universal values",
+      "range_origin": "cross-source synthesis and existing project cards",
+      "protect": ["musical hierarchy", "rhythm foundation", "tone", "groove", "center", "mono", "section contrast"],
+      "verify": "loudness-matched blind comparisons on verse chorus and solo with Dmitry acceptance",
+      "undo_when": "a later stage adds no stable preference over a simpler earlier baseline",
+      "confidence": "medium_high",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {"id": "EXP-ML-20260913-1800-01", "title": "static lead-guitar treatment versus phrase-and-section role automation", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1800-02", "title": "no processing versus level-only target-side dynamic de-masking and complementary masker dip", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1800-03", "title": "stereo pan baseline versus playback-specific binaural HRTF hypothesis", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1800-04", "title": "human role timeline and collision-treatment ladder on Rusted Root Ecstasy multitrack", "status": "not_run"}
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20260913-1800-01",
+      "artist": "Rusted Root",
+      "title": "Ecstasy",
+      "genre": "rock_live",
+      "provider": "TELEFUNKEN Elektroakustik",
+      "url": "https://www.telefunken-elektroakustik.com/multitrack/rusted-root-ecstasy/",
+      "format": "24-bit 44.1-kHz WAV multitrack",
+      "license": "home-studio and educational use only; no commercial use; attribution required",
+      "access": "metadata_and_license_only_audio_not_downloaded",
+      "metrics": "not_computed"
+    }
+  ],
+  "multitracks_added": ["REF-ML-20260913-1800-01"],
+  "counts": {"sources": 3, "videos_studied": 0, "videos_queued_new": 5, "knowledge_cards": 9, "rules": 7, "experiments": 4, "reference_cards": 1},
+  "handoff": "Treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits."
+}
