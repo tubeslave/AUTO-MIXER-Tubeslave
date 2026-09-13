@@ -15,7 +15,8 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-12-1800 | [Report](ML-2026-09-12-1800.md), [JSON patch](ML-2026-09-12-1800.json) | Bass/kick/heavy-guitar interaction: 3 literature/documentation cards, 2 studied and 2 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-0900 | [Report](ML-2026-09-13-0900.md), [JSON patch](ML-2026-09-13-0900.json) | Early/late reverb and rock spatial effects: 3 source/code cards, 3 fully studied videos, 8 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-1200 | [Report](ML-2026-09-13-1200.md), [JSON patch](ML-2026-09-13-1200.json) | Reference-conditioned automixing and rock compression: 3 source/code cards, 3 fully studied videos, 10 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
-| ML-2026-09-13-1500 | [Report](ML-2026-09-13-1500.md), [JSON patch](ML-2026-09-13-1500.json) | Stereo-image metrics and rhythm-guitar width: 4 source/code cards, 0 studied and 3 new queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |\n| ML-2026-09-13-1800 | [Report](ML-2026-09-13-1800.md), [JSON patch](ML-2026-09-13-1800.json) | Lead-guitar role, de-masking and placement: 3 full-text sources, 0 studied and 5 queued videos, 1 legal educational multitrack, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-13-1500 | [Report](ML-2026-09-13-1500.md), [JSON patch](ML-2026-09-13-1500.json) | Stereo-image metrics and rhythm-guitar width: 4 source/code cards, 0 studied and 3 new queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-13-1800 | [Report](ML-2026-09-13-1800.md), [JSON patch](ML-2026-09-13-1800.json) | Lead-guitar role, de-masking and placement: 3 full-text sources, 0 studied and 5 queued videos, 1 legal educational multitrack, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 
 ## Spatial package: reading and safety
 
@@ -47,4 +48,10 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
-## Latest handoff\n\nML-2026-09-13-1800: treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.\n\n## Previous latest handoff\n\nML-2026-09-13-1500: do not optimize one global width/correlation value. Evaluate amplitude, phase/coherence, M/S and mono by band and section. For rhythm guitars compare independent doubles with transient-protected, frequency-dependent decorrelation; judge width, naturalness and quality separately. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.\n
+## Latest handoff
+
+ML-2026-09-13-1800: treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+
+## Previous latest handoff
+
+ML-2026-09-13-1500: do not optimize one global width/correlation value. Evaluate amplitude, phase/coherence, M/S and mono by band and section. For rhythm guitars compare independent doubles with transient-protected, frequency-dependent decorrelation; judge width, naturalness and quality separately. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
