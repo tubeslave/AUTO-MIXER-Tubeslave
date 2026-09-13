@@ -15,6 +15,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-12-1800 | [Report](ML-2026-09-12-1800.md), [JSON patch](ML-2026-09-12-1800.json) | Bass/kick/heavy-guitar interaction: 3 literature/documentation cards, 2 studied and 2 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-0900 | [Report](ML-2026-09-13-0900.md), [JSON patch](ML-2026-09-13-0900.json) | Early/late reverb and rock spatial effects: 3 source/code cards, 3 fully studied videos, 8 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-1200 | [Report](ML-2026-09-13-1200.md), [JSON patch](ML-2026-09-13-1200.json) | Reference-conditioned automixing and rock compression: 3 source/code cards, 3 fully studied videos, 10 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
+| ML-2026-09-13-1500 | [Report](ML-2026-09-13-1500.md), [JSON patch](ML-2026-09-13-1500.json) | Stereo-image metrics and rhythm-guitar width: 4 source/code cards, 0 studied and 3 new queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 
 ## Spatial package: reading and safety
 
@@ -44,6 +45,8 @@ ML-2026-09-12-1800: assign kick and bass roles by section before carving fixed f
 
 ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflection shape separately from late decay, and select snare space with the full arrangement playing. Do not accept reverb matching from T60/EDC/EDP alone: require spectro-temporal and blind listening checks. Use send automation for selected-word throws; keep extreme width and parallel guitar distortion as dedicated, section-aware ear-candy layers. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
+ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+
 ## Latest handoff
 
-ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
+ML-2026-09-13-1500: do not optimize one global width/correlation value. Evaluate amplitude, phase/coherence, M/S and mono by band and section. For rhythm guitars compare independent doubles with transient-protected, frequency-dependent decorrelation; judge width, naturalness and quality separately. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
