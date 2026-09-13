@@ -1,0 +1,195 @@
+{
+  "update_id": "ML-2026-09-13-1200",
+  "discovered_at": "2026-09-13T12:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "status": "candidate_only",
+  "auto_apply": false,
+  "audio_changed": false,
+  "dsp_changed": false,
+  "sources": [
+    {
+      "id": "SRC-ML-20260913-1200-01",
+      "type": "paper",
+      "title": "Diff2Mix: Controllable Music Mixing via Diffusion Models and Differentiable Audio Effects",
+      "authors": ["Yisu Zong", "Jinjie Shi", "Joshua Reiss"],
+      "published": "2026-08-05",
+      "venue": "arXiv:2608.05442v1; accepted ISMIR 2026",
+      "url": "https://arxiv.org/html/2608.05442v1",
+      "reading_depth": "full_html",
+      "limitations": ["three multitracks", "three reference songs", "20 valid experienced participants", "fixed per-track effect chain", "global style embedding"]
+    },
+    {
+      "id": "SRC-ML-20260913-1200-02",
+      "type": "paper",
+      "title": "An Autonomous Method for Multi-Track Dynamic Range Compression",
+      "authors": ["Jacob A. Maddams", "Saoirse Finn", "Joshua D. Reiss"],
+      "published": "2012",
+      "venue": "DAFx-12",
+      "url": "https://www.dafx.de/paper-archive/2012/papers/dafx12_submission_6.pdf",
+      "reading_depth": "full_text_8_pages",
+      "limitations": ["seven songs", "41 tracks", "selected 20-second excerpts", "15 listeners", "monaural output", "400 ms LRA is experiment-specific"]
+    },
+    {
+      "id": "SRC-ML-20260913-1200-03",
+      "type": "code",
+      "title": "dasp-pytorch compressor implementation",
+      "url": "https://github.com/csteinmetz1/dasp-pytorch",
+      "license": "Apache-2.0",
+      "reading_depth": "static_source_inspection_main",
+      "files": ["README.md", "dasp_pytorch/functional.py", "dasp_pytorch/modules.py"],
+      "observation": "release_ms is exposed, but normalized release and alpha_R are commented out and the source states release is not used in smoothing",
+      "limitations": ["code_not_executed", "exact_Diff2Mix_commit_not_established"]
+    }
+  ],
+  "videos": [
+    {
+      "id": "VID-ML-20260913-1200-01",
+      "video_id": "jfhw_NiF8hY",
+      "title": "Parallel Compression On Drums - Metal Mixing Tips",
+      "channel": "Frightbox Recording",
+      "url": "https://www.youtube.com/watch?v=jfhw_NiF8hY",
+      "status": "studied",
+      "transcript": {"coverage": "0:00-6:32", "language": "en", "kind": "auto_generated", "read": "complete"},
+      "classifications": ["compression", "parallel_drum_compression", "kick", "snare", "toms", "overheads", "room"],
+      "numeric_claims": [{"value": "approximately 8 dB GR", "timestamp": "4:32-5:17", "origin": "spoken_auto_caption", "requires_visual_verification": true}]
+    },
+    {
+      "id": "VID-ML-20260913-1200-02",
+      "video_id": "nj75y6J022U",
+      "title": "API 2500 Bus Compressor | UAD Quick Tips",
+      "channel": "Universal Audio",
+      "url": "https://www.youtube.com/watch?v=nj75y6J022U",
+      "status": "studied",
+      "transcript": {"coverage": "0:00-6:01", "language": "en", "kind": "auto_generated", "read": "complete"},
+      "classifications": ["compression", "attack", "release", "ratio", "parallel_mix", "mix_bus", "drum_bus", "guitar_bus", "detector_weighting", "knee"],
+      "numeric_claims": [{"value": "50 ms-3 s variable release", "timestamp": "3:21-3:33", "origin": "spoken_auto_caption", "requires_visual_verification": true}]
+    },
+    {
+      "id": "VID-ML-20260913-1200-03",
+      "video_id": "cgfBcFTbir4",
+      "title": "Adam Nolly Getgood Mixing Masterclass part 1 of 2: Master bus and drums",
+      "channel": "GGD",
+      "url": "https://www.youtube.com/watch?v=cgfBcFTbir4",
+      "status": "studied",
+      "transcript": {"coverage": "0:02-1:12:25", "language": "en", "kind": "auto_generated", "read": "complete"},
+      "classifications": ["EQ", "compression", "attack", "release", "ratio", "gain_reduction", "saturation", "clipping", "transient_control", "reverb", "room", "automation", "mix_bus", "kick", "snare", "toms", "overheads"],
+      "numeric_claims": [
+        {"value": "0.3 ms attack; fastest release; 4:1; 3-4 dB GR on snare and about 1 dB on kick", "timestamp": "3:22-5:25", "origin": "spoken_auto_caption", "requires_visual_verification": true},
+        {"value": "about -13 dB range; about 200 ms release; about 0.5 ms lookahead", "timestamp": "33:35-34:57", "origin": "spoken_auto_caption", "requires_visual_verification": true}
+      ]
+    }
+  ],
+  "queued_sources": [],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260913-1200-01", "title": "Global style is insufficient for rock", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1200-02", "title": "Fixed chain order is a model limitation", "confidence": "high"},
+    {"id": "KC-ML-20260913-1200-03", "title": "Held-out evaluation is required", "confidence": "high"},
+    {"id": "KC-ML-20260913-1200-04", "title": "Parameter sensitivity precedes interpretability", "confidence": "high"},
+    {"id": "KC-ML-20260913-1200-05", "title": "release_ms is a regression candidate, not a proven runtime bug", "confidence": "medium"},
+    {"id": "KC-ML-20260913-1200-06", "title": "No-compression is a first-class baseline", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1200-07", "title": "LRA response is signal-dependent", "confidence": "high"},
+    {"id": "KC-ML-20260913-1200-08", "title": "Drum-bus membership is a creative parameter", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1200-09", "title": "Section automation outranks a single drum preset", "confidence": "medium_high"},
+    {"id": "KC-ML-20260913-1200-10", "title": "Attack, release and wet/dry interact", "confidence": "medium_high"}
+  ],
+  "rules": [
+    {
+      "id": "RULE-ML-20260913-1200-01",
+      "source": "SRC-ML-20260913-1200-01",
+      "when_to_apply": "reference-conditioned rock or metal style transfer",
+      "what_to_change": "add per-section and per-role constraints plus manual override",
+      "protect": ["arrangement hierarchy", "kick-bass relation", "guitar mass", "drum attack", "artistic intent"],
+      "verify": "loudness-matched blind A/B against global-only and manual variants",
+      "undo_when": "role constraints reduce coherence or contradict section intent",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-02",
+      "source": "SRC-ML-20260913-1200-01",
+      "when_to_apply": "predicted fixed chain adds processing without demonstrated need",
+      "what_to_change": "search effect bypass, selection and order before continuous parameters",
+      "protect": ["latency", "phase", "transients", "spectral intent", "automation continuity"],
+      "verify": "equal-loudness fixed-chain versus selected-chain versus manual-chain A/B",
+      "undo_when": "search variance hurts repeatability without audible benefit",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-03",
+      "source": "SRC-ML-20260913-1200-03",
+      "when_to_apply": "importing or updating differentiable DSP",
+      "what_to_change": "sweep every exposed parameter and calculate output/null deltas",
+      "protect": ["determinism", "gradients", "numerical stability", "channel linking"],
+      "verify": "directionally plausible nonzero changes on synthetic and musical signals",
+      "undo_when": "parameter is intentionally inert and removed from public control surface",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-04",
+      "source": "SRC-ML-20260913-1200-02",
+      "when_to_apply": "automatic DRC cannot beat untreated balance repeatably",
+      "what_to_change": "keep no-compression branch in search and evaluation",
+      "protect": ["groove", "transient identity", "phrase dynamics", "contrast"],
+      "verify": "loudness-matched blind A/B versus at least one light treatment",
+      "undo_when": "untreated dynamics create repeatable balance or audibility failure",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-05",
+      "source": "SRC-ML-20260913-1200-02",
+      "when_to_apply": "cross-adaptive compression uses per-track LRA",
+      "what_to_change": "treat LRA as advisory feature constrained by role, section and perception",
+      "protect": ["accent contrast", "punch", "guitar density", "phrasing"],
+      "verify": "section-wise listening plus envelope and crest diagnostics against no DRC",
+      "undo_when": "LRA guidance repeatedly selects worse blind-rated variants",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-06",
+      "source": ["VID-ML-20260913-1200-01", "VID-ML-20260913-1200-03"],
+      "when_to_apply": "parallel compression raises cymbal/hat spill or breaks room continuity",
+      "what_to_change": "compare shell-only, shell-heavy weighted full-kit and current routing",
+      "protect": ["cymbal smoothness", "snare length", "stereo image", "kit cohesion"],
+      "verify": "matched-loudness A/B in dense chorus and sparse verse",
+      "undo_when": "excluding ambience makes the kit detached or sample-like",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-07",
+      "source": ["VID-ML-20260913-1200-02", "VID-ML-20260913-1200-03"],
+      "when_to_apply": "bus compression loses attack or pumps from kick low end",
+      "what_to_change": "jointly test attack, release, detector weighting or HPF and wet/dry",
+      "protect": ["snare cut", "kick weight", "cymbal decay", "groove", "mix stability"],
+      "verify": "matched-loudness A/B plus GR timing for kick and snare",
+      "undo_when": "meter improvement reduces blind-rated energy or size",
+      "confidence": "medium_high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260913-1200-08",
+      "source": "VID-ML-20260913-1200-03",
+      "when_to_apply": "one static drum ambience setting makes verse oversized or chorus undersized",
+      "what_to_change": "create section candidates for room level/width, parallel send, close-mic level and reverb",
+      "protect": ["kit perspective", "groove", "mono", "phrase continuity"],
+      "verify": "blind full-song pass and loudness-matched section-loop A/B",
+      "undo_when": "automation is audible as a technical jump or fights song dynamics",
+      "confidence": "medium_high",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {"id": "EXP-ML-20260913-1200-01", "title": "global versus role-and-section rock reference conditioning", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1200-02", "title": "dasp-pytorch release_ms sensitivity and null", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1200-03", "title": "no DRC versus light cross-adaptive versus manual per-role", "status": "not_run"},
+    {"id": "EXP-ML-20260913-1200-04", "title": "parallel drum bus membership", "status": "not_run"}
+  ],
+  "reference_cards": [],
+  "multitracks_added": [],
+  "counts": {"sources": 3, "videos_studied": 3, "videos_queued": 0, "knowledge_cards": 10, "rules": 8, "experiments": 4, "reference_cards": 0},
+  "handoff": "Do not trust one global reference vector for rock. Validate every exposed DDSP parameter with a sensitivity/null test. Keep no-compression as a candidate. Compare shell-only and weighted full-kit parallel routing."
+}
