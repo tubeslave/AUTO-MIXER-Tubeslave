@@ -13,7 +13,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-12-1200 | [Report](ML-2026-09-12-1200.md), [JSON patch](ML-2026-09-12-1200.json) | Loud-rock peak control: 4 literature/documentation cards, 3 fully studied videos, 8 Knowledge Cards, 6 candidate rules, 4 unrun experiments |
 | ML-2026-09-12-1500 | [Report](ML-2026-09-12-1500.md), [JSON patch](ML-2026-09-12-1500.json) | Drum bleed/gating/room control: 4 literature/documentation cards, 3 studied and 2 queued videos, 1 legal educational multitrack, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-12-1800 | [Report](ML-2026-09-12-1800.md), [JSON patch](ML-2026-09-12-1800.json) | Bass/kick/heavy-guitar interaction: 3 literature/documentation cards, 2 studied and 2 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
-| ML-2026-09-13-0900 | [Report](ML-2026-09-13-0900.md), [JSON patch](ML-2026-09-13-0900.json) | Early/late reverb and rock spatial effects: 3 source/code cards, 3 fully studied videos, 8 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
+| ML-2026-09-13-0900 | [Report](ML-2026-09-13-0900.md), [JSON patch](ML-2026-09-13-0900.json) | Early/late reverb and rock spatial effects: 3 source/code cards, 3 fully studied videos, 8 Knowledge Cards, 8 candidate rules, 4 unrun experiments |\n| ML-2026-09-13-1200 | [Report](ML-2026-09-13-1200.md), [JSON patch](ML-2026-09-13-1200.json) | Reference-conditioned automixing and rock compression: 3 source/code cards, 3 fully studied videos, 10 Knowledge Cards, 8 candidate rules, 4 unrun experiments |
 
 ## Spatial package: reading and safety
 
