@@ -1,0 +1,172 @@
+{
+  "schema_version": "mixing-learning-update-v1",
+  "update_id": "ML-2026-09-14-1200",
+  "discovered_at": "2026-09-14",
+  "run_slot_msk": "12:00",
+  "topic": "sequential automatic mixing, live predictive gain control, bleed robustness, and mix evaluation",
+  "reading_depth_summary": {"full_text": 3, "metadata_only_not_promoted": 1},
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260914-1200-01",
+      "title": "Rethinking Automatic Music Mixing as Sequential Stem Blending",
+      "authors": ["Yen-Tung Yeh", "Chung-Jui Chan", "Yun-Ning (Amy) Hung", "Yi-Hsuan Yang"],
+      "publication_date": "2026-08-06",
+      "discovery_date": "2026-09-14",
+      "identifier": "arXiv:2608.05506v1",
+      "doi": "10.48550/arXiv.2608.05506",
+      "url": "https://arxiv.org/html/2608.05506v1",
+      "reading_depth": "full_text",
+      "read_sections": ["method", "data synthesis", "implementation", "objective evaluation", "perceptual evaluation", "results", "limitations"],
+      "limited_conclusion": "A fixed submix can serve as an acoustic anchor while only the incoming stem is adapted; input order is a testable control variable, not a universal hierarchy.",
+      "limitations": ["18 listeners and six examples", "early sparse submix states not represented by degradation synthesis", "not SOTA on tonal-balance and style-similarity metrics", "demo audio unavailable during check"]
+    },
+    {
+      "id": "SRC-ML-20260914-1200-02",
+      "title": "AILive Mixer: A Deep Learning based Zero Latency Automatic Music Mixer for Live Music Performances",
+      "authors": ["Devansh Zurale", "Iris Lorente", "Michael Lester", "Alex Mitchell"],
+      "publication_date": "2026-03-16",
+      "discovery_date": "2026-09-14",
+      "identifier": "arXiv:2603.15995v1; ICASSP 2026",
+      "doi": "10.1109/ICASSP55912.2026.11462222",
+      "url": "https://arxiv.org/html/2603.15995v1",
+      "reading_depth": "full_text",
+      "read_sections": ["architecture", "multi-rate processing", "zero-latency training", "bleed simulation", "listening test", "results", "limitations"],
+      "limited_conclusion": "Past-context prediction can remove an audio lookahead buffer for 50-ms mono-gain frames, but entrances, gain discontinuities, clipping and synthetic-to-real bleed shift require explicit safety tests.",
+      "limitations": ["mono gains only", "35 training and 8 validation songs", "15 listeners and 8 internal live excerpts", "synthetic bleed with isolated-track targets", "unnormalized listening outputs", "no significant evidence separating ALM-MR from ALM-SR"]
+    },
+    {
+      "id": "SRC-ML-20260914-1200-03",
+      "title": "The Mix Evaluation Dataset",
+      "authors": ["Brecht De Man", "Joshua D. Reiss"],
+      "publication_date": "2017-09-05",
+      "discovery_date": "2026-09-14",
+      "identifier": "DAFx-17 paper 49; ISSN 2413-6689",
+      "doi": null,
+      "url": "https://www.dafx.de/paper-archive/2017/papers/DAFx17_paper_49.pdf",
+      "reading_depth": "full_text",
+      "read_sections": ["dataset construction", "mixes and stems", "preference ratings", "comments", "metadata", "expertise analysis", "conclusion"],
+      "limited_conclusion": "Blind preference, technical quality and structured instrument-specific comments should be retained as distinct observations.",
+      "limitations": ["2017 publication", "Western-genre and participant bias", "current raw-track access and per-track licenses not reverified", "abstract says 180 mixes while the paper table reports 181"]
+    }
+  ],
+  "metadata_only_sources": [
+    {
+      "id": "QUEUE-SCI-ML-20260914-1200-01",
+      "title": "Detection of phase alignment and polarity in drum tracks",
+      "authors": ["Alek Weidman", "John Sweeney", "Wesley Bulla"],
+      "publication_date": "2023",
+      "identifier": "AES Paper 10667",
+      "url": "https://www.aes.org/e-lib/browse.cfm?elib=22248",
+      "reading_depth": "metadata_abstract_only",
+      "status": "not_promoted",
+      "reason": "full text was not freely available; no rule extracted"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260914-1200-01","title":"Acoustic anchor","claim":"A fixed accepted submix constrains the next stem decision without rewriting prior context.","confidence":"medium-high","source_ids":["SRC-ML-20260914-1200-01"]},
+    {"id":"KC-ML-20260914-1200-02","title":"Order is a control","claim":"Stem order changes sequential results and must be conditioned by section role.","confidence":"medium","source_ids":["SRC-ML-20260914-1200-01"]},
+    {"id":"KC-ML-20260914-1200-03","title":"Raw can win","claim":"Automatic processing can degrade an already suitable stem; no-processing and level-only are required baselines.","confidence":"high","source_ids":["SRC-ML-20260914-1200-01"]},
+    {"id":"KC-ML-20260914-1200-04","title":"Metrics can disagree","claim":"Tonal-balance or crest distribution distance can disagree with listener preference.","confidence":"medium-high","source_ids":["SRC-ML-20260914-1200-01","SRC-ML-20260914-1200-03"]},
+    {"id":"KC-ML-20260914-1200-05","title":"Predictive zero latency","claim":"Zero audio-lookahead can be implemented by next-frame prediction and remains fallible at unexpected entrances.","confidence":"high","source_ids":["SRC-ML-20260914-1200-02"]},
+    {"id":"KC-ML-20260914-1200-06","title":"Temporal safety","claim":"Learned live gain trajectories require explicit step, slew, recovery and clipping tests.","confidence":"medium","source_ids":["SRC-ML-20260914-1200-02"]},
+    {"id":"KC-ML-20260914-1200-07","title":"Bleed domain gap","claim":"An isolated-track target is not ground truth for a naturally bleeding live stage.","confidence":"high","source_ids":["SRC-ML-20260914-1200-02"]},
+    {"id":"KC-ML-20260914-1200-08","title":"Preference is not quality","claim":"Preference, technical quality and instrument-specific comments are distinct evaluation fields.","confidence":"high","source_ids":["SRC-ML-20260914-1200-03"]}
+  ],
+  "rule_candidates": [
+    {
+      "id":"RULE-ML-20260914-1200-01","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-01"],
+      "when_apply":"adding one instrument or role into an accepted submix","instrument_section":"any instrument; section-aware",
+      "change":"process only the incoming stem while holding the accepted submix fixed",
+      "proposed_range":"workflow constraint; no numeric DSP range",
+      "range_origin":"paper method",
+      "protect":["accepted balance","spectral hierarchy","space","dynamics"],
+      "verify":"null/context comparison plus loudness-matched blind A/B",
+      "cancel":"the defect is located in the existing submix rather than the incoming stem",
+      "confidence":"medium-high"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-02","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-01"],
+      "when_apply":"choosing sequential stem order","instrument_section":"whole mix; section roles; no automatic vocal priority",
+      "change":"compare foundation-first, section-role priority, and counterbalanced/random control; include rhythm-guitar foundation for Premiera",
+      "proposed_range":"at least 3 order families",
+      "range_origin":"project experiment design; the paper compared domain and random orders",
+      "protect":["creative hierarchy","rhythm-guitar foundation","groove"],
+      "verify":"intermediate renders and final loudness-matched blind preference",
+      "cancel":"order effects do not repeat across sections or worsen protected qualities",
+      "confidence":"medium"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-03","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-01"],
+      "when_apply":"before applying automatic processing to any stem","instrument_section":"all instruments and sections",
+      "change":"retain no-processing and level-only variants",
+      "proposed_range":"level grid determined per loudness-matched experiment",
+      "range_origin":"project control requirement supported by raw-mix results",
+      "protect":["natural attack","timbre","existing suitability"],
+      "verify":"processed candidate must beat both baselines in blind comparison",
+      "cancel":"no reliable advantage over either baseline",
+      "confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-04","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-01","SRC-ML-20260914-1200-03"],
+      "when_apply":"after each sequential blend step","instrument_section":"current stem and cumulative submix",
+      "change":"store and evaluate intermediate submix before continuing",
+      "proposed_range":"every blend step",
+      "range_origin":"sequential model provides intermediate outputs; cadence is workflow design",
+      "protect":["section balance","masking","mono","peak and short-term loudness"],
+      "verify":"structured preference and technical comments at intermediate and final stages",
+      "cancel":"later corrections systematically compensate earlier harm",
+      "confidence":"medium-high"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-05","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-02"],
+      "when_apply":"using predicted live channel gains","instrument_section":"live multitrack, especially percussion and sudden entrances",
+      "change":"enforce tested gain-step/slew bounds, hysteresis or equivalent smoothing, confidence and safe fallback",
+      "proposed_range":"not specified; derive from onset-test grid",
+      "range_origin":"engineering hypothesis from reported gain jumps, not a paper parameter prescription",
+      "protect":["transients","groove","absence of pumping","headroom"],
+      "verify":"first-event error, max gain step, clipping, recovery and blind A/B",
+      "cancel":"smoothing masks attacks or predictor is less stable than static/level-only baseline",
+      "confidence":"medium"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-06","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-02"],
+      "when_apply":"validating predictive live control","instrument_section":"entrances, returns after silence, fills and accents",
+      "change":"include explicit onset and re-entry cases",
+      "proposed_range":"50-ms prediction horizon as tested in the paper plus project-designed controls",
+      "range_origin":"paper architecture and project experiment design",
+      "protect":["first hit or syllable","attack","timing"],
+      "verify":"event-aligned error and loudness-matched listening",
+      "cancel":"first events are systematically lost or gain jumps increase",
+      "confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260914-1200-07","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1200-02","SRC-ML-20260914-1200-03"],
+      "when_apply":"evaluating a live gain controller",
+      "instrument_section":"full live mix and representative sections",
+      "change":"run separate operational non-normalized and loudness-matched blind preference tests",
+      "proposed_range":"two evaluation tracks",
+      "range_origin":"project design responding to the unnormalized live paper and preference-quality distinction",
+      "protect":["headroom validity","preference validity"],
+      "verify":"report clipping/headroom separately from preference and technical-quality scores",
+      "cancel":"conclusions still depend on uncontrolled level differences",
+      "confidence":"high"
+    }
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260914-1200-01","status":"not_run","title":"Rock stem-order test","conditions":["drums-bass foundation","rhythm-guitar foundation","section-role priority","counterbalanced/random control","raw/level-only at every step"],"controls":["same processing candidate","intermediate renders","final loudness matching","blind randomization"],"criteria":["section hierarchy","rhythm-guitar mass","kick/bass centre","snare attack/body","masking","mono","late compensation count"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1200-02","status":"not_run","title":"Live onset forecast","conditions":["static/level-only","50-ms next-frame predictor","smoothed predictor","confidence fallback"],"controls":["event-aligned stimuli","same channels","operational and level-matched evaluations"],"criteria":["first-event error","max gain step","clipping","recovery time","preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1200-03","status":"not_run","title":"Synthetic-to-real bleed shift","conditions":["simulated bleed","naturally recorded bleed"],"controls":["same model/controller","matched programme roles"],"criteria":["gain error","coincident hits","cymbal wash","room continuity","pumping","clipping"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1200-04","status":"not_run","title":"Objective versus perceptual evaluation protocol","conditions":["objective metrics","blind preference","technical-quality score","instrument-feature-valence comments"],"controls":["same excerpts","randomized labels","loudness matching for preference"],"criteria":["ranking agreement","explained disagreements","repeatable protected qualities"],"decision_owner":"Dmitry"}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260914-1200-01","title":"Advanced Time Alignment and Fixing Phase Issues with SoundRadix Auto-Align 2","channel":"Urban Sound Studio","published_at":"2025-02-24","duration_metadata":"PT13M56S","url":"https://www.youtube.com/watch?v=GVWQ0ZJ4Kzo","content_access":"metadata_only","status":"queued_source","transcript":"unavailable","limitations":["visible YouTube UI reported captions unavailable","player state showed conflicting transient duration; metadata duration retained with verification flag"],"conclusions_extracted":false},
+    {"id":"VID-ML-20260914-1200-02","title":"Advanced Mixing Techniques: Phase Correcting Drums","channel":"Berklee Online","presenter":"Richard Mendelson","published_at":"2019-05-14","duration_metadata":"PT8M26S","url":"https://www.youtube.com/watch?v=zFbX_y2ouZA","content_access":"metadata_only","status":"queued_source","transcript":"unavailable","limitations":["visible YouTube UI reported captions unavailable"],"conclusions_extracted":false},
+    {"id":"VID-ML-20260914-1200-03","title":"Prepare Your Tracks For Mixing w/ David Gnozzi","channel":"Pro Mix Academy","presenter":"David Gnozzi","published_at":"2022-06-14","duration_metadata":"PT9M58S","url":"https://www.youtube.com/watch?v=AG0qmqoDWRg","content_access":"metadata_only","status":"queued_source","transcript":"unavailable","limitations":["visible YouTube UI reported captions unavailable"],"conclusions_extracted":false}
+  ],
+  "reference_cards": [],
+  "multitracks_added": [],
+  "deduplication": {"base_reviewed_through":"ML-2026-09-14-0900","duplicates_removed":["compressor control-envelope measurement","black-box DRC inversion","AQFeatures","videos already queued in prior updates"]},
+  "tool_limits": ["Consensus and Scite free access were unavailable from the prior checked quota state; no paid access used", "YouTube captions/transcripts were unavailable for all three selected videos", "AES phase paper full text was not freely available", "Mix Evaluation raw-track catalog and per-track licenses were not reverified"],
+  "next_experiment":"EXP-ML-20260914-1200-01",
+  "safety": {"audio_modified":false,"dsp_modified":false,"runtime_rules_modified":false,"commercial_audio_extracted":false,"external_audio_uploaded":false,"all_rules_auto_apply":false,"other_chat_delivery_confirmed":false}
+}
