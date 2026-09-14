@@ -18,6 +18,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-13-1500 | [Report](ML-2026-09-13-1500.md), [JSON patch](ML-2026-09-13-1500.json) | Stereo-image metrics and rhythm-guitar width: 4 source/code cards, 0 studied and 3 new queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-13-1800 | [Report](ML-2026-09-13-1800.md), [JSON patch](ML-2026-09-13-1800.json) | Lead-guitar role, de-masking and placement: 3 full-text sources, 0 studied and 5 queued videos, 1 legal educational multitrack, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-DYNAMICS-2026-09-13-201140 | [Guide](ML-DYNAMICS-2026-09-13-201140.md), [complete JSON](ML-DYNAMICS-2026-09-13-201140.json), [publication and validation](ML-DYNAMICS-2026-09-13-201140.publication.json) | Dynamics/compression: 14 source cards, 8 Knowledge Cards, 8 candidate rules, 4 queued videos, 1 metadata-only benchmark, 4 unrun experiments; no runtime rule promotion |
+| ML-2026-09-14-0900 | [Report](ML-2026-09-14-0900.md), [JSON patch](ML-2026-09-14-0900.json) | Compressor behavior validation: 4 source/code cards (including 1 reading-depth upgrade), 0 studied and 4 queued videos, 8 Knowledge Cards, 6 candidate rules, 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -55,9 +56,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-DYNAMICS-2026-09-13-201140: distinguish event, performance and section dynamics. CF/PLR/PSR/LRA/GR are not interchangeable; record measurement windows, calibration, activity and articulation. Do not infer compression need from one number or genre. Keep no-DRC and level-only baselines. Next tests: EXP-DYN-20260913-201140-01 (meter contract) and EXP-DYN-20260913-201140-02 (snare attack/body), not_run. Rules remain candidate/auto_apply:false; no audio or runtime changes. Other-chat delivery and agent ingestion are unconfirmed.
+ML-2026-09-14-0900: validate compressor behavior with ramp, bursts, alignment probe and programme audio. When a true GR trajectory exists, compare it directly; keep waveform/spectral color and listener preference separate. Do not transfer attack/release labels between processors as equivalent behavior. Condition dynamic histograms by event, articulation and section. All rules remain `candidate / auto_apply:false`; all experiments remain `not_run`.
 
 ## Previous latest handoffs
+
+ML-DYNAMICS-2026-09-13-201140: distinguish event, performance and section dynamics. CF/PLR/PSR/LRA/GR are not interchangeable; record measurement windows, calibration, activity and articulation. Do not infer compression need from one number or genre. Keep no-DRC and level-only baselines. Next tests: EXP-DYN-20260913-201140-01 (meter contract) and EXP-DYN-20260913-201140-02 (snare attack/body), not_run. Rules remain candidate/auto_apply:false; no audio or runtime changes. Other-chat delivery and agent ingestion are unconfirmed.
 
 ML-2026-09-13-1800: treat lead guitar as a phrase/section role, not a permanent track privilege. Compare no action and the smallest local level move first; only then test bounded dynamic de-masking or playback-specific spatial separation. Do not transplant HRTF results or prototype timing/gain limits. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
