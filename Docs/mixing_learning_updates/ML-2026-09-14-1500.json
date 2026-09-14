@@ -1,0 +1,199 @@
+{
+  "update_id": "ML-2026-09-14-1500",
+  "run_local": "2026-09-14T15:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "discovered_on": "2026-09-14",
+  "base_update": "ML-2026-09-14-1200",
+  "scope": [
+    "dynamic_range_compression",
+    "automatic_equalization",
+    "differentiable_audio_processing",
+    "multiband_semantics",
+    "transient_preservation",
+    "listener_preference",
+    "rock_mix_bus_processing"
+  ],
+  "safety": {
+    "research_only": true,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_rules_changed": false,
+    "repository_code_changed": false,
+    "paid_access_used": false,
+    "external_audio_upload": false
+  },
+  "deduplication": {
+    "checked_default_branch": true,
+    "base_commit": "f6901ec97ae85283be2caec7ca97f9d4f5caba61",
+    "excluded_duplicates": [
+      {
+        "item": "Telefunken Big Big Train — Transit of Venus Across the Sun",
+        "existing_id": "REF-ML-20260912-1500-01"
+      }
+    ]
+  },
+  "tool_availability": {
+    "mixing_learning_reference_hub": "not_exposed",
+    "youtube_learning_bridge": "not_exposed",
+    "youtube_public_browser": "available",
+    "consensus": "monthly_free_limit_exhausted_until_2026-10-01",
+    "scite": "monthly_free_limit_exhausted_until_2026-10-01",
+    "arxiv_mcp": "not_verified",
+    "freesound_mcp": "not_verified",
+    "zotero_mcp": "not_verified"
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260914-1500-01",
+      "title": "Neural-Driven Multi-Band Processing for Automatic Equalization and Style Transfer",
+      "authors": ["Parakrant Sarkar", "Permagnus Lindborg"],
+      "publication": "Proceedings of DAFx-2025",
+      "publication_date": "2025-09",
+      "url": "https://dafx.de/paper-archive/2025/DAFx25_paper_81.pdf",
+      "archive_url": "https://dafx.de/paper-archive/details/AvUulq3fVM5yMf35-alPvQ",
+      "license": "CC_BY_4_0",
+      "reading_depth": "full_text_method_dsp_parameters_dataset_training_baselines_results_listening_discussion_limits",
+      "key_findings": [
+        "Parameters are fixed within each 3 s or 6 s chunk.",
+        "No explicit crossover or band splitting is used; six PEQs and associated compressors are applied sequentially to full-band audio.",
+        "MUSDB18 stems are converted to mono and already contain unknown professional processing.",
+        "PEQ plus single-band DRC captured most MOS benefit and exceeded NDMP on several objective style-transfer metrics.",
+        "Claims of consistent objective superiority are not supported by the complete metric table."
+      ],
+      "numbers": [
+        {"name":"eq_gain_db","range":[-20,20],"origin":"training_range_not_preset"},
+        {"name":"eq_fc_hz","range":[20,21050],"origin":"training_range_not_preset"},
+        {"name":"eq_q","range":[0.1,6.0],"origin":"training_range_not_preset"},
+        {"name":"threshold_db","range":[-60,0],"origin":"training_range_not_preset"},
+        {"name":"ratio","range":[1.0,10.0],"origin":"training_range_not_preset"},
+        {"name":"attack_ms","range":[1.0,100.0],"origin":"training_range_not_preset"},
+        {"name":"release_ms","range":[10.0,500.0],"origin":"training_range_not_preset"},
+        {"name":"listening_participants","value":20,"origin":"study_design"}
+      ],
+      "limitations": [
+        "No released NDMP implementation was identified in the paper.",
+        "Audio-example link was not resolvable from the read source.",
+        "The transient-preservation metric direction is insufficiently documented and discussed inconsistently.",
+        "Mono processed stems do not validate stereo or raw multitrack rock mixing."
+      ]
+    },
+    {
+      "id": "SRC-ML-20260914-1500-02",
+      "title": "Listener Preferences for Alternative Dynamic-Range-Compressed Audio Configurations",
+      "authors": ["William Campbell", "Justin Paterson", "Ian van der Linde"],
+      "publication": "Journal of the Audio Engineering Society 65(7/8), 540-551",
+      "publication_date": "2017-08-15",
+      "doi": "10.17743/jaes.2017.0019",
+      "url": "https://repository.uwl.ac.uk/id/eprint/3324/1/Listener%20preferences%20for%20alternative%20dynamic-range-compressed%20audio%20configurations_Unpublished%20version.pdf",
+      "reading_depth": "full_accepted_manuscript_method_settings_normalization_results_discussion_limits_conclusion",
+      "study_design": {
+        "participants": 130,
+        "task": "13 sequential 2IFC A/B preference trials",
+        "stimulus": "one unknown 10 s mono popular-music excerpt with eight raw tracks",
+        "factors": ["magnitude", "compression_vs_limiting", "track_vs_subgroup_vs_full_sum"],
+        "level_matching": "final RMS normalization -15 dBFS; mean -17.68 LUFS SD 0.09"
+      },
+      "numbers": [
+        {"name":"compression_ratio","value":"1.8:1","origin":"study_stimulus_not_preset"},
+        {"name":"limiting_ratio","value":"10:1","origin":"study_stimulus_not_preset"},
+        {"name":"attack_ms","value":0.5,"origin":"study_stimulus_not_preset"},
+        {"name":"release_ms","value":5,"origin":"study_stimulus_not_preset"},
+        {"name":"moderate_threshold_dbfs","value":-9.9,"origin":"8_percent_samples_above_threshold"},
+        {"name":"heavy_threshold_dbfs","value":-14.8,"origin":"25_percent_samples_above_threshold"}
+      ],
+      "key_findings": [
+        "Compression was preferred more often than chance and limiting less often when pooled across other variables.",
+        "Track processing was preferred more often and full-sum processing less often when pooled across other variables.",
+        "Heavy full-sum limiting was especially disfavored.",
+        "Magnitude alone was marginal, and heavy track compression was among preferred interactions; the result is not simply less compression is better."
+      ],
+      "limitations": [
+        "One 10 s mono excerpt and one processor.",
+        "Common 0.5 ms attack and 5 ms release were not optimized per source or topology.",
+        "Subgroup composition was fixed.",
+        "Generalization to modern stereo rock or metal was not tested."
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260914-1500-01","claim":"Architecture labels require signal-path and probe verification; sequential full-band stages are not crossover multiband processing.","source_ids":["SRC-ML-20260914-1500-01"],"confidence":"high","boundary":"topology_fact_not_preference"},
+    {"id":"KC-ML-20260914-1500-02","claim":"Fixed parameters per 3/6 s chunk are segment-conditioned, not time-varying within the chunk.","source_ids":["SRC-ML-20260914-1500-01"],"confidence":"high","boundary":"paper_implementation"},
+    {"id":"KC-ML-20260914-1500-03","claim":"Every exposed DRC parameter needs an independent sensitivity/null test before it is treated as editable or interpretable.","source_ids":["SRC-ML-20260914-1500-01"],"cross_reference":"ML-2026-09-14-0900","confidence":"high"},
+    {"id":"KC-ML-20260914-1500-04","claim":"A simpler PEQ plus single-band DRC baseline can retain most subjective benefit and win some objective targets.","source_ids":["SRC-ML-20260914-1500-01"],"confidence":"medium_high","boundary":"one_dataset_and_tasks"},
+    {"id":"KC-ML-20260914-1500-05","claim":"Loudness, spectral alignment, crest, transient behavior, phase and preference must remain separate outputs when metrics disagree.","source_ids":["SRC-ML-20260914-1500-01"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1500-06","claim":"Processed mono stems cannot validate stereo, multi-mic phase, bleed or raw-track rock-mixing decisions.","source_ids":["SRC-ML-20260914-1500-01"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1500-07","claim":"At subgroup/full-sum points, peaks in one element can control gain applied to other elements; event-aligned cross-triggering is a diagnostic target.","source_ids":["SRC-ML-20260914-1500-02"],"confidence":"medium_high","boundary":"mechanism_and_single_excerpt_preference_test"},
+    {"id":"KC-ML-20260914-1500-08","claim":"Campbell et al. supports testing DRC placement and caution with heavy full-sum limiting, not universal genre settings.","source_ids":["SRC-ML-20260914-1500-02"],"confidence":"high","boundary":"one_excerpt_fixed_fast_ballistics"}
+  ],
+  "rule_candidates": [
+    {
+      "id":"RULE-ML-20260914-1500-01","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-01"],
+      "when_apply":"processor claims multiband or per-band dynamics","instrument_section":"any source or bus; section-specific evaluation",
+      "change":"run in-band and out-of-band probes before accepting the topology label","proposed_range":"at least one in-band and one out-of-band probe per claimed band","number_origin":"project_experiment_design",
+      "protect":["phase","latency","attack_body","no_unexpected_full_band_pumping"],"success":"localized repeatable response on synthetic and music probes","cancel":"documented full-band topology or leakage disproves isolation","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-02","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-01"],"cross_reference":"ML-2026-09-14-0900",
+      "when_apply":"DRC parameter becomes a trainable or interpretable control","instrument_section":"compressor implementation validation",
+      "change":"one-control sweep with fixed other controls; compare GR and null","proposed_range":{"attack_ms":[1,10,100],"release_ms":[10,100,500]},"number_origin":"NDMP_training_range_boundaries_not_presets",
+      "protect":["causal_parameter_semantics","repeatability","pinned_version"],"success":"independent predictable attack and recovery changes","cancel":"outputs or GR are unchanged or effect contradicts label","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-03","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-01"],
+      "when_apply":"learned multistage or multiband dynamics is proposed","instrument_section":"source_group_or_mix_bus",
+      "change":"compare no-processing, level-only, PEQ, PEQ+single-band DRC and complex system at matched loudness","proposed_range":"match audible processing depth rather than copy training ranges","number_origin":"controlled_comparison_design",
+      "protect":["transient","phase","spectral_balance","mono_stereo_role"],"success":"complex system wins a preregistered musical target without harming protected qualities","cancel":"simple baseline is equal or better","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-04","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-01"],
+      "when_apply":"reference matching or DRC targets transient-rich material","instrument_section":"drums, bass pick/slap, palm-muted guitars by section",
+      "change":"score event attack, body and recovery separately","proposed_range":"onset and tempo conditioned windows; no universal milliseconds claimed","number_origin":"project_test_design",
+      "protect":["shell_body","ghost_notes","pick_articulation","next_beat"],"success":"loudness-matched blind test preserves attack role and body without excess pumping","cancel":"metric improves while punch/body preference worsens","confidence":"medium_high"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-05","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-02"],
+      "when_apply":"bus DRC audibly moves unrelated instruments after kick/snare peaks","instrument_section":"drum subgroup, instrument subgroup or full mix in dense rock sections",
+      "change":"log event-aligned GR and compare local, track, subgroup and full-sum processing","proposed_range":"tempo/envelope matched; Campbell 0.5/5 ms and thresholds explicitly forbidden as presets","number_origin":"study_parameters_retained_only_as_nontransferable_context",
+      "protect":["groove","section_lift","room_continuity","guitar_mass","center_stability"],"success":"desired density without unintended attenuation of neighboring roles","cancel":"cohesion falls or artifacts increase","confidence":"medium_high"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-06","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-02"],
+      "when_apply":"choosing track/subgroup/mix-bus/limiter topology","instrument_section":"verse, chorus and dense fill or solo; role-aware",
+      "change":"counterbalanced loudness-matched A/B/X with separate density, punch and distortion ratings","proposed_range":"at least three contrasting sections","number_origin":"project_minimum_test_design",
+      "protect":["section_contrast","musical_hierarchy","no_automatic_vocal_priority"],"success":"Dmitry preference is stable and protected qualities pass","cancel":"preference flips by section or after matching loudness","confidence":"medium"
+    },
+    {
+      "id":"RULE-ML-20260914-1500-07","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1500-01","SRC-ML-20260914-1500-02"],
+      "when_apply":"numeric DRC or loudness setting is stored","instrument_section":"all",
+      "change":"record number_origin as training_range, study_stimulus, measurement_result or project_test_range","proposed_range":"none","number_origin":"provenance_rule",
+      "protect":["no_research_number_becomes_genre_preset"],"success":"every number has source and applicability boundary","cancel":"unverifiable number is removed","confidence":"high"
+    }
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260914-1500-Q1","title":"Drum Compression: Attack And Release Settings Explained","channel":"Production Expert","url":"https://www.youtube.com/watch?v=pcmHXmWu1lc","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false},
+    {"id":"VID-ML-20260914-1500-Q2","title":"Master bus compression tips w/ Andrew Wade - tutorial","channel":"URM Academy","url":"https://www.youtube.com/watch?v=-AIxQcWfkpA","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false},
+    {"id":"VID-ML-20260914-1500-Q3","title":"Best Mix Bus Compressor for Rock in 2026 | The Sierra Sessions","channel":"Records On Top","url":"https://www.youtube.com/watch?v=lPwVsU3uLRM","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","metadata_claims_not_promoted":["blind test of eight compressors","approximately 3 dB gain reduction"],"conclusions_created":false}
+  ],
+  "reference_cards": [],
+  "multitracks_added": [],
+  "experiments": [
+    {"id":"EXP-ML-20260914-1500-01","title":"Band-specificity audit","status":"not_run","material":"synthetic band-limited probes plus licensed rock drums bass guitars","variants":["no_processing","level_only","PEQ","PEQ_plus_single_band_DRC","true_crossover_multiband","NDMP_like_sequential_full_band"],"controls":["matched_loudness","matched_processing_depth","fixed_sections"],"metrics":["out_of_band_GR_leakage","event_attack_body_recovery","short_term_loudness","documented_window_crest","phase_latency","null_residual","blind_preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1500-02","title":"Attack release semantic sensitivity","status":"not_run","material":"ramp burst burst_train licensed_rock_drums","grid":{"attack_ms":[1,10,100],"release_ms":[10,100,500]},"number_origin":"NDMP_training_range_boundaries_not_presets","metrics":["GR_envelope","null_residual","loudness_matched_listening"],"cancel":"parameter does not independently affect expected behavior","decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1500-03","title":"DRC placement matrix","status":"not_run","material":"licensed_stereo_rock_multitrack","sections":["verse","chorus","dense_fill_or_solo"],"variants":["no_DRC","level_only","track","subgroup","mix_bus","limiter"],"controls":["matched_artistic_density","matched_final_loudness","peak_safety"],"metrics":["event_cross_trigger_GR","kick_snare_body","guitar_mass","room_continuity","blind_preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1500-04","title":"Metric preference disagreement","status":"not_run","material":"renders_from_EXP_01_or_03","metrics":["SI_SDR_or_waveform_fidelity","MRSTFT","crest_with_contract","attack_body","phase","blind_preference"],"success":"conflicts remain visible and interpretable","cancel":"single composite score changes ranking without a musical explanation","decision_owner":"Dmitry"}
+  ],
+  "counts": {
+    "source_cards": 2,
+    "full_text_sources": 2,
+    "knowledge_cards": 8,
+    "rule_candidates": 7,
+    "video_source_cards": 3,
+    "videos_studied": 0,
+    "queued_sources": 3,
+    "reference_cards": 0,
+    "multitracks_added": 0,
+    "experiments_not_run": 4
+  },
+  "next_experiment_id": "EXP-ML-20260914-1500-01",
+  "handoff": "Do not trust multiband labels without band-isolation probes. Fixed segment-level parameters are not time-varying within a segment. Preserve no-processing, level-only and PEQ+single-band baselines. For bus compression measure which source triggers GR and which neighboring roles are attenuated. Training ranges and one-excerpt listening-test settings are not rock presets."
+}
