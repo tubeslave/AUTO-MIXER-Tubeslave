@@ -1,0 +1,97 @@
+{
+  "update_id": "ML-2026-09-14-1800",
+  "run_local": "2026-09-14T18:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "discovered_on": "2026-09-14",
+  "base_update": "ML-2026-09-14-1500",
+  "scope": ["multichannel_debleeding", "channel_permutation_equivariance", "domain_shift", "drum_phase_polarity", "bleed_ducking_expansion", "hi_hat_deessing"],
+  "safety": {"research_only": true, "audio_changed": false, "dsp_changed": false, "runtime_rules_changed": false, "repository_code_changed": false, "paid_access_used": false, "external_audio_upload": false},
+  "deduplication": {"checked_default_branch": true, "base_commit": "a5f4e6f8022670f9108c6a524c25a1b244f89678", "compared_updates": ["ML-2026-09-12-0900", "ML-2026-09-12-1500", "ML-2026-09-14-1500"], "excluded_duplicates": []},
+  "tool_availability": {"mixing_learning_reference_hub": "not_exposed", "youtube_learning_bridge": "not_exposed", "youtube_public_browser": "available", "consensus": "monthly_free_limit_exhausted_until_2026-10-01", "scite": "monthly_free_limit_exhausted_until_2026-10-01", "arxiv_mcp": "not_verified", "freesound_mcp": "not_verified", "zotero_mcp": "not_verified"},
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260914-1800-01",
+      "title": "Learning Input-Channel Permutation Equivariance for Multi-Channel Source Separation: Reducing Bleeding in Small Music Ensembles",
+      "authors": ["Ruchi Pandey", "et al."],
+      "publication_date": "2026-06-15",
+      "doi": "10.48550/arXiv.2606.16551",
+      "url": "https://arxiv.org/html/2606.16551v1",
+      "reading_depth": "full_text_problem_architecture_data_augmentation_losses_results_discussion_limitations",
+      "key_findings": [
+        "The same random permutation is applied to input and target channels; output identity remains tied to the input channel and this is not PIT.",
+        "Permutation training strongly improved objective SDR generalization to unseen rooms, layouts, distances and instruments in the reported five-channel string-ensemble setup.",
+        "At 25 cm on unseen URMP strings, magnitude plus permutation achieved 5.3 dB mean SDR improvement versus 0.3 dB without permutation; real-imaginary plus permutation achieved 3.9 dB versus -5.5 dB.",
+        "The magnitude spectral branch outperformed concatenated real-imaginary features in this architecture; this does not establish that phase cues are generally unhelpful."
+      ],
+      "numbers": [
+        {"name": "channel_count", "value": 5, "origin": "study_architecture_not_runtime_requirement"},
+        {"name": "stft_window_samples", "value": 4096, "origin": "study_architecture"},
+        {"name": "stft_hop_samples", "value": 1024, "origin": "study_architecture"},
+        {"name": "training_mic_distance_cm", "value": 25, "origin": "study_design"},
+        {"name": "test_distance_cm", "range": [20, 50], "origin": "study_generalization_grid"}
+      ],
+      "limitations": ["Synthetic acoustic training and evaluation conditions.", "Strings and small ensembles rather than live rock drums.", "Fixed five-channel architecture.", "Objective SDR without a listening test."]
+    },
+    {
+      "id": "SRC-ML-20260914-1800-02",
+      "title": "The Spheres Dataset: Multitrack Orchestral Recordings for Music Source Separation and Information Retrieval",
+      "authors": ["Jaime García-Martínez", "David Diaz-Guerra", "John Anderson", "Ricardo Falcón Pérez", "Pablo Cabañas-Molero", "Tuomas Virtanen", "Julio José Carabias-Orti", "Pedro Vera-Candeas"],
+      "publication": "IEEE/ACM Transactions on Audio, Speech, and Language Processing 34 (2026), 2622-2634",
+      "publication_date": "2026",
+      "doi": "10.1109/TASLPRO.2026.3685882",
+      "url": "https://arxiv.org/html/2511.21247v2",
+      "dataset_doi": "10.5281/zenodo.17347681",
+      "dataset_url": "https://zenodo.org/records/17347681",
+      "reading_depth": "full_text_recording_design_controlled_bleed_rirs_baselines_cross_dataset_results_limitations_plus_zenodo_metadata_rights",
+      "key_findings": [
+        "Isolated performances were captured through all active microphones, enabling exact target and bleed contribution matrices.",
+        "The public record lists 23 microphones, 48 kHz lossless FLAC, stereo mixes, multichannel signals, RIRs and raw clap-sweep recordings.",
+        "Within-dataset separation improvements did not transfer reliably to Operation Beethoven; room, microphone and instrument mismatch caused artifacts and interference degradation.",
+        "Similar-timbre violin sections were a difficult case."
+      ],
+      "license_status": "metadata_verified_license_unresolved",
+      "license_note": "Zenodo labels the record Open but the Rights/License field is blank; article-text licensing and public-domain compositions do not establish the recording license.",
+      "limitations": ["Orchestral rather than rock domain.", "Individually recorded lines rather than simultaneous ensemble performance.", "Two principal pieces.", "No listener test connecting SDR/SIR/SAR to mix quality."]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260914-1800-01","claim":"Joint input-target permutation is an equivariance augmentation, not PIT; output remains tied to the corresponding input microphone.","source_ids":["SRC-ML-20260914-1800-01"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1800-02","claim":"A multichannel debleeder needs a reorder-then-unreorder test to expose channel-index shortcuts.","source_ids":["SRC-ML-20260914-1800-01"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1800-03","claim":"Room, layout, distance and instrument domain shift can reverse per-channel benefit even when training metrics are positive.","source_ids":["SRC-ML-20260914-1800-01","SRC-ML-20260914-1800-02"],"confidence":"high","boundary":"orchestral_and_string_source_separation"},
+    {"id":"KC-ML-20260914-1800-04","claim":"A weaker complex spectral branch in one dual-domain model is not evidence that phase information is generally unnecessary.","source_ids":["SRC-ML-20260914-1800-01"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1800-05","claim":"Exact target-bleed-RIR matrices validate separation mechanics but do not define the artistic target for rock close microphones.","source_ids":["SRC-ML-20260914-1800-02"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1800-06","claim":"SDR and SIR must remain separate from SAR, transient integrity, inter-channel timing, room image and listener preference.","source_ids":["SRC-ML-20260914-1800-01","SRC-ML-20260914-1800-02"],"confidence":"high"},
+    {"id":"KC-ML-20260914-1800-07","claim":"Snare top-bottom and multi-kick polarity decisions require whole-kit context rather than a fixed always-flip rule.","source_ids":["VID-ML-20260914-1800-01"],"confidence":"medium_high","boundary":"engineer_demonstration_auto_transcript"},
+    {"id":"KC-ML-20260914-1800-08","claim":"Finite keyed ducking or expansion and tuned de-essing are candidates before hard gating when bleed is path-specific.","source_ids":["VID-ML-20260914-1800-01"],"confidence":"medium","boundary":"engineer_workflow_not_controlled_study"},
+    {"id":"KC-ML-20260914-1800-09","claim":"Visual peak alignment may increase fullness while changing intentional overhead-room arrival; geometry, mono and depth controls are required.","source_ids":["VID-ML-20260914-1800-02"],"confidence":"medium_low","boundary":"low_authority_demonstration_without_controlled_AB"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260914-1800-01","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1800-01"],"when_apply":"training or evaluating a joint multichannel debleeder","instrument_section":"multi-mic sources; all evaluated sections","change":"train with paired input-target permutations and run reorder-unreorder inference tests","proposed_range":"all permutations for small P or a fixed representative sample","number_origin":"project_test_design","protect":["output_mic_identity","transients","timing","polarity","room"],"success":"reordered and restored outputs agree within documented tolerances and perceptual ranking is stable","cancel":"output role or audible result depends on channel index","confidence":"high_for_test_need_not_rock_transfer"},
+    {"id":"RULE-ML-20260914-1800-02","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1800-01","SRC-ML-20260914-1800-02"],"when_apply":"model is proposed for unseen room layout distance instrument or channel count","instrument_section":"all multichannel material","change":"hold out each claimed generalization axis and compare raw simple and learned baselines","proposed_range":"at least one holdout per claimed axis","number_origin":"project_test_design","protect":["per_channel_safety","attack_body","coherence","mono","room_depth"],"success":"positive per-channel results and stable blind preference on holdout","cancel":"critical channel degrades or artifacts appear","confidence":"high"},
+    {"id":"RULE-ML-20260914-1800-03","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260914-1800-01","SRC-ML-20260914-1800-02"],"cross_reference":"ML-2026-09-12-1500","when_apply":"objective debleeding metrics improve","instrument_section":"event and section conditioned","change":"retain SDR SIR SAR ISR transient timing room and listening as separate outputs","proposed_range":"no universal threshold","number_origin":"metric_bundle_design","protect":["attack_body","ghost_notes","cymbal_continuity","useful_room","mono"],"success":"isolation rises without fidelity or preference loss","cancel":"artifacts or blind preference worsen","confidence":"high"},
+    {"id":"RULE-ML-20260914-1800-04","status":"candidate","auto_apply":false,"source_ids":["VID-ML-20260914-1800-01"],"when_apply":"opposed snare top-bottom or distance-separated kick microphones","instrument_section":"full drum kit and full mix by section","change":"compare unchanged and both polarity orientations; test delay separately","proposed_range":"two polarity states per channel; no universal delay","number_origin":"engineer_workflow_plus_project_AB","protect":["snare_body_wires","kick_attack_low_end","bass_relation","overhead_room","mono"],"success":"target role improves consistently after loudness matching","cancel":"solo benefit disappears in kit mix or mono room worsens","confidence":"medium_high"},
+    {"id":"RULE-ML-20260914-1800-05","status":"candidate","auto_apply":false,"source_ids":["VID-ML-20260914-1800-01"],"when_apply":"snare spill dominates a kick batter attack mic","instrument_section":"kick and snare events including coincident hits","change":"compare bypass manual edit hard gate and snare-keyed finite attenuation","proposed_range":"event-tuned attenuation and ballistics; no source numbers","number_origin":"engineer_workflow_no_numeric_setting","protect":["kick_attack","coincident_hits","groove","no_chatter_clicks"],"success":"less snare spill without losing required kick event","cancel":"coincident hits are cut or processing is more audible than bleed","confidence":"medium"},
+    {"id":"RULE-ML-20260914-1800-06","status":"candidate","auto_apply":false,"source_ids":["VID-ML-20260914-1800-01"],"when_apply":"snare-bottom is useful but between-hit bleed is excessive","instrument_section":"snare normal hits ghost notes and fills","change":"key finite expansion from snare-top and compare bypass manual and hard gate","proposed_range":{"ratio":["2:1","3:1"]},"number_origin":"Albini_auto_ASR_spoken_example_requires_verification_not_preset","protect":["ghost_notes","wire_decay","body","coincident_events"],"success":"bleed falls without loss of quiet articulation or decay","cancel":"ghost notes decay or detector reliability fails","confidence":"medium"},
+    {"id":"RULE-ML-20260914-1800-07","status":"candidate","auto_apply":false,"source_ids":["VID-ML-20260914-1800-01"],"when_apply":"hi-hat bleed dominates a snare or tom close mic and hard gating damages envelope","instrument_section":"close drum mic across normal hits ghost notes fills and cymbal-dense sections","change":"test tuned de-esser or dynamic band after bypass and manual baselines","proposed_range":"source-specific frequency and depth; no source numbers","number_origin":"engineer_workflow_no_numeric_setting","protect":["drum_attack_body","snare_wires","cymbal_continuity","brightness_balance"],"success":"hi-hat distraction falls without loss of drum identity","cancel":"lisping splash modulation or dull attack appears","confidence":"medium"}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260914-1800-01","title":"Steve Albini on Recording Drums","channel":"Philly Jazz","url":"https://www.youtube.com/watch?v=FvLuP4Kya8U","duration":"28:27","metadata_checked":"2026-09-14","reading_depth":"metadata_plus_full_auto_generated_english_transcript","transcript_available":true,"content_studied":true,"status":"studied","timestamps":{"snare_polarity":"04:56-07:20","coupled_kit":"07:42-08:41","kick_phase":"12:29-15:29","snare_keyed_kick_ducking":"16:41-20:35","snare_bottom_expansion":"21:13-24:07","hihat_deessing":"25:31-27:31"},"classes":["phase_polarity","mic_placement","sidechain_ducking","gating_expansion","deessing_dynamic_spectral_control","kick","snare","tom","hihat_bleed"],"asr_numeric_caution":["4-6 inches","2:1-3:1"]},
+    {"id":"VID-ML-20260914-1800-02","title":"Phase Align Your Drums: Manual & Plugin Workflow","channel":"Guide the Mix","url":"https://www.youtube.com/watch?v=8j6YPs_4Fh4","duration":"05:57","metadata_checked":"2026-09-14","reading_depth":"metadata_plus_full_auto_generated_english_transcript","transcript_available":true,"content_studied":true,"status":"studied_with_low_authority_boundary","classes":["manual_time_alignment","room_pair_move","auto_alignment_plugin"],"limitations":["Session geometry was assumed.","No loudness match mono section repeat or room-depth check was shown.","No numeric settings were stated."]},
+    {"id":"VID-ML-20260914-1800-Q1","title":"Optimizing Phase Relationships with Steve Albini","channel":"Mix with the Masters","url":"https://www.youtube.com/watch?v=DvvLr-Op5yc","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false},
+    {"id":"VID-ML-20260914-1800-Q2","title":"Auto Phase Align Multi-track Drums in REAPER 7.40","channel":"The REAPER Blog","url":"https://www.youtube.com/watch?v=kO_4a2v8h2M","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false},
+    {"id":"VID-ML-20260914-1800-Q3","title":"How Much Drum Bleed Is Acceptable? | FAQ Friday","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=xAYU-UwyDjM","metadata_checked":"2026-09-14","reading_depth":"metadata_and_description_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false}
+  ],
+  "reference_cards": [
+    {"id":"REF-ML-20260914-1800-01","title":"The Spheres Dataset","type":"controlled_bleed_multitrack_RIR_benchmark","genres":["orchestral","classical"],"url":"https://zenodo.org/records/17347681","doi":"10.5281/zenodo.17347681","audio_format":"lossless_FLAC_48_kHz","microphones":23,"assets":["multichannel_per_source_per_mic","stereo_mix","RIRs","raw_claps_sweeps","metadata_JSON"],"access":"public_record_no_download_performed","license_status":"metadata_verified_license_unresolved","status":"queued_reference_license_blocked","audio_analyzed":false,"dsp_metrics_computed":false,"limitations":["not_rock","not_simultaneous_ensemble_performance","not_a_creative_mix_target"]}
+  ],
+  "multitracks_added": [],
+  "experiments": [
+    {"id":"EXP-ML-20260914-1800-01","title":"Multichannel debleeding robustness matrix","status":"not_run","material":"locally_synthesized_controlled_bleed; The_Spheres_only_after_explicit_audio_license_verification","variants":["raw_mixture","simple_per_channel_baseline","non_permutation_joint_model","permutation_trained_joint_model"],"holdouts":["channel_reorder","room_layout","mic_distance","unseen_source_roles"],"controls":["fixed_model_commit","matched_channels","loudness_matched_listening"],"metrics":["per_channel_SDR","SIR","SAR","ISR","attack_body_recovery","interchannel_lag_coherence","mono","artifacts","blind_preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1800-02","title":"Rock drum polarity matrix","status":"not_run","material":"licensed_raw_rock_multitrack_with_snare_top_bottom_or_two_kick_mics","variants":["unchanged","flip_bottom","flip_top"],"controls":["delay_separate_variable","full_kit","full_mix","verse_chorus_fill","matched_loudness","mono"],"metrics":["attack_body_wires","kick_bass_relation","overhead_room_image","bandwise_coherence_lag","blind_preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1800-03","title":"Snare spill control in kick attack mic","status":"not_run","material":"kick_snare_and_coincident_events_in_licensed_rock_drums","variants":["bypass","manual_edit","hard_gate","snare_keyed_finite_ducking","keyed_expansion"],"controls":["matched_kick_attack_role","matched_loudness","full_mix"],"metrics":["snare_spill","kick_attack","coincident_hit_preservation","chatter_clicks","blind_preference"],"decision_owner":"Dmitry"},
+    {"id":"EXP-ML-20260914-1800-04","title":"Hi-hat bleed control","status":"not_run","material":"licensed_snare_or_tom_close_mic_with_hihat_bleed","variants":["bypass","manual_automation","hard_gate","tuned_deesser_dynamic_EQ"],"controls":["matched_target_drum_level","normal_hits","ghost_notes","fills","cymbal_dense_section"],"metrics":["drum_attack_body","wires_decay","cymbal_continuity","modulation_artifacts","blind_preference"],"decision_owner":"Dmitry"}
+  ],
+  "counts": {"source_cards":2,"full_text_sources":2,"knowledge_cards":9,"rule_candidates":7,"video_source_cards":5,"videos_studied":2,"queued_sources":3,"reference_cards":1,"license_blocked_references":1,"multitracks_added":0,"experiments_not_run":4},
+  "next_experiment_id": "EXP-ML-20260914-1800-02",
+  "handoff": "Test multichannel debleeders under channel reorder and room-layout-instrument holdouts; do not let SDR or SIR replace fidelity, room and blind preference. For rock drums audition polarity states in the full kit and mix rather than always flipping the bottom mic. Treat snare-keyed finite ducking or expansion and tuned de-essing as candidates before hard gating, with coincident-hit and ghost-note cancellation checks."
+}
