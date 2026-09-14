@@ -1,0 +1,447 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-09-14-0900",
+  "created_at": "2026-09-14T09:22:12+03:00",
+  "completed_at": "2026-09-14T09:31:21+03:00",
+  "timezone": "Europe/Moscow",
+  "status": "unapplied_research_update",
+  "topic": "compressor_behavior_validation_and_dynamic_feature_limits",
+  "base_context": {
+    "repository": "tubeslave/AUTO-MIXER-Tubeslave",
+    "branch": "master",
+    "last_reviewed_update": "ML-DYNAMICS-2026-09-13-201140",
+    "deduplication": "DOI, arXiv ID, canonical URL, YouTube video ID and candidate-rule intent were compared against the current shared updates. The control-voltage paper is a reading-depth upgrade of SRC-DYN-20260913-201140-05, not a newly discovered title.",
+    "runtime_changes": false,
+    "audio_changes": false
+  },
+  "novelty": [
+    "Upgraded arXiv:2606.18573 from abstract-only to selected full-text methods, results, dataset and limitations.",
+    "Separates gain-reduction trajectory accuracy from waveform and short-time-energy proxy scores.",
+    "Adds a reproducible compressor test contract: quasi-static ramp, multiple-duration bursts, sub-threshold alignment probe and programme material.",
+    "Treats dry-feature centroids and dynamic histograms as diagnostic priors, not genre or section targets.",
+    "Adds song-disjoint and unseen-parameter validation requirements for learned compressor models."
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260914-0900-01",
+      "type": "paper_reading_upgrade",
+      "title": "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements: an Approach and Dataset",
+      "authors": ["Benjamin R. Thompson", "Michael C. Heilemann"],
+      "published": "2026-06-17",
+      "venue": "DAFx26 / arXiv",
+      "doi": "10.48550/arXiv.2606.18573",
+      "url": "https://arxiv.org/html/2606.18573v1",
+      "discovered_at": "2026-09-13T20:11:40+03:00",
+      "reading_upgraded_at": "2026-09-14T09:31:21+03:00",
+      "reading_depth": "selected_full_text_sections_1_to_5_including_equations_methods_results_dataset_and_limitations",
+      "supersedes_reading_depth_of": "SRC-DYN-20260913-201140-05",
+      "limited_findings": [
+        "In the authors' ten single-example fitting experiments, direct gain-reduction loss recovered the measured control trajectory better than waveform L1 or MSTE objectives.",
+        "Waveform proxy metrics compressed the observed separation: the spread between best and worst direct gain error was 85.9%, versus 2.8% for waveform L1 and 13.3% for MSTE in that experiment.",
+        "A quasi-static level ramp exposes the response curve; bursts expose attack/release and programme dependence; a sub-threshold probe supports latency alignment.",
+        "Nominal threshold and attack labels need not equal response-defined threshold or effective attack because the hardware curve is gradual and loop gain alters ballistics."
+      ],
+      "limitations": [
+        "The comparison fitted ten models to ten individual 30-second examples and evaluated each on the same example; it was not a generalization study.",
+        "Training was restricted to 10:1 ratio and fixed single-time-constant release because the tested torchcomp topology could not represent the SSL's lower-ratio curvature or auto-release behavior.",
+        "No subjective listening test establishes that lower control-trajectory error always produces the preferred musical result.",
+        "The direct control-voltage method requires access to an internal or exposed gain-control signal; ordinary plugins usually expose only meters, not ground-truth CV."
+      ],
+      "numbers_are": "study_specific_not_presets"
+    },
+    {
+      "id": "SRC-ML-20260914-0900-02",
+      "type": "paper",
+      "title": "Black-Box Optimization for Identifying and Inverting Audio Dynamic Range Control Effects",
+      "authors": ["Haoran Sun", "Dominique Fourer", "Hichem Maaref"],
+      "published": "2026-08-24",
+      "venue": "arXiv",
+      "doi": "10.48550/arXiv.2607.19645",
+      "url": "https://arxiv.org/html/2607.19645v1",
+      "discovered_at": "2026-09-14T09:22:12+03:00",
+      "reading_depth": "selected_full_text_problem_formulation_features_methods_results_ablation_and_conclusion",
+      "limited_findings": [
+        "Dynamic-histogram descriptors were more useful than several conventional features for moving synthetic inversions toward the dry reference within this experiment.",
+        "Parameter error and recovered-signal feature distance disagreed: a parameter estimate closer to ground truth did not always yield the closest selected-feature reconstruction.",
+        "Non-differentiable feature objectives can be optimized without differentiable DSP, but the reported methods were far slower than real time."
+      ],
+      "limitations": [
+        "Only 25 mono 30-second excerpts were used: five excerpts from each of classical, rock, electronic, pop and jazz.",
+        "Compression/expansion and inversion used one known model family and 30 synthetic profiles; transfer to unknown hardware, multiband processors or full stereo rock production is unproven.",
+        "The dry target was a single training-set centroid per effect type, which can erase genre, instrument, section and artistic-role differences.",
+        "No listening test validated naturalness or musical preference; reported CPU time was 124 to 530 seconds per 30-second excerpt."
+      ],
+      "numbers_are": "study_specific_not_presets"
+    },
+    {
+      "id": "SRC-ML-20260914-0900-03",
+      "type": "paper_and_project_page",
+      "title": "Solid State Bus-Comp: A Large-Scale and Diverse Dataset for Dynamic Range Compressor Virtual Analog Modeling",
+      "authors": ["Yicheng Gu", "Runsong Zhang", "Lauri Juvela", "Zhizheng Wu"],
+      "published": "2025-05-21",
+      "venue": "DAFx25 / arXiv",
+      "doi": "10.48550/arXiv.2504.04589",
+      "url": "https://arxiv.org/html/2504.04589v2",
+      "project_url": "https://www.yichenggu.com/SolidStateBusComp/",
+      "discovered_at": "2026-09-14T09:22:12+03:00",
+      "reading_depth": "selected_full_text_dataset_construction_statistics_benchmarks_ablation_and_conclusion_plus_project_page",
+      "limited_findings": [
+        "The dataset uses 175 unmastered songs and 220 SSL 500 G-Bus parameter combinations; paper reports 2528.53 hours.",
+        "The benchmark split separates 112 training songs from 63 test songs and reserves 76 parameter combinations as unseen controls.",
+        "Time-varying conditioning generally mattered more than simply enlarging several architectures, supporting explicit temporal validation of compressor models."
+      ],
+      "limitations": [
+        "Benchmarks use waveform L1 and multi-resolution STFT losses, exactly the proxy family later shown by Thompson and Heilemann not to be equivalent to direct gain-trajectory error.",
+        "No subjective listening test is reported, and genre/instrument annotations include model-generated labels.",
+        "The paper's 2528.53-hour figure conflicts with the project page's 2258-hour overview; the paper value is retained with this discrepancy flagged.",
+        "The dataset audio license and redistribution terms were not unambiguously stated on the read paper/project page, so no Reference Card or raw-audio ingestion is authorized.",
+        "Published training used a single NVIDIA H200 for 500,000 steps; no paid computation was run for this update."
+      ],
+      "numbers_are": "dataset_and_benchmark_specific_not_mix_settings"
+    },
+    {
+      "id": "SRC-ML-20260914-0900-04",
+      "type": "open_code_static_inspection",
+      "title": "AQFeatures: Objective Audio Quality Characterization — DRC Discrimination",
+      "authors": ["Dominique Fourer"],
+      "published": "2026",
+      "url": "https://github.com/dfourer/AQFeatures",
+      "license": "CC BY-NC 4.0",
+      "readme_blob_sha": "c3649e5bc885f17841f76d4c2791228c262d6f28",
+      "main_script_ref": "main:start_process_db.m inspected on 2026-09-14",
+      "discovered_at": "2026-09-14T09:22:12+03:00",
+      "reading_depth": "readme_license_and_start_process_db_static_inspection",
+      "limited_findings": [
+        "The implementation expects paired original and processed files and ranks descriptors with an inverse-Fisher-style profile-variance to audio-content-variance criterion.",
+        "This supports testing whether a descriptor reacts to compression profiles while remaining less dependent on the source programme."
+      ],
+      "limitations": [
+        "The repository itself warns that the research-oriented code may not exactly reproduce the cited 2017 results.",
+        "Static inspection only; MATLAB pipeline and audio were not run.",
+        "The non-commercial license prevents treating the code as an unrestricted production dependency."
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260914-0900-01",
+      "title": "Measure compressor behavior on the gain trajectory when it is observable",
+      "claim": "Output waveform similarity is not an equivalent measure of gain-reduction behavior because phase, filtering, noise and carrier amplitude affect the proxy.",
+      "scope": ["compressor_model_validation", "plugin_regression", "automatic_mixing"],
+      "confidence": "high_within_studied_experiment",
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "boundary": "Direct GR accuracy does not establish musical preference; retain loudness-matched listening."
+    },
+    {
+      "id": "KC-ML-20260914-0900-02",
+      "title": "A compressor test needs static, ballistic, alignment and programme probes",
+      "claim": "A slow level ramp, multiple-duration bursts, a sub-threshold alignment signal and real music expose different failure modes that one loop cannot reveal.",
+      "scope": ["all_digital_compressors", "hardware_capture", "differentiable_DSP"],
+      "confidence": "high_as_measurement_design",
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "boundary": "The paper's amplitudes and SSL switch values are reproducibility details, not recommended mix settings."
+    },
+    {
+      "id": "KC-ML-20260914-0900-03",
+      "title": "Nominal milliseconds are not behavioral equivalence",
+      "claim": "Detector topology, gain smoothing, knee curvature, feedback loop and programme dependence can make equal attack/release labels produce different GR trajectories.",
+      "scope": ["compressor_comparison", "preset_transfer", "automated_parameter_control"],
+      "confidence": "high",
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "boundary": "Do not infer a listening preference from the trajectory alone."
+    },
+    {
+      "id": "KC-ML-20260914-0900-04",
+      "title": "Dynamic histograms describe redistribution, not the correct artistic target",
+      "claim": "Amplitude-distribution descriptors can detect compression effects missed by single peak/RMS values, but a global dry centroid can erase style, section and instrument role.",
+      "scope": ["feature_engineering", "reference_matching", "dynamics_analysis"],
+      "confidence": "medium",
+      "source_ids": ["SRC-ML-20260914-0900-02", "SRC-ML-20260914-0900-04"],
+      "boundary": "The study used synthetic mono inversions and no subjective listening test."
+    },
+    {
+      "id": "KC-ML-20260914-0900-05",
+      "title": "Parameter recovery and audible recovery are different objectives",
+      "claim": "A lower parameter MSE can coexist with a worse selected-feature reconstruction, so an automatic system must state whether it is estimating controls, recreating output, or restoring a dry signal.",
+      "scope": ["effect_inversion", "automatic_mixing", "model_evaluation"],
+      "confidence": "medium_high_within_model_family",
+      "source_ids": ["SRC-ML-20260914-0900-02"],
+      "boundary": "Neither objective substitutes for a listener-rated musical outcome."
+    },
+    {
+      "id": "KC-ML-20260914-0900-06",
+      "title": "Hold out both songs and control settings",
+      "claim": "Compressor validation should separate unseen programme material from unseen parameter combinations; success on one axis does not prove the other.",
+      "scope": ["compressor_dataset", "learned_DSP", "regression_testing"],
+      "confidence": "high_as_validation_principle",
+      "source_ids": ["SRC-ML-20260914-0900-03"],
+      "boundary": "Dataset diversity still does not prove preference on the project's rock material."
+    },
+    {
+      "id": "KC-ML-20260914-0900-07",
+      "title": "Temporal conditioning is a model requirement, not a proof of sound quality",
+      "claim": "On the Solid State Bus-Comp benchmark, several time-varying conditioning methods generalized better than simple conditioning, but objective waveform rankings were architecture- and metric-dependent.",
+      "scope": ["virtual_analog", "bus_compressor_model", "low_latency_research"],
+      "confidence": "medium_high",
+      "source_ids": ["SRC-ML-20260914-0900-03"],
+      "boundary": "No listening test and no direct GR-ground-truth metric were used in that benchmark."
+    },
+    {
+      "id": "KC-ML-20260914-0900-08",
+      "title": "Cross-study metric disagreement is a required warning",
+      "claim": "A dataset benchmark can rank models with waveform L1/M-STFT while a later direct-CV study shows those proxies may obscure GR behavior; both results can be true because they measure different targets.",
+      "scope": ["evidence_synthesis", "metric_selection", "automatic_mixing"],
+      "confidence": "high",
+      "source_ids": ["SRC-ML-20260914-0900-01", "SRC-ML-20260914-0900-03"],
+      "boundary": "This is a methodological reconciliation, not evidence that a particular model sounds better."
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "R-ML-20260914-0900-01",
+      "name": "validate_exposed_gain_trajectory_before_proxy_scores",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "applies_to": ["compressor_model", "mix_bus", "drum_bus", "instrument_channels"],
+      "when": "a compressor or learned model exposes an internal gain-reduction trajectory",
+      "change": "compare predicted GR directly with the reference trajectory and retain waveform, spectral and listening measures as separate axes",
+      "parameter_range_and_origin": "no mix-setting range; direct GR L1 is the paper's evaluated behavioral metric",
+      "protect": ["musical_preference", "transient_shape", "spectral_color", "stereo_image"],
+      "verify": ["time_aligned_GR_overlay", "GR_error", "waveform_proxy_metrics", "loudness_matched_blind_AB"],
+      "undo": "reject promotion if lower GR error does not survive musical listening or causes unacceptable coloration",
+      "confidence": "high_within_studied_scope"
+    },
+    {
+      "id": "R-ML-20260914-0900-02",
+      "name": "require_four_part_compressor_probe",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "applies_to": ["compressor_plugin", "hardware_capture", "DDSP_compressor"],
+      "when": "validating threshold, ratio, knee, attack, release or latency",
+      "change": "run a quasi-static ramp, several burst durations, a below-threshold alignment probe and programme audio",
+      "parameter_range_and_origin": "paper reproduction option: 1 kHz ramp -48 to 0 dB at 1.6 dB/s and steady bursts 4 to 14 dB above threshold; these are measurement stimuli, not music settings",
+      "protect": ["measurement_validity", "time_alignment", "programme_dependence"],
+      "verify": ["static_curve", "response_defined_threshold", "attack_release_trajectory", "latency", "programme_audio_delta"],
+      "undo": "invalidate the test if level calibration, alignment or nonlinear coloration is conflated with gain modulation",
+      "confidence": "high_as_test_contract"
+    },
+    {
+      "id": "R-ML-20260914-0900-03",
+      "name": "do_not_match_compressors_by_nominal_time_labels",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-01"],
+      "applies_to": ["snare", "kick", "bass", "guitars", "vocals", "drum_bus", "mix_bus"],
+      "when": "comparing processors or transferring a preset between compressor designs",
+      "change": "match the measured response and musical outcome rather than copying attack/release numbers",
+      "parameter_range_and_origin": "no universal range; tested SSL labels were 0.1/0.3/1/3/10/30 ms attack and 0.1/0.3/0.6/1.2 s/Auto release, retained only as hardware dataset metadata",
+      "protect": ["leading_edge", "body", "groove", "recovery_before_next_event"],
+      "verify": ["burst_GR_overlay", "event_aligned_envelope", "matched_loudness_full_mix_AB"],
+      "undo": "cancel transfer if next-event recovery, body or transient behavior diverges despite equal labels",
+      "confidence": "high"
+    },
+    {
+      "id": "R-ML-20260914-0900-04",
+      "name": "hold_out_songs_and_controls_for_learned_DRC",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-03"],
+      "applies_to": ["training", "validation", "automatic_compressor"],
+      "when": "evaluating any learned or fitted dynamics processor",
+      "change": "report separate results for unseen songs and unseen control combinations, including role- and section-specific rock material",
+      "parameter_range_and_origin": "project proposal: at least song-disjoint and parameter-disjoint partitions; no percentage promoted from the paper",
+      "protect": ["generalization_claims", "genre_transfer", "section_roles"],
+      "verify": ["duplicate_hash_check", "song_disjoint_split", "parameter_holdout", "per_instrument_section_report"],
+      "undo": "withhold model acceptance when either split leaks or only aggregate performance is reported",
+      "confidence": "high_as_validation_principle"
+    },
+    {
+      "id": "R-ML-20260914-0900-05",
+      "name": "treat_dynamic_histogram_target_as_advisory",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-02", "SRC-ML-20260914-0900-04"],
+      "applies_to": ["snare", "kick", "bass", "guitars", "vocals", "mix_bus"],
+      "when": "using amplitude distributions or dry-feature centroids to recommend compression",
+      "change": "condition the histogram by active events, articulation, instrument role and section; use it as evidence, not an optimization target",
+      "parameter_range_and_origin": "no compressor range; histogram binning and windows must be recorded per implementation",
+      "protect": ["ghost_notes", "intentional_accents", "section_contrast", "genre_identity"],
+      "verify": ["event_conditioned_histograms", "no_DRC_baseline", "level_only_baseline", "blind_full_mix_AB"],
+      "undo": "reject the recommendation if global matching flattens intentional contrasts or improves only the selected descriptor",
+      "confidence": "medium_high"
+    },
+    {
+      "id": "R-ML-20260914-0900-06",
+      "name": "separate_behavior_color_and_preference_scores",
+      "status": "candidate",
+      "auto_apply": false,
+      "source_ids": ["SRC-ML-20260914-0900-01", "SRC-ML-20260914-0900-03"],
+      "applies_to": ["compressor_A_B", "virtual_analog", "mix_bus", "drum_bus"],
+      "when": "ranking compressor models or settings",
+      "change": "report gain behavior, waveform/spectral coloration and listener preference as three non-collapsed score groups",
+      "parameter_range_and_origin": "no setting range; separation follows the studies' metric disagreement",
+      "protect": ["interpretability", "audible_color", "musical_judgment"],
+      "verify": ["GR_or_event_envelope", "spectrum_and_null_delta", "loudness_matched_blind_rating"],
+      "undo": "do not promote a single composite score if weighting changes the winner",
+      "confidence": "high"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260914-0900-01",
+      "title": "Compressor behavior contract on one plugin",
+      "status": "not_run",
+      "material": ["generated_ramp", "generated_bursts", "sub_threshold_alignment_probe", "licensed_rock_drum_and_mix_bus_excerpts"],
+      "conditions": ["bypass", "two_attack_settings", "two_release_settings", "auto_or_program_dependent_release_if_available"],
+      "controls": ["identical_input_level", "makeup_off_or_logged", "sample_alignment", "loudness_matched_programme_AB"],
+      "measure": ["static_curve", "response_defined_threshold", "GR_or_event_envelope", "latency", "waveform_L1", "multi_resolution_energy", "spectral_delta"],
+      "listener_rating": ["snare_attack", "body", "pumping", "cymbal_smear", "bass_weight", "fatigue"],
+      "success": "nominal parameter changes produce distinct, explainable trajectories and preferred variants survive matched listening",
+      "cancel": "hidden makeup, misalignment or unavailable gain trace prevents behavioral interpretation"
+    },
+    {
+      "id": "EXP-ML-20260914-0900-02",
+      "title": "Direct gain trajectory versus waveform proxy ranking",
+      "status": "not_run",
+      "material": "free subset of the SSL bus compressor control-voltage dataset; files not downloaded in this run",
+      "conditions": ["reference_CV", "candidate_model_A", "candidate_model_B"],
+      "controls": ["same_input", "same_alignment", "same_evaluation_excerpt"],
+      "measure": ["gain_L1", "waveform_L1", "MSTE", "rank_correlation"],
+      "listener_rating": ["attack_match", "release_motion", "naturalness", "preference"],
+      "success": "metric disagreement is quantified and not hidden in one aggregate score",
+      "cancel": "license, dataset size or hardware/CV safety prevents a controlled local subset"
+    },
+    {
+      "id": "EXP-ML-20260914-0900-03",
+      "title": "Global versus event-and-section dynamic histograms",
+      "status": "not_run",
+      "material": ["licensed_snare_track", "licensed_bass_track", "full_mix_sections"],
+      "conditions": ["global_histogram", "active_event_histogram", "verse_histogram", "chorus_histogram", "accent_and_ghost_note_strata"],
+      "controls": ["same_window_definition", "same_calibration", "silence_handling_logged"],
+      "measure": ["distribution_statistics", "event_peak_body_decay", "section_loudness", "classification_stability"],
+      "listener_rating": ["intentional_accent_preservation", "consistency", "groove", "section_lift"],
+      "success": "conditioned views explain audible differences that the global distribution hides",
+      "cancel": "event detector errors merge articulations or section labels are unreliable"
+    },
+    {
+      "id": "EXP-ML-20260914-0900-04",
+      "title": "Multiband isolation baseline for rock drum bus and mix bus",
+      "status": "not_run",
+      "material": ["licensed_rock_drum_bus", "licensed_rock_mix_bus"],
+      "conditions": ["no_processing", "crossover_only", "full_band_compression", "multiband_compression"],
+      "controls": ["same_output_loudness", "same_true_peak_ceiling", "matched_total_GR_where_possible", "mono_check"],
+      "measure": ["per_band_event_envelope", "crossover_delta", "spectral_balance", "stereo_coherence", "peak_and_short_term_loudness"],
+      "listener_rating": ["kick_weight", "snare_punch", "cymbal_smear", "low_end_pumping", "mix_glue", "fatigue"],
+      "success": "any benefit remains after crossover-only and full-band baselines",
+      "cancel": "multiband wins only by loudness, static tonal shift or hidden crossover coloration"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260914-0900-01",
+      "video_id": "mSzvpCz-M2k",
+      "title": "Introduction to FabFilter Pro-C 3",
+      "channel": "FabFilter",
+      "published": "2026-01-15",
+      "duration": "PT19M22S",
+      "url": "https://www.youtube.com/watch?v=mSzvpCz-M2k",
+      "status": "queued_source",
+      "relationship": "recheck_of_VID-DYN-20260913-201140-03",
+      "metadata_depth": "title_channel_date_duration_description",
+      "transcript": "unavailable_after_authorized_visible_transcript_attempt",
+      "claims_extracted": false
+    },
+    {
+      "id": "VID-ML-20260914-0900-02",
+      "video_id": "-WVXx3a1ylo",
+      "title": "10 MINUTE DRUM MIX w/ Adam Nolly Getgood",
+      "channel": "GGD",
+      "published": "2018-12-10",
+      "duration": "PT13M54S",
+      "url": "https://www.youtube.com/watch?v=-WVXx3a1ylo",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_description",
+      "transcript": "unavailable_after_authorized_visible_transcript_attempt",
+      "claims_extracted": false
+    },
+    {
+      "id": "VID-ML-20260914-0900-03",
+      "video_id": "P5PbILAkZDg",
+      "title": "Andrew Scheps uses a '90s pop parallel vocal chain with EQ into LA-2A",
+      "channel": "Heaviness in Metal Music Production",
+      "published": "2026-06-23",
+      "duration": "PT2M38S",
+      "url": "https://www.youtube.com/watch?v=P5PbILAkZDg",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_description",
+      "transcript": "unavailable_after_authorized_visible_transcript_attempt",
+      "claims_extracted": false
+    },
+    {
+      "id": "VID-ML-20260914-0900-04",
+      "video_id": "b9qBHnlw4Gc",
+      "title": "5 Plug Ins For Massive Modern Rock Mixes - Dan Malsch",
+      "channel": "Produce Like A Pro",
+      "published": "2026-06-15",
+      "duration": "PT9M51S",
+      "url": "https://www.youtube.com/watch?v=b9qBHnlw4Gc",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_description",
+      "transcript": "unavailable_after_authorized_visible_transcript_attempt",
+      "claims_extracted": false
+    }
+  ],
+  "reference_cards": [],
+  "reference_search": {
+    "new_multitracks_added": 0,
+    "note": "Solid State Bus-Comp derives processed mixes from Cambridge material, but the read sources did not expose unambiguous redistribution/license terms for the dataset; it is not registered as a legal raw-audio reference. Existing Telefunken/Cambridge project references remain available for planned local experiments."
+  },
+  "conflicts": [
+    {
+      "id": "CONFLICT-ML-20260914-0900-01",
+      "sources": ["SRC-ML-20260914-0900-01", "SRC-ML-20260914-0900-03"],
+      "issue": "Solid State Bus-Comp ranks models with waveform L1 and M-STFT; the later direct-CV study shows waveform proxies need not preserve ranking of gain-trajectory error.",
+      "resolution": "Store behavior, coloration and listening outcomes separately; do not declare either metric universally correct."
+    },
+    {
+      "id": "CONFLICT-ML-20260914-0900-02",
+      "sources": ["SRC-ML-20260914-0900-03"],
+      "issue": "Dataset duration is 2528.53 hours in the paper but 2258 hours on the project page.",
+      "resolution": "Retain the paper figure for paper-specific claims and flag the project-page inconsistency."
+    }
+  ],
+  "tool_status": {
+    "consensus": "unavailable_free_monthly_limit; reset message indicated 2026-10-01",
+    "scite": "search_literature returned INVALID_ARGUMENT on exact-title checks; no citation-strength claim made",
+    "github": "working_read_and_static_source_inspection",
+    "context7": "not_required_for_paper_or_matlab_source_review",
+    "youtube_transcript": "working_bridge_but_no_transcript_available_for_four_attempted_videos",
+    "arxiv_mcp": "not_verified_connected; public primary arXiv HTML used",
+    "freesound_mcp": "not_verified_connected",
+    "zotero_mcp": "not_verified_connected",
+    "hugging_face": "not_required; no dataset files downloaded"
+  },
+  "safety": {
+    "auto_apply": false,
+    "audio_uploaded_to_third_parties": false,
+    "commercial_audio_downloaded": false,
+    "paid_jobs_or_GPU": false,
+    "DSP_engine_changed": false,
+    "runtime_rules_changed": false,
+    "all_experiments_not_run": true
+  },
+  "handoff": "Validate compressor behavior with ramp, bursts, alignment probe and programme audio. When a true GR trajectory exists, compare it directly; keep waveform/spectral color and listener preference separate. Do not transfer attack/release labels between processors as equivalent behavior. Condition dynamic histograms by event, articulation and section; retain no-DRC and level-only baselines.",
+  "counts": {
+    "source_cards": 4,
+    "reading_depth_upgrades": 1,
+    "knowledge_cards": 8,
+    "candidate_rules": 6,
+    "experiments_not_run": 4,
+    "video_source_cards": 4,
+    "videos_studied": 0,
+    "videos_queued": 4,
+    "reference_cards": 0
+  }
+}
