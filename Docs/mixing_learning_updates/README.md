@@ -21,6 +21,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-14-0900 | [Report](ML-2026-09-14-0900.md), [JSON patch](ML-2026-09-14-0900.json) | Compressor behavior validation: 4 source/code cards (including 1 reading-depth upgrade), 0 studied and 4 queued videos, 8 Knowledge Cards, 6 candidate rules, 4 unrun experiments |
 | ML-2026-09-14-1200 | [Report](ML-2026-09-14-1200.md), [JSON patch](ML-2026-09-14-1200.json) | Sequential automatic mixing and live predictive gain control: 3 full-text sources, 0 studied and 3 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-14-1500 | [Report](ML-2026-09-14-1500.md), [JSON patch](ML-2026-09-14-1500.json) | DRC topology and placement audit: 2 full-text sources, 0 studied and 3 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-14-1800 | [Report](ML-2026-09-14-1800.md), [JSON patch](ML-2026-09-14-1800.json) | Multichannel debleeding robustness and rock-drum polarity/bleed control: 2 full-text sources, 2 studied and 3 queued videos, 9 Knowledge Cards, 7 candidate rules, 1 license-blocked dataset, 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -58,9 +59,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-14-1500: verify actual band isolation before accepting a `multiband` label; sequential full-band compressors are not a crossover multiband system. Fixed parameters per segment are not time-varying within that segment. Require no-processing, level-only and PEQ+single-band baselines. For bus DRC, measure which source triggers GR and which neighboring roles are attenuated. Training ranges and one-excerpt listening-test settings are not rock presets. Next test: `EXP-ML-20260914-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-14-1800: test multichannel debleeders under channel reorder and room/layout/instrument holdouts; do not let SDR or SIR replace fidelity, room and blind preference. For rock drums audition polarity states in the full kit and mix rather than always flipping the bottom mic. Treat snare-keyed finite ducking or expansion and tuned de-essing as candidates before hard gating, with coincident-hit and ghost-note cancellation checks. Next test: `EXP-ML-20260914-1800-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-14-1500: verify actual band isolation before accepting a `multiband` label; sequential full-band compressors are not a crossover multiband system. Fixed parameters per segment are not time-varying within that segment. Require no-processing, level-only and PEQ+single-band baselines. For bus DRC, measure which source triggers GR and which neighboring roles are attenuated. Training ranges and one-excerpt listening-test settings are not rock presets. Next test: `EXP-ML-20260914-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-14-1200: treat the accepted submix as an acoustic anchor and process one incoming stem at a time. Treat stem order as a section-aware hypothesis, not a universal hierarchy; for Premiera compare rhythm-guitar-foundation against drums/bass-first and a counterbalanced control. Keep no-processing and level-only baselines. For predictive live gain control, test first events, gain steps, clipping, recovery and synthetic-to-real bleed shift. Separate operational non-normalized checks from loudness-matched preference. All rules remain `candidate / auto_apply:false`; all experiments remain `not_run`.
 
