@@ -17,6 +17,12 @@ Shared operating agreement for Codex.app, Codex CLI, Kimi CLI, and human contrib
 - Use Ayaic Mix Monolith level planes for gain staging and balance in offline
   mixes, soundchecks, and live mode, measuring both individual sources and the
   summed stems/groups they form. Safety limits still win over target loudness.
+- The main offline mixing pipeline is the standard no-reference pipeline:
+  Ayaic source/stem/bus balance, gate where useful, bounded source or drum-bus
+  compression before final gain when crest control is needed, FX15-style
+  section/mod space, and `spectral_ceiling_eq` as the default spectral guard.
+  Do not use `AIR_MINUS_0_80`, final limiters, soft clippers, or reference
+  matching unless the operator explicitly asks for that variant.
 - Prefer the smallest safe diff.
 - Do not add production dependencies without a written reason in the proposal or ADR.
 - In planning and review phases, do not edit production code.

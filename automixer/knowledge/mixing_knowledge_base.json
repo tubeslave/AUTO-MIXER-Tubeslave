@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "purpose": "Decision reference for v2. These are not automatic presets; every action still requires analyzer evidence, critic feedback, and Safety Gate approval.",
+  "research_categories": [
+    "level balance",
+    "EQ/spectral shaping",
+    "compression/dynamics",
+    "panning",
+    "reverb/spatial decisions",
+    "knowledge-based mixing",
+    "ML-based mixing"
+  ],
+  "categories": {
+    "kick": {
+      "useful_frequency_ranges": {
+        "sub_thump": [45, 80],
+        "body": [80, 140],
+        "attack": [2500, 5000]
+      },
+      "common_problem_ranges": {
+        "mud": [180, 350],
+        "box": [350, 650],
+        "click_harshness": [3500, 6500],
+        "sub_buildup": [35, 65]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction"],
+      "risky_actions": ["pan_correction", "reverb_send", "large_eq_boost"],
+      "preferred_metrics": ["lufs", "true_peak_dbtp", "crest_factor_db", "SubIndex", "BassIndex", "MudIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 2.5,
+        "max_compression_ratio": 4.0
+      },
+      "comments": "Keep low-end moves small in live mode; kick decisions should be checked against bass and drum bus headroom."
+    },
+    "snare": {
+      "useful_frequency_ranges": {
+        "body": [140, 240],
+        "crack": [1800, 3500],
+        "air": [7000, 11000]
+      },
+      "common_problem_ranges": {
+        "mud": [250, 500],
+        "ring": [650, 1200],
+        "harshness": [3000, 6000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction", "pan_correction"],
+      "risky_actions": ["large_eq_boost", "long_reverb"],
+      "preferred_metrics": ["lufs", "crest_factor_db", "MudIndex", "HarshnessIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 3.0,
+        "max_pan_step": 0.1
+      },
+      "comments": "Favor small cuts for ring/harshness before boosts. Check overhead bleed before changing level."
+    },
+    "toms": {
+      "useful_frequency_ranges": {
+        "floor_body": [70, 140],
+        "rack_body": [100, 220],
+        "attack": [2500, 5000]
+      },
+      "common_problem_ranges": {
+        "mud": [220, 480],
+        "ring": [500, 1000],
+        "harshness": [3500, 6000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction", "pan_correction"],
+      "risky_actions": ["large_eq_boost", "wide_pan_without_overheads"],
+      "preferred_metrics": ["lufs", "crest_factor_db", "MudIndex", "HarshnessIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 3.0,
+        "max_pan_step": 0.15
+      },
+      "comments": "Tom processing should respect gate/hysteresis and overhead image."
+    },
+    "overheads": {
+      "useful_frequency_ranges": {
+        "cymbal_presence": [4000, 9000],
+        "air": [9000, 14000],
+        "drum_image": [500, 2500]
+      },
+      "common_problem_ranges": {
+        "mud": [200, 500],
+        "harshness": [3500, 7000],
+        "sibilance": [7000, 11000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "pan_correction"],
+      "risky_actions": ["compression_correction", "large_high_shelf_boost"],
+      "preferred_metrics": ["lufs", "stereo_width", "HarshnessIndex", "SibilanceIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.5,
+        "max_eq_boost_db": 0.75,
+        "max_eq_cut_db": 2.5,
+        "max_pan_step": 0.1
+      },
+      "comments": "Treat overheads as image and cymbal balance, not only individual channels."
+    },
+    "bass": {
+      "useful_frequency_ranges": {
+        "fundamental": [45, 120],
+        "definition": [700, 1500],
+        "string_noise": [2000, 4500]
+      },
+      "common_problem_ranges": {
+        "sub_buildup": [35, 70],
+        "mud": [160, 350],
+        "harshness": [2500, 5000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction"],
+      "risky_actions": ["pan_correction", "large_sub_boost"],
+      "preferred_metrics": ["lufs", "true_peak_dbtp", "crest_factor_db", "BassIndex", "MudIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 2.5,
+        "max_compression_ratio": 4.0
+      },
+      "comments": "Bass level should be checked with kick and summed low-end bus before any boost."
+    },
+    "electric_guitar": {
+      "useful_frequency_ranges": {
+        "body": [160, 350],
+        "presence": [1200, 3500],
+        "bite": [3500, 6000]
+      },
+      "common_problem_ranges": {
+        "mud": [180, 400],
+        "vocal_masking": [900, 2500],
+        "harshness": [3000, 6500]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "pan_correction"],
+      "risky_actions": ["compression_correction", "large_mid_boost"],
+      "preferred_metrics": ["lufs", "masking_score", "MudIndex", "HarshnessIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 3.0,
+        "max_pan_step": 0.15
+      },
+      "comments": "Prefer cuts on maskers over vocal boosts. Panning must preserve mono compatibility."
+    },
+    "acoustic_guitar": {
+      "useful_frequency_ranges": {
+        "body": [120, 250],
+        "presence": [1800, 4500],
+        "air": [7000, 12000]
+      },
+      "common_problem_ranges": {
+        "boom": [100, 220],
+        "mud": [250, 500],
+        "harshness": [2500, 6000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction", "pan_correction"],
+      "risky_actions": ["large_air_boost", "wide_pan_in_sparse_mix"],
+      "preferred_metrics": ["lufs", "crest_factor_db", "MudIndex", "HarshnessIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.5,
+        "max_eq_boost_db": 0.75,
+        "max_eq_cut_db": 2.5,
+        "max_pan_step": 0.12
+      },
+      "comments": "Live acoustic guitar often includes bleed; require stable signal evidence before boosts."
+    },
+    "keys": {
+      "useful_frequency_ranges": {
+        "left_hand": [80, 250],
+        "body": [250, 1000],
+        "presence": [1500, 5000],
+        "air": [7000, 12000]
+      },
+      "common_problem_ranges": {
+        "mud": [180, 450],
+        "vocal_masking": [800, 2500],
+        "harshness": [3000, 6500]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "pan_correction"],
+      "risky_actions": ["compression_correction", "large_stereo_width_change"],
+      "preferred_metrics": ["lufs", "stereo_width", "masking_score", "MudIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.75,
+        "max_eq_boost_db": 1.0,
+        "max_eq_cut_db": 2.5,
+        "max_pan_step": 0.12
+      },
+      "comments": "Keys decisions should respect whether the part is lead, pad, or accompaniment."
+    },
+    "lead_vocal": {
+      "useful_frequency_ranges": {
+        "body": [120, 250],
+        "intelligibility": [1200, 3500],
+        "presence": [3500, 6000],
+        "air": [8000, 14000]
+      },
+      "common_problem_ranges": {
+        "mud": [180, 450],
+        "harshness": [3000, 6000],
+        "sibilance": [5500, 10000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction"],
+      "risky_actions": ["pan_correction", "large_presence_boost", "large_makeup_gain"],
+      "preferred_metrics": ["lufs", "speech_intelligibility", "SibilanceIndex", "HarshnessIndex", "true_peak_dbtp"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.5,
+        "max_eq_boost_db": 0.75,
+        "max_eq_cut_db": 2.5,
+        "max_compression_ratio": 3.0
+      },
+      "comments": "Vocal boosts are especially sensitive to feedback; Safety Gate/headroom wins over target loudness."
+    },
+    "backing_vocal": {
+      "useful_frequency_ranges": {
+        "body": [140, 300],
+        "blend": [800, 2500],
+        "air": [7000, 12000]
+      },
+      "common_problem_ranges": {
+        "mud": [200, 500],
+        "masking_lead": [900, 3500],
+        "sibilance": [5500, 10000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction", "compression_correction", "pan_correction"],
+      "risky_actions": ["lead_like_boost", "large_pan_change"],
+      "preferred_metrics": ["lufs", "lead_masking_score", "SibilanceIndex", "MudIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.5,
+        "max_eq_boost_db": 0.75,
+        "max_eq_cut_db": 2.5,
+        "max_pan_step": 0.12
+      },
+      "comments": "Backing vocals should support the lead plane; do not chase soloed brightness."
+    },
+    "master_bus": {
+      "useful_frequency_ranges": {
+        "low_end": [40, 120],
+        "low_mid": [180, 500],
+        "presence": [1500, 5000],
+        "air": [9000, 14000]
+      },
+      "common_problem_ranges": {
+        "sub_buildup": [35, 70],
+        "mud": [180, 450],
+        "harshness": [3000, 6500],
+        "sibilance": [6000, 10000]
+      },
+      "allowed_actions": ["gain_correction", "eq_correction"],
+      "risky_actions": ["compression_correction", "pan_correction", "limiting", "soft_clipping", "reference_matching"],
+      "preferred_metrics": ["integrated_lufs", "true_peak_dbtp", "headroom_db", "MudIndex", "HarshnessIndex"],
+      "live_safe_limits": {
+        "max_gain_change_db": 0.5,
+        "max_eq_boost_db": 0.5,
+        "max_eq_cut_db": 1.5
+      },
+      "comments": "Master bus actions must be conservative. No final limiter, soft clipper, AIR_MINUS_0_80, or reference matching by default."
+    }
+  }
+}
