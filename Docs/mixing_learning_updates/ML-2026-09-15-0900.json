@@ -1,0 +1,91 @@
+{
+  "update_id": "ML-2026-09-15-0900",
+  "run_at": "2026-09-15T09:00:00+03:00",
+  "timezone": "Europe/Moscow",
+  "topic": "functional_grouping_two_stage_automatic_mixing_and_subgroup_compression",
+  "research_only": true,
+  "audio_modified": false,
+  "dsp_modified": false,
+  "runtime_rules_modified": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260915-0900-01",
+      "title": "Understanding Automatic Mixing: A Subtask-Oriented Analysis of Two-Stage Mixing Systems",
+      "authors": ["Jinjie Shi", "Wei Hua", "Kunzhu Xie", "Make Li", "Yuchen Liu", "Joshua Reiss"],
+      "publication_date": "2026-09-02",
+      "publication_status": "arXiv_v1_manuscript_states_accepted_ISMIR_2026",
+      "doi": "10.48550/arXiv.2609.02835",
+      "urls": ["https://arxiv.org/html/2609.02835v1", "https://arxiv.org/pdf/2609.02835"],
+      "license": "CC_BY_4_0_text",
+      "reading_depth": "full_six_page_pdf_and_full_html_methods_grouping_listener_protocol_statistics_results_limitations",
+      "content_studied": true,
+      "study": {
+        "material": "three_dense_pop_rock_metal_excerpts_from_Cambridge_Multitrack_Library",
+        "tracks": [23, 24, 27],
+        "duration_each_approx_seconds": 15,
+        "participants_started": 26,
+        "participants_completed": 19,
+        "participants_retained": 18,
+        "reliability_threshold": "Pearson_r_gt_0.75_on_hidden_repeats",
+        "ratings": 1170,
+        "statistics": ["paired_t_test", "FDR_BH_q", "paired_Cohen_dz"]
+      },
+      "key_results": [
+        "ELL_61.08_vs_MEGAMI_55.47_q_.262_dz_.21_Exp1_two_valid_items_n36",
+        "MEGAMI_55.47_vs_DiffMST_21.36_q_1.64e-9_dz_1.41",
+        "MEGAMI_7G_65.39_vs_4G_50.59_q_6.44e-6_dz_.70_n54",
+        "DiffMST_instrument_16.81_vs_4G_29.37_q_1.55e-4_dz_.56",
+        "DiffMST_4G_29.37_vs_7G_30.91_q_.618_dz_.08",
+        "two_stage_MEGAMI_61.57_vs_single_54.65_q_.0426_dz_.29",
+        "two_stage_DiffMST_28.69_vs_single_19.44_q_7.25e-4_dz_.50"
+      ],
+      "limitations": ["three_short_excerpts", "18_retained_listeners", "manual_grouping", "automatic_functional_grouping_not_tested", "one_silent_DiffMST_item", "possible_floor_effect", "checkpoint_track_count_confound", "within_family_not_human_level_claim"]
+    },
+    {
+      "id": "CODE-ML-20260915-0900-01",
+      "title": "TwoStageMixingAnalysis supplementary project",
+      "urls": ["https://sparrowreivun.github.io/TwoStageMixingAnalysis/", "https://github.com/SparrowReivun/TwoStageMixingAnalysis"],
+      "reading_depth": "full_overview_grouping_rules_and_code_data_pages_no_code_execution_no_audio_download",
+      "content_studied": true,
+      "reproducibility_assets": ["analysis_script", "anonymized_listener_scores", "reliability_table", "full_pairwise_CSV", "system_repository_links"],
+      "limitations": ["supplement_version_status_caveat", "camera_ready_citation_pending_on_page", "sourcing_script_not_audio_license_proof"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260915-0900-01","claim":"Role-aware grouping is a first-class decision; instrument labels do not replace section function.","confidence":"high_within_study_boundary"},
+    {"id":"KC-ML-20260915-0900-02","claim":"Lead may be vocal guitar solo instrument or principal melody; no automatic vocal priority.","confidence":"high_schema_medium_transfer"},
+    {"id":"KC-ML-20260915-0900-03","claim":"Separating shells from high percussion is a rock candidate to protect attacks and cymbal continuity, not a mandatory bus.","confidence":"medium"},
+    {"id":"KC-ML-20260915-0900-04","claim":"Preferred grouping granularity is model-dependent: 7G helped MEGAMI but not Diff-MST relative to 4G.","confidence":"high"},
+    {"id":"KC-ML-20260915-0900-05","claim":"A downstream stage is not guaranteed to repair incorrect upstream grouping.","confidence":"high"},
+    {"id":"KC-ML-20260915-0900-06","claim":"NoMix and ELL or level-only are required local baselines because full-mix model transfer can fail.","confidence":"medium_high_Exp1_reduced_items"},
+    {"id":"KC-ML-20260915-0900-07","claim":"Within-family two-stage gains support separate local-balance and global-coordination evaluation, not DSP presets.","confidence":"high_within_three_excerpts"},
+    {"id":"KC-ML-20260915-0900-08","claim":"Non-significant loudness perturbation is uncertain evidence, not permission to ignore balance.","confidence":"high"},
+    {"id":"KC-ML-20260915-0900-09","claim":"A subgroup-compression demonstration with an acknowledged level jump is not a causal loudness-matched A/B.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260915-0900-01","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260915-0900-01","CODE-ML-20260915-0900-01"],"when_apply":"dense_session_roles_change_by_section","instrument_section":"full_arrangement_by_section","change":"compare_4G_7G_instrument_label_and_manual_section_role_grouping","proposed_range":"four_experimental_grouping_schemes_no_DSP_numbers","number_origin":"study_design","protect":["rhythm_guitar_foundation","lead_hierarchy","kick_bass_centre","cymbal_continuity","room","mono"],"success":"repeatable_sectionwise_blind_loudness_matched_gain","cancel":"benefit_is_model_song_or_section_specific","confidence":"high_need_to_test_medium_transfer"},
+    {"id":"RULE-ML-20260915-0900-02","status":"candidate","auto_apply":false,"source_ids":["CODE-ML-20260915-0900-01"],"when_apply":"assigning_foreground_role","instrument_section":"all_sections","change":"allow_lead_vocal_guitar_solo_or_principal_melody_by_section","proposed_range":"categorical_no_level_or_EQ_number","number_origin":"seven_group_definition","protect":["creative_intent","natural_hierarchy"],"success":"intended_foreground_is_clear_without_permanent_vocal_priority","cancel":"role_conflicts_with_arrangement_or_Dmitry_prefers_baseline","confidence":"high_schema_medium_inference"},
+    {"id":"RULE-ML-20260915-0900-03","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260915-0900-01"],"when_apply":"automatic_mixer_optimizes_dense_session","instrument_section":"group_stems_and_full_mix","change":"evaluate_intra_group_balance_separately_from_inter_group_coordination","proposed_range":"two_stage_vs_monolithic_plus_no_processing_and_level_only","number_origin":"controlled_ablation_design","protect":["local_balance","global_hierarchy","transients","width","mono"],"success":"local_gain_survives_global_stage_and_wins_blind_AB","cancel":"downstream_undoes_gain_or_adds_artifacts","confidence":"high_within_family"},
+    {"id":"RULE-ML-20260915-0900-04","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260915-0900-01"],"when_apply":"selecting_group_granularity_for_new_model_or_version","instrument_section":"full_session","change":"test_group_scheme_with_exact_checkpoint_or_commit","proposed_range":["4G","7G","instrument_or_role_control"],"number_origin":"study_conditions","protect":["across_song_section_stability","no_silent_outputs"],"success":"advantage_repeats_on_holdout","cancel":"advantage_disappears_after_model_or_material_change","confidence":"high"},
+    {"id":"RULE-ML-20260915-0900-05","status":"candidate","auto_apply":false,"source_ids":["SRC-ML-20260915-0900-01"],"when_apply":"full_mix_model_is_used_inside_one_group","instrument_section":"any_functional_group","change":"compare_NoMix_and_simple_ELL_or_level_only","proposed_range":"no_universal_LUFS_target_same_excerpt_matched_output_loudness","number_origin":"study_baselines","protect":["attack","articulation","groove","headroom"],"success":"learned_model_beats_simple_baseline_without_failures","cancel":"simple_baseline_equal_or_better_or_output_unstable","confidence":"medium_high"},
+    {"id":"RULE-ML-20260915-0900-06","status":"candidate","auto_apply":false,"source_ids":["CODE-ML-20260915-0900-01"],"when_apply":"all_drum_bus_processing_is_driven_by_cymbals_or_damages_continuity","instrument_section":"rock_drums","change":"compare_all_drums_with_shell_low_mid_and_high_percussion_split","proposed_range":"routing_only_no_paper_compressor_settings","number_origin":"seven_group_definition_plus_engineering_inference","protect":["kick_snare_attack_body","overhead_image","cymbal_decay","room","phase","mono"],"success":"shell_control_without_bright_pumping_or_kit_image_loss","cancel":"split_breaks_cohesion_or_phase_space","confidence":"medium_low_until_rock_AB"},
+    {"id":"RULE-ML-20260915-0900-07","status":"candidate","auto_apply":false,"source_ids":["VID-ML-20260915-0900-02"],"when_apply":"heavy_stereo_bus_compression_reduces_impact_or_liveness","instrument_section":"subgroups_and_mix_bus","change":"compare_bypass_heavy_master_and_light_subgroup_plus_master","proposed_range":{"drum_bass_GR":"about_1_dB","vocal_group_GR":"2_to_3_dB","other_group_master_GR":"a_couple_dB"},"number_origin":"engineer_spoken_examples_not_presets_exact_times_not_provided","protect":["transient_impact","sustain","vocal_articulation","noise_bleed","inter_group_pumping"],"success":"loudness_matched_blind_preference_and_section_contrast","cancel":"effect_disappears_after_match_or_color_pumping_accumulates","confidence":"medium_low"}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260915-0900-01","title":"How a Multi-Platinum Mixer Builds a Modern Rock Mix (Step by Step)","channel":"The Mix Academy","url":"https://www.youtube.com/watch?v=BOyyYAsN91Y","duration":"2:07:18","metadata_checked":"2026-09-15","reading_depth":"metadata_plus_auto_generated_transcript_selected_target_segments_not_full_GUI_review","transcript_available":true,"content_studied":true,"status":"studied_selected_sections","timestamps":{"mid_side_mixbus_compression":"06:51-11:32","bass_parallel_workflow":"13:45-13:54","rough_reference_balance":"19:41-21:40","kick_snare_frequency_sidechain":"30:00-30:35","guitar_context_and_delay":"56:15-60:33","room_filtering":"69:01-70:17","amp_room":"76:50-77:01","section_automation":"123:25-123:43"},"classes":["reference_matching","MS_compression","multiband_sidechain","loudness_overs","kick","snare","bass","rhythm_guitar","lead_guitar","room_reverb","delay","saturation","automation","mix_bus"],"asr_gui_verification_required":["plugin_names","LF_boundary_around_68_70_Hz_vs_40_Hz","about_1_dB_chorus_jump"],"limitations":["auto_ASR","YouTube_not_raw_audio","not_independently_loudness_matched","selected_transcript_sections_only"]},
+    {"id":"VID-ML-20260915-0900-02","title":"How to Mix Sub Groups With Joe Carrell - Part 1: Saturation & Compression","channel":"Plugin Alliance","url":"https://www.youtube.com/watch?v=WVT9IwRSg-o","duration":"15:53","metadata_checked":"2026-09-15","reading_depth":"metadata_plus_full_auto_generated_english_transcript","transcript_available":true,"content_studied":true,"status":"studied","timestamps":{"hybrid_grouping":"00:36-03:38","saturation":"04:12-07:27","subgroup_master_compression":"07:31-10:28","level_jump_caveat":"10:00-10:05","vocal_group":"11:21-12:47","drum_bass_group":"12:49-14:13"},"classes":["saturation","transient_rounding","compression","attack_release_GR","drums","bass","guitars","keys","lead_vocal","backing_vocal","subgroup","mix_bus","loudness_caveat"],"spoken_settings":{"heavy_master_personal_boundary":"about_4_dB_or_more_disliked_by_engineer","vocal_group_GR":"2_to_3_dB_fast_attack_reasonably_slow_release","drum_bass_GR":"about_1_dB_fastest_release_setting","general_group_master_GR":"a_couple_dB"},"limitations":["vendor_channel","subjective_engineer_workflow","acknowledged_unmatched_level_jump","auto_ASR","no_controlled_listener_test","settings_not_transferable_between_compressors"]},
+    {"id":"VID-ML-20260915-0900-Q1","title":"Mixing With Subgroups Part 2: EQing & Stereo Widening","channel":"Plugin Alliance","url":"https://www.youtube.com/watch?v=JUsMVaXWw28","duration":"16:50","metadata_checked":"2026-09-15","reading_depth":"metadata_title_duration_only","transcript_available":false,"content_studied":false,"status":"queued_source","conclusions_created":false}
+  ],
+  "reference_cards": [],
+  "multitracks_added": [],
+  "experiments": [
+    {"id":"EXP-ML-20260915-0900-01","title":"Grouping matrix on dense rock","status":"not_run","material":"licensed_dense_rock_multitrack","variants":["NoMix","level_only","4G","paper_7G","instrument_label","manual_section_role_rhythm_guitar_foundation"],"controls":["same_checkpoint_commit","same_preprocessing","saved_group_stems","matched_final_loudness","mono","randomized_blind_labels"],"metrics":["hierarchy","kick_bass_centre","shell_attack_body","cymbal_continuity","rhythm_guitar_mass","lead_role","width","artifacts","Dmitry_blind_preference"]},
+    {"id":"EXP-ML-20260915-0900-02","title":"Monolithic versus two-stage","status":"not_run","variants":["monolithic","ELL_to_group_stems_to_global","learned_intragroup_to_global","level_only_to_global"],"controls":["one_model_family_per_comparison","training_track_count_check","matched_loudness","no_silent_output_tolerance"],"metrics":["local_balance_retention","global_coordination","transient_integrity","mono","artifacts","Dmitry_blind_preference"]},
+    {"id":"EXP-ML-20260915-0900-03","title":"Shell and high-percussion split","status":"not_run","variants":["single_all_drums_bus","shell_high_split_bypass","shell_high_split_restrained_processing"],"controls":["unchanged_phase_time","matched_return_loudness","multiple_sections","full_mix","mono"],"metrics":["kick_snare_attack_body","cymbal_decay","overhead_image","room_continuity","pumping","Dmitry_blind_preference"]},
+    {"id":"EXP-ML-20260915-0900-04","title":"Distributed compression architecture","status":"not_run","variants":["no_compression","level_only","single_master","subgroup_only","subgroup_plus_light_master"],"source_derived_trial_regions":{"drum_bass_GR":"about_1_dB","vocal_GR":"2_to_3_dB","other_groups_master":"a_couple_dB"},"controls":["true_bypass","matched_loudness","frozen_EQ_saturation","GR_source_logging","full_sections"],"metrics":["attack","sustain","pumping","section_contrast","noise_bleed","true_peak","Dmitry_blind_preference"]}
+  ],
+  "access_constraints": {"free_only":true,"Consensus":"free_monthly_limit_exhausted_until_2026-10-01","Scite":"free_monthly_limit_exhausted_until_2026-10-01","Mixing_Learning_Reference_Hub":"not_available","YouTube_Learning_Bridge":"not_available","paid_access_used":false,"commercial_audio_downloaded":false,"project_audio_uploaded":false},
+  "counts": {"source_cards":2,"full_text_sources":1,"code_supplements":1,"knowledge_cards":9,"rule_candidates":7,"video_source_cards":3,"videos_studied":2,"queued_sources":1,"reference_cards":0,"multitracks_added":0,"experiments_not_run":4},
+  "next_experiment_id": "EXP-ML-20260915-0900-01",
+  "handoff": "Group by function in each section, not only by instrument label. Lead may be vocal or lead guitar; do not force vocal priority. Seven groups are not universal because the effect was model-dependent. Separate local balance from global coordination and keep NoMix/level-only baselines. Any subgroup-compression demo with a level jump requires a new loudness-matched blind A/B."
+}
