@@ -10,7 +10,8 @@ from typing import Any, Callable, Dict, List, Optional
 class ObservationMixerClient:
     """Wrap a real mixer client and intercept all writes."""
 
-    _MUTATING_PREFIXES = ("set_", "reset_", "load_", "recall_", "route_", "save_")
+    _MUTATING_PREFIXES = ("set_", "reset_", "load_", "recall_", "route_", "save_",
+                          "send_", "_send_", "write_", "apply_")
 
     def __init__(self, base_client: Any, on_command: Optional[Callable[[Dict[str, Any]], None]] = None):
         self._base_client = base_client

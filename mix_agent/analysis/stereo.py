@@ -6,18 +6,67 @@ from typing import Any, Dict
 
 import numpy as np
 
-from .loudness import amp_to_db
+from .dsp_utils import EPS, amp_to_db, channels, iter_frames
 from .spectral import BANDS
 
 
 def _rms(samples: np.ndarray) -> float:
-    return float(np.sqrt(np.mean(np.square(samples)) + 1e-12))
+    data = np.asarray(samples, dtype=np.float64)
+    if data.size == 0:
+        return 0.0
+    return float(np.sqrt(np.mean(np.square(data)) + EPS))
+
+
+def _correlation(left: np.ndarray, right: np.ndarray) -> float:
+    ls = float(np.std(left))
+    rs = float(np.std(right))
+    if ls < 1e-9 and rs < 1e-9:
+        return 1.0
+    if ls < 1e-9 or rs < 1e-9:
+        return 0.0
+    value = float(np.corrcoef(left, right)[0, 1])
+    if not np.isfinite(value):
+        return 0.0
+    return float(np.clip(value, -1.0, 1.0))
+
+
+def _frequency_width(left: np.ndarray, right: np.ndarray, sample_rate: int, n_fft: int = 4096) -> Dict[str, float]:
+    """Average M/S power over every FFT frame instead of only the first frame."""
+    hop = n_fft // 2
+    window = np.hanning(n_fft).astype(np.float64)
+    power_m = np.zeros(n_fft // 2 + 1, dtype=np.float64)
+    power_s = np.zeros_like(power_m)
+    count = 0
+
+    left_frames = list(iter_frames(left, n_fft, hop, pad_end=True))
+    right_frames = list(iter_frames(right, n_fft, hop, pad_end=True))
+    for lf, rf in zip(left_frames, right_frames):
+        L = np.fft.rfft(lf.astype(np.float64, copy=False) * window)
+        R = np.fft.rfft(rf.astype(np.float64, copy=False) * window)
+        M = (L + R) * 0.5
+        S = (L - R) * 0.5
+        power_m += np.square(np.abs(M))
+        power_s += np.square(np.abs(S))
+        count += 1
+
+    if count:
+        power_m /= count
+        power_s /= count
+    freqs = np.fft.rfftfreq(n_fft, 1.0 / float(sample_rate))
+    widths: Dict[str, float] = {}
+    nyquist = sample_rate / 2.0
+    for name, (lo, hi) in BANDS.items():
+        mask = (freqs >= lo) & (freqs < min(hi, nyquist + 1.0))
+        m = float(np.sum(power_m[mask])) if np.any(mask) else 0.0
+        s = float(np.sum(power_s[mask])) if np.any(mask) else 0.0
+        widths[name] = round(s / (m + s + EPS), 6) if (m + s) > EPS else 0.0
+    return widths
 
 
 def compute_stereo_metrics(audio: np.ndarray, sample_rate: int) -> Dict[str, Any]:
-    """Compute stereo width, correlation and mono fold-down risk."""
-    data = np.asarray(audio, dtype=np.float32)
-    if data.ndim == 1 or data.shape[1] < 2:
+    """Compute finite stereo width, correlation and mono fold-down risk."""
+    data = channels(audio)
+    if data.shape[1] < 2:
         return {
             "is_stereo": False,
             "stereo_width": 0.0,
@@ -31,47 +80,34 @@ def compute_stereo_metrics(audio: np.ndarray, sample_rate: int) -> Dict[str, Any
             "limitations": ["Mono source: stereo width and mono compatibility are not meaningful."],
         }
 
-    left = data[:, 0]
-    right = data[:, 1]
-    if np.std(left) < 1e-9 or np.std(right) < 1e-9:
-        corr = 1.0
-    else:
-        corr = float(np.corrcoef(left, right)[0, 1])
+    left = data[:, 0].astype(np.float64, copy=False)
+    right = data[:, 1].astype(np.float64, copy=False)
+    corr = _correlation(left, right)
     mid = (left + right) * 0.5
     side = (left - right) * 0.5
     mid_energy = _rms(mid) ** 2
     side_energy = _rms(side) ** 2
-    stereo_width = float(side_energy / (mid_energy + side_energy + 1e-12))
-    mono = (left + right) * 0.5
-    stereo_rms = _rms(data)
-    mono_loss_db = amp_to_db(stereo_rms) - amp_to_db(_rms(mono))
+    stereo_width = float(side_energy / (mid_energy + side_energy + EPS)) if (mid_energy + side_energy) > EPS else 0.0
+    mono = mid
+    stereo_rms = _rms(np.column_stack([left, right]))
+    mono_rms = _rms(mono)
+    if stereo_rms <= EPS:
+        mono_loss_db = 0.0
+    else:
+        mono_loss_db = max(0.0, amp_to_db(stereo_rms) - amp_to_db(mono_rms))
 
-    n_fft = 4096
-    if len(left) < n_fft:
-        pad = n_fft - len(left)
-        left = np.pad(left, (0, pad))
-        right = np.pad(right, (0, pad))
-    window = np.hanning(n_fft).astype(np.float32)
-    L = np.fft.rfft(left[:n_fft] * window)
-    R = np.fft.rfft(right[:n_fft] * window)
-    freqs = np.fft.rfftfreq(n_fft, 1.0 / sample_rate)
-    M = (L + R) * 0.5
-    S = (L - R) * 0.5
-    widths: Dict[str, float] = {}
-    for name, (lo, hi) in BANDS.items():
-        mask = (freqs >= lo) & (freqs < hi)
-        m = float(np.sum(np.abs(M[mask]) ** 2))
-        s = float(np.sum(np.abs(S[mask]) ** 2))
-        widths[name] = round(s / (m + s + 1e-12), 6)
-
+    widths = _frequency_width(left, right, sample_rate)
     low_width = max(widths.get("sub", 0.0), widths.get("bass", 0.0))
+    side_mid_ratio = side_energy / (mid_energy + EPS) if side_energy > EPS else 0.0
+    risk = bool(corr < 0.1 or mono_loss_db > 2.0 or low_width > 0.5)
+
     return {
         "is_stereo": True,
         "stereo_width": round(stereo_width, 6),
         "inter_channel_correlation": round(corr, 6),
-        "mid_side_energy_ratio": round(side_energy / (mid_energy + 1e-12), 6),
+        "mid_side_energy_ratio": round(float(side_mid_ratio), 6),
         "mono_fold_down_loss_db": round(float(mono_loss_db), 3),
-        "phase_cancellation_risk": bool(corr < 0.1 or mono_loss_db > 2.0),
+        "phase_cancellation_risk": risk,
         "low_frequency_stereo_width": round(float(low_width), 6),
         "low_frequency_stereo_width_warning": bool(low_width > 0.25),
         "frequency_dependent_width": widths,

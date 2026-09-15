@@ -9,6 +9,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import time
+import math
+import threading
+from numbers import Real
+from contextlib import nullcontext
+
+from guarded_mixer import GuardedMixerClient
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from autofoh_models import RuntimeState
@@ -350,12 +356,14 @@ class SafetyDecision:
     bounded: bool = False
     rate_limited: bool = False
     sent: bool = False
+    simulated: bool = False
     message: str = ""
     payload: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class AutoFOHSafetyConfig:
+    shadow_live: bool = False
     channel_fader_max_step_db: float = 1.0
     channel_fader_min_interval_sec: float = 3.0
     bus_fader_max_step_db: float = 1.0
@@ -390,7 +398,10 @@ class AutoFOHSafetyConfig:
     @classmethod
     def from_config(cls, config: Optional[Dict[str, Any]] = None) -> "AutoFOHSafetyConfig":
         config = config or {}
+        if not isinstance(config.get("shadow_live", False), bool):
+            raise ValueError("shadow_live must be boolean")
         return cls(
+            shadow_live=config.get("shadow_live", False),
             channel_fader_max_step_db=float(config.get("channel_fader_max_step_db", 1.0)),
             channel_fader_min_interval_sec=float(config.get("channel_fader_min_interval_sec", 3.0)),
             bus_fader_max_step_db=float(config.get("bus_fader_max_step_db", 1.0)),
@@ -431,8 +442,11 @@ class AutoFOHSafetyController:
         config: AutoFOHSafetyConfig | None = None,
         runtime_policy: RuntimeStatePolicy | None = None,
         time_provider: Callable[[], float] | None = None,
+        reviewer: Callable[[TypedCorrectionAction, RuntimeState], Any] | None = None,
     ):
         self.mixer_client = mixer_client
+        self.reviewer = reviewer
+        self._execution_lock = threading.RLock()
         self.config = config or AutoFOHSafetyConfig()
         self.runtime_policy = runtime_policy or RuntimeStatePolicy()
         self.time_provider = time_provider or time.monotonic
@@ -445,7 +459,17 @@ class AutoFOHSafetyController:
         action: TypedCorrectionAction,
         runtime_state: RuntimeState,
     ) -> SafetyDecision:
+        with self._execution_lock:
+            return self._execute_locked(action, runtime_state)
+
+    def _execute_locked(self, action, runtime_state) -> SafetyDecision:
         decision = SafetyDecision(action=action, runtime_state=runtime_state)
+        if any(isinstance(value, Real) and not math.isfinite(value)
+               for value in action.__dict__.values()):
+            decision.allowed = False
+            decision.message = "non-finite action parameter"
+            self.history.append(decision)
+            return decision
 
         if not self.runtime_policy.is_action_allowed(runtime_state, action.family):
             decision.allowed = False
@@ -453,7 +477,13 @@ class AutoFOHSafetyController:
             self.history.append(decision)
             return decision
 
-        bounded_action, bounded = self._apply_bounds(action)
+        try:
+            bounded_action, bounded = self._apply_bounds(action)
+        except (TypeError, ValueError, OverflowError) as exc:
+            decision.allowed = False
+            decision.message = f"invalid mixer readback: {exc}"
+            self.history.append(decision)
+            return decision
         decision.action = bounded_action
         decision.bounded = bounded
 
@@ -472,11 +502,41 @@ class AutoFOHSafetyController:
             self.history.append(decision)
             return decision
 
+        review = None
         try:
-            result = translator(bounded_action)
+            if self.reviewer is not None:
+                review = self.reviewer(bounded_action, runtime_state)
+                decision.payload["shadow_review"] = dict(review.report)
+                if not review.allowed:
+                    decision.allowed = False
+                    decision.message = review.reason
+                    self.history.append(decision)
+                    return decision
+            if self.config.shadow_live:
+                decision.simulated = True
+                decision.message = "shadow_live: no console writes"
+                decision.payload.update(self._decision_payload(bounded_action))
+                if review is not None:
+                    review.commit()
+                self.history.append(decision)
+                return decision
+            if review is not None:
+                rechecked, _ = self._apply_bounds(bounded_action)
+                if rechecked != bounded_action:
+                    decision.allowed = False
+                    decision.message = "readback changed during shadow review"
+                    self.history.append(decision)
+                    return decision
+            permit = (self.mixer_client.approved_action()
+                      if isinstance(self.mixer_client, GuardedMixerClient) else nullcontext())
+            with permit:
+                result = translator(bounded_action)
             decision.sent = bool(result is not False)
-            self._last_sent_at[bounded_action.target_key] = self.time_provider()
-            decision.payload = self._decision_payload(bounded_action)
+            if decision.sent:
+                self._last_sent_at[bounded_action.target_key] = self.time_provider()
+                if review is not None:
+                    review.commit()
+            decision.payload.update(self._decision_payload(bounded_action))
             decision.message = "sent" if decision.sent else "send returned false"
         except Exception as exc:
             decision.allowed = False
@@ -864,8 +924,8 @@ class AutoFOHSafetyController:
     def _safe_get(callback, default):
         try:
             value = callback()
-            if value is None:
-                return default
-            return value
         except Exception:
             return default
+        if isinstance(value, Real) and not math.isfinite(value):
+            raise ValueError("non-finite console readback")
+        return default if value is None else value
