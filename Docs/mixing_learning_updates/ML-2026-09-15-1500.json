@@ -1,0 +1,222 @@
+{
+  "project": "GPT MIXING ОБЛАКО / Mixing Learning",
+  "update_id": "ML-2026-09-15-1500",
+  "discovered_at": "2026-09-15T15:00:00+03:00",
+  "topic": "acoustic attributes in audio embeddings, spectral-metric contracts, and multi-objective spatial optimization",
+  "status": "research_update",
+  "tool_availability": {
+    "consensus": "free_limit_exhausted",
+    "scite": "free_limit_exhausted",
+    "context7": "available_used_for_torchaudio_docs",
+    "github": "available_used_for_source_dedup_and_publication",
+    "youtube_learning_bridge": "unavailable",
+    "mixing_learning_reference_hub": "unavailable",
+    "browser_transcript_export": "available_no_transcripts_for_selected_videos"
+  },
+  "counts": {
+    "full_text_sources": 2,
+    "code_documentation_sources": 1,
+    "knowledge_cards": 9,
+    "rule_candidates": 7,
+    "studied_videos": 0,
+    "queued_videos": 4,
+    "reference_cards": 0,
+    "experiments_not_run": 4
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260915-1500-01",
+      "title": "Probing Low-Level Acoustic Attribute Encoding in CLAP Audio Embeddings",
+      "authors": ["Héctor Martel", "Joe Hennessy-Priest", "Taemin Cho"],
+      "published": "2026-09-04",
+      "venue": "DAFx-26",
+      "doi": null,
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_19.pdf",
+      "reading_depth": "full_text_8_pages",
+      "findings": [
+        "RT60 and LUFS were approximately linearly decodable from several frozen embeddings under the study protocol",
+        "spectral centroid required nonlinear probes for complex music in most tested encoders",
+        "amplitude-invariant encoders discarded loudness information"
+      ],
+      "research_numbers_not_presets": ["RT60 0-2 s", "-40 to -10 LUFS", "pitch shift -6 to +6 semitones", "STFT 2048 samples, hop 512"],
+      "limitations": [
+        "balanced synthetic perturbations differ from natural mix variation",
+        "music was downmixed to mono and segmented into 10-second chunks",
+        "spectral centroid was averaged over frames and is not a full spectral-balance descriptor",
+        "stereo, dynamics and musical preference were not evaluated",
+        "pitch shifting was used to expand spectral-centroid variation on real datasets"
+      ]
+    },
+    {
+      "id": "SRC-ML-20260915-1500-02",
+      "title": "SPHERE: Automatic Music Upmixing via Audio Language Model Post-Training with Spatial Heuristic Rewards",
+      "authors": ["Zixun Guo", "Calvin Murdock", "Sanjeel Parekh", "W. Owen Brimijoin", "Simon Dixon", "Joshua Reiss", "Ishwarya Ananthabhotla"],
+      "published": "2026-08-31",
+      "venue": "EMNLP 2026 / arXiv v1",
+      "doi": "10.48550/arXiv.2608.30559",
+      "url": "https://arxiv.org/html/2608.30559v1",
+      "reading_depth": "full_text",
+      "findings": [
+        "six coupled rewards cover centering, spread and role-level balance",
+        "removing reward pairs produced reward hacking or spatial collapse",
+        "44 screened listeners preferred high-reward teacher binaural mixes in 338 of 440 trials",
+        "expert rating improvement from SFT to SFT+RL was small despite a larger objective-reward increase"
+      ],
+      "research_numbers_not_presets": ["-23 LUFS listener-test normalization", "29-stem context cap", "30-second segments", "teacher percentile p=0.8", "filter threshold kappa=0.5"],
+      "limitations": [
+        "binaural headphone upmix rather than conventional loudspeaker stereo",
+        "proprietary HRTF prevents exact rendering reproduction",
+        "15 held-out songs and 618 test segments",
+        "teacher-derived thresholds are distribution-specific",
+        "23.5 percent of data excluded by context limit",
+        "expensive H100 training was used by the authors but not reproduced here"
+      ]
+    },
+    {
+      "id": "CODE-ML-20260915-1500-03",
+      "title": "TorchAudio SpectralCentroid implementation contract",
+      "url": "https://github.com/pytorch/audio/blob/b85c99ccac635a06b1afaf5284bf4c1a00c1f9b5/src/torchaudio/transforms/_transforms.py#L1493-L1546",
+      "reading_depth": "selected_official_docs_and_pinned_source",
+      "verified": [
+        "frequency bins are weighted by magnitude",
+        "output is a per-channel time series",
+        "sample rate, FFT size, window, hop, padding and window function are part of the metric contract",
+        "defaults differ from the DAFx paper configuration"
+      ],
+      "limitations": ["selected implementation section only", "no project audio executed"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260915-1500-01","claim":"Feature decodability from an embedding does not make the embedding a calibrated acoustic meter.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-02","claim":"Encoder preprocessing can destroy loudness information; model version and amplitude normalization are mandatory provenance.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-03","claim":"A global spectral centroid does not describe spectral balance, masking, resonances or section roles.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-04","claim":"Spectral metrics require an explicit FFT, window, hop, channel, activity and temporal-aggregation contract.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-05","claim":"Semantic reference embeddings should be tested as auxiliary features while exact loudness and per-band anchors remain explicit.","confidence":"medium-high"},
+    {"id":"KC-ML-20260915-1500-06","claim":"Spatial optimization must jointly constrain center, spread and role-level balance to reduce collapse and reward hacking.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-07","claim":"SPHERE reward-human alignment is evidence for selected binaural comparisons, not a universal stereo pan or width target.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-08","claim":"Spotlight is a section role and may be vocal, lead guitar, riff or another element; vocal priority is not automatic.","confidence":"high"},
+    {"id":"KC-ML-20260915-1500-09","claim":"Objective reward improvements may outpace preference improvements, so perceptual validation remains independent.","confidence":"medium-high"}
+  ],
+  "rule_candidates": [
+    {
+      "id":"RULE-ML-20260915-1500-01",
+      "source":["SRC-ML-20260915-1500-01"],
+      "when":"an embedding is used to infer loudness, reverberation or spectral content",
+      "change":"retain a direct calibrated measurement and record model and preprocessing provenance",
+      "protect":["calibration","reproducibility","headroom"],
+      "test":"compare against BS.1770 or the explicit target metric on song-disjoint data",
+      "cancel":"domain drift, bias or weaker-than-trivial baseline",
+      "confidence":"high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-02",
+      "source":["SRC-ML-20260915-1500-01"],
+      "when":"selecting an encoder for dynamics or level analysis",
+      "change":"test amplitude normalization and invariance before training or using a probe",
+      "protect":["true level differences","headroom"],
+      "test":"controlled level-step and gain-ramp test",
+      "cancel":"embedding remains invariant to level",
+      "confidence":"high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-03",
+      "source":["SRC-ML-20260915-1500-01","CODE-ML-20260915-1500-03"],
+      "when":"spectral centroid is computed for a stem or mix",
+      "change":"record FFT, window, hop, channel reduction, activity mask and aggregation; analyze by section",
+      "protect":["transients","low-end role","local resonances","masking context"],
+      "test":"compare multiple contracts and a per-band spectrum",
+      "cancel":"decision changes materially with windowing or silence proportion",
+      "confidence":"high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-04",
+      "source":["SRC-ML-20260915-1500-01"],
+      "when":"semantic reference matching proposes an EQ move",
+      "change":"test no-processing and level-only before a bounded EQ candidate",
+      "protect":["instrument role","transient and body","tonal identity"],
+      "test":"loudness-matched blind full-mix A/B plus explicit per-band analysis",
+      "cancel":"embedding distance improves while musical preference or role clarity worsens",
+      "confidence":"medium-high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-05",
+      "source":["SRC-ML-20260915-1500-02"],
+      "when":"optimizing pan, width or binaural position",
+      "change":"jointly evaluate center, spread and role-level balance",
+      "protect":["mono compatibility","foundation","spotlight","natural scene"],
+      "test":"ablate each objective and inspect collapse or extremes",
+      "cancel":"reward hacking, all-center collapse or exaggerated edges",
+      "confidence":"high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-06",
+      "source":["SRC-ML-20260915-1500-02"],
+      "when":"assigning a spotlight role",
+      "change":"assign by section and permit non-vocal leads",
+      "protect":["arrangement hierarchy","role transitions","creative intent"],
+      "test":"blind section comparison in the full mix",
+      "cancel":"fixed role conflicts with the intended focus",
+      "confidence":"high","status":"candidate","auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20260915-1500-07",
+      "source":["SRC-ML-20260915-1500-02"],
+      "when":"adapting a SPHERE-like reward to the project",
+      "change":"validate binaural and loudspeaker stereo separately and derive local thresholds",
+      "protect":["renderer validity","translation","listener preference"],
+      "test":"renderer-matched loudness-controlled listening test",
+      "cancel":"no direct evidence in the target playback condition",
+      "confidence":"high","status":"candidate","auto_apply":false
+    }
+  ],
+  "video_source_cards": [
+    {"id":"VIDEO-ML-20260915-1500-01","title":"How to Mix Rock Guitars That Sound Huge | UAD Spotlight","channel":"Universal Audio","published":"2025-10-24","url":"https://www.youtube.com/watch?v=gELIK9iyQRk","duration":"11:50","status":"queued_source","metadata_depth":"page_meta_title_channel_date_duration","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1500-02","title":"How to EQ Heavy Guitars - Hardcore Mixing","channel":"Hardcore Music Studio","published":"2015-07-30","url":"https://www.youtube.com/watch?v=upk6jk-TXY0","duration":"4:43","status":"queued_source","metadata_depth":"page_meta_title_channel_date_duration","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1500-03","title":"Mixing MACHINE HEAD quad-tracked guitars on Nail The Mix","channel":"URM Academy","published":"2016-11-12","url":"https://www.youtube.com/watch?v=2hplhOnwmUk","duration":"11:48","status":"queued_source","metadata_depth":"page_meta_title_channel_date_duration","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1500-04","title":"5 Quick EQ Mixing Tricks","channel":"Produce Like A Pro","published":"2018-02-19","url":"https://www.youtube.com/watch?v=nkPnxOkUd6s","duration":"21:49","status":"queued_source","metadata_depth":"page_meta_title_channel_date_duration","content_read":false,"transcript":"unavailable"}
+  ],
+  "reference_cards": [],
+  "experiments": [
+    {
+      "id":"EXP-ML-20260915-1500-01","status":"not_run","material":"licensed local rock multitrack",
+      "variants":["unchanged","controlled level shift","bounded spectral tilt","controlled reverb"],
+      "measurements":["exact LUFS/RT60/spectral centroid","linear probe","small MLP probe"],
+      "controls":["song-disjoint split","section and instrument holdouts","direct meters retained","no external audio upload","blind Dmitry full-mix evaluation where processing is audible"],
+      "success":["calibrated additive information","generalization beyond training songs","no replacement of direct meters"],
+      "cancel":["data leakage","amplitude invariance","domain bias","worse than trivial baseline"]
+    },
+    {
+      "id":"EXP-ML-20260915-1500-02","status":"not_run","material":"licensed/local drums bass distorted guitars and full mix",
+      "variants":["multiple FFT and hop contracts","activity-aware aggregation","whole-section aggregation"],
+      "controls":["same audio","per-band spectrum","section boundaries","loudness matched when rendering processed variants"],
+      "success":["stable interpretation across reasonable contracts","agreement with per-band and listening checks"],
+      "cancel":["decision dominated by window choice","silence proportion reverses conclusion"]
+    },
+    {
+      "id":"EXP-ML-20260915-1500-03","status":"not_run","material":"synthetic stem-role metadata and spatial parameters",
+      "variants":["center-only","spread-only","level-only","all-objective"],
+      "controls":["same stem roles","no SPHERE threshold transfer","inspect all intermediate rewards"],
+      "success":["no collapsed or extreme solution","trade-offs visible"],
+      "cancel":["reward hacking","unstable result under small role changes"]
+    },
+    {
+      "id":"EXP-ML-20260915-1500-04","status":"not_run","material":"licensed local multitrack and local licensed renderer/HRTF",
+      "variants":["original or no processing","level-only","conventional role-aware stereo","role-aware binaural candidate"],
+      "controls":["loudness matched","headphones and loudspeakers","blind Dmitry evaluation","mono check"],
+      "success":["clearer section focus","foundation preserved","natural width","acceptable translation"],
+      "cancel":["fatigue","mono loss","vocal forced as spotlight","renderer-specific artifact","worse stereo translation"]
+    }
+  ],
+  "safety": {
+    "audio_downloaded": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false,
+    "paid_compute_used": false,
+    "dsp_metrics_claimed_without_audio": false,
+    "dsp_changed": false,
+    "code_changed": false,
+    "runtime_rules_changed": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
