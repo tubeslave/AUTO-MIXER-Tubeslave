@@ -1,0 +1,425 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "patch_id": "ml-2026-09-15-1800",
+  "update_id": "ML-2026-09-15-1800",
+  "created_at": "2026-09-15T18:05:09+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "topic": "controllable_mastering_reference_alignment_quality_and_long_form_safety",
+  "mode": "additive",
+  "base_materials_read": [
+    {
+      "path": "Docs/mixing_learning_updates/README.md",
+      "ref": "master",
+      "sha": "659aef8275c54574c58a61c5b33b7ab225f73c97"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-11-1800.json",
+      "ref": "master",
+      "reason": "deduplicate ITO-Master and SonicMaster as previously known related work"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-12-1200.json",
+      "ref": "master",
+      "reason": "avoid duplicating the established loud-rock peak-control and true-peak rules"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-15-1500.json",
+      "ref": "master",
+      "reason": "retain the explicit-meter-versus-embedding distinction"
+    }
+  ],
+  "novelty": {
+    "type": "reading_depth_and_revision_upgrade",
+    "summary": "ITO-Master and SonicMaster were named as related work in the base but had no source cards. Both full texts were read; SonicMaster v5 is a fresh 2026-09-11 revision with expanded long-form results and limitations.",
+    "deduplicated_against": [
+      "ML-2026-09-11-1800",
+      "ML-2026-09-12-1200",
+      "ML-2026-09-15-1500"
+    ]
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260915-1800-01",
+      "title": "ITO-Master: Inference-Time Optimization for Audio Effects Modeling of Music Mastering Processors",
+      "authors": ["Junghyun Koo", "Marco A. Martinez-Ramirez", "Wei-Hsiang Liao", "Giorgio Fabbro", "Michele Mancusi", "Yuki Mitsufuji"],
+      "url": "https://arxiv.org/html/2506.16889",
+      "doi": "10.48550/arXiv.2506.16889",
+      "publication_date": "2025-07-03",
+      "venue": "ISMIR 2025",
+      "discovered_at": "2026-09-15T18:05:09+03:00",
+      "kind": "conference_preprint",
+      "read_depth": "full_html_introduction_method_datasets_metrics_results_subjective_test_conclusion",
+      "bounded_summary": "The paper compares black-box waveform conversion with a fixed, interpretable 46-parameter differentiable mastering chain and optimizes only the reference embedding at inference. ITO improved the optimized Audio Feature loss and DRV while several independent FAD variants worsened relative to the corresponding pre-ITO model. Direct optimization of processor parameters with the content-independent loss performed poorly.",
+      "limitations": [
+        "The MUSHRA-type test had 10 participants, eight 30-second questions, a different-content reference and no hidden high anchor.",
+        "Production quality, usability and preference were explicitly left for future work; high reference alignment can still follow a poor reference.",
+        "The text-prompt metal/classical/hip-hop analysis was qualitative and used one 11.8-second instrumental rock excerpt.",
+        "The training chain order and effect-activation probabilities are data-generation choices, not mastering presets."
+      ],
+      "novelty": "known_related_work_upgraded_to_full_source_card"
+    },
+    {
+      "id": "S-ML-20260915-1800-02",
+      "title": "ITO-Master official implementation",
+      "url": "https://github.com/SonyResearch/ITO-Master",
+      "kind": "official_reproducible_code",
+      "read_depth": "repository_readme_and_license",
+      "license": "CC BY-NC 4.0",
+      "bounded_summary": "The repository documents white-box style transfer, AudioFeatureLoss ITO and CLAP-text ITO commands. The published examples request CUDA and expose optimization step and learning-rate controls.",
+      "limitations": [
+        "Noncommercial license.",
+        "No code, weights, audio or GPU job was run in this update.",
+        "README command values are implementation examples, not accepted project settings."
+      ],
+      "novelty": "new_code_card"
+    },
+    {
+      "id": "S-ML-20260915-1800-03",
+      "title": "SonicMaster: Towards Controllable All-in-One Music Restoration and Mastering",
+      "authors": ["Jan Melechovsky", "Ambuj Mehrish", "Abhinaba Roy", "Dorien Herremans"],
+      "url": "https://arxiv.org/html/2508.03448",
+      "doi": "10.48550/arXiv.2508.03448",
+      "publication_date": "2026-09-11",
+      "venue": "ICML 2026",
+      "version": "v5",
+      "discovered_at": "2026-09-15T18:05:09+03:00",
+      "kind": "accepted_conference_preprint_revision",
+      "read_depth": "full_html_introduction_dataset_method_metrics_results_listening_tests_appendix_degradation_table_limitations",
+      "bounded_summary": "SonicMaster learns text-conditioned restoration from 175k synthetic clean/degraded pairs spanning EQ, dynamics, reverb, amplitude and stereo. The work reports strong proxy-metric and listening results on its curated degradations, but long-form reverb metrics were not uniformly better and the authors report occasional codec-latent artifacts and inconsistent volume across chained segments.",
+      "limitations": [
+        "Training uses synthetic degradations applied to selected Jamendo segments; it is not a corpus of professional raw-to-master rock sessions.",
+        "The 12-listener study covered 43 pairs; the 20-listener baseline comparison covered only EQ and reverb subsets.",
+        "Compression, punch, clipping and stereo are judged with task-specific proxies that do not establish mastering preference or delivery compliance.",
+        "The authors report occasional robotic voice, slight intelligibility loss and inconsistent long-form volume.",
+        "Album coherence and format-specific mastering are outside the current scope."
+      ],
+      "novelty": "fresh_v5_revision_and_first_full_reading_in_base"
+    },
+    {
+      "id": "S-ML-20260915-1800-04",
+      "title": "SonicMaster official code and model metadata",
+      "urls": ["https://github.com/AMAAI-Lab/SonicMaster", "https://huggingface.co/amaai-lab/SonicMaster"],
+      "kind": "official_code_and_model_metadata",
+      "read_depth": "repository_readme_license_and_hugging_face_metadata",
+      "license": "Apache-2.0",
+      "bounded_summary": "The repository exposes training code and links to an 863M-parameter audio-to-audio model and paired dataset. Model metadata and license were verified; no arbitrary Space or remote compute was launched.",
+      "limitations": [
+        "No local inference, model download or audio evaluation was performed.",
+        "A permissive code/model license does not turn source Jamendo audio into raw multitracks."
+      ],
+      "novelty": "new_code_model_card"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260915-1800-01",
+      "title": "Reference alignment, production quality and preference are separate endpoints",
+      "claim": "A mastering system can become closer to its reference on the optimized feature loss while independent quality metrics degrade; all three endpoints require separate gates.",
+      "evidence": ["S-ML-20260915-1800-01"],
+      "confidence": 0.95
+    },
+    {
+      "id": "KC-ML-20260915-1800-02",
+      "title": "A curated reference is part of the control policy",
+      "claim": "Reference-conditioned optimization faithfully following an unsuitable or poor reference is a failure even when similarity rises.",
+      "evidence": ["S-ML-20260915-1800-01"],
+      "confidence": 0.94
+    },
+    {
+      "id": "KC-ML-20260915-1800-03",
+      "title": "Interpretable controls do not make the optimization objective safe",
+      "claim": "A visible white-box chain helps inspection and undo, but direct parameter optimization can still fail when its content-independent loss is under-specified.",
+      "evidence": ["S-ML-20260915-1800-01", "S-ML-20260915-1800-02"],
+      "confidence": 0.93
+    },
+    {
+      "id": "KC-ML-20260915-1800-04",
+      "title": "Genre words are not mastering targets",
+      "claim": "The paper's one-excerpt qualitative metal prompt does not justify a universal metal EQ, crest factor or LUFS target.",
+      "evidence": ["S-ML-20260915-1800-01"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260915-1800-05",
+      "title": "Synthetic inverse tasks are not professional mastering pairs",
+      "claim": "Learning to invert known synthetic degradations is useful for controlled benchmarks but does not establish recovery of undocumented real production chains.",
+      "evidence": ["S-ML-20260915-1800-03"],
+      "confidence": 0.96
+    },
+    {
+      "id": "KC-ML-20260915-1800-06",
+      "title": "Task proxies need explicit contracts and listening",
+      "claim": "Frame-RMS spread, onset strength, spectral flatness and mid/side energy ratio are task proxies; none alone proves restored punch, unclipped fidelity, stereo quality or mastering readiness.",
+      "evidence": ["S-ML-20260915-1800-03"],
+      "confidence": 0.97
+    },
+    {
+      "id": "KC-ML-20260915-1800-07",
+      "title": "Long-form safety is distinct from short-excerpt quality",
+      "claim": "Segment-level improvement does not guarantee stable song-level loudness or ambience; boundaries and section transitions need dedicated checks.",
+      "evidence": ["S-ML-20260915-1800-03"],
+      "confidence": 0.96
+    },
+    {
+      "id": "KC-ML-20260915-1800-08",
+      "title": "Training ranges are not engineering ranges",
+      "claim": "SonicMaster's large synthetic compressor, EQ and transient-shaper ranges were chosen to create degradations and must not be copied into Automixer settings.",
+      "evidence": ["S-ML-20260915-1800-03"],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260915-1800-09",
+      "title": "Mastering requires delivery and programme scope beyond restoration",
+      "claim": "Single-track restoration quality does not cover album coherence, codec/format preparation, true-peak compliance or artistic sequencing.",
+      "evidence": ["S-ML-20260915-1800-03"],
+      "confidence": 0.97
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "R-ML-20260915-1800-01",
+      "summary": "Gate reference similarity, technical quality and listener preference separately.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["mix_bus", "mastering", "reference_matching", "offline_automatic_mixing"],
+      "when_to_apply": "Any reference-conditioned or text-conditioned full-mix processing.",
+      "what_to_change": "Optimize only a bounded candidate; measure the optimizer objective, independent signal/delivery metrics and blind preference as separate outputs.",
+      "numeric_ranges": null,
+      "range_origin": "No project settings transferred from the papers.",
+      "do_not_damage": ["transients", "low_end_role", "stereo_image", "vocal_or_lead_intelligibility", "section_contrast"],
+      "how_to_verify": ["loudness_matched_blind_AB", "independent_metrics_not_used_for_optimization", "Dmitry_rating"],
+      "cancel_if": "Any protected quality regresses or only the optimized loss improves.",
+      "confidence": 0.96
+    },
+    {
+      "id": "R-ML-20260915-1800-02",
+      "summary": "Reject or reselect a mastering reference before forcing closer alignment.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["full_mix", "mastering_reference"],
+      "when_to_apply": "Reference instrumentation, section energy, tonal density or delivery context differs materially from the target song.",
+      "what_to_change": "Choose section- and role-compatible references or reduce the transfer amount; preserve a no-transfer baseline.",
+      "numeric_ranges": null,
+      "range_origin": "Reference curation principle; no universal distance threshold established.",
+      "do_not_damage": ["song_identity", "rhythm_guitar_foundation", "drum_attack", "arrangement_contrast"],
+      "how_to_verify": ["same_section_comparison", "no_transfer_baseline", "blind_preference"],
+      "cancel_if": "Similarity rises but the target loses its intended balance, density or translation.",
+      "confidence": 0.94
+    },
+    {
+      "id": "R-ML-20260915-1800-03",
+      "summary": "Keep white-box mastering proposals inspectable and reversible, but do not trust visibility as validation.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["differentiable_mastering", "mix_bus"],
+      "when_to_apply": "A model outputs EQ, compression, imaging or limiter parameters.",
+      "what_to_change": "Log every parameter delta, render processor-by-processor bypasses and retain the unchanged baseline.",
+      "numeric_ranges": null,
+      "range_origin": "ITO-Master exposes 46 parameters but does not establish Automixer-safe bounds.",
+      "do_not_damage": ["gain_staging", "phase", "true_peak_headroom", "transient_shape"],
+      "how_to_verify": ["per_processor_bypass", "null_and_delta_listen", "full_mix_AB"],
+      "cancel_if": "A parameter move cannot be tied to a repeatable benefit or violates delivery constraints.",
+      "confidence": 0.93
+    },
+    {
+      "id": "R-ML-20260915-1800-04",
+      "summary": "Treat genre or semantic prompts as candidate directions, never numeric mastering targets.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["text_conditioned_mixing", "mastering", "rock", "metal"],
+      "when_to_apply": "A user asks for denser, punchier, darker, brighter or more metal-like sound.",
+      "what_to_change": "Translate the phrase into explicit, role-aware hypotheses and compare bounded alternatives.",
+      "numeric_ranges": null,
+      "range_origin": "The source provides qualitative prompt steering only.",
+      "do_not_damage": ["instrument_roles", "cymbal_smoothness", "bass_definition", "lead_clarity"],
+      "how_to_verify": ["explicit_hypothesis_log", "loudness_matched_AB", "section_specific_Dmitry_rating"],
+      "cancel_if": "The semantic label encourages a generic spectral or loudness stereotype inconsistent with the song.",
+      "confidence": 0.97
+    },
+    {
+      "id": "R-ML-20260915-1800-05",
+      "summary": "Never promote synthetic degradation parameters as mix or mastering presets.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["dataset_training", "audio_restoration", "mastering"],
+      "when_to_apply": "A dataset documents random EQ, compression, clipping or transient-shaper ranges.",
+      "what_to_change": "Use the numbers only to reproduce the benchmark; derive musical settings from the actual signal and controlled A/B.",
+      "numeric_ranges": {"benchmark_only": "SonicMaster Table 6; intentionally not copied into project bounds"},
+      "range_origin": "Synthetic corruption generator, not engineer recommendations.",
+      "do_not_damage": ["musical_dynamics", "timbre", "attack", "headroom"],
+      "how_to_verify": ["separate_benchmark_and_music_configs", "source_annotation", "blind_AB"],
+      "cancel_if": "A proposed setting exists only because it appears in the degradation generator.",
+      "confidence": 0.99
+    },
+    {
+      "id": "R-ML-20260915-1800-06",
+      "summary": "Require a dedicated long-form continuity gate for segment-based processing.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["full_song", "offline_mastering", "restoration"],
+      "when_to_apply": "A system processes independent or overlapping chunks.",
+      "what_to_change": "Measure and audition boundaries, section transitions and loudness history across the complete render, not only excerpts.",
+      "numeric_ranges": null,
+      "range_origin": "No universal boundary threshold established.",
+      "do_not_damage": ["section_loudness_continuity", "reverb_decay", "stereo_continuity", "timing"],
+      "how_to_verify": ["boundary_delta_scan", "full_song_loudness_history", "headphone_and_monitor_listening"],
+      "cancel_if": "Any boundary click, ambience reset, stereo jump or unintended level drift appears.",
+      "confidence": 0.96
+    },
+    {
+      "id": "R-ML-20260915-1800-07",
+      "summary": "Do not call a restored full mix delivery-ready without explicit mastering compliance checks.",
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_to": ["master_export", "streaming_delivery"],
+      "when_to_apply": "A generative or learned system outputs a polished full mix.",
+      "what_to_change": "After restoration, independently verify loudness history, true peak, decoded delivery, silence/fades and album or set coherence where applicable.",
+      "numeric_ranges": null,
+      "range_origin": "Delivery values must come from the actual destination specification, not the research papers.",
+      "do_not_damage": ["punch", "intended_loudness", "fades", "translation"],
+      "how_to_verify": ["delivery_spec_check", "decoded_codec_true_peak", "full_program_QC", "Dmitry_rating"],
+      "cancel_if": "The output passes restoration proxies but fails delivery or musical QC.",
+      "confidence": 0.97
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "V-ML-20260915-1800-01",
+      "title": "MIX BUS PROCESSING TRICKS w/ Dave Otero & Allegaeon",
+      "channel": "URM Academy",
+      "url": "https://www.youtube.com/watch?v=81d-Yumfcxs",
+      "published": "2021-04-08",
+      "duration": "18:29",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_and_description_verified",
+      "transcript_status": "unavailable_via_permitted_transcript_export",
+      "learned_content": false,
+      "topics_from_metadata_only": ["mix_bus", "top_down_mixing", "metal"],
+      "conclusions_created": false
+    },
+    {
+      "id": "V-ML-20260915-1800-02",
+      "title": "HOW TO SET UP A METAL MIX BUS w/ Cephalic Carnage & Dave Otero",
+      "channel": "URM Academy",
+      "url": "https://www.youtube.com/watch?v=0KPWB6ca8Eo",
+      "published": "2022-07-06",
+      "duration": "12:37",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_and_description_verified",
+      "transcript_status": "unavailable_via_permitted_transcript_export",
+      "learned_content": false,
+      "topics_from_metadata_only": ["mix_bus", "metal"],
+      "conclusions_created": false
+    },
+    {
+      "id": "V-ML-20260915-1800-03",
+      "title": "10 Tips For Louder Masters (Without Distortion)",
+      "channel": "Mastering.com",
+      "url": "https://www.youtube.com/watch?v=YOtvxXaoGeA",
+      "published": "2023-07-02",
+      "duration": "43:13",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_and_description_verified",
+      "transcript_status": "unavailable_via_permitted_transcript_export",
+      "learned_content": false,
+      "topics_from_metadata_only": ["mastering", "loudness", "distortion"],
+      "conclusions_created": false
+    },
+    {
+      "id": "V-ML-20260915-1800-04",
+      "title": "The Mixbus Chain I Use on Every Metal Mix",
+      "channel": "Liquid Studios",
+      "url": "https://www.youtube.com/watch?v=p7s9uHFomwQ",
+      "published": "2025-11-24",
+      "duration": "13:30",
+      "status": "queued_source",
+      "metadata_depth": "title_channel_date_duration_and_description_verified",
+      "transcript_status": "unavailable_via_permitted_transcript_export",
+      "learned_content": false,
+      "topics_from_metadata_only": ["mix_bus", "metal", "AB_demonstration_claimed_in_description"],
+      "conclusions_created": false
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20260915-1800-01",
+      "title": "SonicMasterDataset",
+      "url": "https://huggingface.co/datasets/amaai-lab/SonicMasterDataset",
+      "kind": "licensed_paired_restoration_benchmark",
+      "license": "CC BY 2.0",
+      "metadata_verified": "2026-09-15",
+      "structure": "about 25k clean 30-second Jamendo segments, seven degraded versions per segment, 175k pairs, 208 hours, prompts and degradation metadata",
+      "raw_multitrack": false,
+      "processed_stems": false,
+      "audio_downloaded": false,
+      "use_case": "future clean/degraded/restored full-mix benchmark for metric-versus-preference and long-form continuity tests",
+      "limitations": [
+        "Not a raw multitrack or stem dataset.",
+        "Degradations are predominantly synthetic and the source corpus is Western-heavy.",
+        "License metadata was verified; dataset files were not downloaded or inspected in this run."
+      ]
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260915-1800-01",
+      "title": "Reference alignment versus independent quality",
+      "status": "not_run",
+      "material": "Licensed rock excerpts from a paired benchmark or a project-owned premaster plus a legally available reference.",
+      "conditions": ["unchanged", "feature_match", "white_box_style_transfer", "white_box_plus_bounded_ITO"],
+      "controls": ["same_source", "same_reference", "same_section", "preserve_unmatched_operational_render", "post_process_loudness_matched_listening_copy"],
+      "evaluate": ["optimizer_loss", "independent_explicit_metrics", "true_peak_and_delivery_QC", "artifacts", "blind_Dmitry_preference"],
+      "success": "A candidate must improve reference fit without losing independent quality or blind preference; otherwise reject even if the optimizer loss improves."
+    },
+    {
+      "id": "EXP-ML-20260915-1800-02",
+      "title": "ITO early-stop and objective overfit grid",
+      "status": "not_run",
+      "material": "One licensed dense-rock chorus and one sparse verse.",
+      "conditions": ["0_steps", "10_steps", "30_steps", "100_steps"],
+      "number_origin": "Paper runs up to 100 ITO steps and saves examples every 10; 30 is an added interior diagnostic point, not a mastering setting.",
+      "controls": ["identical_model", "identical_reference", "identical_initial_state", "loudness_matched_listening_copies"],
+      "evaluate": ["optimized_loss", "held_out_metrics", "parameter_trajectory", "transient_body", "stereo", "blind_preference"],
+      "success": "Choose the earliest stable point before held-out quality or preference worsens; do not assume the maximum step count is best."
+    },
+    {
+      "id": "EXP-ML-20260915-1800-03",
+      "title": "Good-reference versus attractive-but-incompatible reference",
+      "status": "not_run",
+      "material": "One legal rock target, one section-compatible reference and one deliberately incompatible reference.",
+      "conditions": ["no_transfer", "compatible_reference", "incompatible_reference"],
+      "controls": ["same_transfer_budget", "same_section_duration", "loudness_matched"],
+      "evaluate": ["reference_similarity", "role_balance", "song_identity", "translation", "blind_Dmitry_preference"],
+      "success": "The evaluation gate rejects a highly aligned but musically worse incompatible-reference result."
+    },
+    {
+      "id": "EXP-ML-20260915-1800-04",
+      "title": "Short-excerpt quality versus full-song continuity",
+      "status": "not_run",
+      "material": "One licensed full-length rock song with contrasting verse, chorus and breakdown.",
+      "conditions": ["unchanged", "independent_30s_chunks", "overlap_conditioned_chunks", "full_context_if_available"],
+      "controls": ["same_model", "same_prompt", "same_render_format", "no_external_upload"],
+      "evaluate": ["boundary_clicks", "level_jumps", "ambience_resets", "stereo_jumps", "section_loudness_history", "full_song_preference"],
+      "success": "No audible or measured boundary discontinuity and no section-level regression relative to the excerpt result."
+    }
+  ],
+  "tool_notes": {
+    "consensus": "monthly free search limit reached; no paid upgrade used",
+    "scite": "monthly free MCP limit reached; no paid upgrade used",
+    "github": "shared base, official repositories, READMEs and licenses inspected; no code executed",
+    "hugging_face": "model and dataset metadata succeeded; no download, Space or Job launched",
+    "youtube": "four public pages inspected and permitted transcript export attempted; no transcripts available",
+    "reference_hub": "not available in the callable tool set",
+    "youtube_learning_bridge": "not available in the callable tool set",
+    "context7": "not needed because no third-party API behavior was asserted",
+    "external_audio_upload": false
+  },
+  "changes_not_made": [
+    "No audio or user source files were uploaded or modified.",
+    "No DSP engine, repository code, runtime configuration or active rules changed.",
+    "No model, dataset or commercial audio was downloaded.",
+    "No paid subscription, GPU job or arbitrary third-party Space was used."
+  ],
+  "handoff": "ML-2026-09-15-1800: reference similarity is not production quality or listener preference. Curate the reference first; keep a no-transfer baseline and independent delivery/quality gates. Treat semantic genre prompts and synthetic degradation ranges as hypotheses only. Segment-based processors require full-song boundary and loudness-continuity checks. Next test: EXP-ML-20260915-1800-01. All rules remain candidate / auto_apply:false; all experiments not_run."
+}
