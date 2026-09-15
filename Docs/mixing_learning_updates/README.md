@@ -23,6 +23,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-14-1500 | [Report](ML-2026-09-14-1500.md), [JSON patch](ML-2026-09-14-1500.json) | DRC topology and placement audit: 2 full-text sources, 0 studied and 3 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-14-1800 | [Report](ML-2026-09-14-1800.md), [JSON patch](ML-2026-09-14-1800.json) | Multichannel debleeding robustness and rock-drum polarity/bleed control: 2 full-text sources, 2 studied and 3 queued videos, 9 Knowledge Cards, 7 candidate rules, 1 license-blocked dataset, 4 unrun experiments |
 | ML-2026-09-15-0900 | [Report](ML-2026-09-15-0900.md), [JSON patch](ML-2026-09-15-0900.json) | Functional grouping and two-stage automatic mixing: 1 full-text source + reproducible supplement, 2 studied and 1 queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-15-1200 | [Report](ML-2026-09-15-1200.md), [JSON patch](ML-2026-09-15-1200.json) | Context-aware pitch correction and vocal-edit safety: 2 full-text sources, 0 studied and 4 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -60,9 +61,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-15-0900: group tracks by function in each section, not only by instrument label. `Lead` may be vocal or lead guitar; do not force vocal priority. Seven groups are not a universal standard because the benefit was model-dependent. Separate intra-group balance from inter-group coordination and retain NoMix/level-only baselines. Any subgroup-compression demonstration with a level jump requires a new loudness-matched blind A/B. Next test: `EXP-ML-20260915-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-15-1200: separate the stable perceptual centre of a vocal note from attacks, releases, glides and vibrato. When the nearest semitone is ambiguous, compare a context-informed target with nearest-note and any available guide/score; stop auto-correction when note boundaries are uncertain. Evaluate pitch accuracy, expression and timbral/formant naturalness separately, and hold timing constant in pitch A/B tests. Do not transfer research perturbation ranges or fixed commercial settings as presets. Next test: `EXP-ML-20260915-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-15-0900: group tracks by function in each section, not only by instrument label. `Lead` may be vocal or lead guitar; do not force vocal priority. Seven groups are not a universal standard because the benefit was model-dependent. Separate intra-group balance from inter-group coordination and retain NoMix/level-only baselines. Any subgroup-compression demonstration with a level jump requires a new loudness-matched blind A/B. Next test: `EXP-ML-20260915-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-14-1800: test multichannel debleeders under channel reorder and room/layout/instrument holdouts; do not let SDR or SIR replace fidelity, room and blind preference. For rock drums audition polarity states in the full kit and mix rather than always flipping the bottom mic. Treat snare-keyed finite ducking or expansion and tuned de-essing as candidates before hard gating, with coincident-hit and ghost-note cancellation checks. Next test: `EXP-ML-20260914-1800-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
