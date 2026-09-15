@@ -60,9 +60,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-14-1800: test multichannel debleeders under channel reorder and room/layout/instrument holdouts; do not let SDR or SIR replace fidelity, room and blind preference. For rock drums audition polarity states in the full kit and mix rather than always flipping the bottom mic. Treat snare-keyed finite ducking or expansion and tuned de-essing as candidates before hard gating, with coincident-hit and ghost-note cancellation checks. Next test: `EXP-ML-20260914-1800-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-15-0900: group tracks by function in each section, not only by instrument label. `Lead` may be vocal or lead guitar; do not force vocal priority. Seven groups are not a universal standard because the benefit was model-dependent. Separate intra-group balance from inter-group coordination and retain NoMix/level-only baselines. Any subgroup-compression demonstration with a level jump requires a new loudness-matched blind A/B. Next test: `EXP-ML-20260915-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-14-1800: test multichannel debleeders under channel reorder and room/layout/instrument holdouts; do not let SDR or SIR replace fidelity, room and blind preference. For rock drums audition polarity states in the full kit and mix rather than always flipping the bottom mic. Treat snare-keyed finite ducking or expansion and tuned de-essing as candidates before hard gating, with coincident-hit and ghost-note cancellation checks. Next test: `EXP-ML-20260914-1800-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-14-1500: verify actual band isolation before accepting a `multiband` label; sequential full-band compressors are not a crossover multiband system. Fixed parameters per segment are not time-varying within that segment. Require no-processing, level-only and PEQ+single-band baselines. For bus DRC, measure which source triggers GR and which neighboring roles are attenuated. Training ranges and one-excerpt listening-test settings are not rock presets. Next test: `EXP-ML-20260914-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
