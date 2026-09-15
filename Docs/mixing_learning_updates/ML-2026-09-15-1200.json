@@ -1,0 +1,65 @@
+{
+  "update_id": "ML-2026-09-15-1200",
+  "project": "GPT MIXING ОБЛАКО / Mixing Learning",
+  "discovered_at": "2026-09-15T12:00:00+03:00",
+  "topic": "context-aware pitch correction, expression preservation, and vocal-edit safety",
+  "status": "research_update",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260915-1200-01",
+      "title": "BERT-APC: A Reference-free Framework for Automatic Pitch Correction via Musical Context Inference",
+      "authors": ["Sungjae Kim", "Kihyun Na", "Jinyoung Choi", "Injung Kim"],
+      "published": "2025-11-25",
+      "revised": "2026-04-28",
+      "doi": "10.48550/arXiv.2511.20006",
+      "url": "https://arxiv.org/html/2511.20006v3",
+      "reading_depth": "full_text",
+      "limitations": ["MOS used 34 listeners, 24 excerpts and three Korean amateur singers", "commercial baselines used one fixed parameter set", "rock transfer not tested", "atypical musical grammar may reduce context-model reliability"]
+    },
+    {
+      "id": "SRC-ML-20260915-1200-02",
+      "title": "Self-supervised restoration of singing voice degraded by pitch shifting using shallow diffusion",
+      "authors": ["Yunyi Liu", "Taketo Akama"],
+      "published": "2026-01-15",
+      "doi": "10.48550/arXiv.2601.10345",
+      "url": "https://arxiv.org/html/2601.10345v1",
+      "reading_depth": "full_text",
+      "limitations": ["objective metrics only; no listener test", "test set mostly isolated Chinese Opera/Western Opera vocals", "no full-rock-mix evaluation", "SI-SDR direction and narrative are internally inconsistent and require reproducible verification"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260915-1200-01","claim":"Stable perceptual note centre should be estimated separately from attacks, releases, glides and vibrato.","confidence":"medium-high"},
+    {"id":"KC-ML-20260915-1200-02","claim":"When detuning is severe, nearest-semitone assignment can be ambiguous; sequential musical context can improve target-note inference within the studied vocal task.","confidence":"medium"},
+    {"id":"KC-ML-20260915-1200-03","claim":"A note-level offset can preserve within-note expressive contour better than independent frame quantization; this remains an engineering candidate for rock vocals.","confidence":"medium"},
+    {"id":"KC-ML-20260915-1200-04","claim":"Note-boundary confidence is a safety gate because downstream pitch targets depend on segmentation.","confidence":"high"},
+    {"id":"KC-ML-20260915-1200-05","claim":"Pitch accuracy, expression preservation and timbral/formant naturalness are separate evaluation axes.","confidence":"high"},
+    {"id":"KC-ML-20260915-1200-06","claim":"Pitch-shift artifact behavior depends on shift magnitude and algorithm; restoration is a separate processing candidate.","confidence":"medium"},
+    {"id":"KC-ML-20260915-1200-07","claim":"Metric definitions and optimization directions must be audited before numerical results enter project rules.","confidence":"high"},
+    {"id":"KC-ML-20260915-1200-08","claim":"Vocal correction and priority must be gated by section role and artistic intent.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260915-1200-01","source":["SRC-ML-20260915-1200-01"],"when":"vocal note centre is suspected inaccurate","change":"estimate stationary/perceptually salient centre separately from transition frames","protect":["phrasing","vibrato","slides"],"test":"compare with whole-note mean and manual centre","cancel":"segmentation or stationary-region confidence is low","confidence":"medium","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-02","source":["SRC-ML-20260915-1200-01"],"when":"nearest semitone is ambiguous","change":"compare nearest-note, context-informed and guide/score targets when available","protect":["harmony","intentional ambiguity"],"test":"section-aware full-mix A/B","cancel":"targets disagree or harmony is atypical","confidence":"medium","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-03","source":["SRC-ML-20260915-1200-01"],"when":"a target note has been accepted","change":"apply the smallest note-level offset while preserving residual within-note contour","protect":["vibrato","scoops","growl/fry","transitions"],"test":"loudness-matched blind A/B","cancel":"flattening or robotic timbre appears","confidence":"medium-high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-04","source":["SRC-ML-20260915-1200-01"],"when":"note-boundary confidence is low","change":"stop automatic correction and require manual review","protect":["consonants","breaths","rapid repetitions","legato"],"test":"manual segmentation control","cancel":"split/merge error is observed","confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-05","source":["SRC-ML-20260915-1200-02"],"when":"a material pitch shift is required","change":"test formant/timbre restoration as a separate stage","protect":["singer identity","attacks","unvoiced consonants"],"test":"separate F0/voicing metrics and loudness-matched blind timbre A/B","cancel":"timbre or intelligibility worsens despite better F0","confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-06","source":["SRC-ML-20260915-1200-01","SRC-ML-20260915-1200-02"],"when":"evaluating pitch correction","change":"hold timing constant and test timing edits separately","protect":["groove","causal attribution"],"test":"factorial pitch-only and timing-only variants","cancel":"variables are confounded","confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260915-1200-07","source":["SRC-ML-20260915-1200-01"],"when":"vocal role changes by section","change":"gate correction and priority by lead/support/ad-lib role","protect":["arrangement hierarchy","emotional performance"],"test":"section-wise full-mix blind preference","cancel":"technical accuracy reduces emotional impact","confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_source_cards": [
+    {"id":"VIDEO-ML-20260915-1200-01","title":"How to Tune Vocals","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=KMw6LHJEEe8","duration":"15:00","status":"queued_source","metadata_depth":"title/channel/duration/search metadata","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1200-02","title":"Melodyne 4 Pt. 2: Finetune Vocals","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=alrMRBqLk5Q","duration":"24:00","status":"queued_source","metadata_depth":"title/channel/duration/search metadata","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1200-03","title":"How to Get Pitch Perfect Tuned Vocals Without Trying","channel":"Waves Audio","url":"https://www.youtube.com/watch?v=i1_5ranAUtM","duration":"05:59","status":"queued_source","metadata_depth":"title/channel/duration/search metadata","content_read":false,"transcript":"unavailable"},
+    {"id":"VIDEO-ML-20260915-1200-04","title":"Vocal Boost Trick","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=IwIZ35CAA5Y","duration":"08:02","status":"queued_source","metadata_depth":"title/channel/duration/search metadata","content_read":false,"transcript":"unavailable"}
+  ],
+  "reference_cards": [],
+  "experiments": [
+    {"id":"EXP-ML-20260915-1200-01","status":"not_run","material":"licensed/local rock vocal","variants":["unchanged","nearest-note quantization","stationary-centre note offset","context-informed target"],"controls":["timing held constant","loudness matched","full-mix and solo","blind Dmitry evaluation"],"success":["better pitch confidence","expression preserved","natural timbre","consonants preserved"],"cancel":["wrong target","robotic contour","damaged transitions","worse full-mix hierarchy"]},
+    {"id":"EXP-ML-20260915-1200-02","status":"not_run","material":"licensed/local vocal boundary stress set","variants":["automatic segmentation","manual-control segmentation"],"controls":["same correction target","same shift engine"],"success":["scoops/vibrato/repetitions/growl/legato preserved"],"cancel":["split or merge errors"]},
+    {"id":"EXP-ML-20260915-1200-03","status":"not_run","material":"licensed/local vocal with small, medium and large shifts","variants":["plain pitch shift","formant-preserving mode","restoration candidate"],"controls":["same target F0","loudness matched","blind listening"],"success":["stable F0 and voicing","lower audible artifacts","identity preserved"],"cancel":["consonant blur","formant drift","identity change"]},
+    {"id":"EXP-ML-20260915-1200-04","status":"not_run","material":"verse/chorus/ad-lib/backing-vocal sections","variants":["unchanged","technically centred","role-aware minimal correction"],"controls":["full arrangement","loudness matched","blind Dmitry evaluation"],"success":["section role and emotion preserved"],"cancel":["vocal priority becomes automatic","intentional instability is erased"]}
+  ],
+  "counts": {"full_text_sources":2,"knowledge_cards":8,"rule_candidates":7,"studied_videos":0,"queued_videos":4,"reference_cards":0,"experiments_not_run":4},
+  "tool_availability": {"consensus":"free_limit_exhausted","scite":"free_limit_exhausted","youtube_learning_bridge":"unavailable","mixing_learning_reference_hub":"unavailable"},
+  "safety": {"audio_downloaded":false,"commercial_audio_extracted":false,"user_audio_uploaded":false,"paid_compute_used":false,"dsp_changed":false,"code_changed":false,"runtime_rules_changed":false}
+}
