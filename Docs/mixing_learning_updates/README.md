@@ -26,6 +26,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-15-1200 | [Report](ML-2026-09-15-1200.md), [JSON patch](ML-2026-09-15-1200.json) | Context-aware pitch correction and vocal-edit safety: 2 full-text sources, 0 studied and 4 queued videos, 8 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-15-1500 | [Report](ML-2026-09-15-1500.md), [JSON patch](ML-2026-09-15-1500.json) | Acoustic attributes in embeddings and safe spatial optimization: 2 full-text sources, 1 code/documentation source, 0 studied and 4 queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 | ML-2026-09-15-1800 | [Report](ML-2026-09-15-1800.md), [JSON patch](ML-2026-09-15-1800.json) | Controllable mastering and reference-alignment safety: 2 full-text sources, 2 code/model cards, 0 studied and 4 queued videos, 1 licensed paired benchmark, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
+| ML-2026-09-16-0900 | [Report](ML-2026-09-16-0900.md), [JSON patch](ML-2026-09-16-0900.json) | Spectral balance and role-aware de-masking: 2 full-text sources, 2 studied and 2 queued videos, 9 Knowledge Cards, 7 candidate rules, 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -63,9 +64,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-15-1800: reference similarity is not production quality or listener preference. Curate the reference first; keep a no-transfer baseline and independent delivery/quality gates. Treat semantic genre prompts and synthetic degradation ranges as hypotheses only. Segment-based processors require full-song boundary and loudness-continuity checks. Next test: `EXP-ML-20260915-1800-01`. All rules remain `candidate / auto_apply:false`; all experiments `not_run`.
+ML-2026-09-16-0900: isolated-track spectral normalization is not de-masking, and spectral overlap is not a psychoacoustic masking label. Establish section role and level/pan first. Use static EQ for stable tonal problems; test only bounded dynamic action for intermittent collisions. Preserve the rhythm-guitar chorus foundation and never give vocal/lead permanent priority. Next test: `EXP-ML-20260916-0900-01`. All rules remain `candidate / auto_apply:false`; all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-15-1800: reference similarity is not production quality or listener preference. Curate the reference first; keep a no-transfer baseline and independent delivery/quality gates. Treat semantic genre prompts and synthetic degradation ranges as hypotheses only. Segment-based processors require full-song boundary and loudness-continuity checks. Next test: `EXP-ML-20260915-1800-01`. All rules remain `candidate / auto_apply:false`; all experiments `not_run`.
 
 ML-2026-09-15-1500: do not treat CLAP or another embedding as an LUFS, RT60 or spectral-balance meter. Record encoder preprocessing and retain explicit calibrated metrics with full FFT/window/hop/channel/activity/aggregation contracts. Optimize center, spread and role-level balance together; assign spotlight by section rather than forcing vocal priority. Do not transfer binaural reward thresholds or a proprietary-HRTF result into conventional stereo rock. Next test: `EXP-ML-20260915-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
