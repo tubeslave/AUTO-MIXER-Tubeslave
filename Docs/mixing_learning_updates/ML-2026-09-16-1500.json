@@ -1,0 +1,385 @@
+{
+  "schema_version": "1.1",
+  "patch_id": "ML-PATCH-2026-09-16-1500",
+  "update_id": "ML-2026-09-16-1500",
+  "created_at": "2026-09-16T15:09:32+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "research_mode": "search",
+  "mode": "additive_with_deduplication",
+  "planned_slot": "2026-09-16T15:00:00+03:00",
+  "actual_start": "2026-09-16T14:57:17+03:00",
+  "previous_update_id": "ML-2026-09-16-1200",
+  "previous_update_url": "https://github.com/tubeslave/AUTO-MIXER-Tubeslave/blob/master/Docs/mixing_learning_updates/ML-2026-09-16-1200.md",
+  "preceding_search_update_id": "ML-2026-09-16-0900",
+  "preceding_search_url": "https://github.com/tubeslave/AUTO-MIXER-Tubeslave/blob/master/Docs/mixing_learning_updates/ML-2026-09-16-0900.md",
+  "topic": "time_frequency_compression_drum_room_parallel_compression_and_legal_multitrack_constraints",
+  "base_materials_read": [
+    "Docs/mixing_learning_updates/README.md@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-0900.md@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-0900.json@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-1200.md@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-1200.json@master"
+  ],
+  "counts": {
+    "source_cards_added": 2,
+    "source_cards_full_text_read": 1,
+    "source_cards_metadata_or_abstract_only": 1,
+    "knowledge_cards_added": 5,
+    "rule_candidates_added": 4,
+    "video_source_cards_added": 4,
+    "videos_studied": 0,
+    "videos_queued_new": 4,
+    "videos_queued_carried_forward": 2,
+    "reference_cards_added": 1,
+    "experiment_plans_added": 4,
+    "literature_duplicates_removed": 4
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260916-1500-01",
+      "title": "FFT-Based Dynamic Range Compression",
+      "authors": ["Leo McCormack", "Vesa Valimaki"],
+      "publication_date": "2017-07-05",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "venue": "14th Sound and Music Computing Conference",
+      "kind": "peer_reviewed_conference_paper",
+      "doi": null,
+      "url": "https://leomccormack.github.io/sparta-site/docs/help/related-publications/mccormack2017fft.pdf",
+      "metadata_url": "https://research.aalto.fi/en/publications/fft-based-dynamic-range-compression/",
+      "license": "CC BY 3.0",
+      "read_depth": "full_pdf_all_8_pages_baseline_method_proposed_architecture_implementation_examples_limitations_conclusion",
+      "bounded_summary": "A feed-forward time-frequency DRC computes energy, gain targets and smoothed gain independently per time-frequency cell. It supports high-resolution multiband compression and frequency-dependent sidechain ducking, but introduces many controls, latency and computational cost. The examples are demonstrations, not perceptual validation.",
+      "implementation_facts_not_project_presets": {
+        "transform": "alias-reduced STFT filterbank",
+        "fft_length_samples": 1024,
+        "hop_size_samples": 128,
+        "bands": 133,
+        "sample_rate_hz": 48000,
+        "frame_size_samples": 512,
+        "low_frequency_subdivision": "lowest four bands subdivided",
+        "origin": "paper implementation"
+      },
+      "limitations": [
+        "No formal listening test establishes preference or transparency.",
+        "Example parameters were intentionally aggressive for spectrogram visibility.",
+        "Latency, temporal resolution and reconstruction artifacts are not reduced to a single quality metric.",
+        "The paper is not a rock-specific evaluation.",
+        "The companion implementation was not executed in this run."
+      ],
+      "citation_check": "partial",
+      "confidence": 0.96
+    },
+    {
+      "id": "S-ML-20260916-1500-02",
+      "title": "Parametric Resynthesis of Measured Spatial Room Impulse Responses",
+      "authors": ["Anthony Gallien", "Benoit Alary", "Markus Noisternig"],
+      "publication_date": "2026-09",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "venue": "DAFx-26 Cambridge",
+      "kind": "conference_paper",
+      "doi": null,
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_08.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/nXNFxdUAPViBJLCUKWHxAQ",
+      "read_depth": "official_metadata_and_abstract_only_full_pdf_text_extraction_unavailable_in_search_run",
+      "status": "queued_source",
+      "bounded_summary": "The abstract separates early-reflection resynthesis via Herglotz analysis from late reverberation via a directional feedback-delay network and reports matching spatial correlation and Energy Decay Relief against measured SRIRs.",
+      "unknown_until_deep_review": [
+        "full method and ablations",
+        "perceptual evaluation",
+        "dataset and audio licensing",
+        "computational and latency limits",
+        "failure cases and applicability to stereo rock ambience"
+      ],
+      "citation_check": "partial",
+      "confidence": 0.58
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260916-1500-01",
+      "title": "Time-frequency DRC is a two-dimensional control system",
+      "claim": "A spectral compressor is defined by its time-frequency analysis and reconstruction as well as by threshold, ratio and ballistics.",
+      "evidence": ["S-ML-20260916-1500-01"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1500-02",
+      "title": "Spectral floor is an artifact guardrail",
+      "claim": "A lower bound on per-band gain is required to prevent harsh attenuation; useful bounds must be chosen by controlled listening rather than copied from an illustration.",
+      "evidence": ["S-ML-20260916-1500-01"],
+      "confidence": 0.95
+    },
+    {
+      "id": "KC-ML-20260916-1500-03",
+      "title": "Resolution settings are method context, not presets",
+      "claim": "FFT length, hop, band count and sample-rate choices determine temporal and spectral behavior and cannot be transferred as genre defaults.",
+      "evidence": ["S-ML-20260916-1500-01"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1500-04",
+      "title": "Gain-map visibility is not preference evidence",
+      "claim": "An intentionally visible spectrogram change demonstrates controllability, not better punch, transparency or musical preference.",
+      "evidence": ["S-ML-20260916-1500-01"],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260916-1500-05",
+      "title": "Free multitrack access does not imply AI-training rights",
+      "claim": "A catalogue may permit educational mixing while separately prohibiting AI training or automated dataset use without contributor-specific permission.",
+      "evidence": ["REF-ML-20260916-1500-01"],
+      "confidence": 0.99
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "V-ML-20260916-1500-01",
+      "video_id": "dOnrcpm_hSc",
+      "title": "Mixing Drum Room Mics: Explosive Tips by Joe Barresi (Soundgarden, QOTSA, Tool)",
+      "channel": "Waves Audio",
+      "url": "https://www.youtube.com/watch?v=dOnrcpm_hSc",
+      "duration": "00:05:32",
+      "page_date_display": "8 years ago",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "status": "queued_source",
+      "content_access": "public_page_metadata_verified_transcript_export_unavailable",
+      "findings": []
+    },
+    {
+      "id": "V-ML-20260916-1500-02",
+      "video_id": "DBOmCMkeqRs",
+      "title": "Get HUGE Drums with This Compressor and Distortion",
+      "channel": "Universal Audio",
+      "url": "https://www.youtube.com/watch?v=DBOmCMkeqRs",
+      "duration": "00:03:15",
+      "page_date_display": "3 years ago",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "status": "queued_source",
+      "content_access": "public_page_metadata_verified_transcript_export_unavailable",
+      "findings": []
+    },
+    {
+      "id": "V-ML-20260916-1500-03",
+      "video_id": "xEGKsdsQ7cU",
+      "title": "How to Set up Parallel Compression with a UAD 1176",
+      "channel": "Universal Audio",
+      "url": "https://www.youtube.com/watch?v=xEGKsdsQ7cU",
+      "duration": "00:07:03",
+      "page_date_display": "4 years ago",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "status": "queued_source",
+      "content_access": "public_page_metadata_verified_transcript_export_unavailable",
+      "findings": []
+    },
+    {
+      "id": "V-ML-20260916-1500-04",
+      "video_id": "DuU6XdVebJo",
+      "title": "Andrew Scheps Reveals How to Approach Parallel Compression",
+      "channel": "Progressions: Success in the Music Industry",
+      "url": "https://www.youtube.com/watch?v=DuU6XdVebJo",
+      "duration": "00:05:10",
+      "page_date_display": "1 year ago",
+      "discovered_at": "2026-09-16T14:57:17+03:00",
+      "status": "queued_source",
+      "content_access": "public_page_metadata_verified_cc_badge_visible_but_transcript_export_unavailable",
+      "findings": []
+    }
+  ],
+  "queued_video_sources_carried_forward": [
+    {
+      "id": "V-ML-20260916-0900-03",
+      "video_id": "Dy-2ygVaW7M",
+      "title": "How To Fit Guitars In A Mix",
+      "channel": "Joey Sturgis Tones",
+      "status": "queued_source"
+    },
+    {
+      "id": "V-ML-20260916-0900-04",
+      "video_id": "xYK-GM3MPD8",
+      "title": "Magic Frequencies For Mixing Electric Guitars",
+      "channel": "Hardcore Music Studio",
+      "status": "queued_source"
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20260916-1500-01",
+      "title": "The Mixing Secrets Free Multitrack Download Library",
+      "url": "https://cambridge-mt.com/",
+      "catalog_url": "https://multitracksearch.cambridge-mt.com/",
+      "kind": "educational_multitrack_catalog",
+      "raw_audio_access": true,
+      "audio_downloaded": false,
+      "license_status": "manual_educational_use_only_for_project_until_contributor_specific_permission",
+      "ai_training_permission": false,
+      "automation_permission": "unresolved_requires_contributor_specific_permission",
+      "restriction": "Official FAQ states that AI-engine training requires individual licensing deals with the relevant contributors.",
+      "allowed_project_use": "catalogue discovery and, after track-level terms verification, manual controlled listening evaluation",
+      "confidence": 0.98
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "R-ML-20260916-1500-01",
+      "title": "Expose spectral DRC analysis and reconstruction",
+      "source": ["S-ML-20260916-1500-01"],
+      "when_to_apply": "Evaluating any time-frequency or spectral compression candidate.",
+      "what_to_change": "Log FFT/filterbank, window, hop, sample rate, band mapping, latency, reconstruction and per-band gain trace.",
+      "proposed_range": null,
+      "must_not_damage": ["transient timing", "drum-room continuity", "mono stability", "latency budget"],
+      "how_to_verify": "Impulse and sweep measurements plus loudness-matched full-mix and mono listening.",
+      "cancel_when": "The implementation cannot expose these variables or audible artifacts cannot be separated from desired gain action.",
+      "confidence": 0.98,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1500-02",
+      "title": "Bound per-band attenuation experimentally",
+      "source": ["S-ML-20260916-1500-01"],
+      "when_to_apply": "A spectral branch can create narrow or deep gain holes.",
+      "what_to_change": "Test a project grid of 0/1/2/3 dB maximum per-band attenuation with identical detector intent; do not copy paper demonstration values.",
+      "proposed_range": {"max_per_band_attenuation_db": [0, 1, 2, 3], "origin": "project A/B grid, not source-derived"},
+      "must_not_damage": ["body", "harmonic continuity", "room tone", "section contrast"],
+      "how_to_verify": "Gain-map inspection, spectral-hole audit and blind loudness-matched listening.",
+      "cancel_when": "A smaller bound performs equally well or tone becomes hollow, unstable or processed.",
+      "confidence": 0.86,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1500-03",
+      "title": "Separate gain-map fit from artifact and preference outcomes",
+      "source": ["S-ML-20260916-1500-01"],
+      "when_to_apply": "Comparing full-band, crossover-multiband and FFT-based dynamics.",
+      "what_to_change": "Report desired gain action, latency/artifacts and Dmitry's blind preference independently.",
+      "proposed_range": null,
+      "must_not_damage": ["attack", "weight", "groove", "image"],
+      "how_to_verify": "Matched controls, objective traces and randomized loudness-matched A/B.",
+      "cancel_when": "Only the optimized or visualized gain map improves while artifacts or preference worsen.",
+      "confidence": 0.97,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1500-04",
+      "title": "Enforce source-specific audio rights",
+      "source": ["REF-ML-20260916-1500-01"],
+      "when_to_apply": "A free multitrack is considered for automated evaluation, dataset ingestion or model training.",
+      "what_to_change": "Record track-level rights and obtain contributor-specific permission before any automated or training use; otherwise restrict to manual listening.",
+      "proposed_range": null,
+      "must_not_damage": ["copyright compliance", "source traceability", "contributor intent"],
+      "how_to_verify": "Retain the applicable terms and permission record beside the Reference Card.",
+      "cancel_when": "Rights are ambiguous or permission does not cover the intended use.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "experiment_plans": [
+    {
+      "id": "EXP-ML-20260916-1500-01",
+      "title": "Full-band versus crossover and FFT frequency-dependent ducking",
+      "status": "not_run",
+      "material": "one contributor-cleared dense-rock excerpt",
+      "single_factor": "frequency-selectivity topology",
+      "conditions": ["unchanged", "full-band sidechain ducking", "fixed-crossover multiband ducking", "FFT time-frequency ducking"],
+      "controls": ["same sidechain", "matched detector intent and maximum action where feasible", "separate loudness-matched listening copies", "no peak normalization", "randomized blind order"],
+      "measure": ["latency", "impulse response", "peak change", "per-band gain trace", "temporal smearing", "boundary artifacts"],
+      "protect": ["kick attack", "bass weight", "rhythm-guitar foundation", "snare body", "cymbal and room continuity", "mono stability"],
+      "success": "The smallest-complexity branch improves the intended collision without audible holes, smear or image change.",
+      "cancel": "Desired action is not matched, artifacts appear, image destabilizes or blind preference does not beat unchanged."
+    },
+    {
+      "id": "EXP-ML-20260916-1500-02",
+      "title": "Spectral attenuation-floor grid",
+      "status": "not_run",
+      "single_factor": "maximum per-band attenuation",
+      "conditions_db": [0, 1, 2, 3],
+      "origin": "project test grid, not source-derived",
+      "controls": ["same topology", "same detector", "same target band", "loudness-matched blind order"],
+      "measure": ["gain-map continuity", "spectral holes", "peak change"],
+      "protect": ["instrument body", "harmonic continuity", "room tone"],
+      "cancel": "A lower bound performs equally well or a higher bound sounds hollow or unstable."
+    },
+    {
+      "id": "EXP-ML-20260916-1500-03",
+      "title": "FFT temporal-resolution audit",
+      "status": "not_run",
+      "single_factor": "analysis time resolution",
+      "conditions": ["short window/hop", "middle window/hop", "long window/hop"],
+      "controls": ["same sidechain", "same gain law", "same maximum attenuation", "matched output loudness"],
+      "measure": ["latency", "attack error", "release error", "pre/post-event gain spread"],
+      "protect": ["drum transients", "ghost notes", "room decay", "fast palm-mute articulation"],
+      "cancel": "Longer resolution smears events or shorter resolution creates unstable frequency action."
+    },
+    {
+      "id": "EXP-ML-20260916-1500-04",
+      "title": "Parallel drum return blend after transcript validation",
+      "status": "not_run",
+      "prerequisite": "obtain permitted content for at least one queued authoritative video or use an independently documented processor setup",
+      "single_factor": "parallel-return blend level",
+      "conditions": ["dry only", "low blend", "middle blend", "high blend"],
+      "controls": ["fixed compressed return", "loudness-matched full-mix copies", "no peak normalization"],
+      "measure": ["peak change", "crest change", "master-bus gain reduction"],
+      "protect": ["snare body", "kick attack", "ghost notes", "cymbal wash", "room continuity"],
+      "cancel": "Density comes mainly from level increase, bleed/noise becomes intrusive or attacks flatten."
+    }
+  ],
+  "deduplication": {
+    "method": ["arxiv_or_doi", "normalized_title", "version_family"],
+    "excluded_existing_sources": [
+      {"identifier": "arXiv:2609.02835", "title": "Two-Stage Automatic Mixing", "existing_update": "ML-2026-09-15-0900"},
+      {"identifier": "arXiv:2603.15995", "title": "AiLive Mixer", "existing_update": "ML-2026-09-14-1200"},
+      {"identifier": "arXiv:2608.30559", "title": "SPHERE", "existing_update": "ML-2026-09-15-1500"},
+      {"identifier": "arXiv:2608.05506", "title": "Sequential Stem Blending", "existing_update": "ML-2026-09-14-1200"}
+    ]
+  },
+  "priority_queue": [
+    {
+      "priority": 1,
+      "id": "S-ML-20260916-1500-02",
+      "next_action": "full_text_deep_review_methods_metrics_perceptual_test_compute_license"
+    },
+    {
+      "priority": 2,
+      "id": "S-ML-20260916-1500-01",
+      "next_action": "verify_companion_source_version_license_and_reproducibility_without_running_paid_compute"
+    },
+    {
+      "priority": 2,
+      "ids": ["V-ML-20260916-1500-01", "V-ML-20260916-1500-02", "V-ML-20260916-1500-03", "V-ML-20260916-1500-04"],
+      "next_action": "one_transcript_recheck_then_keep_queued_without_conclusions_if_unavailable"
+    },
+    {
+      "priority": 3,
+      "ids": ["V-ML-20260916-0900-03", "V-ML-20260916-0900-04"],
+      "next_action": "retain_accumulated_queue_no_repeated_conclusions"
+    }
+  ],
+  "novelty": {
+    "type": "older_significant_omission_plus_fresh_abstract_queue_and_rights_constraint",
+    "summary": "The 2017 FFT-DRC paper was absent and is now fully read; the 2026 SRIR paper is newly discovered but remains abstract-only. The multitrack card records a concrete AI-training restriction. Four current papers were removed as duplicates.",
+    "publication_vs_discovery": "The FFT paper was published in 2017 and discovered for this project on 2026-09-16; the SRIR paper is a 2026 DAFx publication discovered the same day."
+  },
+  "tools_and_limits": {
+    "consensus": "skipped_known_free_access_suspension_reset_unknown",
+    "scite": "skipped_known_quota_exhaustion_until_2026-10-01_utc",
+    "github": "used_for_shared_base_read_title_deduplication_and_publication",
+    "youtube": "public_search_page_metadata_and_permitted_transcript_export_checked",
+    "youtube_learning_bridge": "not_callable",
+    "mixing_learning_reference_hub": "not_callable",
+    "citation_check": "partial",
+    "paid_services_used": false
+  },
+  "safety": [
+    "All rules remain candidate with auto_apply:false.",
+    "All experiments remain not_run.",
+    "No audio, DSP engine, repository code, runtime configuration or active rule changed.",
+    "No user or commercial audio was downloaded, extracted or uploaded.",
+    "No numeric DSP metrics were invented.",
+    "No paid subscription, GPU job or arbitrary third-party Space was used."
+  ],
+  "handoff": "Do not treat FFT compression as multiband compression with more bands. Expose analysis and reconstruction parameters, preserve an unchanged baseline, and judge gain-map fit, artifacts and preference separately. Cambridge multitracks require contributor-specific permission for AI training or automated dataset use."
+}
