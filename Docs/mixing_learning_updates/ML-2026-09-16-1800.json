@@ -1,0 +1,371 @@
+{
+  "schema_version": "1.1",
+  "patch_id": "ML-PATCH-2026-09-16-1800",
+  "update_id": "ML-2026-09-16-1800",
+  "created_at": "2026-09-16T18:28:00+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "research_mode": "deep_review",
+  "mode": "reading_depth_upgrade_with_bounded_rules",
+  "planned_slot": "2026-09-16T18:00:00+03:00",
+  "actual_start": "2026-09-16T18:02:48+03:00",
+  "previous_update_id": "ML-2026-09-16-1500",
+  "previous_update_url": "https://github.com/tubeslave/AUTO-MIXER-Tubeslave/blob/master/Docs/mixing_learning_updates/ML-2026-09-16-1500.md",
+  "preceding_search_update_id": "ML-2026-09-16-1500",
+  "preceding_search_url": "https://github.com/tubeslave/AUTO-MIXER-Tubeslave/blob/master/Docs/mixing_learning_updates/ML-2026-09-16-1500.md",
+  "topic": "spatial_room_impulse_resynthesis_early_late_reverberation_and_rock_drum_room_transfer_limits",
+  "base_materials_read": [
+    "Docs/mixing_learning_updates/README.md@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-1500.md@master",
+    "Docs/mixing_learning_updates/ML-2026-09-16-1500.json@master",
+    "S-ML-20260916-1500-02 full DAFx-26 PDF",
+    "official DAFx-26 companion evaluation page"
+  ],
+  "counts": {
+    "source_cards_added": 0,
+    "source_cards_updated": 1,
+    "source_cards_full_text_read": 1,
+    "companion_pages_read": 1,
+    "knowledge_cards_added": 8,
+    "rule_candidates_added": 7,
+    "video_source_cards_added": 0,
+    "videos_studied": 0,
+    "videos_queued_carried_forward": 6,
+    "reference_cards_added": 0,
+    "experiment_plans_added": 4
+  },
+  "source_card_updates": [
+    {
+      "id": "S-ML-20260916-1500-02",
+      "update_type": "reading_depth_upgrade",
+      "title": "Parametric Resynthesis of Measured Spatial Room Impulse Responses",
+      "authors": ["Anthony Gallien", "Benoit Alary", "Markus Noisternig"],
+      "publication_date": "2026-09",
+      "venue": "Proceedings of DAFx-26, Cambridge, MA",
+      "kind": "peer_reviewed_conference_paper",
+      "doi": null,
+      "issn_online": "2413-6689",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_08.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/nXNFxdUAPViBJLCUKWHxAQ",
+      "companion_url": "https://dafx26-eac.ircam.fr/",
+      "paper_license": "CC BY 4.0",
+      "companion_audio_license": "not_explicitly_verified",
+      "read_depth_before": "official_metadata_and_abstract_only",
+      "read_depth_after": "full_pdf_all_8_pages_including_methods_evaluation_discussion_conclusion_appendix_plus_official_companion_evaluation_text_and_demo_structure",
+      "status": "reviewed_full_text",
+      "method": {
+        "input_domain": "SMA-captured HOA SRIR",
+        "preprocessing": "HOA encoding, pre-delay removal, estimated mixing-time split",
+        "early_stage": "Herglotz analysis for reflection count and DoA/ToA; frequency-dependent order selection; explicit residual scattering and spatial-aliasing modeling",
+        "late_stage": "frequency-dependent RT60 and initial decay power estimation; FDN/DFDN resynthesis; third-octave covariance matching; directional segmentation",
+        "evaluation": "spherical correlation in 5.3-ms blocks and binaurally encoded EDR-difference maps against measurement"
+      },
+      "source_specific_numbers_not_project_presets": {
+        "sample_rate_hz": 48000,
+        "early_analysis_window_samples": 128,
+        "early_analysis_window_ms_reported": 2.6,
+        "window_start_before_estimated_toa_samples": 20,
+        "em32_radius_cm": 4.2,
+        "em32_max_order": 4,
+        "em32_aliasing_frequency_khz_approx": 5.2,
+        "high_frequency_plane_wave_expansion_min_order": 16,
+        "late_directional_segments_in_reported_example": 5,
+        "delay_lines_per_fdn": 32,
+        "delay_length_ms_range": [30, 70],
+        "origin": "paper method and reported evaluation configuration"
+      },
+      "supported_conclusions": [
+        "Early reflections and late reverberation require distinct models after an estimated mixing-time boundary.",
+        "Matching frequency-dependent decay and initial late-field power is not sufficient to reconstruct measured spatial covariance; the authors impose covariance per third-octave band.",
+        "Finite array order, scattering and spatial aliasing are part of the measured SMA domain and affect reconstruction.",
+        "The reported objective comparison improves spherical correlation and EDR agreement against a direct-resynthesis baseline."
+      ],
+      "limitations": [
+        "The paper reports figures rather than a tabulated multi-room statistical evaluation or effect sizes.",
+        "The paper contains no controlled listening test; formal perceptual validation is explicitly future work.",
+        "Evaluation details shown in the paper are for one EM32 measurement in the IRCAM Espro hall, using five 32-delay-line DFDNs.",
+        "The late model assumes one exponential decay slope per directional frequency band and does not handle coupled-room multi-slope decay.",
+        "Finite SMA order prevents recovery of every reflection, and adjacent-beam overlap can overestimate energy.",
+        "Intrinsic spatial resolution of the measurement is not increased by resynthesis.",
+        "No CPU, platform, real-time factor or end-to-end latency benchmark is reported.",
+        "No source-code repository is linked by the paper or companion page.",
+        "The method is HOA/SMA immersive-audio work, not a validation on conventional stereo rock mixes or drum-room microphones."
+      ],
+      "companion_page_findings": [
+        "The official page exposes binaural dry/measurement/direct-resynthesis/proposed-method examples across seven room/configuration sections and three dry source types; this is a demonstration set, not a listener study.",
+        "The authors state that multi-slope decay in the Chaillot example creates larger EDR error that was not highly perceptible in their informal listening.",
+        "The authors state that missed salient early reflections in the Athenee example are audibly perceptible in the drum example.",
+        "No audio files were downloaded and no project DSP metrics were calculated."
+      ],
+      "citation_check": "partial",
+      "confidence": 0.97
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260916-1800-01",
+      "title": "Mixing time is a model boundary, not a creative pre-delay value",
+      "claim": "In the reviewed SRIR framework the direct/early field and stochastic late field are separated at an estimated mixing time after removal of acquisition pre-delay; shifting a complete reverb return is not equivalent.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1800-02",
+      "title": "Early reflections require event-level spatial and spectral representation",
+      "claim": "Early-reflection reconstruction uses reflection count, DoA, ToA and extracted spectrum; a global RT60 or average EQ does not represent that structure.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1800-03",
+      "title": "Late decay has separable spectral, energy and spatial statistics",
+      "claim": "The framework estimates RT60(f), initial decay power P0(f) and bandwise spatial covariance separately; none of the three is a complete late-reverberation descriptor.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260916-1800-04",
+      "title": "Covariance matching is not perceptual equivalence",
+      "claim": "Imposing measured second-order covariance can improve spatial-correlation metrics, but the paper does not establish listener preference or transparency.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260916-1800-05",
+      "title": "Single-slope decay is a falsifiable assumption",
+      "claim": "A single exponential slope per directional band is unsuitable when the measured room exhibits coupled or multi-slope decay; the companion Chaillot example exposes this failure.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1800-06",
+      "title": "Missed early reflections may matter more than a large decay-map error",
+      "claim": "The companion notes report an audible drum difference from omitted salient early reflections, while a larger multi-slope EDR error was described as less perceptible; metric magnitude and audibility are not interchangeable.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.86
+    },
+    {
+      "id": "KC-ML-20260916-1800-07",
+      "title": "Measurement-artifact matching is domain-specific",
+      "claim": "Rigid-sphere scattering and spatial aliasing must be modeled when reproducing a particular SMA measurement, but they are not desirable generic coloration targets for a stereo rock reverb.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.96
+    },
+    {
+      "id": "KC-ML-20260916-1800-08",
+      "title": "Real-time suitability requires a measured compute contract",
+      "claim": "The paper proposes a computationally efficient real-time architecture but provides no platform, real-time factor, CPU load or end-to-end latency table; deployment claims remain unverified for this project.",
+      "evidence": ["S-ML-20260916-1500-02"],
+      "confidence": 0.98
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "R-ML-20260916-1800-01",
+      "title": "Separate early and late reverb decisions",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "Designing or matching a rock room, snare space or ambience return.",
+      "what_to_change": "Treat early-reflection pattern and late-tail decay as separate controllable factors after estimating a physically or perceptually defensible boundary.",
+      "proposed_range": null,
+      "must_not_damage": ["snare and kick attack", "room continuity", "front-back intent", "mono stability"],
+      "how_to_verify": "One-factor renders with the other stage fixed, matched wet contribution and full-mix blind listening.",
+      "cancel_when": "The split creates a discontinuity, timing smear or no repeatable benefit over measured/unchanged ambience.",
+      "confidence": 0.94,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-02",
+      "title": "Do not infer a room match from RT60 alone",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "Comparing measured ambience with an algorithmic late tail.",
+      "what_to_change": "Report frequency-dependent decay, initial late-field energy and channel/spatial relation separately.",
+      "proposed_range": null,
+      "must_not_damage": ["spectral weight", "decay shape", "stereo image", "section contrast"],
+      "how_to_verify": "EDR/decay analysis, bandwise channel relation, mono check and blind full-mix preference.",
+      "cancel_when": "A metric improves while the tail becomes tonally wrong, unstable or less preferred.",
+      "confidence": 0.98,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-03",
+      "title": "Gate single-slope late-tail models",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "A measured or desired decay has one stable slope within each relevant band.",
+      "what_to_change": "Allow a single-slope FDN candidate only after checking for multi-slope or coupled-room behavior.",
+      "proposed_range": null,
+      "must_not_damage": ["tail continuity", "low-frequency decay", "cymbal wash", "room identity"],
+      "how_to_verify": "Inspect decay curves by band and compare single-slope with measured-tail and multi-slope-capable baselines.",
+      "cancel_when": "Systematic curvature, slope changes or audible late-tail mismatch remain.",
+      "confidence": 0.97,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-04",
+      "title": "Keep SMA compensation tied to its measurement chain",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "Resynthesizing a known spherical-array measurement with known geometry and encoding.",
+      "what_to_change": "Model scattering and aliasing only for the matching array/order/encoding contract; do not transfer those artifacts as generic reverb coloration.",
+      "proposed_range": null,
+      "must_not_damage": ["spectral neutrality", "localization", "traceability"],
+      "how_to_verify": "Array-specific impulse/spherical-response comparison and a control without artifact emulation.",
+      "cancel_when": "Array geometry or encoding metadata are missing, or the target is an ordinary stereo ambience rather than SMA reconstruction.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-05",
+      "title": "Separate objective spatial fit from preference",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "Evaluating a reverb or room-resynthesis candidate with EDR, correlation or covariance objectives.",
+      "what_to_change": "Store objective fit, audible artifacts and Dmitry's blind preference as independent outcomes.",
+      "proposed_range": null,
+      "must_not_damage": ["attack", "room naturalness", "musical depth", "mono translation"],
+      "how_to_verify": "Randomized loudness-matched A/B in solo and full mix, plus declared measurement settings.",
+      "cancel_when": "Only the optimized metric improves or the result is preferred only when louder.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-06",
+      "title": "Stress-test salient early-reflection omissions on drums",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "A parametric early-reflection detector or sparse-room model is used on percussive rock material.",
+      "what_to_change": "Compare the reconstructed early field against measured/unchanged early response using kick, snare and cymbal transients before accepting it.",
+      "proposed_range": null,
+      "must_not_damage": ["transient localization", "snare body", "groove", "room size impression"],
+      "how_to_verify": "Transient-specific null/energy inspection and blind full-kit/full-mix listening.",
+      "cancel_when": "Salient reflections are omitted, duplicated or cause audible pre/post-transient coloration.",
+      "confidence": 0.91,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1800-07",
+      "title": "Require compute and rights contracts before dataset use",
+      "source": ["S-ML-20260916-1500-02"],
+      "when_to_apply": "Considering SRIR resynthesis for bulk dataset generation or runtime deployment.",
+      "what_to_change": "Record source-audio/IR rights, code/version, hardware, real-time factor, latency and failure coverage before use.",
+      "proposed_range": null,
+      "must_not_damage": ["licence compliance", "reproducibility", "domain validity"],
+      "how_to_verify": "Traceable licence record and measured local benchmark on free/open code and project-owned or explicitly licensed material.",
+      "cancel_when": "Audio rights, implementation source or deployment measurements are unresolved.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "experiment_plans": [
+    {
+      "id": "EXP-ML-20260916-1800-01",
+      "title": "Late-tail topology with fixed measured early field",
+      "status": "not_run",
+      "material": "project-owned or explicitly licensed dense-rock drums/full mix plus a project-owned or explicitly licensed room impulse",
+      "single_factor": "late-tail model",
+      "conditions": ["measured late-tail convolution baseline", "single-slope frequency-dependent FDN", "multi-slope-capable late model"],
+      "controls": ["identical measured direct/early response", "same split point", "matched wet loudness and initial late energy", "no peak normalization", "randomized blind order"],
+      "measure": ["frequency-dependent decay curve", "EDR", "bandwise interchannel covariance/coherence", "peak change", "latency"],
+      "protect": ["snare and kick attack", "cymbal wash", "room continuity", "bass weight", "mono translation", "section contrast"],
+      "success": "The lowest-complexity model preserves the desired decay and space while matching or beating the measured-tail baseline in Dmitry's blind full-mix judgment.",
+      "cancel": "A slope mismatch, tail discontinuity, image change or loudness advantage explains the result."
+    },
+    {
+      "id": "EXP-ML-20260916-1800-02",
+      "title": "Early-reflection representation with fixed late tail",
+      "status": "not_run",
+      "single_factor": "early-reflection representation",
+      "conditions": ["measured early response", "sparse parametric early model", "early response omitted"],
+      "controls": ["identical late tail", "same direct sound", "matched wet loudness", "randomized blind order"],
+      "measure": ["early-window energy", "time-of-arrival error", "spectral deviation", "mono difference"],
+      "protect": ["drum transient location", "snare body", "groove", "room-size impression"],
+      "cancel": "The sparse model misses or duplicates a salient reflection or is not preferred to measured early response."
+    },
+    {
+      "id": "EXP-ML-20260916-1800-03",
+      "title": "Late-field covariance treatment",
+      "status": "not_run",
+      "single_factor": "late-field channel covariance treatment",
+      "conditions": ["decorrelated late outputs", "measured bandwise covariance mapping", "limited stereo covariance mapping"],
+      "controls": ["same FDN output signals", "same RT60(f)", "same P0(f)", "matched loudness"],
+      "measure": ["bandwise covariance/coherence", "stereo correlation", "mono residual", "image movement"],
+      "protect": ["center stability", "width naturalness", "mono level", "cymbal texture"],
+      "cancel": "Metric matching narrows, destabilizes or phase-colors the musical image."
+    },
+    {
+      "id": "EXP-ML-20260916-1800-04",
+      "title": "Objective-fit versus audibility disagreement audit",
+      "status": "not_run",
+      "single_factor": "controlled early-reflection omission or late-decay mismatch",
+      "conditions": ["reference", "one omitted salient early reflection", "one matched-energy late-decay slope mismatch"],
+      "controls": ["same dry signal", "same overall wet loudness", "one defect per render", "randomized blind order"],
+      "measure": ["EDR error", "early-window correlation", "detection rate", "preference"],
+      "protect": ["attack", "room naturalness", "musical focus"],
+      "cancel": "The defect cannot be isolated or level matching is inadequate."
+    }
+  ],
+  "queued_video_sources_carried_forward": [
+    {"id": "V-ML-20260916-1500-01", "video_id": "dOnrcpm_hSc", "status": "queued_source", "reason": "transcript unavailable; no conclusions"},
+    {"id": "V-ML-20260916-1500-02", "video_id": "DBOmCMkeqRs", "status": "queued_source", "reason": "transcript unavailable; no conclusions"},
+    {"id": "V-ML-20260916-1500-03", "video_id": "xEGKsdsQ7cU", "status": "queued_source", "reason": "transcript unavailable; no conclusions"},
+    {"id": "V-ML-20260916-1500-04", "video_id": "DuU6XdVebJo", "status": "queued_source", "reason": "CC badge observed previously but transcript export unavailable; no conclusions"},
+    {"id": "V-ML-20260916-0900-03", "video_id": "Dy-2ygVaW7M", "status": "queued_source", "reason": "carried queue; no conclusions"},
+    {"id": "V-ML-20260916-0900-04", "video_id": "xYK-GM3MPD8", "status": "queued_source", "reason": "carried queue; no conclusions"}
+  ],
+  "reference_cards": [],
+  "priority_queue": [
+    {
+      "priority": 1,
+      "id": "S-ML-20260916-1500-01",
+      "next_action": "locate and verify the exact FFT-DRC companion implementation version and licence before reproducibility claims"
+    },
+    {
+      "priority": 2,
+      "ids": ["V-ML-20260916-1500-01", "V-ML-20260916-1500-02", "V-ML-20260916-1500-03", "V-ML-20260916-1500-04"],
+      "next_action": "retain until a permitted transcript or other content source becomes available; do not infer from metadata"
+    },
+    {
+      "priority": 3,
+      "ids": ["V-ML-20260916-0900-03", "V-ML-20260916-0900-04"],
+      "next_action": "retain accumulated queue without repeated conclusions"
+    }
+  ],
+  "revised_conclusions": [
+    {
+      "before": "The abstract-level card reported matching spatial correlation and EDR but left perceptual evidence, failure cases and computation unknown.",
+      "after": "Full review confirms objective improvements against direct resynthesis, but no controlled listening test or compute benchmark. The companion page exposes multi-slope and missed-early-reflection failures through author observations, not formal listener statistics."
+    },
+    {
+      "before": "The source was potentially relevant to drum-room and spatial processing.",
+      "after": "Only the early/late decomposition, decay/statistics separation and evaluation discipline transfer as hypotheses. SMA artifact emulation, HOA rendering parameters and reported numeric settings are not stereo-rock presets."
+    }
+  ],
+  "novelty": {
+    "type": "reading_depth_upgrade_and_evidence_boundary_correction",
+    "summary": "The priority DAFx-26 source advanced from abstract-only to full-text review. The useful project result is primarily a tighter boundary: early/late decomposition and separate decay/energy/covariance evaluation are supported; perceptual superiority, stereo-rock transfer and real-time deployment are not yet demonstrated.",
+    "publication_vs_discovery": "Published in September 2026, discovered in the 2026-09-16 15:00 search, fully reviewed in this 18:00 run."
+  },
+  "tools_and_limits": {
+    "consensus": "skipped_known_free_access_suspension_reset_unknown",
+    "scite": "skipped_known_quota_exhaustion_until_2026-10-01_utc",
+    "open_web": "official DAFx paper archive, full PDF and IRCAM companion page read",
+    "github": "used_for_shared_base_read_and_publication",
+    "youtube": "no new search required in deep_review; six queued items carried without conclusions",
+    "youtube_learning_bridge": "not_callable",
+    "mixing_learning_reference_hub": "not_callable",
+    "citation_check": "partial",
+    "paid_services_used": false
+  },
+  "safety": [
+    "All rules remain candidate with auto_apply:false.",
+    "All experiments remain not_run.",
+    "No audio, DSP engine, repository code, runtime configuration or active rule changed.",
+    "No companion or commercial audio was downloaded, extracted or uploaded.",
+    "No numeric DSP metrics were invented; method numbers are labeled as source-specific.",
+    "No paid subscription, GPU job or arbitrary third-party Space was used."
+  ],
+  "handoff": "Separate early reflections from the late field, but do not treat the split as a creative pre-delay preset. RT60, initial late energy and spatial/channel covariance are independent descriptors. Match objective room metrics and musical preference separately; reject single-slope tails on multi-slope rooms and keep SMA artifact compensation tied to the original array domain."
+}
