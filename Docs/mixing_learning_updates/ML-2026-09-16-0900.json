@@ -1,0 +1,404 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "patch_id": "ml-2026-09-16-0900",
+  "update_id": "ML-2026-09-16-0900",
+  "created_at": "2026-09-16T09:12:38+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "topic": "spectral_balance_masking_and_role_aware_eq_in_dense_rock",
+  "mode": "additive",
+  "base_materials_read": [
+    {
+      "path": "Docs/mixing_learning_updates/README.md",
+      "ref": "master",
+      "sha": "9f6ec9651a8bd2eee8631e0907e8dc4eefbe8ff1"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-13-1800.json",
+      "ref": "master",
+      "reason": "deduplicate the existing lead-role and bounded de-masking cards"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-15-0900.json",
+      "ref": "master",
+      "reason": "retain section-role grouping and no global instrument priority"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-15-1500.json",
+      "ref": "master",
+      "reason": "retain explicit spectral-metric configuration requirements"
+    }
+  ],
+  "novelty": {
+    "type": "older_significant_work_missing_from_base_plus_new_video_reading",
+    "summary": "Two absent DAFx sources were read in full. The update separates isolated-track tonal normalization, coarse spectral overlap and psychoacoustic masking, and adds two fully transcript-grounded rhythm-guitar video cards.",
+    "publication_vs_discovery": "Both papers predate discovery on 2026-09-16; they are added because the shared base lacked them, not presented as new publications.",
+    "deduplicated_against": [
+      "ML-2026-09-13-1800",
+      "ML-2026-09-15-0900",
+      "ML-2026-09-15-1500",
+      "ML-2026-09-15-1800"
+    ]
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260916-0900-01",
+      "title": "Automatic Equalization for Individual Instrument Tracks Using Convolutional Neural Networks",
+      "authors": ["Florian Mockenhaupt", "Joscha Simon Rieber", "Shahan Nercessian"],
+      "url": "https://www.dafx.de/paper-archive/2024/papers/DAFx24_paper_27.pdf",
+      "arxiv": "2407.16691",
+      "publication_date": "2024-09",
+      "venue": "DAFx-24",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "kind": "conference_paper",
+      "license": "CC BY 4.0",
+      "read_depth": "full_pdf_all_8_pages_method_data_training_objective_evaluation_listening_test_conclusion",
+      "bounded_summary": "The paper classifies an isolated instrument, subtracts its time-averaged spectrum from an instrument-class average target, smooths the difference and predicts a static four-band parametric EQ. A two-stage differentiable spectral-loss model improves target-reconstruction MAE, and isolated loudness-normalized tracks were preferred in an internal blind comparison.",
+      "limitations": [
+        "The listener heard isolated tracks, not full arrangements, despite being asked about likely mix fit.",
+        "Time averaging removes section, articulation and intermittent-collision information.",
+        "The 35-class instrument classifier reports 79 percent accuracy, so target selection can fail before EQ.",
+        "The test population was internal and no rock-specific full-mix result was reported.",
+        "Training and search parameter bounds are not engineering presets."
+      ]
+    },
+    {
+      "id": "S-ML-20260916-0900-02",
+      "title": "Improved Control for Selective Minimization of Masking Using Inter-Channel Dependency Effects",
+      "authors": ["Enrique Perez Gonzalez", "Joshua D. Reiss"],
+      "url": "https://www.dafx.de/paper-archive/2008/papers/dafx08_15.pdf",
+      "publication_date": "2008-09",
+      "venue": "DAFx-08",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "kind": "conference_paper",
+      "read_depth": "full_pdf_all_7_pages_method_controls_results_future_work",
+      "bounded_summary": "The real-time cross-adaptive effect preserves a selected master channel and applies full-band attenuation to other channels according to coarse spectral-class similarity. The dependency measure is useful as a controllable diagnostic but does not embed a psychoacoustic masking model.",
+      "limitations": [
+        "The 1024-point FFT analysis uses no window and quantized spectral-bin comparisons.",
+        "Gain correction is full-band rather than frequency selective.",
+        "No listening experiment establishes preference or full-mix improvement.",
+        "The authors list psychoacoustic masking-model integration as future work."
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260916-0900-01",
+      "title": "Isolated-track tonal normalization is not de-masking",
+      "claim": "Matching an isolated track to an instrument-class average can improve a tonal proposal but cannot establish its role or audibility in a full arrangement.",
+      "evidence": ["S-ML-20260916-0900-01"],
+      "confidence": 0.96
+    },
+    {
+      "id": "KC-ML-20260916-0900-02",
+      "title": "Average spectrum suppresses musical time",
+      "claim": "Time-averaged spectra cannot distinguish a persistent tonal imbalance from a collision limited to palm mutes, phrases or one section.",
+      "evidence": ["S-ML-20260916-0900-01"],
+      "confidence": 0.95
+    },
+    {
+      "id": "KC-ML-20260916-0900-03",
+      "title": "Spectral similarity is not psychoacoustic masking",
+      "claim": "A coarse overlap score omitting calibrated audibility, temporal coincidence and psychoacoustic thresholds must not be labeled as measured masking.",
+      "evidence": ["S-ML-20260916-0900-02"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-0900-04",
+      "title": "Target-selection error propagates into EQ",
+      "claim": "Automatic EQ must stop or expose uncertainty when instrument classification or target selection is ambiguous.",
+      "evidence": ["S-ML-20260916-0900-01"],
+      "confidence": 0.94
+    },
+    {
+      "id": "KC-ML-20260916-0900-05",
+      "title": "Whole-channel attenuation can solve the wrong problem",
+      "claim": "When a collision is local in frequency or time, full-band attenuation may damage musical balance and section role.",
+      "evidence": ["S-ML-20260916-0900-02"],
+      "confidence": 0.92
+    },
+    {
+      "id": "KC-ML-20260916-0900-06",
+      "title": "Static versus dynamic action follows persistence",
+      "claim": "Stable tonal errors are candidates for static EQ; intermittent collisions require an unchanged baseline and may justify bounded dynamic action only after level and pan checks.",
+      "evidence": ["S-ML-20260916-0900-01", "S-ML-20260916-0900-02"],
+      "confidence": 0.82,
+      "evidence_class": "engineering_inference_requiring_audio_validation"
+    },
+    {
+      "id": "KC-ML-20260916-0900-07",
+      "title": "EQ comparison requires gain compensation",
+      "claim": "Cuts and boosts change signal level, so contextual A/B must compensate loudness before preference is interpreted.",
+      "evidence": ["V-ML-20260916-0900-02"],
+      "confidence": 0.9
+    },
+    {
+      "id": "KC-ML-20260916-0900-08",
+      "title": "Source tone and restrained processing are explicit baselines",
+      "claim": "A processed-guitar candidate must be compared with source-tone revision and a lighter chain, not only with the current dense chain.",
+      "evidence": ["V-ML-20260916-0900-01"],
+      "confidence": 0.75,
+      "evidence_class": "single_engineer_demonstration"
+    },
+    {
+      "id": "KC-ML-20260916-0900-09",
+      "title": "Protected source follows section role",
+      "claim": "Masking control must not assign permanent global priority to vocal or lead; in a chorus, rhythm guitars may be the protected foundation and the lead a complement.",
+      "evidence": ["S-ML-20260916-0900-02", "project_role_context"],
+      "confidence": 0.9
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "V-ML-20260916-0900-01",
+      "video_id": "ZiO0B930Hhk",
+      "title": "How to Get Massive Rhythm Guitars That Cut Through the Mix",
+      "channel": "The Punk Rock Academy",
+      "url": "https://www.youtube.com/watch?v=ZiO0B930Hhk",
+      "duration": "00:08:29",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "page_date_display": "6 days ago",
+      "status": "studied",
+      "content_access": "complete_auto_generated_transcript",
+      "asr_caution": true,
+      "classified_findings": {
+        "eq": ["00:15-00:39 source tone before mix repair", "01:20-02:16 filtering, resonant cuts and a bass-space cut; all numbers need visual verification"],
+        "compression": ["02:30-02:47 palm-mute-only low-band control", "05:51-05:57 bus compression described as medium attack and fast release"],
+        "saturation_clipping": ["03:25-03:42 subtle saturation", "06:44-07:55 exciter, peak limiting, resonant suppression and tape shown on guitar bus"],
+        "reverb_room_stereo": ["03:45-04:03 left guitar to right room and right guitar to left room", "06:03-06:18 reverb reduced after bus audition"],
+        "rhythm_guitars": ["minimalism and source quality", "individual and bus processing demonstrated in context"],
+        "loudness_crest": ["demonstration was not documented as loudness matched"]
+      },
+      "numeric_settings_policy": "all transcripted frequencies, dB values, GR and plugin names are asr_needs_visual_verification and are not accepted presets",
+      "confidence": 0.63
+    },
+    {
+      "id": "V-ML-20260916-0900-02",
+      "video_id": "YALTRqW3It8",
+      "title": "I Was Mixing Guitars WRONG For Years. Here's What Changed.",
+      "channel": "Josh Middleton",
+      "url": "https://www.youtube.com/watch?v=YALTRqW3It8",
+      "duration": "00:18:43",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "page_date_display": "1 year ago",
+      "status": "studied",
+      "content_access": "complete_auto_generated_transcript",
+      "asr_caution": true,
+      "classified_findings": {
+        "eq": ["04:48-05:17 establish balance before EQ and compensate level after moves", "05:48-18:18 source-, tuning- and cab-dependent tour of low cut, palm-mute congestion, warmth, mids, bite, fizz and air"],
+        "compression": [],
+        "saturation_clipping": [],
+        "reverb_delay_room": [],
+        "stereo_pan_width": ["05:18-05:35 quad-tracked guitars are already panned and processed at the group"],
+        "automation": [],
+        "loudness_crest": ["level compensation is explicitly requested; no LUFS or crest target is supplied"],
+        "rhythm_guitars": ["04:11-04:46 frequency moves should be learned and auditioned in mix context", "16:03-18:18 final moves remain dependent on source tone"]
+      },
+      "numeric_settings_policy": "frequency regions and quoted Colin Richardson ranges originate in auto captions; preserve as demonstration context and visually verify before reuse",
+      "confidence": 0.84
+    },
+    {
+      "id": "V-ML-20260916-0900-03",
+      "video_id": "Dy-2ygVaW7M",
+      "title": "How To Fit Guitars In A Mix",
+      "channel": "Joey Sturgis Tones",
+      "url": "https://www.youtube.com/watch?v=Dy-2ygVaW7M",
+      "duration": "00:07:26",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "page_date_display": "4 years ago",
+      "status": "queued_source",
+      "content_access": "metadata_only_transcript_unavailable",
+      "findings": []
+    },
+    {
+      "id": "V-ML-20260916-0900-04",
+      "video_id": "xYK-GM3MPD8",
+      "title": "Magic Frequencies For Mixing Electric Guitars",
+      "channel": "Hardcore Music Studio",
+      "url": "https://www.youtube.com/watch?v=xYK-GM3MPD8",
+      "duration": "00:09:15",
+      "discovered_at": "2026-09-16T09:12:38+03:00",
+      "page_date_display": "3 years ago",
+      "status": "queued_source",
+      "content_access": "metadata_only_transcript_unavailable",
+      "findings": []
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "R-ML-20260916-0900-01",
+      "title": "Level and role before de-masking EQ",
+      "source": ["S-ML-20260916-0900-02", "V-ML-20260916-0900-02"],
+      "when_to_apply": "Two sources appear to collide in a defined section.",
+      "what_to_change": "First compare unchanged with the smallest role-aware level and pan move; open an EQ branch only if the collision remains.",
+      "proposed_range": {"level_move_db": "0 to 2", "origin": "conservative project A/B grid, not a published norm"},
+      "must_not_damage": ["section hierarchy", "rhythm-guitar foundation", "bass weight", "lead phrasing"],
+      "how_to_verify": "Loudness-match variants and compare full mix, mono and adjacent sections.",
+      "cancel_when": "Level/pan performs as well as EQ or the protected foundation weakens.",
+      "confidence": 0.88,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-02",
+      "title": "Instrument average is a proposal, not a destination",
+      "source": ["S-ML-20260916-0900-01"],
+      "when_to_apply": "An isolated source is broadly dull, harsh or unbalanced and classification is confident.",
+      "what_to_change": "Generate a static tonal candidate from the class prior but retain unchanged and manual role-aware branches.",
+      "proposed_range": {"adopted_numeric_range": null, "origin": "paper supplies model bounds only; no project range accepted"},
+      "must_not_damage": ["source identity", "arrangement role", "pick attack", "body"],
+      "how_to_verify": "Listen in full arrangement and compare section-specific role, not only target-spectrum error.",
+      "cancel_when": "Classification is uncertain, the source is intentionally atypical, or target match worsens mix fit.",
+      "confidence": 0.94,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-03",
+      "title": "Choose static or dynamic EQ by persistence",
+      "source": ["S-ML-20260916-0900-01", "S-ML-20260916-0900-02"],
+      "when_to_apply": "A collision is confirmed across labelled verse, chorus and articulation windows.",
+      "what_to_change": "Use static EQ only for stable tonal excess; for intermittent collision test dynamic attenuation capped at 0/1/2/3 dB.",
+      "proposed_range": {"max_dynamic_attenuation_db": [0, 1, 2, 3], "origin": "project experiment grid, not source-derived"},
+      "must_not_damage": ["guitar body", "bass note definition", "snare attack", "section contrast"],
+      "how_to_verify": "Event-labelled gain trace plus loudness-matched full-mix and mono A/B.",
+      "cancel_when": "Action persists outside the collision, pumps, thins the source, or does not beat static/unchanged.",
+      "confidence": 0.8,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-04",
+      "title": "Stop on target uncertainty",
+      "source": ["S-ML-20260916-0900-01"],
+      "when_to_apply": "Automatic instrument or section-role classification selects a spectral target.",
+      "what_to_change": "Expose confidence and require manual target confirmation for ambiguous or mixed sources.",
+      "proposed_range": {"confidence_threshold": null, "origin": "must be calibrated on project validation data"},
+      "must_not_damage": ["unusual instrumentation", "hybrid layers", "creative timbre"],
+      "how_to_verify": "Class/role confusion audit with correct, adjacent and intentionally wrong targets.",
+      "cancel_when": "Confidence is uncalibrated or no reliable class/role exists.",
+      "confidence": 0.95,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-05",
+      "title": "Do not label overlap as masking",
+      "source": ["S-ML-20260916-0900-02"],
+      "when_to_apply": "A metric reports spectral dependency or overlap.",
+      "what_to_change": "Name it overlap/dependency unless calibrated audibility, timing and psychoacoustic assumptions are present.",
+      "proposed_range": {"threshold": null, "origin": "no validated masking threshold in the source"},
+      "must_not_damage": ["metric semantics", "scientific traceability"],
+      "how_to_verify": "Hold spectral overlap similar while varying level, timing and pan; compare metric with listening.",
+      "cancel_when": "A validated project-specific psychoacoustic model and listening calibration replace the proxy.",
+      "confidence": 0.98,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-06",
+      "title": "Section role controls priority",
+      "source": ["S-ML-20260916-0900-02", "project_role_context"],
+      "when_to_apply": "A masking controller needs a protected source.",
+      "what_to_change": "Select the protected source per section and phrase; never default globally to vocal or lead.",
+      "proposed_range": {"priority": "categorical section-role label", "origin": "project arrangement policy"},
+      "must_not_damage": ["rhythm-guitar chorus foundation", "groove", "intentional background role"],
+      "how_to_verify": "Role annotations plus blind full-song review across transitions.",
+      "cancel_when": "Role is ambiguous or sources intentionally fuse into one texture.",
+      "confidence": 0.91,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-0900-07",
+      "title": "Gain-match EQ demonstrations",
+      "source": ["V-ML-20260916-0900-02"],
+      "when_to_apply": "An EQ cut or boost is evaluated by preference.",
+      "what_to_change": "Compensate comparison level without peak-normalizing and retain the unchanged branch.",
+      "proposed_range": {"loudness_tolerance": null, "origin": "must follow the established project loudness-matching protocol"},
+      "must_not_damage": ["transient comparison", "true-peak headroom", "fair preference test"],
+      "how_to_verify": "Blind randomized A/B at fixed monitor level and inspect peaks separately.",
+      "cancel_when": "Level matching changes limiter behavior or cannot be performed independently of the tested EQ.",
+      "confidence": 0.9,
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "reference_cards": [],
+  "reference_search": {
+    "catalogs_checked": [
+      "https://cambridge-mt.com/ms/mtk/",
+      "https://www.telefunken-elektroakustik.com/multitracks"
+    ],
+    "added": 0,
+    "reason": "no uniquely new rock raw-to-processed-to-final session with unambiguous reuse terms was established against the existing base",
+    "audio_downloaded": false,
+    "dsp_metrics_computed": false
+  },
+  "experiment_plans": [
+    {
+      "id": "EXP-ML-20260916-0900-01",
+      "title": "Role-aware static versus dynamic de-masking in dense rock",
+      "status": "not_run",
+      "material": "one licensed dense-rock multitrack with labelled verse and chorus",
+      "conditions": ["unchanged", "role-aware level/pan only", "class-average static EQ", "manual role-aware static EQ", "role-aware dynamic EQ capped at 0/1/2/3 dB"],
+      "controls": ["same edits and processing outside tested branch", "operational render plus separate loudness-matched listening copy", "no peak normalization", "full mix and mono", "randomized blind order"],
+      "evaluate": ["bass note definition", "rhythm-guitar foundation", "lead intelligibility", "snare body and attack", "harshness", "mono stability", "section contrast", "Dmitry blind preference and comments"],
+      "success": "Smallest branch improves intended role clarity without thinning the foundation or revealing processing.",
+      "cancel": "A level/pan move performs equally well, the source thins, gain action becomes audible between phrases, or preference does not improve."
+    },
+    {
+      "id": "EXP-ML-20260916-0900-02",
+      "title": "Stable versus intermittent collision decision test",
+      "status": "not_run",
+      "conditions": ["unchanged", "static EQ", "event-limited dynamic EQ"],
+      "controls": ["same maximum attenuation", "same target band", "event labels", "loudness-matched blind A/B"],
+      "evaluate": ["clarity during collision", "tone outside collision", "audible movement", "section continuity"]
+    },
+    {
+      "id": "EXP-ML-20260916-0900-03",
+      "title": "Instrument-target classification failure audit",
+      "status": "not_run",
+      "conditions": ["unchanged", "correct class target", "adjacent class target", "intentionally wrong target", "manual role target"],
+      "controls": ["same static four-band topology", "gain-matched outputs", "full-mix and isolated views"],
+      "evaluate": ["target error", "mix role", "timbre identity", "confidence calibration"]
+    },
+    {
+      "id": "EXP-ML-20260916-0900-04",
+      "title": "Spectral-overlap proxy validity audit",
+      "status": "not_run",
+      "conditions": ["matched spectrum with different level", "matched spectrum with different timing", "matched spectrum with different pan", "matched overlap with different section role"],
+      "controls": ["fixed analysis settings", "documented FFT/window/hop/activity mask", "blind audibility labels"],
+      "evaluate": ["proxy sensitivity", "false positives", "false negatives", "agreement with listeners"]
+    }
+  ],
+  "tools_and_limits": {
+    "consensus": "unavailable_free_monthly_limit_exhausted",
+    "scite": "unavailable_free_monthly_limit_exhausted",
+    "github": "used_for_shared_base_read_deduplication_and_publication",
+    "youtube_transcript": "permitted public transcript export used sequentially",
+    "mixing_learning_reference_hub": "not_callable",
+    "youtube_learning_bridge": "not_callable",
+    "context7": "not_needed_no_library_api_claims",
+    "paid_services_used": false
+  },
+  "counts": {
+    "source_cards_added": 2,
+    "knowledge_cards_added": 9,
+    "rule_candidates_added": 7,
+    "video_source_cards_added": 4,
+    "videos_studied": 2,
+    "videos_queued": 2,
+    "reference_cards_added": 0,
+    "experiment_plans_added": 4
+  },
+  "safety": [
+    "All rules remain candidate with auto_apply:false.",
+    "All experiments remain not_run.",
+    "No audio, DSP engine, repository code, runtime configuration or active rule changed.",
+    "No user or commercial audio was downloaded, extracted or uploaded.",
+    "No numeric DSP metrics were invented.",
+    "No paid subscription, GPU job or arbitrary third-party Space was used."
+  ],
+  "handoff": "ML-2026-09-16-0900: isolated-track spectral normalization is not de-masking, and spectral overlap is not a psychoacoustic masking label. Establish section role and level/pan first. Use static EQ for stable tonal problems; test only bounded dynamic action for intermittent collisions. Preserve the rhythm-guitar chorus foundation and never give vocal/lead permanent priority. Next test: EXP-ML-20260916-0900-01. All rules remain candidate / auto_apply:false; all experiments not_run."
+}
