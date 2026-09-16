@@ -1,0 +1,438 @@
+{
+  "schema_version": "mixing-learning-patch/1.1",
+  "patch_id": "ml-2026-09-16-1200",
+  "update_id": "ML-2026-09-16-1200",
+  "created_at": "2026-09-16T12:01:11+03:00",
+  "timezone": "Europe/Moscow",
+  "run_type": "scheduled_research_update",
+  "research_mode": "deep_review",
+  "planned_slot": "12:00",
+  "actual_start": "2026-09-16T12:01:11+03:00",
+  "preceding_search_update_id": "ML-2026-09-16-0900",
+  "preceding_search_url": "https://github.com/tubeslave/AUTO-MIXER-Tubeslave/blob/master/Docs/mixing_learning_updates/ML-2026-09-16-0900.md",
+  "topic": "deep_review_cross_adaptive_masking_eq_phase_topology_and_implementation_traceability",
+  "mode": "additive_with_revisions",
+  "base_materials_read": [
+    {
+      "path": "Docs/mixing_learning_updates/README.md",
+      "ref": "master",
+      "sha": "95f4ded21fc24858aa0fb5f9a5d8a96a094aafaf"
+    },
+    {
+      "path": "Docs/mixing_learning_updates/ML-2026-09-16-0900.json",
+      "ref": "master",
+      "sha": "99b2f4ee8a8ddd8a2a601b5d6aa32fbaa9498d39",
+      "reason": "preceding search queue and stable IDs"
+    },
+    {
+      "path": "backend/ml/eq_normalization.py",
+      "ref": "master",
+      "sha": "a1470b692cbb9766b3b5f9f9b04ee03ac4f0971f",
+      "reason": "read-only source-to-implementation traceability audit"
+    },
+    {
+      "path": "tests/test_ml/test_eq_normalization.py",
+      "ref": "master",
+      "sha": "5079dfce263280fb0e0aadf426bee27b0d1ccede",
+      "reason": "read-only verification-scope audit"
+    },
+    {
+      "path": "backend/source_knowledge/data/sources.yaml",
+      "ref": "master",
+      "reason": "preserve existing stable source ID jaes_hafezi_reiss_masking_eq"
+    },
+    {
+      "path": "backend/source_knowledge/data/rules.jsonl",
+      "ref": "master",
+      "reason": "audit existing active masking.problem_outliers_only dependency"
+    },
+    {
+      "update_id": "ML-2026-09-12-1800",
+      "stable_source_id": "SRC-ML-20260912-1800-01",
+      "reason": "deduplicate semantic target-matching evidence"
+    }
+  ],
+  "novelty": {
+    "type": "deep_read_plus_evidence_correction_plus_implementation_audit",
+    "summary": "The full Hafezi-Reiss paper and relevant sections of the peer-reviewed equalization review were read. The update narrows masking claims, separates magnitude from phase topology and records that the current EQNormalizer is single-track static spectral correction rather than the cited cross-adaptive multitrack algorithm.",
+    "new_publication_claim": false,
+    "citation_check": "partial",
+    "deduplicated_against": [
+      "ML-2026-09-16-0900",
+      "ML-2026-09-12-1800",
+      "jaes_hafezi_reiss_masking_eq"
+    ]
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260916-1200-01",
+      "base_source_id": "jaes_hafezi_reiss_masking_eq",
+      "title": "Autonomous Multitrack Equalization Based on Masking Reduction",
+      "authors": ["Sina Hafezi", "Joshua D. Reiss"],
+      "doi": "10.17743/jaes.2015.0021",
+      "primary_metadata_url": "https://qmro.qmul.ac.uk/xmlui/handle/123456789/7804",
+      "reading_copy_url": "https://scispace.com/pdf/autonomous-multitrack-equalization-based-on-masking-31dej53ans.pdf",
+      "publication_date": "2015-05",
+      "discovered_in_project": "before_2026-09-16",
+      "kind": "peer_reviewed_journal_paper",
+      "read_depth": "full_pdf_all_12_pages_model_four_implementations_objective_evaluation_subjective_evaluation_limits_appendix",
+      "bounded_summary": "A cross-adaptive K-by-K track comparison identifies frequencies where a louder masker is nonessential and a maskee is essential, then applies bounded or unbounded peaking cuts. The controller is an engineering-inspired heuristic rather than a calibrated auditory model. Objective MUR changes were small and did not consistently predict subjective masking or preference.",
+      "methods": {
+        "offline": "non-overlapping 1024-point FFT average over full excerpt; up to three second-order IIR peaking cuts per track",
+        "realtime": "ten octave-band RMS filters, EMA smoothing, up to five time-varying peaking filters per track",
+        "pairing": "K(K-1) masker-maskee pairs",
+        "analysis_channel": "stereo tracks converted to mono for detection",
+        "assumption": "relative track levels already adjusted"
+      },
+      "source_numeric_settings_not_project_presets": {
+        "offline_rank_threshold": 10,
+        "offline_q": 2,
+        "realtime_essential_bands": 3,
+        "realtime_constrained_q": 5,
+        "realtime_constrained_max_attenuation_db": 6,
+        "origin": "paper implementation; several values selected by informal listening"
+      },
+      "evaluation": {
+        "songs": 8,
+        "tracks_per_song": "4-10",
+        "excerpt_duration_seconds": "15-50",
+        "participants_total": 11,
+        "participants_analyzed": 9,
+        "playback": "headphones",
+        "loudness_normalized": true,
+        "objective_mean_mur_improvement_percent_by_system": [0.6, 2.4, 1.1, 4.2]
+      },
+      "limitations": [
+        "The controller omits masking caused by a quieter masker that still raises audibility threshold.",
+        "Several filter and ranking parameters were chosen by informal listening.",
+        "MUR improvements were small and sometimes negative by song.",
+        "Objective masking reduction did not consistently predict subjective masking or preference.",
+        "The no-reference multistimulus test forced use of scale extremes and may exaggerate differences.",
+        "Only nine participant results remained after exclusion and playback used one headphone setup.",
+        "No source-code reproduction was completed in this run."
+      ],
+      "confidence": 0.94
+    },
+    {
+      "id": "S-ML-20260916-1200-02",
+      "title": "All About Audio Equalization: Solutions and Frontiers",
+      "authors": ["Vesa Valimaki", "Joshua D. Reiss"],
+      "doi": "10.3390/app6050129",
+      "url": "https://acris.aalto.fi/ws/portalfiles/portal/9936551/applsci_06_00129.pdf",
+      "publication_date": "2016-05-06",
+      "discovered_at": "2026-09-16T12:01:11+03:00",
+      "kind": "peer_reviewed_review",
+      "license": "CC BY 4.0",
+      "read_depth": "targeted_full_relevant_sections_4_4_5_3_5_4_6_5_7_2_8_and_table_3_not_entire_47_page_paper",
+      "bounded_summary": "The review separates minimum-phase, linear-phase, dynamic, targeted and noise/masking equalizers. Linear phase trades phase response for latency and possible pre-ringing; dynamic EQ requires explicit detector ballistics; real-time target matching benefits from activity gating and response smoothing.",
+      "limitations": [
+        "This is a broad review, not a rock-mix listening study.",
+        "The Hafezi-Reiss summary is secondary evidence and describes results as mixed.",
+        "The linked code repository timed out, so reproducibility verification is partial."
+      ],
+      "confidence": 0.96
+    }
+  ],
+  "implementation_audit_cards": [
+    {
+      "id": "IA-ML-20260916-1200-01",
+      "path": "backend/ml/eq_normalization.py",
+      "status": "read_only_audit_no_code_change",
+      "declared_sources": ["Ma et al. Intelligent Multitrack Equalization", "Hafezi and Reiss Autonomous Multitrack Equalization Based on Masking Reduction"],
+      "observed_behavior": "single-input static spectral-profile correction using averaged magnitude, fixed hand-authored target curves and fixed-center EQ band fitting",
+      "not_observed": [
+        "cross-track K(K-1) masker-maskee analysis",
+        "essential versus nonessential frequency ranking across tracks",
+        "activity gate",
+        "temporal state or EMA smoothing",
+        "loudness calibration",
+        "section-role input",
+        "auditory-model or MUR measurement",
+        "filter realization, phase response or latency verification"
+      ],
+      "test_scope": "unit tests cover shapes, fallbacks, gain clamp and OSC serialization; they do not test source equivalence, target provenance, silence behavior, phase, listening preference or full-mix masking",
+      "bounded_conclusion": "The module may be a valid independent static correction component, but the Hafezi citation is contextual and must not be treated as proof that the paper's cross-adaptive method or results were implemented.",
+      "confidence": 0.99
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260916-1200-01",
+      "title": "Masking proxy is not masking ground truth",
+      "claim": "The Hafezi-Reiss controller is an engineering heuristic and its MUR evaluator showed weak, inconsistent alignment with musical preference; neither should be used as a sole masking label.",
+      "evidence": ["S-ML-20260916-1200-01"],
+      "confidence": 0.97
+    },
+    {
+      "id": "KC-ML-20260916-1200-02",
+      "title": "Cross-adaptive evidence requires cross-track implementation",
+      "claim": "Results from a K-by-K masker-maskee system do not validate a single-track target-spectrum normalizer.",
+      "evidence": ["S-ML-20260916-1200-01", "IA-ML-20260916-1200-01"],
+      "confidence": 0.99
+    },
+    {
+      "id": "KC-ML-20260916-1200-03",
+      "title": "More objective de-masking need not mean better mix",
+      "claim": "Masking score, source distinguishability and overall preference must be reported separately.",
+      "evidence": ["S-ML-20260916-1200-01"],
+      "confidence": 0.97
+    },
+    {
+      "id": "KC-ML-20260916-1200-04",
+      "title": "Magnitude match does not choose phase topology",
+      "claim": "Minimum-phase IIR, linear-phase FIR and zero-phase offline realizations can share a magnitude target while differing in latency, phase and transient artifacts.",
+      "evidence": ["S-ML-20260916-1200-02"],
+      "confidence": 0.98
+    },
+    {
+      "id": "KC-ML-20260916-1200-05",
+      "title": "Linear phase is not automatically transparent",
+      "claim": "Linear-phase EQ can avoid phase distortion yet add latency and pre-ringing; it requires transient and workflow checks rather than a quality label.",
+      "evidence": ["S-ML-20260916-1200-02"],
+      "confidence": 0.96
+    },
+    {
+      "id": "KC-ML-20260916-1200-06",
+      "title": "Adaptive targets need activity gating and smoothing",
+      "claim": "A time-varying target system should exclude inactive/noisy frames and smooth desired and applied responses before it can be evaluated musically.",
+      "evidence": ["S-ML-20260916-1200-02"],
+      "confidence": 0.94
+    },
+    {
+      "id": "KC-ML-20260916-1200-07",
+      "title": "Dynamic EQ requires explicit control law",
+      "claim": "Dynamic EQ conclusions are incomplete without threshold/detector, attack, release, band, range, topology and gain-trace context.",
+      "evidence": ["S-ML-20260916-1200-02"],
+      "confidence": 0.97
+    },
+    {
+      "id": "KC-ML-20260916-1200-08",
+      "title": "Citation is not implementation validation",
+      "claim": "A paper cited in a module docstring must be traced to implemented analysis, controls and tests before its evidence is inherited.",
+      "evidence": ["IA-ML-20260916-1200-01"],
+      "confidence": 0.99
+    }
+  ],
+  "revisions_to_existing_conclusions": [
+    {
+      "target": "KC-ML-20260916-0900-03",
+      "previous": "Spectral similarity is not psychoacoustic masking.",
+      "revised": "Correct and retained. Hafezi-Reiss also does not provide ground-truth masking: its controller omits an explicit auditory model and its MUR evaluator aligned weakly with musical judgments.",
+      "reason": "full-paper deep review"
+    },
+    {
+      "target": "KC-ML-20260916-0900-06",
+      "previous": "Static versus dynamic action follows persistence.",
+      "revised": "Retain only as engineering inference. Literature supports explicit time variation, activity gating and smoothing, but does not prove that every intermittent collision should receive dynamic EQ.",
+      "reason": "avoid converting topology description into a prescriptive rule"
+    },
+    {
+      "target": "masking.problem_outliers_only",
+      "previous": "Existing active advisory rule cites jaes_hafezi_reiss_masking_eq and carries project gain/Q bounds.",
+      "revised": "The paper supports prioritizing high-valued detected events within its own heuristic, but does not validate the current project bounds or a different single-track normalizer. Keep active rule unchanged in this research run; schedule source-to-rule audit before future promotion.",
+      "reason": "citation scope and implementation mismatch"
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "R-ML-20260916-1200-01",
+      "title": "Name the spectral process correctly",
+      "source": ["S-ML-20260916-1200-01", "IA-ML-20260916-1200-01"],
+      "when_to_apply": "A component or card claims masking reduction from spectral analysis.",
+      "what_to_change": "Label single-track target matching, cross-track overlap and cross-adaptive masking as separate methods; expose inputs and controller graph.",
+      "proposed_range": null,
+      "must_not_damage": ["traceability", "operator trust", "creative intent"],
+      "how_to_verify": "Map every cited method block to implemented inputs, state, parameters and tests.",
+      "cancel_when": "The implementation cannot reproduce the cited analysis graph or the label overstates the evidence.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-02",
+      "title": "Keep masking, clarity and preference separate",
+      "source": ["S-ML-20260916-1200-01"],
+      "when_to_apply": "Evaluating any de-masking candidate.",
+      "what_to_change": "Report controller score, independent masking/clarity judgment and overall preference as separate outcomes.",
+      "proposed_range": null,
+      "must_not_damage": ["musical blend", "section hierarchy", "timbre"],
+      "how_to_verify": "Blind loudness-matched ratings plus score traces and full-mix comments.",
+      "cancel_when": "Only the optimized metric improves or listener preference falls.",
+      "confidence": 0.97,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-03",
+      "title": "Constrain cross-adaptive attenuation experimentally",
+      "source": ["S-ML-20260916-1200-01"],
+      "when_to_apply": "A cross-track collision persists after role-aware level and pan baselines.",
+      "what_to_change": "Test a project attenuation grid of 0/1/2/3 dB with identical detector and topology; do not import the paper's 6 dB cap or Q values as defaults.",
+      "proposed_range": {"max_attenuation_db": [0, 1, 2, 3], "origin": "project A/B grid, not source-derived"},
+      "must_not_damage": ["rhythm foundation", "bass weight", "snare body", "intentional blend"],
+      "how_to_verify": "Gain trace, full mix, mono and blind loudness-matched preference.",
+      "cancel_when": "A lower bound performs as well, action is audible outside collisions, or preference declines.",
+      "confidence": 0.84,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-04",
+      "title": "Gate inactive frames before adaptive target estimation",
+      "source": ["S-ML-20260916-1200-02"],
+      "when_to_apply": "A target or correction is estimated continuously from changing input.",
+      "what_to_change": "Exclude silence and low-level noise with a calibrated activity decision before updating the target estimate.",
+      "proposed_range": {"threshold": null, "origin": "must be calibrated on project recordings"},
+      "must_not_damage": ["quiet notes", "ghost notes", "tails", "room continuity"],
+      "how_to_verify": "Label active/inactive frames and inspect false closure, target jitter and noise pumping.",
+      "cancel_when": "Quiet intentional content is excluded or the gate creates discontinuity.",
+      "confidence": 0.92,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-05",
+      "title": "Smooth adaptive target and applied filter separately",
+      "source": ["S-ML-20260916-1200-01", "S-ML-20260916-1200-02"],
+      "when_to_apply": "EQ parameters change frame by frame.",
+      "what_to_change": "Log and tune target-response smoothing and applied-filter smoothing as separate controls.",
+      "proposed_range": {"time_constants": null, "origin": "must be derived from one-factor experiments"},
+      "must_not_damage": ["transient clarity", "phrase transitions", "stable timbre"],
+      "how_to_verify": "Parameter-jitter metrics, step response and blind full-song listening.",
+      "cancel_when": "The correction chatters, lags musical changes or pumps between events.",
+      "confidence": 0.93,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-06",
+      "title": "Separate magnitude target from EQ phase topology",
+      "source": ["S-ML-20260916-1200-02"],
+      "when_to_apply": "A target curve can be realized by minimum-phase, linear-phase or zero-phase processing.",
+      "what_to_change": "Hold the magnitude target fixed and compare topology as an independent factor.",
+      "proposed_range": null,
+      "must_not_damage": ["attack", "multi-mic coherence", "latency budget", "mono stability"],
+      "how_to_verify": "Measure magnitude, impulse response, group delay, latency and pre-ringing; then blind loudness-matched A/B.",
+      "cancel_when": "Magnitude differs materially, latency exceeds use case or transient artifacts outweigh benefit.",
+      "confidence": 0.97,
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "R-ML-20260916-1200-07",
+      "title": "Require behavior-level tests before inheriting paper evidence",
+      "source": ["IA-ML-20260916-1200-01"],
+      "when_to_apply": "A DSP/ML module cites a research method.",
+      "what_to_change": "Add tests for the cited method's defining behavior before claiming equivalence; structural unit tests are insufficient.",
+      "proposed_range": null,
+      "must_not_damage": ["existing runtime", "backward compatibility", "safety gates"],
+      "how_to_verify": "Synthetic fixtures and licensed-audio evaluation that isolate each defining behavior.",
+      "cancel_when": "The component is intentionally a different method; then revise provenance language instead of forcing equivalence.",
+      "confidence": 0.99,
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "video_source_cards": [],
+  "queued_video_sources_carried_forward": [
+    {
+      "id": "V-ML-20260916-0900-03",
+      "video_id": "Dy-2ygVaW7M",
+      "status": "queued_source",
+      "reason": "transcript unavailable; not retried during deep_review"
+    },
+    {
+      "id": "V-ML-20260916-0900-04",
+      "video_id": "xYK-GM3MPD8",
+      "status": "queued_source",
+      "reason": "transcript unavailable; not retried during deep_review"
+    }
+  ],
+  "reference_cards": [],
+  "experiment_plans": [
+    {
+      "id": "EXP-ML-20260916-1200-01",
+      "title": "Equal-magnitude EQ topology test",
+      "status": "not_run",
+      "material": "one licensed dense-rock session with multi-mic drums, bass and distorted rhythm guitars",
+      "baseline": "unchanged",
+      "variants": ["unchanged", "minimum_phase_iir", "linear_phase_fir", "zero_phase_offline"],
+      "single_changed_factor": "phase_latency_topology with one fixed modest magnitude target",
+      "controls": ["identical target magnitude within tolerance", "same source excerpt", "output loudness matched", "no peak normalization for listening"],
+      "measurements": ["magnitude deviation", "impulse response", "group delay", "latency", "pre-ringing", "overshoot", "peak change", "mono compatibility"],
+      "protected_qualities": ["kick and snare attack", "bass-guitar coherence", "multi-mic drum image", "harshness", "section impact"],
+      "listener": "Dmitry blind preference and comments",
+      "cancel_when": ["target magnitude differs materially", "latency exceeds intended use", "pre-ringing or smearing is audible", "multi-mic relationships destabilize", "branch does not beat unchanged"]
+    },
+    {
+      "id": "EXP-ML-20260916-1200-02",
+      "title": "Activity gate and smoothing isolation",
+      "status": "not_run",
+      "baseline": "same adaptive target with no gate and no smoothing",
+      "variants": ["none", "activity_gate_only", "target_smoothing_only", "applied_filter_smoothing_only", "gate_plus_both_smoothing_stages"],
+      "single_changed_factor": "one guardrail enabled per branch before combined branch",
+      "controls": ["same detector features", "same target", "same filter topology", "loudness matched"],
+      "measurements": ["false inactive rate", "parameter jitter", "gain trace", "transition lag", "noise pumping"],
+      "protected_qualities": ["ghost notes", "tails", "room continuity", "transient clarity"],
+      "cancel_when": ["quiet intentional content is gated", "smoothing misses section changes", "audible chatter remains", "unchanged is preferred"]
+    },
+    {
+      "id": "EXP-ML-20260916-1200-03",
+      "title": "Masking metric validity under controlled collisions",
+      "status": "not_run",
+      "baseline": "unchanged controlled two-source collisions",
+      "variants": ["current single-track spectral difference", "Hafezi engineering heuristic", "explicit auditory-model proxy"],
+      "single_changed_factor": "metric/controller only; audio treatment disabled for diagnostic phase",
+      "controls": ["systematic level offsets", "timing offsets", "pan positions", "frequency overlap", "same excerpts"],
+      "measurements": ["metric response", "rank stability", "agreement with blinded audibility labels", "false positives on intentional blend"],
+      "protected_qualities": ["role hierarchy", "intentional blend", "section dependence"],
+      "cancel_when": ["metric fails basic monotonicity", "ranking changes with irrelevant transforms", "listener agreement remains weak"]
+    },
+    {
+      "id": "EXP-ML-20260916-1200-04",
+      "title": "Target type under fixed topology",
+      "status": "not_run",
+      "baseline": "unchanged",
+      "variants": ["unchanged", "instrument_class_average", "semantic_embedding_target", "manual_section_role_target"],
+      "single_changed_factor": "target definition",
+      "controls": ["same minimum-phase topology", "same maximum gain", "same section labels", "loudness matched"],
+      "measurements": ["target error", "spectral change", "peak change", "section-specific masking comments"],
+      "protected_qualities": ["source identity", "rhythm foundation", "bass definition", "snare body", "section contrast"],
+      "listener": "Dmitry blind preference and comments",
+      "cancel_when": ["target fit improves but preference falls", "source identity is normalized away", "manual/unchanged performs as well"]
+    }
+  ],
+  "tools_and_limits": {
+    "consensus": "skipped_known_free_access_suspension_reset_unknown",
+    "scite": "skipped_known_free_quota_exhausted_until_2026-10-01_UTC",
+    "open_primary_sources": "used",
+    "github": "used_for_read_only_implementation_audit_and_project_base_update",
+    "youtube_search": "not_performed_deep_review_slot",
+    "mixing_learning_reference_hub": "not_callable",
+    "youtube_learning_bridge": "not_callable",
+    "citation_check": "partial"
+  },
+  "counts": {
+    "source_cards_added": 2,
+    "knowledge_cards_added": 8,
+    "implementation_audit_cards_added": 1,
+    "rule_candidates_added": 7,
+    "experiment_plans_added": 4,
+    "video_source_cards_added": 0,
+    "queued_video_sources_carried_forward": 2,
+    "reference_cards_added": 0,
+    "existing_conclusions_revised": 3
+  },
+  "safety": {
+    "rules_auto_apply": false,
+    "experiments_status": "not_run",
+    "audio_modified": false,
+    "dsp_engine_modified": false,
+    "code_modified": false,
+    "runtime_rules_modified": false,
+    "user_audio_uploaded": false,
+    "paid_services_used": false
+  },
+  "handoff": "Treat EQNormalizer as single-track static spectral-profile correction, not validated cross-adaptive de-masking. Keep unchanged and level/pan baselines. For any time-varying EQ candidate, expose detector, activity gate, smoothing, filter topology and gain trace; judge masking, target fit and preference separately in a loudness-matched full-mix and mono test."
+}
+
