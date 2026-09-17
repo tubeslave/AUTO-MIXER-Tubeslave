@@ -100,3 +100,18 @@ def test_apply_conservative_renders_without_overwriting_stems(tmp_path):
     assert rendered.shape[1] == 2
     assert np.allclose(reread[: len(original)], original, atol=1e-4)
     assert plan.audit_trail
+
+
+def test_offline_pipeline_includes_spectral_ceiling_audit_and_actions(tmp_path):
+    stems = tmp_path / "stems"
+    stems.mkdir()
+    _write_stem(stems / "lead_vocal.wav", 260.0, amplitude=0.3)
+    _write_stem(stems / "backing_vocal.wav", 3200.0, amplitude=0.2)
+
+    plan = analyze(stems=str(stems), genre="rock")
+
+    assert any("spectral_ceiling_eq" in item for item in plan.audit_trail)
+    assert any(
+        action.backend_mapping.get("source") == "spectral_ceiling_eq"
+        for action in plan.actions
+    )

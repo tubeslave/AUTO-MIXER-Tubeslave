@@ -79,6 +79,13 @@ Docs/                    — PDF документация WING, техничес
   целевой плоскости группы. В live это только цель для bounded fader/bus moves:
   true-peak/headroom/feedback safety и запрет fader > 0 dBFS важнее попадания в
   Ayaic-уровень.
+- Основной offline pipeline — стандартный no-reference pipeline: Ayaic баланс
+  источников/стемов/шин, Gate по необходимости, bounded source/drum-bus
+  compression до финального gain для контроля crest factor, FX15-style
+  section/mod space и `spectral_ceiling_eq` как главный спектральный потолок.
+  Не использовать `AIR_MINUS_0_80`, финальный limiter, soft clipper или
+  reference matching по умолчанию; это только явные варианты по запросу
+  оператора.
 
 ### Архитектурные решения
 - AudioCapture — единый сервис. НЕ создавать PyAudio потоки в отдельных модулях
