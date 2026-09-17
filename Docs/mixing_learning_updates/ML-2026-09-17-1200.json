@@ -1,0 +1,165 @@
+{
+  "schema_version": "1.1",
+  "patch_id": "ML-PATCH-2026-09-17-1200",
+  "update_id": "ML-2026-09-17-1200",
+  "created_at": "2026-09-17T12:03:03+03:00",
+  "timezone": "Europe/Moscow",
+  "research_mode": "deep_review",
+  "planned_slot": "2026-09-17T12:00:00+03:00",
+  "actual_start": "2026-09-17T11:58:16+03:00",
+  "previous_update_id": "ML-2026-09-17-0900",
+  "preceding_search_update_id": "ML-2026-09-17-0900",
+  "topic": "verified_lti_audio_graph_compilation_and_explicit_wave_digital_overdrive_model",
+  "counts": {
+    "source_cards_upgraded": 2,
+    "source_cards_full_text_read": 2,
+    "code_cards_added": 2,
+    "knowledge_cards_added": 10,
+    "rule_candidates_added": 7,
+    "video_source_cards_added": 0,
+    "videos_studied": 0,
+    "videos_queued_carried_forward": 10,
+    "reference_cards_added": 0,
+    "experiment_plans_added": 4
+  },
+  "source_card_updates": [
+    {
+      "id": "S-ML-20260917-0900-02",
+      "title": "Compiling Differentiable Audio Graphs to Real-Time DSP",
+      "authors": ["Facundo Franchino", "Sebastian J. Schlecht"],
+      "venue": "DAFx-26 demo",
+      "publication_date": "2026-09",
+      "kind": "conference_demo_paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_61.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/shI7n5mxky_M-9iFrpxXfQ",
+      "license": "CC BY 4.0",
+      "read_depth": "full_pdf_all_4_pages_methods_correctness_cost_controls_certificate_deployment_limits_plus_current_repository_readme_codegen_and_tests",
+      "status": "full_text_read",
+      "bounded_summary": "ADAC preserves the evaluated integer-delay LTI graph transfer function through a JSON-to-FAUST compiler and attaches a sufficient small-gain stability certificate. The demonstrated equivalence and stability claims do not cover nonlinear or time-varying processors.",
+      "verified_facts": {
+        "evaluated_graph_class": "LTI FDN plus reported SDN example",
+        "integer_delay_ir_residual": "approximately 7e-5 of peak without alignment",
+        "tests_reported": "201 unit tests plus end-to-end IR integration suite",
+        "benchmark_context": "Apple M2 single core at 48 kHz",
+        "certificate_type": "sufficient small-gain bound on emitted single-precision coefficients plus recursive-section pole checks"
+      },
+      "limits": [
+        "No listening test or rock mix evaluation.",
+        "LTI proof does not cover compression, clipping, envelope following or modulation.",
+        "CPU and hot-reload figures are hardware, host and version dependent.",
+        "Current fractional-delay code path postdates the paper's rounded-delay description and lacks paper-level equivalence evidence."
+      ],
+      "citation_check": "partial",
+      "confidence": 0.98
+    },
+    {
+      "id": "S-ML-20260917-0900-04",
+      "title": "Explicit Wave Digital Model of the Fulltone OCD Pedal Based on Canonical Piecewise-Linear Functions",
+      "authors": ["Riccardo Giampiccolo", "Stefano Polimeno", "Carlo Macri", "Alice Lenoci", "Oliviero Massi", "Alberto Bernardini"],
+      "venue": "DAFx-26",
+      "publication_date": "2026-09",
+      "kind": "peer_reviewed_conference_paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_24.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/FR5oopmtXLuPh9fiskDhrg",
+      "license": "paper_CC_BY_4.0_repository_license_unresolved",
+      "read_depth": "full_pdf_all_8_pages_model_validation_runtime_alias_note_conclusion_plus_companion_repository_files",
+      "status": "full_text_read",
+      "bounded_summary": "A CPWL explicit WDF approximates the Fulltone OCD v2 clipping circuit and is much faster than the compared iterative WDF in the authors' MATLAB test. Synthetic circuit-simulation fit and informal listening do not establish hardware identity, alias-free behavior or mix preference.",
+      "verified_facts": {
+        "illustrative_test": "1 s, 1 kHz, 1 V sine at 96 kHz",
+        "explicit_model_nmse": 0.0022,
+        "explicit_model_log_spectral_distance": 0.56,
+        "runtime_context": "100 MATLAB runs on Apple M1 Pro",
+        "real_time_ratio_implicit": 3.12,
+        "real_time_ratio_explicit": 0.14
+      },
+      "limits": [
+        "No controlled blind or loudness-matched listening test.",
+        "No measured hardware validation across devices, tolerances and controls.",
+        "Antiderivative antialiasing is proposed as future work; alias-free behavior is not shown.",
+        "Companion repository has no explicit licence file and was not executed."
+      ],
+      "citation_check": "partial",
+      "confidence": 0.97
+    }
+  ],
+  "code_cards": [
+    {
+      "id": "CODE-ML-20260917-1200-01",
+      "source": "S-ML-20260917-0900-02",
+      "url": "https://github.com/cucuwritescode/adac",
+      "commit": "6045856b214ed22e14c1b8342312a709d50dc47a",
+      "license": "MIT",
+      "inspection_depth": "README_LICENSE_codegen_fractional_delay_certificate_export_and_tests",
+      "execution_status": "not_run",
+      "reproducibility": "partial",
+      "version_drift": [
+        "Paper rounds fractional delays; current code preserves fractions and emits de.fdelay with linear interpolation.",
+        "Paper reports sub-10-ms plugin recompilation; current README says about 100 ms."
+      ]
+    },
+    {
+      "id": "CODE-ML-20260917-1200-02",
+      "source": "S-ML-20260917-0900-04",
+      "url": "https://github.com/polimi-ispl/fulltoneocd",
+      "commit": "fb5325ceb5d2b942c5c56fd6989aafb17f06368d",
+      "license": "unresolved_no_license_file",
+      "inspection_depth": "README_file_tree_and_MATLAB_sample_rate_paths",
+      "execution_status": "not_run_installer_not_executed",
+      "reproducibility": "blocked_for_integration_pending_license"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260917-1200-01","claim":"ADAC's demonstrated equivalence is bounded to its tested LTI graph/operator subset and integer-delay evaluation.","evidence":["S-ML-20260917-0900-02"],"confidence":0.99},
+    {"id":"KC-ML-20260917-1200-02","claim":"Full MIMO IR residual, direct-path timing and absolute arrival time are required to verify compiled LTI graph equivalence.","evidence":["S-ML-20260917-0900-02"],"confidence":0.98},
+    {"id":"KC-ML-20260917-1200-03","claim":"A small-gain certificate is sufficient but not necessary; an unproven verdict is not proof of instability.","evidence":["S-ML-20260917-0900-02","CODE-ML-20260917-1200-01"],"confidence":0.99},
+    {"id":"KC-ML-20260917-1200-04","claim":"Stability analysis must use the exact emitted precision and coefficients, not pristine training values alone.","evidence":["S-ML-20260917-0900-02"],"confidence":0.98},
+    {"id":"KC-ML-20260917-1200-05","claim":"Bounded semantic macro-controls are safer than exposing independently movable trained coefficients.","evidence":["S-ML-20260917-0900-02"],"confidence":0.96},
+    {"id":"KC-ML-20260917-1200-06","claim":"Compiler version drift can invalidate a paper-level equivalence claim for newly supported operators such as fractional delay.","evidence":["CODE-ML-20260917-1200-01"],"confidence":0.99},
+    {"id":"KC-ML-20260917-1200-07","claim":"The explicit CPWL OCD model reduces computational cost relative to the tested iterative WDF under one published setup.","evidence":["S-ML-20260917-0900-04"],"confidence":0.97},
+    {"id":"KC-ML-20260917-1200-08","claim":"Circuit-simulation agreement does not establish identity to physical hardware across tolerances and controls.","evidence":["S-ML-20260917-0900-04"],"confidence":0.99},
+    {"id":"KC-ML-20260917-1200-09","claim":"Nonlinear-model accuracy, aliasing, playability, mix fit and listener preference are independent evaluation axes.","evidence":["S-ML-20260917-0900-04"],"confidence":0.99},
+    {"id":"KC-ML-20260917-1200-10","claim":"A paper's CC BY licence does not supply a missing licence for its companion source repository.","evidence":["CODE-ML-20260917-1200-02"],"confidence":0.99}
+  ],
+  "rule_candidates": [
+    {"id":"R-ML-20260917-1200-01","source":"S-ML-20260917-0900-02","when":"compiling a differentiable LTI audio graph","change":"pin commit, operator inventory, sample rate and numeric precision","protect":"semantic equivalence and reproducibility","verify":"source/target manifest plus repeatable build","cancel":"if any version or operator is unresolved","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-02","source":"S-ML-20260917-0900-02","when":"validating compiled LTI output","change":"compare complete MIMO IR without alignment including direct paths and timing","protect":"onset, decay and stereo routing","verify":"sample-domain residual plus frequency/decay checks","cancel":"on unexplained offset or residual beyond documented bound","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-03","source":"S-ML-20260917-0900-02","when":"interpreting a stability certificate","change":"treat small-gain result as sufficient-only and preserve verdict vocabulary","protect":"runtime stability and honest uncertainty","verify":"emitted-coefficient certificate plus stress test","cancel":"on unstable, not-certified or indeterminate without manual review","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-04","source":"S-ML-20260917-0900-02","when":"processor contains nonlinear or time-varying nodes","change":"withhold LTI equivalence/stability generalisation","protect":"correctness and stability","verify":"separate nonlinear/time-varying proof and tests","cancel":"until such evidence exists","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-05","source":"S-ML-20260917-0900-02","when":"exposing trained processor controls","change":"use bounded semantic macro-controls instead of raw trained coefficients","protect":"stability and learned behaviour","verify":"full-range sweep and certificate/quality checks","cancel":"if any control setting breaks bounds or quality","confidence":"medium_high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-06","source":"S-ML-20260917-0900-04","when":"evaluating a nonlinear pedal model","change":"separate circuit fit, aliasing, runtime and loudness-matched preference","protect":"intended harmonic colour, attack and mix role","verify":"synthetic analysis plus blind guitar/full-mix A/B","cancel":"if technical gain fails perceptual or stability criteria","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1200-07","source":"CODE-ML-20260917-1200-02","when":"considering OCD companion code reuse","change":"require explicit repository licence and local reproduction","protect":"legal clarity and reproducibility","verify":"licence file, pinned commit and repeatable test","cancel":"while licence or reproduction is unresolved","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20260917-1200-01",
+      "status":"not_run",
+      "factor":"ADAC_integer_LTI_compilation_path",
+      "variants":["unchanged_source_FDN","generated_integer_delay_FAUST","JSON_to_source_round_trip"],
+      "technical_comparison":"no_alignment_no_loudness_adjustment",
+      "listening_copies_loudness_matched":true,
+      "measurements":["complete_MIMO_IR_residual","direct_path_sample","frequency_response","decay","certificate_verdict","latency","target_CPU"],
+      "protected_qualities":["onset","decay","stereo_image","stability"],
+      "cancel_on":["unexplained_timing_offset","residual_above_documented_bound","certificate_disagreement","NaN_or_Inf","deadline_miss"],
+      "strict_override":false
+    },
+    {"id":"EXP-ML-20260917-1200-02","status":"not_run","factor":"ADAC_fractional_delay_path","baseline":"same_FDN_with_integer_delays","measurements":["IR_residual","timing_error","frequency_response","decay"],"loudness_match":false},
+    {"id":"EXP-ML-20260917-1200-03","status":"not_run","factor":"ADAC_RT60_macro_value","variants_seconds":[0.5,1.0,2.0,4.0],"measurements":["Schroeder_RT60","certificate_verdict","peak","artifact_on_change"],"loudness_match":true},
+    {"id":"EXP-ML-20260917-1200-04","status":"not_run","factor":"OCD_nonlinear_solver_model","variants":["reference_simulation","iterative_WDF","explicit_CPWL"],"controls":"same_input_drive_tone_and_antialias_path","measurements":["waveform_error","harmonic_and_alias_energy","runtime","latency"],"protected_qualities":["attack","asymmetry","guitar_playability","full_mix_role"],"loudness_match":true}
+  ],
+  "video_queue": {"new_search_performed":false,"videos_studied":0,"queued_carried_forward":10,"reason":"deep_review_slot_and_permitted_transcripts_unavailable"},
+  "priority_queue": [
+    "S-ML-20260917-0900-03_WildFX_full_review",
+    "S-ML-20260917-0900-01_PolyADAA_code_license_and_reproducibility",
+    "ADAC_fractional_delay_equivalence_test",
+    "OCD_parameter_space_and_hardware_validation",
+    "ten_queued_video_sources_pending_transcript"
+  ],
+  "revised_conclusions": [
+    "ADAC equivalence and stability guarantees narrowed from generic differentiable audio graphs to the demonstrated LTI operator subset.",
+    "ADAC fractional-delay support in current code is not covered by the paper's integer-delay equivalence evidence.",
+    "OCD model's circuit-simulation fit and runtime improvement do not prove alias-free behavior or listener preference."
+  ],
+  "tool_limits": {"consensus":"skipped_known_free_quota_suspension_reset_unknown","scite":"skipped_until_2026-10-01_UTC","citation_check":"partial"},
+  "safety": {"audio_downloaded":false,"user_audio_uploaded":false,"research_code_executed":false,"installer_executed":false,"dsp_changed":false,"project_code_changed":false,"runtime_rules_changed":false,"model_trained":false}
+}
