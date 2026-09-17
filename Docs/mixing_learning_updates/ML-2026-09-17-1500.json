@@ -1,0 +1,120 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-09-17-1500",
+  "mode": "search",
+  "planned_slot": "2026-09-17T15:00:00+03:00",
+  "actual_start": "2026-09-17T14:59:45+03:00",
+  "created_at": "2026-09-17T15:04:46+03:00",
+  "previous_update_id": "ML-2026-09-17-1200",
+  "preceding_search_update_id": "ML-2026-09-17-0900",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "S-ML-20260917-1500-01",
+      "title": "Stability Analysis of Time-Varying Virtual Analog Filters",
+      "authors": ["Russell McClellan"],
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-01/2026-09-04",
+      "discovered_at": "2026-09-17",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_28.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/nzadVise8gmeLmPAFmfe2g",
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_text",
+      "stable_key": "dafx26-paper-28-stability-analysis-time-varying-virtual-analog-filters",
+      "limits": [
+        "linear state-space models",
+        "paper-specific normalisation and trapezoidal discretisation",
+        "BIBO stability does not establish artefact control or preference",
+        "slow musical modulation guarantee left as future work"
+      ]
+    },
+    {
+      "id": "S-ML-20260917-1500-02",
+      "title": "Keyframe Audio via Extrema Sampling",
+      "authors": ["Matthew Nielsen"],
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-01/2026-09-04",
+      "discovered_at": "2026-09-17",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_21.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/TlJDjO6aNmuslUa9Ku9Pmg",
+      "reading_depth": "official_abstract_metadata_only",
+      "status": "queued_for_deep_review"
+    },
+    {
+      "id": "S-ML-20260917-1500-03",
+      "title": "VoiceFX: CLAP-Based Audio Quality Improvement for Singing and Speech",
+      "authors": ["Elena Georgieva"],
+      "publication": "DAFx-26 demo",
+      "publication_date": "2026-09-01/2026-09-04",
+      "discovered_at": "2026-09-17",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_62.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/vj4oZEp1rjwjq9i55ZeE9A",
+      "reading_depth": "official_abstract_metadata_only",
+      "status": "queued_for_deep_review"
+    },
+    {
+      "id": "S-ML-20260917-1500-04",
+      "title": "Real-Time Neural Audio on Apple Silicon: Benchmarking Inference Frameworks Under Realistic DAW Contention",
+      "authors": ["Dharanipathi Rathna Kumar Balasubramaniam", "Joseph Timoney"],
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-01/2026-09-04",
+      "discovered_at": "2026-09-17",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_16.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/rBxXewYH3YxRTiGXqSabwQ",
+      "reading_depth": "official_abstract_metadata_only",
+      "status": "queued_for_deep_review"
+    }
+  ],
+  "deduplication": [
+    {
+      "id": "DEDUP-ML-20260917-1500-01",
+      "title": "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements: An Approach and Dataset",
+      "duplicate_url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_30.pdf",
+      "canonical_lineage": "arXiv:2606.18573 / ML-2026-09-14-0900",
+      "match_basis": ["normalized_title", "authors", "version_lineage"],
+      "counted_as_independent_evidence": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260917-1500-01","claim":"Frozen-setting pole stability does not imply stability under arbitrary parameter switching.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high_within_model"},
+    {"id":"KC-ML-20260917-1500-02","claim":"A common quadratic Lyapunov function can be preserved by the paper's bounded trapezoidal discretisation.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high_within_assumptions"},
+    {"id":"KC-ML-20260917-1500-03","claim":"The studied SVF and Sallen-Key families have time-varying stability guarantees over the stated bounded ranges.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high_within_model"},
+    {"id":"KC-ML-20260917-1500-04","claim":"The studied linearised Moog and diode ladders require restricted simultaneous-modulation ranges; adjacent alternating-endpoint counterexamples are unstable.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high_within_model"},
+    {"id":"KC-ML-20260917-1500-05","claim":"BIBO stability is independent of zipper noise, aliasing, CPU deadline and listener preference.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high"},
+    {"id":"KC-ML-20260917-1500-06","claim":"Paper-normalised resonance bounds are proof coordinates, not transferable creative presets.","source_ids":["S-ML-20260917-1500-01"],"confidence":"high"},
+    {"id":"KC-ML-20260917-1500-07","claim":"Keyframe Audio requires full review before any transient-preservation claim is transferred to rock editing.","source_ids":["S-ML-20260917-1500-02"],"confidence":"abstract_only"},
+    {"id":"KC-ML-20260917-1500-08","claim":"Embedding recommendation and listener preference can disagree; the reported VoiceFX direction remains abstract-only pending methods review.","source_ids":["S-ML-20260917-1500-03"],"confidence":"abstract_only"}
+  ],
+  "rule_candidates": [
+    {"id":"R-ML-20260917-1500-01","when":"recursive filter parameters are automated or modulated","change":"require common-certificate evidence or bounded trajectory stress testing","protect":["bounded output","session safety"],"verify":["state growth","output growth","NaN/Inf"],"cancel_if":["unbounded growth","non-finite output"],"confidence":"high_within_exact_model","auto_apply":false},
+    {"id":"R-ML-20260917-1500-02","when":"transferring a published stability range","change":"pin topology, normalisation, discretisation, sample rate, precision and parameter mapping","protect":["validity of guarantee"],"verify":["implementation audit","coefficient bounds"],"cancel_if":["mapping mismatch","unsupported nonlinearity"],"confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1500-03","when":"validating time-varying control","change":"test static, smooth, bounded-random and alternating-endpoint trajectories separately","protect":["musical envelope","boundedness"],"verify":["trajectory log","state/output envelope"],"cancel_if":["trajectory-induced instability"],"confidence":"medium_high","auto_apply":false},
+    {"id":"R-ML-20260917-1500-04","when":"a filter passes a stability test","change":"retain separate artefact, aliasing, real-time and blind-preference gates","protect":["attack","tone","workflow reliability"],"verify":["spectral artefacts","CPU deadline","loudness-matched blind test"],"cancel_if":["audible or runtime regression"],"confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1500-05","when":"using a published normalised parameter bound","change":"treat it only as a reproduction coordinate, never a creative preset","protect":["intent","implementation validity"],"verify":["parameter mapping documentation"],"cancel_if":["hardware or topology mismatch"],"confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-1500-06","when":"an embedding or metric recommends enhancement","change":"preserve unchanged candidate and require human comparison","protect":["naturalness","transients","intended character"],"verify":["loudness-matched blind preference"],"cancel_if":["listeners prefer unchanged or hear artefacts"],"confidence":"medium_abstract_supported","auto_apply":false}
+  ],
+  "video_source_cards": [
+    {"id":"QVID-ML-20260917-1500-01","title":"COMPLETE Drum Mix Walkthrough (Rock)","channel":"Hardcore Music Studio","published":"2020-08-11","url":"https://www.youtube.com/watch?v=dGKvBzyvRLY","reading_depth":"metadata_only","status":"queued_source","reason":"permitted_transcript_unavailable_no_conclusions"},
+    {"id":"QVID-ML-20260917-1500-02","title":"Masterclass: Mixing Rock Drums with Mike Major","channel":"SonicScoop","published":"2019-09-04","url":"https://www.youtube.com/watch?v=H6lw3Nxbbno","reading_depth":"metadata_only","status":"queued_source","reason":"permitted_transcript_unavailable_no_conclusions"},
+    {"id":"QVID-ML-20260917-1500-03","title":"How to Mix Rock/Metal Drum Rooms","channel":"House of Rock Academy","published":"2022-12-14","url":"https://www.youtube.com/watch?v=6ACicAmxs_w","reading_depth":"metadata_only","status":"queued_source","reason":"permitted_transcript_unavailable_no_conclusions"}
+  ],
+  "reference_cards": [],
+  "experiments": [
+    {"id":"EXP-ML-20260917-1500-01","title":"Time-varying filter trajectory matrix","status":"not_run","baseline":"static midpoint","single_factor":"parameter trajectory","variants":["slow smooth sweep","bounded random","alternating endpoints"],"loudness_match":"technical pass none; separate listening renders matched","measurements":["state/output growth","pole snapshots","NaN/Inf","true peak","latency","CPU"],"protected_qualities":["bounded output","attack","spectral intent","no zipper/explosion"],"cancel_if":["unbounded growth","non-finite output","deadline miss","audible regression without benefit"]},
+    {"id":"EXP-ML-20260917-1500-02","title":"Keyframe Audio versus OLA/WSOLA/PV","status":"not_run","baseline":"unchanged and standard OLA","single_factor":"time-stretch algorithm","loudness_match":"yes for listening renders","measurements":["transient timing","spectral contrast","phase/coherence","CPU"],"cancel_if":["groove or transient damage","saturation","worse preference"]},
+    {"id":"EXP-ML-20260917-1500-03","title":"CLAP recommendation versus listener choice","status":"not_run","baseline":"unchanged","single_factor":"recommended remedy","loudness_match":"yes","measurements":["embedding score","artefact flags","blind preference"],"cancel_if":["naturalness loss","listener preference for baseline"]},
+    {"id":"EXP-ML-20260917-1500-04","title":"Neural inference under target DAW contention","status":"not_run","baseline":"isolated benchmark","single_factor":"DAW/plugin contention","loudness_match":"not applicable","measurements":["deadline misses","tail latency","CPU","buffer size","model architecture"],"cancel_if":["unsupported hardware transfer","non-reproducible load"]}
+  ],
+  "queue": [
+    "S-ML-20260917-0900-03",
+    "S-ML-20260917-1500-02",
+    "S-ML-20260917-1500-04",
+    "S-ML-20260917-1500-03",
+    "S-ML-20260917-0900-01",
+    "13 queued YouTube sources",
+    "ADAC fractional-delay equivalence",
+    "OCD parameter-space and measured-hardware validation"
+  ],
+  "counts": {"source_cards":4,"full_text_sources":1,"abstract_metadata_only_sources":3,"knowledge_cards":8,"rule_candidates":6,"video_source_cards":3,"studied_videos":0,"queued_videos_total":13,"reference_cards":0,"experiments_not_run":4,"duplicates_mapped":1},
+  "safety": {"audio_downloaded":false,"audio_experiments_run":false,"model_training_claimed":false,"project_code_changed":false,"dsp_changed":false,"runtime_rules_changed":false}
+}
