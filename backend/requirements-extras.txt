@@ -1,0 +1,4 @@
+# Optional RAG and mastering integrations.
+-r requirements-core.txt
+chromadb>=0.4.0
+matchering>=2.0.0
