@@ -1,0 +1,144 @@
+{
+  "schema_version": "1.1",
+  "patch_id": "ML-PATCH-2026-09-17-0900",
+  "update_id": "ML-2026-09-17-0900",
+  "created_at": "2026-09-17T09:05:35+03:00",
+  "timezone": "Europe/Moscow",
+  "research_mode": "search",
+  "planned_slot": "2026-09-17T09:00:00+03:00",
+  "actual_start": "2026-09-17T08:59:04+03:00",
+  "previous_update_id": "ML-2026-09-16-1800",
+  "preceding_search_update_id": "ML-2026-09-16-1500",
+  "topic": "nonlinear_antialiasing_real_time_differentiable_dsp_bass_and_loud_rock_bus_processing",
+  "counts": {
+    "source_cards_added": 4,
+    "source_cards_full_text_read": 1,
+    "source_cards_metadata_or_abstract_only": 3,
+    "knowledge_cards_added": 7,
+    "rule_candidates_added": 5,
+    "video_source_cards_added": 4,
+    "videos_studied": 0,
+    "videos_queued_new": 4,
+    "videos_queued_carried_forward": 6,
+    "reference_cards_added": 0,
+    "experiment_plans_added": 4
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260917-0900-01",
+      "title": "PolyADAA: Improving Aliasing Reduction in Memoryless Nonlinearities Using Lagrange Interpolation and Polynomial Approximation",
+      "authors": ["Leonardo Gabrielli", "Stefano Squartini"],
+      "publication_date": "2026-09",
+      "discovered_at": "2026-09-17T08:59:04+03:00",
+      "venue": "DAFx-26 Cambridge",
+      "kind": "peer_reviewed_conference_paper",
+      "doi": null,
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_47.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/bJcZE8829novO_IxntbV3w",
+      "license": "CC BY 4.0",
+      "read_depth": "full_pdf_all_8_pages_method_experiments_runtime_benchmark_limitations_conclusion_plus_companion_readme",
+      "bounded_summary": "Higher-order Lagrange interpolation plus Chebyshev approximation can reduce measured aliasing for tested tanh and hard-clip nonlinearities, but the useful configuration is frequency-, kernel- and compute-dependent. The work contains no listening test or rock/mastering evaluation.",
+      "implementation_facts_not_presets": {
+        "sample_rate_hz": 48000,
+        "test_signals": "heavily driven sine tones across piano-key frequencies; tanh and hard clip",
+        "lagrange_orders_tested": [2, 3],
+        "chebyshev_orders_tested": [8, 16, 32],
+        "benchmark_cpu": "Intel i7-1360P laptop, Linux",
+        "block_size_samples": 64
+      },
+      "limitations": [
+        "No controlled listening test.",
+        "No musical or rock programme test.",
+        "No oversampling, true-peak or complete mastering-chain comparison.",
+        "Objective SNR cannot establish preferred colour or transient quality.",
+        "Companion repository was not executed and has no explicit standard licence file."
+      ],
+      "code_url": "https://github.com/LOGUNIVPM/PolyADAA",
+      "code_status": "readme_inspected_not_run_license_ambiguous",
+      "citation_check": "partial",
+      "confidence": 0.97
+    },
+    {
+      "id": "S-ML-20260917-0900-02",
+      "title": "Compiling Differentiable Audio Graphs to Real-Time DSP",
+      "authors": ["Facundo Franchino", "Sebastian Jiro Schlecht"],
+      "publication_date": "2026-09",
+      "venue": "DAFx-26 demo",
+      "kind": "conference_demo_paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_61.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/shI7n5mxky_M-9iFrpxXfQ",
+      "read_depth": "official_metadata_and_abstract_only",
+      "status": "queued_source",
+      "unknown_until_deep_review": ["operator coverage", "nonlinear equivalence", "latency and CPU", "stability certificate scope", "code and licence"],
+      "citation_check": "partial",
+      "confidence": 0.58
+    },
+    {
+      "id": "S-ML-20260917-0900-03",
+      "title": "WildFX: A DAW-Powered Pipeline for In-the-Wild Audio FX Graph Modeling",
+      "authors": [],
+      "publication_date": "2026-09",
+      "venue": "DAFx-26",
+      "kind": "conference_paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_56.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/Wa0iqrebqJulEpXKIftRMA",
+      "read_depth": "official_metadata_and_abstract_only",
+      "status": "queued_source",
+      "unknown_until_deep_review": ["dataset provenance", "plugin licences", "render determinism", "train-test leakage", "perceptual evaluation"],
+      "citation_check": "partial",
+      "confidence": 0.52
+    },
+    {
+      "id": "S-ML-20260917-0900-04",
+      "title": "Explicit Wave Digital Model of the Fulltone OCD Pedal Based on Canonical Piecewise-Linear Functions",
+      "authors": ["Riccardo Giampiccolo", "Stefano Polimeno", "Carlo Macri", "Alice Lenoci", "Oliviero Massi", "Alberto Bernardini"],
+      "publication_date": "2026-09",
+      "venue": "DAFx-26",
+      "kind": "conference_paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_24.pdf",
+      "metadata_url": "https://dafx.de/paper-archive/details/FR5oopmtXLuPh9fiskDhrg",
+      "read_depth": "official_metadata_and_abstract_only",
+      "status": "queued_source",
+      "unknown_until_deep_review": ["circuit-validation protocol", "aliasing", "parameter coverage", "perceptual evidence", "code licence"],
+      "citation_check": "partial",
+      "confidence": 0.56
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260917-0900-01","claim":"Alias reduction and preferred nonlinear colour are independent evaluation targets.","evidence":["S-ML-20260917-0900-01"],"confidence":0.99},
+    {"id":"KC-ML-20260917-0900-02","claim":"PolyADAA performance depends jointly on interpolation order, Chebyshev order, kernel and signal frequency.","evidence":["S-ML-20260917-0900-01"],"confidence":0.98},
+    {"id":"KC-ML-20260917-0900-03","claim":"A nonlinear antialias method requires both worst-case probes and real-programme listening.","evidence":["S-ML-20260917-0900-01"],"confidence":0.94},
+    {"id":"KC-ML-20260917-0900-04","claim":"Runtime cost and numerical noise are first-class deployment outcomes.","evidence":["S-ML-20260917-0900-01"],"confidence":0.98},
+    {"id":"KC-ML-20260917-0900-05","claim":"Impulse-response agreement is insufficient evidence for nonlinear graph equivalence.","evidence":["S-ML-20260917-0900-02"],"confidence":0.65},
+    {"id":"KC-ML-20260917-0900-06","claim":"DAW-rendered FX graph datasets require provenance, licence, determinism and leakage audits.","evidence":["S-ML-20260917-0900-03"],"confidence":0.68},
+    {"id":"KC-ML-20260917-0900-07","claim":"Code availability without an explicit licence is not integration permission.","evidence":["S-ML-20260917-0900-01"],"confidence":0.99}
+  ],
+  "rule_candidates": [
+    {"id":"R-ML-20260917-0900-01","source":"S-ML-20260917-0900-01","when":"evaluating clipping or saturation","change":"measure alias energy separately from colour, peak reduction and loudness-matched preference","protect":"transient shape and intended harmonic character","verify":"synthetic probes plus blind real-programme A/B","cancel":"if metric gain does not survive listening or changes intended colour","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-0900-02","source":"S-ML-20260917-0900-01","when":"selecting nonlinear antialias topology","change":"test high-frequency probes and licensed rock material","protect":"cymbal grain, guitar/bass texture, attack","verify":"alias/harmonic analysis and blind A/B","cancel":"if either synthetic or musical test fails","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-0900-03","source":"S-ML-20260917-0900-01","when":"considering real-time deployment","change":"profile CPU, latency and numerical edge cases on target hardware","protect":"real-time stability and latency budget","verify":"stress test at target sample rate/block size","cancel":"on deadline misses, NaN/Inf or unstable output","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-0900-04","source":"S-ML-20260917-0900-01","when":"configuring PolyADAA candidates","change":"treat kernel/N/K/LUT as experimental variables, not genre presets","protect":"audible quality and compute budget","verify":"one-factor sweeps","cancel":"if a simpler topology is equivalent","confidence":"high","auto_apply":false},
+    {"id":"R-ML-20260917-0900-05","source":"S-ML-20260917-0900-01","when":"reusing companion code","change":"require explicit licence and local reproduction before integration","protect":"legal clarity and reproducibility","verify":"licence file, pinned commit, repeatable benchmark","cancel":"while any condition is unresolved","confidence":"high","auto_apply":false}
+  ],
+  "video_source_cards": [
+    {"id":"V-ML-20260917-0900-01","video_id":"qQzRy1WLF0A","title":"Mixing Bass Guitar With Slate Digital Plug Ins","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=qQzRy1WLF0A","published":"2024-01-10","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]},
+    {"id":"V-ML-20260917-0900-02","video_id":"8vG1-FMtOTs","title":"Kick and Bass Low End Mixing Tricks","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=8vG1-FMtOTs","published":"2018-05-07","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]},
+    {"id":"V-ML-20260917-0900-03","video_id":"qXAI_axY8sw","title":"SPIRITBOX Holy Roller Mix Bus Processing","channel":"URM Academy","url":"https://www.youtube.com/watch?v=qXAI_axY8sw","published":"2021-10-26","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]},
+    {"id":"V-ML-20260917-0900-04","video_id":"B6rOWwAO0qo","title":"Mastering Compression Basics in Cubase","channel":"Nail The Mix / URM","url":"https://www.youtube.com/watch?v=B6rOWwAO0qo","published":"2016-01-22","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260917-0900-01","status":"not_run","factor":"nonlinear_antialias_topology","variants":["unchanged","ordinary_clip","4x_oversampled_clip","ADAA","PolyADAA"],"loudness_match":true,"measurements":["alias_to_harmonic_energy","passband_change","peak_and_true_peak","latency","target_device_cpu"],"protected_qualities":["attack","cymbal_grain","guitar_bass_texture","density","preference"]},
+    {"id":"EXP-ML-20260917-0900-02","status":"not_run","factor":"PolyADAA_interpolation_order","baseline":"fixed_transfer_curve_and_kernel","loudness_match":true},
+    {"id":"EXP-ML-20260917-0900-03","status":"not_run","factor":"Chebyshev_order_or_LUT","baseline":"fixed_PolyADAA_topology","measurements":["alias_floor","numerical_noise","cpu"]},
+    {"id":"EXP-ML-20260917-0900-04","status":"not_run","factor":"synthetic_probe_vs_real_programme_ranking","baseline":"same_processor_variants","loudness_match":true}
+  ],
+  "priority_queue": [
+    "S-ML-20260917-0900-02",
+    "S-ML-20260917-0900-01_code_reproducibility",
+    "S-ML-20260917-0900-04",
+    "S-ML-20260917-0900-03",
+    "ten_queued_video_sources_pending_transcript"
+  ],
+  "tool_limits": {"consensus":"skipped_known_free_quota_suspension_reset_unknown","scite":"skipped_until_2026-10-01_UTC","citation_check":"partial"},
+  "safety": {"audio_downloaded":false,"user_audio_uploaded":false,"dsp_changed":false,"code_changed":false,"runtime_rules_changed":false,"model_trained":false}
+}
