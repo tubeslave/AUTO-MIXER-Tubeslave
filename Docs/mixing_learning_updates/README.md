@@ -30,6 +30,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-16-1200 | [Report](ML-2026-09-16-1200.md), [JSON patch](ML-2026-09-16-1200.json) | Deep review of cross-adaptive masking EQ and phase topology: 2 reviewed sources, 1 implementation audit, 8 Knowledge Cards, 7 candidate rules, 2 carried queued videos, 4 unrun experiments |
 | ML-2026-09-16-1500 | [Report](ML-2026-09-16-1500.md), [JSON patch](ML-2026-09-16-1500.json) | Search: 1 full-text FFT-DRC source, 1 abstract-only DAFx-26 source, 0 studied and 4 new queued drum videos, 1 rights-constrained multitrack catalogue, 5 Knowledge Cards, 4 candidate rules, 4 unrun experiments; 4 duplicates removed |
 | ML-2026-09-16-1800 | [Report](ML-2026-09-16-1800.md), [JSON patch](ML-2026-09-16-1800.json) | Deep review: 1 DAFx-26 source upgraded from abstract-only to full text plus official companion evaluation, 8 Knowledge Cards, 7 candidate rules, 6 carried queued videos, 4 unrun experiments; stereo-rock/perceptual/compute limits recorded |
+| ML-2026-09-17-0900 | [Report](ML-2026-09-17-0900.md), [JSON patch](ML-2026-09-17-0900.json) | Search: 1 full-text DAFx-26 nonlinear-antialiasing source, 3 abstract-only queued sources, 7 Knowledge Cards, 5 candidate rules, 0 studied and 4 new queued videos, 4 unrun experiments; no new reference card |
 
 ## Dynamics package: publication and safety
 
@@ -67,9 +68,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-16-1800 (`deep_review`, preceding search `ML-2026-09-16-1500`): separate early reflections from the late field, but do not treat the split as a creative pre-delay preset. `RT60`, initial late energy and spatial/channel covariance are independent descriptors. Match objective room metrics and musical preference separately; reject single-slope tails on multi-slope rooms and keep SMA artifact compensation tied to the original array domain. Next test: `EXP-ML-20260916-1800-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-17-0900 (`search`, preceding search `ML-2026-09-16-1500`): evaluate nonlinear antialiasing separately from harmonic colour, peak control, loudness and blind preference. PolyADAA settings are experimental variables, not rock presets; require target-device CPU/latency and numerical-stability checks. Companion code remains non-integrable until its licence and reproduction are clear. Next test: `EXP-ML-20260917-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-16-1800 (`deep_review`, preceding search `ML-2026-09-16-1500`): separate early reflections from the late field, but do not treat the split as a creative pre-delay preset. `RT60`, initial late energy and spatial/channel covariance are independent descriptors. Match objective room metrics and musical preference separately; reject single-slope tails on multi-slope rooms and keep SMA artifact compensation tied to the original array domain. Next test: `EXP-ML-20260916-1800-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-16-1500 (`search`, preceding search `ML-2026-09-16-0900`): do not treat FFT compression as merely multiband compression with more bands. Expose analysis and reconstruction parameters, preserve an unchanged baseline, and judge gain-map fit, artifacts and preference separately. Cambridge multitracks require contributor-specific permission for AI training or automated dataset use. Next test: `EXP-ML-20260916-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
