@@ -32,6 +32,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-16-1800 | [Report](ML-2026-09-16-1800.md), [JSON patch](ML-2026-09-16-1800.json) | Deep review: 1 DAFx-26 source upgraded from abstract-only to full text plus official companion evaluation, 8 Knowledge Cards, 7 candidate rules, 6 carried queued videos, 4 unrun experiments; stereo-rock/perceptual/compute limits recorded |
 | ML-2026-09-17-0900 | [Report](ML-2026-09-17-0900.md), [JSON patch](ML-2026-09-17-0900.json) | Search: 1 full-text DAFx-26 nonlinear-antialiasing source, 3 abstract-only queued sources, 7 Knowledge Cards, 5 candidate rules, 0 studied and 4 new queued videos, 4 unrun experiments; no new reference card |
 | ML-2026-09-17-1200 | [Report](ML-2026-09-17-1200.md), [JSON patch](ML-2026-09-17-1200.json) | Deep review: 2 queued DAFx-26 sources upgraded to full text, 2 companion-code audits, 10 Knowledge Cards, 7 candidate rules, 10 carried queued videos, 4 unrun experiments; LTI, version-drift, aliasing and licence limits recorded |
+| ML-2026-09-17-1500 | [Report](ML-2026-09-17-1500.md), [JSON patch](ML-2026-09-17-1500.json) | Search: 1 full-text DAFx-26 stability source, 3 abstract/metadata-only sources, 8 Knowledge Cards, 6 candidate rules, 0 studied and 3 new queued drum videos, 4 unrun experiments; 1 duplicate/version mapping |
 
 ## Dynamics package: publication and safety
 
@@ -69,9 +70,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-17-1200 (`deep_review`, preceding search `ML-2026-09-17-0900`): ADAC's demonstrated equivalence and stability guarantees cover its tested LTI graph/operator subset, not nonlinear or time-varying mix processing. Pin the compiler version and test direct paths, absolute timing and the current fractional-delay branch independently. For the OCD model, separate circuit fit, aliasing, runtime and loudness-matched preference; companion-code integration remains blocked by its missing repository licence. Next test: `EXP-ML-20260917-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-17-1500 (`search`, preceding search `ML-2026-09-17-0900`): frozen-setting pole stability does not prove safety under automation or modulation. Pin topology, parameter mapping, discretisation, sample rate and precision; test smooth and adversarial trajectories. Treat BIBO stability, artefacts, aliasing, real-time load and loudness-matched preference as separate gates. Next test: `EXP-ML-20260917-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-17-1200 (`deep_review`, preceding search `ML-2026-09-17-0900`): ADAC's demonstrated equivalence and stability guarantees cover its tested LTI graph/operator subset, not nonlinear or time-varying mix processing. Pin the compiler version and test direct paths, absolute timing and the current fractional-delay branch independently. For the OCD model, separate circuit fit, aliasing, runtime and loudness-matched preference; companion-code integration remains blocked by its missing repository licence. Next test: `EXP-ML-20260917-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-17-0900 (`search`, preceding search `ML-2026-09-16-1500`): evaluate nonlinear antialiasing separately from harmonic colour, peak control, loudness and blind preference. PolyADAA settings are experimental variables, not rock presets; require target-device CPU/latency and numerical-stability checks. Companion code remains non-integrable until its licence and reproduction are clear. Next test: `EXP-ML-20260917-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
