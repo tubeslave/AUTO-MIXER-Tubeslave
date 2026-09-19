@@ -1,0 +1,136 @@
+{
+  "schema_version": "mixing-learning-update-v1",
+  "report_id": "ML-2026-09-19-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-09-19T12:00:00+03:00",
+  "actual_start": "2026-09-19T11:58:06+03:00",
+  "completed_at": "2026-09-19T12:02:00+03:00",
+  "previous_report_id": "ML-2026-09-19-0900",
+  "previous_search_report_id": "ML-2026-09-19-0900",
+  "previous_report_library_ids": {
+    "markdown": "libfile_8b159da7ef648191964a0fa7b6947382",
+    "json": "libfile_d908332b0298819185139d24913cbd93"
+  },
+  "citation_check": "partial",
+  "changes": {
+    "source_cards_added": 1,
+    "source_cards_updated": 1,
+    "code_artifact_cards_updated": 1,
+    "knowledge_cards": 10,
+    "rule_candidates": 8,
+    "video_source_cards": 0,
+    "reference_cards": 0,
+    "experiments": 4,
+    "duplicates_removed": 0
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260919-0900-01",
+      "operation": "update",
+      "title": "Beyond Dry References: Learning Relative Audio Effects Representations via Contrastive Distance Learning",
+      "arxiv_id": "2608.10573v1",
+      "doi": "10.48550/arXiv.2608.10573",
+      "url": "https://arxiv.org/html/2608.10573",
+      "reading_depth": "full_text_equations_protocol_tables_ablations_bidirectional_limits_ethics",
+      "review_status": "deep_reviewed",
+      "key_revision": "The headline base model is hybrid differential-plus-absolute fusion; the published ablations do not isolate pure relative fusion.",
+      "protocol_limits": [
+        "best of seven restarts selected by ground-truth multi-resolution STFT loss",
+        "100 samples per instrument with no confidence intervals or paired significance test",
+        "no controlled listening test",
+        "evaluation retains Fx-Normalization and a controlled differentiable chain",
+        "unseen production graphs and mixture attribution untested"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "S-ML-20260919-1200-01",
+      "operation": "add",
+      "title": "ST-ITO: Controlling Audio Effects for Style Transfer with Inference-Time Optimization",
+      "arxiv_id": "2410.21233v1",
+      "doi": "10.48550/arXiv.2410.21233",
+      "url": "https://arxiv.org/html/2410.21233",
+      "reading_depth": "full_substantive_method_training_benchmark_objective_subjective_results_discussion_limits",
+      "role": "independent_primary_comparator_not_replication",
+      "bounded_conclusion": "Effect-aware objectives can guide optimization, but learned similarity alone does not establish preference; simple rule-based methods can remain competitive on simple styles and guitar-tone matching is a reported failure mode.",
+      "citation_check": "partial"
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "CODE-ML-20260919-0900-02",
+      "operation": "update",
+      "repository": "https://github.com/IsaacYQH/WildFX",
+      "revision": "061e204e2c3b516b1216865bbfeddc6403984a48",
+      "reading_depth": "render_helpers_graph_conversion_core_tests_reaper_integration_tests_preset_validation_tail_handling",
+      "executed": false,
+      "positive_checks": [
+        "non-finite final renders rejected and partial output removed",
+        "float output and weighted mixing tested",
+        "deterministic fixture preparation tested",
+        "sidechain and splitter REAPER integration cases present",
+        "silent and non-finite preset candidates rejected"
+      ],
+      "remaining_gaps": [
+        "no direct-versus-layered sample null test",
+        "RMS activity is not parameter or graph correctness",
+        "no explicit true-peak loudness latency-compensation or state-recall gate",
+        "default three-second tail is not measured decay completion",
+        "repository license unspecified"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260919-1200-01","claim":"RelFx Base is hybrid relative-plus-absolute fusion.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-02","claim":"The single-branch ablation does not isolate the causal contribution of pure relative fusion.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-03","claim":"Architectural antisymmetry is not processor invertibility.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-04","claim":"Ground-truth restart selection is oracle reranking and must be separated from deployable selection.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-05","claim":"Median benchmark gains without uncertainty or listening tests do not establish rock-mix preference.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-06","claim":"Dry-reference-free training does not imply dry-free or topology-free deployment validation.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-07","claim":"Learned effect similarity can be optimized without guaranteeing superior listener judgement.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-08","claim":"WildFX current tests reject several invalid-output classes and should not be described as load-only.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-09","claim":"Non-silent RMS is an activity gate, not a render-equivalence gate.","confidence":"high"},
+    {"id":"KC-ML-20260919-1200-10","claim":"A fixed render tail must not substitute for measured decay completion.","confidence":"medium_high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260919-1200-01","when":"evaluating a relative effect target","change":"separate hybrid, pure-difference and absolute baselines","protect":["causal attribution","source role","section context"],"verify":["same capacity","same training budget","blind preference"],"cancel":["confounded ablation","content leakage"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-02","when":"using multi-start FX optimization","change":"report deployable and oracle-reranked selection separately","protect":["deployment realism","repeatability"],"verify":["oracle regret by song and section"],"cancel":["unstable selector","objective-only gain"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-03","when":"using antisymmetric embeddings","change":"treat negation as a hypothesis only","protect":["transients","tails","noise","phase"],"verify":["actual inversion render","artifact test"],"cancel":["non-invertible effect","audible residue"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-04","when":"promoting an embedding metric","change":"require song-level dispersion and loudness-matched blind listening","protect":["musical preference","section continuity"],"verify":["paired results","Dmitry evaluation"],"cancel":["no reproducible preference"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-05","when":"optimizing effect similarity","change":"retain independent signal and musical-role gates","protect":["true peak","mono","transients","role hierarchy"],"verify":["explicit metrics and listening"],"cancel":["metric gaming"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-06","when":"accepting a layered render","change":"null-test against the equivalent direct graph","protect":["routing","gain","sidechain","latency","tails"],"verify":["time-aligned residual"],"cancel":["unexplained residual"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-07","when":"rendering time-based effects offline","change":"end by measured activity or decay with a hard maximum","protect":["complete tails","bounded runtime"],"verify":["tail energy","audible cutoff"],"cancel":["false early stop","runaway duration"],"confidence":"medium_high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1200-08","when":"considering WildFX integration","change":"require license pinned environment and equivalence tests","protect":["legal compatibility","reproducibility","signal integrity"],"verify":["license file","fixed revision","offline tests"],"cancel":["missing license","state drift"],"confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260919-1200-01","status":"not_run","title":"oracle versus deployable restart selection","baseline":"select best of seven by ground-truth STFT loss","variant":"select best by inference-available embedding objective","one_changed_factor":"restart selection rule","loudness_match":true,"measure":["oracle regret","parameter error","sample peak","true peak","section and integrated loudness","crest","mono residual","section continuity","Dmitry blind preference"],"cancel":["invalid output","selection instability","objective-only gain","protected-quality loss"]},
+    {"id":"EXP-ML-20260919-1200-02","status":"not_run","title":"hybrid versus pure relative representation","baseline":"absolute single-input","variants":["RelFx-style hybrid","pure antisymmetric difference"],"one_changed_factor":"fusion representation","loudness_match":true,"measure":["deployably selected transfer loss","retrieval","parameter error","content leakage","seed uncertainty","blind preference"],"cancel":["capacity mismatch","no reproducible advantage","role damage"]},
+    {"id":"EXP-ML-20260919-1200-03","status":"not_run","title":"WildFX direct versus layered equivalence","baseline":"direct REAPER graph","variant":"layered WildFX execution","one_changed_factor":"execution path","loudness_match":"not applied to null measurement; required for any listening comparison","measure":["time-aligned null residual","impulse response","sidechain envelope","sample peak","true peak","loudness","phase","tail","deterministic replay"],"cancel":["unexplained residual","offset","wrong gain","sidechain mismatch","non-finite or silent output","state drift"]},
+    {"id":"EXP-ML-20260919-1200-04","status":"not_run","title":"fixed versus activity-ended tail","baseline":"fixed three-second tail","variant":"activity or decay ended tail with hard maximum","one_changed_factor":"tail stopping policy","loudness_match":true,"measure":["truncated energy","decay curve","final active sample","duration","wall time","audible cutoff"],"cancel":["false early stop","runaway duration","nondeterministic end","audible damage"]}
+  ],
+  "video": {"searched":false,"studied":0,"queued_total":18},
+  "reference_cards_added": 0,
+  "multitracks_added": 0,
+  "queue": [
+    "VoiceFX full paper",
+    "PolyADAA code license and reproduction",
+    "RelFx public code release uncertainty and deployable selector",
+    "WildFX direct-versus-layered execution after license clarification",
+    "ADAC fractional-delay equivalence",
+    "OCD hardware and parameter-space validation",
+    "corrected Two-Stage script or author revision",
+    "InstructFX2FX license lockfile and true parameter freeze",
+    "18 videos awaiting permitted transcripts"
+  ],
+  "safety": {
+    "audio_downloaded": false,
+    "audio_uploaded": false,
+    "audio_rendered": false,
+    "code_executed": false,
+    "dsp_changed": false,
+    "runtime_rules_changed": false,
+    "model_trained": false,
+    "paid_services_used": false
+  },
+  "handoff": "Do not call the current RelFx winner purely relative: it is a hybrid of difference and absolute processed-state features. Compare oracle reranking with a deployable selector. For WildFX retain invalid-output tests but require direct-versus-layered null equivalence and measured tail completion."
+}
