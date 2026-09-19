@@ -1,0 +1,314 @@
+{
+  "schema_version": "mixing-learning-update-v1",
+  "report_id": "ML-2026-09-19-0900",
+  "mode": "search",
+  "planned_slot": "2026-09-19T09:00:00+03:00",
+  "actual_start": "2026-09-19T09:01:12+03:00",
+  "completed_at": "2026-09-19T09:05:59+03:00",
+  "previous_report_id": "ML-2026-09-18-1800",
+  "previous_search_report_id": "ML-2026-09-18-1500",
+  "previous_report_library_ids": {
+    "markdown": "libfile_ffe9d626d97c819193f8d7bac22b2677",
+    "json": "libfile_7390cbda6f3881918060434a2950c709"
+  },
+  "previous_search_library_ids": {
+    "markdown": "libfile_9002616f6718819197cf5727738b33f5",
+    "json": "libfile_04d891a56fc88191b13c6077ca7195c6"
+  },
+  "citation_check": "partial",
+  "changes": {
+    "source_cards_added": 1,
+    "source_cards_updated": 1,
+    "code_artifact_cards": 2,
+    "knowledge_cards": 12,
+    "rule_candidates": 8,
+    "video_source_cards": 2,
+    "reference_cards": 0,
+    "experiments": 4,
+    "duplicates_removed": 4
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260919-0900-01",
+      "title": "Beyond Dry References: Learning Relative Audio Effects Representations via Contrastive Distance Learning",
+      "short_name": "RelFx",
+      "publication": "arXiv preprint",
+      "published_at": "2026-08-11",
+      "discovered_at": "2026-09-19",
+      "arxiv_id": "2608.10573v1",
+      "doi": "10.48550/arXiv.2608.10573",
+      "license": "CC BY 4.0 for paper",
+      "url": "https://arxiv.org/html/2608.10573",
+      "abstract_url": "https://arxiv.org/abs/2608.10573",
+      "project_url": "https://relative-fx.github.io",
+      "repository_url": "https://github.com/relative-fx/relative-fx",
+      "reading_depth": "full_text_methods_training_data_results_ablations_limitations_and_ethics",
+      "code_executed": false,
+      "audio_downloaded": false,
+      "review_status": "fully_read_paper_code_claim_audited_separately",
+      "method": {
+        "representation": "ordered-pair relative effect transformation",
+        "frontend": "log-mel STFT n_fft 2048 hop 512 64 mel bins 50-18000 Hz",
+        "architecture": "weight-shared dual-branch CNN14 with cross-attention differential gating and 128-dimensional projection",
+        "training_audio": [
+          "6447 mixed tracks / 2681 songs / 185.9 h licensed internal collection",
+          "2585 stems / 240 songs / 156.4 h MoisesDB"
+        ],
+        "pairing": "adjacent non-overlapping 10-second clips from the same structural section",
+        "effect_chain": "EQ distortion multiband compressor gain stereo imager limiter delay reverb",
+        "effect_parameters": "72 continuous plus 8 activation switches",
+        "evaluation": "MUSDB18; 100 samples per instrument; seven random restarts; up to 200 iterations; median multi-resolution STFT loss"
+      },
+      "bounded_findings": [
+        "relative ordered-pair representations can be trained without a dry reference and improved the paper's objective style-transfer metric under its protocol",
+        "same-section cross-segment pairing was central: removing it improved retrieval but degraded style-transfer loss by 34 percent",
+        "retrieval accuracy and style-transfer loss can move in opposite directions and are not interchangeable validation targets",
+        "the bidirectional variant approximately preserved sign reversal and partial composition in embedding space"
+      ],
+      "limitations": [
+        "no controlled listening test",
+        "no dense-rock full-mix evaluation",
+        "objective multi-resolution STFT loss does not establish production preference",
+        "models overall transformations rather than source-specific effects within mixtures",
+        "unseen chain orders and real production chains were not evaluated",
+        "the training compute and internal licensed collection are not available for project reproduction"
+      ],
+      "confidence": "medium_high_for_relative_representation_under_reported_protocol_low_for_automatic_rock_mix_adoption"
+    },
+    {
+      "id": "S-ML-20260917-0900-03",
+      "title": "WildFX: A DAW-Powered Pipeline for In-the-Wild Audio FX Graph Modeling",
+      "publication": "DAFx-26 proceedings",
+      "published_at": "2026-09-01",
+      "discovered_at": "2026-09-17",
+      "reviewed_at": "2026-09-19",
+      "license": "CC BY 4.0 for paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_56.pdf",
+      "official_record": "https://dafx.de/paper-archive/details/Wa0iqrebqJulEpXKIftRMA",
+      "repository_url": "https://github.com/IsaacYQH/WildFX",
+      "reading_depth": "full_eight_page_paper_methods_schema_pipeline_compatibility_experiments_results_limitations_plus_repository_readme_dependency_and_test_inventory",
+      "code_executed": false,
+      "audio_downloaded": false,
+      "review_status": "existing_queue_source_promoted_to_fully_read",
+      "method": {
+        "renderer": "Dockerized REAPER on Linux controlled through reapy/ReaScript",
+        "formats": ["VST", "VST3", "LV2", "CLAP", "bridged Windows plugins"],
+        "graph_scope": "acyclic one-sink graphs with constrained sidechains splitters sends gains and layered decomposition",
+        "compatibility_test": "96 Linux VST3 plugins; loading tests for pedalboard and WildFX; isolated one-second 44.1 kHz 512-sample renders for DawDreamer",
+        "datasets": "two Slakh2100-derived sets, each 5000 train and 270 validation projects",
+        "estimator_training": "four settings trained once for 30000 steps"
+      },
+      "bounded_findings": [
+        "the metadata schema explicitly represents plugins parameters gains main/control edges sidechains and graph structure",
+        "layered scheduling provides a practical dependency-respecting renderer for the supported DAG subset",
+        "the pipeline loaded all 96 tested Linux VST3 plugins whereas the two Python alternatives had failures or silent outputs",
+        "the generated data were usable for an initial blind graph-estimation experiment"
+      ],
+      "limitations": [
+        "plugin loading is not proof of correct or musically meaningful processing",
+        "other formats and bridged Windows plugins were not included in the 96-plugin comparison",
+        "REAPER headless control has no built-in error reporting and every pipeline step was manually checked in a GUI before deployment",
+        "supported graphs are constrained DAGs rather than unrestricted DAW routing",
+        "layered speedup was not benchmarked",
+        "the graph estimator used a five-plugin proof-of-concept inventory, one run per setting and a much smaller training budget than prior work",
+        "node error rates remained high and no listening test was reported"
+      ],
+      "confidence": "medium_high_for_supported_graph_generation_low_for_audio_correctness_without_independent_render_validation"
+    }
+  ],
+  "code_artifact_cards": [
+    {
+      "id": "CODE-ML-20260919-0900-01",
+      "parent_source_id": "S-ML-20260919-0900-01",
+      "title": "RelFx public project repository availability audit",
+      "repository_url": "https://github.com/relative-fx/relative-fx",
+      "repository_commit": "2327f46a4ffbf40b3e2c93430ee5d50d4f57bdf2",
+      "reading_depth": "repository_metadata_root_inventory_and_demo_site_structure",
+      "code_executed": false,
+      "audio_downloaded": false,
+      "findings": [
+        "the paper says source code is available at the project site",
+        "the visible public repository contains only index.html and an audio demo directory",
+        "no model source training code README lockfile or license file is visible",
+        "the public artifact is currently a demo site and does not support independent method reproduction"
+      ],
+      "license_status": "no_repository_license_visible",
+      "reproducibility": "not_verified"
+    },
+    {
+      "id": "CODE-ML-20260919-0900-02",
+      "parent_source_id": "S-ML-20260917-0900-03",
+      "title": "WildFX repository availability audit",
+      "repository_url": "https://github.com/IsaacYQH/WildFX",
+      "repository_commit": "061e204e2c3b516b1216865bbfeddc6403984a48",
+      "reading_depth": "repository_metadata_root_inventory_readme_requirements_and_test_inventory",
+      "code_executed": false,
+      "findings": [
+        "Python source Docker/devcontainer setup sample metadata and two test modules are public",
+        "requirements are version-pinned including CPU-only torch wheels for the declared platforms",
+        "README treats nonzero exit partial batches and missing outputs as errors and adds a default three-second tail for delay echo and reverb layers",
+        "no repository license file or GitHub license identification is visible",
+        "REAPER plugin and source-dataset licenses remain separate prerequisites and were not exercised"
+      ],
+      "license_status": "no_repository_license_visible",
+      "reproducibility": "inspectable_not_executed"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260919-0900-01","claim":"an ordered pair can represent the relative effect change even when neither member is truly dry","source_ids":["S-ML-20260919-0900-01"],"confidence":"medium_high"},
+    {"id":"KC-ML-20260919-0900-02","claim":"reference pairing must preserve musical section context because cross-section content differences can dominate effect differences","source_ids":["S-ML-20260919-0900-01"],"confidence":"high_within_reported_protocol"},
+    {"id":"KC-ML-20260919-0900-03","claim":"effect retrieval accuracy is not a substitute for style-transfer fit and can improve while transfer worsens","source_ids":["S-ML-20260919-0900-01"],"confidence":"high_within_reported_ablation"},
+    {"id":"KC-ML-20260919-0900-04","claim":"multi-resolution STFT loss measures signal fit but not musical preference production quality or preserved role","source_ids":["S-ML-20260919-0900-01"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-05","claim":"a mixture-level relative effect representation does not identify which source inside the mix should change","source_ids":["S-ML-20260919-0900-01"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-06","claim":"unseen processor order and real production chains require explicit out-of-distribution validation","source_ids":["S-ML-20260919-0900-01"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-07","claim":"a paper's source-code claim must be checked against the actual repository contents and license","source_ids":["CODE-ML-20260919-0900-01"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-08","claim":"graph labels must preserve processor order routing edge type sidechain role and linear gain to permit reconstruction","source_ids":["S-ML-20260917-0900-03"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-09","claim":"successful plugin loading does not establish non-silent finite correctly routed or musically valid output","source_ids":["S-ML-20260917-0900-03"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-10","claim":"headless DAW automation needs explicit error detection rendered-output validation and watchdog recovery","source_ids":["S-ML-20260917-0900-03","CODE-ML-20260919-0900-02"],"confidence":"high"},
+    {"id":"KC-ML-20260919-0900-11","claim":"a constrained layered graph decomposition must be tested for render equivalence to the intended routing","source_ids":["S-ML-20260917-0900-03"],"confidence":"medium_high"},
+    {"id":"KC-ML-20260919-0900-12","claim":"single-run graph-estimation results on a five-plugin inventory are initial pipeline validation not a production-capability certificate","source_ids":["S-ML-20260917-0900-03"],"confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260919-0900-01","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260919-0900-01"],"when_apply":"matching a processed reference when a dry target is unavailable","instrument_section":"same-role source and same song section","change":"test an ordered-pair relative transformation target against the existing absolute target","proposed_range":"representation choice only; no source-derived parameter preset","protect":["instrument role","section identity","transients","stereo image","gain structure"],"verify":"objective fit signal safety and loudness-matched blind preference as separate endpoints","cancel":"content shortcut collateral source change or no repeatable preference benefit","confidence":"medium"},
+    {"id":"RULE-ML-20260919-0900-02","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260919-0900-01"],"when_apply":"constructing relative effect references","instrument_section":"verse chorus bridge or other explicit section","change":"pair adjacent or demonstrably similar clips within one structural section","proposed_range":"10-second windows are paper-specific and not adopted as a project default","protect":["articulation","arrangement density","role continuity"],"verify":"content similarity and section labels before effect comparison","cancel":"different section role or activity dominates the comparison","confidence":"medium_high"},
+    {"id":"RULE-ML-20260919-0900-03","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260919-0900-01"],"when_apply":"evaluating an effect representation","instrument_section":"all tested sources and sections","change":"report retrieval transfer fit signal safety and listening preference separately","proposed_range":"evaluation design only","protect":["metric interpretation","musical intent"],"verify":"no single metric is used as a quality proxy","cancel":"conclusions reverse across endpoints","confidence":"high"},
+    {"id":"RULE-ML-20260919-0900-04","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260919-0900-01"],"when_apply":"using a mixture-level effect target","instrument_section":"dense full mix","change":"require stem or role localization before modifying source-specific processors","proposed_range":"no parameter change until attribution is resolved","protect":["unrelated sources","lead hierarchy","kick-bass foundation","snare body"],"verify":"isolated and full-mix residuals","cancel":"target cannot identify the responsible source","confidence":"high"},
+    {"id":"RULE-ML-20260919-0900-05","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260917-0900-03"],"when_apply":"accepting a plugin into automated rendering","instrument_section":"renderer validation corpus","change":"require non-silent finite level-bounded deterministic test renders in addition to load success","proposed_range":"dry impulse noise tone and licensed music checks; thresholds defined by test fixture","protect":["signal integrity","tails","latency","routing"],"verify":"waveform and metadata assertions plus manual spot audit","cancel":"silence NaN clipping state mismatch or nondeterministic output","confidence":"high"},
+    {"id":"RULE-ML-20260919-0900-06","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260917-0900-03"],"when_apply":"serializing or reconstructing an effect graph","instrument_section":"track bus send and sidechain graph","change":"record exact order main/control edge type channel count linear gain parameter state and plugin version","proposed_range":"complete provenance record","protect":["routing semantics","gain staging","sidechain timing"],"verify":"round-trip graph equality and render null test","cancel":"missing edge state ambiguous plugin or unmatched channel layout","confidence":"high"},
+    {"id":"RULE-ML-20260919-0900-07","status":"candidate","auto_apply":false,"source_ids":["S-ML-20260917-0900-03"],"when_apply":"using layered rendering for a supported DAG","instrument_section":"parallel sends splitters sidechains and return buses","change":"compare layered render with an equivalent direct in-DAW render","proposed_range":"one topology at a time","protect":["phase","latency","automation","effect tails","gain"],"verify":"time-aligned residual and loudness-matched audition","cancel":"non-null routing error tail truncation or changed sidechain behavior","confidence":"medium_high"},
+    {"id":"RULE-ML-20260919-0900-08","status":"candidate","auto_apply":false,"source_ids":["CODE-ML-20260919-0900-01","CODE-ML-20260919-0900-02"],"when_apply":"considering research code or demo assets for project use","instrument_section":"software and dataset supply chain","change":"require an explicit repository license compatible asset rights pinned revision and offline reproducible path","proposed_range":"integration gate","protect":["legal clarity","privacy","cost control","reproducibility"],"verify":"license inventory clean environment and no-upload test","cancel":"missing license commercial plugin dependency unclear audio rights or paid requirement","confidence":"high"}
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260919-0900-01",
+      "title": "DRUM MIXING with FX Joe Carrell - FREE Multitracks",
+      "channel": "Produce Like A Pro",
+      "presenter": "Joe Carrell",
+      "published_at": "2024-04-11",
+      "discovered_at": "2026-09-19",
+      "url": "https://www.youtube.com/watch?v=wSNdwTi6xsc",
+      "official_companion_url": "https://producelikeapro.com/blog/drum-mixing-with-fx-joe-carrell/",
+      "content_access": "youtube_metadata_plus_official_companion_article_no_transcript",
+      "transcript": "unavailable_through_permitted_tools",
+      "status": "queued_source",
+      "video_studied": false,
+      "companion_context_only": [
+        "article describes dry drum master parallel compression parallel distortion and separately fed fake-room returns",
+        "article describes short long and experimental reverb/delay auxiliaries followed by optional EQ/compression",
+        "no spoken numerical settings or timestamps were available for verification"
+      ],
+      "conclusions_extracted_from_video": false,
+      "priority": "high"
+    },
+    {
+      "id": "VID-ML-20260919-0900-02",
+      "title": "Mixing With a Mono Drum Room Mic",
+      "channel": "URM Academy / Nail The Mix",
+      "presenter": "Joel Wanasek",
+      "published_at": null,
+      "discovered_at": "2026-09-19",
+      "url": "https://www.youtube.com/watch?v=vc_eZurxpL0",
+      "official_companion_url": "https://urm.academy/nail-mix-previews/mixing-mono-drum-room-mic/",
+      "content_access": "youtube_metadata_plus_official_companion_topic_list_no_transcript",
+      "transcript": "unavailable_through_permitted_tools",
+      "status": "queued_source",
+      "video_studied": false,
+      "companion_context_only": [
+        "official page identifies mono drum-room tone and bombastic snare-room construction as topics",
+        "page also lists snare replacement editing low-end multiband control and dense-metal synth integration",
+        "the page does not expose the demonstrated settings or full reasoning"
+      ],
+      "conclusions_extracted_from_video": false,
+      "priority": "high"
+    }
+  ],
+  "video_studied_count": 0,
+  "video_queue_count": 18,
+  "video_search_performed": true,
+  "reference_cards": [],
+  "multitracks_added": [],
+  "deduplication": [
+    {"key":"arxiv:2608.05442","title":"Diff2Mix","action":"discarded_existing_source"},
+    {"key":"arxiv:2609.02835","title":"Understanding Automatic Mixing","action":"discarded_existing_source"},
+    {"key":"arxiv:2606.22005","title":"InstructFX2FX","action":"discarded_existing_source_and_versions_merged"},
+    {"key":"normalized_title:wildfx_a_daw_powered_pipeline_for_in_the_wild_audio_fx_graph_modeling","action":"updated_existing_card_not_counted_as_new"}
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260919-0900-01",
+      "status": "not_run",
+      "title": "Relative versus absolute effect target",
+      "baseline": "existing absolute or dry-reference target representation",
+      "variant": "RelFx-style ordered-pair relative target",
+      "one_changed_factor": "target representation",
+      "controls": ["same licensed rock stems","same source and target sections","same fixed differentiable chain","same initialization restarts and optimization budget","loudness-matched output"],
+      "measurements": ["multi-resolution STFT fit","parameter error where ground truth exists","sample and true peak","integrated and section loudness","crest","stereo correlation","mono residual","section consistency","Dmitry blind preference"],
+      "protect": ["kick-bass foundation","snare attack and body","rhythm-guitar mass","lead hierarchy","ambience continuity","transient density"],
+      "cancel": ["invalid or silent output","metric-only gain without preference","source-role leakage","worse transients mono or section continuity"]
+    },
+    {
+      "id": "EXP-ML-20260919-0900-02",
+      "status": "not_run",
+      "title": "Section-context sensitivity for relative targets",
+      "baseline": "same-section adjacent reference pair",
+      "variant": "different-section reference pair",
+      "one_changed_factor": "reference section relationship",
+      "controls": ["same song","same instrument or full mix","same effect transformation","same chain and optimizer","loudness matched"],
+      "measurements": ["embedding distance","transfer loss","parameter delta","section residual","blind preference"],
+      "protect": ["arrangement role","activity pattern","articulation","section contrast"],
+      "cancel": ["content change dominates effect estimate","inconsistent direction across songs","worse preference"]
+    },
+    {
+      "id": "EXP-ML-20260919-0900-03",
+      "status": "not_run",
+      "title": "WildFX layered-render equivalence",
+      "baseline": "direct in-DAW render of one supported graph",
+      "variant": "WildFX layer-decomposed render of the same graph",
+      "one_changed_factor": "execution path",
+      "controls": ["same plugins versions parameters stems routing gains sample rate and tail","time alignment before residual analysis","no automatic normalization"],
+      "measurements": ["sample-aligned null residual","peak and true peak","loudness","latency","tail length","sidechain envelope","phase and stereo correlation","CPU and wall time","Dmitry loudness-matched blind preference"],
+      "protect": ["routing semantics","sidechain timing","parallel phase","tails","gain structure"],
+      "cancel": ["missing output","non-finite samples","routing mismatch","tail truncation","unexplained non-null residual"]
+    },
+    {
+      "id": "EXP-ML-20260919-0900-04",
+      "status": "not_run",
+      "title": "Plugin load versus signal-integrity gate",
+      "baseline": "compatibility decision from plugin load success",
+      "variant": "load plus deterministic signal-integrity validation",
+      "one_changed_factor": "acceptance gate",
+      "controls": ["same plugin inventory","same pinned environment","same impulse noise tone and licensed-music fixtures","same parameter preset"],
+      "measurements": ["load and render success","silence","finite samples","expected activity","peak bounds","tail","latency","repeat-render residual","state recall"],
+      "protect": ["signal safety","determinism","privacy","license boundaries"],
+      "cancel": ["false acceptance of silent or invalid renderer","nondeterministic state","commercial dependency without license"]
+    }
+  ],
+  "priority_queue": [
+    "S-ML-20260919-0900-01_RelFx_code_release_listening_evaluation_and_dense_rock_transfer",
+    "S-ML-20260917-1500-03_VoiceFX_full_review",
+    "S-ML-20260917-0900-01_PolyADAA_code_license_and_reproducibility",
+    "WildFX_independent_layered_render_equivalence_and_license_status",
+    "ADAC_fractional_delay_equivalence_test",
+    "OCD_hardware_and_parameter_space_validation",
+    "TwoStage_corrected_script_output_or_author_revision",
+    "InstructFX2FX_license_lockfile_and_parameter_freeze_revision",
+    "eighteen_queued_video_sources_pending_permitted_transcripts"
+  ],
+  "tool_limits": [
+    "Consensus free access unresolved and not retried",
+    "Scite free limit reset stated for 2026-10-01 UTC and not retried",
+    "no paid services used",
+    "no external model weights downloaded",
+    "YouTube transcripts unavailable for the two selected candidates"
+  ],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "repository_code_changed": false,
+    "active_rules_changed": false,
+    "audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "model_training_claimed": false
+  },
+  "handoff": "Treat relative FX targets as a candidate representation, not a preset: keep section and source role matched, and separate transfer fit from signal safety and blind preference. For headless graph rendering, plugin load success is insufficient; validate routing, gains, sidechains, tails, finite output and deterministic replay."
+}
