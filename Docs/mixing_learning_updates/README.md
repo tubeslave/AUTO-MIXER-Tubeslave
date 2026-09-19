@@ -34,6 +34,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-17-1200 | [Report](ML-2026-09-17-1200.md), [JSON patch](ML-2026-09-17-1200.json) | Deep review: 2 queued DAFx-26 sources upgraded to full text, 2 companion-code audits, 10 Knowledge Cards, 7 candidate rules, 10 carried queued videos, 4 unrun experiments; LTI, version-drift, aliasing and licence limits recorded |
 | ML-2026-09-17-1500 | [Report](ML-2026-09-17-1500.md), [JSON patch](ML-2026-09-17-1500.json) | Search: 1 full-text DAFx-26 stability source, 3 abstract/metadata-only sources, 8 Knowledge Cards, 6 candidate rules, 0 studied and 3 new queued drum videos, 4 unrun experiments; 1 duplicate/version mapping |
 | ML-2026-09-17-1800 | [Report](ML-2026-09-17-1800.md), [JSON patch](ML-2026-09-17-1800.json) | Deep review: 2 queued DAFx-26 sources upgraded to full text, 2 companion-code audits, 11 Knowledge Cards, 8 candidate rules, 13 carried queued videos, 4 unrun experiments; sparse-reconstruction and target-host deployment limits recorded |
+| ML-2026-09-19-0900 | [Report](ML-2026-09-19-0900.md), [JSON patch](ML-2026-09-19-0900.json) | Search: 1 new full-text RelFx source, 1 queued WildFX source upgraded to full review, 2 repository audits, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued drum/room videos, 4 unrun experiments; 4 duplicates removed |
 
 ## Dynamics package: publication and safety
 
@@ -71,9 +72,11 @@ ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain
 
 ## Latest handoff
 
-ML-2026-09-17-1800 (`deep_review`, preceding search `ML-2026-09-17-1500`): keyframe stretching is a creative low-compute candidate, not a transparent editor; separate unity sparse-reconstruction colour from stretching and reject haze, repeated splices or vocal/consonant damage. Do not approve neural inference from isolated RTF: require target-DAW tail callback timing, xruns, equivalent streaming state and asynchronous-underrun logging. Next test: `EXP-ML-20260917-1800-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
+ML-2026-09-19-0900 (`search`, preceding successful search `ML-2026-09-18-1500`): treat relative FX targets as a candidate representation, not a preset. Match source role and section, and separate transfer fit from signal safety and loudness-matched preference. For headless graph rendering, plugin load success is insufficient: validate routing, gains, sidechains, tails, finite output and deterministic replay. Next test: `EXP-ML-20260919-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ## Previous latest handoffs
+
+ML-2026-09-17-1800 (`deep_review`, preceding search `ML-2026-09-17-1500`): keyframe stretching is a creative low-compute candidate, not a transparent editor; separate unity sparse-reconstruction colour from stretching and reject haze, repeated splices or vocal/consonant damage. Do not approve neural inference from isolated RTF: require target-DAW tail callback timing, xruns, equivalent streaming state and asynchronous-underrun logging. Next test: `EXP-ML-20260917-1800-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-17-1500 (`search`, preceding search `ML-2026-09-17-0900`): frozen-setting pole stability does not prove safety under automation or modulation. Pin topology, parameter mapping, discretisation, sample rate and precision; test smooth and adversarial trajectories. Treat BIBO stability, artefacts, aliasing, real-time load and loudness-matched preference as separate gates. Next test: `EXP-ML-20260917-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
