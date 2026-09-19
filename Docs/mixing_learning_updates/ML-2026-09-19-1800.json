@@ -1,0 +1,204 @@
+{
+  "schema_version": "mixing-learning-update-v1",
+  "report_id": "ML-2026-09-19-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-09-19T18:00:00+03:00",
+  "actual_start": "2026-09-19T18:02:40+03:00",
+  "completed_at": "2026-09-19T18:15:09+03:00",
+  "previous_report_id": "ML-2026-09-19-1500",
+  "previous_search_report_id": "ML-2026-09-19-1500",
+  "previous_report_library_ids": {
+    "markdown": "libfile_01d88dd7f27881918ef236f492fac254",
+    "json": "libfile_5e397ed6c820819190fb7b6643f8f3a6"
+  },
+  "citation_check": "partial",
+  "changes": {
+    "source_cards_updated": 2,
+    "implementation_audit_cards_added": 2,
+    "knowledge_cards": 12,
+    "rule_candidates": 8,
+    "video_source_cards": 0,
+    "reference_cards": 0,
+    "experiments": 4,
+    "duplicates_removed": 0
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260919-1500-02",
+      "operation": "update",
+      "title": "FDN Sandbox: Real-Time Experimentation and Analysis of FDNs",
+      "authors": ["Alexandre St-Onge", "Gary Scavone"],
+      "publication": "DAFx-26 demo paper",
+      "publication_date": "2026-09-04",
+      "discovered_date": "2026-09-19",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_68.pdf",
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_text_architecture_analysis_metrics_optimization_methods_loss_definitions_performance_table_limits_references",
+      "review_status": "full_text_reviewed",
+      "bounded_conclusion": "FDN Sandbox is useful for inspectable analysis and optimization of the implemented FDN, but its visual metrics, a synthetic-RIR example and average block timings do not establish perceptual preference, measured-room generalization or target-host real-time safety.",
+      "methods": [
+        "actual sfFDN implementation evaluated rather than a differentiable proxy",
+        "nine optimization methods including finite-difference gradient and derivative-free methods",
+        "colorless objective combines spectral-flatness target 0.56 with sparsity regularization",
+        "RIR matching optimizes ten RT60 bands ten tone-correction gains and one global gain using EDR and EDC"
+      ],
+      "limits": [
+        "flatness target 0.56 is an empirical random-noise heuristic rather than a perceptual threshold",
+        "flatness alone can coexist with low echo density",
+        "target RIR example is synthetic and no held-out measured-room set is reported",
+        "no controlled listening test",
+        "no numeric cross-method RIR-match table or multi-seed convergence analysis",
+        "average 128-sample timings on one Intel i9-12900K do not establish p99 p99.9 max xruns allocation-free execution or M3 Max DAW safety"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "S-ML-20260919-1500-03",
+      "operation": "update",
+      "title": "Shimmer Reverberation with Nonlinear Feedback Delay Networks",
+      "authors": ["Gloria Dal Santo", "Xiaojie Pi", "Karolina Prawda", "Sebastian J. Schlecht", "Vesa Välimäki"],
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-04",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_05.pdf",
+      "official_record": "https://dafx.de/paper-archive/details/tLDBzbMbZN8aoERSiwvSpg",
+      "repository": "https://github.com/gdalsanto/delay-network-reverbs",
+      "reading_depth": "full_text_assumptions_five_operators_energy_tests_fdn_configuration_spectrograms_cost_limits_references",
+      "review_status": "full_text_reviewed",
+      "license_note": "paper PDF states CC BY 4.0 while White Rose metadata states CC-BY 2.5; discrepancy retained",
+      "bounded_conclusion": "Nonlinear and time-varying loop operators are credible creative shimmer mechanisms, but approximate energy preservation is not a peak or stability guarantee and the published demonstrations do not validate rock-mix preference, 48-kHz alias control or real-time host safety.",
+      "methods": [
+        "controllable full-wave rectification with first-order antiderivative antialiasing",
+        "signal-dependent fractional delay",
+        "ring modulation",
+        "ring-buffer time compression and expansion",
+        "granular time modification",
+        "energy-ratio evaluation on 336 minutes of random MoisesDB stems using 100-ms nonsilent windows"
+      ],
+      "limits": [
+        "nonlinear spectral redistribution means the intended frequency-dependent T60 is not strictly preserved",
+        "CFWR and SDFD show visible aliasing even in the 96-kHz demonstration",
+        "DC blocking and adaptive makeup alter low-frequency decay and can add gain modulation",
+        "ring modulation and time modification need extra attenuation for short strongly recirculating configurations",
+        "ring-buffer and granular methods trade distortion against latency and smearing",
+        "no controlled MUSHRA ABX or rock-mix listening test",
+        "compute comparison counts mainly multiplications and is not a CPU latency benchmark",
+        "companion audio page was unavailable and examples were not reviewed"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "CODE-ML-20260919-1800-01",
+      "operation": "add",
+      "repository": "https://github.com/Segfault1602/sfFDN",
+      "revision": "6a029317cba6d64016e8a021ba2b5c03239b87aa",
+      "license": "MIT",
+      "reading_depth": "README_CMake_tests_benchmarks_callback_latency_nonlinear_headers_nonlinear_tests_dependency_declarations",
+      "executed": false,
+      "positive_checks": [
+        "explicit MIT license",
+        "modular library with unit and performance fixtures",
+        "callback-latency utility present",
+        "finite and energy-behavior tests present for implemented nonlinear blocks"
+      ],
+      "remaining_gaps": [
+        "current main implements three of the five paper operators: CFWR SDFD and ring modulation",
+        "time-compression and granular implementations were not found",
+        "float32 antialias epsilon is 1e-5 rather than the paper's 1e-8",
+        "some test dependencies use moving master tags",
+        "no musical preference true-peak or target-DAW safety validation"
+      ]
+    },
+    {
+      "id": "CODE-ML-20260919-1800-02",
+      "operation": "add",
+      "repository": "https://github.com/Segfault1602/FDNSandbox",
+      "revision": "b74a33dcb04e116af8e84eaa70b85c030864fbad",
+      "license": "project_license_not_found_in_inspected_root",
+      "reading_depth": "README_CMake_dependency_pins_directory_tests_license_inspection",
+      "executed": false,
+      "positive_checks": [
+        "most dependencies are revision-pinned",
+        "hardening and Debug ASAN configuration are present",
+        "a specific sfFDN revision is pinned"
+      ],
+      "remaining_gaps": [
+        "pinned sfFDN revision 594f85e909081b17da3cb9bb46385419c419f02c differs from current main",
+        "no root project license was found; only a ClearSans Apache license file surfaced",
+        "app-level automated tests were not found in inspected main",
+        "no release artifact or reproduced build",
+        "integration blocked pending license clarification and reproducible target-host validation"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260919-1800-01","claim":"EDR EDC RT60 flatness and echo density are distinct diagnostics and none alone establishes preference.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-02","claim":"FDN Sandbox flatness target 0.56 is a study-specific random-noise heuristic rather than a psychoacoustic threshold.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-03","claim":"Spectral flatness requires an echo-density or sparsity guard because a sparse tail can still appear spectrally flat.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-04","claim":"A synthetic-RIR EDR fit does not establish measured-room generalization or rock-section usefulness.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-05","claim":"Mean block time on one CPU does not replace target-host callback tails xruns allocations and multi-instance testing.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-06","claim":"A linear FDN target fit must be revalidated after inserting any nonlinear or time-varying loop operator.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-07","claim":"Approximate energy preservation is not a sample-peak true-peak BIBO-stability or internal-state guarantee.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-08","claim":"DC blockers and adaptive makeup alter low-frequency decay and may add gain modulation.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-09","claim":"Nonlinear spectral redistribution prevents strict preservation of a prescribed frequency-dependent T60.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-10","claim":"Visible CFWR and SDFD aliasing at 96 kHz requires separate 48-kHz and oversampling or ADAA validation.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-11","claim":"Longer pitch-shift periods can reduce distortion while increasing latency and transient smearing.","confidence":"high"},
+    {"id":"KC-ML-20260919-1800-12","claim":"Implementation subset revision and license constrain applicability: current sfFDN covers three of five methods and the Sandbox application license is unresolved.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260919-1800-01","source":["S-ML-20260919-1500-02","S-ML-20260919-1500-03"],"when":"evaluating a reverberation tail","change":"use EDR EDC RT60 flatness and echo density as separate diagnostics rather than approval","range_or_numbers":"no universal threshold; study-specific flatness target 0.56 must not be exported","protect":["direct attack","early reflections","mono","section contrast"],"verify":["raw metrics","loudness-matched blind preference"],"cancel":["metric-only improvement","worse transients or mono"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-02","source":"S-ML-20260919-1500-02","when":"matching an FDN to an RIR","change":"hold direct and early paths fixed and optimize the late tail separately","range_or_numbers":"paper optimizes 10 RT60 bands plus 10 tone gains and global gain; structure is source-specific","protect":["direct timing","early-reflection identity","attack"],"verify":["synthetic and measured targets","multiple seeds","unchanged baseline"],"cancel":["unstable convergence","early-path damage","no measured-target transfer"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-03","source":"S-ML-20260919-1500-02","when":"comparing FDN optimizers","change":"hold bounds renderer evaluation budget and seeds constant","range_or_numbers":"no preset ranges exported","protect":["causal attribution","reproducibility"],"verify":["per-seed dispersion","same compute budget"],"cancel":["budget mismatch","non-repeatable ranking"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-04","source":"S-ML-20260919-1500-02","when":"claiming real-time suitability","change":"test the pinned build in the target DAW host and interface","range_or_numbers":"buffers 64 128 and 256; report p50 p99 p99.9 max and xruns","protect":["audio continuity","tail continuity","thermal headroom"],"verify":["single and multiple instances","allocation audit"],"cancel":["deadline miss","audio-thread allocation","tail truncation"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-05","source":"S-ML-20260919-1500-03","when":"trying nonlinear shimmer in rock","change":"use a dedicated send in selected sections rather than an automatic insert","range_or_numbers":"paper delays 71 to 400 ms and T60 2.0 to 0.5 s are demonstration parameters not presets","protect":["dry attack","lyrics","groove","lead hierarchy"],"verify":["section-aware A/B","mono","Dmitry blind preference"],"cancel":["transient smear","lyric masking","metallic buildup","lost contrast"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-06","source":"S-ML-20260919-1500-03","when":"placing a nonlinear operator in an FDN loop","change":"reserve attenuation margin and monitor raw internal peak DC and long-run state","range_or_numbers":"R 0.995 and tau 50 ms are 96-kHz study values only; not portable presets","protect":["stability","headroom","low-frequency decay"],"verify":["sample and true peak","DC","NaN Inf","long-run stress"],"cancel":["runaway","non-finite state","DC drift","true-peak overs"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-07","source":"S-ML-20260919-1500-03","when":"using CFWR or SDFD at 48 kHz","change":"compare native rate against oversampling and a suitable antialias method at matched transfer intent","range_or_numbers":"test native 2x and 4x; first-order ADAA for CFWR candidate","protect":["transients","brightness","CPU deadline"],"verify":["alias energy","latency","p99.9 CPU","blind preference"],"cancel":["audible aliasing","changed pitch or decay","deadline miss","no repeatable preference"],"confidence":"medium_high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-08","source":["CODE-ML-20260919-1800-01","CODE-ML-20260919-1800-02"],"when":"considering FDN code reuse","change":"pin and audit only the licensed implemented sfFDN subset; treat absent methods as unavailable","range_or_numbers":"current audited sfFDN implements 3 of 5 paper operators","protect":["licensing","reproducibility","semantic equivalence"],"verify":["revision pin","license record","build and fixture audit"],"cancel":["unclear project license","revision drift","missing operator","unreproduced build"],"confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260919-1800-01","status":"not_run","title":"linear FDN tail versus one nonlinear loop operator","baseline":"pinned linear FDN tail","variant":"same matrix delays attenuation direct and early path with one CFWR or SDFD block","one_changed_factor":"nonlinear loop operator","material":"licensed dense-rock drum-room excerpt plus a vocal or guitar sustain section","loudness_match":"preserve raw render for safety and create a separate perceptually matched listening copy","measure":["sample peak","true peak","internal peak","DC","NaN Inf","bandwise T60 and EDR delta","alias residual","latency","mono","section continuity","Dmitry blind preference"],"protect":["drum attack","low end","vocal intelligibility","guitar density","groove","natural tail"],"cancel":["runaway or non-finite state","true-peak overs beyond budget","DC or low-end shift","audible alias or metallic ring","transient smear","lyric masking","mono damage","no repeatable preference"]},
+    {"id":"EXP-ML-20260919-1800-02","status":"not_run","title":"48-kHz antialias strategy for nonlinear shimmer","baseline":"native-rate nonlinear block","variants":["2x oversampling","4x oversampling","first-order ADAA for CFWR at matched transfer intent"],"one_changed_factor":"antialias strategy","loudness_match":"separate listening copies; raw output retained","measure":["alias-band energy","sample and true peak","T60 shift","latency","p99 p99.9 CPU","xruns","Dmitry blind preference"],"protect":["pitch intent","decay intent","transients","brightness","CPU budget"],"cancel":["changed intended pitch or decay","deadline miss","no repeatable perceptual benefit"]},
+    {"id":"EXP-ML-20260919-1800-03","status":"not_run","title":"FDN RIR fitting with preference kept separate","baseline":"unchanged initial FDN configuration","variants":["analysis-synthesis initialization","finite-difference optimization"],"one_changed_factor":"fitting method","controls":"same budget seeds and renderer; direct and early paths fixed; synthetic and measured targets separate","loudness_match":"yes for blind listening only","measure":["EDC and EDR error","RT60 bands","echo density","flatness","sparsity","peaks","convergence dispersion","Dmitry blind preference"],"protect":["direct timing","early reflections","transients","mono"],"cancel":["metric-only gain","seed instability","transient or mono damage","early-late attribution error"]},
+    {"id":"EXP-ML-20260919-1800-04","status":"not_run","title":"target-host real-time sfFDN stress test","baseline":"pinned sfFDN size 8 single instance","variants":["size 16","size 32","multiple instances","buffers 64 128 and 256 in separate blocks"],"one_changed_factor":"FDN size or instance count within each comparison","environment":"real M3 Max physical interface and target DAW host","loudness_match":"not applicable to runtime qualification; listening remains separate","measure":["p50 p99 p99.9 max callback","xruns","allocations","memory","thermal","latency","tail continuity"],"protect":["audio continuity","tail continuity","host stability"],"cancel":["deadline miss","audio-thread allocation","tail truncation","non-finite state","unpredictable reset"]}
+  ],
+  "video": {
+    "searched": false,
+    "studied": 0,
+    "queued_total": 20,
+    "note": "No broad video search in deep-review mode; queue carried forward unchanged."
+  },
+  "video_source_cards": [],
+  "reference_cards_added": 0,
+  "multitracks_added": 0,
+  "queue": {
+    "carried_video_sources": 20,
+    "companion_audio": {
+      "source": "http://research.spa.aalto.fi/publications/papers/dafx26-shimmer/",
+      "status": "unavailable_during_review",
+      "conclusion": "not reviewed and no subjective conclusion drawn"
+    },
+    "next_literature_action": "continue accumulated queue after the next search report without prioritizing freshness alone"
+  },
+  "revisions": [
+    "EDR EDC and RT60 match no longer imply perceptual approval.",
+    "Approximate energy preservation no longer implies peak safety or universal stability.",
+    "A linear FDN target fit must be revalidated after insertion of nonlinear shimmer processing.",
+    "Published average CPU timings no longer imply target-host real-time qualification.",
+    "Paper-level availability no longer implies that all five operators exist in current sfFDN code."
+  ],
+  "safety": {
+    "audio_downloaded": false,
+    "audio_uploaded_to_third_party": false,
+    "code_executed": false,
+    "paid_services_used": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "active_rules_changed": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "scite": "skipped_until_reported_reset_2026-10-01_UTC",
+    "consensus": "not_retried_after_known_pause"
+  },
+  "handoff": "Do not treat EDR EDC RT60 agreement or approximate energy preservation as proof of a good or safe reverb. Revalidate decay DC internal sample and true peaks after every nonlinear loop operation on raw renders, and use a separate loudness-matched copy for listening. Nonlinear shimmer remains a section-aware send candidate. Current sfFDN covers three of five paper operators; do not integrate the FDNSandbox application until its project license is clear."
+}
