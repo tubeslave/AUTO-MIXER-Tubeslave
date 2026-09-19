@@ -1,0 +1,161 @@
+{
+  "schema_version": "mixing-learning-update-v1",
+  "report_id": "ML-2026-09-19-1500",
+  "mode": "search",
+  "planned_slot": "2026-09-19T15:00:00+03:00",
+  "actual_start": "2026-09-19T15:00:17+03:00",
+  "completed_at": "2026-09-19T15:09:31+03:00",
+  "previous_report_id": "ML-2026-09-19-1200",
+  "previous_search_report_id": "ML-2026-09-19-0900",
+  "previous_report_library_ids": {
+    "markdown": "libfile_8e6f2c222a708191ab8dccc157d984da",
+    "json": "libfile_3cc432b4166c8191a7b3ddd1b79073c4"
+  },
+  "citation_check": "partial",
+  "changes": {
+    "source_cards_added": 3,
+    "code_artifact_cards_added": 2,
+    "knowledge_cards": 11,
+    "rule_candidates": 8,
+    "video_source_cards": 2,
+    "reference_cards": 0,
+    "experiments": 4,
+    "duplicates_removed": 4
+  },
+  "source_cards": [
+    {
+      "id": "S-ML-20260919-1500-01",
+      "operation": "add",
+      "title": "StemFX: Learning Mixing Style Representations via Autoregressive FX Chain Prediction on Source-Separated Stems",
+      "publication_status": "accepted_ISMIR_2026_preprint",
+      "publication_date": "2026-07-17",
+      "discovered_date": "2026-09-19",
+      "arxiv_id": "2607.15634",
+      "doi": "10.48550/arXiv.2607.15634",
+      "url": "https://arxiv.org/html/2607.15634",
+      "reading_depth": "full_methods_tokenization_training_retrieval_transfer_tables_ablations_listening_description_limits_references",
+      "bounded_conclusion": "Variable topology selection is promising under the published four-pseudo-stem protocol, but retrieval and mean similarity gains do not establish a universal rock-mixing rule.",
+      "limits": [
+        "source-separated FMA pseudo-stems with unquantified separation artifacts",
+        "cross-song stems may be harmonically or rhythmically incoherent",
+        "random chains do not model genre-dependent engineering practice",
+        "four broad stems do not represent professional session granularity",
+        "balanced ten-second evaluation windows require every stem to exceed ten percent of total RMS energy",
+        "listener table gives means from twenty production-experienced listeners without confidence intervals paired significance or song-level dispersion",
+        "fixed universal-chain baselines are structurally disadvantaged by unnecessary processors"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "S-ML-20260919-1500-02",
+      "operation": "add",
+      "title": "FDN Sandbox: Real-Time Experimentation and Analysis of FDNs",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_68.pdf",
+      "publication": "DAFx-26_demo",
+      "reading_depth": "abstract_and_selected_architecture_benchmark_optimization_sections",
+      "review_status": "queued_source",
+      "limits": ["not a complete paper or code audit", "timing table uses one Intel i9-12900K", "perceptual validation and target-host tail latency need review"]
+    },
+    {
+      "id": "S-ML-20260919-1500-03",
+      "operation": "add",
+      "title": "Shimmer Reverberation with Nonlinear Feedback Delay Networks",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_05.pdf",
+      "publication": "DAFx-26",
+      "reading_depth": "abstract_and_introduction_only",
+      "review_status": "queued_source",
+      "limits": ["no settings extracted", "stability domain aliasing listening evidence and dense-rock applicability not yet reviewed"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "CODE-ML-20260919-1500-01",
+      "operation": "add",
+      "repository": "https://github.com/barry-mir/stemfx",
+      "revision": "4d7c1b145ced902a77d28d3f390b553378ded8ad",
+      "license": "MIT_code",
+      "reading_depth": "README_package_metadata_public_API_tests_style_transfer_evaluation_latest_commit",
+      "executed": false,
+      "positive_checks": ["installable inference code present", "SCNet source provenance notice declared", "checkpoint-dependent API smoke tests present"],
+      "remaining_gaps": ["checkpoint tests skip without STEMFX_TEST_CKPT", "remote model and separator assets not checked", "evaluation peak-scales summed mixes above 0.95", "no raw true-peak gain or clipping gate", "no paper-number reproduction in this run"]
+    },
+    {
+      "id": "CODE-ML-20260919-1500-02",
+      "operation": "add",
+      "repository": "https://github.com/barry-mir/multiafx",
+      "revision": "4377caab6dbf172cb60de366ef8a3a1e671571f4",
+      "license": "MIT_code",
+      "reading_depth": "README_package_metadata_registry_extreme_parameter_tests_chain_tests",
+      "executed": false,
+      "positive_checks": ["finite float32 wrapper outputs tested at parameter minimum midpoint and maximum", "mono handling serialization and deterministic random-chain construction tested"],
+      "remaining_gaps": ["no true-peak loudness latency tail phase or perceptual tests", "wrapper behavior is not cross-backend semantic equivalence", "empty chain clips to [-1,1] and is not unconditional identity"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260919-1500-01","claim":"FX topology and ordering selection is distinct from parameter tuning inside a fixed chain.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-02","claim":"Retrieval accuracy does not establish mix quality or preference.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-03","claim":"Source-separated pseudo-stems inherit unmeasured separator artifacts.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-04","claim":"Cross-song stem remixing reduces content shortcuts but breaks arrangement coherence.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-05","claim":"Random effect chains do not encode genre- and role-dependent engineering practice.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-06","claim":"Four broad stems are not equivalent to professional session-track granularity.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-07","claim":"Balanced-window evaluation underrepresents sparse and role-changing sections.","confidence":"medium_high"},
+    {"id":"KC-ML-20260919-1500-08","claim":"Mean listener score without paired uncertainty or song dispersion is incomplete evidence.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-09","claim":"Peak scaling before evaluation can hide gain and overload failures.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-10","claim":"Finite-output wrapper tests do not establish effect semantics or production safety.","confidence":"high"},
+    {"id":"KC-ML-20260919-1500-11","claim":"An empty processing chain must be verified as identity; clipping is a transformation.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260919-1500-01","when":"comparing variable and fixed FX topology","change":"hold renderer optimizer device budget and loudness protocol constant","protect":["causal attribution","signal integrity","musical role"],"verify":["one-factor topology comparison","blind preference"],"cancel":["confounded renderer or optimizer","no repeatable advantage"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-02","when":"evaluating a chain representation","change":"report retrieval render safety target similarity and blind preference separately","protect":["interpretability","preference"],"verify":["separate endpoints"],"cancel":["metric substitution"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-03","when":"using pseudo-stem features","change":"gate on separator version leakage role confidence and section activity","protect":["source identity","section role","transients"],"verify":["clean-stem comparator","leakage audit"],"cancel":["separator artifact dominates"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-04","when":"using chains learned from random augmentation","change":"require genre role and section validation","protect":["rock arrangement","processor order","creative intent"],"verify":["licensed rock sessions","Dmitry evaluation"],"cancel":["genre-incoherent processing"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-05","when":"rendering predicted tokens","change":"bind each token to exact backend version unit range and bypass behavior","protect":["parameter meaning","reproducibility"],"verify":["impulse tone and music fixtures"],"cancel":["ambiguous mapping","version drift"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-06","when":"measuring a generated render","change":"preserve raw output for safety and create a separate loudness-matched listening copy","protect":["true peak","gain staging","fair preference"],"verify":["raw and matched reports"],"cancel":["hidden normalization"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-07","when":"using an empty chain as control","change":"require a sample-aligned null within declared tolerance","protect":["identity","headroom","channels"],"verify":["in-range and over-range fixtures"],"cancel":["clipping gain or shape change"],"confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1500-08","when":"considering StemFX or MultiAFx integration","change":"verify model separator dataset and per-track rights plus offline reproducibility","protect":["licensing","privacy","reproducibility"],"verify":["asset cards","fixed revisions","no-upload execution"],"cancel":["unclear rights","unavailable dependency"],"confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260919-1500-01","status":"not_run","title":"learned topology versus fixed universal topology","baseline":"fixed universal neutral-capable chain","variant":"learned variable-length topology","one_changed_factor":"topology selection policy","loudness_match":"separate listening copies; raw safety render preserved","measure":["chain length and order","bypass error","MRSTFT","raw sample peak","true peak","section and integrated loudness","crest","mono residual","latency","tails","Dmitry blind preference"],"protect":["kick-bass relation","snare attack and body","rhythm-guitar foundation","lead hierarchy","ambience continuity","section contrast"],"cancel":["invalid output","topology instability","unwanted distortion or modulation","objective-only gain","worse mono or transients","no repeatable preference"]},
+    {"id":"EXP-ML-20260919-1500-02","status":"not_run","title":"pseudo-stems versus clean session stems","baseline":"separator-derived four stems","variant":"clean licensed stems grouped to the same roles","one_changed_factor":"stem provenance","loudness_match":true,"measure":["leakage","embedding delta","chain delta","parameter delta","rendered residual","role damage","blind preference"],"cancel":["grouping mismatch","unlicensed material","separator leakage dominates","no stable direction"]},
+    {"id":"EXP-ML-20260919-1500-03","status":"not_run","title":"raw render versus peak-conditioned evaluation","baseline":"untouched summed render","variant":"peak-scaled render","one_changed_factor":"pre-metric peak scaling","loudness_match":"only for a separate listening copy","measure":["raw sample peak","true peak","applied gain","MRSTFT","loudness","crest","clipping count","system rank"],"cancel":["non-finite audio","hidden overload","normalization-only ranking reversal"]},
+    {"id":"EXP-ML-20260919-1500-04","status":"not_run","title":"empty-chain identity","baseline":"direct pass-through","variant":"MultiAFx empty chain","one_changed_factor":"empty-chain wrapper","loudness_match":false,"measure":["sample null","gain","clipping count","channel and length change","NaN or Inf","repeatability"],"cancel":["undocumented residual","clipping","gain change","shape change"]}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260919-1500-01","title":"How a Multi-Platinum Mixer Builds a Modern Rock Mix (Step by Step)","channel":"The Mix Academy","url":"https://www.youtube.com/watch?v=BOyyYAsN91Y","published_date":"2025-08-21","reading_depth":"metadata_only_no_permitted_full_transcript","status":"queued_source"},
+    {"id":"VID-ML-20260919-1500-02","title":"Are You Listening? Ep. 3 — Compression in Mastering","channel":"iZotope","url":"https://www.youtube.com/watch?v=IyjlRiNiLBg","published_date":"2019-02-28","reading_depth":"metadata_only_no_permitted_full_transcript","status":"queued_source"}
+  ],
+  "video": {"searched":true,"studied":0,"queued_added":2,"queued_total":20},
+  "deduplication": [
+    "StemFX arXiv and accepted ISMIR listings merged as one work",
+    "StemFX README PyPI and model links treated as one implementation family",
+    "MultiAFx README and PyPI references treated as one artifact",
+    "ST-ITO Diff-MST and Fx-Encoder++ citations already indexed and not counted as new confirmation"
+  ],
+  "reference_cards_added": 0,
+  "multitracks_added": 0,
+  "queue": [
+    "StemFX listener protocol per-song results checkpoint rights and raw-evaluation audit",
+    "VoiceFX full paper",
+    "FDN Sandbox full paper repositories license and target-host benchmark",
+    "nonlinear shimmer reverb full stability aliasing and perceptual review",
+    "PolyADAA code license and reproduction",
+    "RelFx public code uncertainty and deployable selector",
+    "WildFX direct-versus-layered execution after license clarification",
+    "ADAC fractional-delay equivalence",
+    "OCD hardware and parameter-space validation",
+    "corrected Two-Stage script or author revision",
+    "InstructFX2FX license lockfile and true parameter freeze",
+    "20 videos awaiting permitted transcripts"
+  ],
+  "safety": {
+    "audio_downloaded": false,
+    "audio_uploaded": false,
+    "audio_rendered": false,
+    "code_executed": false,
+    "dsp_changed": false,
+    "runtime_rules_changed": false,
+    "model_trained": false,
+    "paid_services_used": false
+  },
+  "handoff": "Treat variable FX topology as a candidate advantage, not a ready chain. Compare topology policies with the same renderer and parameter optimizer, preserve raw output for safety metrics, use a separate loudness-matched listening copy, and null-test every empty-chain control."
+}
