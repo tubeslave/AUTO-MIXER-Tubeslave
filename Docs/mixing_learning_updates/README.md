@@ -36,6 +36,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-17-1800 | [Report](ML-2026-09-17-1800.md), [JSON patch](ML-2026-09-17-1800.json) | Deep review: 2 queued DAFx-26 sources upgraded to full text, 2 companion-code audits, 11 Knowledge Cards, 8 candidate rules, 13 carried queued videos, 4 unrun experiments; sparse-reconstruction and target-host deployment limits recorded |
 | ML-2026-09-19-0900 | [Report](ML-2026-09-19-0900.md), [JSON patch](ML-2026-09-19-0900.json) | Search: 1 new full-text RelFx source, 1 queued WildFX source upgraded to full review, 2 repository audits, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued drum/room videos, 4 unrun experiments; 4 duplicates removed |
 | ML-2026-09-19-1200 | [Report](ML-2026-09-19-1200.md), [JSON patch](ML-2026-09-19-1200.json) | Deep review: RelFx causal/protocol audit, ST-ITO primary comparator and deeper WildFX implementation audit; 10 Knowledge Cards, 8 candidate rules, 18 carried queued videos and 4 unrun experiments; hybrid-fusion and oracle-reranking limits recorded |
+| ML-2026-09-19-1500 | [Report](ML-2026-09-19-1500.md), [JSON patch](ML-2026-09-19-1500.json) | Search: 1 full-text StemFX source, 2 queued DAFx-26 sources, 2 implementation audits, 11 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued videos, 4 unrun experiments; variable-topology and raw-evaluation limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -72,6 +73,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-19-1500 (`search`, preceding successful search `ML-2026-09-19-0900`): treat variable FX topology as a candidate advantage, not a ready chain. Compare topology policies with the same renderer and parameter optimizer, preserve raw output for safety metrics, use a separate loudness-matched listening copy, and null-test every empty-chain control. Next test: `EXP-ML-20260919-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-19-1200 (`deep_review`, preceding search `ML-2026-09-19-0900`): do not call the current RelFx winner purely relative; it mixes differential and absolute processed-state features. Separate oracle-reranked from deployably selected restarts. For WildFX, keep the invalid-output checks but require direct-versus-layered null equivalence and measured tail completion. Next test: `EXP-ML-20260919-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
