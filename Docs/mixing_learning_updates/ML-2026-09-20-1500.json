@@ -1,0 +1,105 @@
+{
+  "update_id": "ML-2026-09-20-1500",
+  "mode": "search",
+  "scheduled_slot": "2026-09-20T15:00:00+03:00",
+  "actual_start": "2026-09-20T14:59:29+03:00",
+  "completed": "2026-09-20T15:04:31+03:00",
+  "preceding_successful_search": "ML-2026-09-20-0900",
+  "preceding_update": "ML-2026-09-20-1200",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260920-1500-01",
+      "title": "Audio-to-Audio via Diffusion Warm Initialization",
+      "authors": ["Cristobal Andrade", "Sebastian J. Schlecht"],
+      "publication": "DAFx-26",
+      "arxiv": "2606.18968",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_50.pdf",
+      "alternate_url": "https://arxiv.org/html/2606.18968",
+      "license": "CC-BY-4.0 article",
+      "reading_depth": "full_text_complete",
+      "finding": "Warm initialization exposes a realism-faithfulness trade-off; the reported tau/JD/FAD region is model-, prompt-, CFG- and task-specific and is supported by informal rather than controlled listening.",
+      "limitations": ["CFG-mismatched FAD reference", "two detailed timbre-transfer directions", "informal listening only", "human-voice and source-removal failures", "no raw peak/gain/transient/mono preference evaluation"]
+    },
+    {
+      "id": "SRC-ML-20260920-1500-02",
+      "title": "Diffusion-Based Music Audio Editing System Using Differentiable Digital Signal Processing Mixture Model",
+      "authors": ["Kengo Takemoto", "Tomohiko Nakamura", "Hiroshi Saruwatari"],
+      "publication": "DAFx-26 demo",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_69.pdf",
+      "official_card": "https://dafx.de/paper-archive/details/pU4J3deBDpTamQ8VW4smzg",
+      "license": "CC-BY-4.0 article",
+      "reading_depth": "full_text_complete",
+      "finding": "Score-informed analysis-by-synthesis exposes source-wise parameters and freezes non-target trajectories, but the demo does not establish waveform-level invariance or robustness beyond two-flute examples.",
+      "limitations": ["score required", "harmonic pitched sources", "two-flute demonstrations", "no controlled listening", "no numeric fidelity table", "no non-target null residual or safety metrics"]
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20260920-1500-01",
+      "name": "Audio-to-Audio via Diffusion Warm Initialization companion artifacts",
+      "url": "https://github.com/CristobalAndrade/Audio-to-Audio-via-Diffusion-Warm-Initialization",
+      "revision": "0ff2bbd289014d077e7a63cfafef536188e23414",
+      "reading_depth": "README_and_complete_demo_manifest_static_audit",
+      "executed": false,
+      "downloaded_audio": false,
+      "root_license": null,
+      "findings": ["HTML demo and audio comparison manifest present", "no executable method code", "no dependency lock", "no root licence", "article licence does not establish rights for every bundled audio asset"],
+      "integration_status": "artifact_only_rights_and_reproducibility_incomplete"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260920-1500-01","claim":"Warm-initialization strength depends jointly on initialization time, noise, prompt, CFG, schedule and model.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-02","claim":"Target-distribution fit and guide-structure preservation are separate axes.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-03","claim":"FAD under mismatched inference settings includes policy mismatch.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-04","claim":"Pitch-set Jaccard distance can miss timing, dynamics, voicing and hallucinated events.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-05","claim":"Informal listening locates hypotheses but does not establish a population preference threshold.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-06","claim":"Explicit diffusion noise may reduce guide fidelity without improving target alignment.","confidence":"medium_high"},
+    {"id":"KC-ML-20260920-1500-07","claim":"The reported source-removal failure blocks generic drum-bleed or stem-removal use.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-08","claim":"Score-informed DDSP editing requires validated score-to-performance alignment.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-09","claim":"Frozen non-target synthesis parameters do not guarantee waveform invariance.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-10","claim":"Reconstruction fidelity must be established before edit attribution.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-11","claim":"Two-flute demonstrations do not establish robustness for dense rock, drums, distortion or unpitched sources.","confidence":"high"},
+    {"id":"KC-ML-20260920-1500-12","claim":"A paper licence does not automatically license bundled audio assets.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260920-1500-01","source":"SRC-ML-20260920-1500-01","when":"testing generative audio transformation","change":"tau_init only","protect":["event count","pitch","rhythm","attacks","gain"],"verify":["raw safety","pitch/onset/event residual","blind preference"],"cancel":["hallucinated or missing events"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-02","source":"SRC-ML-20260920-1500-01","when":"evaluating explicit diffusion noise","change":"lambda only","protect":["guide structure"],"verify":["target fit","guide fidelity","blind preference"],"cancel":["more deviation without preference"],"confidence":"medium_high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-03","source":"SRC-ML-20260920-1500-01","when":"comparing FAD","change":"evaluation policy only","protect":["metric interpretability"],"verify":["matched model, prompt, CFG, count and preprocessing"],"cancel":["cross-policy causal claim"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-04","source":"SRC-ML-20260920-1500-01","when":"drums, bleed removal or section repair","change":"none automatically","protect":["groove","hits","ambience"],"verify":["retained and removed-source residuals"],"cancel":["persistence, substitution or new events"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-05","source":"SRC-ML-20260920-1500-02","when":"score-informed editing","change":"alignment only","protect":["groove","phrasing"],"verify":["alignment by source and section"],"cancel":["note ownership changes"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-06","source":"SRC-ML-20260920-1500-02","when":"before any source edit","change":"analysis-by-synthesis round trip only","protect":["phase","transients","balance","stereo/mono"],"verify":["unedited reconstruction baseline"],"cancel":["material baseline damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-07","source":"SRC-ML-20260920-1500-02","when":"regenerating an edited source","change":"allowlisted selected-source parameters only","protect":["non-target sources","section continuity"],"verify":["exact parameter diff","non-target waveform residual"],"cancel":["off-target changes"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1500-08","source":"ART-ML-20260920-1500-01","when":"considering artifact integration","change":"none until prerequisites","protect":["rights","reproducibility"],"verify":["artifact licences","executable code","pinned dependencies","provenance"],"cancel":["any prerequisite missing"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_source_cards": [
+    {"id":"V-ML-20260920-1500-01","video_id":"qaL3SJubaFQ","title":"The Unwritten Rules of Mix Bus EQ","channel":"SonicScoop / Justin Colletti","url":"https://www.youtube.com/watch?v=qaL3SJubaFQ","published":"2026-03-20","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]},
+    {"id":"V-ML-20260920-1500-02","video_id":"b8RzE8NQOoc","title":"Joe Chiccarelli's Stereo Mix Bus Tips","channel":"Universal Audio","url":"https://www.youtube.com/watch?v=b8RzE8NQOoc","published":"2021-09-15","status":"queued_source","content_access":"metadata_verified_transcript_unavailable","findings":[]}
+  ],
+  "deduplication": [
+    {"canonical":"SRC-ML-20260920-1500-01","duplicates":["arXiv:2606.18968","DAFx26_paper_50"],"reason":"same work/version family"},
+    {"canonical":"SRC-ML-20260920-1500-02","duplicates":["DAFx search listing","official detail card","DAFx26_demo_69.pdf"],"reason":"same proceedings item"},
+    {"canonical":"V-ML-20260917-0900-03","duplicates":["qXAI_axY8sw rediscovery"],"reason":"same YouTube video ID"}
+  ],
+  "revisions": [
+    {"previous":"a useful tau_init can be transferred as a setting","revised":"tau_init is a model/prompt/CFG/schedule/task-specific hypothesis"},
+    {"previous":"lower FAD indicates a better transformation","revised":"FAD must be paired with guide-fidelity, raw-safety and listening checks under matched inference policy"},
+    {"previous":"frozen non-target DDSP parameters imply unchanged audio","revised":"analysis-by-synthesis reconstruction and non-target waveform residual must be validated separately"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260920-1500-01","status":"not_run","priority":"next","baseline":"warm initialization tau_init 0.70","variant":"same pipeline tau_init 0.80","single_factor":"tau_init","fixed":["licensed guide","model revision","prompt","CFG","schedule","seed set","lambda=0","length","format"],"loudness_matching":"separate listening copy only","measurements":["finite output","gain drift","sample/true peak","DC","crest","pitch/onset/event-count residual","transient width","HF change","matched-policy target fit","blind preference"],"protect":["pitch","rhythm","attacks","phrase boundaries","event count","section role","headroom"],"cancel":["new or missing events","seed instability","overload","damaged attacks","metric-only advantage"]},
+    {"id":"EXP-ML-20260920-1500-02","status":"not_run","baseline":"lambda 0","variant":"lambda 1","single_factor":"explicit noise portion","loudness_matching":"separate listening copy only","measurements":["target fit","pitch/onset/event residual","raw safety","blind preference"],"cancel":["worse guide fidelity without preference"]},
+    {"id":"EXP-ML-20260920-1500-03","status":"not_run","baseline":"original observed mixture","variant":"unedited DDSPMM reconstruction","single_factor":"analysis-by-synthesis round trip","loudness_matching":"yes for blind copy","measurements":["source/section null residual","phase/mono","onset","spectral balance","gain","true peak","blind preference"],"cancel":["material reconstruction damage"]},
+    {"id":"EXP-ML-20260920-1500-04","status":"not_run","baseline":"selected-source allowlist regeneration","variant":"all-source parameter regeneration","single_factor":"regeneration scope","loudness_matching":"separate listening copy only","measurements":["exact parameter diff","non-target residual","target edit strength","peaks","phase/mono","section continuity"],"cancel":["non-target drift","alignment failure","loss of groove or identity"]}
+  ],
+  "queue": {
+    "video_count": 24,
+    "studied_videos": 0,
+    "next_deep_review": ["warm-init companion provenance and licence boundaries", "full DDSPMM-guided diffusion method cited by DAFx demo 69", "reconstruction/off-target evaluation design", "transcript-dependent review of 24 queued videos"]
+  },
+  "counts": {"source_cards":2,"artifact_cards":1,"knowledge_cards":12,"candidate_rules":8,"experiments_not_run":4,"new_video_cards":2,"studied_videos":0,"queued_videos_total":24,"reference_cards":0,"new_licensed_multitracks":0,"duplicates_or_versions_resolved":3},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"companion_audio_downloaded":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
