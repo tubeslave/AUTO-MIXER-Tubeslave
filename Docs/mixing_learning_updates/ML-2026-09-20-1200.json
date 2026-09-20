@@ -1,0 +1,94 @@
+{
+  "update_id": "ML-2026-09-20-1200",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-20T12:00:00+03:00",
+  "actual_start": "2026-09-20T12:02:25+03:00",
+  "completed": "2026-09-20T12:06:25+03:00",
+  "preceding_successful_search": "ML-2026-09-20-0900",
+  "preceding_update": "ML-2026-09-20-0900",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260920-0900-01",
+      "title": "CLEAN2FX: Label-Conditioned Modeling for Clean-to-Effect Guitar Audio Transformations",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_58.pdf",
+      "reading_depth": "full_text_complete_plus_implementation_audit",
+      "revised_conclusion": "U-Net gains are internal to a target-aware magnitude/Griffin-Lim/peak-normalized protocol and do not establish causal deployment, source-independent generalization, raw gain transfer, waveform fidelity or listener preference."
+    },
+    {
+      "id": "SRC-ML-20260920-0900-02",
+      "title": "A Production-Oriented Framework for Evaluation of SFX Generation",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_52.pdf",
+      "reading_depth": "full_text_complete_plus_music_domain_mapping",
+      "revised_conclusion": "The nine requirements are independent gates; current CLEAN2FX evaluation leaves identity, raw energy, targeted modification, robustness and efficiency unvalidated."
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUDIT-ML-20260920-1200-01",
+      "name": "fyp-clean2fx notebooks and inference path",
+      "url": "https://github.com/oliveriobp/fyp-clean2fx",
+      "revision": "b6c20ba2966564282fe7a666ad3dc915da883c79",
+      "reading_depth": "full_static_notebook_and_inference_audit",
+      "executed": false,
+      "license": null,
+      "findings": [
+        "index-level random split shares the underlying source-note pool between train and test",
+        "the same 90/10 split drives ReduceLROnPlateau and final evaluation; no separate validation and untouched test",
+        "evaluation uses 20 first encountered examples per effect from one split without repeated seeds or uncertainty",
+        "clean input scaling depends on max(clean,target), which is unavailable at causal inference",
+        "deployment replaces oracle normalization with hard-coded effect corrections estimated on 50 training samples",
+        "FAD audio is independently Griffin-Lim reconstructed and peak-normalized per file",
+        "ConvVAE ratio-of-means is positive only because RAT dominates while 9 of 10 effects worsen",
+        "README source-of-truth CSV outputs are gitignored and absent; cache, dependency lock and root licence are missing"
+      ],
+      "integration_status": "blocked_pending_license_and_causal_validation"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260920-1200-01","claim":"Clean-plus-target normalization is an oracle path because target magnitude is unavailable at inference.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-02","claim":"Effect-specific correction from 50 training examples is a deployment heuristic, not validated equivalence to benchmark normalization.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-03","claim":"Index-random splits of synthetic sequences do not ensure source-note or pickup independence.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-04","claim":"A split used to drive the scheduler is validation and must not also serve as untouched final test.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-05","claim":"Twenty examples per effect from one selection without confidence intervals leave sampling uncertainty unknown.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-06","claim":"Per-file peak normalization before FAD removes raw gain and energy-control information.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-07","claim":"FAD on independently Griffin-Lim-reconstructed files conflates magnitude-model and phase-reconstruction error.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-08","claim":"Original-waveform, unchanged-through-same-reconstruction and deterministic-processor baselines answer different questions.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-09","claim":"Ratio-of-means can hide majority per-effect degradation and requires sign counts and dominant-class sensitivity.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-10","claim":"ConvVAE worsens 9 of 10 effect MSEs; RAT alone creates its positive aggregate ratio-of-means.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-11","claim":"Embedded notebook outputs without published CSVs, cache and pinned dependencies provide only partial reproducibility.","confidence":"high"},
+    {"id":"KC-ML-20260920-1200-12","claim":"Identity rating that excludes loudness does not replace raw safety, musical quality or blind preference in mix.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260920-1200-01","source":"AUDIT-ML-20260920-1200-01","when":"reference-conditioned effect inference","change":"normalization policy only","protect":["gain structure","effect identity"],"verify":["oracle versus causal normalization A/B","raw gain and peak checks"],"cancel":["target information enters causal path","large oracle-to-causal regret"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-02","source":"AUDIT-ML-20260920-1200-01","when":"constructing augmented train/validation/test data","change":"split policy only","protect":["source independence"],"verify":["group by source key, take, pickup and performer","identifier intersection check"],"cancel":["source leakage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-03","source":"AUDIT-ML-20260920-1200-01","when":"training and evaluating learned FX","change":"dataset role assignment only","protect":["untouched final test"],"verify":["scheduler uses validation only","test used after checkpoint freeze"],"cancel":["test repeatedly guides training"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-04","source":"SRC-ML-20260920-0900-02","when":"evaluating transformed audio","change":"evaluation copy only","protect":["raw gain","sample and true peak","crest","DC"],"verify":["raw render before normalization","separate loudness-matched listening copy"],"cancel":["only normalized exports exist"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-05","source":"SRC-ML-20260920-0900-01;AUDIT-ML-20260920-1200-01","when":"attributing audio differences to a magnitude renderer","change":"reconstruction path only","protect":["phase","mono","transients","HF","tail"],"verify":["original waveform control","same-reconstruction control"],"cancel":["reconstruction error is comparable to model difference"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-06","source":"AUDIT-ML-20260920-1200-01","when":"reporting multi-effect results","change":"aggregation and uncertainty only","protect":["effect-specific direction"],"verify":["per-effect values","sign count","aggregate with and without dominant effect","grouped splits and seeds"],"cancel":["universal claim under heterogeneous signs"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-07","source":"SRC-ML-20260920-0900-02","when":"evaluating delay or reverb","change":"render termination only","protect":["rhythmic clarity","tail continuity"],"verify":["decay-complete raw render","onset and tail measurement"],"cancel":["tail truncation","smear"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1200-08","source":"AUDIT-ML-20260920-1200-01","when":"considering CLEAN2FX integration","change":"none until prerequisites are met","protect":["licence compliance","reproducibility","causal validity"],"verify":["explicit licences","published outputs","pinned dependencies","causal evaluation"],"cancel":["any prerequisite missing"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "revisions": [
+    {"previous":"200-example held-out benchmark","revised":"200 selected examples from a scheduler-used split with a shared underlying note pool; not an independent untouched test"},
+    {"previous":"U-Net improves MSE and FAD over unchanged clean","revised":"true only inside target-aware magnitude, Griffin-Lim and peak-normalized protocol; causal deployment remains unverified"},
+    {"previous":"ConvVAE lacks consistent improvement","revised":"confirmed more strongly: 9 of 10 effects worsen and RAT alone reverses the aggregate"},
+    {"previous":"energy control can be checked through current evaluation","revised":"current FAD path erases raw energy through per-file peak normalization"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260920-1200-01","status":"not_run","priority":"next","baseline":"pinned CLEAN2FX checkpoint with target-aware max(clean,target) normalization on licensed paired DI-to-effect audio","variant":"same checkpoint with causal clean-only normalization and predeclared correction policy","single_factor":"normalization policy","loudness_matching":"separate listening copy only","measurements":["gain ratio to target","sample and true peak","finite output","crest","multi-resolution STFT","phase and mono residual","onset timing and width","HF loss","decay and tail","oracle-to-causal regret per effect","blind preference by section"],"protect":["pick attack","pitch","groove","chord definition","effect strength","raw gain structure","mono","tail continuity"],"cancel":["target information enters causal path","invalid or overloaded output","identity drift","attack or HF loss","benefit only under oracle normalization"]},
+    {"id":"EXP-ML-20260920-1200-02","status":"not_run","baseline":"existing index-random 90/10 split","variant":"source-grouped train/validation/test split before augmentation","single_factor":"split policy","loudness_matching":"yes for listening copies","measurements":["per-effect MSE and FAD","raw safety","domain regret","uncertainty across grouped splits","blind preference"],"cancel":["advantage collapses or changes sign"]},
+    {"id":"EXP-ML-20260920-1200-03","status":"not_run","baseline":"original processed waveform","variant":"same target magnitude through 32-iteration Griffin-Lim plus peak normalization","single_factor":"reconstruction path","loudness_matching":"yes for blind preference","measurements":["phase and mono residual","onset","HF","tail","gain loss before normalization","blind preference"],"cancel":["reconstruction damage is audible or comparable to model differences"]},
+    {"id":"EXP-ML-20260920-1200-04","status":"not_run","baseline":"first 20 examples per effect from one split","variant":"predeclared repeated source-grouped panels of equal size","single_factor":"sample-selection policy","loudness_matching":"not applicable","measurements":["effect-wise ranks","sign changes","confidence intervals","dominant-effect sensitivity"],"cancel":["aggregate rank or direction is unstable"]}
+  ],
+  "queue": {
+    "video_count": 22,
+    "studied_videos": 0,
+    "next_deep_review": ["EGFxSet audio licence verification", "causal-normalization A/B protocol", "source-grouped split protocol", "transcript-dependent review of 22 queued videos"]
+  },
+  "counts": {"source_cards_updated":2,"implementation_audits":1,"knowledge_cards":12,"candidate_rules":8,"experiments_not_run":4,"new_video_cards":0,"studied_videos":0,"queued_videos_total":22,"reference_cards":0,"new_licensed_multitracks":0},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
