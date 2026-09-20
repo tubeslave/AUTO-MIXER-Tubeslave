@@ -1,0 +1,104 @@
+{
+  "update_id": "ML-2026-09-20-0900",
+  "mode": "search",
+  "scheduled_slot": "2026-09-20T09:00:00+03:00",
+  "actual_start": "2026-09-20T09:01:48+03:00",
+  "completed": "2026-09-20T09:22:06+03:00",
+  "preceding_successful_search": "ML-2026-09-19-1500",
+  "preceding_update": "ML-2026-09-19-1800",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "sources": [
+    {
+      "id": "SRC-ML-20260920-0900-01",
+      "title": "CLEAN2FX: Label-Conditioned Modeling for Clean-to-Effect Guitar Audio Transformations",
+      "type": "DAFx-26 demo paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_58.pdf",
+      "canonical_card": "https://dafx.de/paper-archive/details/mf2XfRfTSk3I6WdRSLHKZA",
+      "doi": null,
+      "license": "CC BY 4.0",
+      "reading_depth": "full_text_complete",
+      "independence": "primary_source",
+      "limitations": ["16 kHz magnitude-only STFT", "Griffin-Lim phase reconstruction", "constructed sequences from isolated tones", "200-example held-out benchmark", "no controlled listener study", "single-effect labels, not chains"]
+    },
+    {
+      "id": "SRC-ML-20260920-0900-02",
+      "title": "A Production-Oriented Framework for Evaluation of SFX Generation",
+      "type": "DAFx-26 full paper",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_52.pdf",
+      "doi": null,
+      "license": "CC BY 4.0",
+      "reading_depth": "full_text_complete",
+      "independence": "primary_source",
+      "limitations": ["ESC-50 SFX scope", "heterogeneous pretrained configurations", "15-participant identity study", "capability-specific metrics not directly comparable", "not a music-mixing evaluation"]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "DATA-ML-20260920-0900-01",
+      "name": "EGFxSet",
+      "url": "https://zenodo.org/records/7044411",
+      "doi": "10.5281/zenodo.7044411",
+      "reading_depth": "official_metadata_and_file_manifest",
+      "status": "rights_verification_required",
+      "license": null,
+      "note": "Zenodo exposes the files and DOI but no readable licence value; mirdata index licence does not license the audio."
+    },
+    {
+      "id": "CODE-ML-20260920-0900-01",
+      "name": "fyp-clean2fx",
+      "url": "https://github.com/oliveriobp/fyp-clean2fx",
+      "revision": "b6c20ba2966564282fe7a666ad3dc915da883c79",
+      "reading_depth": "repository_metadata_root_manifest_readme_and_commit_audit",
+      "executed": false,
+      "license": null,
+      "integration_status": "blocked_pending_license"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260920-0900-01","claim":"MSE, FAD, reference alignment, diversity and listener preference are distinct gates.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-02","claim":"Delay/reverb magnitude-loss gains can diverge strongly from FAD and require temporal/tail evaluation.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-03","claim":"Condition sensitivity does not prove condition correctness.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-04","claim":"16-kHz magnitude-only Griffin-Lim output does not validate phase, upper-band, stereo or transient fidelity.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-05","claim":"Unchanged input remains a mandatory baseline for learned FX.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-06","claim":"Use raw renders for safety and separate loudness-matched copies for preference.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-07","claim":"Identity, controllability, targeted modification and off-target residual require separate evaluation.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-08","claim":"Inpaint-region scores are not directly comparable to full-output scores.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-09","claim":"Single-effect constructed-sequence results do not justify automatic FX chains for real rock arrangements.","confidence":"high"},
+    {"id":"KC-ML-20260920-0900-10","claim":"Open downloads do not replace explicit audio and code licence verification.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260920-0900-01","source":"SRC-ML-20260920-0900-01","when":"auditioning one labelled effect on licensed DI guitar in a fixed section","change":"renderer only","protect":["attack","pitch","groove","section role"],"verify":["unchanged baseline","pinned processor baseline","raw safety","loudness-matched blind preference"],"cancel":["metric-only gain","attack loss","wrong effect identity"],"confidence":"medium","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-02","source":"SRC-ML-20260920-0900-01","when":"evaluating magnitude-only learned FX","change":"none; add validation gates","protect":["phase","mono","upper band","transients"],"verify":["phase and mono residual","HF loss","artifact audition"],"cancel":["phasiness","combing","HF loss"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-03","source":"SRC-ML-20260920-0900-01","when":"evaluating delay or reverb transfer","change":"one renderer or parameter at a time","protect":["rhythmic clarity","tail continuity"],"verify":["onset","decay/tail","blind preference"],"cancel":["smear","truncated or wrong tail"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-04","source":"SRC-ML-20260920-0900-01","when":"checking label conditioning","change":"target label only","protect":["source content"],"verify":["all-label confusion test","effect recognisability"],"cancel":["label drift"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-05","source":"SRC-ML-20260920-0900-02","when":"any generated or transformed audio is assessed","change":"evaluation copy only","protect":["raw gain and peaks"],"verify":["raw safety render","separate loudness-matched copy"],"cancel":["safety metrics computed only after normalization"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-06","source":"SRC-ML-20260920-0900-02","when":"editing a bounded region or section","change":"target region only","protect":["unrequested regions","boundary continuity"],"verify":["off-target residual","boundary click test"],"cancel":["global rewrite","boundary discontinuity"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-07","source":"SRC-ML-20260920-0900-02","when":"adapting SFX evaluation to music","change":"framework only, not model ranking or thresholds","protect":["musical role","section intent"],"verify":["music-domain A/B"],"cancel":["direct ESC-50 ranking transfer"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-0900-08","source":"DATA-ML-20260920-0900-01;CODE-ML-20260920-0900-01","when":"considering dataset or code integration","change":"none until rights are explicit","protect":["licence compliance"],"verify":["artifact-specific licence text"],"cancel":["ambiguous or missing licence"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "videos": [
+    {"id":"VIDEO-ML-20260920-0900-01","title":"Mixing Rock Music TUTORIAL (2020) | ADAM Audio & Vintage King","url":"https://www.youtube.com/watch?v=bMCFbPB5xlQ","published":"2020-07-22","status":"queued_source","content_studied":false,"reason":"authorized full transcript unavailable"},
+    {"id":"VIDEO-ML-20260920-0900-02","title":"How to Make Lead Guitars Stand Out in a Heavy Mix","channel":"Hardcore Music Studio","url":"https://www.youtube.com/watch?v=wnrqpzpp_uI","published":"2015","duration_metadata":"approximately 6:09","status":"queued_source","content_studied":false,"reason":"authorized full transcript unavailable"}
+  ],
+  "deduplication": [
+    {"title":"RelFx","action":"existing source/version; not counted"},
+    {"title":"StemFX","action":"existing source/version; not counted"},
+    {"title":"Diff2Mix","action":"existing source/version; not counted"},
+    {"title":"Sequential Stem Blending","action":"existing source/version; not counted"}
+  ],
+  "queue": {
+    "video_count": 22,
+    "next_deep_review": ["CLEAN2FX evaluation notebook audit", "EGFxSet and repository licence verification", "music-domain adaptation of nine production requirements", "transcript-dependent review of 22 queued videos"]
+  },
+  "experiments": [
+    {"id":"EXP-ML-20260920-0900-01","status":"not_run","baseline":"same licensed DI through pinned deterministic processor matching one label","variant":"same DI and label through CLEAN2FX U-Net log","single_factor":"renderer","loudness_matching":"separate listening copy only","measurements":["finite output","sample/true peak","gain ratio","latency","multi-resolution STFT","phase/mono residual","crest","onset timing and width","alias/HF loss","effect tail","blind preference by section"],"protect":["pick attack","pitch","groove","chord definition","section role","mono compatibility","tail continuity"],"cancel":["invalid or overloaded output","phasiness","HF loss","attack smear","wrong effect identity","weaker than both baselines","metric-only gain"]},
+    {"id":"EXP-ML-20260920-0900-02","status":"not_run","baseline":"16-kHz magnitude plus Griffin-Lim","variant":"48-kHz waveform or complex-STFT renderer","single_factor":"signal representation","loudness_matching":"yes for blind preference","measurements":["upper-band retention","phase","transients","true peak","preference"]},
+    {"id":"EXP-ML-20260920-0900-03","status":"not_run","baseline":"constructed in-distribution EGFxSet sequences","variant":"licensed real DI rock phrases","single_factor":"source domain","loudness_matching":"yes","measurements":["effect strength","domain regret","identity","transients","preference"]},
+    {"id":"EXP-ML-20260920-0900-04","status":"not_run","baseline":"full-output rewrite","variant":"masked section-local edit","single_factor":"edit scope","loudness_matching":"yes","measurements":["off-target residual","boundary clicks","gain continuity","preference"]}
+  ],
+  "counts": {"full_text_sources":2,"dataset_cards":1,"code_audits":1,"knowledge_cards":10,"candidate_rules":8,"new_video_cards":2,"studied_videos":0,"queued_videos_total":22,"experiments_not_run":4,"reference_cards":0,"new_licensed_multitracks":0,"duplicates_removed":4},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
