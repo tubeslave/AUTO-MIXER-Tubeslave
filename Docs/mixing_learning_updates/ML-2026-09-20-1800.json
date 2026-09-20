@@ -1,0 +1,102 @@
+{
+  "update_id": "ML-2026-09-20-1800",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-20T18:00:00+03:00",
+  "actual_start": "2026-09-20T17:57:46+03:00",
+  "completed": "2026-09-20T18:00:07+03:00",
+  "preceding_successful_search": "ML-2026-09-20-1500",
+  "preceding_update": "ML-2026-09-20-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260920-1800-01",
+      "title": "Differentiable Digital Signal Processing Mixture Model-Guided Diffusion for Synthesis Parameter Estimation from Harmonic Sound Mixtures",
+      "authors": ["Kengo Takemoto", "Tomohiko Nakamura", "Hiroshi Saruwatari"],
+      "publication": "accepted for APSIPA ASC 2026; arXiv preprint",
+      "arxiv": "2609.14427v1",
+      "doi": "10.48550/arXiv.2609.14427",
+      "url": "https://arxiv.org/html/2609.14427",
+      "abstract_url": "https://arxiv.org/abs/2609.14427",
+      "reading_depth": "full_text_complete",
+      "finding": "A conditional DDPM prior reduced loudness and MFCC errors in four score-aligned classical mixtures, but did not improve F0 and Zimtohrli in every mixture and was not validated by controlled listening.",
+      "limitations": ["four classical 2/3-source mixtures", "aligned score required", "train/evaluation piece overlap not disclosed", "mixture-level magnitude loss cannot prove source identity", "no seed sensitivity", "informal listening only", "no raw safety, phase, transient, tail or runtime evaluation"]
+    },
+    {
+      "id": "SRC-ML-20260920-1800-02",
+      "title": "Differentiable Digital Signal Processing Mixture Model for Synthesis Parameter Extraction from Mixture of Harmonic Sounds",
+      "authors": ["Masaya Kawamura", "Tomohiko Nakamura", "Daichi Kitamura", "Hiroshi Saruwatari", "Yu Takahashi", "Kazunobu Kondo"],
+      "publication": "ICASSP 2022",
+      "arxiv": "2202.00200",
+      "doi": "10.1109/ICASSP43922.2022.9746399",
+      "url": "https://arxiv.org/html/2202.00200v1",
+      "reading_depth": "full_text_complete",
+      "finding": "Score-informed mixture-level analysis-by-synthesis can stabilize parameter extraction relative to separation followed by DDSP, but source decomposition remains prior-dependent and was tested only on two-source classical mixtures at 16 kHz.",
+      "limitations": ["two-source classical mixtures", "16 kHz", "aligned score assumption", "author listening only", "no source-wise waveform invariance test"]
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20260920-1500-01",
+      "action": "updated",
+      "name": "Audio-to-Audio via Diffusion Warm Initialization companion artifacts",
+      "url": "https://github.com/CristobalAndrade/Audio-to-Audio-via-Diffusion-Warm-Initialization",
+      "revision": "0ff2bbd289014d077e7a63cfafef536188e23414",
+      "reading_depth": "complete_tree_and_text_manifest_static_audit",
+      "executed": false,
+      "downloaded_audio": false,
+      "root_license": null,
+      "findings": ["root contains README, index and assets only", "no executable method code or dependency lock", "many guide/output/baseline/ground-truth audio files", "no file-level provenance and licence map", "one partial prompt/CFG info file"],
+      "integration_status": "artifact_only_do_not_ingest_audio_rights_unresolved"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260920-1800-01","claim":"Conditional diffusion can regularize DDSP trajectories while reconstruction guidance keeps them mixture-consistent.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-02","claim":"Better loudness and MFCC error does not imply better F0 or perceptual similarity in every mixture.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-03","claim":"A mixture-level magnitude loss can redistribute error between sources and cannot prove source identity.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-04","claim":"A trajectory prior can suppress pathological fluctuations but may suppress intentional vibrato, onsets or phrasing.","confidence":"medium_high"},
+    {"id":"KC-ML-20260920-1800-05","claim":"The late-rising guidance schedule is a method-specific stability hypothesis, not a portable rule.","confidence":"medium_high"},
+    {"id":"KC-ML-20260920-1800-06","claim":"Score-aligned F0 is more constrained than loudness and timbre, so prior gains need not be uniform across parameters.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-07","claim":"Independent 12-second inference requires explicit boundary and crossfade testing.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-08","claim":"Evaluation on the same dataset family as representation training requires a disclosed source/piece-disjoint split.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-09","claim":"Objective similarity and informal author listening do not replace randomized loudness-matched listening.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-10","claim":"The unchanged DDSP round trip is the correct baseline for edit attribution.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-11","claim":"Stochastic reverse diffusion requires fixed-seed and multi-seed robustness reporting.","confidence":"high"},
+    {"id":"KC-ML-20260920-1800-12","claim":"Playback availability does not establish file-level reuse rights or reproducibility.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260920-1800-01","source":"SRC-ML-20260920-1800-01","when":"estimating harmonic-source trajectories from an aligned score","change":"enable one fixed trajectory prior only","protect":["vibrato","attacks","loudness contour","source identity"],"verify":["per-source parameter errors","target/non-target residuals","blind preference"],"cancel":["over-smoothed expression","source swaps"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-02","source":"SRC-ML-20260920-1800-01","when":"tuning reconstruction guidance","change":"guidance schedule only","protect":["convergence","expressive motion"],"verify":["finite states","source residuals","seed spread"],"cancel":["instability","metric-only gains"],"confidence":"medium_high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-03","source":"SRC-ML-20260920-1800-01","when":"accepting a DDSPMM benchmark","change":"evaluation split only","protect":["generalization claim"],"verify":["source, performer and piece overlap"],"cancel":["unknown overlap"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-04","source":"SRC-ML-20260920-1800-01","when":"using chunked inference","change":"boundary strategy only","protect":["phrase continuity","decay","groove"],"verify":["boundary residual","onset","phase","blind continuity"],"cancel":["seams","timing drift"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-05","source":"SRC-ML-20260920-1800-02","when":"before score-informed source editing","change":"analysis-by-synthesis round trip only","protect":["balance","phase/mono","transients","headroom"],"verify":["source/section null residual","raw safety"],"cancel":["material round-trip damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-06","source":"SRC-ML-20260920-1800-01","when":"regenerating an edited source","change":"allowlisted target-source parameters only","protect":["all non-target sources"],"verify":["exact trajectory diff","non-target waveform residual"],"cancel":["off-target energy","identity drift"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-07","source":"SRC-ML-20260920-1800-01","when":"porting paper settings","change":"none automatically","protect":["reproducibility"],"verify":["model/task equivalence"],"cancel":["different model or task"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260920-1800-08","source":"ART-ML-20260920-1500-01","when":"considering companion audio ingestion","change":"none until rights verified","protect":["rights","provenance"],"verify":["file-level source, creator, licence and permitted use"],"cancel":["any unresolved asset"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "deduplication": [
+    {"canonical":"SRC-ML-20260920-1800-01","duplicates":["DAFx demo citation 6 marked submitted","arXiv:2609.14427v1 accepted APSIPA ASC 2026"],"reason":"same work/version family, publication status updated"},
+    {"canonical":"SRC-ML-20260920-1800-02","duplicates":["arXiv:2202.00200","ICASSP DOI 10.1109/ICASSP43922.2022.9746399","author demo page"],"reason":"same foundational work and companion"}
+  ],
+  "revisions": [
+    {"previous":"the full DDSPMM diffusion method was only a submitted citation in the DAFx demo","revised":"arXiv:2609.14427v1 is available in full and marked accepted for APSIPA ASC 2026"},
+    {"previous":"trajectory smoothing broadly improves estimation","revised":"loudness and MFCC improve consistently in the four mixtures, while F0 and Zimtohrli do not"},
+    {"previous":"frozen non-target trajectories are sufficient for edit locality","revised":"require unchanged reconstruction and source-wise non-target residual because mixture fitting is underdetermined"},
+    {"previous":"companion playback can become a reference asset","revised":"exclude from ingestion until file-level provenance and rights are explicit"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260920-1800-01","status":"not_run","priority":"next","baseline":"unconstrained score-initialized DDSPMM","variant":"same renderer with one fixed DDPM trajectory prior","single_factor":"trajectory prior enabled","fixed":["licensed mixture","aligned score","DDSP autoencoder","segment boundaries","seed set","reconstruction loss","format"],"loudness_matching":"separate randomized listening copy only","measurements":["convergence","finite states","per-source F0/loudness/MFCC error","mixture residual","target/non-target residual","sample/true peak","gain","DC","phase/mono","onset/vibrato modulation","boundary continuity","blind preference"],"protect":["intentional pitch motion","attacks","phrasing","source ownership","balance","headroom","section continuity"],"cancel":["source/piece overlap","over-smoothed vibrato or attacks","source swaps","non-target drift","instability","mixture-loss-only improvement"]},
+    {"id":"EXP-ML-20260920-1800-02","status":"not_run","baseline":"lambda_end 3.0 omega 4.0","variant":"same endpoint with linear late ramp","single_factor":"guidance schedule shape","loudness_matching":"separate listening copy only","measurements":["convergence","non-finite states","mixture/source residuals","parameter jerk","onset/vibrato preservation","blind preference"],"cancel":["early instability","expression loss","no repeatable advantage"]},
+    {"id":"EXP-ML-20260920-1800-03","status":"not_run","baseline":"independent 12-second chunks","variant":"overlapped chunks with fixed crossfade","single_factor":"boundary strategy","loudness_matching":"yes for blind copy","measurements":["boundary waveform/spectral residual","onset displacement","phase","loudness continuity","decay truncation","blind seam audibility"],"cancel":["timing drift","doubled attacks","tail truncation","audible seams"]},
+    {"id":"EXP-ML-20260920-1800-04","status":"not_run","baseline":"unchanged DDSPMM reconstruction","variant":"one allowlisted target-source edit","single_factor":"target edit","loudness_matching":"separate listening copy only","measurements":["exact parameter diff","target edit strength","source-wise non-target null residual","mixture residual","peaks","phase/mono","section continuity"],"cancel":["material round-trip damage","non-target residual","source identity loss","preference failure"]}
+  ],
+  "queue": {
+    "video_count": 24,
+    "studied_videos": 0,
+    "remaining": ["URMP train/evaluation piece map for arXiv:2609.14427", "public code/checkpoints for DDSPMM-guided diffusion", "licensed harmonic multitrack reconstruction/off-target test", "transcript-dependent review of 24 queued videos"]
+  },
+  "counts": {"source_cards_added_or_updated":2,"artifact_cards_updated":1,"knowledge_cards":12,"candidate_rules":8,"experiments_not_run":4,"new_video_cards":0,"studied_videos":0,"queued_videos_total":24,"reference_cards":0,"new_licensed_multitracks":0,"duplicates_or_versions_resolved":2},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"companion_audio_downloaded":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
