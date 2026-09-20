@@ -39,6 +39,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-19-1500 | [Report](ML-2026-09-19-1500.md), [JSON patch](ML-2026-09-19-1500.json) | Search: 1 full-text StemFX source, 2 queued DAFx-26 sources, 2 implementation audits, 11 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued videos, 4 unrun experiments; variable-topology and raw-evaluation limits recorded |
 | ML-2026-09-19-1800 | [Report](ML-2026-09-19-1800.md), [JSON patch](ML-2026-09-19-1800.json) | Deep review: 2 queued DAFx-26 sources upgraded to full text, 2 implementation audits, 12 Knowledge Cards, 8 candidate rules, 20 carried queued videos and 4 unrun experiments; metric, stability, aliasing, revision and licence limits recorded |
 | ML-2026-09-20-0900 | [Report](ML-2026-09-20-0900.md), [JSON patch](ML-2026-09-20-0900.json) | Search: 2 full-text DAFx-26 sources, 1 dataset-rights audit, 1 companion-code audit, 10 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued guitar videos, 4 unrun experiments; metric, phase, transient, domain and licence limits recorded |
+| ML-2026-09-20-1200 | [Report](ML-2026-09-20-1200.md), [JSON patch](ML-2026-09-20-1200.json) | Deep review: CLEAN2FX causal-normalization, split and evaluation audit; 2 source cards updated, 1 implementation audit, 12 Knowledge Cards, 8 candidate rules, 22 carried queued videos and 4 unrun experiments; oracle, leakage, aggregation and reproducibility limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -75,6 +76,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-20-1200 (`deep_review`, preceding search `ML-2026-09-20-0900`): CLEAN2FX headline metrics use target-aware input normalization, a scheduler-used split with a shared source-note pool, and peak-normalized Griffin–Lim audio. Test oracle-to-causal normalization first, split by source before augmentation, preserve raw gain/peak/phase/tail gates, and report per-effect signs plus aggregates without the dominant RAT case. Next test: `EXP-ML-20260920-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-20-0900 (`search`, preceding successful search `ML-2026-09-19-1500`): clean-to-effect guitar metrics are not production approval. Keep unchanged and pinned-processor baselines, preserve raw output for peak/gain/phase checks, and use a separate loudness-matched listening copy. Test label correctness separately from label sensitivity; do not integrate EGFxSet audio or fyp-clean2fx code until artifact-specific licences are explicit. Next test: `EXP-ML-20260920-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
