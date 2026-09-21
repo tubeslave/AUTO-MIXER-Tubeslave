@@ -39,7 +39,7 @@ def process(x,sr,ceiling_db=-1.0,drive_db=2.2,target_band_gr_db=(.65,.55,.45,.35
     plan=diagnose(driven,sr,target_band_gr_db);out=np.zeros_like(x);stats=[]
     for b,p in zip(bands,plan):
         env=_envelope(b,sr);thr=p["threshold"]
-        req=np.minimum(1.,thr/env);g=_smooth_gain(req,sr,p["release_ms"])
+        req=np.minimum(1.,thr/env);g=_smooth_gain(req,sr,p["release_ms"])\n        # Hard policy ceiling: adaptive thresholds may see rare outliers; never let a band overreact.\n        g=np.maximum(g,10**(-1.25/20)).astype("float32")
         out+=b*g[:,None]
         stats.append({**p,"max_gr_db":float(-20*np.log10(max(float(g.min()),1e-8))),
                       "p95_gr_db":float(np.percentile(-20*np.log10(np.maximum(g,1e-8)),95))})
