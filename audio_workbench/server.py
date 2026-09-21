@@ -31,6 +31,7 @@ from . import reference_dna
 from . import autonomous_loop
 from . import judge_calibration
 from . import observer_ensemble
+from . import significance
 
 try:
     from fastmcp import FastMCP
@@ -86,6 +87,16 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
 
 
 
+
+
+@mcp.tool()
+def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
+                               perceptual_verdict: str | None = None,
+                               min_delta_rms_dbfs: float = -50.0,
+                               min_affected_fraction: float = 0.02) -> dict[str, Any]:
+    """Stop iterating on changes that are technically measurable but not meaningfully discriminable."""
+    return significance.significance_gate(delta_rms_dbfs, affected_fraction, perceptual_verdict,
+                                          min_delta_rms_dbfs, min_affected_fraction)
 
 @mcp.tool()
 def calibrate_judge_authority(trials: list[dict[str, Any]]) -> dict[str, Any]:
