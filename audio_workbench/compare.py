@@ -17,8 +17,11 @@ def compare(a_path: str,b_path: str, loudness_match: bool=True) -> dict[str,Any]
     a,sra=_read(a_path); b,srb=_read(b_path)
     if sra!=srb:
         raise ValueError("sample rates differ")
-    n=min(len(a),len(b)); c=min(a.shape[1],b.shape[1])
-    a=a[:n,:c]; b=b[:n,:c]
+    if len(a) != len(b):
+        raise ValueError(f"render lengths differ: {len(a)} != {len(b)} frames")
+    if a.shape[1] != b.shape[1]:
+        raise ValueError(f"channel counts differ: {a.shape[1]} != {b.shape[1]}")
+    n=len(a); c=a.shape[1]
     gain_db=0.0
     if loudness_match:
         ra,rb=_rms(a),_rms(b)
