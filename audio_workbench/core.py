@@ -94,11 +94,11 @@ def _band_energy(mono: np.ndarray, sr: int) -> dict[str, float]:
     f, p = signal.welch(mono, sr, nperseg=min(8192, len(mono)))
     bands = {"sub":[20,60], "bass":[60,200], "low_mid":[200,500],
              "mid":[500,2000], "presence":[2000,6000], "air":[6000,min(20000,sr/2)]}
-    total = np.trapz(p, f) + 1e-20
+    total = np.trapezoid(p, f) + 1e-20
     out = {}
     for name,(lo,hi) in bands.items():
         mask = (f >= lo) & (f < hi)
-        out[name] = float(10*np.log10((np.trapz(p[mask], f[mask]) + 1e-20)/total))
+        out[name] = float(10*np.log10((np.trapezoid(p[mask], f[mask]) + 1e-20)/total))
     return out
 
 def analyze(path: str) -> dict[str, Any]:
@@ -138,10 +138,19 @@ def ffmpeg_loudness(path: str) -> dict[str, Any]:
     summary = text[text.rfind("Summary:"):] if "Summary:" in text else text[-4000:]
     return {"returncode":p.returncode, "summary":summary}
 
+def _require_render(con: sqlite3.Connection, render_sha: str) -> None:
+    if con.execute("SELECT 1 FROM renders WHERE sha256=?", (render_sha,)).fetchone() is None:
+        raise KeyError(f"unknown render_sha: {render_sha}")
+
 def record_check(root: str, render_sha: str, name: str, result: dict[str, Any], status: str="ok") -> dict[str, Any]:
     if name not in CHECKS:
         raise ValueError(f"unknown check: {name}")
+    if status not in ("ok", "issue", "not_applicable", "stale", "not_run", "unknown"):
+        raise ValueError(f"invalid check status: {status}")
+    if status == "ok" and not result:
+        raise ValueError("ok check requires non-empty evidence")
     con = _db(Path(root))
+    _require_render(con, render_sha)
     con.execute("""INSERT INTO checks(render_sha,name,status,result_json,updated_at)
                    VALUES(?,?,?,?,CURRENT_TIMESTAMP)
                    ON CONFLICT(render_sha,name) DO UPDATE SET status=excluded.status,
@@ -153,6 +162,7 @@ def record_check(root: str, render_sha: str, name: str, result: dict[str, Any], 
 def invalidate(root: str, render_sha: str, change_type: str) -> dict[str, Any]:
     names = DEPENDENCIES.get(change_type, CHECKS)
     con = _db(Path(root))
+    _require_render(con, render_sha)
     con.executemany("UPDATE checks SET status='stale',updated_at=CURRENT_TIMESTAMP WHERE render_sha=? AND name=?",
                     [(render_sha,n) for n in names])
     con.commit()
@@ -160,13 +170,22 @@ def invalidate(root: str, render_sha: str, change_type: str) -> dict[str, Any]:
 
 def coverage(root: str, render_sha: str) -> dict[str, Any]:
     con = _db(Path(root))
+    _require_render(con, render_sha)
     rows = con.execute("SELECT name,status,result_json,updated_at FROM checks WHERE render_sha=? ORDER BY name",(render_sha,)).fetchall()
+    if len(rows) != len(CHECKS):
+        present = {r["name"] for r in rows}
+        for name in CHECKS:
+            if name not in present:
+                con.execute("INSERT OR IGNORE INTO checks(render_sha,name,status) VALUES(?,?,?)",(render_sha,name,"not_run"))
+        con.commit()
+        rows = con.execute("SELECT name,status,result_json,updated_at FROM checks WHERE render_sha=? ORDER BY name",(render_sha,)).fetchall()
     data = [dict(r) for r in rows]
     blockers = [r["name"] for r in data if r["status"] not in ("ok","not_applicable")]
     return {"render_sha":render_sha,"checks":data,"finalizable":not blockers,"blockers":blockers}
 
 def log_decision(root: str, render_sha: str, hypothesis: str, action: dict[str,Any], outcome: str="proposed") -> dict[str,Any]:
     con = _db(Path(root))
+    _require_render(con, render_sha)
     cur = con.execute("INSERT INTO decisions(render_sha,hypothesis,action_json,outcome) VALUES(?,?,?,?)",
                       (render_sha,hypothesis,json.dumps(action,ensure_ascii=False),outcome))
     con.commit()
