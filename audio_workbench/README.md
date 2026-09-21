@@ -82,3 +82,18 @@ New tools:
 - `set_project_context(project_root, sections, references, notes)` stores song sections, reference files and mix-intent notes.
 
 This is the preferred first workflow for chat-driven offline mixing. Ableton is treated as an optional execution backend for plugin automation, routing and session-native rendering, not as a requirement for analysis.
+
+
+## Experiment engine
+
+v0.1 now includes a reversible candidate renderer for explicit hypotheses. Every experiment automatically includes a bypass candidate, copies the baseline, renders candidates into an experiment directory, registers immutable render hashes, computes signal deltas, and waits for a separate evaluation step. Source audio is never overwritten.
+
+Initial bounded processors: gain, one peaking-EQ biquad and feed-forward envelope compression. These are controlled probes, not claims that this small DSP set is sufficient for production mixing.
+
+Additional diagnostics:
+- generic transient-event analysis;
+- role-priority priors with explicit project-context overrides;
+- section analysis, suspicious-window scan and pairwise overlap graph;
+- deterministic blind A/B labels.
+
+The architecture deliberately separates detection, hypothesis, intervention, verification and selection.
