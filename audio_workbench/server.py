@@ -34,6 +34,7 @@ from . import observer_ensemble
 from . import space_director
 from . import onboarding
 from . import checkpoints
+from . import autonomous_policy
 from . import significance
 
 try:
@@ -103,6 +104,23 @@ def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
 
 
 
+
+
+@mcp.tool()
+def get_autonomous_mix_policy() -> dict[str, Any]:
+    """Return the autonomous-first mixing policy learned from controlled mix experiments."""
+    return autonomous_policy.autonomous_first_policy()
+
+@mcp.tool()
+def evaluate_dense_guitar_guard(guitar_share_db: float, section_density: float,
+                                vocal_active: bool) -> dict[str, Any]:
+    """Guard against over-weighting distorted guitars in dense sections."""
+    return autonomous_policy.dense_guitar_guard(guitar_share_db, section_density, vocal_active)
+
+@mcp.tool()
+def record_contextual_calibration(observation: dict[str, Any]) -> dict[str, Any]:
+    """Convert a human correction into scoped evidence rather than a universal mixing rule."""
+    return autonomous_policy.calibration_update(observation)
 
 @mcp.tool()
 def commit_audio_checkpoint(project_root: str, key: str, path: str,
