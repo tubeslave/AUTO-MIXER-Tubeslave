@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Any
 from . import core
 from . import project
+from . import sections as section_analysis
+from . import masking
+from . import compare as ab_compare
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -27,6 +30,33 @@ def set_project_context(project_root: str, sections: list[dict[str, Any]] | None
                         notes: list[str] | None = None) -> dict[str, Any]:
     """Persist song sections, reference paths and mix-intent notes."""
     return project.update_context(project_root, sections=sections, references=references, notes=notes)
+
+
+@mcp.tool()
+def analyze_sections(audio_path: str, sections: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure one render by musical sections supplied by the project context."""
+    return {"sections": section_analysis.section_features(audio_path, sections)}
+
+@mcp.tool()
+def find_suspicious_windows(audio_path: str, window_s: float = 8.0,
+                            hop_s: float = 4.0, top_k: int = 8) -> dict[str, Any]:
+    """Find statistically unusual windows for extra inspection; never labels them bad."""
+    return section_analysis.find_outlier_windows(audio_path, window_s, hop_s, top_k)
+
+@mcp.tool()
+def analyze_masking(tracks: list[dict[str, Any]]) -> dict[str, Any]:
+    """Build pairwise time-frequency overlap graph. It is diagnostic, not an EQ command."""
+    return masking.masking_graph(tracks)
+
+@mcp.tool()
+def compare_renders(a_path: str, b_path: str, loudness_match: bool = True) -> dict[str, Any]:
+    """Compare two renders without converting difference magnitude into preference."""
+    return ab_compare.compare(a_path, b_path, loudness_match)
+
+@mcp.tool()
+def make_blind_ab(a_path: str, b_path: str, salt: str) -> dict[str, str]:
+    """Return deterministic blinded A/B assignment for evaluation."""
+    return ab_compare.blind_labels(a_path, b_path, salt)
 
 @mcp.tool()
 def inspect_audio(project_root: str, audio_path: str) -> dict[str, Any]:
