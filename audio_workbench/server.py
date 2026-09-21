@@ -35,6 +35,7 @@ from . import space_director
 from . import onboarding
 from . import checkpoints
 from . import autonomous_policy
+from .mastering import MasteringDirector, MasteringConfig
 from . import significance
 
 try:
@@ -105,6 +106,17 @@ def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
 
 
 
+
+
+@mcp.tool()
+def get_mastering_workbench_plan() -> dict[str, Any]:
+    """Return the current autonomous mastering chain and module intent."""
+    return {
+        "version":"0.1",
+        "chain":["analyzer","stabilizer","clarity","impact","clipper","maximizer","regression"],
+        "principle":"diagnose -> bounded processing -> measure delta -> accept/reject",
+        "ozone_equivalence":False,
+    }
 
 @mcp.tool()
 def get_autonomous_mix_policy() -> dict[str, Any]:
