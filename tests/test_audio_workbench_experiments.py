@@ -21,6 +21,10 @@ def test_experiment_has_bypass_and_select():
         ])
         assert len(m["candidates"])==3
         assert m["candidates"][0]["action"]["type"]=="bypass"
+        candidate=m["candidates"][1]
+        from audio_workbench import core
+        for check in core.CHECKS:
+            core.record_check(str(root),candidate["render_sha"],check,{"verified":True})
         chosen=choose_candidate(str(root),m["experiment_id"],1,"controlled test")
         assert chosen["selected"]["candidate"]==1
         tr=analyze_transients(str(src))
