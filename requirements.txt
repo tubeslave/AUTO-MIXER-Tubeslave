@@ -39,3 +39,6 @@ pedalboard>=0.9.0
 # Dev / Test
 pytest>=7.4.0
 pytest-asyncio>=0.21.0
+
+# Audio Workbench MCP
+mcp[cli]>=1.2
