@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "policy": "deny_by_default_until_calibrated",
+  "preferred_candidates": [
+    {
+      "name": "TDR Nova",
+      "formats": ["VST3", "AU"],
+      "intended_roles": ["static_eq", "dynamic_eq", "de_masking_probe"],
+      "autonomous_write_allowed": false,
+      "reason": "calibrate exact installed build and parameter semantics first"
+    },
+    {
+      "name": "Airwindows Consolidated",
+      "formats": ["VST3", "AU"],
+      "intended_roles": ["character", "saturation", "utility_effects"],
+      "autonomous_write_allowed": false,
+      "reason": "allow only individually calibrated algorithms, never the whole catalog at once"
+    }
+  ],
+  "required_before_enable": [
+    "plugin path and exact build recorded",
+    "bypass/null test",
+    "repeatability test",
+    "latency and tail test",
+    "min/default/max parameter smoke test",
+    "no NaN/Inf or hidden clipping",
+    "rendered A/B passes protected-quality checks"
+  ]
+}
