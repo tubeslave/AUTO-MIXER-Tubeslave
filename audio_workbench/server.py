@@ -9,6 +9,8 @@ from . import compare as ab_compare
 from . import experiments
 from . import transients
 from . import roles
+from . import observers
+from . import calibration
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -35,6 +37,37 @@ def set_project_context(project_root: str, sections: list[dict[str, Any]] | None
     return project.update_context(project_root, sections=sections, references=references, notes=notes)
 
 
+
+
+_qwen_observer = None
+
+@mcp.tool()
+def qwen_audio_observe(audio_path: str, question: str, start_s: float = 0.0,
+                       end_s: float | None = None) -> dict[str, Any]:
+    """Ask local Qwen2-Audio about <=30 s mono/16 kHz evidence. Never treats prose as a mix verdict."""
+    global _qwen_observer
+    if _qwen_observer is None:
+        _qwen_observer = observers.Qwen2AudioObserver()
+    return _qwen_observer.ask(audio_path, question, start_s, end_s)
+
+@mcp.tool()
+def audiobox_aesthetics(audio_path: str, start_s: float | None = None,
+                        end_s: float | None = None) -> dict[str, Any]:
+    """Return Audiobox CE/CU/PC/PQ as secondary evidence/regression flags."""
+    return observers.audiobox_scores(audio_path, start_s, end_s)
+
+@mcp.tool()
+def muq_mulan_research_similarity(audio_path: str, texts: list[str],
+                                  allow_noncommercial: bool = False,
+                                  device: str = "cpu") -> dict[str, Any]:
+    """Research-only MuQ-MuLan similarity. License guard defaults to deny."""
+    return observers.muq_mulan_similarity(audio_path, texts, allow_noncommercial, device)
+
+@mcp.tool()
+def create_observer_calibration(project_root: str, clean_path: str,
+                                perturbations: list[dict[str, Any]]) -> dict[str, Any]:
+    """Create capability-by-capability observer exam before learned evidence gets decision weight."""
+    return calibration.make_observer_exam(project_root, clean_path, perturbations)
 
 @mcp.tool()
 def analyze_transients(audio_path: str) -> dict[str, Any]:
