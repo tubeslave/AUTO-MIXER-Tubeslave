@@ -3,7 +3,8 @@ from typing import Any
 
 DOMAINS=("drums","bass","guitars","vocals","space","stereo","macro","master")
 
-def intake_questions(track_count: int | None=None) -> dict[str,Any]:
+def intake_questions(track_count: int | None=None, inferred_intent: dict[str,Any] | None=None) -> dict[str,Any]:
+    inferred=inferred_intent or {}
     questions=[
       {"id":"references","required":False,
        "question":"Есть ли 1–3 референса? Для каждого: что именно нравится (drums/bass/guitars/vocals/space/stereo/macro/master)?",
@@ -27,9 +28,10 @@ def intake_questions(track_count: int | None=None) -> dict[str,Any]:
        "question":"Нужен только premaster или также loud master? Есть ли целевая площадка/формат?",
        "why":"Микс и мастеринг оцениваются раздельно."},
     ]
-    return {"track_count":track_count,"questions":questions,
+    unresolved=[q for q in questions if q["id"] not in inferred or inferred.get(q["id"]) in (None,[],"")]
+    return {"track_count":track_count,"questions":unresolved,"inferred":inferred,
             "recommended_reference_count":"1–3; один достаточен, 2–3 полезны только если у каждого назначена роль",
-            "policy":"не спрашивать то, что надежно определяется из файлов; неизвестное оставлять explicit unknown"}
+            "policy":"сначала вывести максимум намерения из аудио и референсов; задать только короткие прямые вопросы по реально неоднозначным решениям"}
 
 def build_intent(answers: dict[str,Any]) -> dict[str,Any]:
     missing=[q for q in ("hierarchy","energy","space","character","do_not_break") if not answers.get(q)]
@@ -46,3 +48,15 @@ def build_intent(answers: dict[str,Any]) -> dict[str,Any]:
             "space":answers.get("space"),"character":answers.get("character"),
             "protected":answers.get("do_not_break"),"delivery":answers.get("delivery"),
             "policy":"intent guides hypotheses and gates; it is not a license to force metrics"}
+
+
+def infer_from_reference(reference_traits: dict[str,Any], confidence_threshold: float=.75) -> dict[str,Any]:
+    """Convert sufficiently confident reference observations into proposed MixIntent fields.
+    These are proposals, not hidden requirements; ambiguity stays unresolved.
+    """
+    out={}
+    for field in ("hierarchy","energy","space","character","delivery"):
+        item=reference_traits.get(field)
+        if isinstance(item,dict) and float(item.get("confidence",0))>=confidence_threshold:
+            out[field]=item.get("value")
+    return out
