@@ -18,6 +18,9 @@ from . import renderer
 from . import doctor
 from . import automixer_bridge
 from . import reference
+from . import song_model
+from . import events
+from . import causal
 
 try:
     from fastmcp import FastMCP
@@ -68,6 +71,31 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
     return plugin_host.render_plugin(input_path, output_path, plugin_path, parameters,
                                      calibration_record=calibration_record)
 
+
+
+@mcp.tool()
+def build_song_hierarchy(project_root: str) -> dict[str, Any]:
+    """Build track->group->mix hierarchy from the current project manifest."""
+    return song_model.build_hierarchy(project.load_manifest(project_root))
+
+@mcp.tool()
+def get_section_priorities(project_root: str, section_name: str) -> dict[str, float]:
+    """Return section-specific musical priority, with explicit context overriding role guesses."""
+    return song_model.section_priorities(project.load_manifest(project_root), section_name)
+
+@mcp.tool()
+def analyze_audio_events(audio_path: str) -> dict[str, Any]:
+    """Return generic onset/event timing and local crest evidence without quality labels."""
+    return events.analyze_events(audio_path)
+
+@mcp.tool()
+def create_causal_experiment_plan(observation: str, hypothesis: str, target: str,
+                                  interventions: list[dict[str, Any]], expected_effect: str,
+                                  protected_metrics: list[str],
+                                  confidence: dict[str, float] | None = None) -> dict[str, Any]:
+    """Create a bounded causal plan with mandatory no-change control."""
+    return causal.make_plan(observation, hypothesis, target, interventions,
+                            expected_effect, protected_metrics, confidence)
 
 @mcp.tool()
 def create_reference_profile(reference_path: str,
