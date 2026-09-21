@@ -27,3 +27,36 @@ def update_problem_after_tie(problem: dict[str,Any]) -> dict[str,Any]:
     q["expected_impact"]=min(float(q.get("expected_impact",.5)),.2)
     q["uncertainty"]=max(float(q.get("uncertainty",0)),.7)
     return q
+
+
+def assess_blind_trials(choices: list[str], key: list[dict[str,str]],
+                        proposed_labels: set[str]) -> dict[str,Any]:
+    if len(choices)!=len(key):
+        raise ValueError("choices/key length mismatch")
+    resolved=[]
+    for choice,mapping in zip(choices,key):
+        if choice in ("tie","uncertain"):
+            resolved.append(choice)
+        else:
+            if choice not in mapping:
+                raise ValueError(f"unknown blind label: {choice}")
+            resolved.append(mapping[choice])
+    baseline=sum(1 for x in resolved if x=="baseline")
+    proposed=sum(1 for x in resolved if x in proposed_labels)
+    ties=sum(1 for x in resolved if x in ("tie","uncertain"))
+    n=len(resolved)
+    if baseline==n:
+        verdict="reject_intervention_family"
+    elif proposed>baseline and proposed>=max(2,(n+1)//2):
+        verdict="perceptually_significant_candidate"
+    else:
+        verdict="insufficient_or_mixed"
+    return {"resolved":resolved,"baseline_votes":baseline,"proposed_votes":proposed,
+            "tie_uncertain_votes":ties,"verdict":verdict,
+            "policy":"consistent baseline preference is evidence against processing, not a request for a subtler version"}
+
+def effect_budget(previous_results: list[dict[str,Any]]) -> dict[str,Any]:
+    rejected=sum(1 for r in previous_results if r.get("verdict")=="reject_intervention_family")
+    weak=sum(1 for r in previous_results if r.get("verdict")=="insufficient_or_mixed")
+    action="change_problem_or_intervention_family" if rejected else ("raise_minimum_effect_size" if weak>=2 else "continue")
+    return {"rejected_families":rejected,"weak_results":weak,"next_action":action}
