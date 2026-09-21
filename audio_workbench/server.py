@@ -29,6 +29,8 @@ from . import uncertainty
 from . import preference_memory
 from . import reference_dna
 from . import autonomous_loop
+from . import judge_calibration
+from . import observer_ensemble
 
 try:
     from fastmcp import FastMCP
@@ -83,6 +85,23 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
 
 
 
+
+
+@mcp.tool()
+def calibrate_judge_authority(trials: list[dict[str, Any]]) -> dict[str, Any]:
+    """Enable observer authority separately for each capability only after controlled trials."""
+    return judge_calibration.authority_map(trials)
+
+@mcp.tool()
+def filter_judge_verdict(verdict: dict[str, Any],
+                         authority: dict[str, Any]) -> dict[str, Any]:
+    """Remove decision weight from perceptual axes that failed calibration."""
+    return judge_calibration.filter_verdict(verdict, authority)
+
+@mcp.tool()
+def evaluate_observer_ensemble(verdicts: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate calibrated observers and expose disagreement for uncertainty routing."""
+    return observer_ensemble.evaluate(verdicts)
 
 @mcp.tool()
 def plan_next_autonomous_iteration(problems: list[dict[str, Any]],
