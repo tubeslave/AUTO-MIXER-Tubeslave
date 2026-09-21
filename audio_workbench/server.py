@@ -32,6 +32,7 @@ from . import autonomous_loop
 from . import judge_calibration
 from . import observer_ensemble
 from . import space_director
+from . import onboarding
 from . import significance
 
 try:
@@ -99,6 +100,17 @@ def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
     return significance.significance_gate(delta_rms_dbfs, affected_fraction, perceptual_verdict,
                                           min_delta_rms_dbfs, min_affected_fraction)
 
+
+
+@mcp.tool()
+def get_guided_mix_intake(track_count: int | None = None) -> dict[str, Any]:
+    """Ask only for musical intent that cannot be safely inferred from the audio."""
+    return onboarding.intake_questions(track_count)
+
+@mcp.tool()
+def compile_mix_intent(answers: dict[str, Any]) -> dict[str, Any]:
+    """Compile reference roles, hierarchy, macro, space and protected objectives before autonomous mixing."""
+    return onboarding.build_intent(answers)
 
 @mcp.tool()
 def build_sectional_space_plan(sections: list[dict[str, Any]],
