@@ -1,0 +1,258 @@
+{
+  "update_id": "ML-2026-09-21-1500",
+  "mode": "search",
+  "scheduled_slot": "2026-09-21T15:00:00+03:00",
+  "actual_start": "2026-09-21T15:02:10+03:00",
+  "completed": "2026-09-21T15:14:58+03:00",
+  "preceding_successful_search": "ML-2026-09-21-0900",
+  "preceding_update": "ML-2026-09-21-1200",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260921-1500-01",
+      "action": "added_version_family",
+      "title": "Band-Split RNN replication version family",
+      "canonical_title": "The Costs of Reproducibility in Music Separation Research: a Replication of Band-Split RNN",
+      "canonical_arxiv": "2603.09187",
+      "canonical_doi": "10.48550/arXiv.2603.09187",
+      "canonical_url": "https://arxiv.org/html/2603.09187",
+      "versions": [
+        {
+          "arxiv": "2603.09187",
+          "doi": "10.48550/arXiv.2603.09187",
+          "submitted": "2026-03-10",
+          "reading_depth": "abstract_method_architecture_selected_sections"
+        },
+        {
+          "arxiv": "2609.21918",
+          "doi": "10.48550/arXiv.2609.21918",
+          "submitted": "2026-09-18",
+          "reading_depth": "full_text_complete"
+        }
+      ],
+      "deduplication": "same authors, repository, experiment lineage and overlapping results; not independent confirmations",
+      "findings": [
+        "replicated base average cSDR 7.42 versus original 8.24",
+        "alternative data condition average cSDR 7.87",
+        "small-model variability about 0.3 dB vocals and 0.1 dB average",
+        "patience 10 to 30 added about 0.2 dB and 54 percent energy in the reported setting",
+        "4096/1024 STFT condition degraded average cSDR to about 6.6"
+      ],
+      "limitations": [
+        "MUSDB18-HQ only",
+        "mostly single-seed reporting",
+        "no controlled listening",
+        "no downstream mix-utility study",
+        "no phase/mono/true-peak/onset safety suite",
+        "energy results are hardware and workflow specific"
+      ]
+    },
+    {
+      "id": "SRC-ML-20260921-1500-02",
+      "action": "added",
+      "title": "The Internet Archive Music Dataset",
+      "publication": "ISMIR 2026; arXiv preprint",
+      "arxiv": "2609.20870",
+      "doi": "10.48550/arXiv.2609.20870",
+      "url": "https://arxiv.org/pdf/2609.20870",
+      "reading_depth": "full_text_complete",
+      "finding": "A very large captioned full-mix catalogue can support rights-aware discovery, but per-sample licences, uploader uncertainty, heuristic copyright screening and machine captions prevent automatic reference or training approval.",
+      "quantitative_context": {
+        "paper_segments_approx": 4100000,
+        "repository_clips_approx": 4250000,
+        "hours_approx": 34800,
+        "source_files_approx": 548000,
+        "subjective_samples": 100,
+        "volunteers": 20,
+        "ratings_per_item": 2
+      },
+      "limitations": [
+        "uploader-declared licence metadata may be wrong",
+        "ISWC/MusicBrainz matching is heuristic",
+        "deduplication is not acoustic fingerprinting",
+        "captions are machine generated and not human verified",
+        "lossy full mixes rather than raw stems",
+        "mostly non-commercial licences",
+        "caption study is not a production-quality study"
+      ],
+      "reuse_status": "catalog_candidate_rights_verification_required"
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260921-1500-01",
+      "action": "added",
+      "url": "https://github.com/magronp/bsrnn",
+      "revision": "41e9ce4e796159c7a6e6287d4d198ec1cedbf0ce",
+      "licence": "MIT for repository code",
+      "executed": false,
+      "findings": [
+        "repository maps to arXiv 2603.09187 and includes optimized variants absent from the short paper",
+        "fast cSDR differs from museval because of silent-frame NaN handling",
+        "seed 42 is configured while deterministic execution is disabled",
+        "missing checkpoints may initialise random weights",
+        "no automated sum-consistency, leakage, true-peak, loudness, phase/mono, boundary, latency or tail tests found"
+      ]
+    },
+    {
+      "id": "AUD-ML-20260921-1500-02",
+      "action": "added",
+      "url": "https://github.com/bvm810/IAMD",
+      "revision": "779a8596d18638ca4c0340f24b5da0f00526201d",
+      "licence": "MIT for authored code; per-sample Creative Commons for audio",
+      "executed": false,
+      "findings": [
+        "repository reports 4.25M clips versus about 4.1M in the paper",
+        "per-sample licence and provenance fields exist",
+        "ND material is excluded because audio is re-encoded",
+        "third-party evaluation code and models retain separate licences",
+        "dataset contains full mixes, not multitrack stems"
+      ]
+    }
+  ],
+  "dataset_cards": [
+    {
+      "id": "DATA-ML-20260921-1500-01",
+      "source": "SRC-ML-20260921-1500-02",
+      "title": "Internet Archive Music Dataset",
+      "status": "catalog_candidate_rights_verification_required",
+      "raw_stems": false,
+      "audio_downloaded": false,
+      "reference_card_created": false,
+      "reason": "mixed per-file licences, uploader-rights uncertainty, machine captions and full-mix MP3 scope"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260921-1500-01","claim":"Same-author retitled arXiv submissions with one repository and overlapping experiments form one version family, not independent confirmation.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-02","claim":"A replication gap must be reported against an exact metric implementation, split, checkpoint and configuration.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-03","claim":"SDR or cSDR improvement does not establish better downstream mixing or listener preference.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-04","claim":"Small single-seed deltas are weak evidence when they are comparable to observed seed variance.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-05","claim":"Longer STFT windows can trade temporal precision for frequency resolution; the effect is source and model specific.","confidence":"medium"},
+    {"id":"KC-ML-20260921-1500-06","claim":"Energy claims require hardware, stopping rule, failed-run accounting and quality target.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-07","claim":"Missing-checkpoint fallback to random weights is a safety failure unless inference stops before rendering.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-08","claim":"Separator pseudo-stems require sum-consistency, leakage, boundary, transient, phase/mono and peak tests before mix use.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-09","claim":"An uploader-declared Creative Commons field is evidence to inspect, not proof that the uploader controlled every right.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-10","claim":"Code licence, dataset licence and per-file audio licence are separate permissions.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-11","claim":"Machine captions support discovery but need human verification before genre, role or reference labels become project knowledge.","confidence":"high"},
+    {"id":"KC-ML-20260921-1500-12","claim":"A catalogue of lossy full mixes is not a multitrack benchmark and cannot support raw-stem DSP measurements.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260921-1500-01","source":"SRC-ML-20260921-1500-01","when":"deduplicating publication versions","change":"identity mapping only","parameter_range":"authors, title lineage, experiment overlap, repository","range_origin":"source-version audit","protect":["independence claim"],"verify":["authors","methods","results","repository"],"cancel":["overlap disproves independence"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-02","source":"AUD-ML-20260921-1500-01","when":"accepting a separation delta","change":"measurement contract only","parameter_range":"exact metric, silent-frame policy, split, checkpoint, seeds, config","range_origin":"paper-to-repository audit","protect":["reproducibility"],"verify":["manifest","metric parity"],"cancel":["any unresolved mismatch"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-03","source":"SRC-ML-20260921-1500-01","when":"reported gain is near run variance","change":"seed count only","parameter_range":"multiple fixed disclosed seeds","range_origin":"reported small-model variability","protect":["causal interpretation"],"verify":["mean","dispersion","per-source signs"],"cancel":["single-run universal claim"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-04","source":"SRC-ML-20260921-1500-01","when":"testing STFT resolution","change":"window and hop pair only","parameter_range":"2048/512 versus 4096/1024 as study conditions","range_origin":"reported ablation, not a preset","protect":["drum attacks","section timing"],"verify":["source-wise onset error","blind preference"],"cancel":["transient loss"],"confidence":"medium","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-05","source":"AUD-ML-20260921-1500-01","when":"loading a pretrained separator","change":"checkpoint gate only","parameter_range":"expected hash or stop","range_origin":"repository fallback audit","protect":["output validity"],"verify":["checkpoint exists","hash matches"],"cancel":["random or unknown weights"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-06","source":"SRC-ML-20260921-1500-01","when":"using separator output for a bounded mix edit","change":"edit-control source only","parameter_range":"raw stem versus separator estimate","range_origin":"controlled experiment design","protect":["unaffected roles","phase/mono","headroom"],"verify":["additivity","off-target residual","boundaries","blind preference"],"cancel":["audible leakage","peak or phase damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-07","source":"SRC-ML-20260921-1500-02","when":"considering an IAMD item","change":"none until per-file rights pass","parameter_range":"licence, provenance, attribution, share-alike and use compatibility","range_origin":"paper ethics and repository rights audit","protect":["copyright","intended use"],"verify":["file-level record","uploader authority where possible"],"cancel":["NC incompatibility","unclear authorship","missing obligations"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1500-08","source":"SRC-ML-20260921-1500-02","when":"retrieving by machine caption","change":"candidate ranking only","parameter_range":"no audio setting","range_origin":"caption-generation method","protect":["genre and role accuracy"],"verify":["human content review"],"cancel":["metadata-content disagreement"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_cards": [
+    {"id":"VID-ML-20260921-1500-01","title":"Getting a Pro Mix from Amateur Tracks","channel":"Hardcore Music Studio","url":"https://www.youtube.com/watch?v=C4pxCXHlAE4","published":"2025-09-15","topic":"modern heavy and rock mix repair","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_retrieved_no_permitted_bridge"},
+    {"id":"VID-ML-20260921-1500-02","title":"Start to Finish Drum Mix","channel":"Hardcore Music Studio","url":"https://www.youtube.com/watch?v=eiWNtDuBzv0","published":"2024-01-29","topic":"rock and metal drum balance and processing","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_retrieved_no_permitted_bridge"}
+  ],
+  "revisions": [
+    {"previous":"arXiv 2609.21918 is independent fresh confirmation","revised":"it is a shorter same-author version of the 2603.09187 BSRNN replication family"},
+    {"previous":"repository and short-paper BSRNN figures are directly interchangeable","revised":"the repository includes optimized variants absent from the short paper and needs configuration-level mapping"},
+    {"previous":"fast cSDR and museval cSDR are interchangeable","revised":"silent-frame handling differs and the metric contract must be pinned"},
+    {"previous":"better separator metrics imply better mixing utility","revised":"downstream edit utility and collateral damage require separate raw and listening tests"},
+    {"previous":"a Creative Commons catalogue is reusable as a project reference corpus","revised":"IAMD remains per-file rights-gated discovery material with uploader and caption uncertainty"}
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260921-1500-01",
+      "status": "not_run",
+      "priority": "next",
+      "baseline": "one fixed bounded section edit controlled from a rights-cleared raw multitrack stem",
+      "variant": "the identical edit controlled from a BSRNN-estimated pseudo-stem",
+      "single_factor": "edit-control source: raw stem versus separator estimate",
+      "fixed": ["song and section","gain staging","edit curve","processor","automation","sample rate","renderer","checkpoint","segmentation","seed"],
+      "loudness_matching": "separate randomized listening copies only; raw safety renders remain unnormalised",
+      "measurements": ["sum consistency","target residual","non-target residual","role leakage","onset error","boundary discontinuity","sample peak","true peak","phase/mono residual","render time","blind preference"],
+      "protect": ["unaffected instruments","groove","drum attack","bass and rhythm-guitar foundation","stereo image","headroom","section continuity"],
+      "cancel": ["unresolved rights or checkpoint provenance","non-fail-closed loading","audible off-target residual","boundary click","phase/mono damage","unsafe peak","non-repeatable preference"]
+    },
+    {
+      "id": "EXP-ML-20260921-1500-02",
+      "status": "not_run",
+      "baseline": "repository fast cSDR",
+      "variant": "museval-compatible cSDR",
+      "single_factor": "metric implementation and silent-frame policy",
+      "fixed": ["saved estimates","references","frame parameters","aggregation set"],
+      "loudness_matching": "not applicable; measurement audit",
+      "measurements": ["per-frame validity","silent-frame count","per-track delta","aggregate delta"],
+      "protect": ["metric interpretation"],
+      "cancel": ["different audio inputs","unlogged frame exclusion"]
+    },
+    {
+      "id": "EXP-ML-20260921-1500-03",
+      "status": "not_run",
+      "baseline": "linear-fade overlap stitching",
+      "variant": "overlap-add stitching",
+      "single_factor": "stitching method",
+      "fixed": ["checkpoint","mixture","segment length","overlap","sample rate","normalisation"],
+      "loudness_matching": "separate listening copies only",
+      "measurements": ["boundary residual","click count","sum consistency","true peak","phase/mono","runtime","blind preference"],
+      "protect": ["transients","tails","section continuity"],
+      "cancel": ["boundary artifact","peak increase","deadline miss"]
+    },
+    {
+      "id": "EXP-ML-20260921-1500-04",
+      "status": "not_run",
+      "baseline": "IAMD retrieval by machine caption after per-file rights filtering",
+      "variant": "same candidate pool reranked after human genre and role verification",
+      "single_factor": "human verification enabled",
+      "fixed": ["query","rights gate","candidate count","catalogue snapshot"],
+      "loudness_matching": "not applicable until separately cleared listening material exists",
+      "measurements": ["genre precision","role precision","false-reference rate","rights rejection rate"],
+      "protect": ["copyright","reference-label accuracy"],
+      "cancel": ["unclear per-file rights","insufficient provenance","no human agreement"]
+    }
+  ],
+  "deduplication": [
+    {"kind":"version_family","kept":"arXiv:2603.09187 canonical with linked arXiv:2609.21918","removed_independent_count":1},
+    {"kind":"video_id","removed":"bg5DVv_jdtk","reason":"already studied in ML-2026-09-18-0900"}
+  ],
+  "queue": {
+    "video_count": 28,
+    "studied_videos": 0,
+    "remaining": [
+      "full remaining sections and appendices of arXiv 2603.09187",
+      "BSRNN metric, checkpoint and stitching audit",
+      "public checkpoint hashes and licence compatibility",
+      "IAMD per-file rights and human-label validation before any reference use",
+      "rights-cleared paired DI-to-processed rock-guitar fragment",
+      "Open-Amp, GOAT and URMP carried rights and split questions",
+      "28 transcript-dependent video sources"
+    ]
+  },
+  "counts": {
+    "source_cards_added": 2,
+    "implementation_audits_added": 2,
+    "dataset_cards_added": 1,
+    "knowledge_cards": 12,
+    "candidate_rules": 8,
+    "experiments_not_run": 4,
+    "new_video_cards": 2,
+    "studied_videos": 0,
+    "queued_videos_total": 28,
+    "reference_cards": 0,
+    "new_licensed_multitracks": 0,
+    "duplicates_or_versions_resolved": 2,
+    "conclusions_revised": 5
+  },
+  "safety": {
+    "user_audio_uploaded": false,
+    "commercial_audio_downloaded": false,
+    "dataset_audio_downloaded": false,
+    "companion_audio_analysed": false,
+    "paid_services_used": false,
+    "gpu_jobs_run": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "active_rules_changed": false,
+    "model_trained": false
+  }
+}
