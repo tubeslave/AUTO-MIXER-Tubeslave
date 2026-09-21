@@ -1,0 +1,107 @@
+{
+  "update_id": "ML-2026-09-21-1200",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-21T12:00:00+03:00",
+  "actual_start": "2026-09-21T12:01:24+03:00",
+  "completed": "2026-09-21T12:04:15+03:00",
+  "preceding_successful_search": "ML-2026-09-21-0900",
+  "preceding_update": "ML-2026-09-21-0900",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260921-0900-01",
+      "action": "updated",
+      "title": "Open-Amp: Synthetic Data Framework for Audio Effect Foundation Models",
+      "doi": "10.48550/arXiv.2411.14972",
+      "url": "https://arxiv.org/html/2411.14972",
+      "reading_depth": "full_text_deep_review_complete",
+      "finding": "The released foundation model is closed-set lookup conditioned; unseen-device enrolment freezes the network but optimises a new embedding from paired target audio and selects its initial embedding by target loss, so it is supervised target-aware adaptation rather than zero-shot reference inference.",
+      "quantitative_checks": {"table_III_emb256_ESR_penalty_dB_vs_one_to_one":[0.4,5.4,4.8,3.4,4.7],"devices_in_enrolment":3,"enrolment_split":"90/5/5"},
+      "limitations": ["three unseen pedals", "target-aware initialisation", "paired clean/processed data required", "no controlled listening", "no seed or uncertainty report", "no raw peak/phase/HF/aliasing/runtime validation"]
+    },
+    {
+      "id": "SRC-ML-20260921-0900-02",
+      "action": "updated",
+      "title": "GOAT: A Large Dataset of Paired Guitar Audio Recordings and Tablatures",
+      "doi": "10.48550/arXiv.2509.22655",
+      "url": "https://arxiv.org/html/2509.22655v1",
+      "reading_depth": "full_text_deep_review_complete",
+      "finding": "Re-amp augmentation improved the matching amplifier-domain transcription result but did not provide a domain-uniform gain; extra augmentation improved AMP F1 slightly while reducing DI and GuitarSet F1.",
+      "quantitative_checks": {"AMP_minus_DI_F1":{"GOAT_DI":0.022158,"GOAT_AMP":0.086215,"GuitarSet":-0.017412},"AMP_XL_minus_AMP_F1":{"GOAT_DI":-0.024574,"GOAT_AMP":0.006045,"GuitarSet":-0.008004}},
+      "limitations": ["no repeated seeds or uncertainty", "no significance test", "domain-dependent signs", "research-only rights", "best-epoch token metrics", "wait-token imbalance"]
+    },
+    {
+      "id": "SRC-ML-20260921-1200-01",
+      "action": "added",
+      "title": "Towards Zero-Shot Amplifier Modeling: One-to-Many Amplifier Modeling via Tone Embedding Control",
+      "publication": "ISMIR 2024; arXiv preprint",
+      "arxiv": "2407.10646v1",
+      "doi": "10.48550/arXiv.2407.10646",
+      "url": "https://arxiv.org/html/2407.10646",
+      "reading_depth": "full_text_complete",
+      "finding": "An audio-derived tone embedding enables inference without generator retraining and is therefore a true zero-shot comparator to Open-Amp enrolment, but evidence is limited to two unseen amps, objective complex-STFT loss and an author case study.",
+      "limitations": ["proprietary Positive Grid encoder and corpus", "two unseen amps", "no public reproduction path", "no controlled listening", "high-frequency and sustain failures", "unsupported EQ component in case-study target"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260921-0900-01",
+      "action": "updated",
+      "url": "https://github.com/Alec-Wright/OpenAmp",
+      "revision": "b57993408a61d94bf9425ca0acf7af4b3c27f3eb",
+      "executed": false,
+      "findings": ["run_uni_amp addresses only the 394-row training lookup table", "training table represents 150 unique capture files and test table 10 unique captures/26 rows", "test_devs is created but not used by training or validation datasets", "validation changes input guitar but retains training device IDs", "public checkpoints use embedding dimensions 4/8 at epoch 3 rather than paper dimensions 16/64/256 at epoch 8", "generic script loops 1000 epochs", "no unseen-enrolment script", "validation targets may be generated and cached on demand"]
+    },
+    {
+      "id": "AUD-ML-20260921-0900-02",
+      "action": "updated",
+      "url": "https://github.com/JackJamesLoth/GOAT-Dataset",
+      "revision": "55c6e6668ef4546e4635c5e7eaad3062cf7f036b",
+      "executed": false,
+      "findings": ["public notebook has one render loop rather than an explicit five-pass driver", "alignment-quality CSV referenced by notebook is absent", "random processor state is neither seeded nor manifested", "filename hash excludes processing state", "test split uses literal song-name substrings", "no root or per-example licence/provenance map"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260921-1200-01","claim":"Closed-set lookup conditioning, paired embedding enrolment and zero-shot reference conditioning are distinct capabilities.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-02","claim":"Choosing an initial embedding by target loss is an oracle step unless the processed target exists at deployment.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-03","claim":"A different input guitar tests content transfer but not unseen-device transfer.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-04","claim":"A test index is not evaluation evidence if the executed inference and validation paths cannot address it.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-05","claim":"Checkpoint hash, embedding size, epoch, split and dependencies must match before claiming paper reproduction.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-06","claim":"Per-device and worst-case errors are required alongside a universal-renderer average.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-07","claim":"Zero-shot reference conditioning is bounded by the encoder domain and processor components represented during training.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-08","claim":"High-frequency and sustain failures can remain hidden behind aggregate spectral loss.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-09","claim":"Re-amp augmentation is domain adaptation rather than guaranteed cross-domain improvement.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-10","claim":"More timbral variants may improve matching amp-domain robustness while reducing DI or acoustic performance.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-11","claim":"A render count without seeded per-render provenance is not a reproducible augmentation corpus.","confidence":"high"},
+    {"id":"KC-ML-20260921-1200-12","claim":"Best-epoch token accuracy can be invalid when high-frequency wait tokens dominate predictions.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260921-1200-01","source":"SRC-ML-20260921-0900-01","when":"describing a conditioned renderer","change":"capability label only","parameter_range":"closed_set_lookup, paired_enrolment or zero_shot_reference","range_origin":"method inputs and optimisation path","protect":["deployment claim"],"verify":["target information available","parameters updated at inference"],"cancel":["adaptation required for a zero-shot claim"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-02","source":"SRC-ML-20260921-0900-01","when":"testing paired unseen-device enrolment","change":"initial embedding selector only","parameter_range":"deployable neutral/mean versus target-loss oracle","range_origin":"Open-Amp enrolment protocol","protect":["deployment validity"],"verify":["oracle regret","multi-seed convergence","blind preference"],"cancel":["target leakage into deployable selector"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-03","source":"AUD-ML-20260921-0900-01","when":"claiming unseen-device generalisation","change":"split policy only","parameter_range":"source-disjoint plus device-disjoint","range_origin":"static audit and paper distinction","protect":["generalisation claim"],"verify":["executed IDs and source paths"],"cancel":["training IDs in validation","unused test table"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-04","source":"AUD-ML-20260921-0900-01","when":"reproducing a reported checkpoint","change":"none until artifact parity","parameter_range":"exact hash/config/embedding/epoch/split/dependencies","range_origin":"repository-to-paper audit","protect":["reproducibility"],"verify":["machine-readable manifest"],"cancel":["any unresolved mismatch"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-05","source":"SRC-ML-20260921-0900-02","when":"accepting augmentation benefit","change":"augmentation count only","parameter_range":"DI-only versus one deterministic re-amp first","range_origin":"GOAT domain-result audit","protect":["DI","amplified electric guitar","acoustic/domain transfer"],"verify":["per-domain signs","worst case","confidence interval"],"cancel":["material protected-domain regression","single-seed claim"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-06","source":"SRC-ML-20260921-1200-01","when":"evaluating a guitar renderer","change":"measurement suite only","parameter_range":"no audio settings transferred","range_origin":"reported HF/sustain failure","protect":["HF texture","sustain","onset","phase/mono","true peak"],"verify":["raw metrics","section residual","blind preference"],"cancel":["raw-signal damage","metric-only gain"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-07","source":"AUD-ML-20260921-0900-02","when":"creating re-amp augmentation","change":"one render factor only","parameter_range":"derive from rights-cleared processor","range_origin":"controlled experiment design, not GOAT preset","protect":["reproducibility","causal attribution"],"verify":["seed","full state manifest","repeat hash"],"cancel":["unlogged state","non-deterministic repeat"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-1200-08","source":"AUD-ML-20260921-0900-02","when":"considering GOAT examples or dataset audio","change":"none until file-level rights clearance","parameter_range":"not applicable","range_origin":"paper and repository rights audit","protect":["copyright","provenance"],"verify":["owner","source","licence","permitted use"],"cancel":["any unresolved file"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "revisions": [
+    {"previous":"Open-Amp supports zero-shot unseen devices","revised":"its reported unseen route is paired target-aware embedding optimisation; the released inference path is closed-set"},
+    {"previous":"Open-Amp public validation tests unseen devices","revised":"the public main script validates training devices on a different input guitar and leaves test_devs unused"},
+    {"previous":"released Open-Amp checkpoints reproduce the paper","revised":"checkpoint dimensions/epoch and quick-start schedule differ from the reported experiment"},
+    {"previous":"GOAT augmentation improves generalisation without cost","revised":"benefit is domain-dependent and extra augmentation degrades DI/acoustic scores while slightly improving the amp domain"},
+    {"previous":"GOAT helper reproduces the released augmented corpus","revised":"the public notebook lacks the five-pass driver, alignment CSV, fixed seed and processing-state manifest"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260921-1200-01","status":"not_run","priority":"next","baseline":"new-device embedding from deployable neutral or mean initialisation","variant":"new-device embedding initialised by lowest target loss among training embeddings","single_factor":"initial embedding selector: deployable versus target-aware oracle","fixed":["rights-cleared paired DI-to-processor data","model checkpoint","frozen network","embedding dimension","source/device split","optimiser","steps","seed set","loss","render format"],"loudness_matching":"separate randomized listening copies only; raw safety renders remain unnormalised","measurements":["convergence","ESR","MRSTFT","oracle regret","per-section residual","gain","sample peak","true peak","DC","phase/mono","onset","HF/aliasing","sustain/tail","blind preference"],"protect":["pick attack","sustain","effect identity","phase","headroom","section continuity"],"cancel":["target leakage into deployable selector","unstable multi-seed result","raw-signal damage","metric-only advantage"]},
+    {"id":"EXP-ML-20260921-1200-02","status":"not_run","baseline":"validation on training device IDs with held-out guitar content","variant":"same model evaluated on held-out device IDs and held-out content","single_factor":"device split","fixed":["content duration","metrics","checkpoint","format"],"loudness_matching":"separate listening copy only","measurements":["per-device ESR/MRSTFT","worst case","peaks","HF","phase/mono","blind preference"],"protect":["generalisation interpretation"],"cancel":["ID overlap","unaddressable embeddings","missing targets"]},
+    {"id":"EXP-ML-20260921-1200-03","status":"not_run","baseline":"one-to-one renderer for one rights-cleared device","variant":"one-to-many renderer conditioned for the same device","single_factor":"renderer conditioning scope","fixed":["architecture budget","training audio","steps","loss","seeds","sample rate"],"loudness_matching":"separate blind copy only","measurements":["ESR/MRSTFT","gain/true peak","phase/mono","onset","HF","sustain","runtime","blind preference"],"protect":["attack","tone identity","headroom","continuity"],"cancel":["universal fidelity loss","deadline miss","raw damage"]},
+    {"id":"EXP-ML-20260921-1200-04","status":"not_run","baseline":"rights-cleared DI-only training","variant":"same training set plus one deterministic open re-amp per item","single_factor":"augmentation enabled","fixed":["notes/performances","split","model","steps","seed set","pitch augmentation","metrics"],"loudness_matching":"separate blind renderer copy only","measurements":["DI-domain F1","amp-domain F1","acoustic-domain F1","confidence intervals","raw render safety"],"protect":["DI and acoustic performance","annotation alignment","tone diversity"],"cancel":["material protected-domain regression","alignment drift","unmanifested render"]}
+  ],
+  "queue": {"video_count":26,"studied_videos":0,"remaining":["rights-cleared paired DI-to-processed rock-guitar fragment", "Open-Amp file-level code/capture/audio rights", "GOAT Zenodo file-level rights and provenance", "URMP split/code questions from ML-2026-09-20-1800", "26 transcript-dependent video sources"]},
+  "counts": {"source_cards_added":1,"source_cards_updated":2,"implementation_audits_updated":2,"knowledge_cards":12,"candidate_rules":8,"experiments_not_run":4,"new_video_cards":0,"studied_videos":0,"queued_videos_total":26,"reference_cards":0,"new_licensed_multitracks":0,"conclusions_revised":5},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"companion_audio_analysed":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
