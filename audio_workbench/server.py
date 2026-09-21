@@ -28,6 +28,7 @@ from . import perceptual
 from . import uncertainty
 from . import preference_memory
 from . import reference_dna
+from . import autonomous_loop
 
 try:
     from fastmcp import FastMCP
@@ -81,6 +82,23 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
 
 
 
+
+
+@mcp.tool()
+def plan_next_autonomous_iteration(problems: list[dict[str, Any]],
+                                   confidence: dict[str, float],
+                                   observer_disagreement: float = 0.0) -> dict[str, Any]:
+    """Choose investigation/diagnostic path without granting processing authority."""
+    return autonomous_loop.next_iteration(problems, confidence, observer_disagreement)
+
+@mcp.tool()
+def should_stop_autonomous_mix(problems: list[dict[str, Any]],
+                               accepted_improvements: int,
+                               failed_recent_experiments: int,
+                               operator_stop: bool = False) -> dict[str, Any]:
+    """Apply explicit whole-song stop conditions."""
+    return autonomous_loop.stop_decision(problems, accepted_improvements,
+                                         failed_recent_experiments, operator_stop)
 
 @mcp.tool()
 def aggregate_blind_judges(verdicts: list[dict[str, Any]],
