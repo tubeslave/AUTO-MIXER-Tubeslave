@@ -17,6 +17,7 @@ from . import ableton
 from . import renderer
 from . import doctor
 from . import automixer_bridge
+from . import reference
 
 try:
     from fastmcp import FastMCP
@@ -66,6 +67,25 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
     """Offline plugin render. Denied until an exact plugin build has an enabled calibration record."""
     return plugin_host.render_plugin(input_path, output_path, plugin_path, parameters,
                                      calibration_record=calibration_record)
+
+
+@mcp.tool()
+def create_reference_profile(reference_path: str,
+                             sections: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Create a production-trait profile. It is evidence, not a target EQ curve."""
+    return reference.create_profile(reference_path, sections)
+
+@mcp.tool()
+def compare_mix_to_reference(candidate_path: str, profile: dict[str, Any],
+                             candidate_sections: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Compare level, dynamics, relative spectrum and stereo traits to a reference profile."""
+    return reference.compare_to_reference(candidate_path, profile, candidate_sections)
+
+@mcp.tool()
+def propose_reference_hypotheses(comparison: dict[str, Any],
+                                 threshold_db: float = 1.5) -> list[dict[str, Any]]:
+    """Turn large reference deltas into inspection hypotheses, never direct processing commands."""
+    return reference.build_hypotheses(comparison, threshold_db)
 
 @mcp.tool()
 def render_dawless_mix(project_root: str, output_path: str,
