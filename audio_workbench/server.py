@@ -21,6 +21,9 @@ from . import reference
 from . import song_model
 from . import events
 from . import causal
+from . import dynamic_masking
+from . import macro
+from . import quality_loop
 
 try:
     from fastmcp import FastMCP
@@ -72,6 +75,40 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
                                      calibration_record=calibration_record)
 
 
+
+
+@mcp.tool()
+def analyze_dynamic_masking(tracks: list[dict[str, Any]],
+                            priorities: dict[str, float]) -> dict[str, Any]:
+    """Build time-varying masking evidence and indicate which source priority protects."""
+    return dynamic_masking.dynamic_masking_graph(tracks, priorities)
+
+@mcp.tool()
+def analyze_macro_energy(audio_path: str,
+                         sections: list[dict[str, Any]]) -> dict[str, Any]:
+    """Measure relative section energy/contrast across the whole song."""
+    return macro.energy_curve(audio_path, sections)
+
+@mcp.tool()
+def check_macro_regression(before: dict[str, Any], after: dict[str, Any],
+                           protected_pairs: list[dict[str, Any]],
+                           tolerance_db: float = 0.75) -> dict[str, Any]:
+    """Reject local improvements that collapse protected section contrast."""
+    return macro.contrast_regression(before, after, protected_pairs, tolerance_db)
+
+@mcp.tool()
+def rank_next_mix_problem(problems: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Prioritize the next investigation by importance, confidence, impact and uncertainty."""
+    return quality_loop.rank_next_problem(problems)
+
+@mcp.tool()
+def evaluate_causal_candidate(plan: dict[str, Any], candidate: dict[str, Any],
+                              target_improved: bool,
+                              protected_regressions: list[str],
+                              evaluation_confidence: float) -> dict[str, Any]:
+    """Apply causal/protected-metric/confidence gate to one rendered candidate."""
+    return quality_loop.evaluate_candidate(plan, candidate, target_improved,
+                                           protected_regressions, evaluation_confidence)
 
 @mcp.tool()
 def build_song_hierarchy(project_root: str) -> dict[str, Any]:
