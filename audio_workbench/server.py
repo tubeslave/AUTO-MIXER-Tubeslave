@@ -31,6 +31,7 @@ from . import reference_dna
 from . import autonomous_loop
 from . import judge_calibration
 from . import observer_ensemble
+from . import space_director
 from . import significance
 
 try:
@@ -97,6 +98,20 @@ def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
     """Stop iterating on changes that are technically measurable but not meaningfully discriminable."""
     return significance.significance_gate(delta_rms_dbfs, affected_fraction, perceptual_verdict,
                                           min_delta_rms_dbfs, min_affected_fraction)
+
+
+@mcp.tool()
+def build_sectional_space_plan(sections: list[dict[str, Any]],
+                               role_map: dict[str, str]) -> dict[str, Any]:
+    """Build dry/medium/large spatial roles by song section."""
+    return space_director.section_plan(sections, role_map)
+
+@mcp.tool()
+def validate_space_transitions(plan: dict[str, Any],
+                               max_send_jump_db: float = 6.0,
+                               min_crossfade_ms: float = 100.0) -> dict[str, Any]:
+    """Check bounded transitions before rendering sectional space automation."""
+    return space_director.validate_transition(plan, max_send_jump_db, min_crossfade_ms)
 
 @mcp.tool()
 def calibrate_judge_authority(trials: list[dict[str, Any]]) -> dict[str, Any]:
