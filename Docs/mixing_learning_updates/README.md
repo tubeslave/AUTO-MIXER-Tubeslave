@@ -43,6 +43,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-20-1500 | [Report](ML-2026-09-20-1500.md), [JSON patch](ML-2026-09-20-1500.json) | Search: 2 full-text DAFx-26 sources, 1 companion-artifact audit, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued mix-bus videos, 4 unrun experiments; 3 duplicates/version mappings resolved |
 | ML-2026-09-20-1800 | [Report](ML-2026-09-20-1800.md), [JSON patch](ML-2026-09-20-1800.json) | Deep review: full DDSPMM-guided diffusion method plus foundational DDSPMM and companion-rights audit; 2 source cards, 1 artifact update, 12 Knowledge Cards, 8 candidate rules, 24 carried queued videos and 4 unrun experiments; split, source-identity, boundary and listening limits recorded |
 | ML-2026-09-21-0900 | [Report](ML-2026-09-21-0900.md), [JSON patch](ML-2026-09-21-0900.json) | Search: 2 older full-text guitar-FX/data gaps, 2 implementation audits, 1 rights-constrained dataset card, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued vocal-processing videos, 4 unrun experiments; held-out evaluation, deterministic provenance and rights limits recorded |
+| ML-2026-09-21-1200 | [Report](ML-2026-09-21-1200.md), [JSON patch](ML-2026-09-21-1200.json) | Deep review: Open-Amp capability/protocol and repository audit, full zero-shot comparator, GOAT domain-result and renderer audit; 1 added and 2 updated source cards, 12 Knowledge Cards, 8 candidate rules, 26 carried queued videos and 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -79,6 +80,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-21-1200 (`deep_review`, preceding search `ML-2026-09-21-0900`): distinguish closed-set lookup control, paired target-aware embedding enrolment and zero-shot reference conditioning. Require deployable-versus-oracle selector comparison, true device/content holdouts, checkpoint/config parity and per-device/domain worst cases. Keep raw HF/sustain/phase/peak gates separate from loudness-matched listening. Next test: `EXP-ML-20260921-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-21-0900 (`search`, preceding successful search `ML-2026-09-20-1500`): treat effect diversity as a training hypothesis, not a tone preset. Require an actually used held-out-device split, a deterministic per-render manifest and separate rights clearance for code, capture models, source audio and plugins. Compare universal and device-specific renderers on raw safety outputs; judge preference only on separate loudness-matched blind copies. Next test: `EXP-ML-20260921-0900-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
