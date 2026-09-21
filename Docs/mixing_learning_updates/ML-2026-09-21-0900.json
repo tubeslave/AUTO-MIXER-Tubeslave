@@ -1,0 +1,133 @@
+{
+  "update_id": "ML-2026-09-21-0900",
+  "mode": "search",
+  "scheduled_slot": "2026-09-21T09:00:00+03:00",
+  "actual_start": "2026-09-21T08:58:35+03:00",
+  "completed": "2026-09-21T09:11:09+03:00",
+  "preceding_successful_search": "ML-2026-09-20-1500",
+  "preceding_update": "ML-2026-09-20-1800",
+  "citation_check": "partial",
+  "fresh_since_preceding_search": [],
+  "older_significant_gaps_added": ["SRC-ML-20260921-0900-01", "SRC-ML-20260921-0900-02"],
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260921-0900-01",
+      "title": "Open-Amp: Synthetic Data Framework for Audio Effect Foundation Models",
+      "authors": ["Alec Wright", "Alistair Carson", "Lauri Juvela"],
+      "publication": "ICASSP 2025; arXiv preprint version 1 dated 2024-11-22",
+      "arxiv": "2411.14972v1",
+      "doi": "10.48550/arXiv.2411.14972",
+      "url": "https://arxiv.org/html/2411.14972",
+      "reading_depth": "full_text_complete",
+      "finding": "Device-diverse synthetic rendering improved the tested effect representation and supported low-data embedding enrolment, but every selected one-to-one device model outperformed the one-to-many model for its own device and no controlled listening test established preferred tone.",
+      "limitations": ["objective classification/reconstruction evaluation", "no controlled listening test", "only three analogue pedals in the low-data enrolment study", "one-to-many fidelity below one-to-one on all five selected devices", "study settings are not production presets"]
+    },
+    {
+      "id": "SRC-ML-20260921-0900-02",
+      "title": "GOAT: A Large Dataset of Paired Guitar Audio Recordings and Tablatures",
+      "authors": ["Jack James Loth", "Daniel Stoller", "Simon Dixon"],
+      "publication": "ISMIR 2025; arXiv preprint",
+      "arxiv": "2509.22655v1",
+      "doi": "10.48550/arXiv.2509.22655",
+      "url": "https://arxiv.org/html/2509.22655v1",
+      "dataset_url": "https://zenodo.org/records/15690894",
+      "reading_depth": "full_text_complete",
+      "finding": "Paired DI, symbolic and re-amped data provide a useful evaluation structure; amp-domain augmentation helped the tested amp-domain transcription but did not uniformly outperform DI training across domains or dataset sizes.",
+      "limitations": ["research-purpose distribution by request", "authors do not exclusively own all copyrights", "cover performances and community tablatures", "commercial cabinet processing in rendering path", "automatic metrics only", "larger augmentation was not uniformly better"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260921-0900-01",
+      "source": "SRC-ML-20260921-0900-01",
+      "name": "OpenAmp repository",
+      "url": "https://github.com/Alec-Wright/OpenAmp",
+      "revision": "b57993408a61d94bf9425ca0acf7af4b3c27f3eb",
+      "reading_depth": "complete_tree_and_relevant_training_inference_static_audit",
+      "executed": false,
+      "root_license": null,
+      "dependency_lock": false,
+      "findings": ["main training script creates test_devs but validates using train_devs", "newer seeded device-split helper is not used by the main demo validation path", "README describes a basic implementation rather than exact paper reproduction", "dependencies are not pinned", "paper, code, capture-model and source-audio rights are separate"],
+      "integration_status": "blocked_pending_license_and_reproducible_heldout_evaluation"
+    },
+    {
+      "id": "AUD-ML-20260921-0900-02",
+      "source": "SRC-ML-20260921-0900-02",
+      "name": "GOAT-Dataset repository",
+      "url": "https://github.com/JackJamesLoth/GOAT-Dataset",
+      "revision": "55c6e6668ef4546e4635c5e7eaad3062cf7f036b",
+      "reading_depth": "complete_tree_and_render_notebook_static_audit",
+      "executed": false,
+      "root_license": null,
+      "findings": ["render notebook references commercial Neural DSP cabinet processing and local plugin/preset paths", "random render choices have no fixed seed", "no per-render preset/mic/position/distance/phase/room/send manifest is saved", "song-name-specific split logic does not cleanly reproduce the anonymised public description", "plugin/model versions are not locked"],
+      "integration_status": "research_only_rights_and_provenance_unresolved"
+    }
+  ],
+  "dataset_cards": [
+    {
+      "id": "DATA-ML-20260921-0900-01",
+      "source": "SRC-ML-20260921-0900-02",
+      "name": "GOAT",
+      "url": "https://zenodo.org/records/15690894",
+      "reading_depth": "paper_and_metadata_only_no_audio_download",
+      "raw_audio_accessed": false,
+      "rights_status": "research_use_restrictions_and_nonexclusive_copyrights",
+      "project_use_status": "not_added_as_reference_or_licensed_multitrack"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260921-0900-01","claim":"Device diversity can improve effect representations without proving preferred guitar tone.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-02","claim":"One-to-many conditioning trades device-specific fidelity for coverage in the tested Open-Amp setup.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-03","claim":"Open-Amp low-data embedding enrolment is promising but supported here by only three analogue pedals and objective metrics.","confidence":"medium_high"},
+    {"id":"KC-ML-20260921-0900-04","claim":"A declared test-device list is not evidence of held-out evaluation unless the executed validation path consumes it.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-05","claim":"Unpinned dependencies and a basic demo script prevent exact paper-reproduction claims.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-06","claim":"Paper, code, capture-model and source-audio rights require independent clearance.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-07","claim":"Paired DI-to-processed data supports controlled renderer evaluation only when pair and processing provenance are rights-cleared.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-08","claim":"GOAT rights caveats block its use as a reusable project multitrack or Reference Card.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-09","claim":"Stochastic re-amping without seeds and a parameter manifest is not reproducible augmentation.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-10","claim":"A commercial cabinet path prevents exact free reproduction unless replaced and revalidated.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-11","claim":"Amp augmentation gains are domain-specific and do not imply uniform improvement on DI or other datasets.","confidence":"high"},
+    {"id":"KC-ML-20260921-0900-12","claim":"Sequence accuracy dominated by wait or silence tokens is not a valid proxy for musical correctness.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260921-0900-01","source":"SRC-ML-20260921-0900-01","when":"training a multi-device guitar-FX model","change":"device-diversity sampling only","parameter_range":"no audio setting transferred; diversity is the only factor","range_origin":"controlled experiment design, not a paper preset","protect":["source performance","input level","effect identity"],"verify":["held-out-device error","per-device signs","loudness-matched blind preference"],"cancel":["metric-only gain","identity drift"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-02","source":"SRC-ML-20260921-0900-01","when":"selecting universal versus device-specific modelling","change":"conditioning target only","parameter_range":"single-device versus multi-device","range_origin":"Open-Amp topology comparison","protect":["attack","phase/mono","HF texture","headroom"],"verify":["same architecture/context/data/loss","raw safety","blind preference"],"cancel":["audible fidelity loss","coverage-only gain"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-03","source":"SRC-ML-20260921-0900-01","when":"testing low-data embedding enrolment","change":"enrolment data duration only","parameter_range":"derive from available rights-cleared data; do not copy 3 s as a preset","range_origin":"3 s was one paper condition","protect":["unseen-device generalisation"],"verify":["device- and source-grouped split","multi-seed error","blind preference"],"cancel":["device/source overlap","unstable result"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-04","source":"AUD-ML-20260921-0900-01","when":"accepting repository validation evidence","change":"evaluation split path only","parameter_range":"not applicable","range_origin":"static code audit","protect":["generalisation claim"],"verify":["runtime path consumes held-out device IDs"],"cancel":["unused test list","same-device validation"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-05","source":"AUD-ML-20260921-0900-01","when":"considering code, capture or audio ingestion","change":"none until all rights layers are cleared","parameter_range":"not applicable","range_origin":"artifact-specific rights audit","protect":["licensing","provenance"],"verify":["paper, code, model-capture, source-audio and plugin permissions"],"cancel":["any unresolved layer"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-06","source":"AUD-ML-20260921-0900-02","when":"generating re-amped augmentation","change":"one randomised render factor only","parameter_range":"derive from rights-cleared processor controls","range_origin":"controlled experiment design; GOAT random ranges not transferred","protect":["reproducibility","causal attribution"],"verify":["seed","plugin/model version","complete per-render manifest","repeat hash"],"cancel":["unreconstructable output","unlogged random choice"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-07","source":"SRC-ML-20260921-0900-02","when":"using paired DI-to-processed material","change":"renderer only","parameter_range":"no numeric range transferred","range_origin":"paired-baseline design","protect":["gain","true peak","phase/mono","onset","HF","tail"],"verify":["unchanged or known-processor baseline","raw safety","separate loudness-matched listening"],"cancel":["rights uncertainty","missing provenance","raw damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260921-0900-08","source":"SRC-ML-20260921-0900-02","when":"evaluating tablature or event sequences","change":"metric only","parameter_range":"event/chord/sequence metrics plus class-conditioned errors","range_origin":"GOAT failed DadaGP/Whisper result","protect":["musical correctness"],"verify":["wait-token prevalence","sequence alignment","error inspection"],"cancel":["aggregate dominated by wait/silence tokens"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260921-0900-01","title":"3 Levels of Vocal Compression | ft. Noam Wallenberg","url":"https://www.youtube.com/watch?v=qS8puUTz-vI","youtube_id":"qS8puUTz-vI","published":"2026-07-03","topic":["rock/pop vocal compression","A/B context"],"reading_depth":"metadata_only","status":"queued_source","transcript":"not_obtained","claims_extracted":false},
+    {"id":"VID-ML-20260921-0900-02","title":"Delay Throws Explained: Add Space and Impact to Vocals","url":"https://www.youtube.com/watch?v=v4ASP3-mfB0","youtube_id":"v4ASP3-mfB0","published":"2024-03-28","topic":["rock vocal delay throws","space and impact"],"reading_depth":"metadata_only","status":"queued_source","transcript":"not_obtained","claims_extracted":false}
+  ],
+  "deduplication": [
+    {"canonical":"SRC-ML-20260921-0900-01","duplicates":["arXiv:2411.14972","ICASSP 2025 publication"],"reason":"same work/version family"},
+    {"canonical":"existing source","duplicates":["AILive Mixer arXiv:2603.15995","SPHERE arXiv:2608.30559","Reverse Engineering of Music Mixing Graphs","MixAssist","Diff2Mix"],"reason":"already present in project research or source data"},
+    {"canonical":"existing queued video","duplicates":["YouTube QSj2m9oUJno"],"reason":"already queued in an earlier update"}
+  ],
+  "revisions": [
+    {"previous":"synthetic effect diversity implies better guitar FX","revised":"it improves representation or coverage under the tested metrics but does not establish preferred tone or production readiness"},
+    {"previous":"GOAT paired data can be treated as a usable project multitrack","revised":"GOAT remains a restricted research candidate because copyright and processing provenance are incomplete"},
+    {"previous":"repository availability is sufficient for reproduction","revised":"the public paths lack an exact held-out evaluation, deterministic render manifest, licence, dependency lock or fully free processing chain"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260921-0900-01","status":"not_run","priority":"next","baseline":"one device-specific TCN for one rights-cleared processor","variant":"same architecture and data budget with multi-device conditioning","single_factor":"conditioning and training target: single-device versus multi-device","fixed":["rights-cleared rock DI-to-processed pair family","source-grouped split","architecture","context","optimiser","loss","seed set","training steps","sample rate","render format"],"loudness_matching":"separate randomized listening copies only; raw safety renders remain unnormalised","measurements":["ESR","MRSTFT","sample peak","true peak","gain drift","DC","phase/mono residual","onset/transient error","HF/aliasing","tail integrity","blind preference"],"protect":["performance timing","pick attack","low-end weight","phase/mono compatibility","HF texture","headroom","effect identity"],"cancel":["rights or provenance unresolved","split leakage","unsafe peaks","attack/phase/HF damage","metric-only advantage"]},
+    {"id":"EXP-ML-20260921-0900-02","status":"not_run","baseline":"fixed seed and complete re-amp manifest","variant":"same chain with one randomised factor","single_factor":"one of preset, mic, position, distance, phase, room or send","fixed":["DI input","processor versions","all other render settings"],"loudness_matching":"yes for blind copy only","measurements":["repeat hash","manifest completeness","raw peaks","gain","phase/mono","spectral residual","blind preference"],"protect":["reproducibility","causal attribution","attack"],"cancel":["unlogged choice","non-deterministic repeat","unsafe render"]},
+    {"id":"EXP-ML-20260921-0900-03","status":"not_run","baseline":"random clip split","variant":"source- and device-disjoint split","single_factor":"split policy","fixed":["encoder","training examples","augmentation","seed set","evaluation metrics"],"loudness_matching":"not applicable to representation metrics; required for any listening copy","measurements":["KNN/MLP accuracy","per-device signs","confidence intervals","split overlap"],"protect":["generalisation claim"],"cancel":["unresolved overlap","single-seed conclusion"]},
+    {"id":"EXP-ML-20260921-0900-04","status":"not_run","baseline":"rights-cleared self-recorded DI","variant":"same performance through one open and pinned processor","single_factor":"renderer enabled","fixed":["performance","alignment","sample rate","gain staging","seed","format"],"loudness_matching":"separate listening copy only","measurements":["gain/true peak","phase/mono","onset","HF","tail","effect identity","blind preference"],"protect":["performance","attack","timing","headroom"],"cancel":["licence ambiguity","alignment error","raw damage","preference failure"]}
+  ],
+  "queue": {
+    "video_count": 26,
+    "studied_videos": 0,
+    "priority": ["reconcile Open-Amp paper split and current repository evaluation path", "locate explicit rights statements for Open-Amp code, capture models and source audio", "inspect GOAT Zenodo licence/file manifest without downloading audio", "find a rights-cleared paired rock DI-to-processed test fragment", "transcript-dependent review of 26 queued videos"],
+    "remaining": ["URMP train/evaluation piece map for arXiv:2609.14427", "public code/checkpoints for DDSPMM-guided diffusion", "licensed harmonic multitrack reconstruction/off-target test", "26 transcript-dependent queued videos"]
+  },
+  "counts": {"source_cards_added":2,"implementation_audits":2,"dataset_cards":1,"knowledge_cards":12,"candidate_rules":8,"experiments_not_run":4,"new_video_cards":2,"studied_videos":0,"queued_videos_total":26,"reference_cards":0,"new_licensed_multitracks":0,"duplicates_or_versions_resolved":7},
+  "safety": {"user_audio_uploaded":false,"commercial_audio_downloaded":false,"companion_audio_downloaded":false,"paid_services_used":false,"gpu_jobs_run":false,"dsp_changed":false,"runtime_changed":false,"active_rules_changed":false,"model_trained":false}
+}
