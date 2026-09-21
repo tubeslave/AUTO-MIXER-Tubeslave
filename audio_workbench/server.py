@@ -11,11 +11,17 @@ from . import transients
 from . import roles
 from . import observers
 from . import calibration
+from . import plugin_host
+from . import optimizer
+from . import ableton
 
 try:
-    from mcp.server.fastmcp import FastMCP
-except ImportError as exc:
-    raise SystemExit("Install MCP Python SDK: pip install 'mcp[cli]'") from exc
+    from fastmcp import FastMCP
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP
+    except ImportError as exc:
+        raise SystemExit("Install FastMCP or MCP Python SDK") from exc
 
 mcp = FastMCP("Audio Workbench")
 
@@ -38,6 +44,46 @@ def set_project_context(project_root: str, sections: list[dict[str, Any]] | None
 
 
 
+
+
+@mcp.tool()
+def inspect_audio_plugin(plugin_path: str) -> dict[str, Any]:
+    """Inspect a VST3/AU through Pedalboard before granting any write authority."""
+    return plugin_host.inspect_plugin(plugin_path)
+
+@mcp.tool()
+def create_plugin_calibration(plugin_path: str) -> dict[str, Any]:
+    """Return mandatory compatibility tests for a plugin; autonomous writes default to disabled."""
+    return plugin_host.calibration_plan(plugin_path)
+
+@mcp.tool()
+def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
+                          parameters: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Offline plugin render. Never overwrites the source and requires subsequent verification."""
+    return plugin_host.render_plugin(input_path, output_path, plugin_path, parameters)
+
+@mcp.tool()
+def create_optimizer_study(project_root: str, name: str, directions: list[str],
+                           metric_names: list[str]) -> dict[str, Any]:
+    """Create persistent multi-objective Optuna study; optimizer is a proposer, not a judge."""
+    return optimizer.create_multiobjective_study(project_root, name, directions, metric_names)
+
+@mcp.tool()
+def get_pareto_candidates(project_root: str, name: str) -> list[dict[str, Any]]:
+    """Return non-dominated optimization candidates for separate musical evaluation."""
+    return optimizer.pareto_trials(project_root, name)
+
+@mcp.tool()
+def ableton_set_track_volume(track_id: int, value: float,
+                             host: str = "127.0.0.1", send_port: int = 11000) -> dict[str, Any]:
+    """Optional AbletonOSC write. Must be followed by readback/render verification."""
+    return ableton.set_track_volume(track_id, value, host, send_port)
+
+@mcp.tool()
+def ableton_set_device_parameter(track_id: int, device_id: int, parameter_id: int, value: float,
+                                 host: str = "127.0.0.1", send_port: int = 11000) -> dict[str, Any]:
+    """Optional AbletonOSC parameter write. Must be followed by readback/render verification."""
+    return ableton.set_device_parameter(track_id, device_id, parameter_id, value, host, send_port)
 
 _qwen_observer = None
 
