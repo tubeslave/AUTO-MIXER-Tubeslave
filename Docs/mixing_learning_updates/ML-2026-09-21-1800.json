@@ -1,0 +1,196 @@
+{
+  "update_id": "ML-2026-09-21-1800",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-21T18:00:00+03:00",
+  "actual_start": "2026-09-21T17:58:48+03:00",
+  "completed": "2026-09-21T18:02:44+03:00",
+  "preceding_update": "ML-2026-09-21-1500",
+  "preceding_successful_search": "ML-2026-09-21-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "counts": {
+    "source_cards_updated": 1,
+    "implementation_audits_updated": 1,
+    "artifact_cards_added": 1,
+    "knowledge_cards": 12,
+    "candidate_rules": 8,
+    "experiments_not_run": 4,
+    "new_video_cards": 0,
+    "studied_videos": 0,
+    "queued_videos_total": 28,
+    "reference_cards": 0,
+    "new_licensed_multitracks": 0,
+    "conclusions_revised": 8
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260921-1500-01",
+      "action": "reading_depth_upgraded",
+      "title": "The Costs of Reproducibility in Music Separation Research: a Replication of Band-Split RNN",
+      "arxiv": "2603.09187",
+      "doi": "10.48550/arXiv.2603.09187",
+      "url": "https://arxiv.org/html/2603.09187",
+      "reading_depth": "full_text_complete",
+      "version_family": ["2603.09187", "2609.21918"],
+      "method": {
+        "dataset": "MUSDB18-HQ",
+        "split_songs": {"train": 86, "validation": 14, "test": 50},
+        "sample_rate_hz": 44100,
+        "training_chunk_seconds": 3,
+        "loss": "time L1 plus complex-STFT real/imaginary L1",
+        "base_seeds": 3,
+        "most_variants": "single seed"
+      },
+      "test_results": {
+        "original_bsrnn_avg_usdr": 7.94,
+        "original_bsrnn_avg_csdr": 8.24,
+        "replicated_base_avg_usdr": 7.42,
+        "replicated_base_avg_csdr": 7.65,
+        "obsrnn_avg_usdr": 8.57,
+        "obsrnn_avg_csdr": 9.07,
+        "obsrnn_simo_avg_usdr": 9.15,
+        "obsrnn_simo_avg_csdr": 9.79
+      },
+      "findings": [
+        "optimized winner is a compound intervention rather than an isolated factor",
+        "naive stereo and TanH TAC do not support a universal stereo advantage",
+        "stitching policy moves source scores and changes inference cost",
+        "longer patience does not replace multi-seed uncertainty",
+        "SAD result is implementation-specific",
+        "perfect overlap weighting does not establish separator additivity or perceptual transparency"
+      ],
+      "energy_context": {
+        "tabulated_models_kwh_approx": 4808,
+        "whole_project_mwh_approx_long_version": 23,
+        "short_version_mwh": 24.2,
+        "interpretation": "version-dependent project totals include failed, interrupted and exploratory work; CodeCarbon values are extrapolated and hardware-dependent"
+      },
+      "limitations": [
+        "MUSDB18-HQ only",
+        "most variants single seed",
+        "compound optimized treatment",
+        "no controlled listening",
+        "no downstream mix-utility study",
+        "no sum-consistency, phase/mono, true-peak, onset or boundary safety suite"
+      ]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260921-1500-01",
+      "action": "updated",
+      "url": "https://github.com/magronp/bsrnn",
+      "revision": "41e9ce4e796159c7a6e6287d4d198ec1cedbf0ce",
+      "licence": "MIT for repository code",
+      "executed": false,
+      "findings": [
+        "missing checkpoint silently initializes a random model",
+        "load_from_checkpoint uses strict=false",
+        "single-file separation peak-normalizes input but does not restore scale on saved estimates",
+        "zero or non-finite input maximum is not guarded",
+        "fast cSDR plain framed SNR differs contractually from museval bss_eval",
+        "one silent target can NaN every target score in the same fast-cSDR frame",
+        "configured seed 42 coexists with deterministic=false",
+        "metric comparison helper prints values but contains no regression assertion",
+        "stitching paths have no finite, coverage, boundary, additivity, peak or phase assertions",
+        "optimized YAML does not by itself encode the patience-30 training command",
+        "CodeCarbon energy is extrapolated and BMC energy is hard-coded to zero"
+      ],
+      "production_status": "blocked_pending_fail_closed_loading_gain_fix_metric_contract_and_audio_validation"
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20260921-1800-01",
+      "title": "BSRNN model checkpoints for music separation",
+      "url": "https://zenodo.org/records/17516442",
+      "doi": "10.5281/zenodo.17516442",
+      "version": "v3",
+      "published": "2025-11-04",
+      "reading_depth": "official_metadata_and_file_manifest",
+      "downloaded": false,
+      "files": [
+        {"name": "bsrnn-large.zip", "size_gb": 1.6, "md5": "0d1e298e725bf45577a4f61e0a30c2b1"},
+        {"name": "bsrnn-opt.zip", "size_gb": 1.8, "md5": "89075aac776f82295a074a56d0428a18"},
+        {"name": "simo-bsrnn-opt.zip", "size_gb": 1.2, "md5": "817e8ce4bcd17c38bd3812167e97db58"}
+      ],
+      "licence": "not specified on record",
+      "status": "integrity_manifest_available_rights_verification_required",
+      "limits": [
+        "checksum does not prove paper or configuration parity",
+        "repository MIT licence does not automatically cover checkpoint files",
+        "no model archive downloaded or executed"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260921-1800-01", "claim": "A compound optimized pipeline cannot identify a causal benefit for any one component without matched ablations.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-02", "claim": "Stereo-aware architecture is a conditional hypothesis; activation, fusion and source role can reverse the result.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-03", "claim": "Perfect overlap weighting does not establish separator additivity, boundary transparency or phase safety.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-04", "claim": "A fast metric is a different metric until frame selection, scaling, silence and aggregation contracts match.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-05", "claim": "Cross-target silence filtering can erase valid target observations and distort source-wise medians.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-06", "claim": "Input normalisation must be recorded and inverted on estimates before raw gain, headroom or downstream mix use is claimed.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-07", "claim": "A silent-input guard is required before peak normalisation to prevent non-finite pseudo-stems.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-08", "claim": "A missing checkpoint must stop inference; random initialization is not a degraded but usable separator.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-09", "claim": "A configured seed without deterministic execution and environment capture is not repeatability evidence.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-10", "claim": "Longer early-stopping patience and best-seed selection create compute and selection effects requiring separate reporting.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-11", "claim": "Energy estimates must distinguish measured epochs, extrapolation, PUE, hardware and failed-run accounting.", "confidence": "high"},
+    {"id": "KC-ML-20260921-1800-12", "claim": "Archive checksums establish integrity, not licensing, model-paper parity or musical fitness.", "confidence": "high"}
+  ],
+  "candidate_rules": [
+    {"id": "RULE-ML-20260921-1800-01", "source": "SRC-ML-20260921-1500-01", "when": "interpreting a compound optimized system", "change": "attribution wording only", "parameter_range": "bundle-level unless a matched single-factor ablation exists", "range_origin": "full method and ablation audit", "protect": ["causal interpretation"], "verify": ["matched configuration", "single changed factor", "per-source results", "seed uncertainty"], "cancel": ["co-varying factors"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-02", "source": "AUD-ML-20260921-1500-01", "when": "loading a separation model", "change": "checkpoint gate", "parameter_range": "exact expected path and declared archive/checkpoint hash", "range_origin": "static loading-path audit", "protect": ["output validity"], "verify": ["existence", "hash", "configuration mapping"], "cancel": ["missing, mismatched or unknown weights"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-03", "source": "AUD-ML-20260921-1500-01", "when": "peak-normalizing separator input", "change": "store and restore normalization scale on estimates", "parameter_range": "finite non-zero measured input maximum", "range_origin": "separate.py scale audit", "protect": ["gain", "headroom", "dynamics"], "verify": ["finite output", "output/input scale", "sample peak", "true peak"], "cancel": ["zero or non-finite scale", "scale mismatch", "unsafe peak"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-04", "source": "AUD-ML-20260921-1500-01", "when": "comparing separation metrics", "change": "metric contract only", "parameter_range": "implementation, frame coverage, scaling, silence and aggregation", "range_origin": "helpers/eval.py audit", "protect": ["score comparability"], "verify": ["identical saved estimates", "per-target frames", "song aggregation"], "cancel": ["contract mismatch"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-05", "source": "AUD-ML-20260921-1500-01", "when": "handling silent metric frames", "change": "per-target eligibility mask", "parameter_range": "each target independently", "range_origin": "cross-target NaN audit", "protect": ["valid non-silent target evidence"], "verify": ["target-specific masks", "retained frame count"], "cancel": ["one target masks siblings"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-06", "source": "SRC-ML-20260921-1500-01", "when": "testing separator stitching", "change": "stitching policy only", "parameter_range": "declared segment, overlap or hop and window", "range_origin": "paper and code audit", "protect": ["attacks", "phase", "section continuity", "headroom"], "verify": ["boundary residual", "additivity", "sample and true peak", "mono", "blind preference"], "cancel": ["click", "smearing", "leakage", "phase damage"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-07", "source": "SRC-ML-20260921-1500-01", "when": "estimating model improvement", "change": "predeclared multi-seed reporting", "parameter_range": "every planned seed and per-source distribution", "range_origin": "paper variance audit", "protect": ["uncertainty", "generalisation claim"], "verify": ["seed manifest", "all runs", "per-source intervals"], "cancel": ["best-seed selection", "seed tuned as hyperparameter"], "confidence": "high", "status": "candidate", "auto_apply": false},
+    {"id": "RULE-ML-20260921-1800-08", "source": "ART-ML-20260921-1800-01", "when": "considering public checkpoint reuse", "change": "integrity and rights gates", "parameter_range": "published checksum plus explicit compatible licence", "range_origin": "Zenodo record audit", "protect": ["byte identity", "rights"], "verify": ["hash", "licence", "model/config provenance"], "cancel": ["missing licence", "hash mismatch", "unknown provenance"], "confidence": "high", "status": "candidate", "auto_apply": false}
+  ],
+  "experiments": [
+    {"id": "EXP-ML-20260921-1800-01", "status": "not_run", "priority": "next", "baseline": "current separator path retaining peak-normalized estimate scale", "variant": "identical path with recorded input peak factor restored on every estimate", "single_factor": "estimate-scale restoration", "fixed": ["rights-cleared mixture", "checkpoint", "input", "sample rate", "targets", "stitching", "device", "seed"], "loudness_matching": "separate randomized listening copies only; raw safety renders remain unnormalised", "measurements": ["output/input gain ratio", "sum residual", "sample peak", "true peak", "finite values", "uSDR", "phase/mono", "clipping margin", "blind preference"], "protect": ["relative source balance", "dynamics", "transients", "headroom", "stereo image"], "cancel": ["unknown checkpoint", "non-finite output", "scale inversion error", "unsafe peak", "worse additivity", "preference disappears after loudness matching"]},
+    {"id": "EXP-ML-20260921-1800-02", "status": "not_run", "priority": "high", "baseline": "museval cSDR", "variant": "fast cSDR", "single_factor": "metric implementation", "fixed": ["stored references", "stored estimates", "window", "hop", "target order", "song set"], "loudness_matching": "not applicable", "measurements": ["per-target frame mask", "retained duration", "frame scores", "song median", "aggregate rank"], "protect": ["valid non-silent targets", "metric comparability"], "cancel": ["different target mask", "different frame count", "rank reversal"]},
+    {"id": "EXP-ML-20260921-1800-03", "status": "not_run", "priority": "medium", "baseline": "10-second 10-percent-overlap linear fader", "variant": "3-second rectangular OLA with 0.5-second hop", "single_factor": "stitching policy", "fixed": ["audio", "checkpoint", "targets", "gain", "sample rate", "device", "seed"], "loudness_matching": "separate randomized listening copies only", "measurements": ["boundary residual", "sum consistency", "onset error", "phase/mono", "sample peak", "true peak", "runtime", "blind preference"], "protect": ["transients", "groove", "stereo image", "section continuity"], "cancel": ["boundary click", "smearing", "off-target leakage", "phase loss", "non-repeatable preference"]},
+    {"id": "EXP-ML-20260921-1800-04", "status": "not_run", "priority": "medium", "baseline": "large alternative-data BSRNN without attention", "variant": "same recipe with 2-head attention and encoding dimension 16", "single_factor": "attention module", "fixed": ["split", "augmentation", "patience", "stereo mode", "seed set", "batch and learning-rate policy", "compute budget"], "loudness_matching": "separate randomized downstream listening copies only", "measurements": ["per-seed per-source SDR", "edit leakage", "onset error", "phase/mono", "sample peak", "true peak", "blind preference"], "protect": ["source identity", "transients", "unaffected instruments", "headroom"], "cancel": ["source-specific regression", "uncertainty overlap", "collateral damage", "metric-only improvement"]}
+  ],
+  "revisions": [
+    "optimized BSRNN gain is attributed to a compound bundle, not one component",
+    "stereo-aware processing is conditional, not universally beneficial",
+    "fast cSDR is not accepted as museval-equivalent",
+    "current separate.py does not preserve input scale on saved estimates",
+    "seed 42 with deterministic=false is not deterministic reproduction",
+    "longer patience does not replace multi-seed uncertainty",
+    "project energy total is separated from clean-run model cost",
+    "public checksum is separated from reuse permission"
+  ],
+  "deduplication": [
+    {"canonical": "arXiv:2603.09187", "duplicate_or_version": "arXiv:2609.21918", "resolution": "same BSRNN replication version family; not independent evidence"}
+  ],
+  "video_cards": [],
+  "queue": {
+    "video_count": 28,
+    "studied_videos": 0,
+    "remaining": [
+      "explicit compatible licence and exact paper/config mapping for Zenodo v3 checkpoints",
+      "rights-cleared raw multitrack or paired DI-to-processed rock fragment",
+      "raw-stem versus pseudo-stem bounded-edit experiment after checkpoint, rights and gain-contract gates",
+      "IAMD per-file rights and human-label validation before any reference use",
+      "28 transcript-dependent video sources"
+    ]
+  },
+  "safety": {
+    "user_audio_uploaded": false,
+    "commercial_audio_downloaded": false,
+    "dataset_audio_downloaded": false,
+    "checkpoint_downloaded": false,
+    "companion_audio_analysed": false,
+    "paid_services_used": false,
+    "gpu_jobs_run": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "active_rules_changed": false,
+    "model_trained": false
+  }
+}
