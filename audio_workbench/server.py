@@ -24,6 +24,10 @@ from . import causal
 from . import dynamic_masking
 from . import macro
 from . import quality_loop
+from . import perceptual
+from . import uncertainty
+from . import preference_memory
+from . import reference_dna
 
 try:
     from fastmcp import FastMCP
@@ -76,6 +80,44 @@ def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
 
 
 
+
+
+@mcp.tool()
+def aggregate_blind_judges(verdicts: list[dict[str, Any]],
+                           min_confidence: float = 0.65) -> dict[str, Any]:
+    """Aggregate calibrated blind A/B verdicts while preserving tie/uncertain outcomes."""
+    return perceptual.aggregate(verdicts, min_confidence)
+
+@mcp.tool()
+def check_perceptual_catch_trial(file_a_sha: str, file_b_sha: str,
+                                 verdict: dict[str, Any]) -> dict[str, Any]:
+    """Disable trust when a judge confidently prefers one of two identical files."""
+    return perceptual.catch_trial_result(file_a_sha, file_b_sha, verdict)
+
+@mcp.tool()
+def assess_mix_uncertainty(confidence: dict[str, float],
+                           observer_disagreement: float = 0.0) -> dict[str, Any]:
+    """Route low-confidence decisions toward diagnostics, alternatives or human A/B."""
+    return uncertainty.assess(confidence, observer_disagreement)
+
+@mcp.tool()
+def remember_mix_preference(project_root: str, scope: str, context: dict[str, Any],
+                            intervention: dict[str, Any], result: str,
+                            reason: str) -> dict[str, Any]:
+    """Persist accepted, rejected, tie and uncertain decisions without making them universal."""
+    return preference_memory.remember(project_root, scope, context, intervention, result, reason)
+
+@mcp.tool()
+def get_mix_preferences(project_root: str, scope: str,
+                        limit: int = 20) -> list[dict[str, Any]]:
+    """Retrieve recent decisions only from the requested project/genre/user scope."""
+    return preference_memory.retrieve(project_root, scope, limit)
+
+@mcp.tool()
+def build_composite_reference(profiles: dict[str, dict[str, Any]],
+                              assignments: dict[str, str]) -> dict[str, Any]:
+    """Build Reference DNA where different production domains may use different references."""
+    return reference_dna.composite_reference(profiles, assignments)
 
 @mcp.tool()
 def analyze_dynamic_masking(tracks: list[dict[str, Any]],
