@@ -6,6 +6,9 @@ from . import project
 from . import sections as section_analysis
 from . import masking
 from . import compare as ab_compare
+from . import experiments
+from . import transients
+from . import roles
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -31,6 +34,29 @@ def set_project_context(project_root: str, sections: list[dict[str, Any]] | None
     """Persist song sections, reference paths and mix-intent notes."""
     return project.update_context(project_root, sections=sections, references=references, notes=notes)
 
+
+
+@mcp.tool()
+def analyze_transients(audio_path: str) -> dict[str, Any]:
+    """Detect transient events and timing statistics without judging their musical quality."""
+    return transients.analyze_transients(audio_path)
+
+@mcp.tool()
+def get_role_priorities(project_root: str, section_name: str | None = None) -> dict[str, Any]:
+    """Return role priors for contextual reasoning; explicit project intent overrides filename guesses."""
+    return roles.role_priorities(project.load_manifest(project_root), section_name)
+
+@mcp.tool()
+def run_audio_experiment(project_root: str, input_path: str, hypothesis: str,
+                         actions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Render reversible bypass/gain/EQ/compression candidates for one explicit hypothesis."""
+    return experiments.run_experiment(project_root, input_path, hypothesis, actions)
+
+@mcp.tool()
+def select_experiment_candidate(project_root: str, experiment_id: str, candidate: int,
+                                reason: str, evaluator: str = "human_or_calibrated_judge") -> dict[str, Any]:
+    """Commit an evaluated candidate to the decision log. Does not overwrite source audio."""
+    return experiments.choose_candidate(project_root, experiment_id, candidate, reason, evaluator)
 
 @mcp.tool()
 def analyze_sections(audio_path: str, sections: list[dict[str, Any]]) -> dict[str, Any]:
