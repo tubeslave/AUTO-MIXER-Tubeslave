@@ -18,7 +18,10 @@ def _read(path: str):
 
 def _write(path: Path, y: np.ndarray, sr: int):
     path.parent.mkdir(parents=True, exist_ok=True)
-    sf.write(path, np.clip(y, -1.0, 1.0), sr, subtype="PCM_24")
+    if not np.isfinite(y).all():
+        raise ValueError("candidate contains NaN/Inf")
+    # Preserve overload evidence. FLOAT avoids silently hard-clipping probes at +/-1.
+    sf.write(path, y.astype("float32"), sr, subtype="FLOAT")
 
 def _gain(y, sr, p):
     return y * (10.0 ** (float(p.get("db", 0.0))/20.0))
@@ -53,7 +56,11 @@ def _compress(y, sr, p):
 PROCESSORS: dict[str, Callable] = {"gain":_gain,"eq_bell":_eq_bell,"compressor":_compress}
 
 def render_candidate(input_path: str, output_path: str, action: dict[str,Any]) -> dict[str,Any]:
-    y,sr=_read(input_path)
+    src=Path(input_path).expanduser().resolve()
+    dst=Path(output_path).expanduser().resolve()
+    if src == dst:
+        raise ValueError("refusing to overwrite source audio")
+    y,sr=_read(str(src))
     kind=action["type"]
     if kind == "bypass":
         out=y
@@ -61,7 +68,7 @@ def render_candidate(input_path: str, output_path: str, action: dict[str,Any]) -
         out=PROCESSORS[kind](y,sr,action.get("params",{}))
     else:
         raise ValueError(f"unsupported action: {kind}")
-    _write(Path(output_path),out,sr)
+    _write(dst,out,sr)
     return {"output_path":str(Path(output_path).resolve()),"action":action,"analysis":core.analyze(output_path)}
 
 def run_experiment(project_root: str, input_path: str, hypothesis: str,
@@ -93,6 +100,9 @@ def choose_candidate(project_root: str, experiment_id: str, candidate: int,
     p=Path(project_root).resolve()/"experiments"/experiment_id/"experiment.json"
     m=json.loads(p.read_text(encoding="utf-8"))
     row=next(x for x in m["candidates"] if x["candidate"]==candidate)
+    cov=core.coverage(project_root,row["render_sha"])
+    if not cov["finalizable"]:
+        raise RuntimeError(f"candidate has incomplete/stale checks: {cov['blockers']}")
     m["status"]="selected"; m["selected_candidate"]=candidate
     m["selection_reason"]=reason; m["evaluator"]=evaluator
     p.write_text(json.dumps(m,ensure_ascii=False,indent=2),encoding="utf-8")
