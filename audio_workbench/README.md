@@ -70,3 +70,15 @@ The first implementation intentionally separates measurements from judgments. A 
 4. render/rollback adapter for DAW;
 5. calibrated audio-language observer;
 6. learned preference comparator trained on accepted/rejected A/B decisions.
+
+
+## DAWless / chat-first mode
+
+Audio Workbench can work from a plain folder of aligned stems or renders without Ableton/Cubase.
+
+New tools:
+- `create_dawless_project(project_root, audio_dir, title)` scans supported audio files, records sample rate/channel/duration metadata, guesses broad musical roles from filenames, and writes `audio_workbench_project.json`.
+- `get_project_context(project_root)` returns the persistent song manifest.
+- `set_project_context(project_root, sections, references, notes)` stores song sections, reference files and mix-intent notes.
+
+This is the preferred first workflow for chat-driven offline mixing. Ableton is treated as an optional execution backend for plugin automation, routing and session-native rendering, not as a requirement for analysis.
