@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 from . import core
+from . import project
 
 try:
     from mcp.server.fastmcp import FastMCP
@@ -9,6 +10,23 @@ except ImportError as exc:
     raise SystemExit("Install MCP Python SDK: pip install 'mcp[cli]'") from exc
 
 mcp = FastMCP("Audio Workbench")
+
+@mcp.tool()
+def create_dawless_project(project_root: str, audio_dir: str, title: str = "") -> dict[str, Any]:
+    """Create a DAW-independent project manifest from a folder of stems/renders."""
+    return project.create_manifest(project_root, audio_dir, title)
+
+@mcp.tool()
+def get_project_context(project_root: str) -> dict[str, Any]:
+    """Return the persistent DAWless project manifest."""
+    return project.load_manifest(project_root)
+
+@mcp.tool()
+def set_project_context(project_root: str, sections: list[dict[str, Any]] | None = None,
+                        references: list[str] | None = None,
+                        notes: list[str] | None = None) -> dict[str, Any]:
+    """Persist song sections, reference paths and mix-intent notes."""
+    return project.update_context(project_root, sections=sections, references=references, notes=notes)
 
 @mcp.tool()
 def inspect_audio(project_root: str, audio_path: str) -> dict[str, Any]:
