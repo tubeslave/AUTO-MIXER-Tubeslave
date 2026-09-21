@@ -14,6 +14,9 @@ from . import calibration
 from . import plugin_host
 from . import optimizer
 from . import ableton
+from . import renderer
+from . import doctor
+from . import automixer_bridge
 
 try:
     from fastmcp import FastMCP
@@ -58,9 +61,28 @@ def create_plugin_calibration(plugin_path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def render_through_plugin(input_path: str, output_path: str, plugin_path: str,
-                          parameters: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Offline plugin render. Never overwrites the source and requires subsequent verification."""
-    return plugin_host.render_plugin(input_path, output_path, plugin_path, parameters)
+                          parameters: dict[str, Any] | None = None,
+                          calibration_record: str | None = None) -> dict[str, Any]:
+    """Offline plugin render. Denied until an exact plugin build has an enabled calibration record."""
+    return plugin_host.render_plugin(input_path, output_path, plugin_path, parameters,
+                                     calibration_record=calibration_record)
+
+@mcp.tool()
+def render_dawless_mix(project_root: str, output_path: str,
+                       track_settings: dict[str, dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Render aligned manifest tracks to a non-destructive float stereo mix."""
+    return renderer.render_mix(project_root, output_path, track_settings)
+
+@mcp.tool()
+def audio_workbench_doctor(project_root: str | None = None) -> dict[str, Any]:
+    """Report runtime dependencies, project visibility, missing tracks, state DB and free disk."""
+    return doctor.status(project_root)
+
+@mcp.tool()
+def validate_action_for_automixer(action: dict[str, Any], target: str,
+                                  channel_map: dict[str, int]) -> dict[str, Any]:
+    """Translate an accepted offline action into existing Automixer safety structures without applying it."""
+    return automixer_bridge.validate_for_automixer(action, target, channel_map)
 
 @mcp.tool()
 def create_optimizer_study(project_root: str, name: str, directions: list[str],
