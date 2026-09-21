@@ -33,6 +33,7 @@ from . import judge_calibration
 from . import observer_ensemble
 from . import space_director
 from . import onboarding
+from . import checkpoints
 from . import significance
 
 try:
@@ -101,6 +102,21 @@ def assess_change_significance(delta_rms_dbfs: float, affected_fraction: float,
                                           min_delta_rms_dbfs, min_affected_fraction)
 
 
+
+
+@mcp.tool()
+def commit_audio_checkpoint(project_root: str, key: str, path: str,
+                            inputs: dict[str, str],
+                            params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Persist content-addressed intermediate audio so interrupted sessions can resume safely."""
+    return checkpoints.commit(project_root, key, path, inputs, params)
+
+@mcp.tool()
+def check_audio_checkpoint(project_root: str, key: str,
+                           inputs: dict[str, str],
+                           params: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Verify artifact bytes, dependencies and parameters before reusing a checkpoint."""
+    return checkpoints.valid(project_root, key, inputs, params)
 
 @mcp.tool()
 def get_guided_mix_intake(track_count: int | None = None) -> dict[str, Any]:
