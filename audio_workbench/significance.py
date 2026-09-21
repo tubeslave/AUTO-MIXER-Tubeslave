@@ -60,3 +60,18 @@ def effect_budget(previous_results: list[dict[str,Any]]) -> dict[str,Any]:
     weak=sum(1 for r in previous_results if r.get("verdict")=="insufficient_or_mixed")
     action="change_problem_or_intervention_family" if rejected else ("raise_minimum_effect_size" if weak>=2 else "continue")
     return {"rejected_families":rejected,"weak_results":weak,"next_action":action}
+
+
+def minimum_effect_policy(history: list[dict[str,Any]]) -> dict[str,Any]:
+    """Escalate away from micro-polish after repeated inaudible/uncertain experiments."""
+    weak=sum(1 for r in history if r.get("result") in ("tie","uncertain","inaudible"))
+    rejected=sum(1 for r in history if r.get("result")=="rejected")
+    if weak>=2:
+        return {"mode":"macro_or_source_rebalance",
+                "minimum_expected_audibility":"clearly_audible",
+                "forbid":["sub_db_micro_eq","sub_db_section_gain","more_mix_bus_density"],
+                "reason":"repeated blind tests were below useful perceptual significance"}
+    if rejected:
+        return {"mode":"change_intervention_family","minimum_expected_audibility":"audible",
+                "forbid":[],"reason":"previous family lost blind preference"}
+    return {"mode":"normal","minimum_expected_audibility":"small_but_audible","forbid":[]}
