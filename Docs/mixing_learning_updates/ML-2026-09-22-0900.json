@@ -1,0 +1,176 @@
+{
+  "update_id": "ML-2026-09-22-0900",
+  "mode": "search",
+  "scheduled_slot": "2026-09-22T09:00:00+03:00",
+  "actual_start": "2026-09-22T09:01:45+03:00",
+  "completed": "2026-09-22T09:15:06+03:00",
+  "preceding_update": "ML-2026-09-21-1800",
+  "preceding_successful_search": "ML-2026-09-21-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "counts": {
+    "new_source_cards": 2,
+    "full_text_sources": 1,
+    "selected_section_sources": 1,
+    "implementation_audits": 1,
+    "knowledge_cards": 10,
+    "candidate_rules": 8,
+    "experiments_not_run": 4,
+    "new_video_cards": 2,
+    "studied_videos": 0,
+    "queued_videos_total": 30,
+    "reference_cards": 0,
+    "new_licensed_multitracks": 0,
+    "duplicates_removed": 2,
+    "conclusions_revised": 4
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260922-0900-01",
+      "title": "Fast Time-Varying Exponentiated Convolution Methods for Generative Direction Dependent Reverberation",
+      "authors": ["Yuancheng Luo"],
+      "arxiv": "2609.24809v1",
+      "doi": "10.48550/arXiv.2609.24809",
+      "url": "https://arxiv.org/html/2609.24809",
+      "published": "2026-09-21",
+      "discovered": "2026-09-22",
+      "venue_status": "preprint; manuscript states accepted to AES Convention 161",
+      "licence": "CC BY 4.0",
+      "reading_depth": "full_text_complete",
+      "method": [
+        "time-varying exponentiated convolution",
+        "recursive alternative",
+        "spherical-harmonic linear-transform extension",
+        "near-minimum-phase constrained filter fitting",
+        "direction-frequency T60 Gaussian-process sampling"
+      ],
+      "results": [
+        "optimized exponentiating method replaces direct O(M^2 N) work with stated partitioned FFT log-linear factors",
+        "optimized recursive formulation adds an N^2 factor",
+        "short filter fits amplify error under exponentiation",
+        "reducing one demonstrated spherical grid from 25 to 16 points introduced high-frequency spatial aliasing"
+      ],
+      "limitations": [
+        "Gaussian and simulated pressure fields",
+        "no controlled listening",
+        "no real-room or rock-mix validation",
+        "no localization, decoder robustness, direct/early identity, mono, sample-peak or true-peak study",
+        "demonstration parameters are not production presets"
+      ]
+    },
+    {
+      "id": "SRC-ML-20260922-0900-02",
+      "title": "Spherical Harmonic Sliced Wasserstein Displacement Interpolation for Acoustic Source and Reflection Density Modeling",
+      "authors": ["Yuancheng Luo"],
+      "arxiv": "2609.22028v1",
+      "doi": "10.48550/arXiv.2609.22028",
+      "url": "https://arxiv.org/html/2609.22028",
+      "published": "2026-09-18",
+      "discovered": "2026-09-22",
+      "licence": "CC BY 4.0",
+      "reading_depth": "selected_full_text_sections",
+      "sections_read": ["abstract", "introduction", "density estimation", "inverse sampling", "Wasserstein interpolation", "experiment", "conclusion"],
+      "result": "lower spherical sliced-Wasserstein distance than linear or product interpolation for aggregate simulated image-source densities on one line path",
+      "limitations": [
+        "single numerical shoebox-room simulation family",
+        "reflection directions aggregated over RIR duration",
+        "no time-resolved early-reflection validation",
+        "no rendered-audio listening or localization test",
+        "density-space distance is not musical preference"
+      ],
+      "queue_status": "high_priority_deep_review"
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260922-0900-01",
+      "repository": "https://github.com/yluo1/SH-IRT",
+      "revision": "27d6b799546e30ad51ae899aea30e37c17444077",
+      "revision_date": "2026-09-22T00:17:23Z",
+      "licence": "CC BY 4.0",
+      "reading_depth": "README licence and full tutorial_t60_aug static review",
+      "executed": false,
+      "dependencies": ["MATLAB R2024b", "Optimization Toolbox", "Signal Processing Toolbox", "Symbolic Math Toolbox", "Statistics and Machine Learning Toolbox", "Global Optimization Toolbox", "CVX for semidefinite programs"],
+      "findings": [
+        "repository documents time-varying convolution, SH tools, density modeling and T60 generation",
+        "seeded synthetic examples are present",
+        "no tagged release or locked environment established",
+        "listed unit tests were not executed",
+        "no end-to-end decoder, finite-output, peak, mono or listening validation established",
+        "tutorial call exp_k=0.1 conflicts with adjacent caption k=0.5"
+      ],
+      "status": "research_candidate_pending_execution_and_audio_validation"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260922-0900-01","claim":"Direction/frequency decay fit is not evidence of preferred ambience or localization.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-02","claim":"Exponentiation multiplies magnitude and group-delay fitting errors, so short filters can amplify tail error.","confidence":"high_within_method"},
+    {"id":"KC-ML-20260922-0900-03","claim":"A sub-unity magnitude constraint is stability-oriented but is not a complete peak-safety guarantee.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-04","claim":"SH grid and order require held-out high-frequency directional validation.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-05","claim":"Algebraic commutation with linear transforms does not validate decoder normalization or channel conventions.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-06","claim":"Synthetic Gaussian and simulated-SRIR validation does not establish real-room or dense-rock transfer.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-07","claim":"Aggregate reflection-direction density can hide early-reflection timing and temporal echo-density errors.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-08","claim":"Lower SSW distance does not establish audible motion or production usefulness.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-09","claim":"CC BY reuse and reproducibility are separate; toolbox, CVX, seed and revision provenance remain required.","confidence":"high"},
+    {"id":"KC-ML-20260922-0900-10","claim":"Conflicting tutorial annotations block transport of example numbers as defaults.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260922-0900-01","source":"SRC-ML-20260922-0900-01","when":"synthesizing a directional late tail","change":"directional decay field only","parameter_range":"project-specific; no paper example promoted","range_origin":"full-text method and limitation review","protect":["direct sound","early reflections","source position","dry/wet"],"verify":["directional EDC/T60","decoder output","mono","blind preference"],"cancel":["aliasing","unstable peaks","lost localization"],"confidence":"medium","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-02","source":"SRC-ML-20260922-0900-01","when":"fitting exponentiating filters","change":"sub-unity magnitude constraint and realized-response verification","parameter_range":"strictly below unity as method condition; exact examples are not presets","range_origin":"paper filter program","protect":["decay stability","finite output"],"verify":["exponentiated response","peak","tail"],"cancel":["growth","non-finite output","decay overshoot"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-03","source":"SRC-ML-20260922-0900-01","when":"choosing filter length","change":"select from post-exponentiation fit error","parameter_range":"project-specific measured sweep","range_origin":"paper sensitivity result","protect":["HF decay","tail smoothness"],"verify":["per-direction post-exponentiation error"],"cancel":["material error amplification"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-04","source":"SRC-ML-20260922-0900-01","when":"choosing SH order or grid","change":"held-out directional validation","parameter_range":"intended sample rate decoder and directional bandwidth","range_origin":"paper aliasing observation","protect":["localization","HF stability"],"verify":["off-grid error","HF aliasing","decoder render"],"cancel":["off-grid regression"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-05","source":"SRC-ML-20260922-0900-01","when":"moving convolution across a linear transform","change":"exact-convention null test","parameter_range":"identical precision padding and channel order","range_origin":"paper commutation proof plus implementation boundary","protect":["gain","phase"],"verify":["sample null","spectral residual"],"cancel":["normalization or ordering mismatch"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-06","source":"SRC-ML-20260922-0900-01","when":"evaluating synthetic room augmentation","change":"separate direct early and late components","parameter_range":"component-wise comparisons","range_origin":"missing validation dimensions","protect":["attack","intelligibility","section depth"],"verify":["component residuals","full-mix blind AB"],"cancel":["protected component changes"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-07","source":"SRC-ML-20260922-0900-02","when":"using aggregate Wasserstein reflection density","change":"diagnostic only plus time-resolved and rendered checks","parameter_range":"same endpoints and positions","range_origin":"selected-section method review","protect":["early timing","motion continuity"],"verify":["time-resolved reflections","localization","blind AB"],"cancel":["density-only improvement"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-0900-08","source":"AUD-ML-20260922-0900-01","when":"claiming SH-IRT reproduction","change":"pin revision environment CVX and seeds","parameter_range":"exact logged versions","range_origin":"static repository audit","protect":["provenance"],"verify":["manifest","executed test results","documentation/code parity"],"cancel":["parameter mismatch","unlogged dependency"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260922-0900-01","status":"not_run","priority":"next","baseline":"isotropic decay field on one fixed licensed or generated SH-RIR","variant":"same graph with directional decay variance enabled","single_factor":"directional variance in decay field","fixed":["dry/direct path","early reflections","global mean decay","decoder","sample rate","wet/dry","seed","channel order","render length"],"loudness_matching":"separate randomized listening copies only; raw safety renders stay unnormalised","measurements":["directional EDC/T60","tail spectral error","off-grid error","sample peak","true peak","finite values","mono residual","decoder energy","localization","blind preference"],"protect":["attack","source position","early-reflection identity","HF smoothness","mono","section depth"],"cancel":["spatial aliasing","unstable tail","non-finite output","peak hazard","localization collapse","preference disappears after matching"]},
+    {"id":"EXP-ML-20260922-0900-02","status":"not_run","priority":"high","baseline":"direct exponentiating convolution","variant":"optimized partitioned exponentiating convolution","single_factor":"algorithm implementation","fixed":["input FIR","filter","precision","padding","seed","platform"],"loudness_matching":"not applicable","measurements":["sample null","spectral residual","phase residual","tail length","finite output","peak","runtime"],"protect":["numerical equivalence","tail"],"cancel":["residual beyond declared tolerance","different padding or tail contract"]},
+    {"id":"EXP-ML-20260922-0900-03","status":"not_run","priority":"high","baseline":"25-point demonstrated spherical grid","variant":"16-point grid","single_factor":"grid density","fixed":["T60 targets","filter design","SH conventions","decoder","sample rate","seed"],"loudness_matching":"separate listening copies only","measurements":["held-out directional decay error","HF aliasing","localization","mono residual","peak"],"protect":["HF stability","source position"],"cancel":["off-grid or HF regression hidden by in-grid fit"]},
+    {"id":"EXP-ML-20260922-0900-04","status":"not_run","priority":"medium","baseline":"linear interpolation between fixed endpoint SRIR densities","variant":"Wasserstein displacement interpolation","single_factor":"interpolation rule","fixed":["endpoints","path positions","SH order","renderer","gain"],"loudness_matching":"separate matched listening copies; raw renders retained","measurements":["SSW distance","time-resolved early-reflection error","EDC","sample and true peak","mono","localization continuity","blind preference"],"protect":["early timing","motion continuity","headroom"],"cancel":["density-only win","temporal damage","motion discontinuity","peak or mono regression","no repeatable preference"]}
+  ],
+  "deduplication": [
+    {"canonical":"SRC-ML-20260914-0900-01 / arXiv:2606.18573","duplicate_or_version":"DAFx26_paper_30 and DOI 10.60593/ur.d.31892026","reason":"conference/version lineage already reviewed and explicitly deduplicated on 2026-09-17","counted_as_independent_evidence":false},
+    {"canonical":"existing queued video","duplicate_or_version":"YouTube QSj2m9oUJno","reason":"already queued on 2026-09-11 and deduplicated again on 2026-09-21","counted_as_new":false}
+  ],
+  "revisions": [
+    "directional T60 fit is narrowed from spatial-quality evidence to decay-target evidence",
+    "sub-unity filter magnitude is narrowed from safety to one stability condition",
+    "aggregate echo-density interpolation is not evidence of correct early-reflection timing",
+    "linear-transform commutation is not implementation or decoder equivalence"
+  ],
+  "video_cards": [
+    {"id":"VID-ML-20260922-0900-01","video_id":"n1k1fgtwylQ","title":"How Music Got Loud (The Loudness Wars Explained)","channel":"Waves Audio","published":"2025-12-11","url":"https://www.youtube.com/watch?v=n1k1fgtwylQ","status":"queued_source","metadata_depth":"search-result title channel/date and public URL","transcript":"unavailable_authorized_path","claims_extracted":false},
+    {"id":"VID-ML-20260922-0900-02","video_id":"9AbJ7UoloTY","title":"ALAN DOUCHES of West West Side on Mastering Metal","channel":"Produce Like A Pro","published":"2016-07-18","url":"https://www.youtube.com/watch?v=9AbJ7UoloTY","status":"queued_source","metadata_depth":"search-result title channel/date and public URL","transcript":"unavailable_authorized_path","claims_extracted":false}
+  ],
+  "queue": {
+    "video_count": 30,
+    "studied_videos": 0,
+    "remaining": [
+      "SH-IRT direct/optimized equivalence and unit-test audit at revision 27d6b799",
+      "SH-IRT finite-output magnitude-bound decoder and seed validation",
+      "tutorial exp_k parameter/caption inconsistency",
+      "complete arXiv:2609.22028 equation and implementation audit",
+      "rights-cleared component-separated SRIR or rock-room validation material",
+      "rights-cleared raw multitrack or paired DI-to-processed fragment",
+      "30 transcript-dependent video sources"
+    ]
+  },
+  "reference_cards": [],
+  "safety": {
+    "user_audio_uploaded": false,
+    "commercial_audio_downloaded": false,
+    "dataset_audio_downloaded": false,
+    "repository_audio_downloaded": false,
+    "paid_services_used": false,
+    "gpu_jobs_run": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "active_rules_changed": false,
+    "model_trained": false
+  },
+  "handoff": "Treat direction-dependent decay and Wasserstein echo-density interpolation as research candidates, not presets. Keep direct, early and late components separately testable; validate off-grid HF behavior, decoder conventions, raw peak/mono safety and a separate loudness-matched blind preference before promotion."
+}
