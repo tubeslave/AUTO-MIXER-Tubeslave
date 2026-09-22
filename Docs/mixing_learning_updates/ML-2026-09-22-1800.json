@@ -1,0 +1,107 @@
+{
+  "update_id": "ML-2026-09-22-1800",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-22T18:00:00+03:00",
+  "actual_start": "2026-09-22T18:00:59+03:00",
+  "completed": "2026-09-22T18:04:56+03:00",
+  "preceding_update": "ML-2026-09-22-1500",
+  "preceding_successful_search": "ML-2026-09-22-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260922-1800-01",
+      "action": "add",
+      "title": "DiffusionRIR: Room Impulse Response Interpolation using Diffusion Models",
+      "authors": ["Sagi Della Torre", "Mirco Pezzoli", "Fabio Antonacci", "Sharon Gannot"],
+      "arxiv": "2504.20625v1",
+      "doi": "10.48550/arXiv.2504.20625",
+      "url": "https://arxiv.org/html/2504.20625v1",
+      "published": "2025-04-29",
+      "discovered": "2026-09-22",
+      "reading_depth": "full_text_complete",
+      "family_relation": "foundational method for SRC-ML-20260922-1500-02; not independent evidence",
+      "training": {"sample_rate_hz":8000,"rir_samples":1024,"duration_ms":128,"parent_rir_images":8,"patches":176,"patch_shape":[64,64],"overlap_percent":25,"room_m":[6,5.5,2.8],"source_position_pool":9,"t60_s":0.3},
+      "evaluation": {"sample_rate_hz":8000,"rir_samples":2048,"duration_ms":256,"same_nominal_room_geometry":true,"source_positions_tested":9,"t60_s":0.6,"missing_percent":[10,90]},
+      "reported_results": ["approximately 3-7 dB NMSE improvement over spatial cubic interpolation","approximately 0.3 cosine-distance improvement","performance degrades with curvature and toward endfire"],
+      "limitations": ["no documented parent-RIR, room-geometry or source-position-disjoint split","correlated patches from eight parent images","no uncertainty or seed distribution","single spline baseline","no measured-room, listening, localization, phase/mono, peak, long-tail or music test"]
+    },
+    {
+      "id": "SRC-ML-20260922-1500-02",
+      "action": "update",
+      "reading_depth": "full_text_complete",
+      "revision": "inherits foundational normalization, overlap/reassembly and artifact gaps; measured RIR reconstruction and simulated speech beamforming remain separate claims",
+      "independence": "same method family and authors; not an independent replication"
+    }
+  ],
+  "dataset_cards": [
+    {
+      "id": "DATA-ML-20260922-1800-01",
+      "action": "add",
+      "title": "MeshRIR",
+      "url": "https://github.com/sh01k/MeshRIR",
+      "revision": "8a299b6299b17aae9050cf43e192658dbb482471",
+      "revision_date": "2026-07-27",
+      "licence": "CC BY 4.0",
+      "reading_depth": "official_metadata_readme_license_and_paper_selected_sections",
+      "sample_rate_hz": 48000,
+      "assets": ["measured RIRs","known source and microphone geometry","S1-M3969 dense receiver grid","S32-M441 multiple source positions"],
+      "status": "research_benchmark",
+      "not": ["music multitrack","processed-stem set","tonal Reference Card"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260922-1800-01",
+      "target": "DiffusionRIR public artifact",
+      "status": "reproduction_blocked_public_artifact_not_found",
+      "search_date": "2026-09-22",
+      "search_scope": ["paper links","author project page","GitHub repository search","GitHub default-branch code search"],
+      "found": ["primary paper","project synopsis","third-party paper indexes","generic upstream OpenAI guided-diffusion reference"],
+      "not_found": ["DiffusionRIR-specific code","architectural modifications","dependency lock","checkpoint/hash/licence","training split manifest","simulation seeds","mask manifest","normalization statistics","patch reassembly implementation"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260922-1800-01","claim":"The foundational and follow-up DiffusionRIR papers form one evidence family, not independent confirmation.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-02","claim":"176 overlapping patches from eight parent RIR images are correlated samples, not 176 independent rooms.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-03","claim":"Source-position- and room-geometry-disjoint evaluation is not documented; material, T60 and array geometry shifts are narrower.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-04","claim":"Training on 128 ms and applying tiled patches to 256 ms does not establish learned long-context decay.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-05","claim":"Per-patch normalization removes absolute scale; inverse scaling for missing patches needs a causal observable definition.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-06","claim":"Using missing-target energy for rescaling would be oracle assistance; the paper does not resolve this ambiguity.","confidence":"medium_high"},
+    {"id":"KC-ML-20260922-1800-07","claim":"Hard centre cropping of overlap is not evidence of seamless reconstruction without boundary residuals.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-08","claim":"Duplicated-column padding can introduce a false spatial prior and needs an ablation.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-09","claim":"Random masks do not establish robustness to contiguous gaps or one-sided extrapolation.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-10","claim":"NMSE/CD gains over one spline baseline do not establish localization, phase safety, peaks, preference or music utility.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-11","claim":"MeshRIR is rights-cleared 48 kHz measured data, but an 8 kHz/256 ms subset cannot support full-band or long-tail claims.","confidence":"high"},
+    {"id":"KC-ML-20260922-1800-12","claim":"Without code, checkpoint, configuration and split artifacts, a clean-room implementation is not validation of the authors' artifact.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260922-1800-01","source":"SRC-ML-20260922-1800-01","when":"constructing patch datasets","change":"split by parent RIR scene before patch extraction","parameter_range":"group by room, source, receiver scene and parent image","range_origin":"leakage audit","protect":["independence"],"verify":["provenance manifest"],"cancel":["shared parent imagery"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-02","source":"SRC-ML-20260922-1800-01","when":"claiming generalization","change":"declare each held-out geometry, material, T60 and source-position factor","parameter_range":"claim-scope only","range_origin":"protocol audit","protect":["reproducibility"],"verify":["factor-wise splits"],"cancel":["shared or undocumented factor"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-03","source":"SRC-ML-20260922-1800-01","when":"inverting patch normalization","change":"derive scale from observed context only","parameter_range":"causal estimate versus explicitly labelled oracle","range_origin":"paper ambiguity","protect":["absolute gain","direct energy"],"verify":["oracle regret","gain ratio"],"cancel":["missing-target statistic required"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-04","source":"SRC-ML-20260922-1800-01","when":"reassembling overlapping patches","change":"audit stitching policy","parameter_range":"all overlap boundaries","range_origin":"25-percent overlap and centre crop","protect":["direct and early timing","tail continuity"],"verify":["boundary waveform and spectral residual"],"cancel":["click","gain step","phase jump"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-05","source":"SRC-ML-20260922-1800-01","when":"array has fewer than 64 microphones","change":"test padding policy separately","parameter_range":"short-array and edge cases","range_origin":"duplicated-column padding","protect":["spatial gradients"],"verify":["padding ablation"],"cancel":["false continuity","edge bias"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-06","source":"SRC-ML-20260922-1800-01","when":"testing missing microphones","change":"compare equal-count random, contiguous and one-sided masks","parameter_range":"same missing count","range_origin":"mask-topology gap","protect":["worst-case geometry"],"verify":["per-position and worst-case metrics"],"cancel":["structured-gap failure"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-07","source":"DATA-ML-20260922-1800-01","when":"using MeshRIR","change":"retain 48 kHz raw data and create separate 8 kHz paper replica","parameter_range":"48 kHz raw plus explicitly derived 8 kHz copy","range_origin":"dataset and follow-up preprocessing","protect":["HF","delay","long tails"],"verify":["resampling and truncation audit"],"cancel":["confounded comparison"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1800-08","source":"AUD-ML-20260922-1800-01","when":"considering DiffusionRIR integration","change":"pin code, checkpoint, preprocessing, split and seeds first","parameter_range":"exact hashes and licences","range_origin":"artifact audit","protect":["auditability"],"verify":["deterministic replay"],"cancel":["artifact ambiguity"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_cards": [],
+  "reference_cards": [],
+  "deduplication": [
+    {"candidate":"arXiv:2504.20625v1","compared_with":"arXiv:2603.28209v1","result":"same_method_family_foundational_and_followup_not_independent"},
+    {"candidate":"MeshRIR paper, repository and Zenodo","result":"one_dataset_family_not_multiple_confirmations"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260922-1800-01","status":"not_run","priority":"next","baseline":"missing-patch scale estimated only from observed context","variant":"target/original missing-patch energy explicitly labelled oracle","single_factor":"inverse-normalization scale source","fixed":["MeshRIR slice","mask","raw input","normalized patch output","overlap map","renderer","sample rate","output length"],"loudness_matching":"raw RIRs and probes retained; separate randomized loudness-matched listening copies","measurements":["scale error","direct amplitude and delay","NMSE","cosine distance","boundary residual","EDC/T60","phase/coherence","sample peak","true peak","mono residual","blind preference"],"protect":["absolute gain","direct sound","attack","early timing","room identity","phase/mono","headroom","tail continuity"],"cancel":["target leakage in baseline","non-finite scale","gain or phase jump","seam","peak or mono regression","metric-only advantage","no repeatable preference"]},
+    {"id":"EXP-ML-20260922-1800-02","status":"not_run","priority":"high","baseline":"patch-random split","variant":"parent-RIR and source-position grouped split","single_factor":"split unit","fixed":["simulated corpus","patch extraction","architecture","optimization budget","masks","seeds"],"loudness_matching":"not applicable to model metrics; separate matched copies if rendered","measurements":["train-validation gap","NMSE/CD","worst-position error","seed spread","nearest-parent similarity"],"protect":["independent evaluation"],"cancel":["shared parent imagery","undocumented provenance","advantage disappears under grouped split"]},
+    {"id":"EXP-ML-20260922-1800-03","status":"not_run","priority":"high","baseline":"25-percent-overlap centre crop","variant":"deterministic weighted overlap-add","single_factor":"reassembly method","fixed":["patch predictions","positions","scale values","output length","renderer"],"loudness_matching":"raw renders plus separate matched listening copies","measurements":["boundary waveform and spectral residual","direct/early timing","phase/coherence","finite output","peaks","EDC","blind preference"],"protect":["length","gain","phase","tail continuity"],"cancel":["latency or length change","gain drift","worse boundary residual","modulation or clicks"]},
+    {"id":"EXP-ML-20260922-1800-04","status":"not_run","priority":"high","baseline":"uniformly random missing columns","variant":"one contiguous gap with the same missing-channel count","single_factor":"mask topology","fixed":["room","array","source","checkpoint or implementation","seed set","normalization","stitching","renderer"],"loudness_matching":"raw renders plus separate matched listening copies","measurements":["median and worst-position NMSE/CD","direct/early timing","phase/coherence","spatial continuity","EDC","peaks","mono","blind preference"],"protect":["spatial continuity","phase","mono","headroom"],"cancel":["count mismatch","edge-only failure","spatial jump","phase or mono damage","seed fragility","no robust advantage"]}
+  ],
+  "queue": {"video_count":32,"studied_videos":0,"remaining":["official DiffusionRIR code/checkpoint or author clarification of scale recovery and split provenance","causal normalization/reassembly reference implementation","full-band MeshRIR grouped-split and structured-mask benchmark","execute SH-IRT numerical safety tests when exact free/local environment exists","32 transcript-dependent video sources","rights-cleared raw rock multitrack or paired DI-to-processed fragment"]},
+  "counts": {"source_cards_added":1,"source_cards_updated":1,"dataset_cards_added":1,"implementation_audits_added":1,"knowledge_cards_added":12,"candidate_rules_added":8,"experiments_added":4,"video_cards_added":0,"studied_videos":0,"queued_videos_total":32,"reference_cards_added":0},
+  "revisions": ["DiffusionRIR foundational and follow-up papers merged into one evidence family","generalization narrowed because room geometry and source-position-disjoint evaluation are not documented","original-energy patch rescaling marked verification_required and possibly oracle-dependent","clean-room implementation would not validate an unavailable author artifact","MeshRIR added as rights-cleared research benchmark, not music reference"],
+  "safety": ["no audio downloaded or processed","no code or model execution","no model or checkpoint downloaded","no DSP, runtime or active-rule change","no model training","all experiments not_run","all rules candidate and auto_apply false"],
+  "handoff": "Treat DiffusionRIR as a research candidate, not a renderer. Resolve causal patch scaling first; group splits by parent RIR and source/room provenance; keep overlap, padding, mask topology and seed explicit. Use raw full-band outputs for gain, phase, peak and seam checks and separate loudness-matched copies only for blind listening."
+}
