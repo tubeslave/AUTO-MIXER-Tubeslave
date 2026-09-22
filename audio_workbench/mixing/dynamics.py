@@ -1,58 +1,48 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import numpy as np
 from scipy import ndimage
 
-ROLE_POLICY={
- "vocal":{"ratio":2.8,"max_gr_db":5.0,"attack_ms":18,"release_ms":110,"target_pctl":58},
- "bass":{"ratio":2.4,"max_gr_db":4.0,"attack_ms":28,"release_ms":140,"target_pctl":62},
- "guitar":{"ratio":1.7,"max_gr_db":2.5,"attack_ms":24,"release_ms":120,"target_pctl":68},
- "keys":{"ratio":1.5,"max_gr_db":2.0,"attack_ms":30,"release_ms":150,"target_pctl":70},
- "playback":{"ratio":1.35,"max_gr_db":1.5,"attack_ms":35,"release_ms":180,"target_pctl":72},
- "kick":{"ratio":2.0,"max_gr_db":3.0,"attack_ms":22,"release_ms":90,"target_pctl":70},
- "snare":{"ratio":2.0,"max_gr_db":3.0,"attack_ms":16,"release_ms":105,"target_pctl":70},
- "toms":{"ratio":1.8,"max_gr_db":2.5,"attack_ms":20,"release_ms":120,"target_pctl":72},
- "cymbals":{"ratio":1.2,"max_gr_db":1.0,"attack_ms":45,"release_ms":220,"target_pctl":80},
+@dataclass(frozen=True)
+class DynamicsProfile:
+    ratio:float; max_gr_db:float; ride_max_db:float; ride_window_s:float; active_percentile:float
+
+PROFILES={
+ "vocal":DynamicsProfile(3.2,5.0,2.0,1.6,55),
+ "bass":DynamicsProfile(3.0,4.0,1.5,1.8,50),
+ "kick":DynamicsProfile(2.0,2.5,.5,1.0,78),
+ "snare":DynamicsProfile(2.2,3.0,.5,1.0,78),
+ "toms":DynamicsProfile(2.0,2.5,.5,1.1,75),
+ "guitar":DynamicsProfile(1.8,2.5,1.2,2.0,50),
+ "keys":DynamicsProfile(1.6,2.0,1.0,2.2,50),
+ "playback":DynamicsProfile(1.5,1.5,.8,2.5,50),
+ "cymbals":DynamicsProfile(1.3,1.0,.35,2.5,70),
 }
 
-def short_term_db(x:np.ndarray,sr:int,window_ms:float=80,hop_ms:float=20)->np.ndarray:
-    m=x.mean(1) if x.ndim>1 else x
-    win=max(16,int(window_ms*sr/1000));hop=max(1,int(hop_ms*sr/1000))
-    n=max(0,1+(len(m)-win)//hop)
-    if n<=0:return np.array([],dtype=float)
-    out=np.empty(n)
-    for i in range(n):
-        q=m[i*hop:i*hop+win].astype("float64")
-        out[i]=20*np.log10(np.sqrt(np.mean(q*q)+1e-20))
-    return out
-
-def diagnose(x:np.ndarray,sr:int,role:str)->dict:
-    db=short_term_db(x,sr)
-    if len(db)==0:return {"role":role,"dynamic_range_db":0,"recommended":False}
-    active=db>np.percentile(db,35);a=db[active]
-    spread=float(np.percentile(a,90)-np.percentile(a,20))
-    p=ROLE_POLICY.get(role,{"ratio":1.5,"max_gr_db":2,"attack_ms":25,"release_ms":140,"target_pctl":70})
-    return {"role":role,"dynamic_range_db":spread,"recommended":spread>5.0,
-            "threshold_db":float(np.percentile(a,p["target_pctl"])),"policy":p}
-
-def compressor_curve(x:np.ndarray,sr:int,role:str)->tuple[np.ndarray,dict]:
-    d=diagnose(x,sr,role);p=d["policy"]
-    if not d["recommended"]:return np.ones(len(x),dtype="float32"),{**d,"max_gr_db":0.0}
-    m=x.mean(1) if x.ndim>1 else x
-    # 12 ms detector, smoothed with role attack/release.
-    win=max(8,int(.012*sr))
-    env=np.sqrt(ndimage.uniform_filter1d(m.astype("float64")**2,size=win)+1e-20)
-    db=20*np.log10(env+1e-20);over=np.maximum(db-d["threshold_db"],0)
-    target=np.minimum(over*(1-1/p["ratio"]),p["max_gr_db"])
-    gr=np.zeros(len(target),dtype="float32")
-    aa=np.exp(-1/(max(1,p["attack_ms"]*sr/1000)))
-    rr=np.exp(-1/(max(1,p["release_ms"]*sr/1000)))
-    for i in range(1,len(gr)):
-        c=aa if target[i]>gr[i-1] else rr
-        gr[i]=c*gr[i-1]+(1-c)*target[i]
-    return np.power(10,-gr/20).astype("float32"),{**d,"max_gr_db":float(gr.max()),"p95_gr_db":float(np.percentile(gr,95))}
+def analyze_frames(x:np.ndarray,sr:int,role:str,hop_s:float=.02)->dict:
+    m=x.mean(1) if x.ndim>1 else x;hop=max(1,int(sr*hop_s));n=len(m)//hop
+    q=m[:n*hop].reshape(n,hop).astype("float64")
+    db=20*np.log10(np.sqrt(np.mean(q*q,axis=1))+1e-12)
+    p=PROFILES[role];active=db>np.percentile(db,p.active_percentile)
+    target=float(np.median(db[active]))
+    ride=np.where(active,np.clip((target-db)*.42,-p.ride_max_db,p.ride_max_db),0).astype("float32")
+    ride=ndimage.gaussian_filter1d(ride,max(1,p.ride_window_s/(2.355*hop_s)))
+    threshold=float(np.percentile((db+ride)[active],64 if role in ("vocal","bass") else 70))
+    gr=np.where(active,np.clip(np.maximum(db+ride-threshold,0)*(1-1/p.ratio),0,p.max_gr_db),0).astype("float32")
+    sigma={"vocal":1.5,"bass":2,"kick":1,"snare":1,"toms":1.2,"guitar":2,"keys":2.5,"playback":3,"cymbals":3}[role]
+    gr=ndimage.gaussian_filter1d(gr,sigma)
+    # Bounded median compensation preserves the Balance Director's static relationship.
+    makeup=float(np.clip(-np.median((ride-gr)[active]),0,2.0))
+    net=(ride-gr+makeup).astype("float32")
+    return {"db":db,"active":active,"ride_db":ride,"gr_db":gr,"net_db":net,"makeup_db":makeup,
+            "before_spread_db":float(np.percentile(db[active],90)-np.percentile(db[active],10)),
+            "after_spread_db":float(np.percentile((db+net)[active],90)-np.percentile((db+net)[active],10)),
+            "p95_gr_db":float(np.percentile(gr[active],95)),"max_gr_db":float(gr.max()),"hop_s":hop_s}
 
 def apply(x:np.ndarray,sr:int,role:str)->tuple[np.ndarray,dict]:
-    g,d=compressor_curve(x,sr,role)
-    y=x*g[:,None] if x.ndim>1 else x*g
-    # No automatic makeup. Static balance remains the Balance Director's job.
-    return y.astype("float32"),d
+    a=analyze_frames(x,sr,role);n=len(a["net_db"]);hop_s=a["hop_s"]
+    frame_t=(np.arange(n)+.5)*hop_s;sample_t=np.arange(len(x))/sr
+    gdb=np.interp(sample_t,frame_t,a["net_db"],left=a["net_db"][0],right=a["net_db"][-1]).astype("float32")
+    y=x*np.power(10,gdb[:,None]/20).astype("float32") if x.ndim>1 else x*np.power(10,gdb/20).astype("float32")
+    diag={k:v for k,v in a.items() if k not in ("db","active","ride_db","gr_db","net_db")}
+    return y.astype("float32"),diag
