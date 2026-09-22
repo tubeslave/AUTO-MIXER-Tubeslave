@@ -26,7 +26,7 @@ def choose_hypothesis(diagnostics:dict)->Hypothesis|None:
         candidates.append(Hypothesis("dense_width_support","guitar",
             "Dense sections do not gain enough width relative to sparse sections.",.6,
             diagnostics["dense_section_width_deficit_db"],{}))
-    if diagnostics.get("section_loudness_jump_db",0)>1.2:
+    if diagnostics.get("section_loudness_jump_db",0)>1.5:
         candidates.append(Hypothesis("section_level_smoothing","mix",
             "Section transition changes broadband level too abruptly.",.5,
             diagnostics["section_loudness_jump_db"],{}))
