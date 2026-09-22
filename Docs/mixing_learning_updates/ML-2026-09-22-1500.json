@@ -1,0 +1,93 @@
+{
+  "update_id": "ML-2026-09-22-1500",
+  "mode": "search",
+  "scheduled_slot": "2026-09-22T15:00:00+03:00",
+  "actual_start": "2026-09-22T15:02:37+03:00",
+  "completed": "2026-09-22T15:06:56+03:00",
+  "preceding_update": "ML-2026-09-22-1200",
+  "preceding_successful_search": "ML-2026-09-22-0900",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260922-1500-01",
+      "action": "add",
+      "title": "Acoustic Image Source Interpolation with Optimal Transport Barycenter",
+      "authors": ["Yuyang Liu", "Rumeshika Pallewela", "Jesper Brunnstrom", "Isabel Haasler", "Filip Elvander"],
+      "arxiv": "2609.15981v1",
+      "doi": "10.48550/arXiv.2609.15981",
+      "url": "https://arxiv.org/html/2609.15981v1",
+      "published": "2026-09-14",
+      "discovered": "2026-09-22",
+      "licence": "arXiv perpetual non-exclusive licence",
+      "reading_depth": "full_text_complete",
+      "method": ["displacement-invariant OT ground cost", "convex fixed-grid barycenter", "non-convex alternating free-support estimator"],
+      "reported_experiment": {"room_m": [3,4], "dimension": "2D", "max_reflection_order": 2, "main_trials": 400, "default_sigma_x_m": 0.1, "default_known_sources": 4, "default_ring_samples": 4},
+      "limitations": ["equal reflection count and latent correspondence assumed", "Gaussian point perturbations in shoebox simulation", "point-cloud Wasserstein metric only", "initialization and geometry sensitivity", "no rendered RIR, measured room, listening, localization, full-band, phase, peak, mono or music test"]
+    },
+    {
+      "id": "SRC-ML-20260922-1500-02",
+      "action": "add",
+      "title": "On the Usefulness of Diffusion-Based Room Impulse Response Interpolation to Microphone Array Processing",
+      "authors": ["Sagi Della Torre", "Mirco Pezzoli", "Fabio Antonacci", "Sharon Gannot"],
+      "arxiv": "2603.28209v1",
+      "doi": "10.48550/arXiv.2603.28209",
+      "url": "https://arxiv.org/html/2603.28209v1",
+      "published": "2026-03-30",
+      "discovered": "2026-09-22",
+      "licence": "CC BY 4.0",
+      "reading_depth": "full_text_complete",
+      "method": ["DiffusionRIR image inpainting", "overlapping 64x64 patch reconstruction", "patch-wise normalization to [-1,1]", "MVDR and null-steering downstream evaluation"],
+      "results": ["simulated 16-microphone speech beamforming generally improves over measured-channels-only baselines", "real MeshRIR NMSE and cosine distance outperform spatial cubic interpolation", "one measured example reports T60 0.31 s reconstructed versus 0.34 s target"],
+      "limitations": ["measured section does not evaluate beamforming or listening", "8 kHz and 256 ms truncation", "single measured room/subset", "no repeated-seed uncertainty", "no patch seam, full-band HF, phase/mono, peak, localization, long-tail or music test"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260922-1500-01","claim":"arXiv:2609.15981 and 2609.17237 are distinct methods and experiments, not versions or independent perceptual confirmations.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-02","claim":"Equal source displacement constrains persistent ideal image sources but not missing, spurious, weighted or visibility-changing reflections.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-03","claim":"Free-support image-source barycenter is non-convex and initialization-dependent; oracle versus deployable regret is required.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-04","claim":"Point-cloud Wasserstein error does not measure rendered timing, amplitude, phase, localization or preference.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-05","claim":"Centre/corner asymmetry shows average gains do not imply geometric robustness.","confidence":"high_within_simulation"},
+    {"id":"KC-ML-20260922-1500-06","claim":"Real MeshRIR reconstruction and simulated MVDR improvement are separate claims and do not transfer automatically to music reverb.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-07","claim":"Patch-wise RIR normalization and reassembly require gain, boundary, delay and phase checks.","confidence":"high_evaluation_requirement"},
+    {"id":"KC-ML-20260922-1500-08","claim":"Stochastic diffusion interpolation needs repeated-seed distributions.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-09","claim":"8 kHz and 256 ms validation excludes upper-band behavior and long tails.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-10","claim":"One similar EDC/T60 example cannot establish direct-path accuracy, spatial image or preference.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-11","claim":"Speech beamforming metrics validate a downstream spatial-filter task, not musical auralization.","confidence":"high"},
+    {"id":"KC-ML-20260922-1500-12","claim":"Sparse-array geometry must be explicit; one-sided extrapolation is harder than distributed interpolation.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260922-1500-01","source":"SRC-ML-20260922-1500-01","when":"corresponding specular paths plausibly persist","change":"association/interpolation only","parameter_range":"no preset; project-specific matched and unmatched sweeps","range_origin":"full paper","protect":["reflection identity","timing"],"verify":["missing/spurious/visibility cases"],"cancel":["cardinality mismatch","unstable association"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-02","source":"SRC-ML-20260922-1500-01","when":"using a non-convex free-support interpolator","change":"deployable initialization only","parameter_range":"equal candidate and optimization budget","range_origin":"initialization ablation","protect":["reproducibility"],"verify":["multi-seed convergence","oracle regret"],"cancel":["target-informed requirement"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-03","source":"SRC-ML-20260922-1500-01","when":"point-cloud W2 improves","change":"require rendered-RIR and listening validation","parameter_range":"project-specific","range_origin":"metric scope","protect":["direct arrival","phase","amplitude","localization"],"verify":["time-domain residual","blind preference"],"cancel":["metric-only improvement"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-04","source":"SRC-ML-20260922-1500-01","when":"evaluating RIR interpolation","change":"stratify geometry and interpolation/extrapolation","parameter_range":"centre, edge and corner cases","range_origin":"geometry ablation","protect":["worst-case behavior"],"verify":["per-geometry metrics"],"cancel":["edge/corner regression"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-05","source":"SRC-ML-20260922-1500-02","when":"reassembling patch-wise RIR output","change":"validate gain, seams, delay and phase","parameter_range":"all patch overlaps and channels","range_origin":"algorithm structure","protect":["direct path","inter-channel phase"],"verify":["boundary residual","gain ratio","delay"],"cancel":["seam","gain drift","phase drift"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-06","source":"SRC-ML-20260922-1500-02","when":"using stochastic RIR generation","change":"evaluate fixed logged seed set","parameter_range":"project-specific repeated seeds","range_origin":"diffusion sampling","protect":["spatial stability","tails"],"verify":["per-seed distributions"],"cancel":["seed-fragile result"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-07","source":"SRC-ML-20260922-1500-02","when":"citing measured reconstruction and simulated downstream results","change":"keep claims separate","parameter_range":"claim-scope only","range_origin":"experimental design","protect":["epistemic scope"],"verify":["measured rendered-audio transfer"],"cancel":["full-band music claim without transfer"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260922-1500-08","source":"SRC-ML-20260922-1500-02","when":"porting 8 kHz/256 ms results","change":"revalidate at project sample rate and tail length","parameter_range":"project-specific; paper values are not presets","range_origin":"paper preprocessing","protect":["HF","long decay","peak","mono","localization"],"verify":["full-band raw render","blind listening"],"cancel":["HF, tail, peak, mono or localization regression"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_cards": [
+    {"id":"VID-ML-20260922-1500-01","title":"Parallel Drum Compression Tips Nobody Talks About","channel":"Mastering.com","url":"https://www.youtube.com/watch?v=lFN5rb8x0tw","published":"2020-05-17","reading_depth":"metadata_only","status":"queued_source","transcript":"unavailable"},
+    {"id":"VID-ML-20260922-1500-02","title":"Using Parallel Compression to Craft Hard-Hitting Drums!","channel":"Produce Like A Pro / Warren Huart","url":"https://www.youtube.com/watch?v=jbWvrrxEApA","published":"2021-01-25","reading_depth":"metadata_only","status":"queued_source","transcript":"unavailable"}
+  ],
+  "reference_cards": [],
+  "deduplication": [
+    {"candidate":"arXiv:2609.15981v1","compared_with":"arXiv:2609.17237v1","result":"distinct_source_retained","basis":["identifier","normalized title","authors","method","experiment"]},
+    {"candidate":"arXiv:2603.28209v1","result":"absent_from_current_index_added_as_older_gap"},
+    {"candidate":"YouTube lFN5rb8x0tw","result":"absent_from_current_index_queued"},
+    {"candidate":"YouTube jbWvrrxEApA","result":"absent_from_current_index_queued"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260922-1500-01","status":"not_run","priority":"next","baseline":"spatial cubic interpolation on fixed rights-cleared MeshRIR slice and mask","variant":"pinned DiffusionRIR on identical inputs and logged seed set","single_factor":"missing-channel reconstruction method","fixed":["positions","mask","sample rate","truncation","preprocessing","patch overlap","output length","renderer","test probes"],"loudness_matching":"raw RIRs and probes retained; separate randomized loudness-matched listening copies","measurements":["direct delay and amplitude","early reflection error","NMSE","cosine distance","phase/coherence","seams","EDC/T60","sample peak","true peak","mono residual","seed spread","blind preference"],"protect":["direct sound","attack","early timing","room identity","localization","headroom","mono","tail continuity"],"cancel":["unknown checkpoint or provenance","seed fragility","patch seam","gain or phase drift","metric-only win","peak or mono regression","no repeatable preference"]},
+    {"id":"EXP-ML-20260922-1500-02","status":"not_run","priority":"high","baseline":"One-PC circular initialization","variant":"uniform initialization with equal candidate count and budget","single_factor":"initialization","fixed":["room","known and target positions","point clouds","perturbations","solver","tolerance","seeds"],"loudness_matching":"separate matched copies only if RIRs are rendered","measurements":["convergence","iterations","association error","point-cloud W2","time-domain RIR error","oracle regret"],"protect":["reproducibility","reflection identity"],"cancel":["target-informed state","non-convergence","unstable permutation","no repeatable advantage"]},
+    {"id":"EXP-ML-20260922-1500-03","status":"not_run","priority":"high","baseline":"one fixed DiffusionRIR seed","variant":"same checkpoint and input across fixed multi-seed set","single_factor":"sampling seed","fixed":["mask","conditioning","patching","normalization","schedule","renderer"],"loudness_matching":"raw renders plus separate matched listening copies","measurements":["NMSE/CD distribution","delay and phase spread","EDC/T60 spread","seams","finite output","peaks","listening rank stability"],"protect":["direct path","localization","tails"],"cancel":["non-finite output","unstable direct path or localization","seed-dependent preference"]},
+    {"id":"EXP-ML-20260922-1500-04","status":"not_run","priority":"high","baseline":"distributed measurements around target region","variant":"same count on one side creating extrapolation","single_factor":"spatial mask geometry","fixed":["room","target path","measurement count","method","checkpoint","seeds","renderer"],"loudness_matching":"raw renders plus separate matched listening copies","measurements":["worst-case and median RIR error","direct and early timing","phase/coherence","EDC","localization continuity","peaks","mono","blind preference"],"protect":["spatial continuity","phase","mono","headroom"],"cancel":["measurement-count mismatch","edge-only failure","spatial jump","phase or mono damage","no robust advantage"]}
+  ],
+  "queue": {"video_count":32,"studied_videos":0,"remaining":["deep-review public DiffusionRIR artefact, training split, patch reassembly and seed controls","rights-cleared full-band measured SRIR path or raw RIR set","execute SH-IRT numerical safety tests when exact free/local environment exists","32 transcript-dependent video sources","rights-cleared raw rock multitrack or paired DI-to-processed fragment"]},
+  "counts": {"source_cards_added":2,"knowledge_cards_added":12,"candidate_rules_added":8,"experiments_added":4,"video_cards_queued":2,"studied_videos":0,"queued_videos_total":32,"reference_cards_added":0},
+  "revisions": ["arXiv:2609.15981 retained as distinct from 2609.17237 after full-text deduplication","measured-RIR evidence added but separated from simulated downstream beamforming evidence","point-cloud W2 and RIR NMSE/CD limited to diagnostic scope","video queue expanded only with metadata-only cards"],
+  "safety": ["no audio downloaded or processed","no code or model execution","no DSP, runtime, checkpoint or active-rule change","no model training","all experiments not_run","all rules candidate and auto_apply false"],
+  "handoff": "Image-source W2 and measured-RIR NMSE/CD are diagnostics, not permission to enable a reverb renderer. Separate deployable from oracle initialization; validate patch gain/seams, seeds, direct/early timing, phase/mono and long tails on raw renders, then use separate loudness-matched blind copies."
+}
