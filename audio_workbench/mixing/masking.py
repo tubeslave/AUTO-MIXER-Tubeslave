@@ -1,29 +1,48 @@
 from __future__ import annotations
+from dataclasses import dataclass
 import numpy as np
-from scipy import signal
+from scipy import signal,ndimage
 
-def masking_profile(foreground:np.ndarray,background:np.ndarray,sr:int)->dict:
-    """Find broad regions where a background bus competes with an active foreground bus."""
-    fg=foreground.mean(1) if foreground.ndim>1 else foreground
-    bg=background.mean(1) if background.ndim>1 else background
-    f,pf=signal.welch(fg,fs=sr,nperseg=8192)
-    _,pb=signal.welch(bg,fs=sr,nperseg=8192)
-    score=10*np.log10((pb+1e-20)/(pf+1e-20))
-    # Weight only frequencies materially represented in the foreground.
-    fg_rel=10*np.log10((pf+1e-20)/(np.max(pf)+1e-20))
-    valid=(f>=180)&(f<=6000)&(fg_rel>-28)
-    return {"frequency_hz":f,"competition_db":score,"foreground_relative_db":fg_rel,"valid":valid}
+@dataclass(frozen=True)
+class MaskingBand:
+    name:str
+    lo:float
+    hi:float
+    max_cut_db:float
 
-def propose_bells(profile:dict,max_bands:int=2,max_cut_db:float=1.2)->list[dict]:
-    f=profile["frequency_hz"];s=profile["competition_db"];v=profile["valid"]
-    rows=[]
-    for lo,hi in [(180,450),(450,1200),(1200,2800),(2800,6000)]:
-        m=v&(f>=lo)&(f<hi)
-        if not np.any(m):continue
-        q=float(np.percentile(s[m],70))
-        if q<1.5:continue
-        fc=float(np.exp(np.mean(np.log(f[m]+1e-9))))
-        cut=float(-np.clip((q-1.0)*.18,.25,max_cut_db))
-        rows.append({"fc_hz":fc,"q":.8,"gain_db":cut,"competition_db":q})
-    rows.sort(key=lambda r:r["competition_db"],reverse=True)
-    return rows[:max_bands]
+BANDS={
+ "low_punch":MaskingBand("low_punch",45,110,1.5),
+ "low_mid":MaskingBand("low_mid",180,420,1.2),
+ "presence":MaskingBand("presence",1200,3500,1.8),
+ "upper_presence":MaskingBand("upper_presence",3000,6500,1.2),
+}
+
+def band_envelope(x:np.ndarray,sr:int,band:MaskingBand,window_ms:float=45)->np.ndarray:
+    if x.ndim>1:x=x.mean(1)
+    sos=signal.butter(2,[band.lo,band.hi],btype="bandpass",fs=sr,output="sos")
+    y=signal.sosfiltfilt(sos,x).astype("float32")
+    return np.sqrt(ndimage.uniform_filter1d(y*y,size=max(3,int(window_ms*sr/1000)))+1e-12)
+
+def masking_evidence(target:np.ndarray,masker:np.ndarray,sr:int,band:MaskingBand)->dict:
+    t=band_envelope(target,sr,band);m=band_envelope(masker,sr,band)
+    ta=t>np.percentile(t,65);ma=m>np.percentile(m,55);co=ta&ma
+    if np.sum(co)<sr*.25:return {"score":0.,"coactivity":0.,"median_ratio_db":0.}
+    ratio=20*np.log10((m[co]+1e-12)/(t[co]+1e-12))
+    coactivity=float(np.mean(co))
+    med=float(np.median(ratio))
+    # More evidence when masker is competitive with target during target activity.
+    score=float(np.clip(coactivity*2.2,0,1)*np.clip((med+12)/18,0,1))
+    return {"score":score,"coactivity":coactivity,"median_ratio_db":med}
+
+def sidechain_cut_curve(target:np.ndarray,sr:int,band:MaskingBand,depth_db:float)->np.ndarray:
+    e=band_envelope(target,sr,band)
+    lo=np.percentile(e,55);hi=np.percentile(e,90)
+    activity=np.clip((e-lo)/(hi-lo+1e-12),0,1)
+    activity=ndimage.gaussian_filter1d(activity.astype("float32"),sigma=max(1,int(.035*sr)))
+    return (-abs(depth_db)*activity).astype("float32")
+
+def apply_dynamic_band_cut(masker:np.ndarray,curve_db:np.ndarray,sr:int,band:MaskingBand)->np.ndarray:
+    sos=signal.butter(2,[band.lo,band.hi],btype="bandpass",fs=sr,output="sos")
+    band_audio=signal.sosfiltfilt(sos,masker,axis=0).astype("float32")
+    gain=np.power(10,curve_db/20).astype("float32")
+    return (masker+band_audio*(gain[:,None]-1)).astype("float32")
