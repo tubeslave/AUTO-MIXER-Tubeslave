@@ -48,6 +48,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-21-1800 | [Report](ML-2026-09-21-1800.md), [JSON patch](ML-2026-09-21-1800.json) | Deep review: canonical BSRNN replication upgraded to full text, pinned implementation and checkpoint-manifest audit; 12 Knowledge Cards, 8 candidate rules, 28 carried queued videos and 4 unrun experiments; compound-causality, metric, gain, checkpoint, stitching, uncertainty and rights limits recorded |
 | ML-2026-09-22-0900 | [Report](ML-2026-09-22-0900.md), [JSON patch](ML-2026-09-22-0900.json) | Search: 1 fresh full-text directional-reverberation source, 1 selected-section spatial-interpolation source, 1 companion implementation audit, 10 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued loudness/mastering videos, 4 unrun experiments; 2 duplicates removed |
 | ML-2026-09-22-1200 | [Report](ML-2026-09-22-1200.md), [JSON patch](ML-2026-09-22-1200.json) | Deep review: aggregate SSW interpolation upgraded to full text, 1 independent time-resolved POT comparator, expanded pinned SH-IRT audit, 12 Knowledge Cards, 8 candidate rules, 30 carried queued videos and 4 unrun experiments; metric coupling, temporal aggregation, numerical safety and test-coverage limits recorded |
+| ML-2026-09-22-1500 | [Report](ML-2026-09-22-1500.md), [JSON patch](ML-2026-09-22-1500.json) | Search: 2 full-text RIR-interpolation sources (1 queued fresh comparator and 1 older measured-data gap), 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued parallel-drum videos, 4 unrun experiments; version, oracle, geometry, patch, seed and task-transfer limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -84,6 +85,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-22-1500 (`search`, preceding successful search `ML-2026-09-22-0900`): image-source W2 and measured-RIR NMSE/CD are diagnostics, not permission to enable a reverb renderer. Separate deployable from oracle initialization; validate patch gain/seams, seeds, direct/early timing, phase/mono and long tails on raw renders, then use separate loudness-matched blind copies. Next test: `EXP-ML-20260922-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-22-1200 (`deep_review`, preceding search `ML-2026-09-22-0900`): aggregate SSW reflection density is a diagnostic candidate, not evidence of a better moving reverb. Keep timing and direction separately observable; fail closed on solver, conditioning and inverse-CDF faults; validate optional slice weighting against a hand reference. Next test: `EXP-ML-20260922-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
