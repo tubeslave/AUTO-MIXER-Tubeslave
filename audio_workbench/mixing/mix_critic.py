@@ -5,12 +5,17 @@ def section_spread(values:list[float])->float:
     a=np.asarray(values,dtype=float)
     return float(np.percentile(a,90)-np.percentile(a,10)) if len(a)>=3 else 0.
 
-def _active_adjacent_jump(rows:list[dict])->float:
-    """Never compare two active rows that were separated by skipped silence/inactive sections."""
+def _unexplained_section_jump(rows:list[dict])->float:
+    """Measure abrupt level changes after removing the level change explained by arrangement density."""
+    if len(rows)<4:return 0.
+    y=np.asarray([r["rms_db"] for r in rows],dtype=float)
+    d=np.asarray([r.get("density",.5) for r in rows],dtype=float)
+    X=np.column_stack([np.ones(len(d)),d])
+    residual=y-X@np.linalg.lstsq(X,y,rcond=None)[0]
     jumps=[]
     for i in range(1,len(rows)):
         if rows[i].get("active",True) and rows[i-1].get("active",True):
-            jumps.append(abs(rows[i]["rms_db"]-rows[i-1]["rms_db"]))
+            jumps.append(abs(residual[i]-residual[i-1]))
     return max(jumps,default=0.)
 
 def diagnostics(section_rows:list[dict],global_metrics:dict)->dict:
@@ -29,5 +34,5 @@ def diagnostics(section_rows:list[dict],global_metrics:dict)->dict:
       "vocal_section_spread_db":section_spread(vocal),
       "kick_bass_section_drift_db":section_spread(kb),
       "dense_section_width_deficit_db":width_def,
-      "section_loudness_jump_db":_active_adjacent_jump(section_rows),
+      "section_loudness_jump_db":_unexplained_section_jump(section_rows),
     }
