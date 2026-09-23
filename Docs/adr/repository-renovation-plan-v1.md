@@ -212,17 +212,26 @@ R3 one-hypothesis iteration now exists as a canonical live-runtime component:
 - operator touch has priority: `operator_took_control` enters HOLD without issuing rollback, so automation cannot undo an operator's corrective move;
 - OBSERVE/PROPOSE/policy-blocked actions never open a verification window because no mutation occurred.
 
+R3 authoritative Main evidence now has a concrete post-console path:
+- `backend/live_runtime/main_evidence.py` measures RMS/peak/crest only from explicitly routed post-console Main USB tap channels; it never synthesizes Main by summing input stems;
+- `LiveAudioCaptureBridge` accepts exactly one authoritative Main source: either an external meter provider or a snapshot provider;
+- snapshot Main evidence is derived from the same coherent 48-channel copy as channel features, so the Main and feature timestamps are identical;
+- capture slots reserved for the Main tap are excluded from channel-level features so a returned Main cannot be mistaken for a controllable source channel;
+- routing verification remains a PATCH_VERIFY/HIL requirement before the returned tap can authorize autonomous Main decisions.
+
 The audit of `backend/autofoh_evaluation.py` splits its migration class by responsibility. Its explicit observability warning and any validated detector/metric evidence remain **ADAPT** candidates. Its `PendingActionEvaluation`, legacy typed-action rollback construction and proxy evaluation/rollback orchestration are **ARCHIVE** candidates once runtime imports are severed, because those authorities are now owned by `live_runtime` control/iteration layers. No legacy AutoFOH rollback or decision code is imported by the new coordinator.
 
 The audit of `backend/cross_adaptive_eq.py` keeps it in ADAPT only as a possible DSP/evidence reference. Its current policy hard-codes seven band centers, channel priority rules, overlap tolerance and mirror boost/cut behavior, so it is not suitable as the new live locator or decision authority and is not imported by `live_runtime`.
 
-Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, post-write verification, software write -> rollback -> second-readback restoration, single in-flight hypothesis enforcement, verify-window gating, Critic KEEP/rollback outcomes, operator-touch HOLD, and rollback-failure HOLD. The focused `Stem Offline Test` workflow passes on `live-soundcheck-renovation`. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader/AutoFOH evaluation write or rollback authority can be severed or archived.
+The audit of `backend/signal_analysis.py` classifies its level/envelope/transient/spectral measurement ideas as **ADAPT** evidence references only. The file is coupled to compressor-specific state, LUFS/TruePeak objects and WING ratio helpers, so it is not imported wholesale into `live_runtime`; reusable primitives should be re-expressed behind canonical feature contracts instead of reviving its old compressor policy.
+
+Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, post-write verification, software write -> rollback -> second-readback restoration, single in-flight hypothesis enforcement, verify-window gating, Critic KEEP/rollback outcomes, operator-touch HOLD, rollback-failure HOLD, coherent 48-channel capture snapshots and post-console Main tap extraction/exclusion. The focused `Stem Offline Test` workflow runs these live-runtime tests on `live-soundcheck-renovation`. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader/AutoFOH evaluation write or rollback authority can be severed or archived.
 
 Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`, `AutoFaderController`, `AutoCompressorController` and `AutoSoundcheckEngine`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
 
 No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ/evaluation implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
 
-See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md`, `Docs/adr/live-verified-rollback-v1.md` and `Docs/adr/live-one-hypothesis-iteration-v1.md` for the current WING control migration contracts and HIL gates.
+See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md`, `Docs/adr/live-verified-rollback-v1.md`, `Docs/adr/live-one-hypothesis-iteration-v1.md` and `Docs/adr/live-main-evidence-post-console-tap-v1.md` for the current WING control migration contracts and HIL gates.
 
 ## Non-negotiable migration rule
 
