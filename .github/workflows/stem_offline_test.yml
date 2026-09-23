@@ -44,6 +44,7 @@ jobs:
             tests/test_live_decision_engine.py \
             tests/test_live_runtime_service.py \
             tests/test_live_control_plane.py \
+            tests/test_live_wing_adapter.py \
             tests/test_soundcheck_handlers.py
 
       - name: Run offline stem training loop
