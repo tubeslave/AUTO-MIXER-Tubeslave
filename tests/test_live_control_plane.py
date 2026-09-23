@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from live_runtime.contracts import LiveMode, ProposedAction
+from live_runtime.contracts import EqBandLocator, LiveMode, ProposedAction
 from live_runtime.control_plane import LiveControlPlane
 
 
@@ -15,8 +15,19 @@ class FakeMixerAdapter:
 
     @staticmethod
     def _key(action):
-        parameter = "fader_db" if action.parameter == "fader_delta_db" else action.parameter
-        return action.target, parameter
+        relative_to_absolute = {
+            "fader_delta_db": "fader_db",
+            "eq_gain_delta_db": "eq_gain_db",
+        }
+        parameter = relative_to_absolute.get(action.parameter, action.parameter)
+        locator_key = None
+        if action.eq_locator is not None:
+            locator_key = (
+                action.eq_locator.band,
+                action.eq_locator.frequency_hz,
+                action.eq_locator.q,
+            )
+        return action.target, parameter, locator_key
 
     def read_value(self, action):
         value = self.values.get(self._key(action))
@@ -45,7 +56,7 @@ def _action(**overrides):
 
 
 def test_observe_never_writes_but_keeps_before_value_for_audit():
-    adapter = FakeMixerAdapter({("ch:1", "fader_db"): -5.0})
+    adapter = FakeMixerAdapter({("ch:1", "fader_db", None): -5.0})
     events = []
     plane = LiveControlPlane(adapter, audit_sink=events.append)
 
@@ -60,7 +71,7 @@ def test_observe_never_writes_but_keeps_before_value_for_audit():
 
 
 def test_bench_test_bypasses_production_routing_risk_and_confidence_gates():
-    adapter = FakeMixerAdapter({("output:1", "routing"): "USB/1"})
+    adapter = FakeMixerAdapter({("output:1", "routing", None): "USB/1"})
     events = []
     plane = LiveControlPlane(adapter, audit_sink=events.append)
     dangerous_for_production = _action(
@@ -85,7 +96,7 @@ def test_bench_test_bypasses_production_routing_risk_and_confidence_gates():
 
 
 def test_auto_safe_blocks_same_routing_action_before_transport_write():
-    adapter = FakeMixerAdapter({("output:1", "routing"): "USB/1"})
+    adapter = FakeMixerAdapter({("output:1", "routing", None): "USB/1"})
     plane = LiveControlPlane(adapter)
     action = _action(
         target="output:1",
@@ -103,7 +114,7 @@ def test_auto_safe_blocks_same_routing_action_before_transport_write():
 
 
 def test_manual_freeze_still_wins_in_bench_test():
-    adapter = FakeMixerAdapter({("ch:1", "fader_db"): -5.0})
+    adapter = FakeMixerAdapter({("ch:1", "fader_db", None): -5.0})
     plane = LiveControlPlane(adapter)
 
     result = plane.execute(_action(), LiveMode.BENCH_TEST, manual_freeze=True)
@@ -114,7 +125,7 @@ def test_manual_freeze_still_wins_in_bench_test():
 
 
 def test_relative_fader_move_resolves_against_fresh_current_value():
-    adapter = FakeMixerAdapter({("main:1", "fader_db"): -6.0})
+    adapter = FakeMixerAdapter({("main:1", "fader_db", None): -6.0})
     events = []
     plane = LiveControlPlane(adapter, audit_sink=events.append)
     action = _action(
@@ -140,7 +151,7 @@ def test_relative_fader_move_resolves_against_fresh_current_value():
 
 
 def test_relative_fader_move_cannot_exceed_its_declared_max_step_even_in_bench_test():
-    adapter = FakeMixerAdapter({("main:1", "fader_db"): -6.0})
+    adapter = FakeMixerAdapter({("main:1", "fader_db", None): -6.0})
     plane = LiveControlPlane(adapter)
     action = _action(
         target="main:1",
@@ -157,6 +168,56 @@ def test_relative_fader_move_cannot_exceed_its_declared_max_step_even_in_bench_t
     assert adapter.writes == []
 
 
+def test_relative_eq_gain_resolves_against_fresh_located_band_gain():
+    locator = EqBandLocator(3, 3200.0, 1.4)
+    key = ("ch:2", "eq_gain_db", (3, 3200.0, 1.4))
+    adapter = FakeMixerAdapter({key: -1.0})
+    events = []
+    plane = LiveControlPlane(adapter, audit_sink=events.append)
+    action = _action(
+        target="ch:2",
+        parameter="eq_gain_delta_db",
+        value=-0.7,
+        max_step=1.0,
+        eq_locator=locator,
+        reason="release vocal masking",
+    )
+
+    result = plane.execute(action, LiveMode.BENCH_TEST)
+
+    assert result.wrote is True
+    assert result.verified.before == -1.0
+    assert result.verified.after == -1.7
+    assert result.verified.readback == -1.7
+    assert adapter.writes[0].parameter == "eq_gain_db"
+    assert adapter.writes[0].eq_locator == locator
+    assert events[-1]["resolved_action"]["eq_locator"] == {
+        "band": 3,
+        "frequency_hz": 3200.0,
+        "q": 1.4,
+    }
+
+
+def test_relative_eq_gain_cannot_exceed_its_declared_max_step_even_in_bench_test():
+    locator = EqBandLocator(3, 3200.0, 1.4)
+    key = ("ch:2", "eq_gain_db", (3, 3200.0, 1.4))
+    adapter = FakeMixerAdapter({key: -1.0})
+    plane = LiveControlPlane(adapter)
+    action = _action(
+        target="ch:2",
+        parameter="eq_gain_delta_db",
+        value=-1.2,
+        max_step=0.8,
+        eq_locator=locator,
+    )
+
+    result = plane.execute(action, LiveMode.BENCH_TEST)
+
+    assert result.wrote is False
+    assert result.authorization_reason == "max_step_exceeded"
+    assert adapter.writes == []
+
+
 def test_transport_success_is_rejected_when_readback_does_not_match():
     state = {"reads": 0}
 
@@ -167,7 +228,7 @@ def test_transport_success_is_rejected_when_readback_does_not_match():
         return -4.5
 
     adapter = FakeMixerAdapter(
-        {("ch:1", "fader_db"): -5.0},
+        {("ch:1", "fader_db", None): -5.0},
         readback_transform=stale_after_write,
     )
     events = []
@@ -189,7 +250,7 @@ def test_small_numeric_readback_quantization_is_accepted():
         return float(value) + .01
 
     adapter = FakeMixerAdapter(
-        {("ch:1", "fader_db"): -5.0},
+        {("ch:1", "fader_db", None): -5.0},
         readback_transform=quantized,
     )
     plane = LiveControlPlane(adapter, readback_tolerance=.02)
