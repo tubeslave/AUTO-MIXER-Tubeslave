@@ -6,6 +6,7 @@ import pytest
 
 from backend.live_runtime.capture_bridge import LiveAudioCaptureBridge
 from backend.live_runtime.feature_stream import MainFeatureEvidence
+from backend.live_runtime.main_evidence import PostConsoleMainTapEvidenceProvider
 
 
 class FakeCapture:
@@ -82,6 +83,50 @@ def test_bridge_rejects_noncanonical_capture_shape():
         )
 
 
+def test_bridge_requires_exactly_one_authoritative_main_provider():
+    capture = FakeCapture()
+    service = FakeService()
+    tap = PostConsoleMainTapEvidenceProvider(47, 48)
+    with pytest.raises(ValueError, match="exactly one authoritative Main evidence provider"):
+        LiveAudioCaptureBridge(capture, service, roles={})
+    with pytest.raises(ValueError, match="exactly one authoritative Main evidence provider"):
+        LiveAudioCaptureBridge(
+            capture,
+            service,
+            roles={},
+            main_evidence_provider=_main_at,
+            snapshot_main_evidence_provider=tap,
+        )
+
+
+def test_post_console_main_tap_provider_measures_real_stereo_return():
+    provider = PostConsoleMainTapEvidenceProvider(47, 48)
+    block = np.zeros((2048, 48), dtype=np.float32)
+    block[:, 46] = 0.10
+    block[:, 47] = 0.20
+
+    evidence = provider.from_block(block, 12.5)
+
+    assert provider.reserved_capture_channels == (47, 48)
+    assert evidence.timestamp_s == 12.5
+    assert evidence.peak_dbfs == pytest.approx(-13.9794, abs=0.01)
+    assert evidence.rms_dbfs == pytest.approx(-16.0206, abs=0.01)
+    assert evidence.crest_db == pytest.approx(2.0412, abs=0.01)
+
+
+def test_post_console_main_tap_configuration_fails_closed():
+    with pytest.raises(ValueError, match="distinct"):
+        PostConsoleMainTapEvidenceProvider(47, 47)
+    with pytest.raises(ValueError, match="inside 1..48"):
+        PostConsoleMainTapEvidenceProvider(49)
+
+    provider = PostConsoleMainTapEvidenceProvider(47, 48)
+    bad = np.zeros((2048, 48), dtype=np.float32)
+    bad[0, 46] = np.nan
+    with pytest.raises(ValueError, match="NaN or infinity"):
+        provider.from_block(bad, 1.0)
+
+
 def test_bridge_snapshots_48_channels_and_feeds_service_off_callback_thread():
     capture = FakeCapture()
     service = FakeService()
@@ -114,6 +159,41 @@ def test_bridge_snapshots_48_channels_and_feeds_service_off_callback_thread():
         assert features.channels[0].rms_dbfs == pytest.approx(-20.0, abs=0.1)
         assert features.channels[1].rms_dbfs == pytest.approx(-13.98, abs=0.1)
         assert features.main_peak_dbfs == -6.0
+        assert bridge.status().snapshots_processed == 1
+    finally:
+        bridge.stop()
+
+
+def test_snapshot_main_tap_is_time_coherent_and_excluded_from_channel_decisions():
+    capture = FakeCapture()
+    service = FakeService()
+    tap = PostConsoleMainTapEvidenceProvider(47, 48)
+    bridge = LiveAudioCaptureBridge(
+        capture,
+        service,
+        roles={1: "kick"},
+        channel_names={1: "Kick In"},
+        snapshot_main_evidence_provider=tap,
+        window_frames=2048,
+        analysis_interval_s=0.0,
+        wall_clock=lambda: 42.0,
+    )
+    block = np.zeros((2048, 48), dtype=np.float32)
+    block[:, 0] = 0.10
+    block[:, 46] = 0.25
+    block[:, 47] = 0.50
+
+    bridge.start()
+    try:
+        capture.emit(block)
+        assert service.called.wait(1.0)
+        features, _, _ = service.calls[0]
+        channels = {channel.channel for channel in features.channels}
+        assert len(features.channels) == 46
+        assert 47 not in channels
+        assert 48 not in channels
+        assert features.timestamp_s == 42.0
+        assert features.main_peak_dbfs == pytest.approx(-6.0206, abs=0.01)
         assert bridge.status().snapshots_processed == 1
     finally:
         bridge.stop()
