@@ -16,7 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from .contracts import LiveMode
+from .contracts import LiveMode, ProposedAction
+from .control_plane import LiveControlPlane, WriteExecution
+from .wing_adapter import WingWriteAdapter
 
 
 @dataclass(frozen=True)
@@ -31,19 +33,33 @@ class LiveStartRequest:
 
 
 class LiveSoundcheckService:
-    """Authoritative lifecycle seam for the live pipeline.
+    """Authoritative lifecycle and live-control composition seam.
 
     ``AutoSoundcheckEngine`` remains a MIGRATE dependency because it still owns
     useful mixer discovery, audio capture, readback and action logging. New
     callers do not own that engine directly: they start/stop/query this service.
+
+    WING mutations owned by the new architecture are executed through
+    :class:`LiveControlPlane`. The service deliberately obtains the physical
+    WING transport from the compatibility engine but never delegates decision
+    policy to it.
     """
 
     legacy_bridge = True
 
-    def __init__(self, engine_factory: Callable[..., Any] | None = None):
+    def __init__(
+        self,
+        engine_factory: Callable[..., Any] | None = None,
+        *,
+        audit_sink: Callable[[dict[str, Any]], None] | None = None,
+    ):
         self._engine_factory = engine_factory
         self._engine: Any | None = None
         self._request: LiveStartRequest | None = None
+        self._control_plane: LiveControlPlane | None = None
+        self._control_transport: Any | None = None
+        self._control_audit: list[dict[str, Any]] = []
+        self._external_audit_sink = audit_sink
 
     @property
     def active_engine(self) -> Any | None:
@@ -53,6 +69,11 @@ class LiveSoundcheckService:
     @property
     def active_mode(self) -> LiveMode | None:
         return self._request.mode if self._request else None
+
+    @property
+    def control_audit_events(self) -> list[dict[str, Any]]:
+        """Return a copy of new-runtime control decisions for HIL inspection."""
+        return [dict(event) for event in self._control_audit]
 
     @staticmethod
     def _legacy_flags(mode: LiveMode) -> tuple[bool, bool]:
@@ -75,6 +96,72 @@ class LiveSoundcheckService:
 
             factory = AutoSoundcheckEngine
         return factory
+
+    def _record_control_audit(self, payload: dict[str, Any]) -> None:
+        event = dict(payload)
+        self._control_audit.append(event)
+        if self._external_audit_sink is not None:
+            self._external_audit_sink(event)
+
+    def _reset_control_plane(self) -> None:
+        self._control_plane = None
+        self._control_transport = None
+
+    def _active_wing_transport(self) -> Any:
+        """Return the physical WING client owned by the migration bridge.
+
+        In observe mode the legacy engine may expose an ``ObservationMixerClient``
+        as ``mixer_client``. ``_real_mixer_client`` is therefore preferred. A
+        local observation wrapper must never be used to prove physical readback.
+        """
+        if self._engine is None or self._request is None:
+            raise RuntimeError("Live soundcheck is not running")
+
+        mixer_type = str(self._request.mixer_type or "").strip().lower().replace("-", "_")
+        if mixer_type not in {"wing", "wing_rack", "behringer_wing"}:
+            raise NotImplementedError(
+                f"Authoritative live control adapter is not migrated for mixer type {self._request.mixer_type!r}"
+            )
+
+        client = getattr(self._engine, "_real_mixer_client", None)
+        if client is None:
+            client = getattr(self._engine, "mixer_client", None)
+        if client is None:
+            raise RuntimeError("Physical WING transport is not ready")
+        if not hasattr(client, "send") or not hasattr(client, "subscribe"):
+            raise TypeError("Active WING transport does not expose send/subscribe")
+        return client
+
+    def _active_control_plane(self) -> LiveControlPlane:
+        client = self._active_wing_transport()
+        if self._control_plane is None or self._control_transport is not client:
+            self._control_transport = client
+            self._control_plane = LiveControlPlane(
+                WingWriteAdapter(client),
+                audit_sink=self._record_control_audit,
+            )
+        return self._control_plane
+
+    def execute_action(
+        self,
+        action: ProposedAction,
+        *,
+        manual_freeze: bool = False,
+    ) -> WriteExecution:
+        """Execute one new-runtime action through the physical WING boundary.
+
+        Mode selection always comes from the explicit active ``LiveStartRequest``.
+        BENCH_TEST therefore exercises the same write/readback path as production
+        while bypassing production action allowlists. OBSERVE/PROPOSE/FREEZE are
+        still read-before + audit only and never mutate the console.
+        """
+        if self._request is None:
+            raise RuntimeError("Live soundcheck is not running")
+        return self._active_control_plane().execute(
+            action,
+            self._request.mode,
+            manual_freeze=manual_freeze,
+        )
 
     def create_engine(
         self,
@@ -125,6 +212,8 @@ class LiveSoundcheckService:
         if self.is_active():
             raise RuntimeError("Live soundcheck engine already running")
 
+        self._reset_control_plane()
+        self._control_audit.clear()
         engine = self.create_engine(
             request,
             on_state_change=on_state_change,
@@ -138,14 +227,16 @@ class LiveSoundcheckService:
         except Exception:
             self._engine = None
             self._request = None
+            self._reset_control_plane()
             raise
         return engine
 
     def stop(self) -> bool:
-        """Stop the active engine and release lifecycle ownership."""
+        """Stop the active engine and release lifecycle/control ownership."""
         engine = self._engine
         self._engine = None
         self._request = None
+        self._reset_control_plane()
         if engine is None:
             return False
         engine.stop()
@@ -159,6 +250,8 @@ class LiveSoundcheckService:
                 "state": "idle",
                 "mixer_connected": False,
                 "audio_running": False,
+                "control_plane_ready": False,
+                "control_audit_count": len(self._control_audit),
             }
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
@@ -166,4 +259,16 @@ class LiveSoundcheckService:
         mode = self.active_mode
         if mode is not None:
             status["mode"] = mode.value
+
+        transport = getattr(engine, "_real_mixer_client", None)
+        if transport is None:
+            transport = getattr(engine, "mixer_client", None)
+        mixer_type = str(self._request.mixer_type if self._request else "").strip().lower().replace("-", "_")
+        status["control_plane_ready"] = (
+            mixer_type in {"wing", "wing_rack", "behringer_wing"}
+            and transport is not None
+            and hasattr(transport, "send")
+            and hasattr(transport, "subscribe")
+        )
+        status["control_audit_count"] = len(self._control_audit)
         return status
