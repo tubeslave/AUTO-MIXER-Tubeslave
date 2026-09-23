@@ -167,6 +167,8 @@ Collapse stale READMEs/test reports/start scripts/config duplicates; rewrite top
 
 R1 is active: legacy `auto_*` decision modules are frozen for feature work.
 
+Repository continuity for the R3 work is now explicit: the validated live-runtime history ending at `9e015eea` was found to exist in the repository without any branch currently pointing at it, while default `master` was behind that renovation state. A dedicated `live-soundcheck-renovation` branch now anchors that history and is the working branch for subsequent R3 migration. The focused live workflow was updated to run on pushes to this branch so new migration commits cannot silently become untested/orphaned work.
+
 R2/R3 are active for the WING control path:
 - `backend/live_runtime/control_plane.py` is the canonical authorization/write/readback/verification boundary;
 - `backend/live_runtime/wing_adapter.py` adapts the existing WING OSC transport and requires fresh inbound readback rather than trusting the optimistic `WingClient.state` cache;
@@ -201,15 +203,26 @@ R3 verified rollback is now owned by the canonical live control plane:
 - rollback is treated as restoration, not a new musical decision: write-capable modes may restore a captured value even if that parameter would be blocked as a new AUTO_SAFE proposal, while OBSERVE/PROPOSE/FREEZE and manual freeze still prohibit the write;
 - `LiveSoundcheckService.rollback_action()` exposes the same authoritative path to the runtime rather than delegating rollback to legacy AutoFOH evaluation code.
 
+R3 one-hypothesis iteration now exists as a canonical live-runtime component:
+- `backend/live_runtime/iteration.py` permits exactly one applied hypothesis to wait for verification;
+- the verify window is causal and non-blocking: the realtime loop feeds a later feature snapshot instead of the coordinator sleeping or blocking audio/control processing;
+- the default Critic is `backend/live_runtime/decision_engine.verify`, preserving the studio-derived `one hypothesis -> verify -> keep/rollback` architecture without importing studio editing/mastering;
+- an immediate mixer readback mismatch triggers verified restoration before perceptual verification begins;
+- a Critic regression triggers the same canonical `rollback_action()` path; failed restoration enters HOLD and prevents more autonomous hypotheses;
+- operator touch has priority: `operator_took_control` enters HOLD without issuing rollback, so automation cannot undo an operator's corrective move;
+- OBSERVE/PROPOSE/policy-blocked actions never open a verification window because no mutation occurred.
+
+The audit of `backend/autofoh_evaluation.py` splits its migration class by responsibility. Its explicit observability warning and any validated detector/metric evidence remain **ADAPT** candidates. Its `PendingActionEvaluation`, legacy typed-action rollback construction and proxy evaluation/rollback orchestration are **ARCHIVE** candidates once runtime imports are severed, because those authorities are now owned by `live_runtime` control/iteration layers. No legacy AutoFOH rollback or decision code is imported by the new coordinator.
+
 The audit of `backend/cross_adaptive_eq.py` keeps it in ADAPT only as a possible DSP/evidence reference. Its current policy hard-codes seven band centers, channel priority rules, overlap tolerance and mirror boost/cut behavior, so it is not suitable as the new live locator or decision authority and is not imported by `live_runtime`.
 
-Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, post-write verification, and software write -> rollback -> second-readback restoration. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write or rollback authority can be severed or archived.
+Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, post-write verification, software write -> rollback -> second-readback restoration, single in-flight hypothesis enforcement, verify-window gating, Critic KEEP/rollback outcomes, operator-touch HOLD, and rollback-failure HOLD. The focused `Stem Offline Test` workflow passes on `live-soundcheck-renovation`. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader/AutoFOH evaluation write or rollback authority can be severed or archived.
 
 Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`, `AutoFaderController`, `AutoCompressorController` and `AutoSoundcheckEngine`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
 
-No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
+No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ/evaluation implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
 
-See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md` and `Docs/adr/live-verified-rollback-v1.md` for the current WING control migration contracts and HIL gates.
+See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md`, `Docs/adr/live-verified-rollback-v1.md` and `Docs/adr/live-one-hypothesis-iteration-v1.md` for the current WING control migration contracts and HIL gates.
 
 ## Non-negotiable migration rule
 
