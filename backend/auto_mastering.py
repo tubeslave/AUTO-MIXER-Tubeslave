@@ -9,6 +9,8 @@ import logging
 from typing import Dict, Optional, Tuple
 from dataclasses import dataclass
 
+from studio_mastering_metrics import StudioMasteringMeter
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -24,6 +26,7 @@ except ImportError:
     wavfile = None
     HAS_SCIPY = False
 
+
 @dataclass
 class MasteringResult:
     """Result of mastering process."""
@@ -35,6 +38,7 @@ class MasteringResult:
     eq_applied: bool
     success: bool
     error: Optional[str] = None
+
 
 class AutoMaster:
     """Automatic mastering processor."""
@@ -49,6 +53,10 @@ class AutoMaster:
             logger.info("Matchering library available for reference-based mastering")
         else:
             logger.info("Matchering not available, using built-in mastering")
+
+    def _studio_meter(self) -> StudioMasteringMeter:
+        """Return the accepted STUDIO meter for the current sample rate."""
+        return StudioMasteringMeter(self.sample_rate)
 
     def master(
         self,
@@ -128,7 +136,7 @@ class AutoMaster:
         return arr.astype(np.float32, copy=False)
 
     def _builtin_master(self, audio: np.ndarray) -> MasteringResult:
-        """Built-in mastering chain: EQ -> Compression -> Limiting -> Normalization."""
+        """Built-in mastering chain: EQ -> Compression -> loudness -> true-peak safety."""
         processed = self._normalize_audio_shape(audio).copy()
 
         # 1. Gentle high-pass filter at 30Hz
@@ -140,30 +148,36 @@ class AutoMaster:
             attack_ms=30.0, release_ms=200.0
         )
 
-        # 3. Loudness normalization
-        current_rms = np.sqrt(np.mean(self._monitor_signal(processed) ** 2) + 1e-12)
-        current_db = 20 * np.log10(current_rms)
-        gain_db = self.target_lufs - current_db
+        # 3. Standards-based loudness normalization.
+        meter = self._studio_meter()
+        current_lufs = meter.integrated_lufs(processed)
+        gain_db = self.target_lufs - current_lufs
         gain_db = max(-12.0, min(12.0, gain_db))
         gain_linear = 10 ** (gain_db / 20.0)
         processed = processed * gain_linear
 
-        # 4. Brick-wall limiter
-        processed, limiter_reduction = self._apply_limiter(processed, self.true_peak_limit)
+        # 4. Safety attenuation uses reconstructed true peak, not sample peak.
+        processed, limiter_reduction = meter.limit_true_peak(
+            processed,
+            ceiling_dbtp=self.true_peak_limit,
+        )
 
-        # Final measurements
-        peak_db = float(20 * np.log10(np.max(np.abs(processed)) + 1e-10))
-        rms_db = float(20 * np.log10(np.sqrt(np.mean(processed ** 2)) + 1e-10))
+        # Final measurements use the same accepted STUDIO meter.
+        measurement = meter.measure(processed)
 
         return MasteringResult(
-            audio=processed, peak_db=peak_db, lufs=rms_db,
-            gain_applied_db=gain_db, limiter_reduction_db=limiter_reduction,
-            eq_applied=True, success=True
+            audio=processed,
+            peak_db=measurement.sample_peak_dbfs,
+            lufs=measurement.integrated_lufs,
+            gain_applied_db=gain_db,
+            limiter_reduction_db=limiter_reduction,
+            eq_applied=True,
+            success=True,
         )
 
     @staticmethod
     def _estimate_lufs(audio: np.ndarray) -> float:
-        """RMS-based LUFS approximation used by compatibility tests."""
+        """RMS-based LUFS approximation retained for compatibility tests/callers."""
         if audio.size == 0:
             return -100.0
         if audio.ndim > 1:
@@ -172,28 +186,32 @@ class AutoMaster:
         return float(20.0 * np.log10(rms + 1e-12))
 
     def _limit(self, audio: np.ndarray) -> np.ndarray:
-        """Compatibility helper returning only limited audio."""
+        """Compatibility helper returning the legacy sample-peak-limited audio."""
         limited, _ = self._apply_limiter(audio.astype(np.float32), self.true_peak_limit)
         return limited.astype(np.float32)
 
     def _match_target_loudness(self, audio: np.ndarray, target_lufs: Optional[float] = None) -> np.ndarray:
-        """Bring audio toward the configured loudness target while honoring the peak limit."""
+        """Bring audio toward target integrated loudness while honoring true peak."""
         working = self._normalize_audio_shape(audio).astype(np.float32, copy=True)
         desired_lufs = float(self.target_lufs if target_lufs is None else target_lufs)
+        meter = self._studio_meter()
 
-        current_lufs = self._estimate_lufs(working)
+        current_lufs = meter.integrated_lufs(working)
         if np.isfinite(current_lufs):
             gain_db = np.clip(desired_lufs - current_lufs, -18.0, 18.0)
             working *= np.float32(10.0 ** (gain_db / 20.0))
 
-        working = self._limit(working)
+        working, _ = meter.limit_true_peak(working, ceiling_dbtp=self.true_peak_limit)
 
-        post_limit_lufs = self._estimate_lufs(working)
+        post_limit_lufs = meter.integrated_lufs(working)
         if np.isfinite(post_limit_lufs):
             correction_db = np.clip(desired_lufs - post_limit_lufs, -6.0, 6.0)
             if abs(correction_db) >= 0.1:
                 working *= np.float32(10.0 ** (correction_db / 20.0))
-                working = self._limit(working)
+                working, _ = meter.limit_true_peak(
+                    working,
+                    ceiling_dbtp=self.true_peak_limit,
+                )
 
         return working.astype(np.float32, copy=False)
 
@@ -205,7 +223,11 @@ class AutoMaster:
 
         working = self._match_target_loudness(working, self.target_lufs)
 
-        working = self._apply_eq_match(working.astype(np.float64), reference.astype(np.float64), sample_rate).astype(np.float32)
+        working = self._apply_eq_match(
+            working.astype(np.float64),
+            reference.astype(np.float64),
+            sample_rate,
+        ).astype(np.float32)
         return self._match_target_loudness(working, self.target_lufs)
 
     def _apply_eq_match(self, audio: np.ndarray, reference: np.ndarray, sample_rate: int) -> np.ndarray:
@@ -295,7 +317,10 @@ class AutoMaster:
         if audio.ndim == 1:
             return match_channel(audio)
 
-        matched_channels = [match_channel(audio[:, channel_idx]) for channel_idx in range(audio.shape[1])]
+        matched_channels = [
+            match_channel(audio[:, channel_idx])
+            for channel_idx in range(audio.shape[1])
+        ]
         return np.column_stack(matched_channels).astype(original_dtype, copy=False)
 
     def _write_wav(self, path: str, audio: np.ndarray, sample_rate: int):
@@ -345,22 +370,31 @@ class AutoMaster:
                 )
 
                 mastered, _ = sf.read(output_path, dtype='float32')
-
-                peak_db = float(20 * np.log10(np.max(np.abs(mastered)) + 1e-10))
-                rms_db = float(20 * np.log10(np.sqrt(np.mean(mastered ** 2)) + 1e-10))
-                gain_db = rms_db - 20 * np.log10(np.sqrt(np.mean(audio ** 2)) + 1e-10)
+                meter = self._studio_meter()
+                mastered, limiter_reduction = meter.limit_true_peak(
+                    mastered,
+                    ceiling_dbtp=self.true_peak_limit,
+                )
+                measurement = meter.measure(mastered)
+                input_measurement = meter.measure(audio)
+                gain_db = measurement.rms_dbfs - input_measurement.rms_dbfs
 
                 return MasteringResult(
-                    audio=mastered, peak_db=peak_db, lufs=rms_db,
-                    gain_applied_db=float(gain_db), limiter_reduction_db=0,
-                    eq_applied=True, success=True
+                    audio=mastered,
+                    peak_db=measurement.sample_peak_dbfs,
+                    lufs=measurement.integrated_lufs,
+                    gain_applied_db=float(gain_db),
+                    limiter_reduction_db=float(limiter_reduction),
+                    eq_applied=True,
+                    success=True,
                 )
         except Exception as e:
             logger.error(f"Matchering error: {e}, falling back to reference-guided fallback")
+            meter = self._studio_meter()
             return MasteringResult(
                 audio=self._normalize_audio_shape(audio).astype(np.float32, copy=False),
                 peak_db=float(20 * np.log10(np.max(np.abs(audio)) + 1e-10)) if np.size(audio) else -100.0,
-                lufs=self._estimate_lufs(audio),
+                lufs=meter.integrated_lufs(audio),
                 gain_applied_db=0.0,
                 limiter_reduction_db=0.0,
                 eq_applied=False,
@@ -406,7 +440,7 @@ class AutoMaster:
         return output, max_reduction
 
     def _apply_limiter(self, audio: np.ndarray, ceiling_db: float) -> Tuple[np.ndarray, float]:
-        """Apply brick-wall limiter."""
+        """Apply legacy sample-peak brick-wall attenuation."""
         audio = self._normalize_audio_shape(audio)
         ceiling_lin = 10 ** (ceiling_db / 20.0)
         peak = np.max(np.abs(audio))
