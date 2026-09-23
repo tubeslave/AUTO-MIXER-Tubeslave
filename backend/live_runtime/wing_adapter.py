@@ -7,6 +7,8 @@ AutoFOH controllers write to WING directly.
 Migrated surface:
 - input-channel fader: ``ch:N / fader_db``
 - main fader: ``main:N / fader_db``
+- fader delta proposals use the same addresses; the control plane resolves them
+  to an absolute value before the write.
 
 Readback is based on a fresh inbound OSC callback, not ``WingClient.state``.
 ``WingClient.send`` optimistically updates its local state cache for writes, so
@@ -28,6 +30,7 @@ from .contracts import ProposedAction
 
 _CHANNEL_TARGET = re.compile(r"^ch:(\d+)$")
 _MAIN_TARGET = re.compile(r"^main:(\d+)$")
+_FADER_PARAMETERS = {"fader_db", "fader_delta_db"}
 
 
 @dataclass
@@ -68,7 +71,7 @@ class WingWriteAdapter:
 
     @classmethod
     def _address_for(cls, action: ProposedAction) -> str:
-        if action.parameter != "fader_db":
+        if action.parameter not in _FADER_PARAMETERS:
             raise NotImplementedError(
                 f"WingWriteAdapter has not migrated parameter {action.parameter!r} yet"
             )
@@ -119,8 +122,12 @@ class WingWriteAdapter:
         return slot.value
 
     def write_value(self, action: ProposedAction) -> Any:
-        """Write one migrated fader action through WING OSC."""
+        """Write one resolved fader action through WING OSC."""
         address = self._address_for(action)
+        if action.parameter != "fader_db":
+            raise ValueError(
+                "fader_delta_db must be resolved to absolute fader_db by LiveControlPlane before write"
+            )
         if isinstance(action.value, bool) or not isinstance(action.value, (int, float)):
             raise TypeError("fader_db value must be numeric")
         value = float(action.value)
