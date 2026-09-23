@@ -1,9 +1,16 @@
-"""Auto soundcheck message handlers."""
+"""Live soundcheck message handlers.
+
+The websocket/UI layer no longer constructs the legacy AutoSoundcheckEngine
+directly.  Engine construction is routed through ``live_runtime`` so legacy
+plumbing can be migrated without leaving two decision authorities in the
+composition root.
+"""
 
 import asyncio
 import logging
 
-from auto_soundcheck_engine import AutoSoundcheckEngine
+from live_runtime.contracts import LiveMode
+from live_runtime.service import LiveSoundcheckService, LiveStartRequest
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +39,32 @@ def register_handlers(server):
             num_channels = max(selected_channels) if selected_channels else 48
         return selected_channels, num_channels
 
+    def _resolve_mode(data):
+        """Resolve only explicit live modes; never infer BENCH_TEST from hardware."""
+        raw = str(data.get("mode", "")).strip().lower()
+        if raw:
+            aliases = {
+                "test": LiveMode.BENCH_TEST,
+                "bench": LiveMode.BENCH_TEST,
+                "bench_test": LiveMode.BENCH_TEST,
+                "observe": LiveMode.OBSERVE,
+                "propose": LiveMode.PROPOSE,
+                "supervised": LiveMode.SUPERVISED,
+                "auto_safe": LiveMode.AUTO_SAFE,
+                "emergency": LiveMode.EMERGENCY,
+                "freeze": LiveMode.FREEZE,
+            }
+            mode = aliases.get(raw)
+            if mode is None:
+                raise ValueError(f"unsupported live mode: {raw}")
+            return mode
+
+        # Backward compatibility for old clients that explicitly sent
+        # observe_only.  Missing mode/flag is deliberately read-only.
+        if data.get("observe_only") is False:
+            return LiveMode.SUPERVISED
+        return LiveMode.OBSERVE
+
     def _schedule(loop, coro, label):
         def _log_failure(task):
             if task.cancelled():
@@ -54,13 +87,12 @@ def register_handlers(server):
         future.add_done_callback(_log_failure)
 
     async def _start_engine(websocket, data, *, soundcheck_events: bool):
-        """Start the new AutoSoundcheckEngine as the canonical soundcheck path."""
         if _engine_is_active():
             await server.send_to_client(websocket, {
                 "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
                 "is_running": True,
                 "running": True,
-                "error": "Auto soundcheck engine already running",
+                "error": "Live soundcheck engine already running",
             })
             return
 
@@ -75,7 +107,19 @@ def register_handlers(server):
             mixer_config.get("port", 51328 if mixer_type == "dlive" else 2223)
         )
         audio_device = data.get("audio_device", data.get("device_id", audio_config.get("device_name", "soundgrid")))
-        observe_only = data.get("observe_only", soundcheck_events)
+        try:
+            mode = _resolve_mode(data)
+        except ValueError as exc:
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": False,
+                "running": False,
+                "error": str(exc),
+            })
+            return
+
+        observe_only = mode in (LiveMode.OBSERVE, LiveMode.PROPOSE, LiveMode.FREEZE)
         loop = asyncio.get_running_loop()
 
         def on_state(state, msg):
@@ -86,18 +130,20 @@ def register_handlers(server):
                     "is_running": server.auto_soundcheck_running,
                     "running": server.auto_soundcheck_running,
                     "observe_only": server.auto_soundcheck_observe_only,
+                    "mode": mode.value,
                     "current_step": state,
                     "step_progress": 0,
                     "progress": 0,
                     "step_time_remaining": 0,
                     "message": msg or state,
-                }), "auto soundcheck status send")
+                }), "live soundcheck status send")
 
             _schedule(loop, server.broadcast({
                 "type": "auto_engine_state",
                 "state": state,
                 "message": msg,
-            }), "auto engine state broadcast")
+                "mode": mode.value,
+            }), "live engine state broadcast")
 
         def on_channel(ch, ch_data):
             if hasattr(server, "update_mixing_agent_channel"):
@@ -108,30 +154,38 @@ def register_handlers(server):
                     "type": "auto_soundcheck_channel_update",
                     "channel": ch,
                     "data": ch_data,
-                }), "auto soundcheck channel send")
+                }), "live soundcheck channel send")
 
             _schedule(loop, server.broadcast({
                 "type": "auto_engine_channel",
                 "channel": ch,
                 "data": ch_data,
-            }), "auto engine channel broadcast")
+            }), "live engine channel broadcast")
 
         def on_observation(payload):
             payload = {
                 "type": "auto_soundcheck_observation",
+                "mode": mode.value,
                 **payload,
             }
-            _schedule(loop, server.send_to_client(websocket, payload), "auto soundcheck observation send")
+            _schedule(loop, server.send_to_client(websocket, payload), "live soundcheck observation send")
 
-        engine = AutoSoundcheckEngine(
+        service = getattr(server, "_live_soundcheck_service", None)
+        if service is None:
+            service = LiveSoundcheckService()
+            server._live_soundcheck_service = service
+
+        request = LiveStartRequest(
             mixer_type=mixer_type,
             mixer_ip=mixer_ip,
             mixer_port=mixer_port,
             audio_device_name=audio_device,
             num_channels=num_channels,
             selected_channels=selected_channels,
-            observe_only=observe_only,
-            auto_apply=True,
+            mode=mode,
+        )
+        engine = service.create_engine(
+            request,
             on_state_change=on_state,
             on_channel_update=on_channel,
             on_observation=on_observation,
@@ -147,10 +201,11 @@ def register_handlers(server):
             "is_running": True,
             "running": True,
             "observe_only": observe_only,
+            "mode": mode.value,
             "mixer_type": mixer_type,
             "mixer_ip": mixer_ip,
             "selected_channels": selected_channels,
-            "message": "New AutoSoundcheckEngine started",
+            "message": "live_runtime soundcheck service started",
         })
 
     async def handle_start_auto_soundcheck(websocket, data):
@@ -167,7 +222,7 @@ def register_handlers(server):
             "is_running": False,
             "running": False,
             "observe_only": False,
-            "message": "Auto soundcheck stopped"
+            "message": "Live soundcheck stopped"
         })
 
     async def handle_get_auto_soundcheck_status(websocket, data):
@@ -186,11 +241,9 @@ def register_handlers(server):
         })
 
     async def handle_start_auto_engine(websocket, data):
-        """Start the headless auto-soundcheck engine."""
         await _start_engine(websocket, data, soundcheck_events=False)
 
     async def handle_stop_auto_engine(websocket, data):
-        """Stop the headless auto-soundcheck engine."""
         if server.auto_soundcheck_engine:
             server.auto_soundcheck_engine.stop()
             server.auto_soundcheck_engine = None
@@ -204,7 +257,6 @@ def register_handlers(server):
         })
 
     async def handle_get_auto_engine_status(websocket, data):
-        """Get auto-soundcheck engine status."""
         if server.auto_soundcheck_engine:
             status = server.auto_soundcheck_engine.get_status()
         else:
