@@ -6,6 +6,7 @@ from typing import Any
 class LiveMode(str,Enum):
     OBSERVE="observe"
     PROPOSE="propose"
+    BENCH_TEST="bench_test"
     SUPERVISED="supervised"
     AUTO_SAFE="auto_safe"
     EMERGENCY="emergency"
