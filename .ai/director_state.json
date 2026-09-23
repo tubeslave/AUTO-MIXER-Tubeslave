@@ -2,8 +2,8 @@
   "completed": [],
   "active": {
     "id": "cleanup-model-validation",
-    "title": "Validate model-based source cleanup",
-    "objective": "Human-listen RAW/CLEAN/REMOVED for all 11 Ptitsa model-cleaned sources and accept, weaken or reject processing per source before making cleanup the studio baseline."
+    "title": "Validate balance-transparent model cleanup",
+    "objective": "Human-listen the same-balance RAW vs CLEAN Ptitsa rerender, with RAW/CLEAN/REMOVED per-source checks especially for both vocals, before making model cleanup the studio baseline."
   },
   "parallel_progress": {
     "live-soundcheck-v2": [
@@ -35,7 +35,8 @@
       "Tests run 35852601258 exposed a separate wall_layer failure: a fixed 9 kHz band edge exceeded Nyquist in the 1 kHz reduced-rate fixture",
       "The wall-layer filter now caps its upper edge below Nyquist and fails closed to silence when the intended band cannot exist",
       "The fixture now contains an in-band guitar-like sine instead of DC, so it actually tests dense-section wall energy",
-      "Fix commit 7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb; current-head CI verification pending"
+      "Fix commit 7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb",
+      "Later Tests run 35853333095 cleared the guitar regression and reached mastering streaming after 672 passed and 2 skipped on Python 3.11"
     ],
     "studio-cleanup-checkpointing": [
       "Original sequential Ptitsa cleanup run 35828150231 reached the 180-minute workflow timeout and was cancelled before render/upload",
@@ -44,22 +45,38 @@
       "Replacement run 35846566268 completed all 11 per-stem jobs successfully and completed the final full-mix render",
       "Final artifact ptitsa-full-model-cleanup-mix id 10746216442 contains Ptitsa_ModelClean_FullMix_50pct.wav, 320 kbps MP3 and validation previews",
       "Objective residual screen: NIKITA_VOX removed/raw = -6.62 dB and VALERA_VOX = -7.62 dB, while the non-vocal cleaned sources range from about -29.38 dB to -52.49 dB removed/raw; vocals therefore require especially careful human A/B before acceptance"
+    ],
+    "studio-cleanup-balance-transparency": [
+      "User rejected the first cleaned full mix because instrument balance was destroyed, so cleanup and mixing responsibilities are now explicitly separated",
+      "Balance-transparent rerender workflow commit 10476989915e54eded8f6c6c1055cef2fd6c8fd3 completed successfully in run 35859737710; artifact ptitsa-balance-transparent-rerender id 10749861292 contains same-balance RAW and CLEAN WAV/MP3 plus validation JSON",
+      "All 11 CLEAN sources matched RAW length exactly: 11421900 frames each and zero sample drift",
+      "Active-RMS matching passed the 0.05 dB gate on every processed source; maximum absolute post-match delta was about 0.00000051 dB",
+      "Non-vocal level corrections were <= 0.019 dB, while NIKITA_VOX required +4.781 dB and VALERA_VOX +3.502 dB, explaining a major source of the earlier balance collapse",
+      "Same-balance full mixes measured -20.575 LUFS RAW vs -20.549 LUFS CLEAN, with peaks -3.128 vs -3.000 dBFS; machine transparency passed, subjective acceptance remains human-only",
+      "Cleanup contract updated in commit 6385478b1309ba1076a4569df9ada53c55f7aefc: time/length align, active-level match within 0.05 dB, preserve gain/pan/automation until Mixing Director"
+    ],
+    "studio-mastering-numpy2": [
+      "Tests run 35853333095 reached tests/test_mastering_streaming.py after 672 passed and 2 skipped on Python 3.11, then failed because NumPy 2.4.6 removed np.trapz",
+      "Mastering analyzer now prefers np.trapezoid and falls back to np.trapz for older NumPy; fix commit cf19fea72b8a062b00d311b6663be9357dcd6cb1",
+      "Stem Offline Test run 35865011214 passed on the fix commit",
+      "Full Tests matrix run 35865011220 is still verifying the fix"
     ]
   },
   "blockers": [
     {
       "goal": "cleanup-model-validation",
       "status": "human_listening_required",
-      "workflow_run": 35846566268,
-      "step": "Per-source RAW/CLEAN/REMOVED acceptance",
-      "note": "All 11 checkpoints and the final cleaned mix are rendered and durable. Objective metrics do not authorize subjective acceptance; vocal cleanup is much stronger than the other sources and must be listened to before becoming baseline."
+      "workflow_run": 35859737710,
+      "step": "Same-balance RAW vs CLEAN full-mix A/B, then per-source RAW/CLEAN/REMOVED checks where needed",
+      "note": "Machine balance-transparency checks passed. Subjective timbre/artifact acceptance is still required, especially for NIKITA_VOX and VALERA_VOX because their cleanup outputs needed +4.781 dB and +3.502 dB level restoration."
     },
     {
       "goal": "studio-ci",
       "status": "ci_verification_in_progress",
-      "commit": "7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb",
+      "commit": "cf19fea72b8a062b00d311b6663be9357dcd6cb1",
+      "workflow_run": 35865011220,
       "step": "Full Tests matrix",
-      "note": "The click-candidate regression is cleared by evidence from run 35852601258; the newly exposed guitar wall-layer Nyquist regression has been revised and awaits current-head CI."
+      "note": "The previous full matrix reached mastering streaming and exposed NumPy 2 removal of np.trapz. The analyzer compatibility fix is committed; Stem Offline Test is green and Full Tests is still running."
     }
   ],
   "history": [
@@ -75,6 +92,9 @@
     {"event":"cleanup_workflow_revised","goal":"cleanup-model-validation","commit":"705b6f92c1bf202657e115ee330afcefd7fbddcb","workflow_run":35846566268,"result":"success","note":"Split 11 model-cleaned sources into independent matrix jobs; every source checkpoint and the final full cleaned mix completed successfully."},
     {"event":"cleanup_objective_screen","goal":"cleanup-model-validation","workflow_run":35846566268,"artifact_id":10746216442,"result":"awaiting_human_listening","note":"All RAW/CLEAN/REMOVED previews are available. Vocal removed/raw RMS is much stronger (-6.62/-7.62 dB) than non-vocal sources (about -29.38 to -52.49 dB), so vocals are explicitly high-risk for over-cleaning until listened to."},
     {"event":"ci_revision_applied","goal":"studio-editing-click-candidate","commit":"569c856350b7f8f7e0368e6a30a57b13851f3716","workflow_run":35852601258,"result":"cleared_previous_regression","note":"Clustered adjacent derivative spikes and added impulse/step/ramp/sine guards; CI progressed past click_candidate and stopped later at guitar wall_layer after 344 passes on Python 3.11."},
-    {"event":"ci_revision_applied","goal":"studio-guitar-wall-nyquist","commit":"7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb","result":"verification_pending","note":"Made the wall-layer filter Nyquist-safe, fail-closed when the intended band cannot exist, and corrected the reduced-rate fixture to contain in-band content."}
+    {"event":"ci_revision_applied","goal":"studio-guitar-wall-nyquist","commit":"7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb","result":"cleared_by_later_ci","note":"Made the wall-layer filter Nyquist-safe and corrected the reduced-rate fixture; later CI progressed through 672 passes before a mastering compatibility failure."},
+    {"event":"cleanup_balance_rerender_validated","goal":"cleanup-model-validation","commit":"10476989915e54eded8f6c6c1055cef2fd6c8fd3","workflow_run":35859737710,"artifact_id":10749861292,"result":"machine_gate_passed_human_pending","note":"CLEAN sources were length-aligned and active-RMS matched to RAW under the frozen mix recipe. All 11 passed <=0.05 dB active-level delta; vocals required +4.781/+3.502 dB restoration. Same-balance RAW/CLEAN A/B rendered for human acceptance."},
+    {"event":"cleanup_contract_revised","goal":"cleanup-model-validation","commit":"6385478b1309ba1076a4569df9ada53c55f7aefc","result":"documented","note":"Cleanup is now explicitly prohibited from changing mix balance; gain/pan/automation belong to Mixing Director after cleanup acceptance."},
+    {"event":"ci_revision_applied","goal":"studio-mastering-numpy2","commit":"cf19fea72b8a062b00d311b6663be9357dcd6cb1","workflow_run":35865011220,"result":"verification_in_progress","note":"Replaced direct np.trapz use with NumPy-2-compatible np.trapezoid plus legacy fallback after the previous matrix failed at mastering streaming; Stem Offline Test 35865011214 is green."}
   ]
 }
