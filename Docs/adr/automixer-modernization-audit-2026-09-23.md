@@ -124,7 +124,30 @@ Replacement tests:
 - tests/test_soundcheck_handlers.py verifies the live_runtime construction seam, safe default, explicit BENCH_TEST and invalid-mode blocking;
 - tests/test_live_runtime_service.py verifies bridge mode mapping and isolates the one remaining legacy engine import.
 
-Next cleanup target:
+## Cleanup pass 3 — live lifecycle ownership
+Classification and action:
+- KEEP: websocket message names and event callbacks remain transport compatibility only.
+- KEEP/AUTHORITY: `LiveSoundcheckService` now owns the active-engine lifecycle: construct, start, parallel-start rejection, status, stop and failed-start cleanup.
+- MIGRATE: `AutoSoundcheckEngine` remains only as the temporary engine underneath the service.
+- QUARANTINE: `server.auto_soundcheck_engine` is now explicitly a temporary compatibility alias for legacy server cleanup/sync code; live handlers no longer use it to decide whether an engine is active or to query/stop the engine.
+- DELETE FROM HANDLER AUTHORITY: handlers no longer call `engine.start_async()`, `engine.stop()` or `engine.get_status()` directly.
+
+Why this matters:
+- there is now one lifecycle authority for the new live entrypoint;
+- a failed engine start cannot leave a phantom active live runtime;
+- parallel starts are rejected by `live_runtime`, not by duplicated UI heuristics;
+- the next server cleanup can remove the `AutoSoundcheckEngine` type import/ownership without changing the websocket API.
+
+Replacement tests added:
+- service start/stop/status ownership;
+- rejection of parallel live starts;
+- cleanup after failed engine start;
+- handler start/stop/status through the service;
+- BENCH_TEST and production-mode mapping remain covered.
+
+CI evidence for this pass is tracked on the PR head workflow; update this section from pending to passed/failed after the matrix completes.
+
+## Next cleanup target
 - remove the direct AutoSoundcheckEngine import/type dependency from backend/server.py;
 - inventory server-owned AutoEQ/AutoFader/AutoCompressor startup surfaces and move them behind live_runtime or disable them by default;
 - then split WING/audio/readback plumbing out of AutoSoundcheckEngine so the legacy decision loop can be deleted.
