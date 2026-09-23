@@ -1,0 +1,96 @@
+name: Ptitsa studio source checkpoint
+on:
+  push:
+    branches: [studio/ptitsa-fresh-master-20260924]
+    paths: [.github/workflows/ptitsa-studio-source-checkpoint.yml]
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Archive reproducible source snapshot
+        run: |
+          mkdir -p work
+          git rev-parse HEAD > work/revision.txt
+          git archive --format=tar.gz -o work/studio-source.tar.gz HEAD
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-studio-source-code
+          path: |
+            work/studio-source.tar.gz
+            work/revision.txt
+          retention-days: 7
+      - name: Install audio extraction tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+      - name: Extract exact 259 second RAW sources without neural processing
+        shell: python
+        run: |
+          import concurrent.futures, json, pathlib, re, subprocess, time, urllib.parse, urllib.request
+          key='https://disk.yandex.ru/d/OvdRlysTGFbxEQ'
+          prefixes=['BASS','FLOOR','GTR','HI HAT','KEYS L','KEYS R','KICK IN','KICK OUT','NIKITA VOX','OH R','OHL','PB L','PB R','SN B','SN T','TOM 1','TOM 2','VALERA VOX']
+          def read_json(endpoint, **query):
+              for attempt in range(4):
+                  try:
+                      url='https://cloud-api.yandex.net/v1/disk/public/'+endpoint+'?'+urllib.parse.urlencode(query)
+                      with urllib.request.urlopen(url, timeout=90) as response: return json.load(response)
+                  except Exception:
+                      if attempt==3: raise
+                      time.sleep(2**attempt)
+          listing=read_json('resources',public_key=key,limit=1000)
+          names=[item['name'] for item in listing.get('_embedded',{}).get('items',[]) if item.get('type')=='file' and item['name'].lower().endswith('.wav')]
+          def canon(name): return re.sub(r'[^A-Z0-9]+',' ',name.upper()).strip()
+          root=pathlib.Path('work/raw');root.mkdir(parents=True,exist_ok=True)
+          def extract(prefix):
+              cp=canon(prefix);matches=[name for name in names if canon(name).startswith(cp+' ') or canon(name)==cp+' WAV']
+              if len(matches)!=1: raise RuntimeError(f'Ambiguous or missing source {prefix}: {matches}')
+              name=matches[0];href=read_json('resources/download',public_key=key,path='/'+name)['href']
+              output=root/(prefix.replace(' ','_')+'.flac')
+              subprocess.run(['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-y','-ss','1794','-i',href,'-t','259','-ac','2','-ar','44100','-c:a','flac','-sample_fmt','s32','-bits_per_raw_sample','24',str(output)],check=True,timeout=900)
+              probe=json.loads(subprocess.check_output(['ffprobe','-v','error','-show_entries','stream=sample_rate,channels,duration_ts,time_base','-of','json',str(output)]))['streams'][0]
+              if int(probe['sample_rate'])!=44100 or int(probe['duration_ts'])!=11421900: raise RuntimeError(f'Invalid length/rate: {prefix} {probe}')
+              print(f'checkpoint complete {prefix}: {output.stat().st_size} bytes',flush=True)
+              return {'stem':prefix.replace(' ','_'),'original_filename':name,'start_seconds':1794,'duration_seconds':259,'sample_rate':44100,'frames':11421900,'channels':2,'lossless':True}
+          with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool: rows=list(pool.map(extract,prefixes))
+          (root/'source_manifest.json').write_text(json.dumps(rows,indent=2))
+      - name: Save RAW vocal checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-raw-vocals
+          path: work/raw/*VOX.flac
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Save RAW drum checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-raw-drums
+          path: |
+            work/raw/KICK*.flac
+            work/raw/SN_*.flac
+            work/raw/TOM*.flac
+            work/raw/FLOOR.flac
+            work/raw/OH*.flac
+            work/raw/HI*.flac
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Save RAW musical checkpoint
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-raw-music
+          path: |
+            work/raw/BASS.flac
+            work/raw/GTR.flac
+            work/raw/KEYS*.flac
+            work/raw/PB*.flac
+            work/raw/source_manifest.json
+          retention-days: 7
+          if-no-files-found: warn
