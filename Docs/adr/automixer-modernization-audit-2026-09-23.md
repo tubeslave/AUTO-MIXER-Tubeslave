@@ -149,7 +149,31 @@ CI evidence:
 - focused `Stem Offline Test` run on commit `fbe616f327056523264de8f87373f2de9cea7de3` passed, including `tests/test_live_decision_engine.py`, `tests/test_live_runtime_service.py` and `tests/test_soundcheck_handlers.py`;
 - the full Python 3.10/3.11/3.12 `Tests` matrix for the same code commit was still running when this audit entry was written.
 
+## Cleanup pass 4 — one verified live write boundary
+Classification and action:
+- KEEP: `ProposedAction`, `VerifiedAction` and the live-mode authorization policy are retained as typed contracts.
+- KEEP/AUTHORITY: `backend/live_runtime/control_plane.py` is the new hardware-neutral write boundary: read current state -> authorize -> write -> read back -> verify -> audit.
+- MIGRATE: WING/OSC write/readback behavior will move behind `MixerWriteAdapter`; the control plane deliberately contains no OSC addresses or console-specific heuristics.
+- MIGRATE: useful production limits/rate limiting from `AutoFOHSafetyController` remain temporary input to the new policy until equivalent live_runtime coverage exists.
+- QUARANTINE: direct writes from legacy AutoEQ/AutoFader/AutoCompressor/AutoFOH decision code must not become new live entrypoints. They remain only while the real WING adapter is being extracted.
+
+Mode behavior now has a replacement-test seam independent of the legacy engine:
+- OBSERVE/PROPOSE do not call the mutating adapter method;
+- BENCH_TEST bypasses production routing/risk/confidence gates as explicitly requested, while read-before, audit and readback verification still execute;
+- manual freeze still blocks a BENCH_TEST write;
+- AUTO_SAFE blocks routing at the live-runtime boundary;
+- a transport call is not considered accepted when readback does not match the requested value;
+- small explicit numeric readback quantization is tolerated.
+
+Replacement tests:
+- `tests/test_live_control_plane.py` covers blocked observation writes, unrestricted BENCH_TEST routing, production routing blocking, manual freeze, readback mismatch and numeric quantization;
+- the focused live-runtime CI list now includes this test file.
+
+Important limitation after this pass:
+- the new control plane is implemented and tested as a hardware-neutral seam, but the active legacy engine has not yet been rewired through it. Therefore this pass proves the intended write policy, not yet end-to-end WING ownership.
+
 ## Next cleanup target
+- implement the real WING write/readback adapter using existing `WingClient`/OSC primitives and route one narrow typed action family through `LiveControlPlane` first;
 - remove the direct AutoSoundcheckEngine import/type dependency from backend/server.py;
 - inventory server-owned AutoEQ/AutoFader/AutoCompressor startup surfaces and move them behind live_runtime or disable them by default;
-- then split WING/audio/readback plumbing out of AutoSoundcheckEngine so the legacy decision loop can be deleted.
+- then split remaining WING/audio/readback plumbing out of AutoSoundcheckEngine so the legacy decision loop can be deleted.
