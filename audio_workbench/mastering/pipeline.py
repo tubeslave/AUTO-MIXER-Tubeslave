@@ -16,11 +16,15 @@ class MasteringConfig:
     clip_drive_db: float=.8
     maximizer_drive_db: float=2.0
     ceiling_db: float=-1.0
+    target_lufs: float|None=None
+    loudness_tolerance_lu: float=.5
+    max_final_limiter_gr_db: float=3.0
+    max_band_limiter_gr_db: float=4.0
 
 class MasteringDirector:
     def __init__(self,config:MasteringConfig|None=None): self.config=config or MasteringConfig()
     def render(self,x:np.ndarray,sr:int):
-        y=np.asarray(x,dtype=np.float32); before=analyze(y,sr,include_true_peak=True);events=[]
+        y=np.asarray(x,dtype=np.float32); before=analyze(y,sr,include_true_peak=True,include_loudness=True);events=[]
         if self.config.stabilizer:
             y,s=stabilizer.process(y,sr,before);events.append({"module":"stabilizer",**s})
         if self.config.clarity:
@@ -31,9 +35,18 @@ class MasteringDirector:
             y,s=clipper.process(y,sr,self.config.clip_drive_db);events.append({"module":"clipper",**s})
         if self.config.maximizer:
             y,s=maximizer.process(y,sr,self.config.ceiling_db,self.config.maximizer_drive_db);events.append({"module":"maximizer",**s})
-        after=analyze(y,sr,include_true_peak=True)
+        after=analyze(y,sr,include_true_peak=True,include_loudness=True)
         regression={"crest_change_db":after["crest_db"]-before["crest_db"],
           "side_mid_change_db":after["side_mid_db"]-before["side_mid_db"],
           "correlation_change":after["correlation"]-before["correlation"]}
-        safety=evaluate(before,after,MasteringSafetyPolicy(true_peak_ceiling_dbtp=self.config.ceiling_db))
-        return y,{"config":asdict(self.config),"before":before,"after":after,"events":events,"regression":regression,"safety":safety}
+        maximizer_event=next((e for e in events if e.get("module")=="maximizer"),None)
+        budget={"maximizer":maximizer_event}
+        safety=evaluate(before,after,MasteringSafetyPolicy(
+          true_peak_ceiling_dbtp=self.config.ceiling_db,
+          target_lufs=self.config.target_lufs,
+          loudness_tolerance_lu=self.config.loudness_tolerance_lu,
+          require_limiter_evidence=self.config.maximizer,
+          max_final_limiter_gr_db=self.config.max_final_limiter_gr_db,
+          max_band_limiter_gr_db=self.config.max_band_limiter_gr_db,
+        ),processing_evidence=budget)
+        return y,{"config":asdict(self.config),"before":before,"after":after,"events":events,"regression":regression,"budget":budget,"safety":safety}

@@ -5,14 +5,12 @@ from scipy import signal
 BANDS={"sub":(25,80),"low":(80,200),"lowmid":(200,500),"mid":(500,2000),"presence":(2000,5000),"air":(5000,16000)}
 
 def _trapezoid(y: np.ndarray, x: np.ndarray) -> float:
-    """Integrate a spectrum across NumPy 1.x/2.x API changes."""
     modern = getattr(np, "trapezoid", None)
     if modern is not None:
         return float(modern(y, x))
     return float(np.trapz(y, x))
 
 def true_peak_dbtp(x: np.ndarray, oversample: int = 4) -> float:
-    """Estimate inter-sample true peak using bounded polyphase oversampling."""
     x=np.asarray(x,dtype=np.float64)
     if x.ndim==1:x=x[:,None]
     if len(x)==0:return float("-inf")
@@ -23,7 +21,23 @@ def true_peak_dbtp(x: np.ndarray, oversample: int = 4) -> float:
         peak=float(np.max(np.abs(up))+1e-20)
     return float(20*np.log10(peak))
 
-def analyze(x: np.ndarray, sr: int, *, include_true_peak: bool=False) -> dict:
+def integrated_lufs(x: np.ndarray, sr: int) -> tuple[float|None,str]:
+    """Measure BS.1770-style integrated loudness via pyloudnorm when available.
+
+    No RMS approximation is returned here: a missing standards-based meter must remain
+    visible to the mastering safety gate instead of masquerading as LUFS evidence.
+    """
+    try:
+        import pyloudnorm as pyln
+        data=np.asarray(x,dtype=np.float64)
+        if data.ndim==1:data=data[:,None]
+        if len(data)<int(.4*sr):
+            return None,"insufficient_duration"
+        return float(pyln.Meter(sr).integrated_loudness(data)),"pyloudnorm"
+    except Exception:
+        return None,"unavailable"
+
+def analyze(x: np.ndarray, sr: int, *, include_true_peak: bool=False, include_loudness: bool=False) -> dict:
     x=np.asarray(x,dtype=np.float32)
     if x.ndim==1:x=np.column_stack([x,x])
     mono=x.mean(1); rms=float(np.sqrt(np.mean(x.astype(np.float64)**2)+1e-20))
@@ -39,4 +53,8 @@ def analyze(x: np.ndarray, sr: int, *, include_true_peak: bool=False) -> dict:
       "correlation":float(np.corrcoef(x[:,0],x[:,1])[0,1])}
     if include_true_peak:
         result["true_peak_dbtp"]=true_peak_dbtp(x)
+    if include_loudness:
+        value,method=integrated_lufs(x,sr)
+        result["integrated_lufs"]=value
+        result["integrated_lufs_method"]=method
     return result
