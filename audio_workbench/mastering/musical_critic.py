@@ -1,6 +1,7 @@
 from __future__ import annotations
 import numpy as np
 from scipy import signal,ndimage
+from .analyzer import _trapezoid
 
 def _mono(x): return np.asarray(x,dtype=np.float32).mean(axis=1)
 
@@ -50,7 +51,7 @@ def spectral_shift_critic(base,candidate,sr):
         f,p=signal.welch(_mono(x),fs=sr,nperseg=min(8192,len(x)))
         vals={}
         for n,lo,hi in bands:
-            m=(f>=lo)&(f<hi);vals[n]=10*np.log10(np.trapz(p[m],f[m])+1e-20)
+            m=(f>=lo)&(f<hi);vals[n]=10*np.log10(_trapezoid(p[m],f[m])+1e-20)
         anchor=np.mean(list(vals.values()))
         return {k:v-anchor for k,v in vals.items()}
     a,b=energies(base),energies(candidate)
