@@ -24,6 +24,8 @@ Rules:
 - a failed experiment is useful and must be logged;
 - do not make unrelated kitchen-sink changes;
 - human listening remains required for subjective acceptance while the system is under development;
+- subjective audio candidates must be marked `requires_human_review`; a passed machine gate may report `pending_human_review` but may not promote that candidate to an accepted baseline until an explicit listening decision is `accepted`;
+- a human acceptance never overrides a failed machine safety/regression gate, and a human rejection keeps that candidate rejected;
 - no destructive live-console writes without supervised-write policy;
 - no paid external generation or credit spend without explicit approval;
 - model cleanup must pass RAW/CLEAN/REMOVED validation;
