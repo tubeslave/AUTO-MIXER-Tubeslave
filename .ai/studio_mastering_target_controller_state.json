@@ -1,11 +1,53 @@
 {
   "goal": "mastering-target-controller-v2",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "e5e2742d3fb9a27e11f23bb2d7b57e19318babf1",
+  "integration_pr": 115,
+  "merged_commit": "c1628179469a76912c0f282c9a93d706b57c6040",
+  "implementation_commits": [
+    "c05a639b7f57c53233c5cb9e1f12b33e987363fb",
+    "56baaca30603320deeb3c5ce795effcb476191eb",
+    "0ddb8b93c2ebeb8dbac2a86e9adbc358715f1d97"
+  ],
   "scope": "bounded pregain/maximizer-drive search through authoritative mastering safety gate",
+  "controller_contract": {
+    "searched_parameters": ["pregain_db", "maximizer_drive_db"],
+    "unsafe_candidates_discarded": true,
+    "no_safe_candidate_action": "return_untouched_source",
+    "selected_candidate_status": "pending_human_review",
+    "baseline_eligible": false,
+    "candidate_count_bounded": true
+  },
+  "validation": {
+    "initial_ci_run": 35920473249,
+    "initial_result": "failed",
+    "initial_failure": "gain-dependent absolute floor in side/mid evidence made pure pregain look like a stereo-width regression, so the reachable target had no safe candidate",
+    "revision": "side/mid energy floor changed from absolute epsilon to signal-relative floor and regression coverage added for +12 dB linear gain invariance",
+    "final_ci_run": 35921077727,
+    "python_matrix": {
+      "3.10": "success",
+      "3.11": "success",
+      "3.12": "success"
+    },
+    "focused_studio_boundary_python_3_11": {
+      "passed": 15,
+      "warnings": 1
+    },
+    "full_suite_python_3_11": {
+      "passed": 1149,
+      "skipped": 2,
+      "warnings": 2
+    },
+    "machine_acceptance_scope": "controller mechanics, safety evidence and regression behavior only; no subjective music acceptance"
+  },
+  "known_non_failing_warnings": [
+    "Matchering scipy.ndimage.filters import deprecated",
+    "Optuna metric naming API experimental",
+    "Existing AutomaticMixingPapers submodule URL missing during post-checkout cleanup"
+  ],
   "audio_baseline_promoted": false,
   "ptitsa_cleanup_status": "pending_human_review",
   "paid_services_used": false,
-  "next_goal": "run focused controller tests and full CI; revise on evidence before merge"
+  "next_goal": "wire MasteringTargetController into the real offline mastering orchestration/report path so each real candidate records controller choice, rollback reason and human-review state without changing live control"
 }
