@@ -5,8 +5,10 @@ per-channel ring buffers; this module snapshots those buffers at the callback
 boundary, moves all FFT/Director work off the realtime audio callback, joins an
 explicit Main-bus meter sample, and feeds the canonical LiveSoundcheckService.
 
-No Main level is synthesized from USB input stems and no legacy ``auto_*``
-decision policy is imported.
+Main evidence may come from an external authoritative meter provider or from a
+real post-console Main tap contained in the same coherent USB snapshot.  Main
+tap slots are excluded from channel-level musical analysis.  No Main level is
+synthesized from input stems and no legacy ``auto_*`` decision policy is imported.
 """
 
 from __future__ import annotations
@@ -41,9 +43,22 @@ class AudioCaptureReader(Protocol):
 
 
 class MainEvidenceProvider(Protocol):
-    """Return Main-bus evidence aligned to a USB capture timestamp."""
+    """Return externally measured Main-bus evidence aligned to a capture timestamp."""
 
     def __call__(self, capture_timestamp_s: float) -> MainFeatureEvidence | None: ...
+
+
+class SnapshotMainEvidenceProvider(Protocol):
+    """Measure Main from reserved channels in the same coherent USB snapshot."""
+
+    @property
+    def reserved_capture_channels(self) -> tuple[int, ...]: ...
+
+    def from_block(
+        self,
+        block: np.ndarray,
+        capture_timestamp_s: float,
+    ) -> MainFeatureEvidence | None: ...
 
 
 class FeatureSnapshotConsumer(Protocol):
@@ -87,6 +102,7 @@ class LiveAudioCaptureBridge:
 
     The bridge owns neither the audio device nor mixer transport lifecycle.  It
     only subscribes/unsubscribes from an already configured capture service.
+    Exactly one authoritative Main evidence source must be configured.
     """
 
     def __init__(
@@ -95,7 +111,8 @@ class LiveAudioCaptureBridge:
         service: FeatureSnapshotConsumer,
         *,
         roles: Mapping[int, str],
-        main_evidence_provider: MainEvidenceProvider,
+        main_evidence_provider: MainEvidenceProvider | None = None,
+        snapshot_main_evidence_provider: SnapshotMainEvidenceProvider | None = None,
         channel_names: Mapping[int, str] | None = None,
         window_frames: int = 2048,
         analysis_interval_s: float = 0.100,
@@ -116,11 +133,34 @@ class LiveAudioCaptureBridge:
             raise ValueError("max_main_age_s must be >= 0")
         if not subscriber_name:
             raise ValueError("subscriber_name must not be empty")
+        if (main_evidence_provider is None) == (snapshot_main_evidence_provider is None):
+            raise ValueError("configure exactly one authoritative Main evidence provider")
+
+        reserved_channels: tuple[int, ...] = ()
+        if snapshot_main_evidence_provider is not None:
+            reserved_channels = tuple(snapshot_main_evidence_provider.reserved_capture_channels)
+            if len(set(reserved_channels)) != len(reserved_channels):
+                raise ValueError("Main evidence provider reserves duplicate capture channels")
+            for channel in reserved_channels:
+                if isinstance(channel, bool) or not isinstance(channel, int):
+                    raise TypeError("reserved Main capture channels must be integers")
+                if not 1 <= channel <= USB_CHANNEL_COUNT:
+                    raise ValueError(
+                        f"reserved Main capture channel {channel} is outside 1..{USB_CHANNEL_COUNT}"
+                    )
 
         self._capture = capture
         self._service = service
         self._roles = {int(channel): str(role) for channel, role in roles.items()}
         self._main_evidence_provider = main_evidence_provider
+        self._snapshot_main_evidence_provider = snapshot_main_evidence_provider
+        self._analysis_channels = tuple(
+            channel
+            for channel in range(1, USB_CHANNEL_COUNT + 1)
+            if channel not in set(reserved_channels)
+        )
+        if not self._analysis_channels:
+            raise ValueError("Main evidence provider cannot reserve every capture channel")
         self._channel_names = dict(channel_names or {})
         self._window_frames = int(window_frames)
         self._analysis_interval_s = float(analysis_interval_s)
@@ -237,7 +277,17 @@ class LiveAudioCaptureBridge:
 
     def _process_snapshot(self, snapshot: _CaptureSnapshot) -> Any | None:
         try:
-            main = self._main_evidence_provider(snapshot.timestamp_s)
+            if self._snapshot_main_evidence_provider is not None:
+                main = self._snapshot_main_evidence_provider.from_block(
+                    snapshot.audio,
+                    snapshot.timestamp_s,
+                )
+            else:
+                provider = self._main_evidence_provider
+                if provider is None:  # pragma: no cover - constructor enforces XOR
+                    raise RuntimeError("authoritative Main evidence provider is not configured")
+                main = provider(snapshot.timestamp_s)
+
             if main is None:
                 with self._condition:
                     self._missing_main_evidence += 1
@@ -246,6 +296,7 @@ class LiveAudioCaptureBridge:
 
             frame = self._extractor.extract(
                 snapshot.audio,
+                selected_channels=self._analysis_channels,
                 channel_names=self._channel_names,
                 timestamp_s=snapshot.timestamp_s,
             )
