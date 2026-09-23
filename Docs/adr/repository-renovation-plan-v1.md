@@ -167,14 +167,18 @@ Collapse stale READMEs/test reports/start scripts/config duplicates; rewrite top
 
 R1 is active: legacy `auto_*` decision modules are frozen for feature work.
 
-R2/R3 have started for the WING channel-fader path:
+R2/R3 are active for the WING fader path:
 - `backend/live_runtime/control_plane.py` is the canonical authorization/write/readback/verification boundary;
 - `backend/live_runtime/wing_adapter.py` adapts the existing WING OSC transport and requires fresh inbound readback rather than trusting the optimistic `WingClient.state` cache;
-- `backend/live_runtime/service.py` now composes that control plane for an active WING session and owns the control audit trail;
+- `backend/live_runtime/service.py` composes that control plane for an active WING session and owns the control audit trail;
 - the temporary `AutoSoundcheckEngine` remains only as an ADAPT bridge for discovery/audio/mixer connection plumbing while its heuristic policy is retired;
-- channel fader is the first migrated write family; unsupported parameter families fail closed.
+- channel and Main faders are now migrated transport surfaces; unsupported parameter families still fail closed;
+- relative fader proposals use `fader_delta_db`, are resolved against fresh console state inside `LiveControlPlane`, and cannot exceed their own declared `max_step` even in BENCH_TEST;
+- the new `main_headroom_protection` hypothesis now requests a relative `-0.5 dB` move rather than the unsafe ambiguous absolute value `-0.5 dB`.
 
-Automated replacement evidence exists for BENCH_TEST and OBSERVE round trips with callback-driven WING transport doubles. Physical WING HIL evidence is still required before legacy AutoFader write authority can be severed or archived.
+Automated replacement evidence covers callback-driven channel/Main readback, BENCH_TEST/OBSERVE control behavior, relative move resolution, max-step rejection, and the Director -> control-plane -> WING-adapter Main headroom path. Physical WING HIL evidence is still required before legacy AutoFader/MasterFader write authority can be severed or archived.
+
+Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacement.
 
 No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
 
