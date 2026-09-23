@@ -1,0 +1,85 @@
+{
+  "update_id": "ML-2026-09-23-1200",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-23T12:00:00+03:00",
+  "actual_start": "2026-09-23T11:59:13+03:00",
+  "completed": "2026-09-23T12:08:15+03:00",
+  "preceding_update": "ML-2026-09-23-0900",
+  "preceding_successful_search": "ML-2026-09-23-0900",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260923-0900-01",
+      "action": "update",
+      "title": "Synthesis and editing of multi-instrument audio mixtures using scalar-quantised latents with MIDI Span conditioning",
+      "arxiv": "2609.25546v1",
+      "doi": "10.48550/arXiv.2609.25546",
+      "url": "https://arxiv.org/html/2609.25546",
+      "reading_depth": "full_text_complete_rechecked",
+      "paper_inference": {"context_audio":true,"context_midi":true,"euler_steps":32,"cfg":2.0},
+      "released_defaults": {"context_audio":true,"context_midi":false,"euler_steps":16,"cfg":2.0},
+      "revision": "released defaults are not the main-table inference condition",
+      "limitations": ["step ablation uses 56 intervals from seven recordings","competing metric optima","no expert listening test","mono only"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260923-0900-01",
+      "action": "update",
+      "repository": "https://github.com/mimbres/spansynth-edit",
+      "revision": "c89cd92420e3a44d450fb624f9df589560ec4a38",
+      "status": "static_inspection_only",
+      "audited": ["MIDI parser and encoder","Fine40 vocabulary","audio I/O","checkpoint resolver","CLI","Diffusers pipeline","ordinary and FlowEdit samplers","Gradio region selection","selected tests"],
+      "findings": ["source-only normalization without target leakage","inverse gain with warning-only peak handling","outside identity applies to 48 kHz mono crop","hard grid-aligned splice","paper/runtime default mismatch","same-category GM program aliases","FlowEdit identical-MIDI no-op is structural","128-row capacity fails closed","seed absent","mutable model main revision and no file hashes","trust_remote_code documented","tests do not exercise real checkpoint audio safety"]
+    },
+    {
+      "id": "AUD-ML-20260923-0900-02",
+      "action": "update",
+      "target": "MambaVoice linked repository",
+      "url": "https://github.com/adithishankar19/mamba_voice",
+      "checked": "2026-09-23",
+      "http_result": 404,
+      "status": "reproduction_blocked_linked_artifact_unavailable"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260923-1200-01","claim":"Paper results use 32 steps with contextual MIDI; released defaults use 16 steps without contextual MIDI.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-02","claim":"Step-count ablations show competing metric optima, not a universal optimum.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-03","claim":"Source-only normalization avoids target leakage but does not guarantee output headroom after inverse scaling.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-04","claim":"Outside-sample identity is relative to the resampled mono crop, not original multichannel audio.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-05","claim":"Target MIDI is used inside the mask; source context MIDI is optional and off by default.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-06","claim":"Fine40 aliases multiple GM programs, making some apparent timbre edits conditioning-equivalent.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-07","claim":"FlowEdit identical-MIDI equality is structural and does not validate ordinary regeneration.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-08","claim":"CFG MIDI dropout removes every fragment of a crossing physical note.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-09","claim":"The 128-row frame capacity fails closed and should be preflighted.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-10","claim":"Code commit pinning does not pin mutable model downloads or remote pipeline code.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-11","claim":"Mocked tests validate interfaces and algebra, not real-checkpoint audio safety or preference.","confidence":"high"},
+    {"id":"KC-ML-20260923-1200-12","claim":"MambaVoice remains reproduction-blocked while its linked repository returns 404.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260923-1200-01","source":"AUD-ML-20260923-0900-01","when":"every SpanSynth render","change":"record full input, boundary, inference and artifact manifest","parameter_range":"immutable identifiers and explicit flags","protect":["replayability"],"verify":["metadata completeness","repeated output"],"cancel":["mutable or incomplete provenance"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-02","source":"SRC-ML-20260923-0900-01","when":"comparing public runtime with paper","change":"vary steps and contextual MIDI separately","parameter_range":"16 versus 32 steps; context MIDI off versus on","protect":["causal interpretation"],"verify":["single-factor A/B"],"cancel":["two factors changed together"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-03","source":"AUD-ML-20260923-0900-01","when":"source is stereo","change":"block mono inference pending channel strategy","parameter_range":"mono fold-down versus explicit stereo strategy","protect":["pan","width","interchannel phase","mono compatibility"],"verify":["phase","correlation","mono collapse"],"cancel":["image drift","phase damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-04","source":"AUD-ML-20260923-0900-01","when":"checking generated output","change":"separate raw safety render from loudness-matched listening copy","parameter_range":"no limiter in raw path","protect":["headroom","transients"],"verify":["gain","sample peak","true peak","seams","blind preference"],"cancel":["clipping","peak regression","gain-only preference"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-05","source":"AUD-ML-20260923-0900-01","when":"editing instrument program","change":"preflight Fine40 category equality","parameter_range":"GM programs mapped by released vocabulary","protect":["edit intent"],"verify":["encoded row comparison"],"cancel":["requested change unobservable to conditioning"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-06","source":"AUD-ML-20260923-0900-01","when":"testing unchanged-content preservation","change":"compare codec-only with ordinary identical-MIDI regeneration","parameter_range":"one generative-resynthesis factor","protect":["unchanged notes","attack","sustain","ambience"],"verify":["raw residual","onset","spectrum","peaks","blind matched preference"],"cancel":["audible or non-local residual"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-07","source":"AUD-ML-20260923-0900-01","when":"dense or crossing-note MIDI enters inference","change":"log row capacity and inspect whole-note CFG removal","parameter_range":"maximum 128 active rows per frame","protect":["dense chords","sustained notes"],"verify":["capacity stats","crossing-note rows"],"cancel":["overflow","unintended dropout"],"confidence":"medium_high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-1200-08","source":"AUD-ML-20260923-0900-02","when":"considering MambaVoice pseudo-stems","change":"require accessible pinned code, weights, licence and preprocessing","parameter_range":"exact hashes and versions","protect":["auditability","source identity"],"verify":["artifact manifest"],"cancel":["unresolved artifact"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260923-1200-01","status":"not_run","priority":"next","baseline":"frozen HeartCodec SQ roundtrip without generative replacement","variant":"ordinary SpanSynth regeneration with identical source and target MIDI","single_factor":"ordinary generative resynthesis","fixed":["licensed mono source","crop and history","requested and applied bounds","MIDI","checkpoint and codec hashes","32 steps","CFG 2","context MIDI on","seed set"],"loudness_matching":"raw safety renders plus separate randomized matched copies for Dmitry","measurements":["target and non-target residual","onset and pitch drift","attack and HF loss","seams","gain","sample and true peak","loudness","finite output","blind preference"],"protect":["unchanged notes","timing","attack","sustain","ambience","headroom"],"cancel":["unrequested event","audible residual","onset shift","click","transient or HF loss","peak regression","seed fragility","no repeatable preference"]},
+    {"id":"EXP-ML-20260923-1200-02","status":"not_run","priority":"high","baseline":"16 Euler steps","variant":"32 Euler steps","single_factor":"step count","fixed":["audio and MIDI","ordinary sampler","checkpoint and codec","seed set","CFG 2","context MIDI on","interval","gain path"],"loudness_matching":"raw safety plus separate matched blind copies","measurements":["runtime","note and onset adherence","residuals","seams","transients","sample and true peak","blind preference","FAD and MuQ diagnostics"],"protect":["requested edit","unchanged content","attacks"],"cancel":["metric-only gain with worse preservation, timing or preference"]},
+    {"id":"EXP-ML-20260923-1200-03","status":"not_run","priority":"high","baseline":"contextual MIDI off","variant":"contextual MIDI on","single_factor":"source MIDI availability outside mask","fixed":["32 steps","CFG 2","seed","checkpoint and codec","audio and MIDI","interval"],"loudness_matching":"raw checks plus separate matched blind copies","measurements":["boundary continuity","timbre consistency","crossing-note behavior","onset adherence","residuals","peaks","blind preference"],"protect":["context timbre","sustained notes","adjacent events"],"cancel":["no repeatable benefit","worse boundary or non-target behavior"]},
+    {"id":"EXP-ML-20260923-1200-04","status":"not_run","priority":"high","baseline":"unchanged GM program within one Fine40 category","variant":"different GM program mapped to the same category","single_factor":"GM program number inside alias category","fixed":["audio","score geometry","velocities","checkpoint and codec","sampler","seed","bounds"],"loudness_matching":"raw equality check plus separate matched blind copies if outputs differ","measurements":["encoded-condition equality","latent and output equality","requested timbre realization","blind preference"],"protect":["note content","timing","mix balance"],"cancel":["conditioning identical","intended timbre distinction not repeatably audible"]}
+  ],
+  "video_cards": [],
+  "reference_cards": [],
+  "queue": {"video_count":34,"studied_videos":0,"remaining":["ordinary identical-MIDI null with licensed source and pinned assets","16-versus-32 step A/B","context MIDI off-versus-on A/B","Fine40 alias validation","MambaVoice artifact audit if repository reappears","DiffusionRIR causal scaling","SH-IRT numerical safety","34 transcript-dependent video sources","rights-cleared rock multitrack or DI-to-processed pair"]},
+  "counts": {"source_cards_added":0,"source_cards_updated":1,"implementation_audits_added":0,"implementation_audits_updated":2,"knowledge_cards_added":12,"candidate_rules_added":8,"experiments_added":4,"video_cards_added":0,"studied_videos":0,"queued_videos_total":34,"reference_cards_added":0},
+  "revisions": ["public defaults are not the paper main-table condition","outside preservation applies to mono resampled timeline","source-only normalization is causal but not peak-safe","FlowEdit identical-MIDI no-op is structural rather than perceptual evidence","some GM program edits collapse to one Fine40 category","MambaVoice remains reproduction-blocked"],
+  "safety": ["no audio downloaded or processed","no checkpoint or model downloaded","no repository code executed","no paid compute or service","no DSP, runtime or active-rule change","no model training","all experiments not_run","all rules candidate and auto_apply false"],
+  "handoff": "Treat public SpanSynth defaults as a different condition from the paper. First test codec-only versus ordinary identical-MIDI regeneration with pinned code, weights and seed; FlowEdit identical-MIDI is structurally zero. Reject stereo use and same-Fine40-category timbre edits until separately validated."
+}
