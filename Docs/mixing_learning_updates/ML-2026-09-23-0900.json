@@ -1,0 +1,119 @@
+{
+  "update_id": "ML-2026-09-23-0900",
+  "mode": "search",
+  "scheduled_slot": "2026-09-23T09:00:00+03:00",
+  "actual_start": "2026-09-23T08:57:18+03:00",
+  "completed": "2026-09-23T09:08:16+03:00",
+  "preceding_update": "ML-2026-09-22-1800",
+  "preceding_successful_search": "ML-2026-09-22-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260923-0900-01",
+      "action": "add",
+      "title": "Synthesis and editing of multi-instrument audio mixtures using scalar-quantised latents with MIDI Span conditioning",
+      "short_title": "SpanSynth-Edit",
+      "authors": ["Sungkyun Chang", "Keshav Bhandari", "Simon Dixon", "Emmanouil Benetos"],
+      "arxiv": "2609.25546v1",
+      "doi": "10.48550/arXiv.2609.25546",
+      "url": "https://arxiv.org/html/2609.25546",
+      "published": "2026-09-22",
+      "discovered": "2026-09-23",
+      "venue_status": "preprint_submitted_to_ICASSP_2027",
+      "reading_depth": "full_text_complete",
+      "method": {"sample_rate_hz":48000,"channels":1,"latent_dim":128,"latent_rate_hz":25,"scalar_levels":19,"parameters_m":480.8,"training_hours_approx":660,"dataset_families":17},
+      "evaluation": {"slakh_pairs":668,"edit_spans_percent":[30,50,70],"pop909_pairs":882,"human_listening_test":false},
+      "limitations": ["mono only","no controlled listening test","no unchanged-note waveform-preservation test","no stereo, phase, seam, peak, loudness, transient, long-tail or rock-specific evaluation","baseline inputs differ between isolated stems and mixtures"]
+    },
+    {
+      "id": "SRC-ML-20260923-0900-02",
+      "action": "add",
+      "title": "MambaVoice: Lightweight Audiovisual Singing Voice Separation via a Hybrid Mamba-Transformer Model",
+      "authors": ["Adithi Shankar", "Gopika Krishnan", "Gloria Haro", "Xavier Serra", "Martín Rocamora"],
+      "arxiv": "2609.26635v1",
+      "doi": "10.48550/arXiv.2609.26635",
+      "url": "https://arxiv.org/html/2609.26635",
+      "published": "2026-09-22",
+      "discovered": "2026-09-23",
+      "venue_status": "accepted_ISMIR_2026",
+      "reading_depth": "full_text_complete",
+      "method": {"sample_rate_hz":16000,"parameters_m":16.2,"bands":8,"backbone":"two Mamba then two Transformer blocks","visual_condition":"68-point facial-landmark ST-GCN gate"},
+      "listening_test": {"participants":15,"excerpts_per_participant":5,"excerpt_seconds":4,"interpretation":"MambaVoice comparable to VoViT; confidence intervals overlap"},
+      "limitations": ["small preliminary listening test","runtime excludes landmark extraction and buffering","no downstream edit, additivity, leakage, phase/mono, boundary or peak test","linked code unavailable at search time"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260923-0900-01",
+      "target": "SpanSynth-Edit public artifact",
+      "repository": "https://github.com/mimbres/spansynth-edit",
+      "revision": "c89cd92420e3a44d450fb624f9df589560ec4a38",
+      "revision_date": "2026-09-23",
+      "model_card": "https://huggingface.co/mimbres/spansynth-edit",
+      "license": "Apache-2.0 for code and released weights; demo recordings retain original rights",
+      "reading_depth": "README_license_notice_manifest_checkpoint_audio_cli_conditioning_sampling_and_selected_tests",
+      "status": "static_inspection_only",
+      "strengths": ["strict checkpoint geometry and state loading","finite input/output guards","exact latent preservation outside generated mask","exact waveform preservation outside applied interval","float WAV and over-1 peak warning"],
+      "risks": ["stereo input averaged to mono","requested bounds rounded outward to 40 ms grid","hard splice without crossfade","no public CLI seed and no seed in run.json","default model revision is mutable main","quality and safety tests do not exercise the real checkpoint"]
+    },
+    {
+      "id": "AUD-ML-20260923-0900-02",
+      "target": "MambaVoice linked repository",
+      "url": "https://github.com/adithishankar19/mamba_voice",
+      "search_date": "2026-09-23",
+      "status": "reproduction_blocked_linked_artifact_unavailable",
+      "http_result": 404,
+      "not_verified": ["code","checkpoint","dependency lock","split manifest","landmark pipeline","license"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260923-0900-01","claim":"SpanSynth bounds replacement to a region but does not waveform-preserve unchanged notes inside it.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-02","claim":"The 25 Hz latent grid expands edit boundaries to 40 ms multiples; requested and applied intervals must be recorded separately.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-03","claim":"Sample-exact preservation outside a hard splice does not prove click-free or gain-continuous boundaries.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-04","claim":"Released mono inference cannot preserve stereo pan, width or interchannel phase without a separate strategy and test.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-05","claim":"Generated-note metrics need evaluator and codec ceilings because both dominate part of the observed score loss.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-06","claim":"FlowEdit trades some similarity scores against quality and note-add/delete behavior; it is not a monotonic upgrade.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-07","claim":"Insensitivity to 1-5 ms MIDI shifts leaves precise timing control unverified.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-08","claim":"Unrecorded random state and mutable model revision prevent exact replay of public SpanSynth runs.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-09","claim":"MambaVoice is perceptually comparable, not superior, to VoViT in the reported small test.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-10","claim":"MambaVoice network forward time excludes facial preprocessing and buffering and is not end-to-end latency.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-11","claim":"Audiovisual identity grounding still requires leakage, additivity, silence, phase, peak and edit tests before pseudo-stem use.","confidence":"high"},
+    {"id":"KC-ML-20260923-0900-12","claim":"A linked repository returning 404 blocks reproduction despite the paper's code-availability statement.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260923-0900-01","source":"SRC-ML-20260923-0900-01","when":"before a generative music edit","change":"run identical-MIDI null reconstruction","parameter_range":"codec-only baseline versus ordinary generation","range_origin":"method and implementation audit","protect":["unchanged notes","attack","sustain","ambience"],"verify":["raw residual","onset","spectrum","peaks","blind matched preference"],"cancel":["audible or non-local change"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-02","source":"AUD-ML-20260923-0900-01","when":"selecting an edit region","change":"record requested and 40 ms grid-expanded bounds","parameter_range":"outward floor/ceil on 25 Hz latent grid","range_origin":"public CLI","protect":["groove","adjacent transients"],"verify":["left and right boundary residual"],"cancel":["unintended neighbouring event"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-03","source":"AUD-ML-20260923-0900-01","when":"assembling a generated interval","change":"compare hard splice with one deterministic crossfade","parameter_range":"single fixed short equal-power fade, experiment-derived","range_origin":"hard-splice audit","protect":["timing","attack"],"verify":["click, spectral and gain discontinuity"],"cancel":["transient smear"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-04","source":"AUD-ML-20260923-0900-01","when":"source is stereo","change":"block mono-only inference pending channel-strategy test","parameter_range":"mono fold-down versus explicit stereo strategy","range_origin":"public audio loader","protect":["pan","width","mono compatibility"],"verify":["phase, correlation and mono collapse"],"cancel":["image drift","phase damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-05","source":"AUD-ML-20260923-0900-01","when":"rendering generative audio","change":"pin code, checkpoint revision/hash and RNG seed","parameter_range":"exact immutable identifiers","range_origin":"reproducibility audit","protect":["replayability"],"verify":["metadata and repeated output"],"cancel":["mutable or unrecorded asset"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-06","source":"SRC-ML-20260923-0900-01","when":"reporting note adherence","change":"include evaluator and codec-roundtrip ceilings","parameter_range":"same dataset and evaluator","range_origin":"paper error decomposition","protect":["metric interpretation"],"verify":["four-stage score table"],"cancel":["ceiling dominates model error"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-07","source":"SRC-ML-20260923-0900-02","when":"considering audiovisual vocal separation","change":"treat output as pseudo-stem candidate only","parameter_range":"pinned model versus pinned comparator","range_origin":"paper scope","protect":["non-target instruments","vocal identity"],"verify":["additivity","leakage","silence handoff","phase/mono","peaks","blind preference"],"cancel":["target swap","off-target damage"],"confidence":"high","status":"candidate","auto_apply":false},
+    {"id":"RULE-ML-20260923-0900-08","source":"AUD-ML-20260923-0900-02","when":"claiming MambaVoice reproducibility","change":"require accessible pinned code, checkpoint, licence and end-to-end pipeline","parameter_range":"exact hashes and versions","range_origin":"artifact audit","protect":["auditability"],"verify":["artifact manifest and deterministic replay"],"cancel":["404 or missing asset"],"confidence":"high","status":"candidate","auto_apply":false}
+  ],
+  "video_cards": [
+    {"id":"VID-ML-20260923-0900-01","action":"add","title":"Mixing Basics: Guitar - Warren Huart","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=C2WPNv_dTfI","duration":"26:08","reading_depth":"metadata_only","status":"queued_source","transcript":"unavailable_in_visible_youtube_interface"},
+    {"id":"VID-ML-20260923-0900-02","action":"add","title":"How To Produce Rock Music - Warren Huart","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=sAYDgcq3pDE","duration":"36:39","reading_depth":"metadata_only","status":"queued_source","transcript":"unavailable_in_visible_youtube_interface"}
+  ],
+  "reference_cards": [],
+  "deduplication": [
+    {"candidate":"arXiv:2609.25546v1","result":"new_distinct_work"},
+    {"candidate":"arXiv:2609.26635v1","result":"new_distinct_work"},
+    {"candidate":"SpanSynth paper, GitHub, Hugging Face and demo","result":"one_source_artifact_family_not_independent_confirmations"},
+    {"candidate":"MambaVoice paper and linked unavailable repository","result":"one_source_family"},
+    {"candidate":"YouTube C2WPNv_dTfI and sAYDgcq3pDE","result":"not_present_in_existing_index_or_reports"}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260923-0900-01","status":"not_run","priority":"next","baseline":"frozen codec roundtrip without generative replacement","variant":"ordinary SpanSynth generation with identical before and after MIDI","single_factor":"generative resynthesis","fixed":["licensed source","mono fold-down","crop","requested and applied interval","MIDI","checkpoint and codec hashes","16 steps","CFG 2.0","seed set"],"loudness_matching":"retain raw safety renders; create separate randomized loudness-matched copies for Dmitry","measurements":["waveform and non-target residual","onset and pitch drift","transient and HF loss","boundary clicks","gain","sample peak","true peak","loudness","finite output","blind preference"],"protect":["unchanged notes","attack","sustain","ambience","timing","headroom"],"cancel":["unrequested content","onset shift","click","transient or HF loss","peak regression","seed fragility","no repeatable preference"]},
+    {"id":"EXP-ML-20260923-0900-02","status":"not_run","priority":"high","baseline":"public hard interval replacement","variant":"one fixed short equal-power crossfade on the same generated samples","single_factor":"splice policy","fixed":["generated samples","gain","bounds","output length"],"loudness_matching":"raw boundary checks plus separate matched blind copies","measurements":["left/right sample and spectral discontinuity","transient smear","loudness","sample/true peak","blind preference"],"protect":["timing","attack"],"cancel":["timing or attack damage","worse boundary residual"]},
+    {"id":"EXP-ML-20260923-0900-03","status":"not_run","priority":"high","baseline":"ordinary SpanSynth editing","variant":"FlowEdit with fixed start step and averaging","single_factor":"edit sampler","fixed":["audio","MIDI","checkpoint","codec","region","steps","CFG","seed set"],"loudness_matching":"raw diagnostics plus separate matched blind copies","measurements":["requested-add recall","deletion residual","unchanged-note residual","FAD/MSS diagnostic","seams","transients","gain","peaks","blind preference"],"protect":["requested and unchanged content","transients","headroom"],"cancel":["embedding-only gain with worse note or preservation behavior"]},
+    {"id":"EXP-ML-20260923-0900-04","status":"not_run","priority":"blocked_on_artifact","baseline":"pinned VoViT inference","variant":"pinned MambaVoice inference","single_factor":"separator architecture","fixed":["four-second mixtures","target video","accompaniment and interferer","sample rate","level","split"],"loudness_matching":"raw safety and additivity renders plus separate matched blind copies","measurements":["target swaps through silence and overlap","source-wise leakage","additivity","SDR/SIR","phase/mono","sample/true peak","boundary residual","end-to-end runtime including landmarks","blind preference"],"protect":["target identity","non-target instruments","phase","headroom"],"cancel":["unavailable or unpinned artifact","identity swap","off-target damage","non-additivity","phase or peak regression","no repeatable preference"]}
+  ],
+  "queue": {"video_count":34,"studied_videos":0,"remaining":["deep static audit of SpanSynth real inference and null-test design","MambaVoice code/checkpoint audit if linked artifact reappears","SpanSynth per-dataset split and rights provenance","DiffusionRIR causal scale recovery and grouped split","SH-IRT numerical safety tests","34 transcript-dependent video sources","rights-cleared raw rock multitrack or paired DI-to-processed fragment"]},
+  "counts": {"source_cards_added":2,"source_cards_updated":0,"implementation_audits_added":2,"knowledge_cards_added":12,"candidate_rules_added":8,"experiments_added":4,"video_cards_added":2,"studied_videos":0,"queued_videos_total":34,"reference_cards_added":0},
+  "revisions": ["region-local replacement is not unchanged-note preservation inside the region","outside-sample preservation does not establish seamless or peak-safe assembly","MambaVoice perceptual evidence supports comparability to VoViT, not superiority","network forward time is not end-to-end latency","paper-linked 404 blocks MambaVoice reproduction"],
+  "safety": ["no audio downloaded or processed","no model or checkpoint downloaded","no repository code executed","no paid compute or service","no DSP, runtime or active-rule change","no model training","all experiments not_run","all rules candidate and auto_apply false"],
+  "handoff": "Treat SpanSynth as a mono generative research editor, not a transparent repair tool: null-test identical MIDI inside the region, record 40 ms-expanded bounds, pin checkpoint and seed, and test seams and peaks before listening. Treat MambaVoice as a pseudo-stem candidate only after artifacts reappear; current evidence supports comparability to VoViT, not safe mix editing."
+}
