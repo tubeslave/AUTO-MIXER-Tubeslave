@@ -22,4 +22,22 @@ def test_too_short_phrase_remains_diagnose_only():
 
 def test_click_candidate():
  x=np.zeros(1000,dtype="float32");x[500]=1
- assert len(click_candidates(x,1000))>=1
+ assert click_candidates(x,1000)==[500]
+
+
+def test_click_candidate_step_discontinuity_is_detected():
+ x=np.zeros(1000,dtype="float32");x[500:]=1
+ assert click_candidates(x,1000)==[500]
+
+
+def test_broad_transient_ramp_is_not_mislabeled_as_click():
+ x=np.zeros(1000,dtype="float32")
+ x[500:510]=np.linspace(0,1,10,dtype="float32")
+ x[510:]=1
+ assert click_candidates(x,1000)==[]
+
+
+def test_smooth_periodic_signal_has_no_click_candidate():
+ t=np.arange(1000,dtype="float32")/1000
+ x=np.sin(2*np.pi*10*t).astype("float32")
+ assert click_candidates(x,1000)==[]
