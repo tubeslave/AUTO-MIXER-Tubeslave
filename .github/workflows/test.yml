@@ -44,6 +44,7 @@ jobs:
           tests/test_infrastructure/test_studio_mastering_metrics.py
           tests/test_infrastructure/test_auto_mastering_studio_integration.py
           tests/test_infrastructure/test_studio_mastering_offline_boundary.py
+          tests/test_infrastructure/test_studio_autonomous_iteration_v2.py
           -q -s --tb=short
         env:
           PYTHONPATH: backend
