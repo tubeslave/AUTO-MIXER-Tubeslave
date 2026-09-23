@@ -12,7 +12,7 @@ jobs:
       - name: Install separator
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "audio-separator[cpu]"
+          python -m pip install "audio-separator[cpu]" audioread
           audio-separator --env_info
       - name: Fetch Ptitsa snippets directly from Yandex Disk
         shell: python
