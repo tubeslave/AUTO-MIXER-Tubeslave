@@ -5,8 +5,8 @@ from studio_mastering_metrics import StudioMasteringMeter
 
 
 def sine(freq_hz=1000.0, amplitude=1.0, duration=1.0, sample_rate=48000, phase=0.0):
-    t = np.arange(int(sr := sample_rate * duration), dtype=np.float64) / sample_rate
-    assert len(t) == int(sr)
+    sample_count = int(sample_rate * duration)
+    t = np.arange(sample_count, dtype=np.float64) / sample_rate
     return (amplitude * np.sin(2.0 * np.pi * freq_hz * t + phase)).astype(np.float32)
 
 
