@@ -10,14 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Archive reproducible source snapshot
+      - name: Fetch immutable public code archive without submodule traversal
+        env:
+          REVISION: ${{ github.sha }}
         run: |
           mkdir -p work
-          git rev-parse HEAD > work/revision.txt
-          git archive --format=tar.gz -o work/studio-source.tar.gz HEAD
+          printf '%s\n' "$REVISION" > work/revision.txt
+          curl --fail --location --retry 3 "https://codeload.github.com/tubeslave/AUTO-MIXER-Tubeslave/tar.gz/$REVISION" -o work/studio-source.tar.gz
       - uses: actions/upload-artifact@v4
         with:
           name: ptitsa-studio-source-code
