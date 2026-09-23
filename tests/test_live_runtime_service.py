@@ -200,6 +200,32 @@ def test_bench_test_action_uses_service_owned_wing_control_plane_and_fresh_readb
     assert service.control_audit_events[0]["event"] == "live_write_verified"
 
 
+def test_service_owned_rollback_restores_wing_and_requires_fresh_readback():
+    client = FakeWingClient({"/ch/1/fdr": -5.0})
+    ConnectedWingEngine.transport = client
+    service = LiveSoundcheckService(engine_factory=ConnectedWingEngine)
+    service.start(_request(LiveMode.BENCH_TEST))
+
+    write = service.execute_action(_fader_action(-4.0))
+    rollback = service.rollback_action(write.verified)
+
+    assert rollback.wrote is True
+    assert rollback.restored is True
+    assert rollback.before_rollback == -4.0
+    assert rollback.readback == -5.0
+    assert client.values["/ch/1/fdr"] == -5.0
+    assert client.sent == [
+        ("/ch/1/fdr", ()),
+        ("/ch/1/fdr", (-4.0,)),
+        ("/ch/1/fdr", ()),
+        ("/ch/1/fdr", ()),
+        ("/ch/1/fdr", (-5.0,)),
+        ("/ch/1/fdr", ()),
+    ]
+    assert service.get_status()["control_audit_count"] == 2
+    assert service.control_audit_events[-1]["event"] == "live_rollback_verified"
+
+
 def test_observe_action_is_audited_but_never_writes_wing():
     client = FakeWingClient({"/ch/1/fdr": -5.0})
     ConnectedWingEngine.transport = client
