@@ -29,3 +29,18 @@ def authorize(action:ProposedAction,mode:LiveMode,manual_freeze:bool=False)->tup
     if action.confidence<.75 and mode==LiveMode.AUTO_SAFE:
         return False,"confidence_too_low"
     return True,"authorized"
+
+
+def authorize_rollback(mode:LiveMode,manual_freeze:bool=False)->tuple[bool,str]:
+    """Authorize restoration of a value captured by the control plane.
+
+    A rollback is not a new musical decision: it restores the fresh pre-write
+    value recorded by a previous verified execution. Production confidence,
+    parameter allowlists and original action risk therefore do not block the
+    restoration. Explicit no-write states still win, including manual freeze.
+    """
+    if manual_freeze or mode==LiveMode.FREEZE:
+        return False,"frozen"
+    if mode in (LiveMode.OBSERVE,LiveMode.PROPOSE):
+        return False,"writes_disabled"
+    return True,"rollback_authorized"
