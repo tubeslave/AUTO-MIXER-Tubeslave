@@ -152,6 +152,8 @@ def _render(x: np.ndarray, sr: int, role: str, hop_s: float = .02, *,
         "measurement_scope": "actual PCM; fixed RAW-active RMS frames; not event dynamics or LRA",
         "status": "no_op" if no_op else "pending_human_review",
         "baseline_eligible": False, "input_unchanged": True,
+        "requires_human_review": not no_op, "requires_human_listening": not no_op,
+        "balance_match_passed": None if before_level is None else abs(after_level - before_level) <= .05,
     }
     return y, report
 
