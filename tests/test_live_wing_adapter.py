@@ -5,7 +5,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from live_runtime.contracts import ChannelFeatures, LiveMode, MixFeatures, ProposedAction
+from live_runtime.contracts import EqBandLocator, LiveMode, MixFeatures, ProposedAction
 from live_runtime.control_plane import LiveControlPlane
 from live_runtime.decision_engine import propose_one
 from live_runtime.wing_adapter import WingWriteAdapter
@@ -58,6 +58,22 @@ def _fader_action(value=-4.0, **overrides):
         max_step=1.0,
         reversible=True,
         risk="low",
+    )
+    payload.update(overrides)
+    return ProposedAction(**payload)
+
+
+def _eq_action(value=-0.5, **overrides):
+    payload = dict(
+        target="ch:2",
+        parameter="eq_gain_delta_db",
+        value=value,
+        reason="located EQ migration test",
+        confidence=.9,
+        max_step=.8,
+        reversible=True,
+        risk="low",
+        eq_locator=EqBandLocator(3, 3200.0, 1.4),
     )
     payload.update(overrides)
     return ProposedAction(**payload)
@@ -142,6 +158,60 @@ def test_headroom_director_main_delta_is_resolved_from_current_wing_fader():
     ]
 
 
+def test_located_eq_gain_delta_roundtrip_checks_band_fingerprint_and_fresh_readback():
+    client = FakeWingClient({
+        "/ch/2/eq/3f": 3200.0,
+        "/ch/2/eq/3q": 1.4,
+        "/ch/2/eq/3g": -1.0,
+    })
+    plane = LiveControlPlane(WingWriteAdapter(client))
+
+    result = plane.execute(_eq_action(-0.5), LiveMode.BENCH_TEST)
+
+    assert result.wrote is True
+    assert result.verified.before == -1.0
+    assert result.verified.after == -1.5
+    assert result.verified.readback == -1.5
+    assert result.verified.accepted is True
+    assert result.verified.rollback_value == -1.0
+    assert client.sent == [
+        ("/ch/2/eq/3f", ()),
+        ("/ch/2/eq/3q", ()),
+        ("/ch/2/eq/3g", ()),
+        ("/ch/2/eq/3f", ()),
+        ("/ch/2/eq/3q", ()),
+        ("/ch/2/eq/3g", (-1.5,)),
+        ("/ch/2/eq/3f", ()),
+        ("/ch/2/eq/3q", ()),
+        ("/ch/2/eq/3g", ()),
+    ]
+
+
+def test_eq_gain_without_locator_fails_closed_even_in_bench_test():
+    client = FakeWingClient({"/ch/2/eq/3g": -1.0})
+    plane = LiveControlPlane(WingWriteAdapter(client))
+    action = _eq_action(eq_locator=None)
+
+    with pytest.raises(ValueError, match="requires an explicit EqBandLocator"):
+        plane.execute(action, LiveMode.BENCH_TEST)
+    assert client.sent == []
+
+
+def test_stale_eq_band_fingerprint_blocks_gain_write():
+    client = FakeWingClient({
+        "/ch/2/eq/3f": 2800.0,
+        "/ch/2/eq/3q": 1.4,
+        "/ch/2/eq/3g": -1.0,
+    })
+    adapter = WingWriteAdapter(client)
+
+    with pytest.raises(ValueError, match="locator frequency mismatch"):
+        adapter.write_value(
+            _eq_action(parameter="eq_gain_db", value=-1.5)
+        )
+    assert ("/ch/2/eq/3g", (-1.5,)) not in client.sent
+
+
 def test_missing_fresh_readback_times_out_instead_of_trusting_cache():
     client = FakeWingClient({"/ch/1/fdr": -5.0}, drop_queries=True)
     adapter = WingWriteAdapter(client, readback_timeout=.01)
@@ -173,12 +243,24 @@ def test_delta_write_cannot_bypass_control_plane_resolution():
         )
 
 
-def test_only_migrated_fader_surfaces_are_available():
+def test_eq_delta_write_cannot_bypass_control_plane_resolution():
+    client = FakeWingClient({
+        "/ch/2/eq/3f": 3200.0,
+        "/ch/2/eq/3q": 1.4,
+        "/ch/2/eq/3g": -1.0,
+    })
+    adapter = WingWriteAdapter(client)
+
+    with pytest.raises(ValueError, match="must be resolved"):
+        adapter.write_value(_eq_action())
+
+
+def test_only_explicitly_migrated_surfaces_are_available():
     client = FakeWingClient({"/ch/1/fdr": -5.0})
     adapter = WingWriteAdapter(client)
 
     with pytest.raises(NotImplementedError):
-        adapter.write_value(_fader_action(parameter="eq_gain_db"))
+        adapter.write_value(_fader_action(parameter="comp_threshold_db"))
     with pytest.raises(ValueError, match="channel out of range"):
         adapter.write_value(_fader_action(target="ch:41"))
     with pytest.raises(ValueError, match="main out of range"):
@@ -187,3 +269,20 @@ def test_only_migrated_fader_surfaces_are_available():
         adapter.write_value(_fader_action(target="bus:1"))
     with pytest.raises(ValueError, match="outside WING range"):
         adapter.write_value(_fader_action(value=12.0))
+    with pytest.raises(ValueError, match="EQ band out of range"):
+        adapter.write_value(
+            _eq_action(
+                parameter="eq_gain_db",
+                value=-1.0,
+                eq_locator=EqBandLocator(5, 3200.0, 1.4),
+            )
+        )
+    with pytest.raises(ValueError, match="eq_gain_db outside WING range"):
+        eq_client = FakeWingClient({
+            "/ch/2/eq/3f": 3200.0,
+            "/ch/2/eq/3q": 1.4,
+            "/ch/2/eq/3g": -1.0,
+        })
+        WingWriteAdapter(eq_client).write_value(
+            _eq_action(parameter="eq_gain_db", value=16.0)
+        )
