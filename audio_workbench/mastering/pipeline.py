@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass,asdict
 import numpy as np
-from .analyzer import analyze
+from .analyzer import analyze, true_peak_dbtp
 from . import stabilizer,clarity,impact,clipper,maximizer
 from .decision import MasteringSafetyPolicy,evaluate
 
@@ -42,12 +42,25 @@ class MasteringDirector:
             y,s=clipper.process(y,sr,self.config.clip_drive_db);events.append({"module":"clipper",**s})
         if self.config.maximizer:
             y,s=maximizer.process(y,sr,self.config.ceiling_db,self.config.maximizer_drive_db);events.append({"module":"maximizer",**s})
+        safety_event=None
+        if self.config.maximizer:
+            pre_safety_peak=true_peak_dbtp(y)
+            if not np.isfinite(pre_safety_peak):
+                raise ValueError("unmeasurable mastering true peak")
+            attenuation_db=max(0.0, float(pre_safety_peak-self.config.ceiling_db))
+            if attenuation_db>0.0:
+                y=(y*np.float32(10**(-attenuation_db/20))).astype(np.float32)
+            safety_event={"module":"true_peak_safety", "mode":"linked_static_attenuation",
+                          "input_true_peak_dbtp":pre_safety_peak,
+                          "attenuation_db":attenuation_db, "adds_gain":False}
         after=analyze(y,sr,include_true_peak=True,include_loudness=True)
         regression={"crest_change_db":after["crest_db"]-before["crest_db"],
           "side_mid_change_db":after["side_mid_db"]-before["side_mid_db"],
           "correlation_change":after["correlation"]-before["correlation"]}
         maximizer_event=next((e for e in events if e.get("module")=="maximizer"),None)
-        budget={"maximizer":maximizer_event}
+        if maximizer_event is not None:
+            maximizer_event["true_peak_safety"]=safety_event
+        budget={"maximizer":maximizer_event,"true_peak_safety":safety_event}
         safety=evaluate(before,after,MasteringSafetyPolicy(
           true_peak_ceiling_dbtp=self.config.ceiling_db,
           target_lufs=self.config.target_lufs,
