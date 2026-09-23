@@ -1,15 +1,27 @@
 """Tests for backend/handlers/soundcheck_handlers.py."""
 
 import asyncio
+import importlib.util
 import os
 import sys
 from unittest.mock import AsyncMock
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
+BACKEND = os.path.join(os.path.dirname(__file__), '..', 'backend')
+sys.path.insert(0, BACKEND)
 
-from handlers.soundcheck_handlers import register_handlers
+# Load this handler directly so the focused live-runtime test does not import
+# every legacy handler via handlers/__init__.py.  That package-wide import fanout
+# is itself part of the composition-root modernization work.
+_spec = importlib.util.spec_from_file_location(
+    "soundcheck_handlers_test_target",
+    os.path.join(BACKEND, "handlers", "soundcheck_handlers.py"),
+)
+_module = importlib.util.module_from_spec(_spec)
+assert _spec and _spec.loader
+_spec.loader.exec_module(_module)
+register_handlers = _module.register_handlers
 
 
 class DummyServer:
