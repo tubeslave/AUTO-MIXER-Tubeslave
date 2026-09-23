@@ -73,6 +73,14 @@ def test_source_envelopes_serialize_in_cli_manifest(tmp_path, signal):
     assert envelope["crest_ok"] is (signal == "noise")
 
 
+@pytest.mark.parametrize("name", ["04_overhead_L_take", "05_overhead_R_take", "OH L"])
+def test_source_envelope_recognizes_explicit_overhead_name(tmp_path, name):
+    mod = load_pipeline_module()
+    sr = 48000
+    sf.write(tmp_path / f"{name}.wav", np.zeros(sr), sr)
+    assert mod.build_source_envelopes(tmp_path)[f"{name}.wav"]["instrument"] == "overhead"
+
+
 def test_write_summary_includes_soundcheck_stages_and_channels(tmp_path):
     mod = load_pipeline_module()
     output = tmp_path / "mix.wav"

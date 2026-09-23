@@ -461,7 +461,8 @@ def sanitize_input_dir(input_dir: Path, output_path: Path) -> tuple[Path, dict[s
 
 _FILENAME_INSTRUMENTS = (
     ("kick", "kick"), ("snare b", "snare"), ("snare", "snare"),
-    ("f tom", "floor_tom"), ("tom", "rack_tom"), ("oh", "overhead"),
+    ("f tom", "floor_tom"), ("tom", "rack_tom"),
+    ("overhead", "overhead"), ("oh", "overhead"),
     ("hat", "overhead"), ("bass", "bass_guitar"), ("guitar", "electric_guitar"),
     ("accordion", "accordion"), ("back vox", "backing_vocal"),
     ("vocal", "lead_vocal"), ("vox", "lead_vocal"), ("playback", "playback"),

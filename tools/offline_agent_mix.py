@@ -2094,17 +2094,30 @@ def _transient_segment_starts(
     return [int(np.clip(center - window // 2, 0, len(x) - window)) for center in selected]
 
 
+def _overhead_side(name: str) -> str | None:
+    """Read an explicit side token without matching parts of unrelated words."""
+    matches = re.findall(
+        r"(?:^|[\s_.-])(?:overheads?[\s_.-]+|oh[\s_.-]*)(left|right|l|r)"
+        r"(?=[\s_.-]|$)",
+        name.lower(),
+    )
+    sides = {side[0] for side in matches}
+    return next(iter(sides)) if len(sides) == 1 else None
+
+
 def _overhead_lr(plans: dict[int, ChannelPlan]) -> tuple[tuple[int, ChannelPlan], tuple[int, ChannelPlan]] | None:
     overheads = [(channel, plan) for channel, plan in plans.items() if plan.instrument == "overhead"]
     if len(overheads) < 2:
         return None
 
     left = next(
-        ((channel, plan) for channel, plan in overheads if "overhead l" in plan.name.lower() or plan.name.lower().endswith(" l")),
+        ((channel, plan) for channel, plan in overheads
+         if _overhead_side(plan.name) == "l" or plan.name.lower().endswith(" l")),
         None,
     )
     right = next(
-        ((channel, plan) for channel, plan in overheads if "overhead r" in plan.name.lower() or plan.name.lower().endswith(" r")),
+        ((channel, plan) for channel, plan in overheads
+         if _overhead_side(plan.name) == "r" or plan.name.lower().endswith(" r")),
         None,
     )
     if left and right:
@@ -4366,12 +4379,13 @@ def classify_track(path: Path) -> tuple[str, float, float, float, list[tuple[flo
         return "hi_hat", 0.0, 180.0, -28.0, [(450, -1.5, 1.2), (6500, 1.5, 1.0), (9500, 1.0, 0.8)], (-18, 1.8, 18, 180), False
     if "ride" in name:
         return "ride", 0.0, 170.0, -28.5, [(420, -1.2, 1.2), (4800, 1.2, 1.0), (9000, 1.0, 0.8)], (-18, 1.8, 20, 200), False
+    overhead_side = _overhead_side(name)
+    if overhead_side == "l":
+        return "overhead", -0.72, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
+    if overhead_side == "r":
+        return "overhead", 0.72, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
     if "overheads" in name or name == "overheads":
         return "overhead", 0.0, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
-    if "overhead l" in name or name in {"oh l", "ohl"} or name.endswith(" oh l"):
-        return "overhead", -0.72, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
-    if "overhead r" in name or name in {"oh r", "ohr"} or name.endswith(" oh r"):
-        return "overhead", 0.72, 150.0, -27.0, [(350, -1.5, 1.2), (3500, -1.0, 1.5), (10500, 1.5, 0.8)], (-18, 1.6, 25, 300), False
     if name.startswith("room dr l") or name.startswith("room l") or name in {"roomdr l", "room l"}:
         return "room", -0.78, 80.0, -31.0, [(250, -1.5, 1.2), (2500, -1.0, 1.4), (8500, 0.8, 1.0)], (-20, 2.0, 20, 220), False
     if name.startswith("room dr r") or name.startswith("room r") or name in {"roomdr r", "room r"}:

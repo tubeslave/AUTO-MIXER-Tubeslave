@@ -1,0 +1,778 @@
+{
+  "source_head": "79ed951f3a99623d2915192842d20ed37eaba58e",
+  "hardware_contacted": false,
+  "live_writes": false,
+  "listening_approved": false,
+  "measurements": {
+    "drums-control": {
+      "sha256": "47b739d58355370cd72ff635ed92a8ea27f2819ea828edcfe39deed57eaa303b",
+      "frames": 1162476,
+      "sample_rate": 44100,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -3.0000009805991428,
+      "true_peak_dbtp": -2.7687757247599745,
+      "side_to_mid_db": -24.987714425900492
+    },
+    "drums-minus6": {
+      "sha256": "1e13e043379a783f0fc02944706f7fb9e05fa76513557aa66261fa672a208cd0",
+      "frames": 1162476,
+      "sample_rate": 44100,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -3.0000009805991428,
+      "true_peak_dbtp": -2.768998629907125,
+      "side_to_mid_db": -25.15668054234083
+    },
+    "drums-fixed": {
+      "sha256": "e969054aabb6635d8ee3277090b7b2ac177f5ceab72c28220da6155ccd751dab",
+      "frames": 1162476,
+      "sample_rate": 44100,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -3.0000009805991428,
+      "true_peak_dbtp": -2.872215522195809,
+      "side_to_mid_db": -17.428928881381076
+    },
+    "concert-control": {
+      "sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+      "frames": 9827840,
+      "sample_rate": 48000,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -2.9999995180030155,
+      "true_peak_dbtp": -2.9478247799940154,
+      "side_to_mid_db": -15.347256750918028
+    },
+    "concert-minus6": {
+      "sha256": "551541fdbfe7ea997e57b68058619bfc67d8a21479a189d38d5ba151131dd7b9",
+      "frames": 9827840,
+      "sample_rate": 48000,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -2.9999995180030155,
+      "true_peak_dbtp": -2.9478245286867355,
+      "side_to_mid_db": -15.347256471378788
+    },
+    "concert-fixed": {
+      "sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+      "frames": 9827840,
+      "sample_rate": 48000,
+      "channels": 2,
+      "nonfinite": 0,
+      "clipped_samples": 0,
+      "sample_peak_dbfs": -2.9999995180030155,
+      "true_peak_dbtp": -2.9478247799940154,
+      "side_to_mid_db": -15.347256750918028
+    }
+  },
+  "perturbation_results": [
+    {
+      "dataset": "drums",
+      "target": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+      "source_gain_delta_db": -6,
+      "corrective_linear_gain_delta_db": 6,
+      "net_linear_gain_residual_db": 0,
+      "mix_comparison": {
+        "whole": {
+          "start_sample": 0,
+          "residual_relative_db": -12.393992212141011
+        },
+        "after_target_crossfade": {
+          "start_sample": 83349,
+          "residual_relative_db": -12.360245706923994
+        }
+      },
+      "input_unchanged": true
+    },
+    {
+      "dataset": "concert",
+      "target": "Vocal.wav",
+      "source_gain_delta_db": -6,
+      "corrective_linear_gain_delta_db": 6,
+      "net_linear_gain_residual_db": 0,
+      "mix_comparison": {
+        "whole": {
+          "start_sample": 0,
+          "residual_relative_db": -119.5863573749325
+        },
+        "after_target_crossfade": {
+          "start_sample": 2103840,
+          "residual_relative_db": -120.03920023536878
+        }
+      },
+      "input_unchanged": true
+    }
+  ],
+  "fixed_reports": {
+    "drums": {
+      "final_lufs": -24.41,
+      "overheads": [
+        {
+          "file": "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav",
+          "instrument": "overhead",
+          "trim_db": -12.73,
+          "trim_analysis": {
+            "raw_trim_db": -12.73,
+            "applied_trim_db": -12.73,
+            "max_boost_db": 6,
+            "limited_by_bleed": false,
+            "analysis_mode": "windowed_full_track",
+            "active_ratio": 0.6829,
+            "event_to_bleed_db": null,
+            "bleed_ratio": null,
+            "bleed_dominant": false,
+            "reasons": [
+              "ambient mic: do not convert low-level kit bleed into large input gain"
+            ]
+          },
+          "fader_db": -0.9,
+          "pan": -0.4,
+          "hpf": 150,
+          "lpf": 0,
+          "phase_invert": false,
+          "delay_ms": 0,
+          "event_expander": {
+            "enabled": false
+          },
+          "analysis_mode": "windowed_full_track",
+          "analysis_active_ratio": 0.6829,
+          "analysis_threshold_db": null
+        },
+        {
+          "file": "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav",
+          "instrument": "overhead",
+          "trim_db": -1.23,
+          "trim_analysis": {
+            "raw_trim_db": -1.23,
+            "applied_trim_db": -1.23,
+            "max_boost_db": 6,
+            "limited_by_bleed": false,
+            "analysis_mode": "windowed_full_track",
+            "active_ratio": 0.6829,
+            "event_to_bleed_db": null,
+            "bleed_ratio": null,
+            "bleed_dominant": false,
+            "reasons": [
+              "ambient mic: do not convert low-level kit bleed into large input gain"
+            ]
+          },
+          "fader_db": -0.9,
+          "pan": 0.76,
+          "hpf": 150,
+          "lpf": 0,
+          "phase_invert": false,
+          "delay_ms": 0,
+          "event_expander": {
+            "enabled": false
+          },
+          "analysis_mode": "windowed_full_track",
+          "analysis_active_ratio": 0.6829,
+          "analysis_threshold_db": null
+        }
+      ],
+      "drum_pan_rule": {
+        "enabled": true,
+        "overhead_left_channel": 4,
+        "overhead_right_channel": 5,
+        "overhead_left_file": "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav",
+        "overhead_right_file": "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav",
+        "overhead_left_pan": -0.4,
+        "overhead_right_pan": 0.76,
+        "center_measurements": 36,
+        "center_error_before_db": 6.84,
+        "center_error_after_db": 2.46,
+        "center_signed_before_db": -6.84,
+        "center_signed_after_db": -2.46,
+        "placed_close_mics": [
+          {
+            "channel": 1,
+            "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "kick",
+            "rule": "kick_snare_center_after_overheads",
+            "before_pan": 0,
+            "after_pan": 0,
+            "reason": "kick/snare image is the center reference for the overhead pair"
+          },
+          {
+            "channel": 2,
+            "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "snare",
+            "rule": "kick_snare_center_after_overheads",
+            "before_pan": 0,
+            "after_pan": 0,
+            "reason": "kick/snare image is the center reference for the overhead pair"
+          },
+          {
+            "channel": 3,
+            "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "hi_hat",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": 0,
+            "after_pan": -0.166,
+            "measurement_count": 12,
+            "median_overhead_image_pan": -0.166,
+            "left_right_db_examples": [
+              {
+                "start_sec": 0.732,
+                "left_db": -17.09,
+                "right_db": -27.32
+              },
+              {
+                "start_sec": 1.54,
+                "left_db": -17.83,
+                "right_db": -29.05
+              },
+              {
+                "start_sec": 9.056,
+                "left_db": -17.47,
+                "right_db": -28.69
+              },
+              {
+                "start_sec": 9.577,
+                "left_db": -14.19,
+                "right_db": -24.24
+              }
+            ]
+          },
+          {
+            "channel": 6,
+            "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "rack_tom",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": -0.2,
+            "after_pan": -0.17,
+            "measurement_count": 12,
+            "median_overhead_image_pan": -0.17,
+            "left_right_db_examples": [
+              {
+                "start_sec": 0.193,
+                "left_db": -17.03,
+                "right_db": -27.3
+              },
+              {
+                "start_sec": 0.992,
+                "left_db": -17.07,
+                "right_db": -28.22
+              },
+              {
+                "start_sec": 7.943,
+                "left_db": -17.15,
+                "right_db": -29.22
+              },
+              {
+                "start_sec": 9.577,
+                "left_db": -14.18,
+                "right_db": -24.24
+              }
+            ]
+          },
+          {
+            "channel": 7,
+            "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "rack_tom",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": -0.2,
+            "after_pan": -0.178,
+            "measurement_count": 12,
+            "median_overhead_image_pan": -0.178,
+            "left_right_db_examples": [
+              {
+                "start_sec": 0.193,
+                "left_db": -17.04,
+                "right_db": -27.31
+              },
+              {
+                "start_sec": 0.992,
+                "left_db": -17.09,
+                "right_db": -28.24
+              },
+              {
+                "start_sec": 9.577,
+                "left_db": -14.23,
+                "right_db": -24.29
+              },
+              {
+                "start_sec": 12.989,
+                "left_db": -17.22,
+                "right_db": -28.07
+              }
+            ]
+          },
+          {
+            "channel": 8,
+            "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+            "instrument": "rack_tom",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": -0.2,
+            "after_pan": -0.232,
+            "measurement_count": 12,
+            "median_overhead_image_pan": -0.232,
+            "left_right_db_examples": [
+              {
+                "start_sec": 1.262,
+                "left_db": -17.41,
+                "right_db": -29.18
+              },
+              {
+                "start_sec": 7.682,
+                "left_db": -18.87,
+                "right_db": -31.58
+              },
+              {
+                "start_sec": 9.577,
+                "left_db": -14.27,
+                "right_db": -24.34
+              },
+              {
+                "start_sec": 9.846,
+                "left_db": -14.91,
+                "right_db": -29.49
+              }
+            ]
+          }
+        ]
+      },
+      "phase_alignment": [
+        {
+          "channel": 1,
+          "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -3.629,
+          "applied_delay_ms": 3.629,
+          "psr_db": 0.08,
+          "confidence": 0.179,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.001,
+          "corr_flipped": -0.001
+        },
+        {
+          "channel": 2,
+          "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -4.036,
+          "applied_delay_ms": 4.036,
+          "psr_db": 2.02,
+          "confidence": 0.244,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.219,
+          "corr_flipped": -0.219
+        },
+        {
+          "channel": 3,
+          "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -2.923,
+          "applied_delay_ms": 2.923,
+          "psr_db": 1.93,
+          "confidence": 0.21,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.286,
+          "corr_flipped": -0.286
+        },
+        {
+          "channel": 6,
+          "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -3.019,
+          "applied_delay_ms": 3.019,
+          "psr_db": 1.28,
+          "confidence": 0.207,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.424,
+          "corr_flipped": -0.424
+        },
+        {
+          "channel": 7,
+          "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -2.468,
+          "applied_delay_ms": 2.468,
+          "psr_db": 0.46,
+          "confidence": 0.162,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.327,
+          "corr_flipped": -0.327
+        },
+        {
+          "channel": 8,
+          "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -1.955,
+          "applied_delay_ms": 1.955,
+          "psr_db": 0.38,
+          "confidence": 0.172,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.317,
+          "corr_flipped": -0.317
+        }
+      ]
+    },
+    "concert": {
+      "final_lufs": -22.25,
+      "overheads": [
+        {
+          "file": "OH L.wav",
+          "instrument": "overhead",
+          "trim_db": 6,
+          "trim_analysis": {
+            "raw_trim_db": 9.15,
+            "applied_trim_db": 6,
+            "max_boost_db": 6,
+            "limited_by_bleed": true,
+            "analysis_mode": "windowed_full_track",
+            "active_ratio": 0.0879,
+            "event_to_bleed_db": null,
+            "bleed_ratio": null,
+            "bleed_dominant": false,
+            "reasons": [
+              "ambient mic: do not convert low-level kit bleed into large input gain"
+            ]
+          },
+          "fader_db": -0.9,
+          "pan": -0.73,
+          "hpf": 150,
+          "lpf": 0,
+          "phase_invert": false,
+          "delay_ms": 0,
+          "event_expander": {
+            "enabled": false
+          },
+          "analysis_mode": "windowed_full_track",
+          "analysis_active_ratio": 0.0879,
+          "analysis_threshold_db": null
+        },
+        {
+          "file": "OH R.wav",
+          "instrument": "overhead",
+          "trim_db": 6,
+          "trim_analysis": {
+            "raw_trim_db": 9.78,
+            "applied_trim_db": 6,
+            "max_boost_db": 6,
+            "limited_by_bleed": true,
+            "analysis_mode": "windowed_full_track",
+            "active_ratio": 0.0879,
+            "event_to_bleed_db": null,
+            "bleed_ratio": null,
+            "bleed_dominant": false,
+            "reasons": [
+              "ambient mic: do not convert low-level kit bleed into large input gain"
+            ]
+          },
+          "fader_db": -0.9,
+          "pan": 0.43,
+          "hpf": 150,
+          "lpf": 0,
+          "phase_invert": false,
+          "delay_ms": 0,
+          "event_expander": {
+            "enabled": false
+          },
+          "analysis_mode": "windowed_full_track",
+          "analysis_active_ratio": 0.0879,
+          "analysis_threshold_db": null
+        }
+      ],
+      "drum_pan_rule": {
+        "enabled": true,
+        "overhead_left_channel": 9,
+        "overhead_right_channel": 10,
+        "overhead_left_file": "OH L.wav",
+        "overhead_right_file": "OH R.wav",
+        "overhead_left_pan": -0.73,
+        "overhead_right_pan": 0.43,
+        "center_measurements": 54,
+        "center_error_before_db": 2.65,
+        "center_error_after_db": 0.9,
+        "center_signed_before_db": 2.44,
+        "center_signed_after_db": -0.2,
+        "placed_close_mics": [
+          {
+            "channel": 5,
+            "file": "F Tom.wav",
+            "instrument": "floor_tom",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": 0.25,
+            "after_pan": -0.041,
+            "measurement_count": 12,
+            "median_overhead_image_pan": -0.041,
+            "left_right_db_examples": [
+              {
+                "start_sec": 69.162,
+                "left_db": -38.59,
+                "right_db": -34.45
+              },
+              {
+                "start_sec": 69.638,
+                "left_db": -39.06,
+                "right_db": -36.33
+              },
+              {
+                "start_sec": 85.63,
+                "left_db": -37.6,
+                "right_db": -37.22
+              },
+              {
+                "start_sec": 93.63,
+                "left_db": -37.94,
+                "right_db": -35.19
+              }
+            ]
+          },
+          {
+            "channel": 8,
+            "file": "KICK.wav",
+            "instrument": "kick",
+            "rule": "kick_snare_center_after_overheads",
+            "before_pan": 0,
+            "after_pan": 0,
+            "reason": "kick/snare image is the center reference for the overhead pair"
+          },
+          {
+            "channel": 13,
+            "file": "SNARE T.wav",
+            "instrument": "snare",
+            "rule": "kick_snare_center_after_overheads",
+            "before_pan": -0.02,
+            "after_pan": 0,
+            "reason": "kick/snare image is the center reference for the overhead pair"
+          },
+          {
+            "channel": 14,
+            "file": "Snare B.wav",
+            "instrument": "snare",
+            "rule": "kick_snare_center_after_overheads",
+            "before_pan": 0.02,
+            "after_pan": 0,
+            "reason": "kick/snare image is the center reference for the overhead pair"
+          },
+          {
+            "channel": 15,
+            "file": "Tom.wav",
+            "instrument": "rack_tom",
+            "rule": "close_mic_follows_overhead_image",
+            "before_pan": -0.2,
+            "after_pan": 0.017,
+            "measurement_count": 12,
+            "median_overhead_image_pan": 0.017,
+            "left_right_db_examples": [
+              {
+                "start_sec": 69.162,
+                "left_db": -38.59,
+                "right_db": -34.45
+              },
+              {
+                "start_sec": 93.119,
+                "left_db": -40.31,
+                "right_db": -32.16
+              },
+              {
+                "start_sec": 124.106,
+                "left_db": -40.12,
+                "right_db": -33.77
+              },
+              {
+                "start_sec": 133.247,
+                "left_db": -40.14,
+                "right_db": -35.35
+              }
+            ]
+          }
+        ]
+      },
+      "phase_alignment": [
+        {
+          "channel": 5,
+          "file": "F Tom.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -0.499,
+          "applied_delay_ms": 0.499,
+          "psr_db": 1.57,
+          "confidence": 0.162,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.025,
+          "corr_flipped": -0.025
+        },
+        {
+          "channel": 8,
+          "file": "KICK.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -4.503,
+          "applied_delay_ms": 4.503,
+          "psr_db": 2.24,
+          "confidence": 0.167,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": -0.068,
+          "corr_flipped": 0.068
+        },
+        {
+          "channel": 13,
+          "file": "SNARE T.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -1.77,
+          "applied_delay_ms": 1.77,
+          "psr_db": 0.18,
+          "confidence": 0.106,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.153,
+          "corr_flipped": -0.153
+        },
+        {
+          "channel": 14,
+          "file": "Snare B.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -3.692,
+          "applied_delay_ms": 3.692,
+          "psr_db": 0.18,
+          "confidence": 0.106,
+          "coherence": 1,
+          "phase_invert": true,
+          "corr_current": -0.084,
+          "corr_flipped": 0.084
+        },
+        {
+          "channel": 15,
+          "file": "Tom.wav",
+          "reference": "overhead_pair",
+          "measured_delay_ms": -1.313,
+          "applied_delay_ms": 1.313,
+          "psr_db": 0.37,
+          "confidence": 0.115,
+          "coherence": 1,
+          "phase_invert": false,
+          "corr_current": 0.133,
+          "corr_flipped": -0.133
+        }
+      ]
+    }
+  },
+  "implementation_sha256": {
+    "tools/offline_agent_mix.py": "56118b209a1b9ea6cbf82e5903e480c0d0ff94428a20b4b5dd3210212c132705",
+    "tools/repa_song_soundcheck_pipeline.py": "883eec178cbc2fd7f2a318cd27be9a6fc9fd114bb9b316743c982246688f63ed"
+  },
+  "sanitizer_isolation": {
+    "drums-fixed": {
+      "bit_identical": true,
+      "residual_power_ratio": 0,
+      "residual_relative_db": null
+    },
+    "drums-fixed-minus6": {
+      "bit_identical": false,
+      "residual_power_ratio": 0.058063262371597535,
+      "residual_relative_db": -12.360985663310997
+    },
+    "drums-fixed-locked-sanitation": {
+      "bit_identical": false,
+      "residual_power_ratio": 2.421274223772251e-13,
+      "residual_relative_db": -126.15956021327868
+    }
+  },
+  "input_sha256": {
+    "drums": {
+      "01_kick_066_phrase_rock_complex_fast_sticks.wav": "32584563a078eca3ae7e8a1e34f2a2ab4e19123cb73843ef2d5591369d7df8cd",
+      "02_snare_066_phrase_rock_complex_fast_sticks.wav": "f978ae719d04a391672dc1e40de52292d3e197c2e50c12d12c496d33a1c5308e",
+      "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav": "95804684a6d36cf2118f44ce9d72190407a9efadd796b1e04dfa048c2d04520e",
+      "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav": "4c73da63b97f2b1b75fed99a83656dca67b982b89516874404b4cf0cb898e3fa",
+      "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav": "116aa85fbaef445c1f0226660aeac78f9dac7ca47c80ce3bb78cffdf9951044c",
+      "06_tom_1_066_phrase_rock_complex_fast_sticks.wav": "1424f6844cf093500457ba0ba34ee12bb6bb21e3d953c2d38c4c6442752763a5",
+      "07_tom_2_066_phrase_rock_complex_fast_sticks.wav": "15201e5eecb7b5cfe4831a1ebf9ec013546733480a988401f6973a797403be0a",
+      "08_tom_3_066_phrase_rock_complex_fast_sticks.wav": "95778319e41e3fed2e638dffcbb700dfab775626da1484cdcb7cca816b2617f8"
+    },
+    "concert": {
+      "Accordion.wav": "6f64a443d1380492d39ca5db8dd8fb35d8b54ceac21dfce49503e9c098a996c2",
+      "Back Vox L.wav": "360743b0446bd66514e8351ed6396c4fa588353e17c3271d012df9eb50015fce",
+      "Back Vox R.wav": "c77c69424e8794fe28129a7248b967ba600833d9abcae1dc73fe2c92ebf5ff3b",
+      "Bass.wav": "ef66d9198b0629bef910d1c7ba5d1a089f12e306e022dea815046f9d3db72b1b",
+      "F Tom.wav": "cffb940174fcbc67778ab768eadbc506b42631105dcd506d7a530a0cac64831e",
+      "Guitar L.wav": "38158addafd5d4dfcfa28fc7d711c65a8b643b0e3c76959c6267a6fd3b1af131",
+      "Guitar R.wav": "29c1fc1ae8276fcf2802d1ad8b1fb43b6d1a9821267bb5d659cd30feacb7d913",
+      "KICK.wav": "ce84f80119f720c614b3a1a2451014e1bb0dcea23cdc8bb09dadd96e9c25a3e4",
+      "OH L.wav": "97b997babe839a5a6894a906891a379166cb483e777637190d86122c39f57bb0",
+      "OH R.wav": "eacee3e69b63a6acc111ff24049e03c2a35ff4962f6a143221bdd3bafd93f192",
+      "Playback L.wav": "1428ae357bad469635530faba7eed60a2223e8fe69bcf95a9e62acbe95115ce2",
+      "Playback R.wav": "e20c0e676ea2af655bae250918ffdbf6a736f41a2a8d4d51e4ed34bd794e4858",
+      "SNARE T.wav": "7b58f3d339136417985ad4242b319394d995f7a768bc1acfb55dfe8bf0f9da9b",
+      "Snare B.wav": "e55486f72d9139dc600b3e49056cee806f637141bd3a438992eb1de5ed32e92b",
+      "Tom.wav": "fa24ee62942718d1d11e56ba6d3f05fc9de627bc29cb6b02c89f892c7d742b0f",
+      "Vocal.wav": "7ff4da510d8002a16ee242076349acb74ca8a55f5a751a973787ebf93e066d57"
+    }
+  },
+  "canonical_commands": [
+    [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+      "--input-dir",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-control/input",
+      "--output",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-control/mix.wav",
+      "--report",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-control/report.json",
+      "--summary",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-control/summary.md",
+      "--run-log",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-control/render.log",
+      "--no-smart-dsp"
+    ],
+    [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+      "--input-dir",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-minus6/input",
+      "--output",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-minus6/mix.wav",
+      "--report",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-minus6/report.json",
+      "--summary",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-minus6/summary.md",
+      "--run-log",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/drums-minus6/render.log",
+      "--no-smart-dsp"
+    ],
+    [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+      "--input-dir",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-control/input",
+      "--output",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-control/mix.wav",
+      "--report",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-control/report.json",
+      "--summary",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-control/summary.md",
+      "--run-log",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-control/render.log",
+      "--no-smart-dsp"
+    ],
+    [
+      "/opt/homebrew/opt/python@3.14/bin/python3.14",
+      "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+      "--input-dir",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-minus6/input",
+      "--output",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-minus6/mix.wav",
+      "--report",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-minus6/report.json",
+      "--summary",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-minus6/summary.md",
+      "--run-log",
+      "/tmp/automixer-balance-trial-20260923.qwzeNh/concert-minus6/render.log",
+      "--no-smart-dsp"
+    ]
+  ],
+  "artifact_root": "/tmp/automixer-balance-trial-20260923.qwzeNh"
+}
