@@ -1,0 +1,14 @@
+{
+  "goal": "studio-mastering-meter-integration-with-live-isolation",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "c66a2d418ac4aeb704de72b861c0b708fed07cc1",
+  "source_commit": "a5b472fcbcf5290510667a304e9da3774fee54b2",
+  "source_prs": [112, 113],
+  "method": "exact-mastering-blobs-only-no-live-merge",
+  "protected_unchanged_paths": ["audio_workbench/", "mix_agent/", "backend/lufs_gain_staging.py"],
+  "audio_baseline_promoted": false,
+  "ptitsa_cleanup_status": "pending_human_review",
+  "paid_services_used": false,
+  "next_goal": "verify focused offline-boundary renders and full CI, then integrate into Workbench without changing live code"
+}
