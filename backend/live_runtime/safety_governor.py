@@ -17,6 +17,11 @@ def authorize(action:ProposedAction,mode:LiveMode,manual_freeze:bool=False)->tup
         return False,"frozen"
     if mode in (LiveMode.OBSERVE,LiveMode.PROPOSE):
         return False,"writes_disabled"
+    # BENCH_TEST is an explicit engineering mode requested by the operator:
+    # normal production allowlists, confidence gates and bounded-step policies are bypassed
+    # so every console decision is visible on WING. Readback/audit remain enabled.
+    if mode==LiveMode.BENCH_TEST:
+        return True,"bench_test_unrestricted"
     if mode==LiveMode.AUTO_SAFE and action.parameter in BLOCKED_IN_AUTO:
         return False,"parameter_not_allowlisted"
     if mode==LiveMode.AUTO_SAFE and (action.risk!="low" or not action.reversible):
