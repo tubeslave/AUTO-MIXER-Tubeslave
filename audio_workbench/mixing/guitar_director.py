@@ -19,13 +19,29 @@ def lowmid_control_db(x:np.ndarray,sr:int,max_db:float=1.2)->np.ndarray:
     r=20*np.log10((a+1e-9)/(b+1e-9));th=float(np.percentile(r,84))
     return -ndimage.gaussian_filter1d(np.clip((r-th)*.4,0,max_db).astype("float32"),int(.025*sr))
 
+def _wall_bandpass(x:np.ndarray,sr:int)->np.ndarray:
+    """Apply the wall-layer band without ever crossing Nyquist.
+
+    Production material is normally 44.1/48 kHz, but offline fixtures and reduced-rate
+    analysis must remain valid.  If the sample rate cannot represent the intended
+    120 Hz lower edge, there is no meaningful wall band and silence is safer than an
+    invalid or aliased filter.
+    """
+    nyquist=.5*float(sr)
+    high=min(9000.0,nyquist*.95)
+    low=120.0
+    if high<=low:
+        return np.zeros_like(x,dtype="float32")
+    sos=signal.butter(2,[low,high],btype="bandpass",fs=sr,output="sos")
+    return signal.sosfilt(sos,x).astype("float32")
+
 def wall_layer(x:np.ndarray,sr:int,density:np.ndarray)->np.ndarray:
     """Low-level decorrelated stereo layer. Original guitar remains the anchor."""
     if x.ndim>1:x=x.mean(1)
     l=np.r_[np.zeros(int(.009*sr),dtype="float32"),x][0:len(x)]
     r=np.r_[np.zeros(int(.014*sr),dtype="float32"),x][0:len(x)]
-    l=signal.sosfilt(signal.butter(2,[120,9000],btype="bandpass",fs=sr,output="sos"),l).astype("float32")
-    r=signal.sosfilt(signal.butter(2,[120,9000],btype="bandpass",fs=sr,output="sos"),r).astype("float32")
+    l=_wall_bandpass(l,sr)
+    r=_wall_bandpass(r,sr)
     d=np.asarray(density,dtype="float32")
     amount=np.clip((d-.48)*1.25,0,1)*10**(-16/20)
     return np.column_stack([l*amount,r*amount]).astype("float32")
