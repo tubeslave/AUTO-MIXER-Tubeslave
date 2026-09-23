@@ -16,8 +16,8 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
-from .contracts import EqBandLocator, LiveMode, MixFeatures, ProposedAction
-from .control_plane import LiveControlPlane, WriteExecution
+from .contracts import EqBandLocator, LiveMode, MixFeatures, ProposedAction, VerifiedAction
+from .control_plane import LiveControlPlane, RollbackExecution, WriteExecution
 from .decision_engine import LiveHypothesis, propose_one
 from .eq_locator import EqTargetEvidence, RealtimeEqLocatorSelector
 from .wing_adapter import WingWriteAdapter
@@ -226,6 +226,27 @@ class LiveSoundcheckService:
             raise RuntimeError("Live soundcheck is not running")
         return self._active_control_plane().execute(
             action,
+            self._request.mode,
+            manual_freeze=manual_freeze,
+        )
+
+    def rollback_action(
+        self,
+        verified: VerifiedAction,
+        *,
+        manual_freeze: bool = False,
+    ) -> RollbackExecution:
+        """Restore an action through the same physical WING/readback boundary.
+
+        The rollback value must have been captured by a prior reversible
+        ``execute_action`` result. The current active mode remains authoritative:
+        OBSERVE/PROPOSE/FREEZE cannot mutate the console, while write-capable
+        modes may restore the captured pre-write state.
+        """
+        if self._request is None:
+            raise RuntimeError("Live soundcheck is not running")
+        return self._active_control_plane().rollback(
+            verified,
             self._request.mode,
             manual_freeze=manual_freeze,
         )
