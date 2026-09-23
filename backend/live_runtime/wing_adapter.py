@@ -183,6 +183,38 @@ class WingWriteAdapter:
             raise TimeoutError(f"No fresh WING readback for {address}")
         return slot.value
 
+    def read_eq_locators(self, channel: int) -> list[EqBandLocator]:
+        """Read fresh frequency/Q fingerprints for all four channel PEQ bands.
+
+        This is a read-only migration primitive for the realtime EQ locator
+        selector.  It deliberately does not consult ``WingClient.state`` and it
+        does not read or change gain, so choosing a candidate band cannot mutate
+        the console or accidentally validate an optimistic local cache value.
+        """
+        if isinstance(channel, bool) or not isinstance(channel, int):
+            raise TypeError("WING channel must be an integer")
+        if not 1 <= channel <= 40:
+            raise ValueError(f"WING channel out of range: {channel}")
+
+        locators: list[EqBandLocator] = []
+        for band in range(1, 5):
+            frequency = self._numeric(
+                self._query_address(f"/ch/{channel}/eq/{band}f"),
+                label="WING EQ frequency readback",
+            )
+            q = self._numeric(
+                self._query_address(f"/ch/{channel}/eq/{band}q"),
+                label="WING EQ Q readback",
+            )
+            if not self.EQ_FREQ_MIN_HZ <= frequency <= self.EQ_FREQ_MAX_HZ:
+                raise ValueError(
+                    f"WING EQ frequency outside range on band {band}: {frequency}"
+                )
+            if not self.EQ_Q_MIN <= q <= self.EQ_Q_MAX:
+                raise ValueError(f"WING EQ Q outside range on band {band}: {q}")
+            locators.append(EqBandLocator(band=band, frequency_hz=frequency, q=q))
+        return locators
+
     def _assert_eq_locator_matches(self, action: ProposedAction) -> None:
         """Require the physical band's current F/Q to match the proposed locator."""
         if action.parameter not in _EQ_GAIN_PARAMETERS:
