@@ -24,75 +24,75 @@ Inputs:
 
 Responsibilities:
 - enumerate/open audio device;
-- stable channel map;
-- ring buffers;
-- per-channel meters, LUFS/RMS/peak/crest;
-- spectrum, masking, feedback candidates;
-- correlation/phase;
-- transient/dynamics features;
-- group/main features;
-- optional short audition capture for higher-level analysis.
+- stable channel map and ring buffers;
+- per-channel meters, LUFS/RMS/peak/crest and spectrum;
+- masking, feedback, correlation/phase, transient/dynamics features;
+- group/main features and optional short audition capture.
 
 ### Control plane
-- WING state readback first;
+- WING state readback;
 - OSC/native protocol adapter;
-- proposal -> safety -> write -> readback -> verify;
-- rollback snapshot;
-- rate limiting, hysteresis, confidence and max-step limits;
-- manual-touch freeze: operator action wins.
+- proposal -> write -> readback -> verify;
+- rollback snapshot and audit log;
+- production modes add rate limiting, confidence, max-step limits and manual-touch priority.
 
-Dante network subscriptions are a separate adapter. WING internal MOD/USB routing is not the same thing as Dante network subscription routing.
+## Operating modes
+
+OBSERVE: audio + console read only.
+PROPOSE: produce actions, never write.
+BENCH_TEST: explicit development/test mode. Normal production write restrictions are bypassed so EQ, dynamics, faders, buses, routing and other WING decisions can be observed directly on the console. Every write is still logged and read back so the test is inspectable.
+SUPERVISED: operator-approved bounded write batches.
+AUTO_SAFE: allowlisted reversible low-risk autonomous writes.
+EMERGENCY: deterministic feedback/clip protection.
+FREEZE: no writes.
+
+Mode is never inferred merely from the presence of a console.
+
+### User mode contract
+
+When the operator explicitly says this is a TEST / development session, BENCH_TEST may be selected and broad WING writes are expected.
+
+When the operator explicitly says "we are doing a soundcheck", "soundcheck mode", "we are running the concert/show", or equivalent, production protections are enabled. BENCH_TEST must not carry across into a soundcheck or concert.
+
+Default after a fresh connection or uncertain context: OBSERVE.
 
 ## Live Directors
 
-1. Input/Preamp Director: clipping/headroom; conservative trim only when explicitly enabled.
-2. Phase Director: polarity/correlation proposals; no blind delay writes.
-3. Channel EQ Director: HPF/PEQ, resonance/harshness, bounded dynamic corrections.
-4. Dynamics Director: compression/gate/expander proposals appropriate to live sources.
-5. Feedback Director: fast narrow-band detection; emergency path has deterministic local rules.
-6. Balance Director: faders/VCAs/DCAs and vocal-anchor relationship.
-7. Group Director: drums/music/vocals/subgroups, buses, DCAs, mute groups.
-8. Masking Director: kick/bass, vocal/music, snare/guitar relationships.
-9. Space/FX Director: sends/returns and section-aware FX within safe bounds.
-10. Main Director: whole-mix spectrum, crest, loudness trend and stereo image. Prefer source/group fixes before Main EQ.
-11. Monitor Director: separate policy; never reuse FOH targets blindly.
-12. Show/Scene Director: snapshots/snippets, song/section context and recall boundaries.
+1. Input/Preamp Director.
+2. Phase Director.
+3. Channel EQ Director.
+4. Dynamics Director.
+5. Feedback Director.
+6. Balance Director.
+7. Group Director.
+8. Masking Director.
+9. Space/FX Director.
+10. Main Director.
+11. Monitor Director.
+12. Show/Scene Director.
 
 ## GPT / voice commands
 
-GPT is the supervisory interface, not the realtime DSP loop.
+GPT is supervisory, not the realtime DSP loop. Commands compile into explicit local actions; free-form LLM text is never sent directly to OSC.
 
 Examples:
-- "start soundcheck"
+- "test mode" -> BENCH_TEST
+- "start soundcheck" -> leave BENCH_TEST and enter production soundcheck policy
+- "concert mode" -> leave BENCH_TEST and enter production show policy
 - "analyze drums only"
 - "freeze vocal 1"
-- "make the lead vocal slightly more forward"
 - "show proposed EQ changes"
-- "apply only high-confidence changes"
 - "undo last pass"
 - "stop all writes"
-
-Commands compile into explicit local actions. No free-form LLM output is sent directly to OSC.
 
 ## Audio routing
 
 ### USB MVP
-WING 48x48 USB -> local Live Bridge -> feature engine. This is the first implementation target because it avoids Dante network-control dependencies.
+WING 48x48 USB -> local Live Bridge -> feature engine.
 
 ### Dante
-WING AoIP-Dante 64x64 -> Dante network -> host receiver (DVS/interface) -> Live Bridge.
-Dante subscriptions are configured through a dedicated Dante routing layer. If Dante Managed API/DDM is unavailable, routing remains a verified preset/manual operation rather than GUI automation during a show.
-
-## Safety states
-
-OBSERVE: audio + console read only.
-PROPOSE: produce actions, never write.
-SUPERVISED: user approves batches; bounded writes enabled.
-AUTO_SAFE: only allowlisted reversible low-risk writes.
-EMERGENCY: deterministic feedback/clip protection only.
-FREEZE: no writes.
-
-Default at startup: OBSERVE.
+WING AoIP-Dante 64x64 -> Dante network -> host receiver -> Live Bridge.
+Dante network subscriptions are a separate routing adapter from WING internal routing.
 
 ## First MVP
 
@@ -102,7 +102,7 @@ Default at startup: OBSERVE.
 - 20 Hz feature stream.
 - channel/group/main analysis.
 - Proposal API.
-- safety governor.
+- BENCH_TEST for visible engineering tests.
+- production safety governor.
 - OSC write/readback/rollback.
 - soundcheck FSM: DISCOVER -> PATCH_VERIFY -> LISTEN -> PROPOSE -> APPLY -> VERIFY -> HOLD.
-- no routing writes until expected patch map is verified.
