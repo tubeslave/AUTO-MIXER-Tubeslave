@@ -21,6 +21,12 @@ def test_analyzer_loudness_evidence_is_explicit():
  assert a["integrated_lufs_method"]=="pyloudnorm"
  assert np.isfinite(a["integrated_lufs"])
 
+def test_side_mid_evidence_is_invariant_to_linear_gain():
+ x=tone()
+ before=analyze(x,48000)
+ after=analyze(x*np.float32(10**(12/20)),48000)
+ assert abs(after["side_mid_db"]-before["side_mid_db"]) < 1e-6
+
 def test_pipeline_finite_and_same_shape():
  x=tone();y,r=MasteringDirector().render(x,48000)
  assert y.shape==x.shape and np.isfinite(y).all()
