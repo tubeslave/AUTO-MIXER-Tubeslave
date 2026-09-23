@@ -53,6 +53,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-23-0900 | [Report](ML-2026-09-23-0900.md), [JSON patch](ML-2026-09-23-0900.json) | Search: 2 fresh full-text sources, 2 implementation/artifact audits, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued guitar/rock videos, 4 unrun experiments; unchanged-note, mono, boundary, seed, metric and reproducibility limits recorded |
 | ML-2026-09-23-1200 | [Report](ML-2026-09-23-1200.md), [JSON patch](ML-2026-09-23-1200.json) | Deep review: SpanSynth inference/default parity, mono/boundary/gain contract, Fine40 aliases and reproducibility; 1 source and 2 audits updated, 12 Knowledge Cards, 8 candidate rules, 4 unrun experiments; 34 queued videos retained |
 | ML-2026-09-23-1500 | [Report](ML-2026-09-23-1500.md), [JSON patch](ML-2026-09-23-1500.json) | Search: 2 fresh full-text preprints, 1 demo-artifact audit, 10 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued drum videos, 4 unrun experiments; guide-dependency, metric-circularity, binaural-stage and reproducibility limits recorded |
+| ML-2026-09-23-1800 | [Report](ML-2026-09-23-1800.md), [JSON patch](ML-2026-09-23-1800.json) | Deep review: SRF-SVB checked against full NSVB primary paper and pinned implementation; 1 source and 1 artifact updated, 1 source and 1 implementation audit added, 12 Knowledge Cards, 8 candidate rules, 36 carried queued videos and 4 unrun experiments; shared-benchmark, validation/test, guide, seed and deployment limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -89,6 +90,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-23-1800 (`deep_review`, preceding search `ML-2026-09-23-1500`): treat SRF-SVB and NSVB as one guide-conditioned PopBuTFy evidence family, not independent proof. Reject validation=test protocols, hidden guide dependence and unmanifested preprocessing randomness. Compare latent mapping and correction engine as separate factors; protect lyrics, identity, formants, consonants, timing and peaks. Next test: `EXP-ML-20260923-1800-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-23-1500 (`search`, preceding successful search `ML-2026-09-23-0900`): treat SRF-SVB as professional-guide-conditioned resynthesis, not automatic tuning; evaluate identity and pronunciation independently of CAM++ SECS. Treat GeoAtt as magnitude-only evidence and require explicit phase/ITD, localization, mono and peak gates before binaural use. Next test: `EXP-ML-20260923-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
