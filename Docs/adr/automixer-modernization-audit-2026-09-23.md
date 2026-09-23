@@ -145,7 +145,9 @@ Replacement tests added:
 - handler start/stop/status through the service;
 - BENCH_TEST and production-mode mapping remain covered.
 
-CI evidence for this pass is tracked on the PR head workflow; update this section from pending to passed/failed after the matrix completes.
+CI evidence:
+- focused `Stem Offline Test` run on commit `fbe616f327056523264de8f87373f2de9cea7de3` passed, including `tests/test_live_decision_engine.py`, `tests/test_live_runtime_service.py` and `tests/test_soundcheck_handlers.py`;
+- the full Python 3.10/3.11/3.12 `Tests` matrix for the same code commit was still running when this audit entry was written.
 
 ## Next cleanup target
 - remove the direct AutoSoundcheckEngine import/type dependency from backend/server.py;
