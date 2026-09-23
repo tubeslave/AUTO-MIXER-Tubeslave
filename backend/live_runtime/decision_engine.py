@@ -42,11 +42,13 @@ def propose_one(features:MixFeatures,roles:dict[int,str],
                 "vocal_intelligibility",.03))
 
     # Headroom: source/group correction is preferred; main cut is a last safety move.
+    # This is explicitly a *delta*, not an absolute fader position. The live
+    # control plane resolves it against a fresh WING readback before writing.
     if features.main_peak_dbfs>-2.0:
         conf=min(.99,.82+(features.main_peak_dbfs+2)*.04)
         candidates.append(LiveHypothesis(
             "main_headroom_protection","main:1","Main peak headroom is below live corridor.",
-            conf,ProposedAction("main:1","fader_db",-0.5,"restore main headroom",conf,max_step=.5,risk="low"),
+            conf,ProposedAction("main:1","fader_delta_db",-0.5,"restore main headroom",conf,max_step=.5,risk="low"),
             "main_peak_dbfs",.25))
 
     # Harsh source correction. Do not touch inactive channels.
