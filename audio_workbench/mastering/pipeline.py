@@ -56,12 +56,13 @@ class MasteringDirector:
             safety_event={"module":"true_peak_safety", "mode":"linked_static_attenuation",
                           "input_true_peak_dbtp":pre_safety_peak,
                           "attenuation_db":attenuation_db, "adds_gain":False}
-            events.append(safety_event)
         after=analyze(y,sr,include_true_peak=True,include_loudness=True)
         regression={"crest_change_db":after["crest_db"]-before["crest_db"],
           "side_mid_change_db":after["side_mid_db"]-before["side_mid_db"],
           "correlation_change":after["correlation"]-before["correlation"]}
         maximizer_event=next((e for e in events if e.get("module")=="maximizer"),None)
+        if maximizer_event is not None:
+            maximizer_event["true_peak_safety"]=safety_event
         budget={"maximizer":maximizer_event,"true_peak_safety":safety_event}
         safety=evaluate(before,after,MasteringSafetyPolicy(
           true_peak_ceiling_dbtp=self.config.ceiling_db,
