@@ -1,9 +1,9 @@
 """Live soundcheck message handlers.
 
-The websocket/UI layer no longer constructs the legacy AutoSoundcheckEngine
-directly.  Engine construction is routed through ``live_runtime`` so legacy
-plumbing can be migrated without leaving two decision authorities in the
-composition root.
+The websocket/UI layer does not construct, start, stop or inspect the legacy
+AutoSoundcheckEngine directly. Engine lifecycle is routed through
+``live_runtime`` so the old engine can be decomposed without leaving parallel
+decision authorities in the composition root.
 """
 
 import asyncio
@@ -16,10 +16,15 @@ logger = logging.getLogger(__name__)
 
 
 def register_handlers(server):
+    def _service():
+        service = getattr(server, "_live_soundcheck_service", None)
+        if service is None:
+            service = LiveSoundcheckService()
+            server._live_soundcheck_service = service
+        return service
+
     def _engine_is_active():
-        engine = server.auto_soundcheck_engine
-        state = getattr(getattr(engine, "state", None), "value", None)
-        return bool(engine and state not in ("stopped", "error"))
+        return bool(_service().is_active())
 
     def _channel_selection(data):
         raw_channels = data.get("channels", [])
@@ -60,7 +65,7 @@ def register_handlers(server):
             return mode
 
         # Backward compatibility for old clients that explicitly sent
-        # observe_only.  Missing mode/flag is deliberately read-only.
+        # observe_only. Missing mode/flag is deliberately read-only.
         if data.get("observe_only") is False:
             return LiveMode.SUPERVISED
         return LiveMode.OBSERVE
@@ -87,6 +92,7 @@ def register_handlers(server):
         future.add_done_callback(_log_failure)
 
     async def _start_engine(websocket, data, *, soundcheck_events: bool):
+        service = _service()
         if _engine_is_active():
             await server.send_to_client(websocket, {
                 "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
@@ -170,11 +176,6 @@ def register_handlers(server):
             }
             _schedule(loop, server.send_to_client(websocket, payload), "live soundcheck observation send")
 
-        service = getattr(server, "_live_soundcheck_service", None)
-        if service is None:
-            service = LiveSoundcheckService()
-            server._live_soundcheck_service = service
-
         request = LiveStartRequest(
             mixer_type=mixer_type,
             mixer_ip=mixer_ip,
@@ -184,16 +185,28 @@ def register_handlers(server):
             selected_channels=selected_channels,
             mode=mode,
         )
-        engine = service.create_engine(
-            request,
-            on_state_change=on_state,
-            on_channel_update=on_channel,
-            on_observation=on_observation,
-        )
+        try:
+            engine = service.start(
+                request,
+                on_state_change=on_state,
+                on_channel_update=on_channel,
+                on_observation=on_observation,
+            )
+        except RuntimeError as exc:
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": service.is_active(),
+                "running": service.is_active(),
+                "error": str(exc),
+            })
+            return
+
+        # Temporary compatibility alias for legacy server cleanup/sync code.
+        # New live handlers never use this alias for lifecycle decisions.
         server.auto_soundcheck_engine = engine
         server.auto_soundcheck_running = True
         server.auto_soundcheck_observe_only = observe_only
-        engine.start_async()
 
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
@@ -208,25 +221,28 @@ def register_handlers(server):
             "message": "live_runtime soundcheck service started",
         })
 
+    async def _stop_engine(websocket, *, soundcheck_events: bool):
+        _service().stop()
+        server.auto_soundcheck_engine = None
+        server.auto_soundcheck_running = False
+        server.auto_soundcheck_observe_only = False
+        await server.send_to_client(websocket, {
+            "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+            "status": "stopped",
+            "is_running": False,
+            "running": False,
+            "observe_only": False,
+            "message": "Live soundcheck stopped",
+        })
+
     async def handle_start_auto_soundcheck(websocket, data):
         await _start_engine(websocket, data, soundcheck_events=True)
 
     async def handle_stop_auto_soundcheck(websocket, data):
-        if server.auto_soundcheck_engine:
-            server.auto_soundcheck_engine.stop()
-            server.auto_soundcheck_engine = None
-        server.auto_soundcheck_running = False
-        server.auto_soundcheck_observe_only = False
-        await server.send_to_client(websocket, {
-            "type": "auto_soundcheck_status",
-            "is_running": False,
-            "running": False,
-            "observe_only": False,
-            "message": "Live soundcheck stopped"
-        })
+        await _stop_engine(websocket, soundcheck_events=True)
 
     async def handle_get_auto_soundcheck_status(websocket, data):
-        engine_status = server.auto_soundcheck_engine.get_status() if server.auto_soundcheck_engine else {}
+        engine_status = _service().get_status()
         await server.send_to_client(websocket, {
             "type": "auto_soundcheck_status",
             "is_running": server.auto_soundcheck_running,
@@ -244,28 +260,15 @@ def register_handlers(server):
         await _start_engine(websocket, data, soundcheck_events=False)
 
     async def handle_stop_auto_engine(websocket, data):
-        if server.auto_soundcheck_engine:
-            server.auto_soundcheck_engine.stop()
-            server.auto_soundcheck_engine = None
-        server.auto_soundcheck_running = False
-        server.auto_soundcheck_observe_only = False
-        await server.send_to_client(websocket, {
-            "type": "auto_engine_status",
-            "status": "stopped",
-            "is_running": False,
-            "running": False,
-        })
+        await _stop_engine(websocket, soundcheck_events=False)
 
     async def handle_get_auto_engine_status(websocket, data):
-        if server.auto_soundcheck_engine:
-            status = server.auto_soundcheck_engine.get_status()
-        else:
-            status = {"state": "idle", "mixer_connected": False, "audio_running": False}
+        status = _service().get_status()
         await server.send_to_client(websocket, {
             "type": "auto_engine_status",
             "is_running": server.auto_soundcheck_running,
             "running": server.auto_soundcheck_running,
-            **status
+            **status,
         })
 
     return {
