@@ -1,2 +1,9 @@
 from .pipeline import MasteringDirector, MasteringConfig
-__all__=["MasteringDirector","MasteringConfig"]
+from .target_controller import MasteringTargetController, MasteringTargetSearchConfig
+
+__all__=[
+    "MasteringDirector",
+    "MasteringConfig",
+    "MasteringTargetController",
+    "MasteringTargetSearchConfig",
+]

@@ -15,6 +15,7 @@ class MasteringConfig:
     clarity_strength: float=.18
     clip_drive_db: float=.8
     maximizer_drive_db: float=2.0
+    pregain_db: float=0.0
     ceiling_db: float=-1.0
     target_lufs: float|None=None
     loudness_tolerance_lu: float=.5
@@ -24,7 +25,13 @@ class MasteringConfig:
 class MasteringDirector:
     def __init__(self,config:MasteringConfig|None=None): self.config=config or MasteringConfig()
     def render(self,x:np.ndarray,sr:int):
-        y=np.asarray(x,dtype=np.float32); before=analyze(y,sr,include_true_peak=True,include_loudness=True);events=[]
+        source=np.asarray(x,dtype=np.float32)
+        y=source.copy()
+        before=analyze(source,sr,include_true_peak=True,include_loudness=True);events=[]
+        if abs(float(self.config.pregain_db))>1e-12:
+            gain=np.float32(10**(float(self.config.pregain_db)/20.0))
+            y=(y*gain).astype(np.float32,copy=False)
+            events.append({"module":"pregain","gain_db":float(self.config.pregain_db),"linear_gain":float(gain)})
         if self.config.stabilizer:
             y,s=stabilizer.process(y,sr,before);events.append({"module":"stabilizer",**s})
         if self.config.clarity:
