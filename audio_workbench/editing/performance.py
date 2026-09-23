@@ -17,10 +17,21 @@ def event_levels(x:np.ndarray,sr:int,lo:float,hi:float,percentile:float=97,
         levels.append(20*np.log10(np.sqrt(np.mean(x[a:b].astype("float64")**2)+1e-20)))
     return {"peaks":peaks,"levels_db":np.asarray(levels)}
 
-def robust_outliers(levels_db:np.ndarray,z_min:float=2.8)->np.ndarray:
-    if len(levels_db)<8:return np.zeros(len(levels_db),dtype=bool)
-    med=np.median(levels_db);mad=np.median(np.abs(levels_db-med))+1e-9
-    z=.6745*(levels_db-med)/mad
+def robust_outliers(levels_db:np.ndarray,z_min:float=2.8,
+                    min_events:int=6,min_scale_db:float=.25)->np.ndarray:
+    """Flag only strong local level outliers while preserving short musical phrases.
+
+    Six detected events are enough to identify an extreme defect, but passages shorter
+    than that remain diagnose-only.  The robust-scale floor avoids treating tiny
+    sub-dB performance variation as an outlier when MAD is close to zero.
+    """
+    levels=np.asarray(levels_db,dtype="float64")
+    if len(levels)<min_events:
+        return np.zeros(len(levels),dtype=bool)
+    med=float(np.median(levels))
+    mad=float(np.median(np.abs(levels-med)))
+    scale=max(mad,float(min_scale_db),1e-9)
+    z=.6745*(levels-med)/scale
     return np.abs(z)>=z_min
 
 def bounded_event_gain(level_db:float,median_db:float,max_move_db:float=2.0)->float:
