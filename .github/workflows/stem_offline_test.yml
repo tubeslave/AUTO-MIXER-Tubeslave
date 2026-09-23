@@ -38,6 +38,9 @@ jobs:
       - name: Run stem training loop tests
         run: pytest -q tests/test_stem_training_loop.py
 
+      - name: Run live decision engine tests
+        run: pytest -q tests/test_live_decision_engine.py
+
       - name: Run offline stem training loop
         run: |
           python -m mix_agent.stem_training_loop \
