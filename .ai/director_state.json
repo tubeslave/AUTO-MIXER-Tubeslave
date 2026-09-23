@@ -3,7 +3,7 @@
   "active": {
     "id": "cleanup-model-validation",
     "title": "Validate model-based source cleanup",
-    "objective": "Finish the checkpointed full-song pretrained cleanup experiment and accept/reject processing per source from RAW/CLEAN/REMOVED evidence."
+    "objective": "Human-listen RAW/CLEAN/REMOVED for all 11 Ptitsa model-cleaned sources and accept, weaken or reject processing per source before making cleanup the studio baseline."
   },
   "parallel_progress": {
     "live-soundcheck-v2": [
@@ -15,38 +15,51 @@
       "Perceptual Critic now has an explicit one-hypothesis candidate acceptance gate",
       "Target-direction and collateral-regression tests added; focused perceptual tests passed 6/6",
       "Artifact Critic was revised to be Nyquist-safe and to use a click-rate-specific regression tolerance",
-      "Full CI subsequently reached a separate editing-performance regression instead of the former Artifact Critic failure"
+      "Full CI subsequently progressed through later studio regressions instead of the former Artifact Critic failure"
     ],
     "studio-editing-small-sample": [
       "Full Tests run 35837914007 failed identically on Python 3.10/3.11/3.12 because robust_outliers disabled all passages shorter than eight events",
       "Short-passage policy revised: six events can expose an extreme level defect; fewer than six remain diagnose-only",
       "A 0.25 dB robust-scale floor prevents tiny low-variance performance differences from becoming false outliers",
       "Regression coverage added for an obvious six-event defect, a stable six-event phrase, and a five-event diagnose-only phrase",
-      "Code/test commits 6857abc97c6a8bc250df39d9c4293771f3ce9aca and 9589529c27a799b3c5f6a57e5704a6d83c0113ef",
-      "Tests run 35840719646 progressed to a separate click_candidate regression: 295 passed, 1 skipped before failure on Python 3.11"
+      "Code/test commits 6857abc97c6a8bc250df39d9c4293771f3ce9aca and 9589529c27a799b3c5f6a57e5704a6d83c0113ef"
+    ],
+    "studio-editing-click-candidate": [
+      "The synthetic one-sample click creates two adjacent derivative spikes; the old detector compared each spike against the other and suppressed both",
+      "click_candidates now clusters adjacent supra-threshold derivative samples, compares the cluster against activity outside it and rejects broad transient runs",
+      "Regression tests cover impulse, step discontinuity, broad ramp and smooth periodic signal",
+      "Fix commit 569c856350b7f8f7e0368e6a30a57b13851f3716",
+      "Tests run 35852601258 progressed past click_candidate to a later guitar-director failure after 344 passed and 1 skipped on Python 3.11"
+    ],
+    "studio-guitar-wall-nyquist": [
+      "Tests run 35852601258 exposed a separate wall_layer failure: a fixed 9 kHz band edge exceeded Nyquist in the 1 kHz reduced-rate fixture",
+      "The wall-layer filter now caps its upper edge below Nyquist and fails closed to silence when the intended band cannot exist",
+      "The fixture now contains an in-band guitar-like sine instead of DC, so it actually tests dense-section wall energy",
+      "Fix commit 7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb; current-head CI verification pending"
     ],
     "studio-cleanup-checkpointing": [
       "Original sequential Ptitsa cleanup run 35828150231 reached the 180-minute workflow timeout and was cancelled before render/upload",
       "Cleanup workflow refactored into 11 per-stem matrix jobs with max-parallel 6",
-      "Each completed stem now uploads a durable checkpoint: cleaned WAV, RAW/CLEAN/REMOVED MP3 previews and JSON residual metrics",
-      "Final full-mix render consumes the completed per-stem checkpoints instead of depending on one uninterrupted sequential job",
-      "Refactor commit 705b6f92c1bf202657e115ee330afcefd7fbddcb; replacement run 35846566268 started successfully"
+      "Each completed stem uploads a durable checkpoint: cleaned WAV, RAW/CLEAN/REMOVED MP3 previews and JSON residual metrics",
+      "Replacement run 35846566268 completed all 11 per-stem jobs successfully and completed the final full-mix render",
+      "Final artifact ptitsa-full-model-cleanup-mix id 10746216442 contains Ptitsa_ModelClean_FullMix_50pct.wav, 320 kbps MP3 and validation previews",
+      "Objective residual screen: NIKITA_VOX removed/raw = -6.62 dB and VALERA_VOX = -7.62 dB, while the non-vocal cleaned sources range from about -29.38 dB to -52.49 dB removed/raw; vocals therefore require especially careful human A/B before acceptance"
     ]
   },
   "blockers": [
     {
       "goal": "cleanup-model-validation",
-      "status": "checkpointed_parallel_compute_in_progress",
+      "status": "human_listening_required",
       "workflow_run": 35846566268,
-      "step": "Per-stem cleanup matrix",
-      "note": "Six jobs can run concurrently; acceptance waits for per-stem RAW/CLEAN/REMOVED evidence."
+      "step": "Per-source RAW/CLEAN/REMOVED acceptance",
+      "note": "All 11 checkpoints and the final cleaned mix are rendered and durable. Objective metrics do not authorize subjective acceptance; vocal cleanup is much stronger than the other sources and must be listened to before becoming baseline."
     },
     {
-      "goal": "studio-editing-small-sample",
-      "status": "ci_regression_found",
-      "workflow_run": 35840719646,
-      "step": "tests/test_editing_performance.py::test_click_candidate",
-      "note": "click_candidates returned no candidate for the synthetic impulse fixture; not revised in the cleanup-checkpointing task."
+      "goal": "studio-ci",
+      "status": "ci_verification_in_progress",
+      "commit": "7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb",
+      "step": "Full Tests matrix",
+      "note": "The click-candidate regression is cleared by evidence from run 35852601258; the newly exposed guitar wall-layer Nyquist regression has been revised and awaits current-head CI."
     }
   ],
   "history": [
@@ -59,6 +72,9 @@
     {"event":"ci_failure_analyzed","goal":"studio-editing-small-sample","workflow_run":35837914007,"result":"editing_policy_regression","note":"All three Python jobs stopped at test_editing_performance: a clearly defective sixth event was suppressed solely by the hard len<8 guard."},
     {"event":"ci_revision_applied","goal":"studio-editing-small-sample","commits":["6857abc97c6a8bc250df39d9c4293771f3ce9aca","9589529c27a799b3c5f6a57e5704a6d83c0113ef"],"workflow_run":35840719646,"result":"next_regression_found","note":"Lowered the evidence floor to six events and added regression coverage; subsequent CI reached test_click_candidate after 295 passing tests on Python 3.11."},
     {"event":"cleanup_timeout_confirmed","goal":"cleanup-model-validation","workflow_run":35828150231,"result":"cancelled_timeout","note":"The sequential CPU cleanup hit the workflow 180-minute limit. Final render, MP3 encoding and artifact upload were skipped, so no usable checkpoint survived."},
-    {"event":"cleanup_workflow_revised","goal":"cleanup-model-validation","commit":"705b6f92c1bf202657e115ee330afcefd7fbddcb","workflow_run":35846566268,"result":"in_progress","note":"Split 11 model-cleaned sources into independent matrix jobs (max-parallel 6), each producing cleaned WAV plus RAW/CLEAN/REMOVED previews and residual metrics before final mix assembly."}
+    {"event":"cleanup_workflow_revised","goal":"cleanup-model-validation","commit":"705b6f92c1bf202657e115ee330afcefd7fbddcb","workflow_run":35846566268,"result":"success","note":"Split 11 model-cleaned sources into independent matrix jobs; every source checkpoint and the final full cleaned mix completed successfully."},
+    {"event":"cleanup_objective_screen","goal":"cleanup-model-validation","workflow_run":35846566268,"artifact_id":10746216442,"result":"awaiting_human_listening","note":"All RAW/CLEAN/REMOVED previews are available. Vocal removed/raw RMS is much stronger (-6.62/-7.62 dB) than non-vocal sources (about -29.38 to -52.49 dB), so vocals are explicitly high-risk for over-cleaning until listened to."},
+    {"event":"ci_revision_applied","goal":"studio-editing-click-candidate","commit":"569c856350b7f8f7e0368e6a30a57b13851f3716","workflow_run":35852601258,"result":"cleared_previous_regression","note":"Clustered adjacent derivative spikes and added impulse/step/ramp/sine guards; CI progressed past click_candidate and stopped later at guitar wall_layer after 344 passes on Python 3.11."},
+    {"event":"ci_revision_applied","goal":"studio-guitar-wall-nyquist","commit":"7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb","result":"verification_pending","note":"Made the wall-layer filter Nyquist-safe, fail-closed when the intended band cannot exist, and corrected the reduced-rate fixture to contain in-band content."}
   ]
 }
