@@ -167,20 +167,30 @@ Collapse stale READMEs/test reports/start scripts/config duplicates; rewrite top
 
 R1 is active: legacy `auto_*` decision modules are frozen for feature work.
 
-R2/R3 are active for the WING fader path:
+R2/R3 are active for the WING control path:
 - `backend/live_runtime/control_plane.py` is the canonical authorization/write/readback/verification boundary;
 - `backend/live_runtime/wing_adapter.py` adapts the existing WING OSC transport and requires fresh inbound readback rather than trusting the optimistic `WingClient.state` cache;
 - `backend/live_runtime/service.py` composes that control plane for an active WING session and owns the control audit trail;
 - the temporary `AutoSoundcheckEngine` remains only as an ADAPT bridge for discovery/audio/mixer connection plumbing while its heuristic policy is retired;
-- channel and Main faders are now migrated transport surfaces; unsupported parameter families still fail closed;
+- channel and Main faders are migrated transport surfaces;
 - relative fader proposals use `fader_delta_db`, are resolved against fresh console state inside `LiveControlPlane`, and cannot exceed their own declared `max_step` even in BENCH_TEST;
-- the new `main_headroom_protection` hypothesis now requests a relative `-0.5 dB` move rather than the unsafe ambiguous absolute value `-0.5 dB`.
+- the new `main_headroom_protection` hypothesis requests a relative `-0.5 dB` move rather than the unsafe ambiguous absolute value `-0.5 dB`.
 
-Automated replacement evidence covers callback-driven channel/Main readback, BENCH_TEST/OBSERVE control behavior, relative move resolution, max-step rejection, and the Director -> control-plane -> WING-adapter Main headroom path. Physical WING HIL evidence is still required before legacy AutoFader/MasterFader write authority can be severed or archived.
+R3 has now started for channel PEQ gain as a second transport/control family:
+- `EqBandLocator` carries the exact WING band plus expected frequency/Q fingerprint;
+- musical EQ reductions use `eq_gain_delta_db`, not ambiguous absolute `eq_gain_db` semantics;
+- `LiveControlPlane` resolves the delta against fresh current band gain and applies the proposal's own `max_step` in every write-capable mode, including BENCH_TEST;
+- `WingWriteAdapter` accepts channel bands 1..4 only, re-queries physical frequency/Q before mutation, writes the resolved gain, then requires fresh post-write gain readback;
+- masking/harshness hypotheses do not emit a hardware-actionable EQ move when no explicit locator has been provided by the realtime state/evidence layer;
+- the protocol/address primitive comes from KEEP_CORE `wing_addresses.py`; no legacy `auto_eq.py` decision code was imported into the new authority.
 
-Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacement.
+Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, WING frequency/Q fingerprint checks, and post-write verification. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write authority can be severed or archived.
 
-No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
+Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
+
+No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
+
+See also `Docs/adr/live-channel-eq-cutover-v1.md` for the channel-EQ migration contract and HIL gate.
 
 ## Non-negotiable migration rule
 
