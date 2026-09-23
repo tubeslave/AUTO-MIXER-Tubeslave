@@ -37,6 +37,21 @@ def integrated_lufs(x: np.ndarray, sr: int) -> tuple[float|None,str]:
     except Exception:
         return None,"unavailable"
 
+def _side_mid_db(x: np.ndarray) -> float:
+    """Return a gain-invariant side/mid energy ratio with a relative floor.
+
+    Using an absolute epsilon in numerator and denominator makes an exactly centered
+    stereo signal appear to narrow whenever its gain rises. The floor must scale with
+    signal power so linear pregain cannot masquerade as a stereo-width change.
+    """
+    mid=(x[:,0]+x[:,1])*.5
+    side=(x[:,0]-x[:,1])*.5
+    mid_power=float(np.mean(mid.astype(np.float64)**2))
+    side_power=float(np.mean(side.astype(np.float64)**2))
+    reference=max(mid_power,side_power,1e-30)
+    floor=reference*1e-12
+    return float(10*np.log10((side_power+floor)/(mid_power+floor)))
+
 def analyze(x: np.ndarray, sr: int, *, include_true_peak: bool=False, include_loudness: bool=False) -> dict:
     x=np.asarray(x,dtype=np.float32)
     if x.ndim==1:x=np.column_stack([x,x])
@@ -46,10 +61,9 @@ def analyze(x: np.ndarray, sr: int, *, include_true_peak: bool=False, include_lo
     bands={}
     for k,(lo,hi) in BANDS.items():
         m=(f>=lo)&(f<hi); bands[k]=float(10*np.log10(_trapezoid(p[m],f[m])+1e-20))
-    mid=(x[:,0]+x[:,1])*.5;side=(x[:,0]-x[:,1])*.5
     result={"rms_dbfs":float(20*np.log10(rms)),"sample_peak_dbfs":float(20*np.log10(peak)),
       "crest_db":float(20*np.log10(peak/rms)),"bands_db":bands,
-      "side_mid_db":float(10*np.log10((np.mean(side*side)+1e-20)/(np.mean(mid*mid)+1e-20))),
+      "side_mid_db":_side_mid_db(x),
       "correlation":float(np.corrcoef(x[:,0],x[:,1])[0,1])}
     if include_true_peak:
         result["true_peak_dbtp"]=true_peak_dbtp(x)
