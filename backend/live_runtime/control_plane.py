@@ -59,32 +59,41 @@ def _matches_expected(expected: Any, actual: Any, *, tolerance: float) -> bool:
     return expected == actual
 
 
+_RELATIVE_PARAMETERS = {
+    "fader_delta_db": "fader_db",
+    "eq_gain_delta_db": "eq_gain_db",
+}
+
+
 def _resolve_action(action: ProposedAction, before: Any) -> ProposedAction:
     """Resolve relative proposal semantics into a concrete mixer write.
 
-    Directors reason naturally in bounded deltas for slow live fader moves. The
-    hardware adapter, however, must receive an absolute fader value. Resolution
-    happens only after a fresh read, which prevents a proposal such as ``-0.5``
-    from accidentally becoming an absolute ``-0.5 dB`` fader position.
+    Directors reason naturally in bounded deltas for slow live moves. Hardware
+    adapters receive absolute values only. Resolution happens after a fresh
+    read, preventing a proposal such as ``-0.5`` from accidentally becoming an
+    absolute fader or EQ-gain position.
     """
 
-    if action.parameter != "fader_delta_db":
+    resolved_parameter = _RELATIVE_PARAMETERS.get(action.parameter)
+    if resolved_parameter is None:
         return action
     if isinstance(action.value, bool) or not isinstance(action.value, (int, float)):
-        raise TypeError("fader_delta_db value must be numeric")
+        raise TypeError(f"{action.parameter} value must be numeric")
     if isinstance(before, bool) or not isinstance(before, (int, float)):
-        raise TypeError("fader_delta_db requires numeric mixer readback")
+        raise TypeError(f"{action.parameter} requires numeric mixer readback")
+    if action.parameter == "eq_gain_delta_db" and action.eq_locator is None:
+        raise ValueError("eq_gain_delta_db requires an explicit EqBandLocator")
     delta = float(action.value)
     current = float(before)
     if not (math.isfinite(delta) and math.isfinite(current)):
-        raise ValueError("fader_delta_db and current fader value must be finite")
-    return replace(action, parameter="fader_db", value=current + delta)
+        raise ValueError(f"{action.parameter} and current value must be finite")
+    return replace(action, parameter=resolved_parameter, value=current + delta)
 
 
 def _bounded_relative_action(action: ProposedAction) -> tuple[bool, str]:
     """Enforce the proposal's own max-step contract for relative moves."""
 
-    if action.parameter != "fader_delta_db" or action.max_step is None:
+    if action.parameter not in _RELATIVE_PARAMETERS or action.max_step is None:
         return True, "within_step_bound"
     if isinstance(action.value, bool) or not isinstance(action.value, (int, float)):
         return False, "invalid_delta"
@@ -130,9 +139,9 @@ class LiveControlPlane:
         """Authorize, resolve, write, read back and verify one action.
 
         The current value is read before authorization so blocked proposals are
-        still auditable without mutating the console. Relative fader proposals
-        are resolved against that fresh value. A successful transport write is
-        *not* treated as success until readback matches the resolved target.
+        still auditable without mutating the console. Relative proposals are
+        resolved against that fresh value. A successful transport write is not
+        treated as success until readback matches the resolved target.
         """
 
         before = self._adapter.read_value(action)
