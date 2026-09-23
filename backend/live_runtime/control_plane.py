@@ -18,7 +18,7 @@ import math
 from typing import Any, Callable, Protocol
 
 from .contracts import LiveMode, ProposedAction, VerifiedAction
-from .safety_governor import authorize
+from .safety_governor import authorize, authorize_rollback
 
 
 class MixerWriteAdapter(Protocol):
@@ -38,6 +38,18 @@ class WriteExecution:
     """Result of one authorization/write/readback cycle."""
 
     verified: VerifiedAction
+    authorization_reason: str
+    wrote: bool
+
+
+@dataclass(frozen=True)
+class RollbackExecution:
+    """Result of restoring the pre-write value captured by a live execution."""
+
+    original: VerifiedAction
+    before_rollback: Any
+    readback: Any
+    restored: bool
     authorization_reason: str
     wrote: bool
 
@@ -100,6 +112,24 @@ def _bounded_relative_action(action: ProposedAction) -> tuple[bool, str]:
     if abs(float(action.value)) > abs(float(action.max_step)) + 1e-12:
         return False, "max_step_exceeded"
     return True, "within_step_bound"
+
+
+def _rollback_action(verified: VerifiedAction) -> ProposedAction:
+    """Build an absolute restoration write from a captured pre-write value."""
+
+    if verified.rollback_value is None:
+        raise ValueError("Verified action has no rollback value")
+    proposal = verified.proposal
+    parameter = _RELATIVE_PARAMETERS.get(proposal.parameter, proposal.parameter)
+    return replace(
+        proposal,
+        parameter=parameter,
+        value=verified.rollback_value,
+        reason=f"rollback: {proposal.reason}",
+        confidence=1.0,
+        max_step=None,
+        reversible=False,
+    )
 
 
 class LiveControlPlane:
@@ -196,6 +226,96 @@ class LiveControlPlane:
                 "before": before,
                 "readback": readback,
                 "accepted": accepted,
+                "rollback_value": verified.rollback_value,
             }
         )
         return WriteExecution(verified=verified, authorization_reason=reason, wrote=True)
+
+    def rollback(
+        self,
+        verified: VerifiedAction,
+        mode: LiveMode,
+        *,
+        manual_freeze: bool = False,
+    ) -> RollbackExecution:
+        """Restore a reversible execution to its captured pre-write value.
+
+        Rollback is a restoration primitive, not a fresh musical proposal. It is
+        therefore allowed in write-capable production modes even when the
+        original parameter would be blocked as a new AUTO_SAFE action. Explicit
+        OBSERVE/PROPOSE/FREEZE states and manual freeze still prohibit writes.
+
+        The rollback path is independently read-before/write/readback verified.
+        For PEQ this also reuses the original physical band fingerprint, so a
+        stale locator fails closed before mutation in the hardware adapter.
+        """
+
+        if verified.rollback_value is None:
+            self._audit(
+                {
+                    "event": "live_rollback_unavailable",
+                    "mode": mode.value,
+                    "reason": "not_reversible",
+                    "action": asdict(verified.proposal),
+                }
+            )
+            return RollbackExecution(
+                original=verified,
+                before_rollback=verified.readback,
+                readback=verified.readback,
+                restored=False,
+                authorization_reason="not_reversible",
+                wrote=False,
+            )
+
+        rollback_action = _rollback_action(verified)
+        before_rollback = self._adapter.read_value(rollback_action)
+        allowed, reason = authorize_rollback(mode, manual_freeze=manual_freeze)
+        if not allowed:
+            self._audit(
+                {
+                    "event": "live_rollback_blocked",
+                    "mode": mode.value,
+                    "reason": reason,
+                    "original_action": asdict(verified.proposal),
+                    "rollback_action": asdict(rollback_action),
+                    "before_rollback": before_rollback,
+                }
+            )
+            return RollbackExecution(
+                original=verified,
+                before_rollback=before_rollback,
+                readback=before_rollback,
+                restored=False,
+                authorization_reason=reason,
+                wrote=False,
+            )
+
+        self._adapter.write_value(rollback_action)
+        readback = self._adapter.read_value(rollback_action)
+        restored = _matches_expected(
+            verified.rollback_value,
+            readback,
+            tolerance=self._readback_tolerance,
+        )
+        self._audit(
+            {
+                "event": "live_rollback_verified" if restored else "live_rollback_mismatch",
+                "mode": mode.value,
+                "reason": reason,
+                "original_action": asdict(verified.proposal),
+                "rollback_action": asdict(rollback_action),
+                "before_rollback": before_rollback,
+                "target": verified.rollback_value,
+                "readback": readback,
+                "restored": restored,
+            }
+        )
+        return RollbackExecution(
+            original=verified,
+            before_rollback=before_rollback,
+            readback=readback,
+            restored=restored,
+            authorization_reason=reason,
+            wrote=True,
+        )
