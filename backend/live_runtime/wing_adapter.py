@@ -34,6 +34,17 @@ _CHANNEL_TARGET = re.compile(r"^ch:(\d+)$")
 _MAIN_TARGET = re.compile(r"^main:(\d+)$")
 _FADER_PARAMETERS = {"fader_db", "fader_delta_db"}
 _EQ_GAIN_PARAMETERS = {"eq_gain_db", "eq_gain_delta_db"}
+_OUTPUT_GROUPS = {"MOD", "AUX", "CRD", "AES", "USB"}
+
+
+@dataclass(frozen=True)
+class OutputRouteReadback:
+    """Fresh physical WING output-route observation."""
+
+    output_group: str
+    output_number: int
+    source_group: str
+    source_channel: int
 
 
 @dataclass
@@ -182,6 +193,48 @@ class WingWriteAdapter:
         if not slot.event.wait(self._readback_timeout):
             raise TimeoutError(f"No fresh WING readback for {address}")
         return slot.value
+
+    def read_output_route(self, output_group: str, output_number: int) -> OutputRouteReadback:
+        """Read one physical output route from fresh WING callbacks.
+
+        This deliberately bypasses ``WingClient.get_output_routing()`` because
+        that legacy helper waits a fixed interval and then consults the shared
+        state cache. PATCH_VERIFY needs proof from the current query response,
+        not a possibly stale cached route.
+        """
+        if not isinstance(output_group, str):
+            raise TypeError("WING output_group must be a string")
+        group = output_group.strip().upper()
+        if group not in _OUTPUT_GROUPS:
+            raise ValueError(f"Unsupported WING output group: {output_group!r}")
+        if isinstance(output_number, bool) or not isinstance(output_number, int):
+            raise TypeError("WING output_number must be an integer")
+        if not 1 <= output_number <= 48:
+            raise ValueError(f"WING output number out of range: {output_number}")
+
+        base = f"/io/out/{group}/{output_number - 1}"
+        source_group_raw = self._query_address(f"{base}/grp")
+        if not isinstance(source_group_raw, str):
+            raise TypeError("WING output source group readback must be a string")
+        source_group = source_group_raw.strip().upper()
+        if not source_group:
+            raise ValueError("WING output source group readback is empty")
+
+        source_channel_number = self._numeric(
+            self._query_address(f"{base}/in"),
+            label="WING output source channel readback",
+        )
+        if not source_channel_number.is_integer():
+            raise ValueError(
+                f"WING output source channel readback must be integral: {source_channel_number}"
+            )
+
+        return OutputRouteReadback(
+            output_group=group,
+            output_number=output_number,
+            source_group=source_group,
+            source_channel=int(source_channel_number),
+        )
 
     def read_eq_locators(self, channel: int) -> list[EqBandLocator]:
         """Read fresh frequency/Q fingerprints for all four channel PEQ bands.
