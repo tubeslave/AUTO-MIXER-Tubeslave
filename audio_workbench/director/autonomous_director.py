@@ -13,6 +13,9 @@ class Goal:
     priority:int
 
 ROADMAP=[
+ Goal("live-soundcheck-v2","Live Soundcheck Pipeline v2",
+      "Build a separate realtime pipeline: local multichannel audio capture, WING state/control, live directors, safety governor and verified USB/Dante routing.",
+      ["USB capture MVP","WING snapshot/readback","proposal safety governor","soundcheck FSM","HIL test"],[],98),
  Goal("cleanup-model-validation","Validate model-based source cleanup",
       "Select per-source pretrained cleanup only after RAW/CLEAN/REMOVED listening and artifact checks.",
       ["full-song cleaned mix rendered","removed residual audited","no gate-like fallback","accepted strengths recorded"],[],100),
