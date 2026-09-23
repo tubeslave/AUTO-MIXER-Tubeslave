@@ -5,7 +5,24 @@
     "title": "Validate model-based source cleanup",
     "objective": "Finish the full-song pretrained cleanup experiment and accept/reject processing per source from evidence."
   },
+  "parallel_progress": {
+    "live-soundcheck-v2": [
+      "Studio-derived one-hypothesis live decision engine added",
+      "Masking action now requires measured overlap instead of legacy dominance heuristic",
+      "Live decision tests wired into CI and passed in workflow run 35833133811"
+    ]
+  },
+  "blockers": [
+    {
+      "goal": "cleanup-model-validation",
+      "status": "compute_in_progress",
+      "workflow_run": 35828150231,
+      "step": "Neural cleanup selected sources"
+    }
+  ],
   "history": [
-    {"event":"director_enabled","note":"Autonomous roadmap execution enabled."}
+    {"event":"director_enabled","note":"Autonomous roadmap execution enabled."},
+    {"event":"cleanup_checked","workflow_run":35828150231,"status":"in_progress","note":"Full multitrack download succeeded; neural cleanup is still computing."},
+    {"event":"parallel_task_completed","goal":"live-soundcheck-v2","commit":"a29759f5534fdf86a3bbad2027c8caaa7ed4db4e","workflow_run":35833133811,"result":"success","note":"Studio-derived live decision engine tests are now part of CI and passed."}
   ]
 }
