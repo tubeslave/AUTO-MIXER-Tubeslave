@@ -1,0 +1,11 @@
+{
+  "goal": "mastering-target-controller-v2",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "e5e2742d3fb9a27e11f23bb2d7b57e19318babf1",
+  "scope": "bounded pregain/maximizer-drive search through authoritative mastering safety gate",
+  "audio_baseline_promoted": false,
+  "ptitsa_cleanup_status": "pending_human_review",
+  "paid_services_used": false,
+  "next_goal": "run focused controller tests and full CI; revise on evidence before merge"
+}
