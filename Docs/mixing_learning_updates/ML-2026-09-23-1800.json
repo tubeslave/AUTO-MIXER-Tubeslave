@@ -1,0 +1,96 @@
+{
+  "update_id": "ML-2026-09-23-1800",
+  "mode": "deep_review",
+  "scheduled_slot": "2026-09-23T18:00:00+03:00",
+  "actual_start": "2026-09-23T17:58:42+03:00",
+  "completed": "2026-09-23T18:03:30+03:00",
+  "preceding_update": "ML-2026-09-23-1500",
+  "preceding_successful_search": "ML-2026-09-23-1500",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260923-1500-01",
+      "operation": "update",
+      "title": "SRF-SVB: Style-Consistent Singing Voice Beautifying via Rectified Flow",
+      "arxiv": "2609.25610v1",
+      "url": "https://arxiv.org/html/2609.25610",
+      "reading_depth": "full_text_complete_comparator_checked",
+      "status": "research_candidate_dependent_benchmark_evidence",
+      "key_revision": "English evaluation reuses the 617-pair PopBuTFy test family introduced by NSVB; NSVB is not independent confirmation."
+    },
+    {
+      "id": "SRC-ML-20260923-1800-01",
+      "operation": "add",
+      "title": "Learning the Beauty in Songs: Neural Singing Voice Beautifier",
+      "doi": "10.18653/v1/2022.acl-long.549",
+      "arxiv": "2202.13277",
+      "url": "https://aclanthology.org/2022.acl-long.549/",
+      "reading_depth": "full_text_complete",
+      "status": "peer_reviewed_research_candidate",
+      "data": {"chinese_songs":99,"chinese_singers":12,"english_songs":443,"english_singers":22,"subjective_samples":60,"raters_per_sample_min":10},
+      "limitations": ["constructed amateur/professional roles", "template-pitch dependency", "no conventional-edit baseline", "no rock-session stereo phase peak boundary or full-song evaluation"]
+    }
+  ],
+  "implementation_audits": [
+    {
+      "id": "AUD-ML-20260923-1800-01",
+      "repository": "https://github.com/MoonInTheRiver/NeuralSVB",
+      "revision": "7a80bc51806103f09c7448b0daf93f49615ce52f",
+      "license": "GPL-3.0_code",
+      "inspection": "static_only",
+      "status": "reproduction_partial_production_blocked",
+      "findings": ["validation and test return the same held-out list", "raw-input inference is WIP", "only English training config present", "random embedding-example selection lacks a saved manifest", "no explicit torch.manual_seed found", "linked checkpoint has no repository checksum or separate weight licence"]
+    },
+    {
+      "id": "ART-ML-20260923-1500-01",
+      "operation": "update",
+      "repository": "https://github.com/mrwho729/SRF-SVB",
+      "revision": "7f6d65517cd54ddb099435de17d6f14bc6f7664a",
+      "status": "demo_only_reproduction_blocked"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260923-1800-01","claim":"SRF-SVB and NSVB English results share the 617-pair PopBuTFy test family.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-02","claim":"Both systems depend on target pitch; SRF-SVB additionally depends on same-content professional timing.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-03","claim":"PopBuTFy amateur roles are performed by trained vocalists, limiting transfer to ordinary correction.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-04","claim":"NSVB qualified-listener evidence does not cover rock sessions or production safety.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-05","claim":"The public NSVB validation and test sets are identical by implementation.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-06","claim":"NSVB raw-input deployment is WIP in the documented public path.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-07","claim":"Only an English public training configuration is present.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-08","claim":"Random embedding-example selection lacks a reproduction manifest.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-09","claim":"Python and NumPy seeds do not establish deterministic Torch/GPU reproduction.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-10","claim":"Checkpoint hashes and rights are separate from the code licence.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-11","claim":"Latent-mapping MOS/MCD gains do not prove identity, consonant or formant preservation.","confidence":"high"},
+    {"id":"KC-ML-20260923-1800-12","claim":"GeoAtt remains unreproducible end to end without public code and explicit phase/ITD stages.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260923-1800-01","apply_when":"sources share dataset or derived splits","change":"treat them as one evidence family","protect":["independence claims"],"verify":"source singer song overlap","cancel":"overlap unresolved","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-02","apply_when":"guided correction is evaluated","change":"record pitch and timing source","protect":["authorship","phrasing"],"verify":"guide provenance","cancel":"hidden dependency","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-03","apply_when":"model selection is proposed","change":"require disjoint validation and test manifests","protect":["generalization"],"verify":"split audit","cancel":"validation equals test","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-04","apply_when":"resynthesis is tested","change":"compare with conventional bounded edit","protect":["lyrics","formants","timing","consonants"],"verify":"single-factor matched A/B","cancel":"artifacts or no preference","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-05","apply_when":"latent tone mapping is tested","change":"ablate mapping independently","protect":["identity"],"verify":"independent identity ratings","cancel":"identity drift","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-06","apply_when":"integration is proposed","change":"require raw-input path weights hashes and rights","protect":["reproducibility"],"verify":"artifact manifest","cancel":"WIP or unverifiable weights","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-07","apply_when":"stochastic preprocessing is used","change":"persist selections and all seeds","protect":["exact replay"],"verify":"repeated hashes","cancel":"unrecorded randomness","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1800-08","apply_when":"audio outputs are compared","change":"separate raw safety and matched preference copies","protect":["peaks","HF","consonants","boundaries"],"verify":"raw metrics and blind matched test","cancel":"clipping phase damage or level bias","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260923-1800-01","status":"not_run","baseline":"NSVB latent mapping disabled","variant":"NSVB latent mapping enabled","single_factor":"latent mapping","loudness_matched_preference":true,"cancel":["identity loss","pronunciation loss","formant drift","clipping","boundary artifacts","seed instability","no repeatable preference"]},
+    {"id":"EXP-ML-20260923-1800-02","status":"not_run","baseline":"official validation-equals-test split","variant":"singer-and-song-disjoint validation/test","single_factor":"split protocol","cancel":["gain disappears","manifest not reproducible"]},
+    {"id":"EXP-ML-20260923-1800-03","status":"not_run","baseline":"recorded dry professional guide","variant":"separation-derived guide","single_factor":"guide source","cancel":["artifact leakage","target corruption","preference changes by contamination"]},
+    {"id":"EXP-ML-20260923-1800-04","status":"not_run","baseline":"bounded conventional pitch correction","variant":"guide-conditioned resynthesis","single_factor":"correction engine","loudness_matched_preference":true,"cancel":["protected-quality damage","no repeatable preference"]}
+  ],
+  "queue": {
+    "queued_source_total": 36,
+    "studied_videos_total": 0,
+    "priority": ["independent SRF/NSVB split and guide audit", "GeoAtt code phase ITD chain", "SpanSynth identical-MIDI null", "DiffusionRIR causal scaling", "permitted transcripts", "rights-cleared rock multitracks"]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "model_training_claimed": false,
+  "active_rules_changed": false,
+  "dsp_changed": false,
+  "runtime_changed": false
+}
