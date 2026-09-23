@@ -4,7 +4,9 @@ This module is intentionally narrow. It migrates one write family at a time
 behind :class:`LiveControlPlane` instead of letting legacy AutoEQ/AutoFader/
 AutoFOH controllers write to WING directly.
 
-First cutover: channel fader only.
+Migrated surface:
+- input-channel fader: ``ch:N / fader_db``
+- main fader: ``main:N / fader_db``
 
 Readback is based on a fresh inbound OSC callback, not ``WingClient.state``.
 ``WingClient.send`` optimistically updates its local state cache for writes, so
@@ -25,6 +27,7 @@ from .contracts import ProposedAction
 
 
 _CHANNEL_TARGET = re.compile(r"^ch:(\d+)$")
+_MAIN_TARGET = re.compile(r"^main:(\d+)$")
 
 
 @dataclass
@@ -36,9 +39,9 @@ class _FreshReadSlot:
 class WingWriteAdapter:
     """Translate typed live actions into WING OSC transport operations.
 
-    Only ``ch:N / fader_db`` is supported in this migration slice. Unsupported
-    actions fail closed so a BENCH_TEST authorization cannot accidentally turn
-    into an unreviewed protocol write.
+    Fader writes are migrated for channels and mains. Unsupported parameters and
+    target families fail closed so BENCH_TEST authorization cannot accidentally
+    turn into an unreviewed protocol write.
     """
 
     FADER_MIN_DB = -144.0
@@ -69,13 +72,22 @@ class WingWriteAdapter:
             raise NotImplementedError(
                 f"WingWriteAdapter has not migrated parameter {action.parameter!r} yet"
             )
-        match = _CHANNEL_TARGET.fullmatch(action.target)
-        if not match:
-            raise ValueError(f"Unsupported WING target: {action.target!r}")
-        channel = int(match.group(1))
-        if not 1 <= channel <= 40:
-            raise ValueError(f"WING channel out of range: {channel}")
-        return f"/ch/{channel}/fdr"
+
+        channel_match = _CHANNEL_TARGET.fullmatch(action.target)
+        if channel_match:
+            channel = int(channel_match.group(1))
+            if not 1 <= channel <= 40:
+                raise ValueError(f"WING channel out of range: {channel}")
+            return f"/ch/{channel}/fdr"
+
+        main_match = _MAIN_TARGET.fullmatch(action.target)
+        if main_match:
+            main = int(main_match.group(1))
+            if not 1 <= main <= 4:
+                raise ValueError(f"WING main out of range: {main}")
+            return f"/main/{main}/fdr"
+
+        raise ValueError(f"Unsupported WING target: {action.target!r}")
 
     def _slot_for(self, address: str) -> _FreshReadSlot:
         with self._slots_lock:
@@ -107,7 +119,7 @@ class WingWriteAdapter:
         return slot.value
 
     def write_value(self, action: ProposedAction) -> Any:
-        """Write one migrated channel-fader action through WING OSC."""
+        """Write one migrated fader action through WING OSC."""
         address = self._address_for(action)
         if isinstance(action.value, bool) or not isinstance(action.value, (int, float)):
             raise TypeError("fader_db value must be numeric")
