@@ -3,18 +3,120 @@ on:
   push:
     branches: [audio-workbench-mcp-v0.1]
     paths: [.github/workflows/ptitsa-full-model-cleanup-mix.yml]
+
 jobs:
-  render:
+  cleanup:
+    name: cleanup ${{ matrix.stem }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        include:
+          - {stem: BASS, prefix: BASS, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '1.0'}
+          - {stem: GTR, prefix: GTR, model: denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt, pattern: dry, strength: '0.5'}
+          - {stem: FLOOR, prefix: FLOOR, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: KICK_IN, prefix: KICK IN, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: KICK_OUT, prefix: KICK OUT, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: NIKITA_VOX, prefix: NIKITA VOX, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: SN_B, prefix: SN B, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: SN_T, prefix: SN T, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: TOM_1, prefix: TOM 1, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: TOM_2, prefix: TOM 2, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
+          - {stem: VALERA_VOX, prefix: VALERA VOX, model: mel_band_roformer_bleed_suppressor_v1.ckpt, pattern: Instrumental, strength: '0.5'}
     steps:
       - uses: actions/checkout@v4
-      - name: Install audio tools
+      - name: Install cleanup tools
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq ffmpeg
           python -m pip install --upgrade pip
           python -m pip install "audio-separator[cpu]" audioread soundfile numpy scipy
+      - name: Download one Ptitsa source
+        shell: python
+        env:
+          STEM: ${{ matrix.stem }}
+          PREFIX: ${{ matrix.prefix }}
+        run: |
+          import json,os,urllib.parse,urllib.request,subprocess,pathlib,re
+          key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
+          stem=os.environ["STEM"]; prefix=os.environ["PREFIX"]
+          q=urllib.parse.urlencode({"public_key":key,"limit":100})
+          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources?"+q,timeout=60) as r:
+              listing=json.load(r)
+          items=listing.get("_embedded",{}).get("items",[])
+          names=[i["name"] for i in items if i.get("type")=="file" and i["name"].lower().endswith(".wav")]
+          def canon(s): return re.sub(r"[^A-Z0-9]+"," ",s.upper()).strip()
+          cp=canon(prefix)
+          matches=[n for n in names if canon(n).startswith(cp+" ") or canon(n)==cp+" WAV"]
+          if not matches: raise RuntimeError(f"No WAV found for {prefix}; available={names}")
+          name=sorted(matches)[0]
+          q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
+          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
+              href=json.load(r)["href"]
+          pathlib.Path("work/raw").mkdir(parents=True,exist_ok=True)
+          subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(29*60+54),"-i",href,
+                          "-t","259","-ac","2","-ar","44100","-c:a","pcm_s24le",f"work/raw/{stem}.wav"],check=True)
+      - name: Run model and create checkpoint
+        shell: bash
+        env:
+          STEM: ${{ matrix.stem }}
+          MODEL: ${{ matrix.model }}
+          PATTERN: ${{ matrix.pattern }}
+          STRENGTH: ${{ matrix.strength }}
+        run: |
+          set -euxo pipefail
+          mkdir -p work/model work/checkpoint/clean work/checkpoint/previews
+          audio-separator "work/raw/$STEM.wav" -m "$MODEL" --output_format WAV --output_dir work/model --normalization 1.0 --use_soundfile
+          candidate="$(find work/model -type f -iname "*_*(${PATTERN})_*.wav" | head -1)"
+          test -n "$candidate"
+          python - "$STEM" "$candidate" "$STRENGTH" <<'PY'
+          import sys,json,pathlib,soundfile as sf,numpy as np
+          stem,candidate,strength=sys.argv[1],sys.argv[2],float(sys.argv[3])
+          r,sr=sf.read(f"work/raw/{stem}.wav",always_2d=True,dtype="float32")
+          c,sr2=sf.read(candidate,always_2d=True,dtype="float32")
+          n=min(len(r),len(c)); r=r[:n]; c=c[:n]
+          if c.shape[1]!=r.shape[1]: c=np.repeat(c[:,:1],r.shape[1],axis=1)
+          y=r+strength*(c-r); removed=r-y
+          sf.write(f"work/checkpoint/clean/{stem}.wav",y,sr,subtype="PCM_24")
+          sf.write(f"work/{stem}_RAW.wav",r,sr,subtype="PCM_24")
+          sf.write(f"work/{stem}_CLEAN.wav",y,sr,subtype="PCM_24")
+          sf.write(f"work/{stem}_REMOVED.wav",removed,sr,subtype="PCM_24")
+          rms=lambda x: float(np.sqrt(np.mean(np.square(x),dtype=np.float64)+1e-20))
+          report={"stem":stem,"strength":strength,"frames":n,"sample_rate":sr,
+                  "raw_rms":rms(r),"clean_rms":rms(y),"removed_rms":rms(removed),
+                  "removed_to_raw_db":float(20*np.log10((rms(removed)+1e-20)/(rms(r)+1e-20)))}
+          pathlib.Path("work/checkpoint").joinpath(f"{stem}.json").write_text(json.dumps(report,indent=2))
+          PY
+          for kind in RAW CLEAN REMOVED; do
+            ffmpeg -hide_banner -loglevel error -y -i "work/${STEM}_${kind}.wav" -c:a libmp3lame -b:a 192k "work/checkpoint/previews/${STEM}_${kind}.mp3"
+          done
+      - name: Upload per-stem checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-clean-${{ matrix.stem }}
+          path: work/checkpoint
+          retention-days: 7
+
+  render:
+    name: render full checkpointed mix
+    needs: cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install render tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install soundfile numpy
+      - name: Download cleanup checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ptitsa-clean-*
+          path: work/checkpoints
+          merge-multiple: true
       - name: Download full Ptitsa song multitrack
         shell: python
         run: |
@@ -22,98 +124,53 @@ jobs:
           key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
           prefixes=["BASS","FLOOR","GTR","HI HAT","KEYS L","KEYS R","KICK IN","KICK OUT","NIKITA VOX",
                     "OH R","OHL","PB L","PB R","SN B","SN T","TOM 1","TOM 2","VALERA VOX"]
-          # Resolve the real current filenames from the public folder instead of guessing timestamp suffixes.
           q=urllib.parse.urlencode({"public_key":key,"limit":100})
-          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources?"+q,timeout=60) as r:
-              listing=json.load(r)
+          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources?"+q,timeout=60) as r: listing=json.load(r)
           items=listing.get("_embedded",{}).get("items",[])
           names=[i["name"] for i in items if i.get("type")=="file" and i["name"].lower().endswith(".wav")]
-          pathlib.Path("work/raw").mkdir(parents=True,exist_ok=True)
-          start=29*60+54; dur=259
+          pathlib.Path("work/clean").mkdir(parents=True,exist_ok=True)
+          def canon(s): return re.sub(r"[^A-Z0-9]+"," ",s.upper()).strip()
           for prefix in prefixes:
-              def canon(s):
-                  return re.sub(r"[^A-Z0-9]+"," ",s.upper()).strip()
-              cp=canon(prefix)
-              matches=[n for n in names if canon(n).startswith(cp+" ") or canon(n)==cp+" WAV"]
-              if not matches:
-                  raise RuntimeError(f"No WAV found for {prefix}; available={names}")
-              name=sorted(matches)[0]
-              q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
-              with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
-                  href=json.load(r)["href"]
-              out="work/raw/"+prefix.replace(" ","_")+".wav"
-              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",href,
-                              "-t",str(dur),"-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
-      - name: Neural cleanup selected sources
-        shell: bash
-        run: |
-          set -euxo pipefail
-          mkdir -p work/clean
-          cp work/raw/*.wav work/clean/
-          # Bleed Suppressor: conservative 50% residual blend for vocals and close drums.
-          for stem in VALERA_VOX NIKITA_VOX SN_T SN_B TOM_1 TOM_2 FLOOR KICK_IN KICK_OUT; do
-            od="work/model_bleed/$stem"; mkdir -p "$od"
-            audio-separator "work/raw/$stem.wav" -m mel_band_roformer_bleed_suppressor_v1.ckpt --output_format WAV --output_dir "$od" --normalization 1.0 --use_soundfile
-            c="$(find "$od" -type f -name '*_(Instrumental)_*.wav' | head -1)"
-            python - "$stem" "$c" <<'PY'
-          import sys,soundfile as sf,numpy as np
-          stem=sys.argv[1];clean=sys.argv[2]
-          r,sr=sf.read(f"work/raw/{stem}.wav",always_2d=True,dtype="float32")
-          c,sr2=sf.read(clean,always_2d=True,dtype="float32");n=min(len(r),len(c));r=r[:n];c=c[:n]
-          if c.shape[1]!=r.shape[1]:c=np.repeat(c[:,:1],r.shape[1],axis=1)
-          # 50% model strength, intentionally conservative until full-mix listening approval.
-          y=r+.5*(c-r)
-          sf.write(f"work/clean/{stem}.wav",y,sr,subtype="PCM_24")
-          PY
-          done
-          # Guitar: Aufr33 denoise was the strongest useful candidate in v5; use 50%.
-          od="work/model_gtr";mkdir -p "$od"
-          audio-separator work/raw/GTR.wav -m denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt --output_format WAV --output_dir "$od" --normalization 1.0 --use_soundfile
-          c="$(find "$od" -type f -name '*_(dry)_*.wav' | head -1)"
-          python - "$c" <<'PY'
-          import sys,soundfile as sf,numpy as np
-          r,sr=sf.read("work/raw/GTR.wav",always_2d=True,dtype="float32");c,sr2=sf.read(sys.argv[1],always_2d=True,dtype="float32")
-          n=min(len(r),len(c));r=r[:n];c=c[:n]
-          if c.shape[1]!=r.shape[1]:c=np.repeat(c[:,:1],r.shape[1],axis=1)
-          sf.write("work/clean/GTR.wav",r+.5*(c-r),sr,subtype="PCM_24")
-          PY
-          # Bass: v5 Bleed Suppressor changed it only weakly, so 100% is still conservative in absolute residual.
-          od="work/model_bass";mkdir -p "$od"
-          audio-separator work/raw/BASS.wav -m mel_band_roformer_bleed_suppressor_v1.ckpt --output_format WAV --output_dir "$od" --normalization 1.0 --use_soundfile
-          c="$(find "$od" -type f -name '*_(Instrumental)_*.wav' | head -1)"
-          cp "$c" work/clean/BASS.wav
+              cp=canon(prefix); matches=[n for n in names if canon(n).startswith(cp+" ") or canon(n)==cp+" WAV"]
+              if not matches: raise RuntimeError(f"No WAV found for {prefix}")
+              name=sorted(matches)[0]; q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
+              with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r: href=json.load(r)["href"]
+              out="work/clean/"+prefix.replace(" ","_")+".wav"
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(29*60+54),"-i",href,
+                              "-t","259","-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
+          for p in pathlib.Path("work/checkpoints/clean").glob("*.wav"):
+              (pathlib.Path("work/clean")/p.name).write_bytes(p.read_bytes())
       - name: Render full cleaned mix
         shell: python
         run: |
-          import json,pathlib,soundfile as sf,numpy as np
-          rep=json.loads(pathlib.Path("audio_workbench/mixing/ptitsa_v1_static.json").read_text()) if pathlib.Path("audio_workbench/mixing/ptitsa_v1_static.json").exists() else None
-          # Frozen gains/pans from the accepted Ptitsa balance. Fallback values are intentionally explicit.
+          import pathlib,soundfile as sf,numpy as np
           gains={"BASS":-7.0,"FLOOR":-11.0,"GTR":-8.0,"HI_HAT":-15.0,"KEYS_L":-12.0,"KEYS_R":-12.0,
                  "KICK_IN":-8.0,"KICK_OUT":-10.0,"NIKITA_VOX":-7.5,"OH_R":-12.0,"OHL":-12.0,
                  "PB_L":-11.0,"PB_R":-11.0,"SN_B":-14.0,"SN_T":-8.5,"TOM_1":-11.0,"TOM_2":-11.0,"VALERA_VOX":-6.5}
           pans={"BASS":0,"FLOOR":.35,"GTR":-.45,"HI_HAT":.5,"KEYS_L":-.65,"KEYS_R":.65,"KICK_IN":0,"KICK_OUT":0,
                 "NIKITA_VOX":.18,"OH_R":.75,"OHL":-.75,"PB_L":-.8,"PB_R":.8,"SN_B":0,"SN_T":0,
                 "TOM_1":-.3,"TOM_2":.3,"VALERA_VOX":0}
-          files={p.stem:p for p in pathlib.Path("work/clean").glob("*.wav")}
-          N=min(sf.info(p).frames for p in files.values());sr=44100;out=pathlib.Path("work/Ptitsa_ModelClean_FullMix_50pct.wav")
+          files={p.stem:p for p in pathlib.Path("work/clean").glob("*.wav")}; N=min(sf.info(p).frames for p in files.values()); sr=44100
+          out=pathlib.Path("work/Ptitsa_ModelClean_FullMix_50pct.wav")
           with sf.SoundFile(out,"w",samplerate=sr,channels=2,subtype="PCM_24") as w:
             for start in range(0,N,sr*20):
-              count=min(sr*20,N-start);mix=np.zeros((count,2),np.float32)
+              count=min(sr*20,N-start); mix=np.zeros((count,2),np.float32)
               for name,p in files.items():
-                with sf.SoundFile(p) as f:f.seek(start);x=f.read(count,dtype="float32",always_2d=True)
-                m=x.mean(1);amp=10**(gains.get(name,-12)/20);th=(pans.get(name,0)+1)*np.pi/4
-                mix[:,0]+=m*amp*np.cos(th);mix[:,1]+=m*amp*np.sin(th)
+                with sf.SoundFile(p) as f: f.seek(start); x=f.read(count,dtype="float32",always_2d=True)
+                m=x.mean(1); amp=10**(gains.get(name,-12)/20); th=(pans.get(name,0)+1)*np.pi/4
+                mix[:,0]+=m*amp*np.cos(th); mix[:,1]+=m*amp*np.sin(th)
               w.write(mix)
-          # Headroom normalize only, no limiter/mastering.
-          x,sr=sf.read(out,always_2d=True,dtype="float32");pk=np.max(np.abs(x));g=10**(-3/20)/(pk+1e-20)
+          x,sr=sf.read(out,always_2d=True,dtype="float32"); pk=np.max(np.abs(x)); g=10**(-3/20)/(pk+1e-20)
           sf.write(out,x*g,sr,subtype="PCM_24")
       - name: Encode listening MP3
-        run: |
-          ffmpeg -hide_banner -loglevel error -y -i work/Ptitsa_ModelClean_FullMix_50pct.wav -c:a libmp3lame -b:a 320k work/Ptitsa_ModelClean_FullMix_50pct_320.mp3
-      - uses: actions/upload-artifact@v4
+        run: ffmpeg -hide_banner -loglevel error -y -i work/Ptitsa_ModelClean_FullMix_50pct.wav -c:a libmp3lame -b:a 320k work/Ptitsa_ModelClean_FullMix_50pct_320.mp3
+      - name: Upload final mix and validation previews
+        uses: actions/upload-artifact@v4
         with:
           name: ptitsa-full-model-cleanup-mix
           path: |
             work/Ptitsa_ModelClean_FullMix_50pct.wav
             work/Ptitsa_ModelClean_FullMix_50pct_320.mp3
+            work/checkpoints/previews/*.mp3
+            work/checkpoints/*.json
           retention-days: 7
