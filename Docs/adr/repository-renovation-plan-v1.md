@@ -90,7 +90,7 @@ Debug scripts, duplicate loaders, obsolete variants and dead glue. Delete only a
 - backend/auto_fader_v2/core/bleed_detector.py as confidence/evidence only.
 - backend/auto_fader_v2/core/channel_classifier.py
 - backend/auto_fader_v2/core/integrated_lufs.py
-- backend/cross_adaptive_eq.py: retain DSP/proposal primitive only if new masking tests validate it.
+- backend/cross_adaptive_eq.py: retain DSP/evidence ideas only if new masking tests validate them; do not reuse its hard-coded decision policy.
 - backend/compressor_adaptation.py: retain parameter/DSP helpers, not old policy.
 - backend/auto_effects.py / auto_fx.py / auto_reverb.py: consolidate into live Space/FX Director.
 
@@ -176,21 +176,25 @@ R2/R3 are active for the WING control path:
 - relative fader proposals use `fader_delta_db`, are resolved against fresh console state inside `LiveControlPlane`, and cannot exceed their own declared `max_step` even in BENCH_TEST;
 - the new `main_headroom_protection` hypothesis requests a relative `-0.5 dB` move rather than the unsafe ambiguous absolute value `-0.5 dB`.
 
-R3 has now started for channel PEQ gain as a second transport/control family:
+R3 channel PEQ gain cutover now includes deliberate realtime band selection:
 - `EqBandLocator` carries the exact WING band plus expected frequency/Q fingerprint;
 - musical EQ reductions use `eq_gain_delta_db`, not ambiguous absolute `eq_gain_db` semantics;
 - `LiveControlPlane` resolves the delta against fresh current band gain and applies the proposal's own `max_step` in every write-capable mode, including BENCH_TEST;
 - `WingWriteAdapter` accepts channel bands 1..4 only, re-queries physical frequency/Q before mutation, writes the resolved gain, then requires fresh post-write gain readback;
-- masking/harshness hypotheses do not emit a hardware-actionable EQ move when no explicit locator has been provided by the realtime state/evidence layer;
+- `WingWriteAdapter.read_eq_locators()` now enumerates all four PEQ frequency/Q fingerprints from fresh inbound OSC callbacks for read-only selection;
+- `backend/live_runtime/eq_locator.py` selects an already-existing band from explicit realtime spectral evidence using an octave-distance corridor plus optional Q constraints; low-confidence or no-match evidence returns no locator and therefore no hardware-actionable EQ move;
+- masking/harshness hypotheses still refuse hardware EQ when no explicit locator has been produced;
 - the protocol/address primitive comes from KEEP_CORE `wing_addresses.py`; no legacy `auto_eq.py` decision code was imported into the new authority.
 
-Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, WING frequency/Q fingerprint checks, and post-write verification. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write authority can be severed or archived.
+The audit of `backend/cross_adaptive_eq.py` keeps it in ADAPT only as a possible DSP/evidence reference. Its current policy hard-codes seven band centers, channel priority rules, overlap tolerance and mirror boost/cut behavior, so it is not suitable as the new live locator or decision authority and is not imported by `live_runtime`.
+
+Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, WING frequency/Q fingerprint checks, and post-write verification. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write authority can be severed or archived.
 
 Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
 
 No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
 
-See also `Docs/adr/live-channel-eq-cutover-v1.md` for the channel-EQ migration contract and HIL gate.
+See also `Docs/adr/live-channel-eq-cutover-v1.md` and `Docs/adr/live-eq-locator-selector-v1.md` for the channel-EQ migration contract and HIL gate.
 
 ## Non-negotiable migration rule
 
