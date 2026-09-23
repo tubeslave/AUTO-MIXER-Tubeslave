@@ -13,11 +13,13 @@ capture.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Callable
 
-from .contracts import LiveMode, ProposedAction
+from .contracts import EqBandLocator, LiveMode, MixFeatures, ProposedAction
 from .control_plane import LiveControlPlane, WriteExecution
+from .decision_engine import LiveHypothesis, propose_one
+from .eq_locator import EqTargetEvidence, RealtimeEqLocatorSelector
 from .wing_adapter import WingWriteAdapter
 
 
@@ -57,6 +59,7 @@ class LiveSoundcheckService:
         self._engine: Any | None = None
         self._request: LiveStartRequest | None = None
         self._control_plane: LiveControlPlane | None = None
+        self._control_adapter: WingWriteAdapter | None = None
         self._control_transport: Any | None = None
         self._control_audit: list[dict[str, Any]] = []
         self._external_audit_sink = audit_sink
@@ -105,6 +108,7 @@ class LiveSoundcheckService:
 
     def _reset_control_plane(self) -> None:
         self._control_plane = None
+        self._control_adapter = None
         self._control_transport = None
 
     def _active_wing_transport(self) -> Any:
@@ -132,15 +136,78 @@ class LiveSoundcheckService:
             raise TypeError("Active WING transport does not expose send/subscribe")
         return client
 
-    def _active_control_plane(self) -> LiveControlPlane:
+    def _active_wing_adapter(self) -> WingWriteAdapter:
+        """Return one shared adapter for read-only evidence and control writes.
+
+        EQ band selection and mutation must observe the same physical transport.
+        Reusing one adapter also reuses its callback subscriptions while every
+        query still requires a fresh inbound WING response.
+        """
         client = self._active_wing_transport()
-        if self._control_plane is None or self._control_transport is not client:
+        if self._control_adapter is None or self._control_transport is not client:
             self._control_transport = client
+            self._control_adapter = WingWriteAdapter(client)
+            self._control_plane = None
+        return self._control_adapter
+
+    def _active_control_plane(self) -> LiveControlPlane:
+        adapter = self._active_wing_adapter()
+        if self._control_plane is None:
             self._control_plane = LiveControlPlane(
-                WingWriteAdapter(client),
+                adapter,
                 audit_sink=self._record_control_audit,
             )
         return self._control_plane
+
+    def select_eq_locator(
+        self,
+        channel: int,
+        evidence: EqTargetEvidence,
+    ) -> EqBandLocator | None:
+        """Resolve realtime spectral evidence against fresh physical WING bands.
+
+        This is read-only. A low-confidence or unmatched target returns ``None``
+        and therefore cannot become a hardware-actionable EQ proposal.
+        """
+        selector = RealtimeEqLocatorSelector(self._active_wing_adapter())
+        locator = selector.select(channel, evidence)
+        self._record_control_audit(
+            {
+                "event": "live_eq_locator_selected" if locator is not None else "live_eq_locator_unresolved",
+                "channel": channel,
+                "evidence": asdict(evidence),
+                "locator": asdict(locator) if locator is not None else None,
+            }
+        )
+        return locator
+
+    def propose_hypothesis(
+        self,
+        features: MixFeatures,
+        roles: dict[int, str],
+        *,
+        masking: dict[tuple[int, int], float] | None = None,
+        eq_evidence: dict[tuple[int, str], EqTargetEvidence] | None = None,
+    ) -> LiveHypothesis | None:
+        """Compose realtime evidence, physical band selection and the Director.
+
+        ``eq_evidence`` keys are ``(channel, intent)`` where intent matches the
+        Director's evidence names such as ``harshness`` or ``vocal_masking``.
+        The service resolves only supplied evidence; it never invents a PEQ band
+        from an instrument preset or legacy AutoEQ policy.
+        """
+        locators: dict[tuple[int, str], EqBandLocator] = {}
+        for key, evidence in (eq_evidence or {}).items():
+            channel, _intent = key
+            locator = self.select_eq_locator(channel, evidence)
+            if locator is not None:
+                locators[key] = locator
+        return propose_one(
+            features,
+            roles,
+            masking=masking,
+            eq_locators=locators,
+        )
 
     def execute_action(
         self,
