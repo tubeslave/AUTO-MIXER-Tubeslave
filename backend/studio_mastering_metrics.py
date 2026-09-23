@@ -21,6 +21,8 @@ BLOCK_SECONDS = 0.400
 HOP_SECONDS = 0.100
 SILENCE_FLOOR_DB = -100.0
 TRUE_PEAK_TOLERANCE_DB = 0.02
+TRUE_PEAK_CHUNK_SECONDS = 1.0
+TRUE_PEAK_OVERLAP_SAMPLES = 16
 
 
 @dataclass(frozen=True)
@@ -118,13 +120,19 @@ class StudioMasteringMeter:
             return SILENCE_FLOOR_DB
 
         peaks = []
-        # Flush the short FIR tail so peaks near the end are not hidden by
-        # interpolation filter delay.
-        tail = np.zeros(16, dtype=np.float32)
+        chunk_len = max(1, int(round(TRUE_PEAK_CHUNK_SECONDS * self.sample_rate)))
+        overlap = TRUE_PEAK_OVERLAP_SAMPLES
+        tail = np.zeros(overlap, dtype=np.float32)
         for index in range(arr.shape[1]):
-            meter = TruePeakMeter(self.sample_rate)
-            channel = np.concatenate((arr[:, index], tail))
-            peaks.append(meter.process(channel))
+            channel = arr[:, index]
+            channel_peak = SILENCE_FLOOR_DB
+            for start in range(0, len(channel), chunk_len):
+                segment_start = max(0, start - overlap)
+                segment_end = min(len(channel), start + chunk_len + overlap)
+                segment = np.concatenate((channel[segment_start:segment_end], tail))
+                meter = TruePeakMeter(self.sample_rate)
+                channel_peak = max(channel_peak, meter.process(segment))
+            peaks.append(channel_peak)
         return float(max(peaks))
 
     def measure(self, audio: np.ndarray) -> MasteringSafetyMeasurement:
@@ -163,16 +171,28 @@ class StudioMasteringMeter:
         This is a safety guard, not a creative limiter. It never adds gain and
         therefore cannot be used to chase a loudness target.
         """
-        arr = self._as_samples_channels(audio)
-        original_was_mono = np.asarray(audio).ndim == 1
+        original = np.asarray(audio)
+        original_was_mono = original.ndim == 1
+        original_was_channels_first = (
+            original.ndim == 2
+            and original.shape[0] <= 8
+            and original.shape[1] > original.shape[0]
+        )
+        arr = self._as_samples_channels(original)
+
+        def restore_layout(processed: np.ndarray) -> np.ndarray:
+            if original_was_mono:
+                return processed[:, 0].astype(np.float32, copy=False)
+            if original_was_channels_first:
+                return processed.T.astype(np.float32, copy=False)
+            return processed.astype(np.float32, copy=False)
+
         if len(arr) == 0:
-            result = arr[:, 0] if original_was_mono else arr
-            return result.astype(np.float32, copy=False), 0.0
+            return restore_layout(arr), 0.0
 
         current_peak = self.true_peak_dbtp(arr)
         if current_peak <= ceiling_dbtp + TRUE_PEAK_TOLERANCE_DB:
-            result = arr[:, 0] if original_was_mono else arr
-            return result.astype(np.float32, copy=True), 0.0
+            return restore_layout(arr.copy()), 0.0
 
         reduction_db = float(current_peak - ceiling_dbtp)
         gain = np.float32(10.0 ** (-reduction_db / 20.0))
@@ -184,5 +204,4 @@ class StudioMasteringMeter:
             limited *= np.float32(10.0 ** (-correction_db / 20.0))
             reduction_db += correction_db
 
-        result = limited[:, 0] if original_was_mono else limited
-        return result.astype(np.float32, copy=False), reduction_db
+        return restore_layout(limited), reduction_db
