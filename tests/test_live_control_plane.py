@@ -258,3 +258,82 @@ def test_small_numeric_readback_quantization_is_accepted():
     result = plane.execute(_action(value=-4.0), LiveMode.BENCH_TEST)
 
     assert result.verified.accepted is True
+
+
+def test_relative_fader_rollback_restores_captured_absolute_value_and_verifies():
+    adapter = FakeMixerAdapter({("main:1", "fader_db", None): -6.0})
+    events = []
+    plane = LiveControlPlane(adapter, audit_sink=events.append)
+    action = _action(
+        target="main:1",
+        parameter="fader_delta_db",
+        value=-0.5,
+        max_step=0.5,
+        reason="temporary headroom test",
+    )
+
+    write = plane.execute(action, LiveMode.BENCH_TEST)
+    rollback = plane.rollback(write.verified, LiveMode.BENCH_TEST)
+
+    assert rollback.wrote is True
+    assert rollback.restored is True
+    assert rollback.before_rollback == -6.5
+    assert rollback.readback == -6.0
+    assert adapter.writes[-1].parameter == "fader_db"
+    assert adapter.writes[-1].value == -6.0
+    assert events[-1]["event"] == "live_rollback_verified"
+    assert events[-1]["target"] == -6.0
+
+
+def test_rollback_restoration_bypasses_auto_safe_new_action_allowlist():
+    adapter = FakeMixerAdapter({("output:1", "routing", None): "USB/1"})
+    events = []
+    plane = LiveControlPlane(adapter, audit_sink=events.append)
+    bench_action = _action(
+        target="output:1",
+        parameter="routing",
+        value="MOD/1",
+        confidence=.2,
+        reversible=True,
+        risk="high",
+        max_step=None,
+    )
+
+    write = plane.execute(bench_action, LiveMode.BENCH_TEST)
+    rollback = plane.rollback(write.verified, LiveMode.AUTO_SAFE)
+
+    assert rollback.wrote is True
+    assert rollback.authorization_reason == "rollback_authorized"
+    assert rollback.restored is True
+    assert rollback.readback == "USB/1"
+    assert adapter.values[("output:1", "routing", None)] == "USB/1"
+    assert events[-1]["event"] == "live_rollback_verified"
+
+
+def test_manual_freeze_blocks_rollback_even_in_bench_test():
+    adapter = FakeMixerAdapter({("ch:1", "fader_db", None): -5.0})
+    plane = LiveControlPlane(adapter)
+    write = plane.execute(_action(value=-4.0), LiveMode.BENCH_TEST)
+
+    rollback = plane.rollback(write.verified, LiveMode.BENCH_TEST, manual_freeze=True)
+
+    assert rollback.wrote is False
+    assert rollback.restored is False
+    assert rollback.authorization_reason == "frozen"
+    assert adapter.values[("ch:1", "fader_db", None)] == -4.0
+    assert len(adapter.writes) == 1
+
+
+def test_non_reversible_action_has_no_rollback_write():
+    adapter = FakeMixerAdapter({("ch:1", "fader_db", None): -5.0})
+    events = []
+    plane = LiveControlPlane(adapter, audit_sink=events.append)
+    write = plane.execute(_action(value=-4.0, reversible=False), LiveMode.BENCH_TEST)
+
+    rollback = plane.rollback(write.verified, LiveMode.BENCH_TEST)
+
+    assert rollback.wrote is False
+    assert rollback.restored is False
+    assert rollback.authorization_reason == "not_reversible"
+    assert len(adapter.writes) == 1
+    assert events[-1]["event"] == "live_rollback_unavailable"
