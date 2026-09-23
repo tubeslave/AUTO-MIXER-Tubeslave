@@ -26,9 +26,11 @@ Current thresholds are conservative engineering defaults, not psychoacoustically
 
 ## Verification
 
-Focused local test reproduction of the committed module/tests: `6 passed`.
+Focused reproduction of the committed perceptual-critic module/tests: `6 passed`.
 
-GitHub CI for commit `dad336fbdc5b8d81b254cde57ee57e763ddea7c5` was started as workflow `35835155423`; final matrix status is recorded separately in Director state when available.
+The first full matrix run, workflow `35835155423`, reached an existing Artifact Critic test before the new perceptual tests and exposed a real low-sample-rate bug: the 6-14 kHz fizz band is invalid at an 8 kHz sample rate, and the click-regression tolerance was dimensionally too large for a per-sample click rate. The failure was not in the new perceptual gate.
+
+Revision commit `1b6286a1698223418024a3316816cddba6a6e3e4` makes Artifact Critic band filtering Nyquist-safe and uses a click-rate-specific regression tolerance. The exact failing synthetic fixture was reproduced after the fix: clean click rate `0.0`, injected-click rate `0.0049375`, and the comparison rejects the candidate for `click_rate` regression. Full CI rerun `35835666282` is pending at the time of this note.
 
 ## Next integration
 
