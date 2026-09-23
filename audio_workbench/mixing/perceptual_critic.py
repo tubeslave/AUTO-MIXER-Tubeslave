@@ -14,6 +14,22 @@ class PerceptualSnapshot:
     width_db:float
     climax_lift_db:float
 
+@dataclass(frozen=True)
+class PerceptualAcceptancePolicy:
+    """Conservative engineering defaults; calibrate from listening evidence, not taste labels."""
+    vocal_intelligibility_min_improvement:float=.02
+    harshness_min_improvement:float=.03
+    punch_min_improvement_db:float=.25
+    climax_min_improvement_db:float=.20
+    max_density_delta:float=.15
+    max_width_delta_db:float=1.5
+    max_foreground_delta_db:float=1.0
+    max_foreground_delta_for_vocal_db:float=1.5
+    max_harshness_regression:float=.06
+    max_intelligibility_regression:float=.04
+    max_punch_regression_db:float=.75
+    max_climax_regression_db:float=.50
+
 def _rms(x):
     return float(np.sqrt(np.mean(np.asarray(x,dtype="float64")**2)+1e-20))
 
@@ -98,3 +114,67 @@ def compare(before:PerceptualSnapshot,after:PerceptualSnapshot,target:str)->dict
     return {"target":target,"before":b[key],"after":a[key],"delta":a[key]-b[key],
             "collateral":{"density":a["density"]-b["density"],"width_db":a["width_db"]-b["width_db"],
                           "foreground_db":a["foreground_db"]-b["foreground_db"]}}
+
+def accept_candidate(before:PerceptualSnapshot,after:PerceptualSnapshot,target:str,
+                     policy:PerceptualAcceptancePolicy|None=None)->dict:
+    """Accept a perceptual hypothesis only when its target improves without large collateral drift.
+
+    This deliberately does not decide whether a mix is "good". It is a regression gate for one
+    bounded hypothesis. Electrical constraints such as peak headroom and LUFS cheating stay in the
+    outer iteration layer where those measurements are available.
+    """
+    p=policy or PerceptualAcceptancePolicy()
+    b=asdict(before);a=asdict(after)
+    target_spec={
+        "vocal_intelligibility":("vocal_intelligibility",1,p.vocal_intelligibility_min_improvement),
+        "harshness":("harshness",-1,p.harshness_min_improvement),
+        "punch":("punch_db",1,p.punch_min_improvement_db),
+        "climax":("climax_lift_db",1,p.climax_min_improvement_db),
+    }
+    if target not in target_spec:
+        raise ValueError(f"Unsupported perceptual target: {target}")
+    key,direction,min_improvement=target_spec[target]
+    raw_delta=float(a[key]-b[key])
+    improvement=float(raw_delta*direction)
+    failures=[]
+    if improvement<min_improvement:
+        failures.append("target_not_improved")
+
+    density_delta=float(a["density"]-b["density"])
+    width_delta=float(a["width_db"]-b["width_db"])
+    foreground_delta=float(a["foreground_db"]-b["foreground_db"])
+    foreground_limit=(p.max_foreground_delta_for_vocal_db
+                      if target=="vocal_intelligibility" else p.max_foreground_delta_db)
+    if abs(density_delta)>p.max_density_delta:
+        failures.append("density_regression")
+    if abs(width_delta)>p.max_width_delta_db:
+        failures.append("width_regression")
+    if abs(foreground_delta)>foreground_limit:
+        failures.append("foreground_regression")
+
+    if target!="harshness" and a["harshness"]-b["harshness"]>p.max_harshness_regression:
+        failures.append("harshness_regression")
+    if target!="vocal_intelligibility" and b["vocal_intelligibility"]-a["vocal_intelligibility"]>p.max_intelligibility_regression:
+        failures.append("intelligibility_regression")
+    if target!="punch" and b["punch_db"]-a["punch_db"]>p.max_punch_regression_db:
+        failures.append("punch_regression")
+    if target!="climax" and b["climax_lift_db"]-a["climax_lift_db"]>p.max_climax_regression_db:
+        failures.append("climax_regression")
+
+    return {
+        "accept":not failures,
+        "failures":failures,
+        "target":target,
+        "target_before":float(b[key]),
+        "target_after":float(a[key]),
+        "target_improvement":improvement,
+        "collateral":{
+            "density":density_delta,
+            "width_db":width_delta,
+            "foreground_db":foreground_delta,
+            "harshness":float(a["harshness"]-b["harshness"]),
+            "vocal_intelligibility":float(a["vocal_intelligibility"]-b["vocal_intelligibility"]),
+            "punch_db":float(a["punch_db"]-b["punch_db"]),
+            "climax_lift_db":float(a["climax_lift_db"]-b["climax_lift_db"]),
+        },
+    }
