@@ -1,6 +1,14 @@
 # Current State
 
-Generated: 2026-08-19T21:17:30Z
+Generated: 2026-09-23T19:17:17Z
+
+## Восстановление спектра — 2026-09-23
+
+Локальный mix_bus фикс подтверждён recovery-регрессией: провал 1 кГц
+больше не вызывает срезы здоровых областей. Диагностика не закрывает
+мультитрековый, listening или hardware gate. Итоговые проверки после
+truth-записи ещё требуются. Evidence и следующий шаг:
+`Docs/reports/GOAL_RECOVERY_DIAGNOSTIC_20260923.md`.
 
 ## M123 Instrument Space decision integration — 2026-08-04
 
@@ -364,7 +372,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `codex_security_local_remediation_truth_sync` at `2026-08-19T21:17:30Z`.
+Latest ledger handoff row: `spectral_recovery_diagnostic_local_fix` at `2026-09-23T19:17:17Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

@@ -10,8 +10,20 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-08-19T21:17:30Z",
+  "last_heartbeat_utc": "2026-09-23T19:17:17Z",
   "current_writer_lease": null,
+  "spectral_recovery_diagnostic_20260923": {
+    "status": "local_fix_targeted_verified_final_validation_pending",
+    "report": "Docs/reports/GOAL_RECOVERY_DIAGNOSTIC_20260923.md",
+    "scope": "mix_bus spectral stage, six defects, three synthetic noise seeds",
+    "mean_recovery_before": [0.0319, 0.0317, 0.0316],
+    "mean_recovery_after": [0.0635, 0.0636, 0.0634],
+    "full_pipeline_verified": false,
+    "multitrack_or_listening_gate_closed": false,
+    "next_software_action": "Evaluate the full offline pipeline on three distinct multitracks and fix the largest measured recovery failure",
+    "hardware_contacted": false,
+    "live_writes": false
+  },
   "m123_instrument_space_checkpoint": {
     "recorded_at_utc": "2026-08-04T21:40:47Z",
     "status": "WAITING_FOR_EXTERNAL_VALIDATION",

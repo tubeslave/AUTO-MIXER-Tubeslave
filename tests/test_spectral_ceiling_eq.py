@@ -3,6 +3,7 @@ import subprocess
 import sys
 
 import numpy as np
+import pytest
 import soundfile as sf
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "backend"))
@@ -157,6 +158,83 @@ def test_master_bus_correction_is_limited_to_one_db():
     assert proposal.bands
     assert all(abs(band.gain_db) <= 1.0 for band in proposal.bands)
     assert proposal.safety["max_abs_gain_db"] == 1.0
+
+
+def _recovery_noise(seed):
+    from scipy.signal import lfilter
+
+    audio = lfilter(
+        [0.049922035, -0.095993537, 0.050612699, -0.004408786],
+        [1, -2.494956002, 2.017265875, -0.522189400],
+        np.random.default_rng(seed).standard_normal(4 * 48000),
+    )
+    return 0.3 * audio / np.max(np.abs(audio))
+
+
+def _repair_mix_spectrum(audio, sample_rate):
+    from mix_agent.actions.base import apply_parametric_eq
+    from mix_agent.agent.decision_loop import _spectral_actions_for_proposal
+
+    proposal = SpectralCeilingEQAnalyzer().analyze(
+        audio, instrument_role="mix_bus", sample_rate=sample_rate,
+    )
+    repaired = audio.copy()
+    for action in _spectral_actions_for_proposal(proposal, "mix"):
+        if action.mode != "safe_apply":
+            continue
+        assert action.action_type == "parametric_eq"
+        parameters = action.parameters
+        repaired = apply_parametric_eq(
+            repaired, sample_rate, parameters["frequency_hz"],
+            parameters["gain_db"], parameters["q"],
+        )
+    return repaired
+
+
+@pytest.mark.parametrize("seed", [7, 23, 91])
+def test_mix_bus_recovery_does_not_cut_healthy_bands_around_a_scoop(seed):
+    from recovery_trial import run_trial, spectral_distance_db
+
+    original = _recovery_noise(seed)
+    report = run_trial(original, 48000, _repair_mix_spectrum)
+    by_defect = {result.defect: result for result in report.results}
+
+    assert by_defect["scooped_mids"].recovery_ratio >= -0.01
+    for defect in ("mud_300", "harsh_3k", "boxy_500"):
+        assert by_defect[defect].recovery_ratio > 0.05
+    assert all(result.recovery_ratio >= -0.01 for result in report.results)
+    assert spectral_distance_db(
+        _repair_mix_spectrum(original, 48000), original, 48000,
+    ) < 0.01
+
+
+def test_mix_bus_recovery_decisions_are_invariant_to_input_gain():
+    from recovery_trial import DEFAULT_CORPUS, apply_defect
+
+    analyzer = SpectralCeilingEQAnalyzer()
+    damaged = apply_defect(_recovery_noise(7), 48000, DEFAULT_CORPUS[0])
+    decisions = []
+    for gain_db in (0.0, -6.0, -12.0):
+        proposal = analyzer.analyze(
+            damaged * 10 ** (gain_db / 20),
+            instrument_role="mix_bus", sample_rate=48000,
+        )
+        assert proposal.should_apply
+        decisions.append([(band.name, band.gain_db) for band in proposal.bands])
+    assert decisions[0] == decisions[1] == decisions[2]
+
+
+@pytest.mark.parametrize("slope", [0.0, -3.0, -6.0])
+def test_broadband_reference_respects_target_slope_and_local_deficits(slope):
+    from heuristics.spectral_ceiling_eq import _reference_db
+
+    frequencies = np.geomspace(80.0, 14000.0, 120)
+    spectrum = -24.0 + slope * np.log2(frequencies / 1000.0)
+    spectrum[(frequencies > 700.0) & (frequencies < 1400.0)] -= 4.0
+    reference = _reference_db(
+        frequencies, spectrum, 1000.0, slope_db_per_oct=slope,
+    )
+    assert reference == pytest.approx(-24.0)
 
 
 def test_config_disabled_returns_no_applyable_moves():

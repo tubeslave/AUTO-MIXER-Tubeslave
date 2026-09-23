@@ -16,6 +16,8 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 import numpy as np
 
 EPS = 1e-12
+SPECTRAL_FIT_LOW_HZ = 80.0
+SPECTRAL_FIT_HIGH_HZ = 14000.0
 DEFAULT_PROFILE_PATH = (
     Path(__file__).resolve().parents[2] / "configs" / "spectral_ceiling_profiles.yaml"
 )
@@ -481,8 +483,8 @@ def estimate_spectral_tilt_db_per_oct(
     frequencies_hz: np.ndarray,
     magnitude_db: np.ndarray,
     *,
-    low_hz: float = 80.0,
-    high_hz: float = 14000.0,
+    low_hz: float = SPECTRAL_FIT_LOW_HZ,
+    high_hz: float = SPECTRAL_FIT_HIGH_HZ,
 ) -> float:
     """Estimate broad dB/oct spectral tilt from a smoothed spectrum."""
     freqs = np.asarray(frequencies_hz, dtype=np.float64)
@@ -502,9 +504,22 @@ def _reference_db(
     frequencies_hz: np.ndarray,
     magnitude_db: np.ndarray,
     reference_freq_hz: float,
+    *,
+    slope_db_per_oct: Optional[float] = None,
 ) -> float:
     freqs = np.asarray(frequencies_hz, dtype=np.float64)
     mags = np.asarray(magnitude_db, dtype=np.float64)
+    if slope_db_per_oct is not None:
+        # A local dip at the anchor must not lower the ceiling of the whole mix.
+        broadband = (
+            (freqs >= SPECTRAL_FIT_LOW_HZ) & (freqs <= SPECTRAL_FIT_HIGH_HZ)
+            & np.isfinite(freqs) & np.isfinite(mags)
+        )
+        if np.count_nonzero(broadband) >= 4:
+            offsets = mags[broadband] - slope_db_per_oct * np.log2(
+                freqs[broadband] / reference_freq_hz
+            )
+            return float(np.median(offsets))
     low = reference_freq_hz / math.sqrt(2.0)
     high = reference_freq_hz * math.sqrt(2.0)
     mask = (freqs >= low) & (freqs <= high)
@@ -622,7 +637,12 @@ class SpectralCeilingEQAnalyzer:
             target_db = np.asarray([], dtype=np.float64)
         else:
             measured_tilt = estimate_spectral_tilt_db_per_oct(frequencies, measured_db)
-            reference_db = _reference_db(frequencies, measured_db, cfg.reference_freq_hz)
+            reference_db = _reference_db(
+                frequencies, measured_db, cfg.reference_freq_hz,
+                slope_db_per_oct=(
+                    profile.effective_slope_db_per_oct if role == "mix_bus" else None
+                ),
+            )
             target_db = generate_noise_slope_curve(
                 frequencies,
                 slope_db_per_oct=profile.effective_slope_db_per_oct,
