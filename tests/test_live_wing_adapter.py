@@ -91,6 +91,26 @@ def test_control_plane_fader_roundtrip_uses_real_query_after_write():
     ]
 
 
+def test_main_fader_roundtrip_uses_same_fresh_readback_boundary():
+    client = FakeWingClient({"/main/1/fdr": -3.0})
+    adapter = WingWriteAdapter(client)
+    plane = LiveControlPlane(adapter)
+    action = _fader_action(-3.5, target="main:1", reason="main transport migration test")
+
+    result = plane.execute(action, LiveMode.BENCH_TEST)
+
+    assert result.wrote is True
+    assert result.verified.before == -3.0
+    assert result.verified.readback == -3.5
+    assert result.verified.accepted is True
+    assert result.verified.rollback_value == -3.0
+    assert client.sent == [
+        ("/main/1/fdr", ()),
+        ("/main/1/fdr", (-3.5,)),
+        ("/main/1/fdr", ()),
+    ]
+
+
 def test_missing_fresh_readback_times_out_instead_of_trusting_cache():
     client = FakeWingClient({"/ch/1/fdr": -5.0}, drop_queries=True)
     adapter = WingWriteAdapter(client, readback_timeout=.01)
@@ -107,7 +127,7 @@ def test_transport_write_failure_is_not_silently_accepted():
         adapter.write_value(_fader_action(-4.0))
 
 
-def test_only_migrated_channel_fader_surface_is_available():
+def test_only_migrated_fader_surfaces_are_available():
     client = FakeWingClient({"/ch/1/fdr": -5.0})
     adapter = WingWriteAdapter(client)
 
@@ -115,5 +135,9 @@ def test_only_migrated_channel_fader_surface_is_available():
         adapter.write_value(_fader_action(parameter="eq_gain_db"))
     with pytest.raises(ValueError, match="channel out of range"):
         adapter.write_value(_fader_action(target="ch:41"))
+    with pytest.raises(ValueError, match="main out of range"):
+        adapter.write_value(_fader_action(target="main:5"))
+    with pytest.raises(ValueError, match="Unsupported WING target"):
+        adapter.write_value(_fader_action(target="bus:1"))
     with pytest.raises(ValueError, match="outside WING range"):
         adapter.write_value(_fader_action(value=12.0))
