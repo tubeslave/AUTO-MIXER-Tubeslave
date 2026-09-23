@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
-from .contracts import ChannelFeatures,MixFeatures,ProposedAction
+from .contracts import ChannelFeatures,EqBandLocator,MixFeatures,ProposedAction
 
 @dataclass(frozen=True)
 class LiveHypothesis:
@@ -18,9 +18,16 @@ def _by_name(channels:Iterable[ChannelFeatures],needle:str)->list[ChannelFeature
     return [c for c in channels if n in c.name.lower()]
 
 def propose_one(features:MixFeatures,roles:dict[int,str],
-                masking:dict[tuple[int,int],float]|None=None)->LiveHypothesis|None:
-    """Studio-style live reasoning: one evidence-backed bounded hypothesis at a time."""
+                masking:dict[tuple[int,int],float]|None=None,
+                eq_locators:dict[tuple[int,str],EqBandLocator]|None=None)->LiveHypothesis|None:
+    """Studio-style live reasoning: one evidence-backed bounded hypothesis at a time.
+
+    EQ ideas are intentionally not hardware-actionable until upstream analysis
+    supplies an explicit physical band locator. This prevents an abstract
+    "reduce 0.7 dB" idea from landing on an arbitrary WING EQ slot.
+    """
     masking=masking or {}
+    eq_locators=eq_locators or {}
     candidates:list[LiveHypothesis]=[]
     leads=[c for c in features.channels if roles.get(c.channel)=="lead_vocal"]
     music=[c for c in features.channels if roles.get(c.channel) in {"guitar","keys","playback","music_bus"}]
@@ -31,14 +38,17 @@ def propose_one(features:MixFeatures,roles:dict[int,str],
         for m in music:
             overlap=float(masking.get((v.channel,m.channel),0.))
             if overlap<.35: continue
+            locator=eq_locators.get((m.channel,"vocal_masking"))
+            if locator is None: continue
             # harshness here is used only as supporting evidence on the masker.
             conf=min(.94,.58+.28*overlap+.08*max(0.,m.harshness or 0.))
             candidates.append(LiveHypothesis(
                 "vocal_masking_release",f"ch:{v.channel}",
                 f"{m.name} overlaps active lead vocal; release presence on masker, not boost master.",
                 conf,
-                ProposedAction(f"ch:{m.channel}","eq_gain_db",-0.7,
-                    f"free lead vocal from {m.name} masking",conf,max_step=1.0,risk="low"),
+                ProposedAction(f"ch:{m.channel}","eq_gain_delta_db",-0.7,
+                    f"free lead vocal from {m.name} masking",conf,max_step=1.0,risk="low",
+                    eq_locator=locator),
                 "vocal_intelligibility",.03))
 
     # Headroom: source/group correction is preferred; main cut is a last safety move.
@@ -51,14 +61,18 @@ def propose_one(features:MixFeatures,roles:dict[int,str],
             conf,ProposedAction("main:1","fader_delta_db",-0.5,"restore main headroom",conf,max_step=.5,risk="low"),
             "main_peak_dbfs",.25))
 
-    # Harsh source correction. Do not touch inactive channels.
+    # Harsh source correction. Do not touch inactive channels and do not invent
+    # a physical band when the realtime state/evidence layer has not selected one.
     for c in features.channels:
         if c.activity>.45 and (c.harshness or 0)>.78:
+            locator=eq_locators.get((c.channel,"harshness"))
+            if locator is None: continue
             conf=min(.9,.62+.3*(c.harshness or 0))
             candidates.append(LiveHypothesis(
                 "source_harshness",f"ch:{c.channel}",f"{c.name} has persistent upper-presence excess.",
-                conf,ProposedAction(f"ch:{c.channel}","eq_gain_db",-0.6,
-                    "bounded dynamic/PEQ presence reduction",conf,max_step=.8,risk="low"),
+                conf,ProposedAction(f"ch:{c.channel}","eq_gain_delta_db",-0.6,
+                    "bounded PEQ presence reduction",conf,max_step=.8,risk="low",
+                    eq_locator=locator),
                 "harshness",.04))
 
     return max(candidates,key=lambda h:h.confidence) if candidates else None
