@@ -95,3 +95,15 @@ A legacy module may be deleted when:
 - deleting it does not remove the only rollback/readback/safety implementation.
 
 Git history is the archive. We do not keep dead code in the active tree merely as a museum.
+
+
+## Cleanup pass 1 — completed
+- Removed 448 generated top-level session artifacts from the active tree.
+- Added sessions/ to .gitignore so runtime state does not return to source control.
+- Removed 430 auto-collected article/book/video cards from backend/ai/knowledge.
+- Preserved the six runtime-curated knowledge files explicitly used by KnowledgeBase.AGENT_RUNTIME_CATEGORIES:
+  agent_auto_apply_protocol, instrument_profiles, live_sound_checklist, mixing_rules, troubleshooting, wing_osc_reference.
+- Tracked-file count dropped from 1,821 to 944 without deleting WING/OSC/audio/Dante infrastructure or new Studio/Live code.
+- Git history remains the archive for all removed material.
+
+Next cleanup target: backend/server.py composition root and parallel legacy decision controllers.
