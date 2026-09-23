@@ -1,0 +1,16 @@
+{
+  "goal": "studio-compression-v2",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "381f8fad1cf30e046f71ca38adea792fd359b46e",
+  "priority_reason": "explicit user request; reproducible shared DSP failures",
+  "local_targeted_tests": {"passed": 42},
+  "local_full_suite": "collection blocked: pythonosc missing; no passing claim",
+  "scope": "causal shared source compression and offline dynamics adapter",
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "ptitsa_and_belye_masters": "unchanged; human listening pending",
+  "next_goal": "inspect real-source comparisons and full exact-branch CI; accept or revise code, never auto-accept music"
+}
