@@ -1,14 +1,55 @@
 {
   "goal": "studio-mastering-meter-integration-with-live-isolation",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "c66a2d418ac4aeb704de72b861c0b708fed07cc1",
   "source_commit": "a5b472fcbcf5290510667a304e9da3774fee54b2",
   "source_prs": [112, 113],
+  "integration_pr": 114,
+  "tested_code_commit": "e4ef5c31f47f2dde163e0bc21d0db249a3f0e8dc",
+  "ci_merge_commit": "41d41a378fbccf8167d25f9e1698822342a0acb4",
+  "merged_commit": "b11f32c441a82f3799d28db4a38272e48afcff3c",
   "method": "exact-mastering-blobs-only-no-live-merge",
+  "integrated_path": "backend AutoMaster used by tools/offline_agent_mix.py",
   "protected_unchanged_paths": ["audio_workbench/", "mix_agent/", "backend/lufs_gain_staging.py"],
+  "validation": {
+    "workflow_run": 35915142706,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "focused_suite": {"passed": 15, "verified_log_job_id": 107364622372},
+    "full_suite_python_3_11": {"passed": 1144, "skipped": 2, "warnings": 2},
+    "subprocess_modes": ["builtin", "reference_fallback", "safety_only"],
+    "network_attempts": 0,
+    "audio_device_modules_imported": false,
+    "source_and_reference_arrays_unchanged": true,
+    "stereo_ratio_and_frame_count_preserved": true,
+    "builtin_fixture_lufs": -18.000000171828315,
+    "fallback_fixture_lufs": -18.000000300674554,
+    "safety_fixture_true_peak_dbtp": -0.9999999497790988,
+    "scope": "synthetic mastering fixtures and existing full regression suite; not subjective music acceptance"
+  },
+  "additional_mock_regression": {
+    "baseline_artifact_id": 10769336628,
+    "master_integration_artifact_id": 10773893754,
+    "fixture_wav_equal": true,
+    "fixed_mix_wav_equal": true,
+    "report_equal": true,
+    "splitter_mode": "mock",
+    "osc_disabled": true,
+    "actions": [],
+    "limitation": "existing mock fixture only; does not exercise neural cleanup or prove all shared live/offline paths invariant"
+  },
+  "known_non_failing_warnings": [
+    "Matchering scipy.ndimage.filters import deprecated",
+    "Optuna metric naming API experimental",
+    "Existing AutomaticMixingPapers submodule URL missing during post-checkout cleanup"
+  ],
+  "architecture_limitations": [
+    "Studio and live still share DSP and rule/agent components; no blanket independence claim",
+    "Workbench MasteringDirector and its separate budget/evidence path were preserved, not replaced by AutoMaster",
+    "Changes are committed in the repository, not deployed to the user's local computer"
+  ],
   "audio_baseline_promoted": false,
   "ptitsa_cleanup_status": "pending_human_review",
   "paid_services_used": false,
-  "next_goal": "verify focused offline-boundary renders and full CI, then integrate into Workbench without changing live code"
+  "next_goal": "Mastering Target Controller v2: bounded gain/drive candidates with loudness/true-peak and limiter-budget evidence, retaining human approval for audible output"
 }
