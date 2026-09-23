@@ -169,3 +169,25 @@ def test_iteration_requires_no_change_counterfactual(tmp_path, monkeypatch):
             plan=plan, critic_result=_critic("machine_safe"), evaluation_confidence=0.9,
         )
     assert calls == []
+
+
+def test_real_iteration_delivery_exports_audition_without_promoting_baseline(tmp_path):
+    baseline = tmp_path / "baseline.wav"
+    candidate = tmp_path / "candidate.wav"
+    _write_tone(baseline, gain=0.08, frames=48000)
+    _write_tone(candidate, gain=0.075, frames=48000)
+
+    report = studio_iteration.run_studio_iteration(
+        baseline, candidate, tmp_path / "run",
+        baseline_id="baseline-real", candidate_id="candidate-real",
+        plan=_plan(), critic_result=_critic("machine_safe"), evaluation_confidence=0.9,
+        target_lufs=-18.0, ceiling_dbtp=-1.2,
+    )
+
+    assert report["status"] == "pending_human_review"
+    assert report["baseline_promoted"] is False
+    assert report["baseline_after"] == "baseline-real"
+    assert report["delivery"]["candidate_audition_exported"] is True
+    assert report["delivery"]["mastering"]["status"] != "rejected"
+    assert (tmp_path / "run" / "master" / "Iteration_Master.wav").exists()
+    assert (tmp_path / "run" / "master" / "Iteration_Master_320.mp3").exists()
