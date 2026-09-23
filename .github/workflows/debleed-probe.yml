@@ -1,0 +1,32 @@
+name: Debleed source probe
+on:
+  push:
+    branches: [audio-workbench-mcp-v0.1]
+    paths: [.github/workflows/debleed-probe.yml]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect public Yandex source
+        shell: python
+        run: |
+          import json, urllib.parse, urllib.request
+          key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
+          base="https://cloud-api.yandex.net/v1/disk/public/resources"
+          def get(path=""):
+              q={"public_key":key,"limit":100}
+              if path:q["path"]=path
+              u=base+"?"+urllib.parse.urlencode(q)
+              with urllib.request.urlopen(u,timeout=60) as r:return json.load(r)
+          root=get()
+          print("ROOT",root.get("name"),root.get("type"),root.get("size"))
+          items=(root.get("_embedded") or {}).get("items",[])
+          for x in items:
+              print("ITEM",x.get("name"),x.get("type"),x.get("size"),x.get("path"))
+              if x.get("type")=="dir":
+                  try:
+                      sub=get(x.get("path",""))
+                      for y in (sub.get("_embedded") or {}).get("items",[]):
+                          print(" SUB",y.get("name"),y.get("type"),y.get("size"),y.get("path"))
+                  except Exception as e: print(" SUBERR",e)
