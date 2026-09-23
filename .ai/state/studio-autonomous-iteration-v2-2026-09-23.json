@@ -1,0 +1,37 @@
+{
+  "branch": "audio-workbench-mcp-v0.1",
+  "scope": "studio_offline",
+  "task": "Make Autonomous Iteration consume Perceptual Critic v2 states without silently moving the studio baseline",
+  "status": "validation_pending",
+  "decision": "pending_ci",
+  "implementation": {
+    "quality_loop_commit": "c3d34420e6281641b172719c86bbbc75aa8e32b7",
+    "quality_loop_tests_commit": "f54cd5c936db8de89cf42f9d7fb416a9d20e8801",
+    "autonomous_loop_commit": "6df78c466948e85dddb8c1e983caa5f1ce4f4857",
+    "autonomous_loop_tests_commit": "ad110f905e18e3d72fd4160d9c5e623ffeee506c",
+    "contract": [
+      "Perceptual Critic rejected is a terminal machine veto for the candidate and routes to rollback_candidate.",
+      "pending_human_review keeps the current baseline unchanged and routes to human_listening.",
+      "machine_safe perceptual candidates marked requires_human_listening remain pending until explicit human acceptance.",
+      "Only an accepted transition returns promote_baseline and changes baseline_after to candidate.id.",
+      "Critic evidence, uncertainty and protected_regressions are copied into the iteration transition record for audit.",
+      "Human acceptance cannot override a critic rejection or a failed causal/protected-metric gate."
+    ]
+  },
+  "validation": {
+    "local_transition_smoke": "5 transition scenarios matched the intended state contract; this was a direct logic smoke, not the repository pytest suite",
+    "stem_offline_run": 35886914812,
+    "stem_offline_status": "success",
+    "github_tests_run": 35886914788,
+    "github_tests_status_at_record_time": "in_progress"
+  },
+  "current_cleanup_baseline": {
+    "status": "pending_human_review",
+    "workflow_run": 35859737710,
+    "note": "Balance-transparent Ptitsa cleanup remains outside the accepted baseline until human RAW/CLEAN listening accepts it, with special attention to both vocals."
+  },
+  "next_studio_goal_after_validation": {
+    "id": "mastering-director-v2",
+    "task": "Audit and harden Mastering Director so loudness/limiting changes are bounded, true-peak safe, preserve protected punch/crest metrics, produce A/B evidence and still require human listening for subjective acceptance."
+  }
+}
