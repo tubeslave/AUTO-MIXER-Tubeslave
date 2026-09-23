@@ -18,7 +18,7 @@ jobs:
       - name: Download full Ptitsa song multitrack
         shell: python
         run: |
-          import json,urllib.parse,urllib.request,subprocess,pathlib
+          import json,urllib.parse,urllib.request,subprocess,pathlib,re
           key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
           prefixes=["BASS","FLOOR","GTR","HI HAT","KEYS L","KEYS R","KICK IN","KICK OUT","NIKITA VOX",
                     "OH R","OHL","PB L","PB R","SN B","SN T","TOM 1","TOM 2","VALERA VOX"]
@@ -31,7 +31,10 @@ jobs:
           pathlib.Path("work/raw").mkdir(parents=True,exist_ok=True)
           start=29*60+54; dur=259
           for prefix in prefixes:
-              matches=[n for n in names if n.upper().startswith(prefix+" ") or n.upper()==prefix+".WAV"]
+              def canon(s):
+                  return re.sub(r"[^A-Z0-9]+"," ",s.upper()).strip()
+              cp=canon(prefix)
+              matches=[n for n in names if canon(n).startswith(cp+" ") or canon(n)==cp+" WAV"]
               if not matches:
                   raise RuntimeError(f"No WAV found for {prefix}; available={names}")
               name=sorted(matches)[0]
