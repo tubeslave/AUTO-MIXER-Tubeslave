@@ -1,0 +1,11 @@
+{
+  "completed": [],
+  "active": {
+    "id": "cleanup-model-validation",
+    "title": "Validate model-based source cleanup",
+    "objective": "Finish the full-song pretrained cleanup experiment and accept/reject processing per source from evidence."
+  },
+  "history": [
+    {"event":"director_enabled","note":"Autonomous roadmap execution enabled."}
+  ]
+}
