@@ -14,8 +14,15 @@
     "studio-perceptual-v21": [
       "Perceptual Critic now has an explicit one-hypothesis candidate acceptance gate",
       "Target-direction and collateral-regression tests added; focused perceptual tests passed 6/6",
-      "Full CI exposed an unrelated low-sample-rate Artifact Critic bug before reaching the new gate",
-      "Artifact Critic was revised to be Nyquist-safe and to use a click-rate-specific regression tolerance; CI rerun 35835666282 pending"
+      "Artifact Critic was revised to be Nyquist-safe and to use a click-rate-specific regression tolerance",
+      "Full CI subsequently reached a separate editing-performance regression instead of the former Artifact Critic failure"
+    ],
+    "studio-editing-small-sample": [
+      "Full Tests run 35837914007 failed identically on Python 3.10/3.11/3.12 because robust_outliers disabled all passages shorter than eight events",
+      "Short-passage policy revised: six events can expose an extreme level defect; fewer than six remain diagnose-only",
+      "A 0.25 dB robust-scale floor prevents tiny low-variance performance differences from becoming false outliers",
+      "Regression coverage added for an obvious six-event defect, a stable six-event phrase, and a five-event diagnose-only phrase",
+      "Code/test commits 6857abc97c6a8bc250df39d9c4293771f3ce9aca and 9589529c27a799b3c5f6a57e5704a6d83c0113ef; Tests run 35840719646 in progress"
     ]
   },
   "blockers": [
@@ -32,6 +39,8 @@
     {"event":"parallel_task_completed","goal":"live-soundcheck-v2","commit":"a29759f5534fdf86a3bbad2027c8caaa7ed4db4e","workflow_run":35833133811,"result":"success","note":"Studio-derived live decision engine tests are now part of CI and passed."},
     {"event":"parallel_task_implemented","goal":"studio-perceptual-v21","commits":["25fef09180cec11d3a3e63b13bf701955b01f64e","dad336fbdc5b8d81b254cde57ee57e763ddea7c5"],"result":"focused_tests_passed","tests":"6/6","note":"Added perceptual candidate acceptance and collateral regression guards."},
     {"event":"ci_failure_analyzed","goal":"studio-perceptual-v21","workflow_run":35835155423,"result":"unrelated_preexisting_failure","note":"Artifact Critic attempted a 6-14 kHz bandpass at 8 kHz sample rate and click-rate regression used an unsuitable generic 0.08 threshold."},
-    {"event":"ci_revision_applied","goal":"studio-perceptual-v21","commit":"1b6286a1698223418024a3316816cddba6a6e3e4","workflow_run":35835666282,"result":"pending_ci","note":"Made Artifact Critic Nyquist-safe and click regression sensitivity metric-specific; reproduced failing synthetic fixture successfully after revision."}
+    {"event":"ci_revision_applied","goal":"studio-perceptual-v21","commit":"1b6286a1698223418024a3316816cddba6a6e3e4","workflow_run":35835666282,"result":"superseded_by_later_ci","note":"Made Artifact Critic Nyquist-safe and click regression sensitivity metric-specific; later CI progressed to an editing-performance failure."},
+    {"event":"ci_failure_analyzed","goal":"studio-editing-small-sample","workflow_run":35837914007,"result":"editing_policy_regression","note":"All three Python jobs stopped at test_editing_performance: a clearly defective sixth event was suppressed solely by the hard len<8 guard."},
+    {"event":"ci_revision_applied","goal":"studio-editing-small-sample","commits":["6857abc97c6a8bc250df39d9c4293771f3ce9aca","9589529c27a799b3c5f6a57e5704a6d83c0113ef"],"workflow_run":35840719646,"result":"pending_ci","note":"Lowered the evidence floor to six events, added a robust-scale floor, and added regression coverage without enabling edits for phrases shorter than six events."}
   ]
 }
