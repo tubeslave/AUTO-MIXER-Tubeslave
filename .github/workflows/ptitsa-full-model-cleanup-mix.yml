@@ -20,21 +20,25 @@ jobs:
         run: |
           import json,urllib.parse,urllib.request,subprocess,pathlib
           key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
-          names=[
-          "BASS 0002 [2023-03-03 191740].wav","FLOOR 0002 [2023-03-03 191740].wav","GTR 0002 [2023-03-03 191740].wav",
-          "HI HAT 0002 [2023-03-03 191740].wav","KEYS L 0002 [2023-03-03 191740].wav","KEYS R 0002 [2023-03-03 191740].wav",
-          "KICK IN 0002 [2023-03-03 191740].wav","KICK OUT 0002 [2023-03-03 191740].wav","NIKITA VOX 0002 [2023-03-03 191740].wav",
-          "OH R 0002 [2023-03-03 191740].wav","OHL 0002 [2023-03-03 191740].wav","PB L 0002 [2023-03-03 191740].wav",
-          "PB R 0002 [2023-03-03 191740].wav","SN B 0002 [2023-03-03 191740].wav","SN T 0002 [2023-03-03 191740].wav",
-          "TOM 1 0002 [2023-03-03 191740].wav","TOM 2 0002 [2023-03-03 191740].wav","VALERA VOX 0002 [2023-03-03 191740].wav"]
+          prefixes=["BASS","FLOOR","GTR","HI HAT","KEYS L","KEYS R","KICK IN","KICK OUT","NIKITA VOX",
+                    "OH R","OHL","PB L","PB R","SN B","SN T","TOM 1","TOM 2","VALERA VOX"]
+          # Resolve the real current filenames from the public folder instead of guessing timestamp suffixes.
+          q=urllib.parse.urlencode({"public_key":key,"limit":100})
+          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources?"+q,timeout=60) as r:
+              listing=json.load(r)
+          items=listing.get("_embedded",{}).get("items",[])
+          names=[i["name"] for i in items if i.get("type")=="file" and i["name"].lower().endswith(".wav")]
           pathlib.Path("work/raw").mkdir(parents=True,exist_ok=True)
-          # Ptitsa starts at 29:54 in the concert files; 4:19 duration.
           start=29*60+54; dur=259
-          for name in names:
+          for prefix in prefixes:
+              matches=[n for n in names if n.upper().startswith(prefix+" ") or n.upper()==prefix+".WAV"]
+              if not matches:
+                  raise RuntimeError(f"No WAV found for {prefix}; available={names}")
+              name=sorted(matches)[0]
               q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
               with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
                   href=json.load(r)["href"]
-              out="work/raw/"+name.split(" 0002")[0].replace(" ","_")+".wav"
+              out="work/raw/"+prefix.replace(" ","_")+".wav"
               subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",href,
                               "-t",str(dur),"-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
       - name: Neural cleanup selected sources
