@@ -4,7 +4,7 @@
 Move the old Automixer onto the new Studio + Live architecture. Prefer deletion/rebuild over preserving legacy heuristics that can silently compete with the new Directors.
 
 ## Repository snapshot
-- 1,821 tracked files.
+- 1,821 tracked files at the start of the audit.
 - backend/: 666 files.
 - audio_workbench/: 111 files.
 - tests/: 143 files.
@@ -71,7 +71,7 @@ Target composition:
 - legacy automatic controllers are not instantiated by default.
 
 ## Knowledge-base cleanup
-backend/ai/knowledge contains hundreds of auto-collected cards, including unrelated books/videos/articles. Do not use it as an authoritative runtime knowledge source.
+backend/ai/knowledge contained hundreds of auto-collected cards, including unrelated books/videos/articles. It is not an authoritative runtime knowledge source.
 Plan:
 1. preserve only curated instrument/mixing/live/WING documents;
 2. move source-grounded learning to the newer Mixing Learning store;
@@ -96,7 +96,6 @@ A legacy module may be deleted when:
 
 Git history is the archive. We do not keep dead code in the active tree merely as a museum.
 
-
 ## Cleanup pass 1 — completed
 - Removed 448 generated top-level session artifacts from the active tree.
 - Added sessions/ to .gitignore so runtime state does not return to source control.
@@ -106,4 +105,26 @@ Git history is the archive. We do not keep dead code in the active tree merely a
 - Tracked-file count dropped from 1,821 to 944 without deleting WING/OSC/audio/Dante infrastructure or new Studio/Live code.
 - Git history remains the archive for all removed material.
 
-Next cleanup target: backend/server.py composition root and parallel legacy decision controllers.
+## Cleanup pass 2 — live composition seam
+Classification and action:
+- KEEP: websocket handler API names and callback/event transport, because the frontend still depends on them.
+- MIGRATE: AutoSoundcheckEngine. It remains temporarily underneath a dedicated compatibility bridge because it still contains useful discovery/audio/readback/logging plumbing.
+- KEEP/AUTHORITY: backend/live_runtime/service.py now owns construction of the live soundcheck engine.
+- DELETE FROM NEW ENTRYPOINTS: handlers no longer import or construct AutoSoundcheckEngine directly.
+- QUARANTINE-IN-PLACE: legacy engine decision heuristics remain reachable only through the bridge until their useful plumbing is split out and their decision authority is replaced.
+
+Behavioral changes:
+- missing live mode now defaults to OBSERVE, not the old implicit write-capable path;
+- explicit BENCH_TEST is preserved for visible WING development testing;
+- explicit legacy `observe_only: false` maps to SUPERVISED, never BENCH_TEST;
+- invalid modes are rejected before engine construction;
+- live mode is surfaced in start/state events for auditability.
+
+Replacement tests:
+- tests/test_soundcheck_handlers.py verifies the live_runtime construction seam, safe default, explicit BENCH_TEST and invalid-mode blocking;
+- tests/test_live_runtime_service.py verifies bridge mode mapping and isolates the one remaining legacy engine import.
+
+Next cleanup target:
+- remove the direct AutoSoundcheckEngine import/type dependency from backend/server.py;
+- inventory server-owned AutoEQ/AutoFader/AutoCompressor startup surfaces and move them behind live_runtime or disable them by default;
+- then split WING/audio/readback plumbing out of AutoSoundcheckEngine so the legacy decision loop can be deleted.
