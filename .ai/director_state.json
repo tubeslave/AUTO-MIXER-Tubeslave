@@ -56,10 +56,11 @@
       "Cleanup contract updated in commit 6385478b1309ba1076a4569df9ada53c55f7aefc: time/length align, active-level match within 0.05 dB, preserve gain/pan/automation until Mixing Director"
     ],
     "studio-mastering-numpy2": [
-      "Tests run 35853333095 reached tests/test_mastering_streaming.py after 672 passed and 2 skipped on Python 3.11, then failed because NumPy 2.4.6 removed np.trapz",
-      "Mastering analyzer now prefers np.trapezoid and falls back to np.trapz for older NumPy; fix commit cf19fea72b8a062b00d311b6663be9357dcd6cb1",
-      "Stem Offline Test run 35865011214 passed on the fix commit",
-      "Full Tests matrix run 35865011220 is still verifying the fix"
+      "Tests run 35853333095 reached tests/test_mastering_streaming.py after 672 passed and 2 skipped on Python 3.11, then failed because NumPy 2 removed np.trapz in mastering analyzer",
+      "Analyzer compatibility fix cf19fea72b8a062b00d311b6663be9357dcd6cb1 switched to np.trapezoid with legacy np.trapz fallback",
+      "The next matrix run 35865011220 progressed further to 892 passed and 2 skipped on Python 3.12, exposing the same obsolete np.trapz call in musical_critic.py",
+      "Musical Critic now reuses the shared NumPy-compatible integration helper; fix commit 6eca08d37badafb6ae838fbe387158036e873fa9",
+      "Full Tests run 35865456706 passed on Python 3.10, 3.11 and 3.12; Stem Offline Test 35865011214 also passed on the analyzer fix"
     ]
   },
   "blockers": [
@@ -69,14 +70,6 @@
       "workflow_run": 35859737710,
       "step": "Same-balance RAW vs CLEAN full-mix A/B, then per-source RAW/CLEAN/REMOVED checks where needed",
       "note": "Machine balance-transparency checks passed. Subjective timbre/artifact acceptance is still required, especially for NIKITA_VOX and VALERA_VOX because their cleanup outputs needed +4.781 dB and +3.502 dB level restoration."
-    },
-    {
-      "goal": "studio-ci",
-      "status": "ci_verification_in_progress",
-      "commit": "cf19fea72b8a062b00d311b6663be9357dcd6cb1",
-      "workflow_run": 35865011220,
-      "step": "Full Tests matrix",
-      "note": "The previous full matrix reached mastering streaming and exposed NumPy 2 removal of np.trapz. The analyzer compatibility fix is committed; Stem Offline Test is green and Full Tests is still running."
     }
   ],
   "history": [
@@ -95,6 +88,7 @@
     {"event":"ci_revision_applied","goal":"studio-guitar-wall-nyquist","commit":"7e4d395b9631abf14bfc8bda3c2b98a90ef8a6fb","result":"cleared_by_later_ci","note":"Made the wall-layer filter Nyquist-safe and corrected the reduced-rate fixture; later CI progressed through 672 passes before a mastering compatibility failure."},
     {"event":"cleanup_balance_rerender_validated","goal":"cleanup-model-validation","commit":"10476989915e54eded8f6c6c1055cef2fd6c8fd3","workflow_run":35859737710,"artifact_id":10749861292,"result":"machine_gate_passed_human_pending","note":"CLEAN sources were length-aligned and active-RMS matched to RAW under the frozen mix recipe. All 11 passed <=0.05 dB active-level delta; vocals required +4.781/+3.502 dB restoration. Same-balance RAW/CLEAN A/B rendered for human acceptance."},
     {"event":"cleanup_contract_revised","goal":"cleanup-model-validation","commit":"6385478b1309ba1076a4569df9ada53c55f7aefc","result":"documented","note":"Cleanup is now explicitly prohibited from changing mix balance; gain/pan/automation belong to Mixing Director after cleanup acceptance."},
-    {"event":"ci_revision_applied","goal":"studio-mastering-numpy2","commit":"cf19fea72b8a062b00d311b6663be9357dcd6cb1","workflow_run":35865011220,"result":"verification_in_progress","note":"Replaced direct np.trapz use with NumPy-2-compatible np.trapezoid plus legacy fallback after the previous matrix failed at mastering streaming; Stem Offline Test 35865011214 is green."}
+    {"event":"ci_revision_applied","goal":"studio-mastering-numpy2","commit":"cf19fea72b8a062b00d311b6663be9357dcd6cb1","workflow_run":35865011220,"result":"next_compatibility_call_found","note":"Analyzer was made NumPy-2-compatible; the next matrix cleared mastering streaming and then found the same removed np.trapz API in Musical Critic after 892 passes on Python 3.12."},
+    {"event":"ci_revision_completed","goal":"studio-mastering-numpy2","commit":"6eca08d37badafb6ae838fbe387158036e873fa9","workflow_run":35865456706,"result":"success","note":"Musical Critic now reuses the shared integration helper. Full Tests passed on Python 3.10, 3.11 and 3.12."}
   ]
 }
