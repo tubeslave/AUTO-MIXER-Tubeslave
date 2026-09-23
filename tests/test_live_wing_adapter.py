@@ -5,8 +5,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-from live_runtime.contracts import LiveMode, ProposedAction
+from live_runtime.contracts import ChannelFeatures, LiveMode, MixFeatures, ProposedAction
 from live_runtime.control_plane import LiveControlPlane
+from live_runtime.decision_engine import propose_one
 from live_runtime.wing_adapter import WingWriteAdapter
 
 
@@ -111,6 +112,36 @@ def test_main_fader_roundtrip_uses_same_fresh_readback_boundary():
     ]
 
 
+def test_headroom_director_main_delta_is_resolved_from_current_wing_fader():
+    client = FakeWingClient({"/main/1/fdr": -6.0})
+    plane = LiveControlPlane(WingWriteAdapter(client))
+    features = MixFeatures(
+        channels=[],
+        main_rms_dbfs=-12.0,
+        main_peak_dbfs=-1.5,
+        main_crest_db=10.5,
+    )
+
+    hypothesis = propose_one(features, {})
+
+    assert hypothesis is not None
+    assert hypothesis.name == "main_headroom_protection"
+    assert hypothesis.action.parameter == "fader_delta_db"
+    assert hypothesis.action.value == -0.5
+
+    result = plane.execute(hypothesis.action, LiveMode.BENCH_TEST)
+
+    assert result.verified.before == -6.0
+    assert result.verified.after == -6.5
+    assert result.verified.readback == -6.5
+    assert result.verified.accepted is True
+    assert client.sent == [
+        ("/main/1/fdr", ()),
+        ("/main/1/fdr", (-6.5,)),
+        ("/main/1/fdr", ()),
+    ]
+
+
 def test_missing_fresh_readback_times_out_instead_of_trusting_cache():
     client = FakeWingClient({"/ch/1/fdr": -5.0}, drop_queries=True)
     adapter = WingWriteAdapter(client, readback_timeout=.01)
@@ -125,6 +156,21 @@ def test_transport_write_failure_is_not_silently_accepted():
 
     with pytest.raises(RuntimeError, match="write transport failed"):
         adapter.write_value(_fader_action(-4.0))
+
+
+def test_delta_write_cannot_bypass_control_plane_resolution():
+    client = FakeWingClient({"/main/1/fdr": -6.0})
+    adapter = WingWriteAdapter(client)
+
+    with pytest.raises(ValueError, match="must be resolved"):
+        adapter.write_value(
+            _fader_action(
+                target="main:1",
+                parameter="fader_delta_db",
+                value=-0.5,
+                max_step=0.5,
+            )
+        )
 
 
 def test_only_migrated_fader_surfaces_are_available():
