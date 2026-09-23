@@ -69,3 +69,18 @@ def test_true_peak_limiter_never_boosts_safe_audio():
     limited, reduction_db = meter.limit_true_peak(audio, ceiling_dbtp=-1.0)
     assert reduction_db == 0.0
     np.testing.assert_allclose(limited, audio, atol=0.0, rtol=0.0)
+
+
+def test_true_peak_limiter_preserves_channels_first_layout():
+    meter = StudioMasteringMeter(48000)
+    mono = sine(
+        freq_hz=12000.0,
+        amplitude=0.88,
+        duration=0.1,
+        phase=3.0 * np.pi / 4.0,
+    )
+    channels_first = np.stack([mono, mono * 0.8], axis=0)
+    limited, reduction_db = meter.limit_true_peak(channels_first, ceiling_dbtp=-1.0)
+    assert reduction_db > 0.0
+    assert limited.shape == channels_first.shape
+    assert meter.true_peak_dbtp(limited) <= -0.98
