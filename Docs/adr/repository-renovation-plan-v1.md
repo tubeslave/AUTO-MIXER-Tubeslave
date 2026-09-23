@@ -193,15 +193,23 @@ R3 realtime EQ composition is now service-owned rather than caller-owned:
 - the complete software path `spectral evidence -> fresh WING bands -> locator -> Director -> relative EQ action -> LiveControlPlane -> write -> fresh readback` is covered by focused CI;
 - low-confidence evidence fails closed without querying or mutating the console.
 
+R3 verified rollback is now owned by the canonical live control plane:
+- every reversible successful/mismatched write retains the fresh pre-write value as its rollback target;
+- `LiveControlPlane.rollback()` performs a fresh read, restores the captured absolute value, performs a second fresh readback and audits verified/mismatched restoration;
+- relative fader/EQ proposals roll back to the captured absolute value rather than applying an inverse delta;
+- PEQ rollback preserves the original frequency/Q locator fingerprint and therefore fails closed if the physical band identity has changed;
+- rollback is treated as restoration, not a new musical decision: write-capable modes may restore a captured value even if that parameter would be blocked as a new AUTO_SAFE proposal, while OBSERVE/PROPOSE/FREEZE and manual freeze still prohibit the write;
+- `LiveSoundcheckService.rollback_action()` exposes the same authoritative path to the runtime rather than delegating rollback to legacy AutoFOH evaluation code.
+
 The audit of `backend/cross_adaptive_eq.py` keeps it in ADAPT only as a possible DSP/evidence reference. Its current policy hard-codes seven band centers, channel priority rules, overlap tolerance and mirror boost/cut behavior, so it is not suitable as the new live locator or decision authority and is not imported by `live_runtime`.
 
-Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, and post-write verification. Focused live CI on the service-composition code path passed 54 tests plus the 2 stem-loop tests. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write authority can be severed or archived.
+Automated replacement evidence covers callback-driven channel/Main fader readback, BENCH_TEST/OBSERVE control behavior, relative fader and EQ-gain resolution, max-step rejection, explicit EQ locator requirements, fresh four-band WING F/Q enumeration, evidence-driven nearest-band selection, Q eligibility, low-confidence/no-match fail-closed behavior, service-owned evidence/locator/Director composition, WING frequency/Q fingerprint checks, post-write verification, and software write -> rollback -> second-readback restoration. Physical WING HIL evidence is still required before legacy AutoFader/AutoEQ/MasterFader write or rollback authority can be severed or archived.
 
 Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`, `AutoFaderController`, `AutoCompressorController` and `AutoSoundcheckEngine`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
 
 No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
 
-See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md` and `Docs/adr/live-eq-evidence-service-composition-v1.md` for the channel-EQ migration contract and HIL gate.
+See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md` and `Docs/adr/live-verified-rollback-v1.md` for the current WING control migration contracts and HIL gates.
 
 ## Non-negotiable migration rule
 
