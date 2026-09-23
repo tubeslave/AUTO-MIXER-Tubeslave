@@ -12,7 +12,7 @@ BACKEND = os.path.join(os.path.dirname(__file__), '..', 'backend')
 sys.path.insert(0, BACKEND)
 
 # Load this handler directly so the focused live-runtime test does not import
-# every legacy handler via handlers/__init__.py.  That package-wide import fanout
+# every legacy handler via handlers/__init__.py. That package-wide import fanout
 # is itself part of the composition-root modernization work.
 _spec = importlib.util.spec_from_file_location(
     "soundcheck_handlers_test_target",
@@ -32,7 +32,7 @@ class DummyServer:
         }
         self.auto_soundcheck_running = False
         self.auto_soundcheck_observe_only = False
-        self.auto_soundcheck_engine = None
+        self.auto_soundcheck_engine = None  # temporary legacy compatibility alias
         self.sent_messages = []
         self.broadcast_messages = []
         self.send_to_client = AsyncMock(side_effect=self._capture_send)
@@ -50,11 +50,14 @@ class FakeEngine:
     def __init__(self):
         self.state = type("State", (), {"value": "idle"})()
         self.started = False
+        self.stopped = False
 
     def start_async(self):
         self.started = True
+        self.state = type("State", (), {"value": "running"})()
 
     def stop(self):
+        self.stopped = True
         self.state = type("State", (), {"value": "stopped"})()
 
 
@@ -63,16 +66,44 @@ class FakeLiveService:
         self.requests = []
         self.callbacks = []
         self.engine = FakeEngine()
+        self._active = False
+        self.status = {"state": "idle", "mixer_connected": False, "audio_running": False}
 
-    def create_engine(self, request, **callbacks):
+    def is_active(self):
+        return self._active
+
+    def start(self, request, **callbacks):
+        if self._active:
+            raise RuntimeError("Live soundcheck engine already running")
         self.requests.append(request)
         self.callbacks.append(callbacks)
+        self._active = True
+        self.engine.start_async()
+        self.status = {
+            "state": "running",
+            "mixer_connected": True,
+            "audio_running": True,
+            "mode": request.mode.value,
+        }
         return self.engine
+
+    def stop(self):
+        if not self._active:
+            return False
+        self.engine.stop()
+        self._active = False
+        self.status = {"state": "idle", "mixer_connected": False, "audio_running": False}
+        return True
+
+    def get_status(self):
+        return dict(self.status)
 
 
 @pytest.mark.asyncio
 async def test_get_auto_soundcheck_status_includes_legacy_aliases():
     server = DummyServer()
+    service = FakeLiveService()
+    server._live_soundcheck_service = service
     handlers = register_handlers(server)
 
     await handlers["get_auto_soundcheck_status"]("ws", {})
@@ -87,17 +118,15 @@ async def test_get_auto_soundcheck_status_includes_legacy_aliases():
 
 
 @pytest.mark.asyncio
-async def test_get_auto_soundcheck_status_forwards_session_report_summary():
+async def test_get_auto_soundcheck_status_forwards_session_report_summary_from_service():
     server = DummyServer()
-
-    class StatusEngine:
-        def get_status(self):
-            return {
-                "state": "running",
-                "autofoh_session_report_summary": "AutoFOH session report: events=4; sent=1; blocked=3; guard_blocks=2",
-            }
-
-    server.auto_soundcheck_engine = StatusEngine()
+    service = FakeLiveService()
+    service._active = True
+    service.status = {
+        "state": "running",
+        "autofoh_session_report_summary": "AutoFOH session report: events=4; sent=1; blocked=3; guard_blocks=2",
+    }
+    server._live_soundcheck_service = service
     server.auto_soundcheck_running = True
     handlers = register_handlers(server)
 
@@ -109,7 +138,7 @@ async def test_get_auto_soundcheck_status_forwards_session_report_summary():
 
 
 @pytest.mark.asyncio
-async def test_start_auto_soundcheck_routes_construction_through_live_runtime():
+async def test_start_auto_soundcheck_routes_lifecycle_through_live_runtime():
     server = DummyServer()
     service = FakeLiveService()
     server._live_soundcheck_service = service
@@ -129,6 +158,23 @@ async def test_start_auto_soundcheck_routes_construction_through_live_runtime():
     assert server.auto_soundcheck_observe_only is True
     assert server.auto_soundcheck_running is True
     assert service.engine.started is True
+    assert server.auto_soundcheck_engine is service.engine
+
+
+@pytest.mark.asyncio
+async def test_stop_auto_soundcheck_routes_lifecycle_through_live_runtime():
+    server = DummyServer()
+    service = FakeLiveService()
+    server._live_soundcheck_service = service
+    handlers = register_handlers(server)
+
+    await handlers["start_auto_soundcheck"]("ws", {"mode": "observe"})
+    await handlers["stop_auto_soundcheck"]("ws", {})
+
+    assert service.engine.stopped is True
+    assert service.is_active() is False
+    assert server.auto_soundcheck_engine is None
+    assert server.auto_soundcheck_running is False
 
 
 @pytest.mark.asyncio
