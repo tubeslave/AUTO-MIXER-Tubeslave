@@ -52,6 +52,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-22-1800 | [Report](ML-2026-09-22-1800.md), [JSON patch](ML-2026-09-22-1800.json) | Deep review: foundational DiffusionRIR protocol plus public-artifact and MeshRIR rights audits; 1 added and 1 updated source card, 1 dataset card, 1 implementation audit, 12 Knowledge Cards, 8 candidate rules, 32 carried queued videos and 4 unrun experiments; split, causal scaling, stitching, padding, mask and reproducibility limits recorded |
 | ML-2026-09-23-0900 | [Report](ML-2026-09-23-0900.md), [JSON patch](ML-2026-09-23-0900.json) | Search: 2 fresh full-text sources, 2 implementation/artifact audits, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued guitar/rock videos, 4 unrun experiments; unchanged-note, mono, boundary, seed, metric and reproducibility limits recorded |
 | ML-2026-09-23-1200 | [Report](ML-2026-09-23-1200.md), [JSON patch](ML-2026-09-23-1200.json) | Deep review: SpanSynth inference/default parity, mono/boundary/gain contract, Fine40 aliases and reproducibility; 1 source and 2 audits updated, 12 Knowledge Cards, 8 candidate rules, 4 unrun experiments; 34 queued videos retained |
+| ML-2026-09-23-1500 | [Report](ML-2026-09-23-1500.md), [JSON patch](ML-2026-09-23-1500.json) | Search: 2 fresh full-text preprints, 1 demo-artifact audit, 10 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued drum videos, 4 unrun experiments; guide-dependency, metric-circularity, binaural-stage and reproducibility limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -88,6 +89,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-23-1500 (`search`, preceding successful search `ML-2026-09-23-0900`): treat SRF-SVB as professional-guide-conditioned resynthesis, not automatic tuning; evaluate identity and pronunciation independently of CAM++ SECS. Treat GeoAtt as magnitude-only evidence and require explicit phase/ITD, localization, mono and peak gates before binaural use. Next test: `EXP-ML-20260923-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-23-1200 (`deep_review`, preceding search `ML-2026-09-23-0900`): public SpanSynth defaults (16 steps, no context MIDI) are not the paper main-table condition (32 steps, context MIDI). Use codec-only versus ordinary identical-MIDI regeneration for the first preservation null; FlowEdit identical-MIDI is structurally zero. Pin code, weights and seed; gate mono/stereo, hard splices, peaks and Fine40 aliases separately. Next test: `EXP-ML-20260923-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 

@@ -1,0 +1,102 @@
+{
+  "update_id": "ML-2026-09-23-1500",
+  "mode": "search",
+  "scheduled_slot": "2026-09-23T15:00:00+03:00",
+  "actual_start": "2026-09-23T15:00:41+03:00",
+  "completed": "2026-09-23T15:11:16+03:00",
+  "preceding_update": "ML-2026-09-23-1200",
+  "preceding_successful_search": "ML-2026-09-23-0900",
+  "citation_check": "partial",
+  "audio_executed": false,
+  "code_executed": false,
+  "auto_apply": false,
+  "discovery": {
+    "arxiv_recent_checked": ["cs.SD", "eess.AS"],
+    "hugging_face_papers": "unavailable_tool_error",
+    "scite": "skipped_until_2026-10-01_UTC",
+    "consensus": "not_retried_paused"
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260923-1500-01",
+      "title": "SRF-SVB: Style-Consistent Singing Voice Beautifying via Rectified Flow",
+      "arxiv": "2609.25610v1",
+      "doi": "10.48550/arXiv.2609.25610",
+      "url": "https://arxiv.org/html/2609.25610",
+      "reading_depth": "full_text_complete",
+      "status": "research_candidate",
+      "key_findings": [
+        "inference requires a same-content professional guide and DTW alignment",
+        "CAM++ is shared by timbre conditioning and SECS evaluation",
+        "Chinese MOS-Q is comparable to NSVB rather than clearly superior",
+        "pronunciation degradation is acknowledged"
+      ],
+      "limitations": ["15 listeners and 30 clips", "UVR-derived professional test vocals", "no rock-specific evaluation", "no stereo phase true-peak or seed-robustness tests"]
+    },
+    {
+      "id": "SRC-ML-20260923-1500-02",
+      "title": "HRTF Upsampling Across Varying Measurement Configurations with Geometry-Aware Query-Conditioned Aggregation",
+      "arxiv": "2609.25995v1",
+      "doi": "10.48550/arXiv.2609.25995",
+      "url": "https://arxiv.org/html/2609.25995",
+      "reading_depth": "full_text_complete",
+      "status": "research_candidate",
+      "key_findings": ["single model improves held-out-listener LSD across four LAP configurations", "query conditioning supplies the largest ablation gain", "relative geometry adds a smaller consistent benefit"],
+      "limitations": ["magnitude only", "minimum phase and ITD separate", "SONICOM only", "LSD and ILD only", "no localization or listening test", "code and weights unavailable"]
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20260923-1500-01",
+      "repository": "https://github.com/mrwho729/SRF-SVB",
+      "revision": "7f6d65517cd54ddb099435de17d6f14bc6f7664a",
+      "license": "Apache-2.0",
+      "inspection": "root_listing_readme_license_static_only",
+      "status": "demo_only_reproduction_blocked",
+      "missing": ["model code", "weights", "environment lock", "split manifest", "seed protocol", "per-file audio rights manifest"]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260923-1500-01","claim":"SRF-SVB is professional-guide-conditioned rather than unguided correction.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-02","claim":"CAM++ timbre conditioning and CAM++ SECS evaluation are not independent.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-03","claim":"Chinese MOS-Q is comparable to NSVB with overlapping intervals.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-04","claim":"The MOS study does not establish rock-vocal production safety or preference.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-05","claim":"Separator-derived professional vocals are processed estimates rather than dry ground truth.","confidence":"medium-high"},
+    {"id":"KC-ML-20260923-1500-06","claim":"GeoAtt evaluates HRTF magnitude reconstruction, not a complete binaural renderer.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-07","claim":"LSD and ILD gains do not verify localization, externalization or preference.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-08","claim":"Query conditioning is the largest spatial ablation; relative geometry is incremental.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-09","claim":"Magnitude, phase reconstruction and ITD must remain separately observable.","confidence":"high"},
+    {"id":"KC-ML-20260923-1500-10","claim":"A licensed demo site is neither a reproducible implementation nor a blanket audio-rights manifest.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260923-1500-01","apply_when":"rights-cleared same-content guide exists","change":"test guided beautification","protect":["phrasing","authorship"],"verify":"record guide and alignment","cancel":"missing or mismatched guide","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-02","apply_when":"evaluating vocal correction","change":"compare guided regeneration with manual causal correction","protect":["lyrics","formants","expression","timing"],"verify":"single-factor blind A/B","cancel":"pronunciation or identity loss","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-03","apply_when":"conditioning encoder is reused by a metric","change":"add independent metrics and identity ratings","protect":["honest model selection","identity"],"verify":"cross-metric rank agreement","cancel":"metric-only benefit","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-04","apply_when":"regenerated vocal is rendered","change":"separate raw safety copy from matched listening copy","protect":["consonants","HF","headroom"],"verify":"residual and peak gates","cancel":"clipping or level-only preference","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-05","apply_when":"separator-derived target is proposed","change":"audit residual before ground-truth use","protect":["target integrity"],"verify":"bleed and artifact inspection","cancel":"audible corruption","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-06","apply_when":"HRTF magnitude is upsampled","change":"make phase and ITD stages explicit","protect":["localization","mono compatibility"],"verify":"stage-wise metrics","cancel":"implicit or unmeasured stage","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-07","apply_when":"LSD or ILD improves","change":"require localization and musical listening gates","protect":["externalization","preference"],"verify":"blind matched test","cancel":"perceptual regression","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260923-1500-08","apply_when":"integration is proposed","change":"require immutable code weights licences and preprocessing","protect":["reproducibility"],"verify":"artifact manifest","cancel":"missing artifact","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260923-1500-01","status":"not_run","baseline":"manual causal pitch correction","variant":"guided SRF-SVB-style regeneration","single_factor":"correction method","loudness_matched_preference":true,"cancel":["guide leakage","pronunciation loss","identity drift","timing damage","clipping","seed instability","no repeatable preference"]},
+    {"id":"EXP-ML-20260923-1500-02","status":"not_run","baseline":"CAM++ SECS ranking","variant":"independent encoder plus blinded identity ratings","single_factor":"evaluation family","cancel":["non-replicating CAM++ gain","conflict with blinded identity"]},
+    {"id":"EXP-ML-20260923-1500-03","status":"not_run","baseline":"measured HRTF complete chain","variant":"upsampled magnitude plus pinned minimum-phase and ITD stages","single_factor":"measured versus upsampled HRTF","loudness_matched_preference":true,"cancel":["front-back confusion","localization spread","phase damage","mono damage","peak regression","no repeatable preference"]},
+    {"id":"EXP-ML-20260923-1500-04","status":"not_run","baseline":"mean pooling","variant":"query-conditioned aggregation","single_factor":"spatial aggregation","cancel":["seed-fragile gain","listener-confined gain","aggregate-only gain"]}
+  ],
+  "video_source_cards": [
+    {"id":"VID-ML-20260923-1500-01","url":"https://www.youtube.com/watch?v=R0h9IcLenI0","title":"3 Secrets to Massive Drum Room Tracks","channel":"Hardcore Music Studio","duration":"13:32","reading_depth":"metadata_only","status":"queued_source","transcript":"visible_control_absent"},
+    {"id":"VID-ML-20260923-1500-02","url":"https://www.youtube.com/watch?v=jdBCh4iimMs","title":"Adding Density and Attack to Snare Using Compression","channel":"Hardcore Music Studio","duration":"about_15_minutes","reading_depth":"metadata_only","status":"queued_source","transcript":"visible_control_absent"}
+  ],
+  "deduplication": {
+    "excluded_existing": ["arXiv:2609.25546", "arXiv:2609.26635"],
+    "rejected_shallow_video": "https://www.youtube.com/watch?v=2ZHbdIZ1KsY"
+  },
+  "queue": {"queued_source_total": 36, "studied_videos_total": 0, "priority":["SRF-SVB guide dependency and metric circularity","GeoAtt magnitude phase ITD boundary","SpanSynth identical-MIDI null","DiffusionRIR causal scaling","36 transcript-dependent videos","rights-cleared rock multitrack or DI-effect pair"]},
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "model_training_claimed": false,
+  "active_rules_changed": false,
+  "dsp_changed": false,
+  "runtime_changed": false
+}
