@@ -1,0 +1,86 @@
+name: Ptitsa model debleed benchmark
+on:
+  push:
+    branches: [audio-workbench-mcp-v0.1]
+    paths: [.github/workflows/debleed-benchmark.yml]
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install separator
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "audio-separator[cpu]"
+          audio-separator --env_info
+      - name: Fetch Ptitsa snippets directly from Yandex Disk
+        shell: python
+        run: |
+          import json, subprocess, urllib.parse, urllib.request, pathlib
+          key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
+          jobs={
+            "ValeraVox":("VALERA VOX 0002 [2023-03-03 191740].wav", 29*60+54+179),
+            "SnareTop":("SN T 0002 [2023-03-03 191740].wav", 29*60+54+35),
+            "Bass":("BASS 0002 [2023-03-03 191740].wav", 29*60+54+13),
+            "Guitar":("GTR 0002 [2023-03-03 191740].wav", 29*60+54+13),
+          }
+          pathlib.Path("bench/raw").mkdir(parents=True,exist_ok=True)
+          for label,(name,start) in jobs.items():
+              q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
+              with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
+                  href=json.load(r)["href"]
+              out=f"bench/raw/{label}.wav"
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",href,
+                              "-t","12","-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-i",out,
+                              "-c:a","libmp3lame","-b:a","320k",f"bench/raw/{label}_RAW.mp3"],check=True)
+              print(label,start,out)
+      - name: Run pretrained cleanup models
+        run: |
+          set -euxo pipefail
+          models=(
+            "mel_band_roformer_bleed_suppressor_v1.ckpt"
+            "mel_band_roformer_denoise_debleed_gabox.ckpt"
+            "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt"
+          )
+          for model in "${models[@]}"; do
+            tag="${model%.ckpt}"
+            for f in bench/raw/*.wav; do
+              name="$(basename "$f" .wav)"
+              od="bench/$tag/$name"
+              mkdir -p "$od"
+              audio-separator "$f" -m "$model" --output_format WAV --output_dir "$od" --normalization 1.0 --use_soundfile
+              clean="$(find "$od" -maxdepth 1 -type f -name '*.wav' | head -1)"
+              test -n "$clean"
+              cp "$clean" "$od/CLEAN.wav"
+              python - "$f" "$od/CLEAN.wav" "$od/REMOVED.wav" <<'PY'
+          import sys, soundfile as sf, numpy as np
+          raw,sr=sf.read(sys.argv[1],always_2d=True,dtype="float32")
+          clean,sr2=sf.read(sys.argv[2],always_2d=True,dtype="float32")
+          n=min(len(raw),len(clean)); raw=raw[:n];clean=clean[:n]
+          if clean.shape[1]!=raw.shape[1]:
+              clean=np.repeat(clean[:,:1],raw.shape[1],axis=1)
+          sf.write(sys.argv[3],raw-clean,sr,subtype="PCM_24")
+          PY
+              ffmpeg -hide_banner -loglevel error -y -i "$od/CLEAN.wav" -c:a libmp3lame -b:a 320k "$od/CLEAN.mp3"
+              ffmpeg -hide_banner -loglevel error -y -i "$od/REMOVED.wav" -c:a libmp3lame -b:a 320k "$od/REMOVED.mp3"
+            done
+          done
+      - name: Build manifest
+        shell: python
+        run: |
+          import json, pathlib
+          rows=[]
+          for p in pathlib.Path("bench").glob("*/*/CLEAN.mp3"):
+              rows.append({"model":p.parents[1].name,"target":p.parent.name,
+                           "clean":str(p),"removed":str(p.parent/"REMOVED.mp3")})
+          pathlib.Path("bench/manifest.json").write_text(json.dumps(rows,indent=2))
+          print(json.dumps(rows,indent=2))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-model-debleed-benchmark
+          path: |
+            bench/**/*.mp3
+            bench/manifest.json
+          retention-days: 7
