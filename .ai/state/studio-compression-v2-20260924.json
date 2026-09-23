@@ -1,16 +1,70 @@
 {
   "goal": "studio-compression-v2",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "381f8fad1cf30e046f71ca38adea792fd359b46e",
   "priority_reason": "explicit user request; reproducible shared DSP failures",
-  "local_targeted_tests": {"passed": 42},
-  "local_full_suite": "collection blocked: pythonosc missing; no passing claim",
-  "scope": "causal shared source compression and offline dynamics adapter",
+  "pull_request": 118,
+  "tested_code_commit": "904734ef87c01514560bd25285f7ba4d4b5539c7",
+  "merge_commit": "df9c35f635078b0ecb677cf1710b9ff11bcfb489",
+  "scope": "causal shared source compression and full-source offline dynamics adapter",
+  "fixed": [
+    "silence, 10 ms and anti-phase stereo IndexErrors",
+    "signed L/R fold-down before detector power",
+    "centered-Gaussian frame GR replaced by independent causal attack/release",
+    "rider, actual compressor GR and bounded makeup now separate",
+    "PCM remeasurement instead of inferred frame-gain spread",
+    "explicit human-review metadata propagated into existing quality loop"
+  ],
+  "validation": {
+    "workflow_run": 35932431618,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "full_suite_count": null,
+    "full_suite_count_note": "full job success verified; no total count inferred without reading log",
+    "local_new_tests_passed": 43,
+    "local_new_plus_existing_tests_passed": 54,
+    "local_full_suite": "collection blocked: pythonosc missing; remote CI supplied full validation",
+    "uploaded_code_blob_identity_verified": true,
+    "actual_processor_sensitivity_probes": 9,
+    "max_analytic_ballistics_error_db_less_than": 0.000001,
+    "full_vs_irregular_blocks": "sample-identical in tested RMS and peak cases including sidechain HPF",
+    "neural_and_audio_device_modules_loaded_in_isolated_probe": []
+  },
+  "real_audio_experiment": {
+    "song": "Belye Stai",
+    "source_kind": "original raw mono WAV from existing two source ZIPs",
+    "duration_seconds_per_source": 207,
+    "sample_rate": 44100,
+    "sources": [
+      {"name": "VALERA_VOX", "max_gr_db": 4.999999523162842, "active_p95_gr_db": 4.3907551765441895, "makeup_db": 2.0, "active_rms_delta_db": -0.5879444721095552, "balance_match_passed": false, "reason": "makeup cap"},
+      {"name": "BASS", "max_gr_db": 3.8926146030426025, "active_p95_gr_db": 3.438532829284668, "makeup_db": 1.1975401920796616, "active_rms_delta_db": -1.1136008564802289, "balance_match_passed": false, "reason": "true-peak headroom"},
+      {"name": "SN_T", "max_gr_db": 2.823321580886841, "active_p95_gr_db": 2.181997776031494, "makeup_db": 1.3486637558963785, "active_rms_delta_db": -0.00000028819053099482517, "balance_match_passed": true}
+    ],
+    "full_source_arrays_unchanged": true,
+    "archive_pcm_hashes_rechecked": true,
+    "audition_excerpt_seconds": [60, 90],
+    "audition_variants": ["RAW", "legacy shared dynamics", "v2 shared dynamics"],
+    "audition_lufs_matching_error_less_than_lu": 0.001,
+    "audition_true_peak_ceiling_dbtp": -3.0,
+    "audition_path": "/mnt/data/compression_audit/listening",
+    "evidence_path": "/mnt/data/compression_audit/real_audio_evidence.json",
+    "important_distinction": "legacy comparison is the shared module, not the separate compressor in the previously delivered Belye Stai mix",
+    "status": "pending_human_review"
+  },
+  "limitations": [
+    "Automatic threshold and role defaults are engineering proposals, not artistic acceptance",
+    "Active 20 ms RMS spread is not event dynamics, crest factor or LRA",
+    "Vocal and bass full-source makeup did not achieve exact level matching; no balance-transparent claim",
+    "Rider/makeup are full-source offline operations; only the DSP core supports chunk-state equivalence",
+    "Existing local Belye Stai recipe and delivered masters were not silently replaced",
+    "Repository integration is not deployment to the user's computer"
+  ],
+  "review": "self-review; no independent reviewer claimed",
   "live_code_changed": false,
+  "mastering_code_changed": false,
   "neural_audio_used": false,
   "paid_services_used": false,
   "audio_baseline_promoted": false,
   "ptitsa_and_belye_masters": "unchanged; human listening pending",
-  "next_goal": "inspect real-source comparisons and full exact-branch CI; accept or revise code, never auto-accept music"
+  "next_goal": "Compression Director: bounded event/body/recovery-aware attack/release/threshold proposals and explicit level-match/headroom resolution, followed by matched human A/B rather than preset or one-number acceptance"
 }
