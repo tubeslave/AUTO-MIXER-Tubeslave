@@ -40,7 +40,7 @@ class FakeWingClient:
 
 
 def _stereo_contract():
-    tap = PostConsoleMainTap(left_slot=47, right_slot=48)
+    tap = PostConsoleMainTap(left_channel=47, right_channel=48)
     return MainTapPatchContract(
         tap=tap,
         routes=(
@@ -106,7 +106,7 @@ def test_missing_fresh_route_readback_fails_closed_instead_of_using_cache():
 
     result = verifier.verify(
         MainTapPatchContract(
-            tap=PostConsoleMainTap(left_slot=47),
+            tap=PostConsoleMainTap(left_channel=47),
             routes=(MainTapRouteExpectation(usb_slot=47, source_channel=1),),
         )
     )
@@ -123,7 +123,7 @@ def test_transport_query_failure_is_reported_as_failed_patch_proof():
 
     result = verifier.verify(
         MainTapPatchContract(
-            tap=PostConsoleMainTap(left_slot=47),
+            tap=PostConsoleMainTap(left_channel=47),
             routes=(MainTapRouteExpectation(usb_slot=47, source_channel=1),),
         )
     )
@@ -134,7 +134,7 @@ def test_transport_query_failure_is_reported_as_failed_patch_proof():
 
 
 def test_contract_must_cover_exact_reserved_tap_slots():
-    tap = PostConsoleMainTap(left_slot=47, right_slot=48)
+    tap = PostConsoleMainTap(left_channel=47, right_channel=48)
 
     with pytest.raises(ValueError, match='exactly cover reserved tap slots'):
         MainTapPatchContract(

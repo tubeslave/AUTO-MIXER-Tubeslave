@@ -55,7 +55,7 @@ class MainTapPatchContract:
         routes = tuple(self.routes)
         if not routes:
             raise ValueError("Main tap PATCH_VERIFY requires at least one route")
-        expected_slots = set(self.tap.excluded_slots)
+        expected_slots = set(self.tap.channels)
         route_slots = [route.usb_slot for route in routes]
         if len(route_slots) != len(set(route_slots)):
             raise ValueError("Main tap PATCH_VERIFY routes contain duplicate USB slots")
