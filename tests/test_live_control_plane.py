@@ -15,7 +15,8 @@ class FakeMixerAdapter:
 
     @staticmethod
     def _key(action):
-        return action.target, action.parameter
+        parameter = "fader_db" if action.parameter == "fader_delta_db" else action.parameter
+        return action.target, parameter
 
     def read_value(self, action):
         value = self.values.get(self._key(action))
@@ -109,6 +110,50 @@ def test_manual_freeze_still_wins_in_bench_test():
 
     assert result.wrote is False
     assert result.authorization_reason == "frozen"
+    assert adapter.writes == []
+
+
+def test_relative_fader_move_resolves_against_fresh_current_value():
+    adapter = FakeMixerAdapter({("main:1", "fader_db"): -6.0})
+    events = []
+    plane = LiveControlPlane(adapter, audit_sink=events.append)
+    action = _action(
+        target="main:1",
+        parameter="fader_delta_db",
+        value=-0.5,
+        max_step=0.5,
+        reason="restore main headroom",
+    )
+
+    result = plane.execute(action, LiveMode.BENCH_TEST)
+
+    assert result.wrote is True
+    assert result.verified.before == -6.0
+    assert result.verified.after == -6.5
+    assert result.verified.readback == -6.5
+    assert result.verified.proposal.parameter == "fader_delta_db"
+    assert result.verified.proposal.value == -0.5
+    assert adapter.writes[0].parameter == "fader_db"
+    assert adapter.writes[0].value == -6.5
+    assert events[-1]["resolved_action"]["parameter"] == "fader_db"
+    assert events[-1]["resolved_action"]["value"] == -6.5
+
+
+def test_relative_fader_move_cannot_exceed_its_declared_max_step_even_in_bench_test():
+    adapter = FakeMixerAdapter({("main:1", "fader_db"): -6.0})
+    plane = LiveControlPlane(adapter)
+    action = _action(
+        target="main:1",
+        parameter="fader_delta_db",
+        value=-1.0,
+        max_step=0.5,
+    )
+
+    result = plane.execute(action, LiveMode.BENCH_TEST)
+
+    assert result.wrote is False
+    assert result.authorization_reason == "max_step_exceeded"
+    assert result.verified.before == -6.0
     assert adapter.writes == []
 
 
