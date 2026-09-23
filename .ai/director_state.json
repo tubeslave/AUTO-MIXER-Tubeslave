@@ -3,7 +3,7 @@
   "active": {
     "id": "cleanup-model-validation",
     "title": "Validate model-based source cleanup",
-    "objective": "Finish the full-song pretrained cleanup experiment and accept/reject processing per source from evidence."
+    "objective": "Finish the checkpointed full-song pretrained cleanup experiment and accept/reject processing per source from RAW/CLEAN/REMOVED evidence."
   },
   "parallel_progress": {
     "live-soundcheck-v2": [
@@ -22,25 +22,43 @@
       "Short-passage policy revised: six events can expose an extreme level defect; fewer than six remain diagnose-only",
       "A 0.25 dB robust-scale floor prevents tiny low-variance performance differences from becoming false outliers",
       "Regression coverage added for an obvious six-event defect, a stable six-event phrase, and a five-event diagnose-only phrase",
-      "Code/test commits 6857abc97c6a8bc250df39d9c4293771f3ce9aca and 9589529c27a799b3c5f6a57e5704a6d83c0113ef; Tests run 35840719646 in progress"
+      "Code/test commits 6857abc97c6a8bc250df39d9c4293771f3ce9aca and 9589529c27a799b3c5f6a57e5704a6d83c0113ef",
+      "Tests run 35840719646 progressed to a separate click_candidate regression: 295 passed, 1 skipped before failure on Python 3.11"
+    ],
+    "studio-cleanup-checkpointing": [
+      "Original sequential Ptitsa cleanup run 35828150231 reached the 180-minute workflow timeout and was cancelled before render/upload",
+      "Cleanup workflow refactored into 11 per-stem matrix jobs with max-parallel 6",
+      "Each completed stem now uploads a durable checkpoint: cleaned WAV, RAW/CLEAN/REMOVED MP3 previews and JSON residual metrics",
+      "Final full-mix render consumes the completed per-stem checkpoints instead of depending on one uninterrupted sequential job",
+      "Refactor commit 705b6f92c1bf202657e115ee330afcefd7fbddcb; replacement run 35846566268 started successfully"
     ]
   },
   "blockers": [
     {
       "goal": "cleanup-model-validation",
-      "status": "compute_in_progress",
-      "workflow_run": 35828150231,
-      "step": "Neural cleanup selected sources"
+      "status": "checkpointed_parallel_compute_in_progress",
+      "workflow_run": 35846566268,
+      "step": "Per-stem cleanup matrix",
+      "note": "Six jobs can run concurrently; acceptance waits for per-stem RAW/CLEAN/REMOVED evidence."
+    },
+    {
+      "goal": "studio-editing-small-sample",
+      "status": "ci_regression_found",
+      "workflow_run": 35840719646,
+      "step": "tests/test_editing_performance.py::test_click_candidate",
+      "note": "click_candidates returned no candidate for the synthetic impulse fixture; not revised in the cleanup-checkpointing task."
     }
   ],
   "history": [
     {"event":"director_enabled","note":"Autonomous roadmap execution enabled."},
-    {"event":"cleanup_checked","workflow_run":35828150231,"status":"in_progress","note":"Full multitrack download succeeded; neural cleanup is still computing."},
+    {"event":"cleanup_checked","workflow_run":35828150231,"status":"in_progress","note":"Full multitrack download succeeded; neural cleanup was computing."},
     {"event":"parallel_task_completed","goal":"live-soundcheck-v2","commit":"a29759f5534fdf86a3bbad2027c8caaa7ed4db4e","workflow_run":35833133811,"result":"success","note":"Studio-derived live decision engine tests are now part of CI and passed."},
     {"event":"parallel_task_implemented","goal":"studio-perceptual-v21","commits":["25fef09180cec11d3a3e63b13bf701955b01f64e","dad336fbdc5b8d81b254cde57ee57e763ddea7c5"],"result":"focused_tests_passed","tests":"6/6","note":"Added perceptual candidate acceptance and collateral regression guards."},
     {"event":"ci_failure_analyzed","goal":"studio-perceptual-v21","workflow_run":35835155423,"result":"unrelated_preexisting_failure","note":"Artifact Critic attempted a 6-14 kHz bandpass at 8 kHz sample rate and click-rate regression used an unsuitable generic 0.08 threshold."},
     {"event":"ci_revision_applied","goal":"studio-perceptual-v21","commit":"1b6286a1698223418024a3316816cddba6a6e3e4","workflow_run":35835666282,"result":"superseded_by_later_ci","note":"Made Artifact Critic Nyquist-safe and click regression sensitivity metric-specific; later CI progressed to an editing-performance failure."},
     {"event":"ci_failure_analyzed","goal":"studio-editing-small-sample","workflow_run":35837914007,"result":"editing_policy_regression","note":"All three Python jobs stopped at test_editing_performance: a clearly defective sixth event was suppressed solely by the hard len<8 guard."},
-    {"event":"ci_revision_applied","goal":"studio-editing-small-sample","commits":["6857abc97c6a8bc250df39d9c4293771f3ce9aca","9589529c27a799b3c5f6a57e5704a6d83c0113ef"],"workflow_run":35840719646,"result":"pending_ci","note":"Lowered the evidence floor to six events, added a robust-scale floor, and added regression coverage without enabling edits for phrases shorter than six events."}
+    {"event":"ci_revision_applied","goal":"studio-editing-small-sample","commits":["6857abc97c6a8bc250df39d9c4293771f3ce9aca","9589529c27a799b3c5f6a57e5704a6d83c0113ef"],"workflow_run":35840719646,"result":"next_regression_found","note":"Lowered the evidence floor to six events and added regression coverage; subsequent CI reached test_click_candidate after 295 passing tests on Python 3.11."},
+    {"event":"cleanup_timeout_confirmed","goal":"cleanup-model-validation","workflow_run":35828150231,"result":"cancelled_timeout","note":"The sequential CPU cleanup hit the workflow 180-minute limit. Final render, MP3 encoding and artifact upload were skipped, so no usable checkpoint survived."},
+    {"event":"cleanup_workflow_revised","goal":"cleanup-model-validation","commit":"705b6f92c1bf202657e115ee330afcefd7fbddcb","workflow_run":35846566268,"result":"in_progress","note":"Split 11 model-cleaned sources into independent matrix jobs (max-parallel 6), each producing cleaned WAV plus RAW/CLEAN/REMOVED previews and residual metrics before final mix assembly."}
   ]
 }
