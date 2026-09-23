@@ -1,0 +1,228 @@
+{
+  "scope": "full canonical offline execution on two local corpora, not approved mix quality",
+  "source_head_before_fix": "6b388bf78",
+  "pipeline_source_sha256": "91ef1479c2e1b6dea2e8568946abef44720002c726b6e640c61f8401f2e14bc1",
+  "hardware_contacted": false,
+  "live_writes": false,
+  "listening_accepted": false,
+  "third_corpus_available": false,
+  "runs": [
+    {
+      "input_dir": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/external/automix-toolkit/drums-test-rock/tracks",
+      "input_files": [
+        {
+          "name": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "32584563a078eca3ae7e8a1e34f2a2ab4e19123cb73843ef2d5591369d7df8cd"
+        },
+        {
+          "name": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "f978ae719d04a391672dc1e40de52292d3e197c2e50c12d12c496d33a1c5308e"
+        },
+        {
+          "name": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "95804684a6d36cf2118f44ce9d72190407a9efadd796b1e04dfa048c2d04520e"
+        },
+        {
+          "name": "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "4c73da63b97f2b1b75fed99a83656dca67b982b89516874404b4cf0cb898e3fa"
+        },
+        {
+          "name": "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "116aa85fbaef445c1f0226660aeac78f9dac7ca47c80ce3bb78cffdf9951044c"
+        },
+        {
+          "name": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "1424f6844cf093500457ba0ba34ee12bb6bb21e3d953c2d38c4c6442752763a5"
+        },
+        {
+          "name": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "15201e5eecb7b5cfe4831a1ebf9ec013546733480a988401f6973a797403be0a"
+        },
+        {
+          "name": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "95778319e41e3fed2e638dffcbb700dfab775626da1484cdcb7cca816b2617f8"
+        }
+      ],
+      "output": "/tmp/automixer-goal-corpus-20260923.iXSgVS/drums-fixed.wav",
+      "frames": 1162476,
+      "duration_sec": 26.36,
+      "sample_rate": 44100,
+      "channels": 2,
+      "sha256": "47b739d58355370cd72ff635ed92a8ea27f2819ea828edcfe39deed57eaa303b",
+      "manifest_hash_matches": true,
+      "nonfinite_samples": 0,
+      "clipped_samples": 0,
+      "true_peak_dbtp": -2.7687757247599745,
+      "reported_lufs": -22.62,
+      "source_envelope_count": 8,
+      "smart_dsp_bytes": 209435690,
+      "input_health": {
+        "files_scanned": 8,
+        "files_unhealthy": 3,
+        "clicks_total": 28,
+        "synchronized_click_groups": 0,
+        "unhealthy": {
+          "02_snare_066_phrase_rock_complex_fast_sticks.wav": [
+            "clicks:19"
+          ],
+          "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav": [
+            "clicks:8"
+          ],
+          "08_tom_3_066_phrase_rock_complex_fast_sticks.wav": [
+            "clicks:1"
+          ]
+        },
+        "repaired": true,
+        "sanitized_dir": "/tmp/automixer-goal-corpus-20260923.iXSgVS/drums-fixed.sanitized_input"
+      },
+      "exit_code": 0
+    },
+    {
+      "input_dir": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/offline_test_input/multitrack",
+      "input_files": [
+        {
+          "name": "Accordion.wav",
+          "sha256": "6f64a443d1380492d39ca5db8dd8fb35d8b54ceac21dfce49503e9c098a996c2"
+        },
+        {
+          "name": "Back Vox L.wav",
+          "sha256": "360743b0446bd66514e8351ed6396c4fa588353e17c3271d012df9eb50015fce"
+        },
+        {
+          "name": "Back Vox R.wav",
+          "sha256": "c77c69424e8794fe28129a7248b967ba600833d9abcae1dc73fe2c92ebf5ff3b"
+        },
+        {
+          "name": "Bass.wav",
+          "sha256": "ef66d9198b0629bef910d1c7ba5d1a089f12e306e022dea815046f9d3db72b1b"
+        },
+        {
+          "name": "F Tom.wav",
+          "sha256": "cffb940174fcbc67778ab768eadbc506b42631105dcd506d7a530a0cac64831e"
+        },
+        {
+          "name": "Guitar L.wav",
+          "sha256": "38158addafd5d4dfcfa28fc7d711c65a8b643b0e3c76959c6267a6fd3b1af131"
+        },
+        {
+          "name": "Guitar R.wav",
+          "sha256": "29c1fc1ae8276fcf2802d1ad8b1fb43b6d1a9821267bb5d659cd30feacb7d913"
+        },
+        {
+          "name": "KICK.wav",
+          "sha256": "ce84f80119f720c614b3a1a2451014e1bb0dcea23cdc8bb09dadd96e9c25a3e4"
+        },
+        {
+          "name": "OH L.wav",
+          "sha256": "97b997babe839a5a6894a906891a379166cb483e777637190d86122c39f57bb0"
+        },
+        {
+          "name": "OH R.wav",
+          "sha256": "eacee3e69b63a6acc111ff24049e03c2a35ff4962f6a143221bdd3bafd93f192"
+        },
+        {
+          "name": "Playback L.wav",
+          "sha256": "1428ae357bad469635530faba7eed60a2223e8fe69bcf95a9e62acbe95115ce2"
+        },
+        {
+          "name": "Playback R.wav",
+          "sha256": "e20c0e676ea2af655bae250918ffdbf6a736f41a2a8d4d51e4ed34bd794e4858"
+        },
+        {
+          "name": "SNARE T.wav",
+          "sha256": "7b58f3d339136417985ad4242b319394d995f7a768bc1acfb55dfe8bf0f9da9b"
+        },
+        {
+          "name": "Snare B.wav",
+          "sha256": "e55486f72d9139dc600b3e49056cee806f637141bd3a438992eb1de5ed32e92b"
+        },
+        {
+          "name": "Tom.wav",
+          "sha256": "fa24ee62942718d1d11e56ba6d3f05fc9de627bc29cb6b02c89f892c7d742b0f"
+        },
+        {
+          "name": "Vocal.wav",
+          "sha256": "7ff4da510d8002a16ee242076349acb74ca8a55f5a751a973787ebf93e066d57"
+        }
+      ],
+      "output": "/tmp/automixer-goal-corpus-20260923.iXSgVS/concert.wav",
+      "frames": 9827840,
+      "duration_sec": 204.74666666666667,
+      "sample_rate": 48000,
+      "channels": 2,
+      "sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+      "manifest_hash_matches": true,
+      "nonfinite_samples": 0,
+      "clipped_samples": 0,
+      "true_peak_dbtp": -2.9478247799940154,
+      "reported_lufs": -22.25,
+      "source_envelope_count": 16,
+      "smart_dsp_bytes": 388707378,
+      "input_health": {
+        "files_scanned": 16,
+        "files_unhealthy": 16,
+        "clicks_total": 15,
+        "synchronized_click_groups": 1,
+        "unhealthy": {
+          "Accordion.wav": [
+            "clicks:1"
+          ],
+          "Back Vox L.wav": [
+            "clicks:1",
+            "dropout_runs:2"
+          ],
+          "Back Vox R.wav": [
+            "clicks:1",
+            "dropout_runs:2"
+          ],
+          "Bass.wav": [
+            "clicks:1",
+            "dropout_runs:2"
+          ],
+          "F Tom.wav": [
+            "clicks:1"
+          ],
+          "Guitar L.wav": [
+            "clicks:1"
+          ],
+          "Guitar R.wav": [
+            "clicks:1"
+          ],
+          "KICK.wav": [
+            "clicks:1"
+          ],
+          "OH L.wav": [
+            "clicks:1"
+          ],
+          "OH R.wav": [
+            "clicks:1"
+          ],
+          "Playback L.wav": [
+            "clicks:1",
+            "dropout_runs:2"
+          ],
+          "Playback R.wav": [
+            "clicks:1",
+            "dropout_runs:2"
+          ],
+          "SNARE T.wav": [
+            "clicks:1"
+          ],
+          "Snare B.wav": [
+            "clicks:1"
+          ],
+          "Tom.wav": [
+            "clicks:1"
+          ],
+          "Vocal.wav": [
+            "dropout_runs:1"
+          ]
+        },
+        "repaired": true,
+        "sanitized_dir": "/tmp/automixer-goal-corpus-20260923.iXSgVS/concert.sanitized_input"
+      },
+      "exit_code": 0
+    }
+  ],
+  "drums_wav_unchanged_by_serialization_fix": true
+}

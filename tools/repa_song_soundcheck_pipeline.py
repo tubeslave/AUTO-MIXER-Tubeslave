@@ -498,7 +498,7 @@ def build_source_envelopes(input_dir: Path) -> dict[str, Any]:
             "activity_fraction": round(env.identity.activity_fraction, 3),
             "measured_crest_db": round(env.measured_crest_db, 1),
             "crest_target_db": list(env.crest_target_db),
-            "crest_ok": env.crest_ok,
+            "crest_ok": bool(env.crest_ok),
             "touch_zones_hz": [list(z) for z in env.touch_zones_hz],
         }
         del audio

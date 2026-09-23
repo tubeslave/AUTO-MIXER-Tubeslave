@@ -1,7 +1,12 @@
 import importlib.util
+import json
 import sys
 from datetime import datetime
 from pathlib import Path
+
+import numpy as np
+import pytest
+import soundfile as sf
 
 
 def load_pipeline_module():
@@ -44,6 +49,28 @@ def test_build_render_command_routes_to_channel_triggered_renderer(tmp_path):
     assert "--tempo-bpm" in command
     assert "--genre" in command
     assert "rock" in command
+
+
+@pytest.mark.parametrize("signal", ["silence", "tone", "noise"])
+def test_source_envelopes_serialize_in_cli_manifest(tmp_path, signal):
+    mod = load_pipeline_module()
+    sample_rate = 48000
+    time = np.arange(sample_rate) / sample_rate
+    audio = {
+        "silence": np.zeros(sample_rate),
+        "tone": 0.2 * np.sin(2 * np.pi * 60 * time),
+        "noise": 0.05 * np.random.default_rng(7).standard_normal(sample_rate),
+    }[signal]
+    sf.write(tmp_path / "vocal.wav", audio, sample_rate)
+
+    manifest = {"source_envelopes": mod.build_source_envelopes(tmp_path)}
+    encoded = json.dumps(manifest, allow_nan=False)
+    envelope = json.loads(encoded)["source_envelopes"]["vocal.wav"]
+
+    assert type(envelope["crest_ok"]) is bool
+    low, high = envelope["crest_target_db"]
+    assert envelope["crest_ok"] == (low <= envelope["measured_crest_db"] <= high)
+    assert envelope["crest_ok"] is (signal == "noise")
 
 
 def test_write_summary_includes_soundcheck_stages_and_channels(tmp_path):

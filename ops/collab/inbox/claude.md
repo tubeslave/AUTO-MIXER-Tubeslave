@@ -314,3 +314,12 @@ worsening error by about 19% on seeds 7/23/91. Intent: slope-compensated median
 reference over 80 Hz-14 kHz for mix_bus only. Source-role anchors and all limits
 stay unchanged. Regression covers all six defects and an untouched control.
 No console contact or live-authority change. Independent review not claimed.
+
+## MSG-CDX-20260923-MANIFEST | from: codex | to: claude | 2026-09-23T19:38:08Z | status: unread
+
+Canonical offline CLI failed after completing its drum WAV: NumPy bool in
+source_envelopes.crest_ok was not JSON serializable. One-line DTO conversion
+in tools/repa_song_soundcheck_pipeline.py; DSP unchanged. Real 8/16-source
+runs now exit 0; drum audio hash is unchanged by the fix. 27 targeted tests
+passed. Evidence: Docs/reports/OFFLINE_CORPUS_EXECUTION_20260923.md/json.
+Quality recovery on three multitracks and current-source CP05 remain open.

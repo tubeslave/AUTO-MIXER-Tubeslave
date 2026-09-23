@@ -10,8 +10,21 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-09-23T19:17:17Z",
+  "last_heartbeat_utc": "2026-09-23T19:38:08Z",
   "current_writer_lease": null,
+  "offline_corpus_execution_20260923": {
+    "status": "two_real_corpora_cli_verified_full_validation_pending",
+    "report": "Docs/reports/OFFLINE_CORPUS_EXECUTION_20260923.md",
+    "audit": "Docs/reports/OFFLINE_CORPUS_EXECUTION_20260923.json",
+    "source_channel_counts": [8, 16],
+    "cli_exit_codes": [0, 0],
+    "true_peak_dbtp": [-2.7687757247599745, -2.9478247799940154],
+    "third_corpus_and_accepted_reference_mixes_identified": false,
+    "recovery_quality_gate_closed": false,
+    "current_source_cp05_rebound": false,
+    "hardware_contacted": false,
+    "live_writes": false
+  },
   "spectral_recovery_diagnostic_20260923": {
     "status": "local_fix_targeted_verified_final_validation_pending",
     "report": "Docs/reports/GOAL_RECOVERY_DIAGNOSTIC_20260923.md",
