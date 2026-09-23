@@ -163,6 +163,21 @@ Delete dead scripts/duplicates after two conditions:
 R7 ROOT CLEANUP
 Collapse stale READMEs/test reports/start scripts/config duplicates; rewrite top-level README around Studio + Live products.
 
+## Current migration state — 2026-09-23
+
+R1 is active: legacy `auto_*` decision modules are frozen for feature work.
+
+R2/R3 have started for the WING channel-fader path:
+- `backend/live_runtime/control_plane.py` is the canonical authorization/write/readback/verification boundary;
+- `backend/live_runtime/wing_adapter.py` adapts the existing WING OSC transport and requires fresh inbound readback rather than trusting the optimistic `WingClient.state` cache;
+- `backend/live_runtime/service.py` now composes that control plane for an active WING session and owns the control audit trail;
+- the temporary `AutoSoundcheckEngine` remains only as an ADAPT bridge for discovery/audio/mixer connection plumbing while its heuristic policy is retired;
+- channel fader is the first migrated write family; unsupported parameter families fail closed.
+
+Automated replacement evidence exists for BENCH_TEST and OBSERVE round trips with callback-driven WING transport doubles. Physical WING HIL evidence is still required before legacy AutoFader write authority can be severed or archived.
+
+No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
+
 ## Non-negotiable migration rule
 
 Do not delete first and debug later. First sever runtime imports, add replacement tests, run CI/HIL, then archive/delete. Conversely, do not keep old code merely because it once worked: if it has no validated role in the target architecture, it leaves the runtime tree.
