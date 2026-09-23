@@ -55,6 +55,20 @@ class MixerSnapshot:
     timestamp_s:float
 
 @dataclass(frozen=True)
+class EqBandLocator:
+    """Physical PEQ band identity required for live gain writes.
+
+    A musical idea such as "reduce harshness around 3 kHz" is not sufficient
+    to mutate a console.  The live control path carries the exact WING band plus
+    its expected frequency/Q fingerprint so an ambiguous ``eq_gain`` proposal
+    cannot silently land on whichever band happens to occupy that slot.
+    """
+
+    band:int
+    frequency_hz:float
+    q:float
+
+@dataclass(frozen=True)
 class ProposedAction:
     target:str
     parameter:str
@@ -64,6 +78,7 @@ class ProposedAction:
     max_step:float|None=None
     reversible:bool=True
     risk:str="low"
+    eq_locator:EqBandLocator|None=None
 
 @dataclass(frozen=True)
 class VerifiedAction:
