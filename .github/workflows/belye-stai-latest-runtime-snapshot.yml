@@ -1,0 +1,27 @@
+name: Belye Stai latest runtime snapshot
+on:
+  push:
+    branches: [studio/belye-stai-remix-latest-20260924]
+    paths: [.github/workflows/belye-stai-latest-runtime-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fetch exact accepted runtime
+        run: |
+          mkdir -p work unpack
+          curl --fail --location --retry 3 https://codeload.github.com/tubeslave/AUTO-MIXER-Tubeslave/tar.gz/326cec43286ea3722608fbc92de7dfe0c0481692 -o work/source.tar.gz
+          tar -xzf work/source.tar.gz --strip-components=1 -C unpack
+          printf '%s\n' 326cec43286ea3722608fbc92de7dfe0c0481692 > unpack/REVISION.txt
+          tar -czf work/runtime.tar.gz -C unpack audio_workbench backend mix_agent tools tests .ai Docs pytest.ini REVISION.txt
+          sha256sum work/runtime.tar.gz > work/runtime.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: belye-stai-latest-runtime
+          path: |
+            work/runtime.tar.gz
+            work/runtime.sha256
+          retention-days: 7
