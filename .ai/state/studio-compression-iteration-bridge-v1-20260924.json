@@ -1,0 +1,29 @@
+{
+  "goal": "compression-iteration-bridge-v1",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "901e60b84137d3b3d7312edb1a9465bd1909ef06",
+  "priority_reason": "next accepted Compression Director v1.1 goal: reuse Perceptual Critic and Autonomous Iteration without machine-only musical selection",
+  "scope": "STUDIO/offline Compression Director v1.1 candidate-family bridge only",
+  "required_variant_ids": ["preserve_transient", "balanced", "control"],
+  "mandatory_counterfactual": "bypass/no_change",
+  "policy": {
+    "objective_failures": "critic veto and rollback",
+    "machine_safe": "pending human listening",
+    "baseline_promotion_from_bridge": false
+  },
+  "real_source_grounding": {
+    "song": "Belye Stai",
+    "experiment": "Compression Director v1.1 60-second raw source validation",
+    "candidates_checked": 9,
+    "calibration_error_bound_db": 0.08,
+    "musical_winner_claimed": false
+  },
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "next_gate": "full exact-branch CI on Python matrix, then accept/revise/rollback"
+}
