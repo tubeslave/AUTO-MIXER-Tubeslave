@@ -57,6 +57,8 @@ jobs:
             tests/test_live_main_tap_patch_verify.py \
             tests/test_live_patch_startup.py \
             tests/test_live_wing_main_meter.py \
+            tests/test_live_session_config.py \
+            tests/test_live_soundcheck_handler_composition.py \
             tests/test_soundcheck_handlers.py
 
       - name: Run offline stem training loop
