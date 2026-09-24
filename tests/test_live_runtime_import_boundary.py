@@ -1,3 +1,4 @@
+import ast
 import os
 from pathlib import Path
 import subprocess
@@ -29,6 +30,30 @@ FORBIDDEN_LEGACY_DECISION_ROOTS = (
     "autofoh_evaluation",
     "cross_adaptive_eq",
 )
+
+# Compatibility code is quarantined behind one explicit source boundary. The
+# adapter may contain the frozen legacy constructor import, but no canonical
+# live_runtime module may import a legacy decision authority directly.
+LEGACY_IMPORT_HOLDERS = {
+    "legacy_soundcheck_adapter.py",
+}
+
+
+def _legacy_imports_in_source(path: Path) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    imported: set[str] = set()
+    for node in ast.walk(tree):
+        modules: list[str] = []
+        if isinstance(node, ast.Import):
+            modules.extend(alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            modules.append(node.module)
+        for module in modules:
+            parts = module.split(".")
+            root = parts[1] if parts and parts[0] == "backend" and len(parts) > 1 else parts[0]
+            if root in FORBIDDEN_LEGACY_DECISION_ROOTS:
+                imported.add(root)
+    return imported
 
 
 def _run_fresh_interpreter(body: str) -> subprocess.CompletedProcess[str]:
@@ -79,3 +104,30 @@ def test_constructing_canonical_live_service_is_still_legacy_import_free():
         "service = LiveSoundcheckService()\n"
         "assert service.active_engine is None"
     )
+
+
+def test_constructing_canonical_service_does_not_even_load_compat_adapter():
+    _assert_clean_subprocess(
+        "import sys\n"
+        "from live_runtime.service import LiveSoundcheckService\n"
+        "service = LiveSoundcheckService()\n"
+        "assert 'live_runtime.legacy_soundcheck_adapter' not in sys.modules"
+    )
+
+
+def test_canonical_live_runtime_sources_do_not_import_legacy_decision_authorities():
+    runtime_root = BACKEND_ROOT / "live_runtime"
+    violations = {}
+    for path in sorted(runtime_root.glob("*.py")):
+        if path.name in LEGACY_IMPORT_HOLDERS:
+            continue
+        imports = _legacy_imports_in_source(path)
+        if imports:
+            violations[path.name] = sorted(imports)
+    assert violations == {}
+
+
+def test_compat_adapter_is_the_only_allowlisted_legacy_decision_import_holder():
+    runtime_root = BACKEND_ROOT / "live_runtime"
+    adapter = runtime_root / "legacy_soundcheck_adapter.py"
+    assert _legacy_imports_in_source(adapter) == {"auto_soundcheck_engine"}
