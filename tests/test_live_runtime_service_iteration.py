@@ -4,7 +4,16 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
 from live_runtime.contracts import ChannelFeatures, LiveMode, MixFeatures, SoundcheckState
+from live_runtime.feature_stream import MainFeatureEvidence
 from live_runtime.iteration import IterationPhase
+from live_runtime.main_evidence import PostConsoleMainTap
+from live_runtime.patch_startup import MainTapPatchStartupCoordinator
+from live_runtime.patch_verify import (
+    MainTapPatchContract,
+    MainTapPatchVerifier,
+    MainTapRouteExpectation,
+    PhysicalMainMeterEvidence,
+)
 from live_runtime.service import LiveSoundcheckService, LiveStartRequest
 
 
@@ -38,6 +47,25 @@ def _features(main_peak_dbfs):
     )
 
 
+def _patch_contract():
+    return MainTapPatchContract(
+        tap=PostConsoleMainTap(left_channel=47, right_channel=48),
+        routes=(
+            MainTapRouteExpectation(usb_slot=47, source_channel=1),
+            MainTapRouteExpectation(usb_slot=48, source_channel=2),
+        ),
+    )
+
+
+def _tap_evidence():
+    return MainFeatureEvidence(
+        rms_dbfs=-18.0,
+        peak_dbfs=-6.0,
+        crest_db=12.0,
+        timestamp_s=10.0,
+    )
+
+
 class FakeWingClient:
     def __init__(self, values=None):
         self.values = dict(values or {})
@@ -56,6 +84,16 @@ class FakeWingClient:
         for callback in self.callbacks.get(address, []):
             callback(address, str(actual), 0.5, actual)
         return True
+
+
+class FakeMeterProvider:
+    def read(self):
+        return PhysicalMainMeterEvidence(
+            peak_dbfs=-6.4,
+            rms_dbfs=-18.3,
+            timestamp_s=10.05,
+            source="test-main-meter",
+        )
 
 
 class ConnectedWingEngine:
@@ -77,14 +115,34 @@ class ConnectedWingEngine:
         return {"state": self.state.value, "mixer_connected": True, "audio_running": True}
 
 
+def _patch_startup_factory(adapter, _host, audit_sink):
+    return MainTapPatchStartupCoordinator(
+        MainTapPatchVerifier(adapter),
+        FakeMeterProvider(),
+        audit_sink=audit_sink,
+    )
+
+
 def _service(window=0.0):
-    client = FakeWingClient({"/main/1/fdr": -6.0})
+    client = FakeWingClient(
+        {
+            "/main/1/fdr": -6.0,
+            "/io/out/USB/46/grp": "MAIN",
+            "/io/out/USB/46/in": 1,
+            "/io/out/USB/47/grp": "MAIN",
+            "/io/out/USB/47/in": 2,
+        }
+    )
     ConnectedWingEngine.transport = client
     service = LiveSoundcheckService(
         engine_factory=ConnectedWingEngine,
         iteration_verification_window_s=window,
+        patch_startup_factory=_patch_startup_factory,
     )
     service.start(_request())
+    verified = service.verify_main_tap_patch(_patch_contract(), _tap_evidence())
+    assert verified.verified is True
+    assert service.get_status()["soundcheck_state"] == "listen"
     return service, client
 
 
@@ -158,5 +216,5 @@ def test_operator_takeover_propagates_hold_without_fighting_manual_control():
 
     ignored = service.process_feature_snapshot(_features(-0.2), roles={})
     assert ignored.state is SoundcheckState.HOLD
-    assert ignored.reason == "operator_took_control"
+    assert ignored.reason == "startup_state_blocked:hold"
     assert client.sent == sent_after_apply
