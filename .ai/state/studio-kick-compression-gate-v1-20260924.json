@@ -1,8 +1,16 @@
 {
   "goal": "grouped-kick-original-compressor-adapter-and-transient-body-gate-v1",
-  "status": "implementation_and_real_song_validation_complete_pending_ci_and_human_listening",
+  "status": "accepted_machine_validation_audio_candidate_pending_human_listening",
   "date": "2026-09-24",
   "base_commit": "683dfb65f040715445905b117175b92ecf0fc441",
+  "pull_request": 133,
+  "tested_head_commit": "226ec49097854192aa0f02a7b798701d24a53877",
+  "merge_commit": "5abc9bb8abe7ef5919018aae6a3f132fc4ade8c6",
+  "ci": {
+    "workflow_run": 35974776892,
+    "conclusion": "success",
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"}
+  },
   "bounded_task": "Expose exact KICK_IN/KICK_OUT grouped compressor boundary, propose bounded timing-only replacements, gate on fixed event windows, and rerender surviving candidates through the full Belye Stai session.",
   "local_validation": {
     "new_tests_passed": 12,
@@ -40,7 +48,7 @@
     "climax_lift_db": 0.0,
     "protected_failures": []
   },
-  "decision": "accept_code_if_ci_green_keep_audio_candidate_pending_human_listening",
+  "decision": "accept_kick_processor_and_gate_code_keep_tighter_body_as_human_audition_only",
   "audio_baseline_promoted": false,
   "accepted_vocal_changed": false,
   "bass_baseline_changed": false,
@@ -49,5 +57,18 @@
   "neural_audio_used": false,
   "paid_external_credits_used": false,
   "human_listening_required_for_subjective_acceptance": true,
+  "next_goal_probe": {
+    "source_group": ["SN_T", "SN_B"],
+    "existing_snare_no_change_pcm_error": 0.0,
+    "bottom_polarity": -1,
+    "bottom_relative_gain_db": -5.812252814757382,
+    "bottom_expansion_threshold_dbfs": -59.92695773879325,
+    "baseline_compressor_threshold_dbfs": -37.57189773258226,
+    "baseline_ratio": 3.0,
+    "baseline_attack_ms": 14,
+    "baseline_release_ms": 110,
+    "baseline_max_gr_db": 5.0,
+    "simple_precompression_event_probe_count": 925
+  },
   "next_goal": "SN_T/SN_B synchronized snare adapter with polarity preservation, bottom-mic expansion freeze, ghost-note/body/bleed gate, then full-session audition."
 }
