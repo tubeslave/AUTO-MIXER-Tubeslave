@@ -1,37 +1,47 @@
 {
   "goal": "studio-calibration-replay-corpus-v1",
-  "status": "local_runtime_validated_remote_code_write_blocked",
+  "status": "remote_implementation_requires_integrity_revision_local_compatible_fix_validated",
   "base_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
-  "bounded_task": "implement evidence-only corpus build, compare-and-append and deterministic replay for annotated studio-autonomous-iteration-v2 reports",
-  "repository_runtime_integration": "pending: create_file for audio_workbench/mixing/calibration_corpus.py was blocked before a commit was returned",
-  "write_blocker": "OpenAI tool response: could not determine the safety status of the request; no alternate code-write route attempted",
-  "container_git_blocker": "git ls-remote failed: Could not resolve host: github.com",
-  "local_validation": {
-    "command": "python -m pytest tests/test_studio_calibration_corpus_v1.py tests/test_studio_perceptual_calibration_v1.py -k 'not existing_annotation_api_integration' -q --tb=short --junitxml=evidence/local-unit-tests.xml",
-    "passed": 40,
-    "new_corpus_cases_passed": 33,
-    "existing_calibration_cases_passed": 7,
-    "deselected": 1,
-    "deselected_reason": "full studio_iteration import integration requires repository runtime unavailable in this container; test is written but not claimed passed",
+  "reviewed_remote_commit": "2f0d9594e1eeca3e5713bf4a2fc24e559e82cd16",
+  "reviewed_module_git_blob": "603e9808dcecf07d5c4dc23904d52068d83606da",
+  "reviewed_tests_git_blob": "e21ffe0eb0805f67c7cc79c79b487631d2fb219b",
+  "bounded_task": "harden append integrity in the actual remotely added corpus implementation without replacing its public API or record format",
+  "concurrent_change_reconciliation": "During this run a separate implementation, tests and seed appeared on the same feature branch. Earlier local whole-report prototype results do not validate that remote implementation. Remote code was read and copied with exact Git-blob verification before review. It was not overwritten.",
+  "confirmed_remote_failures": [
+    "append to a valid record lacking its final newline writes concatenated invalid JSON and only then raises, leaving corrupted history",
+    "build_calibration_record aliases nested caller-owned lists; later input mutation changes a supposedly digested record",
+    "two overlapping writers can append records with the same previous_record_id and break replay",
+    "an existing loader test fails because its expected canonical/line-2 error does not match the actual line-1 parse error"
+  ],
+  "local_compatible_fix": [
+    "deep JSON snapshot before assigning record digest",
+    "fail closed on missing final newline",
+    "exclusive sidecar writer lock without auto-unlock",
+    "pre-write full replay plus fsynced temporary file and atomic prefix-preserving replace",
+    "cleanup on fsync/replace failure and unchanged native-JSON record digest",
+    "clear canonical-JSON parse error without weakening the existing test"
+  ],
+  "actual_validation": {
+    "python": "3.13.5",
+    "command": "python -m pytest tests -q --tb=short --junitxml=evidence/after-fix.xml",
+    "scope": "checksum-verified sparse corpus/calibration source subset, not the full repository",
+    "before_fix_passed": 15,
+    "before_fix_failed": 4,
+    "after_fix_passed": 24,
+    "after_fix_failed": 0,
+    "new_integrity_tests": 8,
+    "existing_corpus_tests": 9,
+    "existing_calibration_tests": 7,
     "compileall_passed": true,
-    "full_repository_tests_run": false,
-    "ci_run_for_this_implementation": null,
-    "existing_classifier_git_blob_verified": "1800c10eb54471b8b61d224e392e01e5447aff12"
+    "git_apply_check_and_byte_verification_passed": true,
+    "full_repository_ci_run": false
   },
-  "local_artifact_sha256": {
-    "audio_workbench/mixing/calibration_corpus.py": "178c945cd4d7f847b2938f9383810743fc31bad384a78bc977f4d2304e982fba",
-    "tests/test_studio_calibration_corpus_v1.py": "daa8f3e53c2c2b43c9885ef2fede89736a795b3c4abd9846e23b73a13f7c71b6"
-  },
-  "synthetic_experiment": {
-    "records": 6,
-    "classification_outcomes": 6,
-    "head_record_id": "4d9afa0b2cb64f4b3fed9fefcdbb53bb8e7573cba67d441b4c1b1bddab27ffa2",
-    "trusted_head_checked": true,
-    "previous_bytes_preserved_after_each_append": true,
-    "real_listening_data": false
-  },
-  "prior_evidence_correction": "The earlier 8-passed claim is not reproducible from its supplied ZIP, which contains only a text result, report and seed. It is not used as validation for this implementation; the current executed pytest/JUnit evidence supersedes it.",
-  "legacy_prototype_seed_imported": false,
+  "local_patch_sha256": "dead6659d3fa3bb54c616ad210eae33751d6b7d3260d1d1df0b6d7aef18143c6",
+  "local_fixed_module_sha256": "0f5a4d89c5194ee2b6e31d10969cfe57111c796af606487d14446ab7ff4c073d",
+  "write_status": "This run's create_file call for its separate Python implementation was blocked by an OpenAI safety-status determination failure. Documentation/state updates succeeded. No alternate code-write route attempted; the compatible correction patch remains local.",
+  "container_git_status": "DNS failure resolving github.com",
+  "prior_evidence_correction": "Do not treat the earlier text-only 8-passed prototype artifact as reproducible test evidence. The separate local 40-passed prototype is also not the remotely added implementation. Current compatible-patch acceptance evidence is the 24-test run above.",
+  "merge_decision": "do_not_merge_until_integrity_fix_and_actual_repository_CI",
   "audio_dsp_changed": false,
   "mastering_changed": false,
   "live_code_changed": false,
@@ -40,5 +50,5 @@
   "neural_audio_used": false,
   "paid_external_credits_used": false,
   "human_listening_required": true,
-  "next_goal": "land the prepared runtime and tests through an authorized working code-write path; run the actual annotation integration test and full CI before merge; import only source-verified annotated iteration reports, not a reconstructed historical render"
+  "next_goal": "integrate the minimal compatible integrity patch through an authorized working writer, run full Python 3.10/3.11/3.12 repository CI, then validate source-bound corpus ingestion; coordinate one writer per branch"
 }
