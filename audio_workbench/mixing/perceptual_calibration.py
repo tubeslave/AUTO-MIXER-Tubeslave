@@ -92,6 +92,12 @@ def foreground_stability_evidence(
     reference = baseline if activity_reference is None else _mono_finite(activity_reference, "activity_reference")
     if reference.shape != baseline.shape:
         raise ValueError("activity_reference shape differs from foreground")
+    if np.max(np.abs(baseline)) < 1e-10:
+        raise ValueError("baseline_foreground is effectively silent")
+    if np.max(np.abs(candidate)) < 1e-10:
+        raise ValueError("candidate_foreground is effectively silent")
+    if np.max(np.abs(reference)) < 1e-10:
+        raise ValueError("activity_reference is effectively silent")
 
     window = max(1, int(round(float(p.window_ms) * sr / 1000.0)))
     hop = max(1, int(round(float(p.hop_ms) * sr / 1000.0)))
