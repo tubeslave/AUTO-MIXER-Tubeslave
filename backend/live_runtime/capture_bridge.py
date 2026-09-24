@@ -9,6 +9,13 @@ Main evidence may come from an external authoritative meter provider or from a
 real post-console Main tap contained in the same coherent USB snapshot.  Main
 tap slots are excluded from channel-level musical analysis.  No Main level is
 synthesized from input stems and no legacy ``auto_*`` decision policy is imported.
+
+When an explicit ``MainTapPatchContract`` is supplied, the bridge also closes the
+startup seam without becoming a second state-machine authority: the first
+coherent snapshot is offered to the service's feature gate, and a DISCOVER result
+is immediately followed by the service-owned read-only PATCH_VERIFY using that
+same Main evidence.  The proof snapshot is never reused for a musical proposal;
+subsequent snapshots reach the Director only after the service has reached LISTEN.
 """
 
 from __future__ import annotations
@@ -20,6 +27,7 @@ from typing import Any, Callable, Mapping, Protocol
 
 import numpy as np
 
+from .contracts import SoundcheckState
 from .feature_stream import (
     MainFeatureEvidence,
     USB_CHANNEL_COUNT,
@@ -27,6 +35,7 @@ from .feature_stream import (
     Usb48FeatureExtractor,
     assemble_mix_features,
 )
+from .patch_verify import MainTapPatchContract
 
 
 class AudioCaptureReader(Protocol):
@@ -72,6 +81,16 @@ class FeatureSnapshotConsumer(Protocol):
     ) -> Any: ...
 
 
+class PatchVerifyConsumer(FeatureSnapshotConsumer, Protocol):
+    """Additional service-owned startup gate used only when explicitly configured."""
+
+    def verify_main_tap_patch(
+        self,
+        contract: MainTapPatchContract,
+        tap_evidence: MainFeatureEvidence,
+    ) -> Any: ...
+
+
 @dataclass(frozen=True)
 class CaptureBridgeStatus:
     running: bool
@@ -103,6 +122,13 @@ class LiveAudioCaptureBridge:
     The bridge owns neither the audio device nor mixer transport lifecycle.  It
     only subscribes/unsubscribes from an already configured capture service.
     Exactly one authoritative Main evidence source must be configured.
+
+    ``patch_contract`` is optional and deliberately narrow.  When present it
+    requires coherent post-console Main evidence from the captured snapshot and
+    a consumer exposing ``verify_main_tap_patch``.  The bridge never interprets
+    routing evidence or changes FSM state itself; it only notices the service's
+    DISCOVER result and hands the same Main evidence back to the service-owned
+    PATCH_VERIFY gate.
     """
 
     def __init__(
@@ -113,6 +139,7 @@ class LiveAudioCaptureBridge:
         roles: Mapping[int, str],
         main_evidence_provider: MainEvidenceProvider | None = None,
         snapshot_main_evidence_provider: SnapshotMainEvidenceProvider | None = None,
+        patch_contract: MainTapPatchContract | None = None,
         channel_names: Mapping[int, str] | None = None,
         window_frames: int = 2048,
         analysis_interval_s: float = 0.100,
@@ -135,6 +162,17 @@ class LiveAudioCaptureBridge:
             raise ValueError("subscriber_name must not be empty")
         if (main_evidence_provider is None) == (snapshot_main_evidence_provider is None):
             raise ValueError("configure exactly one authoritative Main evidence provider")
+        if patch_contract is not None:
+            if not isinstance(patch_contract, MainTapPatchContract):
+                raise TypeError("patch_contract must be MainTapPatchContract")
+            if snapshot_main_evidence_provider is None:
+                raise ValueError(
+                    "automatic PATCH_VERIFY requires coherent snapshot Main evidence"
+                )
+            if not callable(getattr(service, "verify_main_tap_patch", None)):
+                raise TypeError(
+                    "automatic PATCH_VERIFY requires a service exposing verify_main_tap_patch"
+                )
 
         reserved_channels: tuple[int, ...] = ()
         if snapshot_main_evidence_provider is not None:
@@ -154,6 +192,7 @@ class LiveAudioCaptureBridge:
         self._roles = {int(channel): str(role) for channel, role in roles.items()}
         self._main_evidence_provider = main_evidence_provider
         self._snapshot_main_evidence_provider = snapshot_main_evidence_provider
+        self._patch_contract = patch_contract
         self._analysis_channels = tuple(
             channel
             for channel in range(1, USB_CHANNEL_COUNT + 1)
@@ -306,6 +345,25 @@ class LiveAudioCaptureBridge:
                 max_main_age_s=self._max_main_age_s,
             )
             result = self._service.process_feature_snapshot(features, dict(self._roles))
+
+            # The service remains the only FSM authority.  A pre-verified live
+            # session returns DISCOVER without evaluating a Director; in that
+            # exact state, hand the *same* coherent Main evidence into its
+            # read-only startup proof.  Do not re-run this feature frame after
+            # successful verification, so a proof snapshot can never also cause
+            # a musical write.
+            if self._patch_contract is not None:
+                state = getattr(result, "state", None)
+                if state is None:
+                    raise RuntimeError(
+                        "automatic PATCH_VERIFY consumer returned a result without state"
+                    )
+                if state is SoundcheckState.DISCOVER:
+                    verifier = getattr(self._service, "verify_main_tap_patch", None)
+                    if not callable(verifier):  # pragma: no cover - constructor enforces this
+                        raise RuntimeError("PATCH_VERIFY service method disappeared at runtime")
+                    result = verifier(self._patch_contract, main)
+
             with self._condition:
                 self._snapshots_processed += 1
                 self._last_error = None
