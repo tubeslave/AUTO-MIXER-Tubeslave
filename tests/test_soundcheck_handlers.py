@@ -32,7 +32,6 @@ class DummyServer:
         }
         self.auto_soundcheck_running = False
         self.auto_soundcheck_observe_only = False
-        self.auto_soundcheck_engine = None  # temporary legacy compatibility alias
         self.sent_messages = []
         self.broadcast_messages = []
         self.send_to_client = AsyncMock(side_effect=self._capture_send)
@@ -158,7 +157,7 @@ async def test_start_auto_soundcheck_routes_lifecycle_through_live_runtime():
     assert server.auto_soundcheck_observe_only is True
     assert server.auto_soundcheck_running is True
     assert service.engine.started is True
-    assert server.auto_soundcheck_engine is service.engine
+    assert not hasattr(server, "auto_soundcheck_engine")
 
 
 @pytest.mark.asyncio
@@ -173,7 +172,7 @@ async def test_stop_auto_soundcheck_routes_lifecycle_through_live_runtime():
 
     assert service.engine.stopped is True
     assert service.is_active() is False
-    assert server.auto_soundcheck_engine is None
+    assert not hasattr(server, "auto_soundcheck_engine")
     assert server.auto_soundcheck_running is False
 
 
