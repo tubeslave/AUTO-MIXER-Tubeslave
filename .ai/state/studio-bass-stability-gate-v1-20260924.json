@@ -3,6 +3,14 @@
   "status": "accepted_machine_validation_no_musical_change",
   "date": "2026-09-24",
   "base_branch": "audio-workbench-mcp-v0.1",
+  "pull_request": 132,
+  "tested_head_commit": "a95a6b2e02451b5b2ce18391cfb940971fe729a8",
+  "merge_commit": "ea254193fc2019985d018050df745d976d32f363",
+  "ci": {
+    "workflow_run": 35971305507,
+    "conclusion": "success",
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"}
+  },
   "bounded_task": "fixed-window bass body-stability and attack-protection gate with timing-only baseline-relative probes",
   "local_validation": {
     "new_tests_passed": 5,
