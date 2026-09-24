@@ -14,8 +14,10 @@ capture.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Callable
+import threading
+from typing import Any, Callable, Mapping
 
+from .capture_bridge import LiveAudioCaptureBridge
 from .contracts import (
     EqBandLocator,
     LiveMode,
@@ -29,9 +31,48 @@ from .decision_engine import LiveHypothesis, propose_one
 from .eq_locator import EqTargetEvidence, RealtimeEqLocatorSelector
 from .feature_stream import MainFeatureEvidence
 from .iteration import IterationCoordinator, IterationPhase, IterationResult
+from .main_evidence import PostConsoleMainTapEvidenceProvider
 from .patch_startup import MainTapPatchStartupCoordinator, PatchVerifyStartupResult
 from .patch_verify import MainTapPatchContract
 from .wing_adapter import WingWriteAdapter
+
+
+@dataclass(frozen=True)
+class LiveCaptureBridgeConfig:
+    """Explicit production composition for the service-owned capture bridge.
+
+    The patch contract is the single source of truth for reserved post-console
+    Main capture slots.  The service derives the snapshot Main provider from
+    that contract, preventing callers from accidentally composing a mismatched
+    provider/route pair.  Channel roles remain explicit evidence supplied by
+    the composition root; no legacy classifier or ``auto_*`` policy is reused.
+    """
+
+    patch_contract: MainTapPatchContract
+    roles: Mapping[int, str]
+    channel_names: Mapping[int, str] | None = None
+    window_frames: int = 2048
+    analysis_interval_s: float = 0.100
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.patch_contract, MainTapPatchContract):
+            raise TypeError("patch_contract must be MainTapPatchContract")
+        if isinstance(self.window_frames, bool) or int(self.window_frames) <= 0:
+            raise ValueError("window_frames must be > 0")
+        if isinstance(self.analysis_interval_s, bool) or float(self.analysis_interval_s) < 0.0:
+            raise ValueError("analysis_interval_s must be >= 0")
+        object.__setattr__(self, "window_frames", int(self.window_frames))
+        object.__setattr__(self, "analysis_interval_s", float(self.analysis_interval_s))
+        object.__setattr__(
+            self,
+            "roles",
+            {int(channel): str(role) for channel, role in dict(self.roles).items()},
+        )
+        object.__setattr__(
+            self,
+            "channel_names",
+            {int(channel): str(name) for channel, name in dict(self.channel_names or {}).items()},
+        )
 
 
 @dataclass(frozen=True)
@@ -43,6 +84,7 @@ class LiveStartRequest:
     num_channels: int
     selected_channels: list[int]
     mode: LiveMode = LiveMode.OBSERVE
+    capture_bridge: LiveCaptureBridgeConfig | None = None
 
 
 @dataclass(frozen=True)
@@ -68,6 +110,13 @@ class LiveSoundcheckService:
     authority from this service. The autonomous feature loop is additionally
     gated by the canonical startup state machine: DISCOVER -> PATCH_VERIFY ->
     LISTEN/HOLD.
+
+    When ``LiveStartRequest.capture_bridge`` is configured, this service also
+    owns the lifecycle of ``LiveAudioCaptureBridge``.  The legacy engine is then
+    reduced to a temporary owner of the validated AudioCapture transport: once
+    that capture object becomes available, the service subscribes the canonical
+    live feature bridge; on stop it unsubscribes the bridge before stopping the
+    legacy engine/audio device.
     """
 
     legacy_bridge = True
@@ -79,11 +128,13 @@ class LiveSoundcheckService:
         audit_sink: Callable[[dict[str, Any]], None] | None = None,
         iteration_verification_window_s: float = 1.0,
         patch_startup_factory: Callable[..., MainTapPatchStartupCoordinator] | None = None,
+        capture_bridge_factory: Callable[..., LiveAudioCaptureBridge] | None = None,
     ):
         if iteration_verification_window_s < 0:
             raise ValueError("iteration_verification_window_s must be >= 0")
         self._engine_factory = engine_factory
         self._patch_startup_factory = patch_startup_factory
+        self._capture_bridge_factory = capture_bridge_factory
         self._engine: Any | None = None
         self._request: LiveStartRequest | None = None
         self._control_plane: LiveControlPlane | None = None
@@ -96,6 +147,10 @@ class LiveSoundcheckService:
         self._iteration_hypothesis: LiveHypothesis | None = None
         self._soundcheck_state: SoundcheckState | None = None
         self._last_patch_verify: PatchVerifyStartupResult | None = None
+        self._capture_bridge: LiveAudioCaptureBridge | Any | None = None
+        self._capture_bridge_error: str | None = None
+        self._capture_bridge_lock = threading.RLock()
+        self._lifecycle_stopping = False
 
     @property
     def active_engine(self) -> Any | None:
@@ -145,6 +200,100 @@ class LiveSoundcheckService:
     def _reset_startup(self) -> None:
         self._soundcheck_state = None
         self._last_patch_verify = None
+
+    def _build_capture_bridge(self, capture: Any) -> LiveAudioCaptureBridge | Any:
+        if self._request is None or self._request.capture_bridge is None:
+            raise RuntimeError("Live capture bridge is not configured")
+        config = self._request.capture_bridge
+        tap = config.patch_contract.tap
+        main_provider = PostConsoleMainTapEvidenceProvider(
+            tap.left_channel,
+            tap.right_channel,
+        )
+        factory = self._capture_bridge_factory or LiveAudioCaptureBridge
+        return factory(
+            capture,
+            self,
+            roles=config.roles,
+            channel_names=config.channel_names,
+            snapshot_main_evidence_provider=main_provider,
+            patch_contract=config.patch_contract,
+            window_frames=config.window_frames,
+            analysis_interval_s=config.analysis_interval_s,
+        )
+
+    def _try_start_capture_bridge(self) -> bool:
+        """Attach the canonical feature bridge once legacy AudioCapture exists.
+
+        ``AutoSoundcheckEngine.start_async()`` returns before its worker has
+        necessarily created ``audio_capture``.  State callbacks therefore call
+        this method opportunistically, and ``start()`` calls it once more after
+        launching the worker.  The lock makes those two paths idempotent.
+        """
+        with self._capture_bridge_lock:
+            if self._lifecycle_stopping:
+                return False
+            if self._capture_bridge is not None:
+                return True
+            if self._capture_bridge_error is not None:
+                return False
+            if self._engine is None or self._request is None:
+                return False
+            config = self._request.capture_bridge
+            if config is None:
+                return False
+            capture = getattr(self._engine, "audio_capture", None)
+            if capture is None:
+                return False
+
+            try:
+                bridge = self._build_capture_bridge(capture)
+                bridge.start()
+            except Exception as exc:
+                self._capture_bridge_error = f"{type(exc).__name__}: {exc}"
+                previous = self._soundcheck_state
+                self._soundcheck_state = SoundcheckState.HOLD
+                self._record_control_audit(
+                    {
+                        "event": "live_capture_bridge_start_failed",
+                        "state_before": previous.value if previous is not None else None,
+                        "state_after": SoundcheckState.HOLD.value,
+                        "reason": self._capture_bridge_error,
+                    }
+                )
+                return False
+
+            self._capture_bridge = bridge
+            self._record_control_audit(
+                {
+                    "event": "live_capture_bridge_started",
+                    "reserved_main_channels": list(config.patch_contract.tap.channels),
+                    "role_count": len(config.roles),
+                    "window_frames": config.window_frames,
+                    "analysis_interval_s": config.analysis_interval_s,
+                }
+            )
+            return True
+
+    def _stop_capture_bridge(self) -> bool:
+        with self._capture_bridge_lock:
+            bridge = self._capture_bridge
+            self._capture_bridge = None
+        if bridge is None:
+            return False
+        try:
+            bridge.stop()
+        except Exception as exc:
+            self._capture_bridge_error = f"{type(exc).__name__}: {exc}"
+            self._record_control_audit(
+                {
+                    "event": "live_capture_bridge_stop_failed",
+                    "reason": self._capture_bridge_error,
+                }
+            )
+            return False
+        self._record_control_audit({"event": "live_capture_bridge_stopped"})
+        return True
 
     def _active_wing_transport(self) -> Any:
         """Return the physical WING client owned by the migration bridge."""
@@ -523,7 +672,7 @@ class LiveSoundcheckService:
         on_channel_update=None,
         on_observation=None,
     ) -> Any:
-        """Construct and start exactly one live engine instance."""
+        """Construct and start exactly one live engine and optional capture bridge."""
         if self.is_active():
             raise RuntimeError("Live soundcheck engine already running")
 
@@ -531,37 +680,66 @@ class LiveSoundcheckService:
         self._reset_iteration()
         self._reset_startup()
         self._control_audit.clear()
+        self._capture_bridge = None
+        self._capture_bridge_error = None
+        self._lifecycle_stopping = False
+
+        def lifecycle_state_change(state, message):
+            # The legacy worker may create AudioCapture after start_async()
+            # returns. Every state transition is therefore a readiness edge for
+            # the service-owned bridge. No decision policy is imported here.
+            self._try_start_capture_bridge()
+            if on_state_change is not None:
+                on_state_change(state, message)
+
         engine = self.create_engine(
             request,
-            on_state_change=on_state_change,
+            on_state_change=lifecycle_state_change,
             on_channel_update=on_channel_update,
             on_observation=on_observation,
         )
         self._engine = engine
         self._request = request
+        self._soundcheck_state = SoundcheckState.DISCOVER
         try:
             engine.start_async()
+            # Also cover engines/fakes that expose AudioCapture synchronously
+            # without emitting a state transition after it becomes available.
+            self._try_start_capture_bridge()
         except Exception:
+            self._lifecycle_stopping = True
+            try:
+                self._stop_capture_bridge()
+            finally:
+                self._engine = None
+                self._request = None
+                self._reset_control_plane()
+                self._reset_iteration()
+                self._reset_startup()
+                self._lifecycle_stopping = False
+            raise
+        return engine
+
+    def stop(self) -> bool:
+        """Stop bridge first, then legacy engine/audio transport, and release ownership."""
+        engine = self._engine
+        if engine is None:
+            return False
+
+        self._lifecycle_stopping = True
+        try:
+            # Unsubscribe while AudioCapture is still alive. If the legacy engine
+            # emits a stop-state callback, _lifecycle_stopping prevents a bridge
+            # from being reattached during teardown.
+            self._stop_capture_bridge()
+            engine.stop()
+        finally:
             self._engine = None
             self._request = None
             self._reset_control_plane()
             self._reset_iteration()
             self._reset_startup()
-            raise
-        self._soundcheck_state = SoundcheckState.DISCOVER
-        return engine
-
-    def stop(self) -> bool:
-        """Stop the active engine and release lifecycle/control ownership."""
-        engine = self._engine
-        self._engine = None
-        self._request = None
-        self._reset_control_plane()
-        self._reset_iteration()
-        self._reset_startup()
-        if engine is None:
-            return False
-        engine.stop()
+            self._lifecycle_stopping = False
         return True
 
     def get_status(self) -> dict[str, Any]:
@@ -579,6 +757,15 @@ class LiveSoundcheckService:
             else "idle"
         )
         patch_result = self._last_patch_verify
+        bridge = self._capture_bridge
+        bridge_status = None
+        if bridge is not None and hasattr(bridge, "status"):
+            try:
+                bridge_status = asdict(bridge.status())
+            except (TypeError, ValueError):
+                bridge_status = None
+        bridge_running = bool(bridge_status.get("running")) if bridge_status else bridge is not None
+        bridge_configured = bool(self._request and self._request.capture_bridge is not None)
 
         if engine is None:
             return {
@@ -593,6 +780,10 @@ class LiveSoundcheckService:
                 "patch_verify_verified": None,
                 "patch_verify_reason": None,
                 "patch_verify_physical_source": None,
+                "capture_bridge_configured": False,
+                "capture_bridge_running": False,
+                "capture_bridge_error": self._capture_bridge_error,
+                "capture_bridge": None,
             }
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
@@ -622,4 +813,8 @@ class LiveSoundcheckService:
             if patch_result and patch_result.physical_evidence is not None
             else None
         )
+        status["capture_bridge_configured"] = bridge_configured
+        status["capture_bridge_running"] = bridge_running
+        status["capture_bridge_error"] = self._capture_bridge_error
+        status["capture_bridge"] = bridge_status
         return status
