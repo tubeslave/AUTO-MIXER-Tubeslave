@@ -55,9 +55,11 @@ def test_foreground_stability_reuses_explicit_fixed_activity_reference():
     assert r["total_windows"] > r["active_windows"] or r["active_windows"] > 0
 
 
-def test_foreground_stability_fails_closed_on_shape_or_insufficient_windows():
+def test_foreground_stability_fails_closed_on_shape_silence_or_insufficient_windows():
     with pytest.raises(ValueError, match="shapes differ"):
         foreground_stability_evidence(np.ones(4000), np.ones(3999), 8000)
+    with pytest.raises(ValueError, match="effectively silent"):
+        foreground_stability_evidence(np.ones(8000), np.zeros(8000), 8000)
     with pytest.raises(ValueError, match="not enough analysis windows"):
         foreground_stability_evidence(np.ones(100), np.ones(100), 8000)
 
