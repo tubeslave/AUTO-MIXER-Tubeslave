@@ -1,0 +1,44 @@
+{
+  "goal": "studio-routed-contribution-renderer-v1",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "a9f634aa0fb3855bafff9daf4a823de5ede360bd",
+  "priority_reason": "current STUDIO roadmap names exact routed contribution/session rerender as the next blocker after full-mix context v1",
+  "bounded_task": "replace direct-source premaster subtraction with a deterministic full-session rerender callback for one compression source override",
+  "scope": "studio/offline only; compression hypotheses, Perceptual Critic and human-review audition gate",
+  "design": {
+    "authoritative_candidate": "full session rerender",
+    "renderer_calls": ["baseline", "no_change", "candidate", "source_muted"],
+    "source_muted_delta": "diagnostic context-dependent marginal, never claimed as an additive stem under nonlinear routing",
+    "baseline_promotion": "forbidden without human listening"
+  },
+  "belye_stai_recipe_audit": {
+    "status": "inspected_not_migrated",
+    "observed_dependencies": [
+      "lead vocal affects source-dependent guitar/masking automation",
+      "lead/back vocals feed chamber and slap returns",
+      "drums feed room return",
+      "bass receives kick-linked low-band ducking",
+      "all buses pass through shared mix-bus compression"
+    ],
+    "conclusion": "a fixed dry-source subtraction cannot be called exact for this recipe",
+    "blocker": "delivery recipe is procedural, hard-coded and not exposed as a reusable session renderer callback"
+  },
+  "planned_validation": {
+    "synthetic_graph": "dry path + delayed wet return + shared nonlinear bus",
+    "tests": [
+      "authoritative rerender differs from naive dry replacement",
+      "exact no-change rerender identity",
+      "nondeterministic renderer rejection",
+      "missing anchor bus rejection",
+      "immutable source inputs and no machine baseline promotion"
+    ],
+    "ci": "pending"
+  },
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "next_goal": "after CI acceptance, migrate the Belye Stai procedural DSP recipe behind the SessionRender callback and run real full-premaster compression candidates through the routed context gate"
+}
