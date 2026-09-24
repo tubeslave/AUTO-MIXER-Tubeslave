@@ -1,0 +1,98 @@
+name: Live server cutover (one-shot)
+
+on:
+  push:
+    branches: [live-soundcheck-renovation-run11]
+    paths:
+      - .github/workflows/live_server_cutover_once.yml
+      - tools/migrations/live_server_cutover_once.py
+      - tests/test_live_server_service_boundary.py
+
+concurrency:
+  group: live-server-cutover-run11
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-prove:
+    if: github.repository == 'tubeslave/AUTO-MIXER-Tubeslave' && github.ref == 'refs/heads/live-soundcheck-renovation-run11'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      OSC_DISABLED: "true"
+      STEM_SEPARATION_TEST_MODE: mock
+      STEM_SEPARATION_ENABLE_REAL_MODEL: "false"
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify branch and apply exact baseline-checked migration
+        run: |
+          test "$GITHUB_REF" = refs/heads/live-soundcheck-renovation-run11
+          mkdir -p artifacts/live-server-cutover
+          python tools/migrations/live_server_cutover_once.py apply
+          git diff --check
+          git diff --stat
+          git diff > artifacts/live-server-cutover/source.patch
+      - name: Install established focused-suite dependencies
+        run: python -m pip install numpy soundfile pytest pytest-asyncio
+      - name: Run entire focused file list including new boundary proof
+        run: |
+          set -o pipefail
+          python - <<'PY' | tee artifacts/live-server-cutover/pytest.log
+          from pathlib import Path
+          import re
+          import subprocess
+          import sys
+          workflow = Path('.github/workflows/stem_offline_test.yml').read_text()
+          files = sorted(set(re.findall(r'tests/test_[A-Za-z0-9_]+\.py', workflow)))
+          assert 'tests/test_live_server_service_boundary.py' in files
+          print('Focused test files:', files, flush=True)
+          subprocess.run([sys.executable, '-m', 'pytest', '-q', *files,
+                          '--junitxml=artifacts/live-server-cutover/pytest.xml'], check=True)
+          PY
+      - name: Run offline stem loop and verify disabled OSC
+        run: |
+          python -m mix_agent.stem_training_loop --generate-fixture --splitter mock --out artifacts/stem_training_loop
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('artifacts/stem_training_loop/stem_training_report.json').read_text())
+          assert report['osc_disabled'] is True
+          assert report['splitter_mode'] == 'mock'
+          print('OSC disabled; mock splitter verified')
+          PY
+      - name: Record executed evidence and remove temporary migration machinery
+        run: |
+          python tools/migrations/live_server_cutover_once.py evidence
+          git rm -- tools/migrations/live_server_cutover_once.py .github/workflows/live_server_cutover_once.yml
+          git diff --check
+          git diff HEAD > artifacts/live-server-cutover/final-source.patch
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-server-cutover-evidence
+          path: artifacts/live-server-cutover/
+          retention-days: 14
+      - name: Commit and fast-forward push only the authorized working branch
+        run: |
+          test "$GITHUB_REF" = refs/heads/live-soundcheck-renovation-run11
+          git add -- backend/server.py backend/handlers/soundcheck_handlers.py \
+            backend/live_runtime/service.py backend/live_runtime/service_core.py \
+            tests/test_soundcheck_handlers.py tests/test_live_soundcheck_handler_composition.py \
+            tests/test_live_runtime_import_boundary.py .github/workflows/stem_offline_test.yml \
+            Docs/adr/live-server-service-cutover-v1.md Docs/adr/repository-renovation-plan-v1.md
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'refactor(live): sever server soundcheck engine ownership after focused proof'
+          git push origin HEAD:refs/heads/live-soundcheck-renovation-run11
+          echo "SOURCE_COMMIT=$(git rev-parse HEAD)"
