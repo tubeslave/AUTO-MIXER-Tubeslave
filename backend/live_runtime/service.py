@@ -1,11 +1,10 @@
 """Canonical LIVE/SOUNDCHECK service with single-owner hardware lifecycle.
 
-The existing live decision/startup/audio lifecycle remains in ``service_core``.
-This facade completes the next migration seam by making ``LiveMixerSession``
-the owner of physical mixer discovery/connect/disconnect whenever the explicit
-canonical capture composition is enabled. The frozen legacy engine receives
-only ``LegacyExternalMixerSeam``'s read-only proxy; it cannot create a second
-connection or recover write authority, including in BENCH_TEST.
+The configured production path now owns mixer, audio capture, startup gates and
+session lifecycle entirely inside ``backend/live_runtime``.  It does not
+construct or start ``AutoSoundcheckEngine``.  Sessions without an explicit
+capture bridge retain the frozen legacy path temporarily as compatibility
+proof while references are severed.
 """
 
 from __future__ import annotations
@@ -13,11 +12,13 @@ from __future__ import annotations
 from dataclasses import asdict
 from typing import Any, Callable
 
+from .audio_capture_session import LiveAudioCaptureConfig, LiveAudioCaptureSession
 from .contracts import SoundcheckState
 from .legacy_mixer_seam import LegacyExternalMixerSeam
 from .mixer_session import LiveMixerConfig, LiveMixerSession
 from .service_core import LiveCaptureBridgeConfig, LiveSnapshotResult, LiveStartRequest
 from .service_core import LiveSoundcheckService as _CoreLiveSoundcheckService
+from .session_lifecycle import LiveSessionLifecycle
 
 __all__ = [
     "LiveCaptureBridgeConfig",
@@ -28,12 +29,12 @@ __all__ = [
 
 
 class LiveSoundcheckService(_CoreLiveSoundcheckService):
-    """Authoritative live service owning canonical mixer and audio sessions.
+    """Authoritative live service owning canonical mixer/audio/session lifecycle.
 
     Sessions with an explicit ``capture_bridge`` are the migrated production
-    composition and therefore receive single-owner mixer + audio lifecycle.
-    Sessions without it retain the legacy path temporarily for compatibility
-    evidence only; that path is not expanded with new decision features.
+    composition.  They never construct the legacy decision engine.  Sessions
+    without it retain the legacy path temporarily for compatibility evidence
+    only; that path is not expanded with new decision features.
     """
 
     def __init__(
@@ -49,11 +50,15 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         self._mixer_session: LiveMixerSession | Any | None = None
         self._legacy_mixer_seam: LegacyExternalMixerSeam | Any | None = None
 
+    @staticmethod
+    def _is_canonical_session_handle(value: Any) -> bool:
+        return isinstance(value, LiveSessionLifecycle)
+
     def _build_owned_mixer(self) -> Any:
         if self._request is None or self._request.capture_bridge is None:
             raise RuntimeError("Canonical mixer ownership requires configured capture_bridge")
         if self._engine is None:
-            raise RuntimeError("Legacy compatibility engine must exist before mixer hand-off")
+            raise RuntimeError("Canonical live session lifecycle must exist before mixer start")
         if self._mixer_session is not None or self._legacy_mixer_seam is not None:
             raise RuntimeError("Canonical mixer ownership is already established")
 
@@ -66,14 +71,16 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         session_factory = self._mixer_session_factory or LiveMixerSession
         session = session_factory(config, audit_sink=self._record_control_audit)
         client = session.start()
+        seam = None
         try:
-            seam_factory = self._legacy_mixer_seam_factory or LegacyExternalMixerSeam
-            seam = seam_factory(
-                self._engine,
-                session,
-                audit_sink=self._record_control_audit,
-            )
-            seam.bind()
+            if not self._is_canonical_session_handle(self._engine):
+                seam_factory = self._legacy_mixer_seam_factory or LegacyExternalMixerSeam
+                seam = seam_factory(
+                    self._engine,
+                    session,
+                    audit_sink=self._record_control_audit,
+                )
+                seam.bind()
         except Exception:
             session.stop()
             raise
@@ -87,12 +94,13 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
                 "mixer_type": getattr(target, "mixer_type", None),
                 "ip": getattr(target, "ip", None),
                 "port": getattr(target, "port", None),
+                "legacy_seam_bound": seam is not None,
             }
         )
         return client
 
     def _release_owned_mixer(self) -> list[BaseException]:
-        """Detach the legacy non-owner, then disconnect the physical mixer once."""
+        """Detach any legacy non-owner, then disconnect the physical mixer once."""
         errors: list[BaseException] = []
         seam = self._legacy_mixer_seam
         session = self._mixer_session
@@ -124,6 +132,41 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         if not errors and (seam is not None or session is not None):
             self._record_control_audit({"event": "live_service_mixer_released"})
         return errors
+
+    def _build_owned_audio_capture(self) -> Any:
+        """Create the canonical physical stream without binding a legacy consumer."""
+        if self._request is None or self._request.capture_bridge is None:
+            raise RuntimeError("Canonical audio capture requires configured capture_bridge")
+        if self._engine is None:
+            raise RuntimeError("Canonical live session lifecycle must exist before audio start")
+        if self._audio_capture_session is not None or self._legacy_audio_capture_seam is not None:
+            raise RuntimeError("Canonical audio capture ownership is already established")
+
+        config = self._request.capture_bridge
+        required_channels = set(config.roles)
+        required_channels.update(config.patch_contract.tap.channels)
+        capture_config = LiveAudioCaptureConfig(
+            audio_device_name=self._request.audio_device_name,
+            num_channels=self._request.num_channels,
+            sample_rate=48_000,
+            required_channel_ids=tuple(sorted(required_channels)),
+        )
+        session_factory = self._audio_capture_session_factory or LiveAudioCaptureSession
+        session = session_factory(capture_config, audit_sink=self._record_control_audit)
+        capture = session.start()
+
+        self._audio_capture_session = session
+        self._legacy_audio_capture_seam = None
+        self._record_control_audit(
+            {
+                "event": "live_service_audio_capture_owned",
+                "channels": self._request.num_channels,
+                "sample_rate": 48_000,
+                "required_channel_ids": list(sorted(required_channels)),
+                "legacy_seam_bound": False,
+            }
+        )
+        return capture
 
     def _active_wing_transport(self) -> Any:
         """Return the live-runtime-owned physical WING client when migrated."""
@@ -158,7 +201,7 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         on_channel_update=None,
         on_observation=None,
     ) -> Any:
-        """Start one session with canonical mixer+audio ownership when configured."""
+        """Start one session; configured live paths never run the legacy engine."""
         if self.is_active():
             raise RuntimeError("Live soundcheck engine already running")
 
@@ -174,8 +217,40 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         self._legacy_mixer_seam = None
         self._lifecycle_stopping = False
 
+        self._request = request
+        self._soundcheck_state = SoundcheckState.DISCOVER
+
+        if request.capture_bridge is not None:
+            lifecycle = LiveSessionLifecycle(
+                on_state_change=on_state_change,
+                audit_sink=self._record_control_audit,
+                stop_callback=self.stop,
+            )
+            self._engine = lifecycle
+            lifecycle.begin_start()
+            try:
+                self._build_owned_mixer()
+                self._build_owned_audio_capture()
+                self._try_start_capture_bridge()
+                lifecycle.mark_running()
+            except Exception as exc:
+                self._lifecycle_stopping = True
+                try:
+                    lifecycle.mark_error(exc)
+                    self._stop_capture_bridge()
+                    self._release_owned_audio_capture()
+                    self._release_owned_mixer()
+                finally:
+                    self._engine = None
+                    self._request = None
+                    self._reset_control_plane()
+                    self._reset_iteration()
+                    self._reset_startup()
+                    self._lifecycle_stopping = False
+                raise
+            return lifecycle
+
         def lifecycle_state_change(state, message):
-            self._try_start_capture_bridge()
             if on_state_change is not None:
                 on_state_change(state, message)
 
@@ -186,32 +261,20 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
             on_observation=on_observation,
         )
         self._engine = engine
-        self._request = request
-        self._soundcheck_state = SoundcheckState.DISCOVER
-        legacy_start_attempted = False
         try:
-            if request.capture_bridge is not None:
-                self._build_owned_mixer()
-                self._build_owned_audio_capture()
-            legacy_start_attempted = True
             engine.start_async()
-            self._try_start_capture_bridge()
         except Exception:
             self._lifecycle_stopping = True
             try:
-                self._stop_capture_bridge()
-                if legacy_start_attempted:
-                    try:
-                        engine.stop()
-                    except Exception as cleanup_exc:
-                        self._record_control_audit(
-                            {
-                                "event": "live_legacy_engine_start_cleanup_failed",
-                                "reason": f"{type(cleanup_exc).__name__}: {cleanup_exc}",
-                            }
-                        )
-                self._release_owned_audio_capture()
-                self._release_owned_mixer()
+                try:
+                    engine.stop()
+                except Exception as cleanup_exc:
+                    self._record_control_audit(
+                        {
+                            "event": "live_legacy_engine_start_cleanup_failed",
+                            "reason": f"{type(cleanup_exc).__name__}: {cleanup_exc}",
+                        }
+                    )
             finally:
                 self._engine = None
                 self._request = None
@@ -223,31 +286,41 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         return engine
 
     def stop(self) -> bool:
-        """Stop bridge/legacy consumers before canonical audio and mixer owners."""
+        """Stop canonical consumers/owners or the frozen legacy compatibility path."""
         engine = self._engine
         if engine is None:
             return False
 
+        canonical = self._is_canonical_session_handle(engine)
         self._lifecycle_stopping = True
         first_error: BaseException | None = None
+        if canonical:
+            engine.begin_stop()
         try:
             self._stop_capture_bridge()
-            try:
-                engine.stop()
-            except BaseException as exc:
-                first_error = exc
-                self._record_control_audit(
-                    {
-                        "event": "live_legacy_engine_stop_failed",
-                        "reason": f"{type(exc).__name__}: {exc}",
-                    }
-                )
+            if not canonical:
+                try:
+                    engine.stop()
+                except BaseException as exc:
+                    first_error = exc
+                    self._record_control_audit(
+                        {
+                            "event": "live_legacy_engine_stop_failed",
+                            "reason": f"{type(exc).__name__}: {exc}",
+                        }
+                    )
             for exc in self._release_owned_audio_capture():
                 if first_error is None:
                     first_error = exc
             for exc in self._release_owned_mixer():
                 if first_error is None:
                     first_error = exc
+
+            if canonical:
+                if first_error is None:
+                    engine.mark_stopped()
+                else:
+                    engine.mark_error(first_error)
         finally:
             self._engine = None
             self._request = None
@@ -260,11 +333,15 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         return True
 
     def get_status(self) -> dict[str, Any]:
-        """Expose physical ownership without probing the legacy write-blocking proxy."""
+        """Expose physical ownership without probing any legacy write-blocking proxy."""
         session = self._mixer_session
         if session is None:
             status = super().get_status()
             status["mixer_transport_owned_by_live_runtime"] = False
+            status["legacy_engine_attached"] = bool(
+                self._engine is not None
+                and not self._is_canonical_session_handle(self._engine)
+            )
             return status
 
         engine = self._engine
@@ -287,6 +364,7 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
                 "capture_bridge": None,
                 "audio_capture_owned_by_live_runtime": False,
                 "mixer_transport_owned_by_live_runtime": False,
+                "legacy_engine_attached": False,
             }
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
@@ -346,4 +424,5 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         status["capture_bridge"] = bridge_status
         status["audio_capture_owned_by_live_runtime"] = audio_owned
         status["mixer_transport_owned_by_live_runtime"] = True
+        status["legacy_engine_attached"] = not self._is_canonical_session_handle(engine)
         return status
