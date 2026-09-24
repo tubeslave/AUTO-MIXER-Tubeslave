@@ -1,0 +1,837 @@
+{
+  "source_head": "818f304f5a605680f67c2df8bc2693a1b7975cdd",
+  "old_detector_sha256": "ebb1b3bedb8ace1730edadcb32988d1e53c35848294ab6f3a6f387ece08b60dd",
+  "detector_sha256": "7f5b10d79d4d73f7cd2509b2ad8fab17116d01cfd0d0ba7965959aa3d8b60ad0",
+  "hardware_contacted": false,
+  "live_writes": false,
+  "listening_approved": false,
+  "datasets": {
+    "drums": {
+      "source": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/external/automix-toolkit/drums-test-rock/tracks",
+      "target": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+      "source_diagnostics": [
+        {
+          "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "32584563a078eca3ae7e8a1e34f2a2ab4e19123cb73843ef2d5591369d7df8cd",
+          "sample_rate": 44100,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "f978ae719d04a391672dc1e40de52292d3e197c2e50c12d12c496d33a1c5308e",
+          "sample_rate": 44100,
+          "old_events": [
+            {
+              "start": 37639,
+              "end": 37646
+            },
+            {
+              "start": 73247,
+              "end": 73260
+            },
+            {
+              "start": 120940,
+              "end": 120946
+            },
+            {
+              "start": 191704,
+              "end": 191712
+            },
+            {
+              "start": 309203,
+              "end": 309206
+            },
+            {
+              "start": 332561,
+              "end": 332563
+            },
+            {
+              "start": 355730,
+              "end": 355744
+            },
+            {
+              "start": 403885,
+              "end": 403894
+            },
+            {
+              "start": 451160,
+              "end": 451170
+            },
+            {
+              "start": 473838,
+              "end": 473848
+            },
+            {
+              "start": 497519,
+              "end": 497522
+            },
+            {
+              "start": 520771,
+              "end": 520773
+            },
+            {
+              "start": 566395,
+              "end": 566401
+            },
+            {
+              "start": 660796,
+              "end": 660807
+            },
+            {
+              "start": 684156,
+              "end": 684161
+            },
+            {
+              "start": 768013,
+              "end": 768014
+            },
+            {
+              "start": 844853,
+              "end": 844857
+            },
+            {
+              "start": 867489,
+              "end": 867489
+            },
+            {
+              "start": 935674,
+              "end": 935681
+            }
+          ],
+          "new_events": [],
+          "old_changed_samples": 5156,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0.11449668002372826,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "95804684a6d36cf2118f44ce9d72190407a9efadd796b1e04dfa048c2d04520e",
+          "sample_rate": 44100,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "4c73da63b97f2b1b75fed99a83656dca67b982b89516874404b4cf0cb898e3fa",
+          "sample_rate": 44100,
+          "old_events": [
+            {
+              "start": 38094,
+              "end": 38102
+            },
+            {
+              "start": 344523,
+              "end": 344525
+            },
+            {
+              "start": 433629,
+              "end": 433638
+            },
+            {
+              "start": 590133,
+              "end": 590133
+            },
+            {
+              "start": 595987,
+              "end": 596003
+            },
+            {
+              "start": 625607,
+              "end": 625630
+            },
+            {
+              "start": 718404,
+              "end": 718404
+            },
+            {
+              "start": 936046,
+              "end": 936050
+            }
+          ],
+          "new_events": [],
+          "old_changed_samples": 2182,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0.016980061540509683,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "116aa85fbaef445c1f0226660aeac78f9dac7ca47c80ce3bb78cffdf9951044c",
+          "sample_rate": 44100,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "1424f6844cf093500457ba0ba34ee12bb6bb21e3d953c2d38c4c6442752763a5",
+          "sample_rate": 44100,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "15201e5eecb7b5cfe4831a1ebf9ec013546733480a988401f6973a797403be0a",
+          "sample_rate": 44100,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        },
+        {
+          "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+          "sha256": "95778319e41e3fed2e638dffcbb700dfab775626da1484cdcb7cca816b2617f8",
+          "sample_rate": 44100,
+          "old_events": [
+            {
+              "start": 901361,
+              "end": 901364
+            }
+          ],
+          "new_events": [],
+          "old_changed_samples": 268,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0.013104095875196342,
+          "new_energy_removed_fraction": 0
+        }
+      ],
+      "runs": [
+        {
+          "condition": "control",
+          "delta_db": 0,
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/input",
+            "--output",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/mix.wav",
+            "--report",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/report.json",
+            "--summary",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/summary.md",
+            "--run-log",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/render.log",
+            "--no-smart-dsp"
+          ],
+          "exit_code": 0,
+          "elapsed_sec": 8.91920512499928,
+          "audio": {
+            "sha256": "08cec1bf56e61c128339056c2f444a25b138fccbc704889f2c8f70257589c0a7",
+            "frames": 1162476,
+            "sample_rate": 44100,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.989351734956884
+          },
+          "final_lufs": -23.61,
+          "input_health": {
+            "files_scanned": 8,
+            "files_unhealthy": 0,
+            "clicks_total": 0,
+            "synchronized_click_groups": 0,
+            "unhealthy": {},
+            "repaired": false
+          }
+        },
+        {
+          "condition": "minus6",
+          "delta_db": -6,
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/input",
+            "--output",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/mix.wav",
+            "--report",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/report.json",
+            "--summary",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/summary.md",
+            "--run-log",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/render.log",
+            "--no-smart-dsp"
+          ],
+          "exit_code": 0,
+          "elapsed_sec": 8.88261408299877,
+          "audio": {
+            "sha256": "ca4ccb20ff037784e8822c567b43f6398798f373ff8f109ce07e576f96fac44a",
+            "frames": 1162476,
+            "sample_rate": 44100,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.989351734956884
+          },
+          "final_lufs": -23.61,
+          "input_health": {
+            "files_scanned": 8,
+            "files_unhealthy": 0,
+            "clicks_total": 0,
+            "synchronized_click_groups": 0,
+            "unhealthy": {},
+            "repaired": false
+          }
+        }
+      ],
+      "gain_trial_residual_relative_db": -127.874008993588,
+      "gain_trial_bit_identical": false,
+      "old_control_sha256": "e969054aabb6635d8ee3277090b7b2ac177f5ceab72c28220da6155ccd751dab",
+      "control_unchanged_from_before_fix": false,
+      "inputs_unchanged": true
+    },
+    "concert": {
+      "source": "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/offline_test_input/multitrack",
+      "target": "Vocal.wav",
+      "source_diagnostics": [
+        {
+          "file": "Accordion.wav",
+          "sha256": "6f64a443d1380492d39ca5db8dd8fb35d8b54ceac21dfce49503e9c098a996c2",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.00032618817065233063,
+          "new_energy_removed_fraction": 0.00032618817065233063
+        },
+        {
+          "file": "Back Vox L.wav",
+          "sha256": "360743b0446bd66514e8351ed6396c4fa588353e17c3271d012df9eb50015fce",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 287,
+          "new_changed_samples": 287,
+          "old_energy_removed_fraction": 0.012578261340711383,
+          "new_energy_removed_fraction": 0.012578261340711383
+        },
+        {
+          "file": "Back Vox R.wav",
+          "sha256": "c77c69424e8794fe28129a7248b967ba600833d9abcae1dc73fe2c92ebf5ff3b",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 287,
+          "new_changed_samples": 287,
+          "old_energy_removed_fraction": 0.02724546129975869,
+          "new_energy_removed_fraction": 0.02724546129975869
+        },
+        {
+          "file": "Bass.wav",
+          "sha256": "ef66d9198b0629bef910d1c7ba5d1a089f12e306e022dea815046f9d3db72b1b",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "old_changed_samples": 287,
+          "new_changed_samples": 287,
+          "old_energy_removed_fraction": 0.0000750321368215845,
+          "new_energy_removed_fraction": 0.0000750321368215845
+        },
+        {
+          "file": "F Tom.wav",
+          "sha256": "cffb940174fcbc67778ab768eadbc506b42631105dcd506d7a530a0cac64831e",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.005537882085484114,
+          "new_energy_removed_fraction": 0.005537882085484114
+        },
+        {
+          "file": "Guitar L.wav",
+          "sha256": "38158addafd5d4dfcfa28fc7d711c65a8b643b0e3c76959c6267a6fd3b1af131",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.000021573661225682272,
+          "new_energy_removed_fraction": 0.000021573661225682272
+        },
+        {
+          "file": "Guitar R.wav",
+          "sha256": "29c1fc1ae8276fcf2802d1ad8b1fb43b6d1a9821267bb5d659cd30feacb7d913",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.00001952184938791568,
+          "new_energy_removed_fraction": 0.00001952184938791568
+        },
+        {
+          "file": "KICK.wav",
+          "sha256": "ce84f80119f720c614b3a1a2451014e1bb0dcea23cdc8bb09dadd96e9c25a3e4",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50718,
+              "end": 50718
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50718,
+              "end": 50718
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.00019957515217972066,
+          "new_energy_removed_fraction": 0.00019957515217972066
+        },
+        {
+          "file": "OH L.wav",
+          "sha256": "97b997babe839a5a6894a906891a379166cb483e777637190d86122c39f57bb0",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.0031568873083348548,
+          "new_energy_removed_fraction": 0.0031568873083348548
+        },
+        {
+          "file": "OH R.wav",
+          "sha256": "eacee3e69b63a6acc111ff24049e03c2a35ff4962f6a143221bdd3bafd93f192",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.0021990059038687892,
+          "new_energy_removed_fraction": 0.0021990059038687892
+        },
+        {
+          "file": "Playback L.wav",
+          "sha256": "1428ae357bad469635530faba7eed60a2223e8fe69bcf95a9e62acbe95115ce2",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50689,
+              "end": 50689
+            }
+          ],
+          "old_changed_samples": 287,
+          "new_changed_samples": 287,
+          "old_energy_removed_fraction": 0.000035752715819237224,
+          "new_energy_removed_fraction": 0.000035752715819237224
+        },
+        {
+          "file": "Playback R.wav",
+          "sha256": "e20c0e676ea2af655bae250918ffdbf6a736f41a2a8d4d51e4ed34bd794e4858",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50690,
+              "end": 50690
+            }
+          ],
+          "old_changed_samples": 287,
+          "new_changed_samples": 287,
+          "old_energy_removed_fraction": 0.00007131774043411809,
+          "new_energy_removed_fraction": 0.00007131774043411809
+        },
+        {
+          "file": "SNARE T.wav",
+          "sha256": "7b58f3d339136417985ad4242b319394d995f7a768bc1acfb55dfe8bf0f9da9b",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50718,
+              "end": 50718
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50718,
+              "end": 50718
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.0008070564926406787,
+          "new_energy_removed_fraction": 0.0008070564926406787
+        },
+        {
+          "file": "Snare B.wav",
+          "sha256": "e55486f72d9139dc600b3e49056cee806f637141bd3a438992eb1de5ed32e92b",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50691,
+              "end": 50691
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50691,
+              "end": 50691
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.0002748703560712107,
+          "new_energy_removed_fraction": 0.0002748703560712107
+        },
+        {
+          "file": "Tom.wav",
+          "sha256": "fa24ee62942718d1d11e56ba6d3f05fc9de627bc29cb6b02c89f892c7d742b0f",
+          "sample_rate": 48000,
+          "old_events": [
+            {
+              "start": 50691,
+              "end": 50691
+            }
+          ],
+          "new_events": [
+            {
+              "start": 50691,
+              "end": 50691
+            }
+          ],
+          "old_changed_samples": 288,
+          "new_changed_samples": 288,
+          "old_energy_removed_fraction": 0.019390661198637416,
+          "new_energy_removed_fraction": 0.019390661198637416
+        },
+        {
+          "file": "Vocal.wav",
+          "sha256": "7ff4da510d8002a16ee242076349acb74ca8a55f5a751a973787ebf93e066d57",
+          "sample_rate": 48000,
+          "old_events": [],
+          "new_events": [],
+          "old_changed_samples": 0,
+          "new_changed_samples": 0,
+          "old_energy_removed_fraction": 0,
+          "new_energy_removed_fraction": 0
+        }
+      ],
+      "runs": [
+        {
+          "condition": "control",
+          "delta_db": 0,
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/input",
+            "--output",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/mix.wav",
+            "--report",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/report.json",
+            "--summary",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/summary.md",
+            "--run-log",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/render.log",
+            "--no-smart-dsp"
+          ],
+          "exit_code": 0,
+          "elapsed_sec": 48.31799466699886,
+          "audio": {
+            "sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+            "frames": 9827840,
+            "sample_rate": 48000,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.9478247799940154
+          },
+          "final_lufs": -22.25,
+          "input_health": {
+            "files_scanned": 16,
+            "files_unhealthy": 16,
+            "clicks_total": 15,
+            "synchronized_click_groups": 1,
+            "unhealthy": {
+              "Accordion.wav": [
+                "clicks:1"
+              ],
+              "Back Vox L.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Back Vox R.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Bass.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "F Tom.wav": [
+                "clicks:1"
+              ],
+              "Guitar L.wav": [
+                "clicks:1"
+              ],
+              "Guitar R.wav": [
+                "clicks:1"
+              ],
+              "KICK.wav": [
+                "clicks:1"
+              ],
+              "OH L.wav": [
+                "clicks:1"
+              ],
+              "OH R.wav": [
+                "clicks:1"
+              ],
+              "Playback L.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Playback R.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "SNARE T.wav": [
+                "clicks:1"
+              ],
+              "Snare B.wav": [
+                "clicks:1"
+              ],
+              "Tom.wav": [
+                "clicks:1"
+              ],
+              "Vocal.wav": [
+                "dropout_runs:1"
+              ]
+            },
+            "repaired": true,
+            "sanitized_dir": "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/mix.sanitized_input"
+          }
+        },
+        {
+          "condition": "minus6",
+          "delta_db": -6,
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/input",
+            "--output",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/mix.wav",
+            "--report",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/report.json",
+            "--summary",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/summary.md",
+            "--run-log",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/render.log",
+            "--no-smart-dsp"
+          ],
+          "exit_code": 0,
+          "elapsed_sec": 49.37073204199987,
+          "audio": {
+            "sha256": "551541fdbfe7ea997e57b68058619bfc67d8a21479a189d38d5ba151131dd7b9",
+            "frames": 9827840,
+            "sample_rate": 48000,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.9478245286867355
+          },
+          "final_lufs": -22.25,
+          "input_health": {
+            "files_scanned": 16,
+            "files_unhealthy": 16,
+            "clicks_total": 15,
+            "synchronized_click_groups": 1,
+            "unhealthy": {
+              "Accordion.wav": [
+                "clicks:1"
+              ],
+              "Back Vox L.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Back Vox R.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Bass.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "F Tom.wav": [
+                "clicks:1"
+              ],
+              "Guitar L.wav": [
+                "clicks:1"
+              ],
+              "Guitar R.wav": [
+                "clicks:1"
+              ],
+              "KICK.wav": [
+                "clicks:1"
+              ],
+              "OH L.wav": [
+                "clicks:1"
+              ],
+              "OH R.wav": [
+                "clicks:1"
+              ],
+              "Playback L.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "Playback R.wav": [
+                "clicks:1",
+                "dropout_runs:2"
+              ],
+              "SNARE T.wav": [
+                "clicks:1"
+              ],
+              "Snare B.wav": [
+                "clicks:1"
+              ],
+              "Tom.wav": [
+                "clicks:1"
+              ],
+              "Vocal.wav": [
+                "dropout_runs:1"
+              ]
+            },
+            "repaired": true,
+            "sanitized_dir": "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/mix.sanitized_input"
+          }
+        }
+      ],
+      "gain_trial_residual_relative_db": -119.5863573749325,
+      "gain_trial_bit_identical": false,
+      "old_control_sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+      "control_unchanged_from_before_fix": true,
+      "inputs_unchanged": true
+    }
+  },
+  "final_detector_sha256": "a393c3abbfa451845177801832fdcb8a1bd8d0bf26dbbae6d8194b7a531b4144",
+  "post_render_formatting": {
+    "ast_sha256": "f0d575c247199b91916accbb1b828850fe97e5a8cc71aff222655f6bd90c77db",
+    "semantics_unchanged": true
+  },
+  "artifact_root": "/tmp/automixer-click-guard-20260924.aWIqGU"
+}

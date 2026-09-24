@@ -29,8 +29,11 @@ CLICK_ISOLATION_DB = 12.0       # окружение (медиана) тише �
 # 12 дБ: медиана |sin| = 0.707·amp, поэтому стационарный синус 0.3 против
 # клика 1.0 даёт 13.4 дБ — ловится; громкий контекст 0.9 даёт 3.9 дБ —
 # музыкальный пик не ловится (запас 8 дБ). Реальная музыка имеет больший
-# crest, отрыв клика ещё выше; синхронность по каналам — отдельный сигнал.
+# crest; одной разницы уровней недостаточно без проверки границ выброса.
 CLICK_CONTEXT_MS = 25.0         # окно оценки окружения вокруг события
+CLICK_SUPPORT_RATIO = 0.25      # четверть высоты выброса над локальным фоном
+CLICK_EDGE_PERCENTILE = 95.0    # локальный фон первых разностей огибающей
+CLICK_EDGE_ISOLATION_DB = 12.0   # обе границы должны выделяться над этим фоном
 CLIP_CEILING = 0.999
 CLIP_MIN_RUN = 4                # ≥ стольких сэмплов подряд у потолка
 DROPOUT_MIN_MS = 2.0
@@ -85,6 +88,41 @@ def _to_mono_abs(x: np.ndarray) -> np.ndarray:
     return np.abs(x)
 
 
+def _has_isolated_click_edges(
+    mono: np.ndarray,
+    start: int,
+    end: int,
+    peak: float,
+    max_len: int,
+    context_peak: float,
+    context_slope: float,
+) -> bool:
+    """Reject short threshold crossings on smooth or sustained musical crests."""
+    support_floor = context_peak + (peak - context_peak) * CLICK_SUPPORT_RATIO
+    left, right = start, end
+    while left > 0 and mono[left - 1] > support_floor and start - left < max_len:
+        left -= 1
+    while right + 1 < len(mono) and mono[right + 1] > support_floor and right - end < max_len:
+        right += 1
+    if right - left + 1 > max_len or left == 0 or right + 1 == len(mono):
+        return False
+    # Include nearby cycles so a quiet wider window does not hide musical periodicity.
+    near_slopes = np.concatenate((
+        np.abs(np.diff(mono[max(0, left - max_len):left])),
+        np.abs(np.diff(mono[right + 1:right + 1 + max_len])),
+    ))
+    if near_slopes.size:
+        context_slope = max(context_slope, float(np.percentile(near_slopes, CLICK_EDGE_PERCENTILE)))
+    required_jump = max(
+        peak * CLICK_SUPPORT_RATIO,
+        context_slope * 10.0 ** (CLICK_EDGE_ISOLATION_DB / 20.0),
+    )
+    return bool(
+        mono[left] - mono[left - 1] >= required_jump
+        and mono[right] - mono[right + 1] >= required_jump
+    )
+
+
 def detect_clicks(
     x: np.ndarray,
     sr: int,
@@ -96,7 +134,8 @@ def detect_clicks(
 
     Критерии: |x| > threshold, длительность события ≤ max_click_ms, и
     медиана окружения (±CLICK_CONTEXT_MS без самого события) тише пика
-    события минимум на isolation_db.
+    события минимум на isolation_db. Короткая вершина плавного транзиента
+    не считается кликом: весь выброс должен иметь короткие изолированные границы.
     """
     mono = _to_mono_abs(x)
     hot = np.flatnonzero(mono > threshold)
@@ -123,7 +162,13 @@ def detect_clicks(
         context = np.concatenate([left, right]) if left.size + right.size else np.array([0.0])
         ctx_med = float(np.median(context))
         if ctx_med <= 0 or 20.0 * np.log10(peak / max(ctx_med, 1e-12)) >= isolation_db:
-            out.append(ClickEvent(start=a, end=b, peak_abs=peak))
+            slopes = np.concatenate((np.abs(np.diff(left)), np.abs(np.diff(right))))
+            context_slope = (
+                float(np.percentile(slopes, CLICK_EDGE_PERCENTILE)) if slopes.size else 0.0
+            )
+            context_peak = float(np.percentile(context, CLICK_EDGE_PERCENTILE))
+            if _has_isolated_click_edges(mono, a, b, peak, max_len, context_peak, context_slope):
+                out.append(ClickEvent(start=a, end=b, peak_abs=peak))
     return out
 
 

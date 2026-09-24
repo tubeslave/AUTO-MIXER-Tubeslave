@@ -10,7 +10,22 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-09-23T20:28:42Z",
+  "last_heartbeat_utc": "2026-09-24T05:12:04Z",
+  "input_click_transient_guard_20260924": {
+    "status": "smooth_crest_repair_regression_fixed_real_renders_verified",
+    "report": "Docs/reports/INPUT_CLICK_TRANSIENT_GUARD_20260924.md",
+    "audit": "Docs/reports/INPUT_CLICK_TRANSIENT_GUARD_20260924.json",
+    "snare_false_repairs_before": 19,
+    "snare_false_repairs_after": 0,
+    "snare_gain_probe_residual_relative_db": -127.874008993588,
+    "known_recording_glitch_events_retained": 15,
+    "concert_control_bit_identical": true,
+    "independent_review_complete": false,
+    "quality_gate_closed": false,
+    "current_source_cp05_rebound": false,
+    "hardware_contacted": false,
+    "live_writes": false
+  },
   "offline_balance_probe_20260923": {
     "status": "overhead_identity_fixed_sanitizer_gain_dependence_localized",
     "report": "Docs/reports/OFFLINE_BALANCE_AND_OVERHEAD_20260923.md",

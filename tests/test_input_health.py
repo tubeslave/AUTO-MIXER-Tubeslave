@@ -23,8 +23,62 @@ def sine(freq=440.0, seconds=1.0, amp=0.3, sr=SR):
 
 
 class TestClicks:
+    @pytest.mark.parametrize("sr", [44100, 48000, 96000])
+    @pytest.mark.parametrize("polarity", [-1, 1])
+    def test_smooth_short_crest_is_not_a_recording_click(self, sr, polarity):
+        t = np.arange(sr) / sr
+        x = polarity * 0.98 * np.exp(-((t - 0.5) / 0.0012) ** 2)
+        assert detect_clicks(x, sr) == []
+        assert np.array_equal(repair_clicks(x, detect_clicks(x, sr), sr), x)
+        assert robust_peak(x, sr) == pytest.approx(0.98)
+
+    @pytest.mark.parametrize("sr", [44100, 48000, 96000])
+    @pytest.mark.parametrize("frequency", [180, 1000, 8000])
+    def test_damped_musical_attack_is_not_a_recording_click(self, sr, frequency):
+        t = np.arange(int(0.05 * sr)) / sr
+        attack = (1 - np.exp(-t / 0.0005)) * np.exp(-t / 0.003)
+        burst = attack * np.sin(2 * np.pi * frequency * t)
+        burst *= 0.98 / np.max(np.abs(burst))
+        x = np.zeros(sr)
+        x[sr // 2:sr // 2 + len(burst)] = burst
+        assert detect_clicks(x, sr) == []
+
+    @pytest.mark.parametrize("sr", [44100, 48000, 96000])
+    @pytest.mark.parametrize("polarity", [-1, 1])
+    @pytest.mark.parametrize("width", [1, 3, 12])
+    def test_abrupt_isolated_click_remains_detectable(self, sr, polarity, width):
+        x = sine(sr=sr, amp=0.2)
+        start = sr // 2
+        x[start:start + width] = polarity
+        events = detect_clicks(x, sr)
+        assert len(events) == 1
+        assert events[0].start == start
+        assert events[0].end == start + width - 1
+        assert np.max(np.abs(repair_clicks(x, events, sr))) < 0.5
+
     def test_clean_sine_has_no_clicks(self):
         assert detect_clicks(sine(), SR) == []
+
+    @pytest.mark.parametrize("edge", ["start", "end"])
+    def test_truncated_excursion_without_two_boundaries_is_not_auto_repaired(self, edge):
+        x = np.zeros(SR)
+        if edge == "start":
+            x[:3] = 1.0
+        else:
+            x[-3:] = 1.0
+        assert detect_clicks(x, SR) == []
+
+    def test_stereo_click_detection_preserves_event_position(self):
+        x = np.column_stack((sine(amp=0.2), sine(freq=220, amp=0.1)))
+        x[24000:24003, 0] = -1.0
+        events = detect_clicks(x, SR)
+        assert [(e.start, e.end) for e in events] == [(24000, 24002)]
+
+    def test_explicit_lower_candidate_threshold_still_works(self):
+        x = sine(amp=0.1)
+        x[24000:24003] = 0.5
+        assert detect_clicks(x, SR) == []
+        assert len(detect_clicks(x, SR, threshold=0.45)) == 1
 
     def test_isolated_full_scale_click_detected(self):
         x = sine(amp=0.2)
@@ -139,6 +193,18 @@ class TestSynchronizedClicks:
 
 class TestRealFixtureRegression:
     """Регрессия инцидента 2026-07-29: SONG REPA с глитчами записи."""
+
+    def test_real_snare_crests_are_preserved(self):
+        sf = pytest.importorskip("soundfile")
+        from pathlib import Path
+        src = (Path(__file__).resolve().parents[1] / "external" / "automix-toolkit"
+               / "drums-test-rock" / "tracks"
+               / "02_snare_066_phrase_rock_complex_fast_sticks.wav")
+        if not src.is_file():
+            pytest.skip("drum corpus fixture not present")
+        x, sr = sf.read(src)
+        assert detect_clicks(x, sr) == []
+        assert np.array_equal(repair_clicks(x, detect_clicks(x, sr), sr), x)
 
     def test_song_repa_glitches_detected(self):
         sf = pytest.importorskip("soundfile")

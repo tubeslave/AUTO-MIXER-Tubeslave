@@ -51,7 +51,7 @@ Supervised WING Rack proof.
   - real current-tree arm64 packaged-app launch smoke replay from a clean checkout, operator-accessible remote-client token provisioning and invalid or expired-token recovery without persistence or disclosure, Developer ID signing, notarization, stapling and Gatekeeper acceptance
   - operator-present room and PA listening with audible rollback, stereo master 47/48 route and true-peak verification, and emergency-stop validation
   - clean-checkout full suite plus reproduction of the final five-store no-WING, hashed-dependency and arm64 package evidence after writer-lease release, preserving all five canonical hashes and excluding documented synthetic and legacy-unbound audit rows from physical evidence
-- Latest ledger handoff row: `offline_balance_probe_overhead_identity_fix` at `2026-09-23T20:28:42Z`
+- Latest ledger handoff row: `input_click_transient_guard` at `2026-09-24T05:12:04Z`
 - Live authority remains denied: release-ready live correction families remain `0`, live-allowed safety rows remain `0`, and current supervised live-write kinds remain `0`.
 - No live authority changed.
 
