@@ -1,6 +1,16 @@
 # Current State
 
-Generated: 2026-09-24T05:12:04Z
+Generated: 2026-09-24T08:04:58Z
+
+## Проверка фазовых решений — 2026-09-24
+
+Устранены три прямые регрессии offline phase; положительные известные
+задержки и полярности восстанавливаются. На реальных парах 11 прежних
+задержек не прошли проверку достаточного числа достоверных ударов.
+Все четыре полных рендера завершились без клиппинга. Это подтверждает
+отказ от слабых решений, но не акустическую или listening-приёмку.
+Evidence: `Docs/reports/OFFLINE_PHASE_VERIFICATION_20260924.md`.
+Независимое ревью, текущий CP05, третий корпус и hardware gate открыты.
 
 ## Сохранение атак — 2026-09-24
 
@@ -398,7 +408,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `input_click_transient_guard` at `2026-09-24T05:12:04Z`.
+Latest ledger handoff row: `offline_phase_verification` at `2026-09-24T08:04:58Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

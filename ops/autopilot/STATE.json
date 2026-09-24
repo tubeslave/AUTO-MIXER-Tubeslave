@@ -10,7 +10,21 @@
   "active_checkpoint": "M001-EXTERNAL-WING-READONLY-ARTIFACT",
   "checkpoint_status": "waiting_for_external_validation",
   "last_verified_commit": "cc1a2ca503d424b2e3dd307be3cbe66f296dcc6c",
-  "last_heartbeat_utc": "2026-09-24T05:12:04Z",
+  "last_heartbeat_utc": "2026-09-24T08:04:58Z",
+  "offline_phase_verification_20260924": {
+    "status": "three_phase_regressions_fixed_real_renders_abstain_on_weak_evidence",
+    "report": "Docs/reports/OFFLINE_PHASE_VERIFICATION_20260924.md",
+    "audit": "Docs/reports/OFFLINE_PHASE_VERIFICATION_20260924.json",
+    "focused_tests_before_truth": 93,
+    "real_delay_actions_rejected": 11,
+    "synthetic_and_recorded_injected_delay_recovery_verified": true,
+    "real_acoustic_phase_recovery_proven": false,
+    "independent_review_complete": false,
+    "quality_gate_closed": false,
+    "current_source_cp05_rebound": false,
+    "hardware_contacted": false,
+    "live_writes": false
+  },
   "input_click_transient_guard_20260924": {
     "status": "smooth_crest_repair_regression_fixed_real_renders_verified",
     "report": "Docs/reports/INPUT_CLICK_TRANSIENT_GUARD_20260924.md",

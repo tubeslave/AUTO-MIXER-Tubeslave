@@ -1,5 +1,19 @@
 # Autopilot Last Report
 
+## Проверка фазовых решений — 2026-09-24
+
+Три прямые регрессии устранены: несвязанные сигналы, противоречивые задержки
+и невозможность уменьшить завышенную прежнюю задержку. План меняется только
+после проверки ударов, корреляции и низкочастотной суммы. Положительные
+контрольные задержки восстанавливаются, включая записанный snare.
+Четыре полных WAV без клиппинга; 6/5 неподтверждённых задержек на двух наборах
+не назначены. Gain-остатки -133.272/-119.926 dB не являются оценкой качества.
+До truth-записи прошли 93 целевых теста. Общий suite следует после неё.
+Kimi review завершилось 403; CP05, listening и аппаратные этапы не закрыты.
+Следующий шаг — сквозное восстановление дефектов на реальных мультитреках,
+а не новая фазовая функция. Evidence:
+`Docs/reports/OFFLINE_PHASE_VERIFICATION_20260924.md` и соседний JSON.
+
 ## Сохранение атак — 2026-09-24
 
 Исправлен input-health детектор: короткая гладкая вершина больше не
@@ -46,7 +60,7 @@ Gain-проба показала почти точное восстановле�
 
 ## M123 Instrument Space decision integration — 2026-08-04
 
-- Latest heartbeat: 2026-09-24T05:12:04Z.
+- Latest heartbeat: 2026-09-24T08:04:58Z.
 - Implemented the real Product Layer path from cached pan, level and spectral
   measurements to explainable masking, spatial-imbalance and drift relations.
 - Added bounded 12-snapshot in-memory history, source-identity reset and
@@ -387,7 +401,7 @@ Current blocker from `STATE.json`: M110-HW01 is no longer blocked by digital sil
 
 Next operator action from `STATE.json`: Do not widen live authority. Finish M120 validation, commit the source/truth change, release the writer lease, create exactly one marker-only CP05 rebind and verify the dynamic gate. Keep the proven non-silent Ableton-to-WING Main 47/48 feed running and repeat route-only M110-HW01 from a clean committed checkout. Proceed to HW02-HW05 only if the fresh artifact is accepted and teardown verifies capture stopped, mixer disconnected, route authority revoked and backend terminated cleanly. Before any HW02-HW05 write, physically contain all PA and monitor outputs and confirm Main 1 muted. Separately provide the exact WING Rack serial/same-console attestation for the 2026-07-11 M005 run, complete the clean committed compatibility replay and record an explicit verified_migration M006 owner decision. Complete signing/notarization/Gatekeeper and production remote-auth recovery separately.
 
-Latest ledger handoff row: `input_click_transient_guard` at `2026-09-24T05:12:04Z`.
+Latest ledger handoff row: `offline_phase_verification` at `2026-09-24T08:04:58Z`.
 
 Historical 2026-07-12 ledger checkpoint: `local_engineering_95_final_tree_full_suite_no_wing_validation` at `2026-07-12T13:56:06Z`.
 

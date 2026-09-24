@@ -1,0 +1,739 @@
+{
+  "source_head": "b07d5d630b734b5214c476be73b36a085d68681f",
+  "source_sha256": "aa813367d2eb8c5c5e0fc2b643a9a1c7efdff13118deaef67d620b063bc59253",
+  "hardware_contacted": false,
+  "live_writes": false,
+  "listening_approved": false,
+  "independent_review_complete": false,
+  "datasets": {
+    "drums": {
+      "runs": [
+        {
+          "condition": "control",
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-control/input",
+            "--output",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-control/mix.wav",
+            "--report",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-control/report.json",
+            "--summary",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-control/summary.md",
+            "--run-log",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-control/render.log",
+            "--no-smart-dsp"
+          ],
+          "elapsed_sec": 9.411993124995206,
+          "exit_code": 0,
+          "audio": {
+            "sha256": "53a21e23483c12722d0a9202527645644118ca9b2742606bfd857d6c9f56d6c7",
+            "frames": 1162476,
+            "sample_rate": 44100,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.972626815946577
+          },
+          "final_lufs": -23.1,
+          "phase_before": [
+            {
+              "channel": 1,
+              "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.629,
+              "applied_delay_ms": 3.629,
+              "psr_db": 0.22,
+              "confidence": 0.184,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.003,
+              "corr_flipped": -0.003
+            },
+            {
+              "channel": 2,
+              "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -4.363,
+              "applied_delay_ms": 4.363,
+              "psr_db": 0.88,
+              "confidence": 0.178,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.132,
+              "corr_flipped": -0.132
+            },
+            {
+              "channel": 3,
+              "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.926,
+              "applied_delay_ms": 2.926,
+              "psr_db": 1.94,
+              "confidence": 0.222,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.331,
+              "corr_flipped": -0.331
+            },
+            {
+              "channel": 6,
+              "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.018,
+              "applied_delay_ms": 3.018,
+              "psr_db": 0.6,
+              "confidence": 0.184,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.423,
+              "corr_flipped": -0.423
+            },
+            {
+              "channel": 7,
+              "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.353,
+              "applied_delay_ms": 2.353,
+              "psr_db": 0.22,
+              "confidence": 0.183,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.382,
+              "corr_flipped": -0.382
+            },
+            {
+              "channel": 8,
+              "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.155,
+              "applied_delay_ms": 2.155,
+              "psr_db": 0.48,
+              "confidence": 0.19,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.355,
+              "corr_flipped": -0.355
+            }
+          ],
+          "phase_after": [
+            {
+              "channel": 1,
+              "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            },
+            {
+              "channel": 2,
+              "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 3,
+              "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            },
+            {
+              "channel": 6,
+              "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 7,
+              "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 8,
+              "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            }
+          ],
+          "input_hashes": {
+            "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav": "4c73da63b97f2b1b75fed99a83656dca67b982b89516874404b4cf0cb898e3fa",
+            "01_kick_066_phrase_rock_complex_fast_sticks.wav": "32584563a078eca3ae7e8a1e34f2a2ab4e19123cb73843ef2d5591369d7df8cd",
+            "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav": "95804684a6d36cf2118f44ce9d72190407a9efadd796b1e04dfa048c2d04520e",
+            "02_snare_066_phrase_rock_complex_fast_sticks.wav": "f978ae719d04a391672dc1e40de52292d3e197c2e50c12d12c496d33a1c5308e",
+            "07_tom_2_066_phrase_rock_complex_fast_sticks.wav": "15201e5eecb7b5cfe4831a1ebf9ec013546733480a988401f6973a797403be0a",
+            "06_tom_1_066_phrase_rock_complex_fast_sticks.wav": "1424f6844cf093500457ba0ba34ee12bb6bb21e3d953c2d38c4c6442752763a5",
+            "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav": "116aa85fbaef445c1f0226660aeac78f9dac7ca47c80ce3bb78cffdf9951044c",
+            "08_tom_3_066_phrase_rock_complex_fast_sticks.wav": "95778319e41e3fed2e638dffcbb700dfab775626da1484cdcb7cca816b2617f8"
+          },
+          "inputs_unchanged": true,
+          "previous_wav_sha256": "08cec1bf56e61c128339056c2f444a25b138fccbc704889f2c8f70257589c0a7",
+          "bit_identical_to_before": false
+        },
+        {
+          "condition": "minus6",
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/drums-minus6/input",
+            "--output",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-minus6/mix.wav",
+            "--report",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-minus6/report.json",
+            "--summary",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-minus6/summary.md",
+            "--run-log",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/drums-minus6/render.log",
+            "--no-smart-dsp"
+          ],
+          "elapsed_sec": 9.155729625003005,
+          "exit_code": 0,
+          "audio": {
+            "sha256": "29398121e4288bac16baffcaf00b1e9a87d933b0fa5af7a7439feb0a1b198eb0",
+            "frames": 1162476,
+            "sample_rate": 44100,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.972626842753111
+          },
+          "final_lufs": -23.1,
+          "phase_before": [
+            {
+              "channel": 1,
+              "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.629,
+              "applied_delay_ms": 3.629,
+              "psr_db": 0.22,
+              "confidence": 0.184,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.003,
+              "corr_flipped": -0.003
+            },
+            {
+              "channel": 2,
+              "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -4.363,
+              "applied_delay_ms": 4.363,
+              "psr_db": 0.88,
+              "confidence": 0.178,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.132,
+              "corr_flipped": -0.132
+            },
+            {
+              "channel": 3,
+              "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.926,
+              "applied_delay_ms": 2.926,
+              "psr_db": 1.94,
+              "confidence": 0.222,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.331,
+              "corr_flipped": -0.331
+            },
+            {
+              "channel": 6,
+              "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.018,
+              "applied_delay_ms": 3.018,
+              "psr_db": 0.6,
+              "confidence": 0.184,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.423,
+              "corr_flipped": -0.423
+            },
+            {
+              "channel": 7,
+              "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.353,
+              "applied_delay_ms": 2.353,
+              "psr_db": 0.22,
+              "confidence": 0.183,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.382,
+              "corr_flipped": -0.382
+            },
+            {
+              "channel": 8,
+              "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -2.155,
+              "applied_delay_ms": 2.155,
+              "psr_db": 0.48,
+              "confidence": 0.19,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.355,
+              "corr_flipped": -0.355
+            }
+          ],
+          "phase_after": [
+            {
+              "channel": 1,
+              "file": "01_kick_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            },
+            {
+              "channel": 2,
+              "file": "02_snare_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 3,
+              "file": "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            },
+            {
+              "channel": 6,
+              "file": "06_tom_1_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 7,
+              "file": "07_tom_2_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 1
+            },
+            {
+              "channel": 8,
+              "file": "08_tom_3_066_phrase_rock_complex_fast_sticks.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            }
+          ],
+          "input_hashes": {
+            "04_overhead_L_066_phrase_rock_complex_fast_sticks.wav": "4c73da63b97f2b1b75fed99a83656dca67b982b89516874404b4cf0cb898e3fa",
+            "01_kick_066_phrase_rock_complex_fast_sticks.wav": "32584563a078eca3ae7e8a1e34f2a2ab4e19123cb73843ef2d5591369d7df8cd",
+            "03_hi-hat_066_phrase_rock_complex_fast_sticks.wav": "95804684a6d36cf2118f44ce9d72190407a9efadd796b1e04dfa048c2d04520e",
+            "02_snare_066_phrase_rock_complex_fast_sticks.wav": "736a42a140be3125e54d3c3be4630d1fdfeba979d6afcb0a5b47ecdf257b3217",
+            "07_tom_2_066_phrase_rock_complex_fast_sticks.wav": "15201e5eecb7b5cfe4831a1ebf9ec013546733480a988401f6973a797403be0a",
+            "06_tom_1_066_phrase_rock_complex_fast_sticks.wav": "1424f6844cf093500457ba0ba34ee12bb6bb21e3d953c2d38c4c6442752763a5",
+            "05_overhead_R_066_phrase_rock_complex_fast_sticks.wav": "116aa85fbaef445c1f0226660aeac78f9dac7ca47c80ce3bb78cffdf9951044c",
+            "08_tom_3_066_phrase_rock_complex_fast_sticks.wav": "95778319e41e3fed2e638dffcbb700dfab775626da1484cdcb7cca816b2617f8"
+          },
+          "inputs_unchanged": true,
+          "previous_wav_sha256": "ca4ccb20ff037784e8822c567b43f6398798f373ff8f109ce07e576f96fac44a",
+          "bit_identical_to_before": false
+        }
+      ],
+      "gain_trial_residual_relative_db": -133.27225088428665,
+      "gain_trial_bit_identical": false
+    },
+    "concert": {
+      "runs": [
+        {
+          "condition": "control",
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-control/input",
+            "--output",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-control/mix.wav",
+            "--report",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-control/report.json",
+            "--summary",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-control/summary.md",
+            "--run-log",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-control/render.log",
+            "--no-smart-dsp"
+          ],
+          "elapsed_sec": 53.14691562500229,
+          "exit_code": 0,
+          "audio": {
+            "sha256": "ee764f4a2eacb0d38ed96fc2ead68b46fb933ffcef3424ce1a208c2784edff5d",
+            "frames": 9827840,
+            "sample_rate": 48000,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.9478241556279294
+          },
+          "final_lufs": -22.13,
+          "phase_before": [
+            {
+              "channel": 5,
+              "file": "F Tom.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -0.499,
+              "applied_delay_ms": 0.499,
+              "psr_db": 1.57,
+              "confidence": 0.162,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.025,
+              "corr_flipped": -0.025
+            },
+            {
+              "channel": 8,
+              "file": "KICK.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -4.503,
+              "applied_delay_ms": 4.503,
+              "psr_db": 2.24,
+              "confidence": 0.167,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": -0.068,
+              "corr_flipped": 0.068
+            },
+            {
+              "channel": 13,
+              "file": "SNARE T.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -1.77,
+              "applied_delay_ms": 1.77,
+              "psr_db": 0.18,
+              "confidence": 0.106,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.153,
+              "corr_flipped": -0.153
+            },
+            {
+              "channel": 14,
+              "file": "Snare B.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.692,
+              "applied_delay_ms": 3.692,
+              "psr_db": 0.18,
+              "confidence": 0.106,
+              "coherence": 1,
+              "phase_invert": true,
+              "corr_current": -0.084,
+              "corr_flipped": 0.084
+            },
+            {
+              "channel": 15,
+              "file": "Tom.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -1.313,
+              "applied_delay_ms": 1.313,
+              "psr_db": 0.37,
+              "confidence": 0.115,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.133,
+              "corr_flipped": -0.133
+            }
+          ],
+          "phase_after": [
+            {
+              "channel": 5,
+              "file": "F Tom.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            },
+            {
+              "channel": 8,
+              "file": "KICK.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 5
+            },
+            {
+              "channel": 13,
+              "file": "SNARE T.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            },
+            {
+              "channel": 14,
+              "file": "Snare B.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": true,
+              "valid_hits": 1
+            },
+            {
+              "channel": 15,
+              "file": "Tom.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            }
+          ],
+          "input_hashes": {
+            "Back Vox R.wav": "c77c69424e8794fe28129a7248b967ba600833d9abcae1dc73fe2c92ebf5ff3b",
+            "Tom.wav": "fa24ee62942718d1d11e56ba6d3f05fc9de627bc29cb6b02c89f892c7d742b0f",
+            "Accordion.wav": "6f64a443d1380492d39ca5db8dd8fb35d8b54ceac21dfce49503e9c098a996c2",
+            "Guitar L.wav": "38158addafd5d4dfcfa28fc7d711c65a8b643b0e3c76959c6267a6fd3b1af131",
+            "Playback L.wav": "1428ae357bad469635530faba7eed60a2223e8fe69bcf95a9e62acbe95115ce2",
+            "SNARE T.wav": "7b58f3d339136417985ad4242b319394d995f7a768bc1acfb55dfe8bf0f9da9b",
+            "Snare B.wav": "e55486f72d9139dc600b3e49056cee806f637141bd3a438992eb1de5ed32e92b",
+            "Vocal.wav": "7ff4da510d8002a16ee242076349acb74ca8a55f5a751a973787ebf93e066d57",
+            "F Tom.wav": "cffb940174fcbc67778ab768eadbc506b42631105dcd506d7a530a0cac64831e",
+            "OH R.wav": "eacee3e69b63a6acc111ff24049e03c2a35ff4962f6a143221bdd3bafd93f192",
+            "KICK.wav": "ce84f80119f720c614b3a1a2451014e1bb0dcea23cdc8bb09dadd96e9c25a3e4",
+            "OH L.wav": "97b997babe839a5a6894a906891a379166cb483e777637190d86122c39f57bb0",
+            "Back Vox L.wav": "360743b0446bd66514e8351ed6396c4fa588353e17c3271d012df9eb50015fce",
+            "Guitar R.wav": "29c1fc1ae8276fcf2802d1ad8b1fb43b6d1a9821267bb5d659cd30feacb7d913",
+            "Playback R.wav": "e20c0e676ea2af655bae250918ffdbf6a736f41a2a8d4d51e4ed34bd794e4858",
+            "Bass.wav": "ef66d9198b0629bef910d1c7ba5d1a089f12e306e022dea815046f9d3db72b1b"
+          },
+          "inputs_unchanged": true,
+          "previous_wav_sha256": "fcf4d10a5aa4bfaa8951f16809132c68f1f6bee3f9de1d427d49f9f0dd4f7009",
+          "bit_identical_to_before": false
+        },
+        {
+          "condition": "minus6",
+          "command": [
+            "/opt/homebrew/opt/python@3.14/bin/python3.14",
+            "/Users/dmitrijvolkov/AUTO-MIXER-Tubeslave-main/tools/repa_song_soundcheck_pipeline.py",
+            "--input-dir",
+            "/tmp/automixer-click-guard-20260924.aWIqGU/concert-minus6/input",
+            "--output",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-minus6/mix.wav",
+            "--report",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-minus6/report.json",
+            "--summary",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-minus6/summary.md",
+            "--run-log",
+            "/tmp/automixer-phase-trial-20260924.KYkLYA/concert-minus6/render.log",
+            "--no-smart-dsp"
+          ],
+          "elapsed_sec": 54.38015325000015,
+          "exit_code": 0,
+          "audio": {
+            "sha256": "0378d01a053231a1648faf339fbe94c7a7e1e46501a534e4b3f566a1cf3aaa29",
+            "frames": 9827840,
+            "sample_rate": 48000,
+            "channels": 2,
+            "nonfinite": 0,
+            "clipped_samples": 0,
+            "true_peak_dbtp": -2.9478245590501437
+          },
+          "final_lufs": -22.13,
+          "phase_before": [
+            {
+              "channel": 5,
+              "file": "F Tom.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -0.499,
+              "applied_delay_ms": 0.499,
+              "psr_db": 1.57,
+              "confidence": 0.162,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.025,
+              "corr_flipped": -0.025
+            },
+            {
+              "channel": 8,
+              "file": "KICK.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -4.503,
+              "applied_delay_ms": 4.503,
+              "psr_db": 2.24,
+              "confidence": 0.167,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": -0.068,
+              "corr_flipped": 0.068
+            },
+            {
+              "channel": 13,
+              "file": "SNARE T.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -1.77,
+              "applied_delay_ms": 1.77,
+              "psr_db": 0.18,
+              "confidence": 0.106,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.153,
+              "corr_flipped": -0.153
+            },
+            {
+              "channel": 14,
+              "file": "Snare B.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -3.692,
+              "applied_delay_ms": 3.692,
+              "psr_db": 0.18,
+              "confidence": 0.106,
+              "coherence": 1,
+              "phase_invert": true,
+              "corr_current": -0.084,
+              "corr_flipped": 0.084
+            },
+            {
+              "channel": 15,
+              "file": "Tom.wav",
+              "reference": "overhead_pair",
+              "measured_delay_ms": -1.313,
+              "applied_delay_ms": 1.313,
+              "psr_db": 0.37,
+              "confidence": 0.115,
+              "coherence": 1,
+              "phase_invert": false,
+              "corr_current": 0.133,
+              "corr_flipped": -0.133
+            }
+          ],
+          "phase_after": [
+            {
+              "channel": 5,
+              "file": "F Tom.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            },
+            {
+              "channel": 8,
+              "file": "KICK.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 5
+            },
+            {
+              "channel": 13,
+              "file": "SNARE T.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 0
+            },
+            {
+              "channel": 14,
+              "file": "Snare B.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": true,
+              "valid_hits": 1
+            },
+            {
+              "channel": 15,
+              "file": "Tom.wav",
+              "reference": "overhead_pair",
+              "status": "skipped",
+              "reason": "insufficient_valid_hits",
+              "applied_delay_ms": 0,
+              "phase_invert": false,
+              "valid_hits": 2
+            }
+          ],
+          "input_hashes": {
+            "Back Vox R.wav": "c77c69424e8794fe28129a7248b967ba600833d9abcae1dc73fe2c92ebf5ff3b",
+            "Tom.wav": "fa24ee62942718d1d11e56ba6d3f05fc9de627bc29cb6b02c89f892c7d742b0f",
+            "Accordion.wav": "6f64a443d1380492d39ca5db8dd8fb35d8b54ceac21dfce49503e9c098a996c2",
+            "Guitar L.wav": "38158addafd5d4dfcfa28fc7d711c65a8b643b0e3c76959c6267a6fd3b1af131",
+            "Playback L.wav": "1428ae357bad469635530faba7eed60a2223e8fe69bcf95a9e62acbe95115ce2",
+            "SNARE T.wav": "7b58f3d339136417985ad4242b319394d995f7a768bc1acfb55dfe8bf0f9da9b",
+            "Snare B.wav": "e55486f72d9139dc600b3e49056cee806f637141bd3a438992eb1de5ed32e92b",
+            "Vocal.wav": "8aba2ced4613d5ca67194120ebbbe11827202866945a8117e6f9c3ae5e0f222a",
+            "F Tom.wav": "cffb940174fcbc67778ab768eadbc506b42631105dcd506d7a530a0cac64831e",
+            "OH R.wav": "eacee3e69b63a6acc111ff24049e03c2a35ff4962f6a143221bdd3bafd93f192",
+            "KICK.wav": "ce84f80119f720c614b3a1a2451014e1bb0dcea23cdc8bb09dadd96e9c25a3e4",
+            "OH L.wav": "97b997babe839a5a6894a906891a379166cb483e777637190d86122c39f57bb0",
+            "Back Vox L.wav": "360743b0446bd66514e8351ed6396c4fa588353e17c3271d012df9eb50015fce",
+            "Guitar R.wav": "29c1fc1ae8276fcf2802d1ad8b1fb43b6d1a9821267bb5d659cd30feacb7d913",
+            "Playback R.wav": "e20c0e676ea2af655bae250918ffdbf6a736f41a2a8d4d51e4ed34bd794e4858",
+            "Bass.wav": "ef66d9198b0629bef910d1c7ba5d1a089f12e306e022dea815046f9d3db72b1b"
+          },
+          "inputs_unchanged": true,
+          "previous_wav_sha256": "551541fdbfe7ea997e57b68058619bfc67d8a21479a189d38d5ba151131dd7b9",
+          "bit_identical_to_before": false
+        }
+      ],
+      "gain_trial_residual_relative_db": -119.92594250635706,
+      "gain_trial_bit_identical": false
+    }
+  },
+  "review_attempt": {
+    "tool": "kimi --print --plan",
+    "session": "b83ca3b9-db91-451a-a71a-22c6d1ce956d",
+    "exit_code": 1,
+    "error": "403 access_terminated_error",
+    "acceptance": false
+  }
+}

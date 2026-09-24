@@ -64,6 +64,16 @@ from autofoh_safety import (  # noqa: E402
 from auto_fx import AutoFXPlanner, FXBusDecision, FXPlan, FXSendDecision  # noqa: E402
 from channel_recognizer import classification_from_legacy_preset  # noqa: E402
 from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
+from heuristics.phase_v3 import (  # noqa: E402
+    HIT_WINDOW_POST_MS,
+    HIT_WINDOW_PRE_MS,
+    IQR_SANITY_MS,
+    MAD_APPLY_LIMIT_MS,
+    MIN_HITS,
+    POLARITY_R_MIN,
+    SUM_VERIFY_BANDS_HZ,
+    detect_onsets,
+)
 from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
 from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
 from perceptual import PerceptualConfig, PerceptualEvaluator  # noqa: E402
@@ -1927,8 +1937,12 @@ def _drum_channel_names(instrument: str) -> bool:
     return instrument in {"kick", "snare", "rack_tom", "floor_tom", "hi_hat", "ride", "percussion"}
 
 
-def apply_drum_phase_alignment(plans: dict[int, ChannelPlan], sr: int, max_delay_ms: float = 12.0) -> list[dict[str, Any]]:
-    """Apply the project's GCC-PHAT close-mic-to-overhead drum alignment rule."""
+def apply_drum_phase_alignment(
+    plans: dict[int, ChannelPlan], sr: int, max_delay_ms: float = 12.0,
+) -> list[dict[str, Any]]:
+    """Verify hit-consistent close-mic delay/polarity before changing the plan."""
+    if not np.isfinite(max_delay_ms) or max_delay_ms <= 0:
+        raise ValueError("max_delay_ms must be finite and positive")
     overheads = [plan for plan in plans.values() if plan.instrument == "overhead"]
     if len(overheads) < 2:
         return []
@@ -1940,7 +1954,8 @@ def apply_drum_phase_alignment(plans: dict[int, ChannelPlan], sr: int, max_delay
             raise ValueError(f"{plan.path.name}: sample rate mismatch {file_sr} != {sr}")
         overhead_signals.append(signal)
     reference = np.mean(np.vstack(overhead_signals), axis=0).astype(np.float32)
-    reference = highpass(reference, sr, 40.0)
+    if len(reference) and np.all(np.isfinite(reference)):
+        reference = highpass(reference, sr, 40.0)
 
     reports: list[dict[str, Any]] = []
     for channel, plan in plans.items():
@@ -1950,71 +1965,118 @@ def apply_drum_phase_alignment(plans: dict[int, ChannelPlan], sr: int, max_delay
         target, file_sr = read_mono(plan.path)
         if file_sr != sr:
             raise ValueError(f"{plan.path.name}: sample rate mismatch {file_sr} != {sr}")
+        note = {
+            "channel": channel, "file": plan.path.name, "reference": "overhead_pair",
+            "status": "skipped", "reason": "insufficient_valid_hits",
+            "applied_delay_ms": round(plan.delay_ms, 3), "phase_invert": plan.phase_invert,
+            "valid_hits": 0,
+        }
+        plan.phase_notes.append(note)
+        reports.append(note)
+        if not len(target) or not len(reference):
+            note["reason"] = "empty_audio"
+            continue
+        if not np.all(np.isfinite(target)) or not np.all(np.isfinite(reference)):
+            note["reason"] = "nonfinite_audio"
+            continue
         target = highpass(target, sr, 40.0)
-        window_len = int(3.0 * sr)
-        starts = _active_segment_starts(target, sr)
+        pre = int(HIT_WINDOW_PRE_MS * sr / 1000.0)
+        post = int(HIT_WINDOW_POST_MS * sr / 1000.0)
+        windows = []
         measurements = []
-        for start in starts:
-            window = min(len(reference) - start, len(target) - start, window_len)
-            if window < int(0.5 * sr):
+        for onset in detect_onsets(target, sr):
+            start, end = onset - pre, onset + post
+            if start < 0 or end > min(len(reference), len(target)):
                 continue
-            ref_seg = reference[start:start + window]
-            tgt_seg = target[start:start + window]
+            ref_seg = reference[start:end]
+            tgt_seg = target[start:end]
+            if np.max(np.abs(ref_seg)) < 1e-8 or np.max(np.abs(tgt_seg)) < 1e-8:
+                continue
             fft_size = _next_power_of_two(len(ref_seg))
             if fft_size != len(ref_seg):
                 ref_seg = np.pad(ref_seg, (0, fft_size - len(ref_seg)))
                 tgt_seg = np.pad(tgt_seg, (0, fft_size - len(tgt_seg)))
 
-            analyzer = GCCPHATAnalyzer(sample_rate=sr, fft_size=fft_size, max_delay_ms=max_delay_ms)
+            analyzer = GCCPHATAnalyzer(
+                sample_rate=sr, fft_size=fft_size, max_delay_ms=max_delay_ms,
+            )
             measurement = analyzer.compute_delay(ref_seg, tgt_seg)
             measured_delay_ms = float(measurement.delay_ms)
             boundary_hit = abs(abs(measured_delay_ms) - max_delay_ms) < 0.05
-            if boundary_hit or not np.isfinite(measured_delay_ms):
+            # PHAT's energy-normalized confidence is not amplitude invariant.
+            if (boundary_hit or not np.isfinite(measured_delay_ms)
+                    or not np.isfinite(measurement.psr) or measurement.psr < 3.0):
                 continue
-            measurements.append((start, measurement))
+            windows.append((start, end))
+            measurements.append(measurement)
 
-        if not measurements:
+        note["valid_hits"] = len(measurements)
+        if len(measurements) < MIN_HITS:
+            continue
+        delays = np.array([m.delay_ms for m in measurements])
+        measured_delay_ms = float(np.median(delays))
+        mad = float(np.median(np.abs(delays - measured_delay_ms)))
+        iqr = float(np.percentile(delays, 75) - np.percentile(delays, 25))
+        note.update({
+            "measured_delay_ms": round(measured_delay_ms, 3),
+            "mad_ms": round(mad, 3), "iqr_ms": round(iqr, 3),
+            "psr_db": round(float(np.median([m.psr for m in measurements])), 2),
+        })
+        if mad > MAD_APPLY_LIMIT_MS or iqr > IQR_SANITY_MS:
+            note["reason"] = "inconsistent_hit_delays"
+            continue
+        if measured_delay_ms > 500.0 / sr:
+            note["reason"] = "target_requires_advance"
             continue
 
-        negative_measurements = [(start, m) for start, m in measurements if float(m.delay_ms) < -0.3]
-        if negative_measurements:
-            median_delay = float(np.median([float(m.delay_ms) for _, m in negative_measurements]))
-            start, measurement = min(
-                negative_measurements,
-                key=lambda item: abs(float(item[1].delay_ms) - median_delay),
-            )
-        else:
-            start, measurement = measurements[0]
-        measured_delay_ms = float(measurement.delay_ms)
+        # Absolute, sample-quantized target: repeated passes cannot ratchet delay.
+        delay_ms = max(0, round(-measured_delay_ms * sr / 1000.0)) * 1000.0 / sr
+        if delay_ms > max_delay_ms:
+            note["reason"] = "delay_out_of_bounds"
+            continue
+        aligned = delay_signal(target, sr, delay_ms)
+        correlations = np.array([
+            _norm_corr(reference[a:b], aligned[a:b]) for a, b in windows
+        ])
+        invert = bool(np.median(correlations) < 0)
+        signed = -correlations if invert else correlations
+        candidate_corr = float(np.median(signed))
+        note.update({"candidate_delay_ms": round(delay_ms, 3),
+                     "candidate_phase_invert": invert,
+                     "corr_candidate": round(candidate_corr, 3)})
+        if candidate_corr < POLARITY_R_MIN or np.mean(signed >= POLARITY_R_MIN) < 0.75:
+            note["reason"] = "weak_or_inconsistent_correlation"
+            continue
+        candidate = -aligned if invert else aligned
+        current = delay_signal(target, sr, plan.delay_ms)
+        if plan.phase_invert:
+            current = -current
+        current_corr = float(np.median([
+            _norm_corr(reference[a:b], current[a:b]) for a, b in windows
+        ]))
+        note["corr_current"] = round(current_corr, 3)
+        if abs(plan.delay_ms - delay_ms) < 500.0 / sr and plan.phase_invert == invert:
+            note.update(status="unchanged", reason="already_aligned")
+            continue
+        if candidate_corr < current_corr + 0.02:
+            note["reason"] = "no_correlation_improvement"
+            continue
 
-        delay_ms = 0.0
-        if measured_delay_ms < -0.3:
-            delay_ms = min(max_delay_ms, -measured_delay_ms)
-            plan.delay_ms = max(plan.delay_ms, delay_ms)
-
-        aligned = delay_signal(target, sr, plan.delay_ms)
-        corr_start = start
-        corr_end = min(corr_start + window_len, len(reference), len(aligned))
-        corr_ref = reference[corr_start:corr_end]
-        corr_target = aligned[corr_start:corr_end]
-        current_corr = _norm_corr(corr_ref, -corr_target if plan.phase_invert else corr_target)
-        flipped_corr = _norm_corr(corr_ref, corr_target if plan.phase_invert else -corr_target)
-        if abs(flipped_corr) > 0.12 and flipped_corr > current_corr + 0.04:
-            plan.phase_invert = not plan.phase_invert
-
-        note = {
-            "reference": "overhead_pair",
-            "measured_delay_ms": round(measured_delay_ms, 3),
-            "applied_delay_ms": round(plan.delay_ms, 3),
-            "psr_db": round(float(measurement.psr), 2) if np.isfinite(measurement.psr) else None,
-            "confidence": round(float(measurement.confidence), 3) if np.isfinite(measurement.confidence) else None,
-            "coherence": round(float(measurement.coherence), 3) if np.isfinite(measurement.coherence) else None,
-            "phase_invert": plan.phase_invert,
-            "corr_current": round(current_corr, 3),
-            "corr_flipped": round(flipped_corr, 3),
-        }
-        plan.phase_notes.append(note)
-        reports.append({"channel": channel, "file": plan.path.name, **note})
+        # Fixed hit passages, zero-filled delay, no circular wrap or reselection.
+        sum_gains = []
+        for lo, hi in SUM_VERIFY_BANDS_HZ:
+            before = sum(_band_power(reference[a:b] + current[a:b], sr, lo, hi)
+                         for a, b in windows)
+            after = sum(_band_power(reference[a:b] + candidate[a:b], sr, lo, hi)
+                        for a, b in windows)
+            sum_gains.append(10.0 * math.log10(after / before))
+        note["sum_band_gain_db"] = [round(gain, 3) for gain in sum_gains]
+        if not all(np.isfinite(gain) and gain >= -0.05 for gain in sum_gains):
+            note["reason"] = "low_band_sum_worsened"
+            continue
+        plan.delay_ms, plan.phase_invert = delay_ms, invert
+        note.update(status="applied", reason="verified_hits_and_sum",
+                    applied_delay_ms=round(delay_ms, 3), phase_invert=invert)
 
     return reports
 
