@@ -56,6 +56,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-23-1800 | [Report](ML-2026-09-23-1800.md), [JSON patch](ML-2026-09-23-1800.json) | Deep review: SRF-SVB checked against full NSVB primary paper and pinned implementation; 1 source and 1 artifact updated, 1 source and 1 implementation audit added, 12 Knowledge Cards, 8 candidate rules, 36 carried queued videos and 4 unrun experiments; shared-benchmark, validation/test, guide, seed and deployment limits recorded |
 | ML-2026-09-24-0900 | [Report](ML-2026-09-24-0900.md), [JSON patch](ML-2026-09-24-0900.json) | Search: 2 fresh full-text papers plus 1 official benchmark comparator and 1 artifact-rights audit; 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new queued bass/guitar videos, 4 unrun experiments; pseudo-target, clean-note, split, matched-simulator, amplitude-contract and licence limits recorded |
 | ML-2026-09-24-1200 | [Report](ML-2026-09-24-1200.md), [JSON patch](ML-2026-09-24-1200.json) | Deep review: MIDIBack checked against BERT-APC and pinned GAME/MuScriptor dependencies; plate protocols and public artifact availability reconciled; 4 source cards updated, 2 artifact audits added and 1 updated, 12 Knowledge Cards, 8 candidate rules, 38 carried queued videos and 4 unrun experiments |
+| ML-2026-09-24-1500 | [Report](ML-2026-09-24-1500.md), [JSON patch](ML-2026-09-24-1500.json) | Search: 2 fresh full-text spatial-audio preprints, 1 fully studied Puremix/CLA video and 1 new metadata-only queued video; 2 source cards, 2 video cards, 12 Knowledge Cards, 8 candidate rules, 39 queued videos and 4 unrun experiments; SMA-ground-truth, simulated-single-source, stereo-link and loudness-match limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -76,6 +77,8 @@ Earlier `R-20260911-1200-*` and `R-20260911-1500-*` references in the package re
 ML-SPATIAL-2026-09-11-155446: distinguish dry position, source width, relative depth and ambience. Pre-delay is not a distance scale. Choose pan/width operators and musical priority by section role. Preserve mono compatibility, attack, groove and the intended rhythm-guitar foundation. Next proposed test: EXP-SP-20260911-155446-01, wet contribution versus pre-delay, blind and loudness-matched; `not_run`.
 
 ## Previous handoffs
+
+ML-2026-09-24-1500 (`search`, preceding successful search `ML-2026-09-24-0900`): keep Herglotz and adaptive FoV as spatial-analysis research candidates, not rock-mix controls. Compare linked and unlinked parallel drum compression with the CLA chain fixed; preserve raw peak, mono and image checks, and judge preference only on separate loudness-matched blind copies. Treat `2:1`, `100 ms`, `+3 dB at 60 Hz` and `+3 dB at 8 kHz` as source-specific hypotheses. Next test: `EXP-ML-20260924-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-11-1800: compare same section to same section; estimate current-to-target deltas; choose sparse FX topology/order before parameter optimization; gate pseudo-stem corrections on separation quality. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
