@@ -1,12 +1,31 @@
 {
   "goal": "compression-director-v1.1",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "589c525369adb8e0ebd49594e924e0308ac1d0f4",
+  "pull_request": 120,
+  "merge_commit": "7a90ebf73ed72f857fa8b150e1f64566076dc9af",
   "scope": "threshold-only calibration to actual active-p95 LinkedCompressor GR plus timing-censor evidence",
   "safety_invariants": ["max_gr unchanged", "ratio/attack/release/knee/rms unchanged", "human listening required", "no machine winner", "no live or mastering changes"],
+  "ci": {"workflow_run": 35943338515, "python_3_10": "success", "python_3_11": "success", "python_3_12": "success"},
+  "real_source_validation": {
+    "song": "Belye Stai",
+    "scope": "first 60 seconds of RAW bass, snare-top and Valera vocal",
+    "candidate_count": 9,
+    "all_converged_within_db": 0.08,
+    "bass_errors_db": [0.028, -0.049, -0.064],
+    "snare_errors_db": [-0.017, 0.042, 0.013],
+    "vocal_errors_db": [0.016, -0.009, -0.038],
+    "timing_censoring": {
+      "bass": {"events": 64, "attack_censored": 0, "recovery_censored": 1},
+      "snare": {"events": 246, "attack_censored": 0, "recovery_censored": 0},
+      "vocal": {"events": 108, "attack_censored": 22, "recovery_censored": 10}
+    },
+    "full_207s_batch": "attempted but local run timed out after bass/snare; not claimed complete",
+    "subjective_status": "pending_human_listening"
+  },
   "paid_services_used": false,
   "neural_audio_used": false,
   "audio_baseline_promoted": false,
-  "next_gate": "focused tests, exact-branch CI, real Belye Stai full-source evidence"
+  "next_goal": "Integrate v1.1 candidates into Autonomous Iteration and Perceptual Critic as a bounded hypothesis family, preserving matched A/B and mandatory human listening; do not let critic auto-select subjective compression."
 }
