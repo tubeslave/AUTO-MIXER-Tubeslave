@@ -1,0 +1,275 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-24-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-24T18:00:00+03:00",
+  "actual_start_msk": "2026-09-24T17:59:32+03:00",
+  "completed_msk": "2026-09-24T18:08:16+03:00",
+  "preceding_update_id": "ML-2026-09-24-1500",
+  "preceding_search_update_id": "ML-2026-09-24-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260924-1500-01",
+      "operation": "update",
+      "stable_id": "arXiv:2609.28068v1",
+      "url": "https://arxiv.org/html/2609.28068",
+      "reading_depth": "full_text_equation_and_metric_audit",
+      "revisions": [
+        "Equation 15 prints C=-(ln L+P), while the prose says C decreases as the positive fitting error improves and stops when the next C increases; sign, optimization direction, and stopping rule are internally inconsistent without an unstated convention",
+        "the criterion is AIC-inspired and empirically selected, not standard AIC; no held-out criterion-selection set or BIC result is reported",
+        "detection rate is detected-count divided by true-count, can exceed 100 percent, and is not precision or recall",
+        "angular and presence errors are conditional on correctly matched detected reflections and omit misses and extra peaks",
+        "measured 13-reflection labels are second-order ISM predictions and may omit higher-order, scattered, or diffracted arrivals"
+      ],
+      "artifact_status": "no_public_implementation_found_in_targeted_search_equation_conflict_unresolved",
+      "limited_conclusion": "Promising localization-map candidate; unattended echo-count claims are blocked until the published sign/stopping convention and full TP/FP/FN accounting are independently verified."
+    },
+    {
+      "id": "S-ML-20260916-1500-02",
+      "operation": "update_relationship",
+      "title": "Parametric Resynthesis of Measured Spatial Room Impulse Responses",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_08.pdf",
+      "stable_id": "normalized_title:parametric-resynthesis-of-measured-spatial-room-impulse-responses|dafx-2026",
+      "reading_depth": "full_text_reread_plus_official_companion_structure",
+      "relationship": "same_group_downstream_herglotz_resynthesis_not_independent_replication",
+      "findings": [
+        "Herglotz detection is used inside an end-to-end early-reflection and DFDN late-field resynthesis chain",
+        "detailed paper evidence is one EM32 measurement in IRCAM Espro evaluated by spherical correlation and binaural EDR-difference figures",
+        "there is no controlled listening test, released implementation, multi-room statistical table, or CPU/latency benchmark",
+        "the paper acknowledges finite-order missed reflections, adjacent-beam energy overestimation, and single-slope late-decay limits"
+      ],
+      "limited_conclusion": "Objective downstream resynthesis evidence exists but is dependent same-family evidence and does not resolve detector-count reproducibility or establish perceptual superiority."
+    },
+    {
+      "id": "SRC-ML-20260924-1500-02",
+      "operation": "update",
+      "stable_id": "arXiv:2609.28343v1",
+      "url": "https://arxiv.org/html/2609.28343",
+      "reading_depth": "full_text_loss_split_baseline_and_protocol_audit",
+      "revisions": [
+        "the method avoids a separate localizer at inference but training includes explicit ground-truth DOA loss and the paper reports DOA error",
+        "the paper does not state speaker-disjoint, utterance-disjoint, or room-geometry-disjoint splits",
+        "NMSE and ILD/ITD are both training objectives and evaluation measures, so those objective results are partially coupled to the loss",
+        "fixed-baseline parameters are selected on 50 high-DRR scenarios whose train-validation-test provenance is not reported",
+        "the declared MUSHRA screens contain a hidden reference and three algorithms but no described dedicated low-quality anchor",
+        "non-significance against the reference in one low-DRR scene is not equivalence"
+      ],
+      "artifact_status": "no_public_code_weights_training_manifest_or_split_manifest_found_in_targeted_search",
+      "limited_conclusion": "Explicitly DOA-supervised adaptive binaural renderer evaluated on simulated single-source speech; not localization-free and not validated for real multi-source music."
+    },
+    {
+      "id": "SRC-ML-20260924-1800-01",
+      "operation": "add",
+      "title": "Field-of-View Informed Binaural Signal Matching for Head-Worn Arrays",
+      "url": "https://www.researchgate.net/publication/410601217_Field-of-View_Informed_Binaural_Signal_Matching_for_Head-Worn_Arrays",
+      "stable_id": "normalized_title:field-of-view-informed-binaural-signal-matching-for-head-worn-arrays|aes-avarig-2026",
+      "publication_date": "2026-06-30",
+      "discovery_date": "2026-09-24",
+      "doi": null,
+      "reading_depth": "full_author_uploaded_manuscript",
+      "review_status": "abstract_and_750_word_precis_peer_reviewed_full_manuscript_not_peer_reviewed",
+      "relationship": "closest_fixed_fov_comparator_same_bsm_fov_evidence_family",
+      "findings": [
+        "Monte Carlo evaluation covers 200 simulated 16-kHz sets with one to three TIMIT speakers, diffuse babble, four room or DRR conditions, and inside versus outside FoV groupings",
+        "COMPASS-BSM receives ground-truth DOAs and ATFs and is an oracle best-case comparator",
+        "listening uses 16 participants, four simulated single-talker conditions, a hidden HOA reference, BSM as lower anchor, and BS.1770-2 loudness equalization",
+        "listening is limited to sources inside the FoV, static binaural playback, simulated speech, and no head tracking",
+        "shared authors, BSM formulation, HRTF or array assumptions, and research lineage make this supporting family evidence rather than independent replication"
+      ],
+      "limited_conclusion": "Fixed FoV can reallocate reproduction error toward a chosen frontal region in the tested simulated wearable-array domain; it does not independently validate neural adaptation, moving scenes, music, or stereo-mix controls."
+    }
+  ],
+  "knowledge_cards": [
+    "The printed Herglotz information criterion and stopping direction are mutually inconsistent unless a sign or optimization convention is missing.",
+    "A detected-count ratio is not recall; values above 100 percent require explicit false-positive accounting.",
+    "Conditional angular and presence errors over matched detections must be paired with miss and extra-peak rates.",
+    "ISM-derived directions in a measured room are model-assisted labels rather than direct physical ground truth.",
+    "Same-group downstream resynthesis is extension evidence, not an independent detector replication.",
+    "Spherical correlation and EDR fit do not establish perceptual quality, peak safety, or musical suitability.",
+    "FoV-BSM-Net is explicitly DOA-supervised despite omitting a separate inference localizer.",
+    "Random scenario splitting within three fixed simulated rooms does not establish speaker, utterance, or geometry generalization.",
+    "Training on NMSE and ILD/ITD partially couples those objective metrics to the optimization target.",
+    "A fixed baseline selected on 50 scenarios of unreported split provenance needs a declared selection split.",
+    "A MUSHRA label does not replace a described low-quality anchor, screening, and predefined contrasts.",
+    "Fixed and neural FoV publications are one BSM/FoV evidence family, not two independent confirmations."
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20260924-1800-01",
+      "when": "implementing Herglotz echo count",
+      "change": "fail closed until Eq. 15 sign, optimization direction, and stop rule are reconciled",
+      "numeric_provenance": "published Eq. 15 and prose",
+      "protect": ["deterministic count", "reproducibility"],
+      "verify": ["known-count synthetic maps", "log L P C every iteration"],
+      "cancel": "published formula and described stop select opposite branches",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-02",
+      "when": "reporting echo detection",
+      "change": "use one-to-one angular matching and TP FP FN precision recall F1; label count ratio auxiliary only",
+      "numeric_provenance": "metric audit of arXiv:2609.28068v1",
+      "protect": ["honest failure accounting"],
+      "verify": ["matching-threshold sweep", "unmatched peak log"],
+      "cancel": "headline metric discards misses or extra peaks",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-03",
+      "when": "reporting localization error",
+      "change": "include every target frame and separate matched error, miss rate, and false-positive rate",
+      "numeric_provenance": "conditional-error audit",
+      "protect": ["weak reflections", "dense frames"],
+      "verify": ["stratify by level separation order and room"],
+      "cancel": "only matched peaks enter headline performance",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-04",
+      "when": "validating measured SRIR detections",
+      "change": "label ISM references model_assisted and add manual or independent confirmation",
+      "numeric_provenance": "second-order ISM reference in measured validation",
+      "protect": ["scattered arrivals", "diffracted arrivals", "higher-order paths"],
+      "verify": ["compare first-order and expanded label sets"],
+      "cancel": "conclusion depends on one incomplete ISM order",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-05",
+      "when": "using Herglotz in resynthesis",
+      "change": "treat DAFx26 as same-family objective evidence and require raw reconstruction plus loudness-matched blind listening",
+      "numeric_provenance": "DAFx26 full text and official companion",
+      "protect": ["direct sound", "attacks", "spatial continuity", "headroom"],
+      "verify": ["ToA spectrum energy mono phase peak and listening"],
+      "cancel": "beam overlap missed salient reflection or tail mismatch dominates",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-06",
+      "when": "describing neural FoV",
+      "change": "call it DOA-supervised adaptive FoV rather than localization-free",
+      "numeric_provenance": "lambda_DOA=0.01 and reported DOA error",
+      "protect": ["method transparency"],
+      "verify": ["ablate DOA loss", "compare explicit-localizer baseline"],
+      "cancel": "claim implies no localization labels or dependence",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-07",
+      "when": "evaluating FoV generalization",
+      "change": "require speaker utterance room-geometry and HRTF disjoint tests plus real multi-source capture",
+      "numeric_provenance": "reported simulated dataset and split description",
+      "protect": ["timbre", "binaural cues", "target identity"],
+      "verify": ["per-domain worst cases", "moving and off-axis scenes"],
+      "cancel": "benefit disappears outside matched simulation family",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260924-1800-08",
+      "when": "running perceptual FoV tests",
+      "change": "declare hidden reference low-quality anchor BS.1770 alignment screening and preregistered contrasts; do not treat non-significance as equivalence",
+      "numeric_provenance": "protocol audit of neural and fixed FoV studies",
+      "protect": ["valid inference", "listener safety"],
+      "verify": ["confidence intervals", "equivalence bounds", "raw safety render"],
+      "cancel": "anchor or screening missing or loudness explains preference",
+      "confidence": "high",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260924-1800-01",
+      "status": "not_run",
+      "title": "Herglotz information-criterion parity gate",
+      "baseline": "literal published C=-(ln L+P) and stated stop at C(i+1)>C(i)",
+      "variant": "preregistered internally consistent alternative with identical optimizer and maps",
+      "one_changed_factor": "criterion sign and stopping convention",
+      "controls": ["same known-count synthetic spherical maps", "same initialization grid fitter noise count separation and level range", "log L P C each iteration"],
+      "measure": ["selected count", "TP", "FP", "FN", "precision", "recall", "F1", "seed stability"],
+      "protect": ["identical localization map", "identical fitting path"],
+      "success": "one unambiguous convention reproduces known counts and independent replay",
+      "cancel": "literal rule conflicts algebraically with prose or no convention is robust"
+    },
+    {
+      "id": "EXP-ML-20260924-1800-02",
+      "status": "not_run",
+      "title": "Detector-to-resynthesis causal contribution",
+      "baseline": "early resynthesis from manually reviewed DoA ToA count labels",
+      "variant": "identical renderer driven by blind Herglotz detections",
+      "one_changed_factor": "reflection detector and count source",
+      "loudness_matching": "separate BS.1770-matched blind copies; raw renders retained",
+      "measure": ["TP FP FN", "onset and ToA error", "early-energy ratio", "spherical correlation", "EDR", "sample and true peak", "mono residual", "blind preference"],
+      "protect": ["direct-sound identity", "drum attacks", "room continuity", "spatial stability", "headroom"],
+      "success": "detector-driven resynthesis approaches manual-label baseline without salient miss or extra peak",
+      "cancel": "missed salient reflection duplicated energy wrong onset or loudness advantage explains result"
+    },
+    {
+      "id": "EXP-ML-20260924-1800-03",
+      "status": "not_run",
+      "title": "DOA-supervision ablation",
+      "baseline": "FoV-BSM-Net with lambda_DOA=0.01",
+      "variant": "identical training with lambda_DOA=0",
+      "one_changed_factor": "explicit DOA-supervision term",
+      "controls": ["same split manifest seeds architecture optimizer epochs HRTF and simulation", "same remaining loss weights"],
+      "measure": ["DOA error", "NMSE", "held-out IPD and ICLD", "real multi-source failure rate", "loudness-matched preference"],
+      "protect": ["target identity", "timbre", "binaural cues", "finite output", "peaks"],
+      "success": "quantify dependence of adaptive gain on explicit localization labels",
+      "cancel": "disjoint split checkpoint config or compute parity unavailable"
+    },
+    {
+      "id": "EXP-ML-20260924-1800-04",
+      "status": "not_run",
+      "title": "Fixed versus adaptive FoV on real multi-source material",
+      "baseline": "fixed FoV-BSM with declared frontal prior",
+      "variant": "adaptive FoV-BSM with identical backend",
+      "one_changed_factor": "fixed versus signal-dependent FoV parameters",
+      "loudness_matching": "separate matched blind copies; raw safety outputs retained",
+      "measure": ["target and non-target cue error", "image stability", "timbre", "peaks", "mono compatibility", "listener preference"],
+      "protect": ["non-target ambience", "target identity", "spatial continuity", "headroom"],
+      "success": "adaptive FoV improves unseen real target rendering without non-target degradation or image jumps",
+      "cancel": "target selection is oracle-dependent moving scenes break continuity or benefit vanishes"
+    }
+  ],
+  "video_updates": {
+    "studied_this_run": 0,
+    "queued_source_count": 39,
+    "new_video_source_cards": 0,
+    "updated_video_source_cards": 0,
+    "note": "No video search or transcript review was required in this deep-review run."
+  },
+  "reference_updates": {
+    "new_reference_cards": 0,
+    "new_rights_cleared_raw_rock_multitracks": 0
+  },
+  "dedupe": [
+    "DAFx26 parametric resynthesis was already fully reviewed in ML-2026-09-16-1800 and is updated only as dependent downstream evidence",
+    "fixed and neural FoV are separate publications grouped into one BSM/FoV evidence family rather than independent confirmations"
+  ],
+  "project_changes": {
+    "source_cards_added": 1,
+    "source_cards_updated": 3,
+    "knowledge_cards_added": 12,
+    "candidate_rules_added": 8,
+    "experiments_added": 4,
+    "reference_cards_added": 0,
+    "video_source_cards_added": 0,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false
+  },
+  "handoff": "Do not implement Herglotz echo count until Eq. 15 and its stopping direction are reconciled; report TP/FP/FN rather than count ratio. Treat DAFx resynthesis as same-family objective evidence. Describe FoV-BSM-Net as DOA-supervised adaptive binaural rendering and keep both FoV papers outside conventional stereo-rock controls until real multi-source music tests exist."
+}
