@@ -83,5 +83,6 @@ def match_processed_source(reference: np.ndarray, candidate: np.ndarray, sr: int
         'headroom_verified': False,
         'requires_full_session_rerender': True,
         'requires_human_listening': True,
+        'requires_human_review': True,
         'baseline_eligible': False,
     }
