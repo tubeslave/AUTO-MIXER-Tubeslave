@@ -1,29 +1,73 @@
 {
   "goal": "compression-iteration-bridge-v1",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "901e60b84137d3b3d7312edb1a9465bd1909ef06",
-  "priority_reason": "next accepted Compression Director v1.1 goal: reuse Perceptual Critic and Autonomous Iteration without machine-only musical selection",
+  "tested_code_commit": "250386f2309c4e983eb68699feab78e3f95f8b6b",
+  "pull_request": 121,
+  "merge_commit": "e00b052399f9adf3e89ba837246b03e4ce7c9025",
+  "priority_reason": "connect accepted Compression Director v1.1 to the existing causal plan, Perceptual Critic and Autonomous Iteration without creating a second acceptance policy",
   "scope": "STUDIO/offline Compression Director v1.1 candidate-family bridge only",
   "required_variant_ids": ["preserve_transient", "balanced", "control"],
   "mandatory_counterfactual": "bypass/no_change",
   "policy": {
-    "objective_failures": "critic veto and rollback",
-    "machine_safe": "pending human listening",
-    "baseline_promotion_from_bridge": false
+    "objective_failures": "Perceptual Critic veto plus Autonomous Iteration rollback",
+    "machine_safe": "pending human listening with baseline unchanged",
+    "baseline_promotion_from_bridge": false,
+    "winner_ranking": false
+  },
+  "validation": {
+    "workflow_run": 35947696544,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "python_3_11_studio_boundary": {"passed": 21, "warnings": 1},
+    "python_3_11_full_suite": {"passed": 1233, "skipped": 2, "warnings": 2},
+    "new_bridge_tests": 5,
+    "tested_behaviors": [
+      "exact three compression variants plus exactly one bypass/no_change counterfactual",
+      "source PCM immutability and same sample-rate/frame-count evidence",
+      "JSON-safe auditable candidate evidence",
+      "machine-safe Perceptual Critic result remains pending_human_review with baseline unchanged",
+      "objective compression failure vetoes an improved proxy and routes to rollback",
+      "invalid target or candidate fails closed"
+    ]
   },
   "real_source_grounding": {
     "song": "Belye Stai",
     "experiment": "Compression Director v1.1 60-second raw source validation",
     "candidates_checked": 9,
     "calibration_error_bound_db": 0.08,
-    "musical_winner_claimed": false
+    "musical_winner_claimed": false,
+    "interpretation": "source-level grounding only; not evidence that a full mix perceptually improved"
   },
+  "bridge_evidence": {
+    "source_and_candidate_pcm_sha256": true,
+    "sample_rate_and_frames_recorded": true,
+    "actual_render_max_gr_recorded": true,
+    "calibration_recorded": true,
+    "timing_censoring_recorded": true,
+    "candidate_true_peak_recorded": true,
+    "audition_plan": "exact fixed-reference-active RMS match followed by one common pair trim; no limiter"
+  },
+  "limitations": [
+    "Perceptual Critic needs real mix-context before/after snapshots; source-only Compression Director statistics are not treated as mix improvement",
+    "this bridge does not yet insert a processed source back into a complete mix/stem context",
+    "candidate calibration gate consumes the v1.1 calibration evidence and separately verifies actual shape/hash/max-GR/A-B true-peak constraints; independently recomputing active-p95 target error inside the bridge is a future hardening option",
+    "a machine-safe candidate is only an audition candidate until human listening accepts it",
+    "existing Belye Stai and Ptitsa delivered mixes are unchanged"
+  ],
+  "ci_nonblocking_warnings": [
+    "Matchering imports scipy.ndimage.filters.maximum_filter1d from a deprecated namespace",
+    "Optuna Study.set_metric_names is experimental",
+    "checkout post-job cleanup reports missing .gitmodules URL for external/AutomaticMixingPapers",
+    "GitHub Actions runner reports Node.js 20 deprecation for checkout/setup-python actions"
+  ],
+  "review": "self-review plus full repository CI; no independent human audio review claimed",
   "live_code_changed": false,
+  "backend_code_changed": false,
   "mastering_code_changed": false,
-  "neural_audio_used": false,
+  "neural_audio_processing_or_model_inference_used": false,
   "paid_services_used": false,
   "audio_baseline_promoted": false,
   "human_listening_required": true,
-  "next_gate": "full exact-branch CI on Python matrix, then accept/revise/rollback"
+  "next_goal": "Full-mix Compression Context Adapter v1: replace exactly one source contribution in a controlled offline mix/stem context, compute real before/after PerceptualSnapshot evidence for the same mix, export level-matched human auditions for objective+critic survivors, and still forbid baseline promotion without listening"
 }
