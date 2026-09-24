@@ -1,27 +1,70 @@
 {
   "goal": "belye-stai-local-vocal-processor-adapter-v1",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "7f3f9d3065fe64d4c9e49f4cc581460b58c657d4",
+  "pull_request": 127,
+  "tested_head": "1d18177d9d575128e48b7d9573b90234a442305f",
+  "merge_commit": "4d1dbd5af6d37ccd18d81b750fc566c456e11fd4",
   "scope": "raw VALERA_VOX local DSP chain through explicit first-compressor replacement boundary",
   "real_audio_proof": {
     "source": "18_VALERA_VOX.wav",
     "sample_rate": 44100,
     "frames": 9128700,
+    "duration_seconds": 207.0,
     "precompression_max_abs_error": 0.0,
     "precompression_pcm_sha256": "0925bca62f2c44b78ac999c1522697228d116681d1dc0390d047dc2c335cfb2f",
     "processed_max_abs_error": 0.0,
     "processed_sample_equal": true,
     "processed_pcm_sha256": "64123ff2668b9f3ebf9ef4657c3af2416a4939abecb5972448caffa994df8d26",
-    "input_unchanged": true
+    "input_unchanged": true,
+    "legacy_first_compressor": {
+      "threshold_dbfs": -37.04489931934363,
+      "ratio": 3.2,
+      "attack_ms": 10.0,
+      "release_ms": 105.0,
+      "knee_db": 5.0,
+      "hard_max_gr_db": 4.5,
+      "observed_max_gr_db": 4.49997091293335,
+      "observed_sampled_p95_gr_db": 3.499265193939209
+    },
+    "legacy_second_compressor": {
+      "threshold_dbfs": -37.83347409469074,
+      "ratio": 2.0,
+      "attack_ms": 30.0,
+      "release_ms": 220.0,
+      "knee_db": 5.0,
+      "hard_max_gr_db": 2.5,
+      "observed_max_gr_db": 2.4433681964874268,
+      "observed_sampled_p95_gr_db": 1.3453396558761597
+    }
   },
-  "local_contract_tests": {"passed": 4},
-  "ci": "pending",
+  "validation": {
+    "local_contract_tests_passed": 4,
+    "workflow_run": 35963306396,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "python_3_10_studio_boundary": "21 passed",
+    "python_3_10_full_suite": "1255 passed, 2 skipped",
+    "known_nonblocking_warnings": [
+      "Matchering scipy.ndimage.filters deprecation",
+      "Optuna set_metric_names experimental API",
+      "checkout cleanup: external/AutomaticMixingPapers missing .gitmodules URL",
+      "GitHub Actions Node 20 deprecation warning"
+    ],
+    "whole_song_procedural_rerender": "local attempt exceeded execution window after drum processing; not counted as evidence"
+  },
+  "replacement_contract": {
+    "insert_point": "after frozen EQ/expander/slow ride and before original first compressor",
+    "replacement": "first compressor only",
+    "frozen_downstream_local_stages": ["second compressor", "de-esser", "final active-RMS level stage"],
+    "requires_human_review": true,
+    "requires_human_listening": true,
+    "baseline_eligible": false
+  },
   "live_code_changed": false,
   "mastering_code_changed": false,
   "neural_audio_used": false,
   "paid_services_used": false,
   "audio_baseline_promoted": false,
-  "human_listening_required_for_replacement": true,
-  "next_goal": "generate Compression Director v1.1 candidates from the exact pre-first-compressor signal, replace the original first compressor in place, rerender the full Belye Stai session, then evaluate with Perceptual Critic and Autonomous Iteration"
+  "next_goal": "generate Compression Director v1.1 candidates from the exact pre-first-compressor signal, replace the original first compressor in place, rerender each result through the exact Belye Stai SessionRenderer, then evaluate with Perceptual Critic and Autonomous Iteration and export only surviving level-matched human A/B candidates"
 }
