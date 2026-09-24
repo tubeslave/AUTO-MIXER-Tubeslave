@@ -1,0 +1,169 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-24-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-24T15:00:00+03:00",
+  "actual_start_msk": "2026-09-24T14:58:26+03:00",
+  "completed_msk": "2026-09-24T15:06:00+03:00",
+  "preceding_update_id": "ML-2026-09-24-1200",
+  "preceding_search_update_id": "ML-2026-09-24-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260924-1500-01",
+      "title": "Echo Detection Using the Herglotz Wavefunction in Spatial Room Impulse Responses Measured with Spherical Microphone Arrays",
+      "url": "https://arxiv.org/html/2609.28068",
+      "stable_id": "arXiv:2609.28068v1",
+      "publication_date": "2026-09-23",
+      "discovery_date": "2026-09-24",
+      "reading_depth": "full_text",
+      "relationship": "primary_preprint",
+      "artifact_status": "no_public_companion_code_found_in_targeted_search",
+      "findings": [
+        "Herglotz localization is followed by nonnegative spherical-Gaussian fitting and an empirically selected AIC-like echo-count criterion",
+        "the large simulation uses equal-amplitude echoes, 35-degree minimum angular separation, and 250 configurations for each echo count from 1 to 12",
+        "measured EM64 validation uses one IRCAM ESPRO configuration and ISM-computed reference directions rather than directly measured ground-truth DoAs",
+        "all methods detect the direct sound and first reflection in the 10 ms frame; MUSIC is best for direct-sound angular error while Herglotz is best for first-reflection and relative-presence errors",
+        "in one 42 ms frame with 13 later reflections, detection rates are Herglotz 70%, SRP 31%, maxWDI 62%, and MUSIC 38%",
+        "cross-frame tracking, false-positive rejection, ToA and spectral reconstruction, resynthesis, and listening quality are not validated"
+      ],
+      "limited_conclusion": "Promising diagnostic for overlapping early-reflection directions in higher-order SRIRs; not evidence for an automatic reverb renderer or musical mix rule."
+    },
+    {
+      "id": "SRC-ML-20260924-1500-02",
+      "title": "Neural Field-of-View for Binaural Signal Matching with Wearable Microphone Arrays",
+      "url": "https://arxiv.org/html/2609.28343",
+      "stable_id": "arXiv:2609.28343v1",
+      "publication_date": "2026-09-23",
+      "discovery_date": "2026-09-24",
+      "license": "CC BY 4.0",
+      "reading_depth": "full_text",
+      "relationship": "primary_preprint",
+      "artifact_status": "no_public_companion_implementation_or_weights_found_in_targeted_search",
+      "findings": [
+        "FoV-BSM-Net predicts a signal-dependent spatial weighting mask for binaural signal matching from a wearable microphone array",
+        "the dataset is 12000 simulated single-source speech scenes with a 9600/1200/1200 split",
+        "the NMSE contract uses full complex error below 1.5 kHz and magnitude-only error above 1.5 kHz",
+        "the MUSHRA study has 12 normal-hearing listeners and two simulated speech scenes",
+        "at low DRR adaptive FoV is not significantly different from the reference, but is also not significantly better than fixed FoV",
+        "at high DRR adaptive FoV beats fixed FoV but remains 23.7 MUSHRA points below the reference",
+        "real recordings, multiple sources, music, moving listeners and personalized HRTFs are not validated"
+      ],
+      "limited_conclusion": "Research candidate for binaural reproduction from sparse wearable arrays; not evidence for conventional stereo rock-mix panning, width or spatial processing."
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260924-1500-01",
+      "title": "(Drums) Parallel Drum Compression | Processing On A Track Or Whole Kit",
+      "url": "https://www.youtube.com/watch?v=Z0eqw_3cY2A",
+      "stable_id": "youtube:Z0eqw_3cY2A",
+      "channel": "Puremix",
+      "speaker": "Chris Lord-Alge",
+      "duration": "PT2M36S",
+      "reading_depth": "full_permitted_caption_track",
+      "content_status": "content_read",
+      "caption_language": "en",
+      "caption_provenance": "authored_or_unspecified",
+      "categories": ["drum_bus", "parallel_compression", "eq", "stereo_linking", "ab_demonstration"],
+      "timestamped_findings": [
+        {"time":"00:07-00:18","claim":"send drums to a separate stereo compressor and return on another pair or aux"},
+        {"time":"00:17-00:46","claim":"Neve pair or 33609-style plug-in; threshold 0, recovery 100 ms, ratio 2:1; output gain is gain staging"},
+        {"time":"00:47-01:13","claim":"leave channels unlinked so a large hit on one side does not duck the opposite side"},
+        {"time":"01:18-01:27","claim":"blend the parallel return to taste"},
+        {"time":"01:28-01:38","claim":"add about 3 dB at 8 kHz and 3 dB at 60 Hz on the return"},
+        {"time":"01:44-02:04","claim":"no-parallel/parallel demonstration; no independent loudness match or GR trace is reported"}
+      ],
+      "limitations": [
+        "one engineer and one production excerpt",
+        "attack, detector topology, exact threshold units, gain reduction, send level and final blend are not established by the captions",
+        "the demonstrated A/B was not independently loudness matched or measured",
+        "unlinked detection can alter image motion and centre stability"
+      ]
+    },
+    {
+      "id": "VID-ML-20260924-1500-02",
+      "title": "Andrew Scheps: How to Properly Use Parallel Compression",
+      "url": "https://www.youtube.com/watch?v=DuU6XdVebJo",
+      "stable_id": "youtube:DuU6XdVebJo",
+      "channel": "Progressions: Success in the Music Industry",
+      "duration": "PT5M10S",
+      "reading_depth": "metadata_only",
+      "content_status": "queued_source",
+      "reason": "metadata and public page verified; permitted transcript exporter returned no transcript; no technique or parameter inferred"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260924-1500-01","claim":"Herglotz improves dense-frame direction and presence estimation in the reported SMA conditions, not reverb rendering quality.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-02","claim":"The measured Herglotz reference directions are ISM-derived and are not independent physical ground truth.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-03","claim":"Equal-amplitude echoes and a 35-degree minimum separation bound the large Herglotz simulation.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-04","claim":"The empirically chosen AIC-like criterion needs false-positive and alternative-criterion checks before unattended use.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-05","claim":"Single-frame echo detection does not solve cross-frame association, time-of-arrival or reflection reconstruction.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-06","claim":"FoV-BSM-Net evidence is simulated, single-source and speech-based.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-07","claim":"Magnitude-only NMSE above 1.5 kHz is a study-specific contract, not a universal music-spatial metric.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-08","claim":"Twelve listeners and two simulated scenes support a narrow perceptual comparison, not broad music generalization.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-09","claim":"A non-significant difference from the reference in a small test does not establish equivalence.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-10","claim":"The high-DRR adaptive system still differs substantially from the reference despite beating fixed FoV.","confidence":"high"},
+    {"id":"KC-ML-20260924-1500-11","claim":"CLA's unlinked parallel bus is an engineer preference whose stereo and centre behavior must be measured.","confidence":"medium"},
+    {"id":"KC-ML-20260924-1500-12","claim":"Spoken compressor and EQ values describe one chain and do not define a portable preset without processor and gain-reduction parity.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260924-1500-01","source_ids":["SRC-ML-20260924-1500-01"],"status":"candidate","auto_apply":false,"applies_when":"analysing a spherical-array SRIR frame","change":"use Herglotz only as a diagnostic candidate for overlapping early reflections","suggested_range":null,"number_provenance":"paper method and measured validation","protect":["arrival identity","timing"],"verify":"compare against measured or manually annotated directions","cancel":"reference is only model-derived or false positives rise","confidence":"medium"},
+    {"id":"RULE-ML-20260924-1500-02","source_ids":["SRC-ML-20260924-1500-01"],"status":"candidate","auto_apply":false,"applies_when":"estimating multiple echoes","change":"log frame, band, array order, information criterion and peak count","suggested_range":"paper examples use 5.33, 10 and 42 ms; not presets","number_provenance":"paper evaluation design","protect":["reproducibility"],"verify":"window and criterion sweep in held-out rooms","cancel":"result changes materially with criterion or window","confidence":"high"},
+    {"id":"RULE-ML-20260924-1500-03","source_ids":["SRC-ML-20260924-1500-01"],"status":"candidate","auto_apply":false,"applies_when":"turning detected echoes into processing","change":"require separate ToA, gain, spectrum, tracking and resynthesis validation","suggested_range":null,"number_provenance":"unvalidated downstream scope","protect":["direct and early timing","phase","mono","peaks"],"verify":"reconstruction metrics and loudness-matched listening","cancel":"any protected quality worsens","confidence":"high"},
+    {"id":"RULE-ML-20260924-1500-04","source_ids":["SRC-ML-20260924-1500-02"],"status":"candidate","auto_apply":false,"applies_when":"evaluating adaptive binaural FoV","change":"keep the claim within wearable-array binaural reproduction","suggested_range":null,"number_provenance":"paper task definition","protect":["binaural cues","timbre"],"verify":"real multi-source recordings and independent HRTFs","cancel":"transferred to stereo mix without evidence","confidence":"high"},
+    {"id":"RULE-ML-20260924-1500-05","source_ids":["SRC-ML-20260924-1500-02"],"status":"candidate","auto_apply":false,"applies_when":"using NMSE, ITD, ILD, ICLD or IPD results","change":"preserve exact metric bands and phase-versus-magnitude contract","suggested_range":"1.5 kHz crossover only within the cited study contract","number_provenance":"paper metric definition","protect":["interpretation"],"verify":"report each metric plus listening","cancel":"aggregate metric hides a cue failure","confidence":"high"},
+    {"id":"RULE-ML-20260924-1500-06","source_ids":["SRC-ML-20260924-1500-02"],"status":"candidate","auto_apply":false,"applies_when":"interpreting the FoV MUSHRA result","change":"label it two-scene simulated-speech evidence with n=12","suggested_range":null,"number_provenance":"paper listening-test design","protect":["external validity"],"verify":"preregistered music and real-room test","cancel":"generalization is claimed without new data","confidence":"high"},
+    {"id":"RULE-ML-20260924-1500-07","source_ids":["VID-ML-20260924-1500-01"],"status":"candidate","auto_apply":false,"applies_when":"testing rock-drum parallel compression","change":"compare stereo-linked with dual-mono or unlinked detection","suggested_range":"2:1 ratio, 100 ms recovery, threshold 0 only as spoken CLA conditions","number_provenance":"youtube:Z0eqw_3cY2A at 00:17-01:13","protect":["kick and snare centre","tom placement","width","mono"],"verify":"raw GR and image metrics plus loudness-matched blind A/B","cancel":"image wanders or centre or mono degrades","confidence":"medium"},
+    {"id":"RULE-ML-20260924-1500-08","source_ids":["VID-ML-20260924-1500-01"],"status":"candidate","auto_apply":false,"applies_when":"trying the CLA parallel-return EQ","change":"treat the spoken shelves or boosts as a chain-specific hypothesis, not a preset","suggested_range":"about +3 dB at 60 Hz and +3 dB at 8 kHz","number_provenance":"youtube:Z0eqw_3cY2A at 01:28-01:38","protect":["low-end headroom","cymbal harshness","transients"],"verify":"level-matched EQ-on versus EQ-off inside the same return","cancel":"peaks, harshness or masking worsen","confidence":"medium-low"}
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20260924-1500-01","status":"not_run","title":"Linked versus unlinked parallel drum compression","baseline":"one stereo-linked 33609-style parallel compressor","variant":"the same two compressor channels in dual-mono or unlinked mode","single_factor":"detector or link state","material":"rights-cleared rock multitrack","controls":["same drum send","same compressor implementation","same ratio","same recovery","same threshold","same makeup gain","same return level","EQ bypassed","same latency compensation","same render path"],"loudness_matching":"retain raw safety renders; create separate integrated-loudness-matched blind copies","measurements":["left and right gain-reduction traces","interchannel level drift","centre-image movement","kick snare and tom localisation","transient crest","sample peak","true peak","correlation","mono residual","blind preference by section"],"protect":["groove","kick and snare centre","tom movement","cymbal width","punch","mono compatibility","headroom"],"success":"unlinked mode gives repeatable preferred width or punch without unstable centre motion, mono loss or extra peak risk","cancel":"link parity cannot be established, image motion becomes distracting, centre elements shift, mono residual worsens, or preference disappears after loudness matching"
+    },
+    {"id":"EXP-ML-20260924-1500-02","status":"not_run","title":"CLA parallel-return EQ contribution","baseline":"same parallel return with EQ bypassed","variant":"same return with approximately +3 dB at 60 Hz and +3 dB at 8 kHz","single_factor":"return EQ","controls":["same send","same compression","same link state","same gain","same latency"],"loudness_matching":"separate loudness-matched blind copies","measurements":["low-band headroom","cymbal harshness","transient crest","sample and true peak","masking","blind preference"],"protect":["kick definition","bass separation","cymbal smoothness","headroom"],"success":"EQ improves useful weight and point without masking or harshness","cancel":"peak risk, low-end masking or high-frequency harshness worsens"},
+    {"id":"EXP-ML-20260924-1500-03","status":"not_run","title":"Herglotz versus conventional echo-localization maps on held-out measured SRIRs","baseline":"SRP, maxWDI and MUSIC with the same Gaussian fitting and model selection","variant":"Herglotz localization with the same downstream fitting","single_factor":"localization map","controls":["same licensed measured SRIR","same frame and band","same array order","same peak fitter","same criterion"],"loudness_matching":"not applicable to detection; required only for later resynthesis listening","measurements":["DoA error","false positives","false negatives","relative presence error","ToA error","cross-frame association"],"protect":["reference independence","timing"],"success":"advantage survives manual or measured ground truth and tracking","cancel":"ground truth is only ISM-derived or false positives and tracking failures erase the gain"},
+    {"id":"EXP-ML-20260924-1500-04","status":"not_run","title":"Fixed versus adaptive FoV-BSM on real multi-source music capture","baseline":"fixed FoV-BSM","variant":"adaptive FoV-BSM-Net","single_factor":"FoV adaptation","controls":["same wearable array","same real capture","same HRTF","same filter design","same regularization","same gain"],"loudness_matching":"retain raw cue and safety renders; separate binaural loudness-matched blind copies","measurements":["NMSE with exact contract","ITD","ILD","ICLD","IPD","sample and true peak","blind spatial and timbre preference"],"protect":["localisation","timbre","direct versus ambience balance","headroom"],"success":"adaptive advantage persists in real multi-source music without cue or timbre damage","cancel":"source overlap, HRTF mismatch or motion removes the advantage or protected qualities worsen"}
+  ],
+  "queue": {
+    "video_queued_before": 38,
+    "video_queued_after": 39,
+    "videos_studied_this_run": 1,
+    "videos_queued_this_run": 1,
+    "priorities": [
+      "public code, data and exact configurations for both fresh spatial preprints",
+      "measured or manual echo ground truth, false positives and cross-frame tracking for Herglotz",
+      "real multi-source music transfer for adaptive FoV-BSM",
+      "permitted transcript retrieval for youtube:DuU6XdVebJo and the remaining queued videos",
+      "existing MIDIBack, plate, GeoAtt, SpanSynth, DiffusionRIR, BSRNN and SRF-SVB controlled tests",
+      "per-file rights-cleared rock multitracks with raw tracks, stems and final mix"
+    ]
+  },
+  "dedupe": {
+    "duplicates_removed": 1,
+    "version_families_merged": 1,
+    "notes": [
+      "youtube:Pa6kDbYQFK8 was treated as a likely alternate edit/version of the Puremix CLA segment rather than independent evidence",
+      "no prior source card was found for arXiv:2609.28068 or arXiv:2609.28343"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "video_source_cards_added": 2,
+  "source_cards_added": 2,
+  "source_cards_updated": 0,
+  "artifact_cards_added": 0,
+  "knowledge_cards_added": 12,
+  "candidate_rules_added": 8,
+  "experiments_added": 4,
+  "audio_modified": false,
+  "dsp_modified": false,
+  "runtime_modified": false,
+  "repositories_modified_outside_knowledge_base": false,
+  "models_or_checkpoints_run": false,
+  "handoff": "Keep Herglotz and adaptive FoV as spatial-analysis research candidates, not rock-mix controls. Compare linked and unlinked parallel drum compression with the CLA chain fixed; preserve raw peak, mono and image checks, and judge preference only on separate loudness-matched blind copies. Treat all spoken settings as source-specific hypotheses and never auto-apply them."
+}
