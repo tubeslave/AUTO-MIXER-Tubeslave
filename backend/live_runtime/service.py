@@ -27,7 +27,10 @@ from .contracts import (
 from .control_plane import LiveControlPlane, RollbackExecution, WriteExecution
 from .decision_engine import LiveHypothesis, propose_one
 from .eq_locator import EqTargetEvidence, RealtimeEqLocatorSelector
+from .feature_stream import MainFeatureEvidence
 from .iteration import IterationCoordinator, IterationPhase, IterationResult
+from .patch_startup import MainTapPatchStartupCoordinator, PatchVerifyStartupResult
+from .patch_verify import MainTapPatchContract
 from .wing_adapter import WingWriteAdapter
 
 
@@ -62,7 +65,9 @@ class LiveSoundcheckService:
     WING mutations owned by the new architecture are executed through
     :class:`LiveControlPlane`. One-hypothesis proposal/verification is owned by
     :class:`IterationCoordinator`; the legacy engine never receives decision
-    authority from this service.
+    authority from this service. The autonomous feature loop is additionally
+    gated by the canonical startup state machine: DISCOVER -> PATCH_VERIFY ->
+    LISTEN/HOLD.
     """
 
     legacy_bridge = True
@@ -73,10 +78,12 @@ class LiveSoundcheckService:
         *,
         audit_sink: Callable[[dict[str, Any]], None] | None = None,
         iteration_verification_window_s: float = 1.0,
+        patch_startup_factory: Callable[..., MainTapPatchStartupCoordinator] | None = None,
     ):
         if iteration_verification_window_s < 0:
             raise ValueError("iteration_verification_window_s must be >= 0")
         self._engine_factory = engine_factory
+        self._patch_startup_factory = patch_startup_factory
         self._engine: Any | None = None
         self._request: LiveStartRequest | None = None
         self._control_plane: LiveControlPlane | None = None
@@ -87,6 +94,8 @@ class LiveSoundcheckService:
         self._iteration_verification_window_s = float(iteration_verification_window_s)
         self._iteration: IterationCoordinator | None = None
         self._iteration_hypothesis: LiveHypothesis | None = None
+        self._soundcheck_state: SoundcheckState | None = None
+        self._last_patch_verify: PatchVerifyStartupResult | None = None
 
     @property
     def active_engine(self) -> Any | None:
@@ -132,6 +141,10 @@ class LiveSoundcheckService:
     def _reset_iteration(self) -> None:
         self._iteration = None
         self._iteration_hypothesis = None
+
+    def _reset_startup(self) -> None:
+        self._soundcheck_state = None
+        self._last_patch_verify = None
 
     def _active_wing_transport(self) -> Any:
         """Return the physical WING client owned by the migration bridge."""
@@ -188,6 +201,72 @@ class LiveSoundcheckService:
                 audit_sink=self._record_control_audit,
             )
         return self._iteration
+
+    def _build_patch_startup_coordinator(self) -> MainTapPatchStartupCoordinator:
+        if self._request is None:
+            raise RuntimeError("Live soundcheck is not running")
+        adapter = self._active_wing_adapter()
+        if self._patch_startup_factory is not None:
+            coordinator = self._patch_startup_factory(
+                adapter,
+                self._request.mixer_ip,
+                self._record_control_audit,
+            )
+            if not isinstance(coordinator, MainTapPatchStartupCoordinator):
+                raise TypeError(
+                    "patch_startup_factory must return MainTapPatchStartupCoordinator"
+                )
+            return coordinator
+        return MainTapPatchStartupCoordinator.for_wing(
+            adapter,
+            self._request.mixer_ip,
+            audit_sink=self._record_control_audit,
+        )
+
+    def verify_main_tap_patch(
+        self,
+        contract: MainTapPatchContract,
+        tap_evidence: MainFeatureEvidence,
+    ) -> PatchVerifyStartupResult:
+        """Run the read-only Main PATCH_VERIFY gate for the active WING session.
+
+        Starting the compatibility engine establishes DISCOVER only. The
+        autonomous Director/Critic loop is not allowed to consume feature
+        snapshots until this method proves the configured post-console Main tap
+        and advances the service to LISTEN. Any proof failure advances to HOLD.
+        """
+        if self._engine is None or self._request is None:
+            raise RuntimeError("Live soundcheck is not running")
+        if self._soundcheck_state not in (
+            SoundcheckState.DISCOVER,
+            SoundcheckState.PATCH_VERIFY,
+        ):
+            current = self._soundcheck_state.value if self._soundcheck_state else "idle"
+            raise RuntimeError(
+                "Main PATCH_VERIFY may run only from DISCOVER/PATCH_VERIFY; "
+                f"current state is {current}"
+            )
+
+        if self._soundcheck_state is SoundcheckState.DISCOVER:
+            self._soundcheck_state = SoundcheckState.PATCH_VERIFY
+            self._record_control_audit(
+                {
+                    "event": "live_state_transition",
+                    "state_before": SoundcheckState.DISCOVER.value,
+                    "state_after": SoundcheckState.PATCH_VERIFY.value,
+                    "reason": "startup_patch_verify",
+                }
+            )
+
+        coordinator = self._build_patch_startup_coordinator()
+        result = coordinator.run(
+            SoundcheckState.PATCH_VERIFY,
+            contract,
+            tap_evidence,
+        )
+        self._last_patch_verify = result
+        self._soundcheck_state = result.state
+        return result
 
     def select_eq_locator(
         self,
@@ -287,13 +366,31 @@ class LiveSoundcheckService:
     ) -> LiveSnapshotResult:
         """Advance the canonical one-hypothesis live loop by one feature frame.
 
-        When a hypothesis is already in flight, this snapshot can only verify it;
-        no second proposal is evaluated. A terminal KEEP/rollback result returns
-        to LISTEN. Operator takeover or rollback failure propagates HOLD. A new
-        proposal is considered only on a later snapshot.
+        The startup lifecycle is authoritative: DISCOVER/PATCH_VERIFY/HOLD cannot
+        enter the autonomous Director/Critic loop. Once PATCH_VERIFY reaches
+        LISTEN, an active hypothesis can only be verified; no second proposal is
+        evaluated. A terminal KEEP/rollback returns to LISTEN. Operator takeover
+        or rollback failure propagates HOLD.
         """
+        if self._request is None or self._engine is None:
+            raise RuntimeError("Live soundcheck is not running")
+        startup_state = self._soundcheck_state
+        if startup_state not in (
+            SoundcheckState.LISTEN,
+            SoundcheckState.PROPOSE,
+            SoundcheckState.APPLY,
+            SoundcheckState.VERIFY,
+        ):
+            if startup_state is None:
+                raise RuntimeError("Live soundcheck startup state is not initialized")
+            return LiveSnapshotResult(
+                state=startup_state,
+                reason=f"startup_state_blocked:{startup_state.value}",
+            )
+
         coordinator = self._active_iteration_coordinator()
         if coordinator.hold_reason is not None:
+            self._soundcheck_state = SoundcheckState.HOLD
             return LiveSnapshotResult(
                 state=SoundcheckState.HOLD,
                 reason=coordinator.hold_reason,
@@ -311,6 +408,7 @@ class LiveSoundcheckService:
             )
             result = coordinator.verify(metrics, manual_freeze=manual_freeze)
             state = self._state_for_iteration(result)
+            self._soundcheck_state = state
             if result.phase not in (IterationPhase.VERIFY_PENDING, IterationPhase.VERIFY_WAIT):
                 self._iteration_hypothesis = None
             return LiveSnapshotResult(
@@ -327,6 +425,7 @@ class LiveSoundcheckService:
             eq_evidence=eq_evidence,
         )
         if hypothesis is None:
+            self._soundcheck_state = SoundcheckState.LISTEN
             return LiveSnapshotResult(state=SoundcheckState.LISTEN, reason="no_hypothesis")
 
         metrics = self._snapshot_metrics(
@@ -344,8 +443,10 @@ class LiveSoundcheckService:
             self._iteration_hypothesis = hypothesis
         else:
             self._iteration_hypothesis = None
+        state = self._state_for_iteration(result)
+        self._soundcheck_state = state
         return LiveSnapshotResult(
-            state=self._state_for_iteration(result),
+            state=state,
             hypothesis=hypothesis,
             iteration=result,
             reason=result.reason,
@@ -428,6 +529,7 @@ class LiveSoundcheckService:
 
         self._reset_control_plane()
         self._reset_iteration()
+        self._reset_startup()
         self._control_audit.clear()
         engine = self.create_engine(
             request,
@@ -444,7 +546,9 @@ class LiveSoundcheckService:
             self._request = None
             self._reset_control_plane()
             self._reset_iteration()
+            self._reset_startup()
             raise
+        self._soundcheck_state = SoundcheckState.DISCOVER
         return engine
 
     def stop(self) -> bool:
@@ -454,6 +558,7 @@ class LiveSoundcheckService:
         self._request = None
         self._reset_control_plane()
         self._reset_iteration()
+        self._reset_startup()
         if engine is None:
             return False
         engine.stop()
@@ -469,8 +574,11 @@ class LiveSoundcheckService:
             if iteration_hold_reason is not None
             else SoundcheckState.VERIFY.value
             if iteration_active
-            else SoundcheckState.LISTEN.value
+            else self._soundcheck_state.value
+            if self._soundcheck_state is not None
+            else "idle"
         )
+        patch_result = self._last_patch_verify
 
         if engine is None:
             return {
@@ -481,7 +589,10 @@ class LiveSoundcheckService:
                 "control_audit_count": len(self._control_audit),
                 "iteration_active": False,
                 "iteration_hold_reason": None,
-                "soundcheck_state": SoundcheckState.LISTEN.value,
+                "soundcheck_state": "idle",
+                "patch_verify_verified": None,
+                "patch_verify_reason": None,
+                "patch_verify_physical_source": None,
             }
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
@@ -504,4 +615,11 @@ class LiveSoundcheckService:
         status["iteration_active"] = iteration_active
         status["iteration_hold_reason"] = iteration_hold_reason
         status["soundcheck_state"] = soundcheck_state
+        status["patch_verify_verified"] = patch_result.verified if patch_result else None
+        status["patch_verify_reason"] = patch_result.reason if patch_result else None
+        status["patch_verify_physical_source"] = (
+            patch_result.physical_evidence.source
+            if patch_result and patch_result.physical_evidence is not None
+            else None
+        )
         return status
