@@ -28,6 +28,7 @@
     "candidate": "Compression Director v1.1 vocal balanced",
     "target": "vocal_intelligibility",
     "context": "controlled pre-bus real-source mix; real recipe-processed non-lead contributions; identical static lead mapping; no FX/glue/mastering",
+    "candidate_contribution_match_gain_db": -0.015048693378062694,
     "baseline_reconstruction_max_error": 0.0,
     "candidate_rest_max_error": 2.9802322387695312e-08,
     "before": {
@@ -40,22 +41,22 @@
       "climax_lift_db": 1.3437200601475006
     },
     "after": {
-      "vocal_intelligibility": 0.8020083832987949,
-      "foreground_db": -1.0743827240746697,
-      "harshness": 0.4918675710802871,
+      "vocal_intelligibility": 0.8013813571248335,
+      "foreground_db": -1.0894313585674051,
+      "harshness": 0.49185675741023,
       "density": 0.88,
-      "width_db": -10.32366981189837,
+      "width_db": -10.317078515487283,
       "punch_db": 18.908533124830164,
-      "climax_lift_db": 0.66823209005587
+      "climax_lift_db": 0.6650528528977127
     },
     "deltas": {
-      "vocal_intelligibility": 0.017309122256218723,
-      "foreground_db": 0.16168488069926945,
-      "harshness": 0.015377743572063007,
+      "vocal_intelligibility": 0.016682096082257347,
+      "foreground_db": 0.14663624620653404,
+      "harshness": 0.015366929902005888,
       "density": 0.0025000000000000577,
-      "width_db": -0.06656882825534538,
+      "width_db": -0.059977531844259246,
       "punch_db": 0.0,
-      "climax_lift_db": -0.6754879700916305
+      "climax_lift_db": -0.6786672072497879
     },
     "critic_policy_result": {
       "machine_decision": "rejected",
@@ -74,5 +75,5 @@
     "paid_services_used": false,
     "human_listening_required": true
   },
-  "next_gate": "open PR and require exact-branch Tests workflow on Python 3.10/3.11/3.12; accept/revise based on CI and patch review"
+  "next_gate": "require exact final-head Tests workflow on Python 3.10/3.11/3.12; accept/revise based on CI and patch review"
 }
