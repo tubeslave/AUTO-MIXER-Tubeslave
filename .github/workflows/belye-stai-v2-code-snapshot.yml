@@ -1,0 +1,27 @@
+name: Belye Stai v2 code snapshot
+on:
+  push:
+    branches: [studio/belye-stai-remix-v2-20260924]
+    paths: [.github/workflows/belye-stai-v2-code-snapshot.yml]
+permissions:
+  contents: read
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Retrieve immutable tested source code only
+        run: |
+          mkdir -p work unpack
+          curl --fail --location --retry 2 https://codeload.github.com/tubeslave/AUTO-MIXER-Tubeslave/tar.gz/fbe5813affb6ec36a04cc59e0230673ca5f9bc7d -o work/source.tar.gz
+          tar -xzf work/source.tar.gz --strip-components=1 -C unpack
+          printf '%s\n' fbe5813affb6ec36a04cc59e0230673ca5f9bc7d > unpack/REVISION.txt
+          tar -czf work/studio-runtime.tar.gz -C unpack audio_workbench tests backend mix_agent tools .ai Docs pytest.ini REVISION.txt
+          sha256sum work/studio-runtime.tar.gz > work/studio-runtime.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: belye-stai-v2-tested-runtime
+          path: |
+            work/studio-runtime.tar.gz
+            work/studio-runtime.sha256
+          retention-days: 7
