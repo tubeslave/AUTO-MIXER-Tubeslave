@@ -2,9 +2,9 @@ name: Tests
 
 on:
   push:
-    branches: [master, live-soundcheck-renovation]
+    branches: [master, live-soundcheck-renovation, 'live-soundcheck-renovation-*']
   pull_request:
-    branches: [master]
+    branches: [master, live-soundcheck-renovation]
   workflow_dispatch:
 
 jobs:
