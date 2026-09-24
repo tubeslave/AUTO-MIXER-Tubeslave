@@ -3,9 +3,12 @@
 This module deliberately does not grant machine authority over subjective audio.
 A candidate may be rendered for listening, but the baseline cannot be promoted here.
 Rejected candidates are rolled back to the immutable baseline before mastering.
+Post-hoc human calibration may be attached as annotation-only evidence; it cannot
+rewrite the historical machine transition or baseline state.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import hashlib
 import json
 from pathlib import Path
@@ -16,6 +19,7 @@ import soundfile as sf
 
 from .autonomous_loop import resolve_candidate_iteration
 from .mastering.offline import audio_digest, deliver_master
+from .mixing.perceptual_calibration import classify_human_machine_disagreement
 
 
 def _file_digest(path: Path) -> str:
@@ -41,6 +45,96 @@ def _validate_plan(plan: dict[str, Any], critic_result: dict[str, Any]) -> str:
     if not any(c.get("type") == "bypass" for c in candidates if isinstance(c, dict)):
         raise ValueError("causal plan must retain a bypass/no-change counterfactual")
     return target
+
+
+def _decision_snapshot(report: dict[str, Any]) -> dict[str, Any]:
+    """Copy fields that human calibration is forbidden to modify."""
+    transition = dict(report.get("transition") or {})
+    delivery = dict(report.get("delivery") or {})
+    return {
+        "status": report.get("status"),
+        "baseline_promoted": report.get("baseline_promoted"),
+        "baseline_after": report.get("baseline_after"),
+        "delivery_role": delivery.get("role"),
+        "delivery_source_id": delivery.get("source_id"),
+        "rolled_back_to_baseline": delivery.get("rolled_back_to_baseline"),
+        "transition_status": transition.get("status"),
+        "transition_next_action": transition.get("next_action"),
+        "transition_baseline_before": transition.get("baseline_before"),
+        "transition_baseline_after": transition.get("baseline_after"),
+        "transition_promote_baseline": transition.get("promote_baseline"),
+        "transition_rollback_candidate": transition.get("rollback_candidate"),
+        "transition_protected_regressions": deepcopy(transition.get("protected_regressions")),
+    }
+
+
+def add_human_calibration_annotation(
+    report: dict[str, Any],
+    human_review: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Attach post-listening calibration evidence without changing a decision.
+
+    ``None`` is an explicit no-op so ordinary autonomous reports remain valid before
+    a listener responds.  A supplied review is classified by the existing
+    Perceptual Human Calibration layer and written under ``human_calibration`` only.
+    Historical ``status``, transition, delivery routing and baseline fields remain
+    byte-for-byte equivalent as Python values.  Invalid evidence fails closed.
+    """
+    if not isinstance(report, dict):
+        raise TypeError("report must be a dictionary")
+    if report.get("schema") != "studio-autonomous-iteration-v2":
+        raise ValueError("unsupported studio iteration report schema")
+
+    enriched = deepcopy(report)
+    if human_review is None:
+        return enriched
+    if not isinstance(human_review, dict):
+        raise TypeError("human_review must be a dictionary or None")
+    if "human_calibration" in report:
+        raise ValueError("iteration report already contains human calibration evidence")
+
+    critic = report.get("critic")
+    if not isinstance(critic, dict):
+        raise ValueError("iteration report critic evidence is missing")
+    before = _decision_snapshot(report)
+    annotation = classify_human_machine_disagreement(critic, human_review)
+    annotation = {
+        **annotation,
+        "role": "annotation_only",
+        "source_report_schema": str(report["schema"]),
+        "historical_machine_transition_preserved": True,
+        "historical_delivery_routing_preserved": True,
+        "historical_baseline_state_preserved": True,
+        "may_change_iteration_status": False,
+        "may_change_transition": False,
+        "may_change_delivery": False,
+    }
+    enriched["human_calibration"] = annotation
+    if _decision_snapshot(enriched) != before:
+        raise RuntimeError("human calibration attempted to mutate autonomous decision state")
+    return enriched
+
+
+def persist_human_calibration_annotation(
+    report_path: str | Path,
+    human_review: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Persist annotation-only listening evidence into an existing iteration report."""
+    path = Path(report_path)
+    if not path.is_file():
+        raise FileNotFoundError(f"iteration report does not exist: {path}")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"invalid iteration report JSON: {path}") from exc
+    enriched = add_human_calibration_annotation(report, human_review)
+    if enriched == report:
+        return enriched
+    encoded = json.dumps(enriched, indent=2, allow_nan=False)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(encoded, encoding="utf-8")
+    tmp.replace(path)
+    return enriched
 
 
 def run_studio_iteration(
