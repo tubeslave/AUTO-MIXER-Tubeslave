@@ -1,0 +1,14 @@
+{
+  "goal": "studio-calibration-replay-corpus-v1",
+  "status": "contract_validated_integration_pending",
+  "base_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
+  "local_prototype_tests_passed": 8,
+  "real_seed_record_id": "ab77de5aa9e1cb7c2ae616ef4581cf3c3a50ec4250e53b47a6decd2d26c8e023",
+  "runtime_integration": "pending",
+  "audio_dsp_changed": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "critic_thresholds_changed": false,
+  "audio_baseline_promoted": false,
+  "next_goal": "implement the validated replay corpus contract in runtime code and repository tests"
+}
