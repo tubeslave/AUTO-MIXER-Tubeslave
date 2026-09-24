@@ -1,0 +1,78 @@
+{
+  "goal": "bass-compression-director-v1",
+  "status": "implementation_pending_ci",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "31052c0d17d26d0fbee3b1ce062a4adeece0cbe5",
+  "priority_reason": "user approved the new vocal compression and requested instrument-specific compression for remaining sources; generic bass family was objectively rejected",
+  "scope": "bass-specific candidate proposal plus event-body technical screen; no winner and no baseline promotion",
+  "local_validation": {
+    "focused_tests_passed": 72,
+    "full_suite_claimed": false,
+    "test_scope": ["bass compression director v1", "Belye Stai bass adapter", "Compression Director v1.1", "shared compression v2"]
+  },
+  "real_audio": {
+    "song": "Belye Stai",
+    "source": "BASS",
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "event_count": 233,
+    "current_body_spread_db": 2.7812366372897834,
+    "current_attack_to_body_contrast_db": 11.486173360229499,
+    "approved_vocal_v2_frozen": true,
+    "session_reference_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+    "candidates": [
+      {
+        "id": "preserve_transient",
+        "threshold_dbfs": -20.203125,
+        "ratio": 3.5,
+        "attack_ms": 10.095238095236995,
+        "release_ms": 124.38775510204067,
+        "target_active_p95_gr_db": 3.8,
+        "actual_active_p95_gr_db": 3.7288501262664795,
+        "body_spread_delta_db": -0.008566745861170233,
+        "attack_contrast_delta_db": -0.10622864005974364,
+        "protected_full_mix_failures": [],
+        "full_mix_sha256": "d33ac30210a052eda82a9588402d44df417578cd8a2985af322ab802c68f5f1c",
+        "contextual_machine_safe": true
+      },
+      {
+        "id": "balanced",
+        "threshold_dbfs": -20.875,
+        "ratio": 3.5,
+        "attack_ms": 7.931972789114781,
+        "release_ms": 117.47732426303843,
+        "target_active_p95_gr_db": 4.1,
+        "actual_active_p95_gr_db": 4.154326915740967,
+        "body_spread_delta_db": -0.13449556662603968,
+        "attack_contrast_delta_db": -0.09574915897080949,
+        "protected_full_mix_failures": [],
+        "full_mix_sha256": "cdc9fceaf53bd89368b9cc96d658231fec69f28af9fa82c95b192d0eabd083e9",
+        "contextual_machine_safe": true
+      },
+      {
+        "id": "control",
+        "threshold_dbfs": -20.875,
+        "ratio": 4.0,
+        "attack_ms": 6.489795918366639,
+        "release_ms": 103.65646258503389,
+        "target_active_p95_gr_db": 4.3,
+        "actual_active_p95_gr_db": 4.314470291137695,
+        "body_spread_delta_db": -0.17002622593566485,
+        "attack_contrast_delta_db": -0.08742186980530775,
+        "protected_full_mix_failures": [],
+        "full_mix_sha256": "3b1acdc4f373eefef8521554d78e1185c49b3bb08dac0135e80232d0ec147a43",
+        "contextual_machine_safe": true
+      }
+    ],
+    "machine_interpretation": "all three bass-specific candidates improved or preserved body stability within the technical gate and caused no protected full-mix regression",
+    "automatic_winner_selected": false,
+    "audio_baseline_promoted": false,
+    "human_listening_required": true
+  },
+  "known_execution_failure": "attempted one-process multi-candidate audition render exceeded the local execution/memory window before writing candidate clips; objective per-candidate rerenders completed successfully in isolated processes and are the only results claimed",
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "next_goal": "after CI, export level-matched contextual bass A/B in a memory-bounded render path and collect human listening preference; then build kick/snare-specific compression directors using transient/body/recovery objectives rather than copying bass or vocal settings"
+}
