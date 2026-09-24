@@ -1,0 +1,46 @@
+{
+  "goal": "bass-baseline-aware-stability-gate-v1",
+  "status": "accepted_machine_validation_no_musical_change",
+  "date": "2026-09-24",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "bounded_task": "fixed-window bass body-stability and attack-protection gate with timing-only baseline-relative probes",
+  "local_validation": {
+    "new_tests_passed": 5,
+    "focused_tests_passed": 46,
+    "real_song_duration_s": 207,
+    "sample_rate": 44100,
+    "macro_event_count": 233,
+    "baseline_body_spread_db": 2.8602675020228006,
+    "baseline_median_attack_body_db": 1.7743199191637729
+  },
+  "experiments": {
+    "stronger_gr_family": {
+      "survivors": [],
+      "result": "all three worsened body-spread proxy"
+    },
+    "screen_60s": {
+      "candidate": "7ms_attack_170ms_release_same_threshold_ratio",
+      "body_spread_delta_db": -0.1472658868918053,
+      "result": "screen_only_survivor"
+    },
+    "screen_candidate_full_207s": {
+      "body_spread_delta_db": 0.09962836760489324,
+      "attack_body_delta_db": -0.08617897933230623,
+      "result": "rejected_on_full_length"
+    },
+    "final_timing_family_full_207s": [
+      {"id": "faster_recovery", "body_spread_delta_db": 0.01590492610244354, "attack_body_delta_db": -0.01961730916183768, "survives": false},
+      {"id": "longer_recovery", "body_spread_delta_db": 0.0038349075469206184, "attack_body_delta_db": 0.01356662540156961, "survives": false},
+      {"id": "quicker_attack_longer_release", "body_spread_delta_db": 0.08993863983465289, "attack_body_delta_db": -0.06921223030158785, "survives": false}
+    ]
+  },
+  "decision": "keep_existing_bass_compressor",
+  "audio_baseline_promoted": false,
+  "accepted_vocal_changed": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "human_listening_required_for_subjective_acceptance": true,
+  "next_goal": "grouped kick and snare original-compressor adapters plus transient/body stability gates; preserve synchronized mic-group behavior and ghost-note/bleed constraints"
+}
