@@ -1,7 +1,12 @@
 {
   "goal": "studio-perceptual-human-calibration-v1",
-  "status": "validation_pending_ci",
+  "status": "accepted_machine_validation",
   "base_commit": "415720116f73b7e297ca5e1a853fd06e28953705",
+  "pull_request": 141,
+  "tested_head": "90fa7a8880d0db81d15231b355106b24376051b9",
+  "merge_commit": "dea8b0d5bea4a96627a85e01db5dc2fa3c130a70",
+  "ci_run": 36011293502,
+  "ci_matrix": {"3.10":"success","3.11":"success","3.12":"success"},
   "bounded_task": "formalize human-vs-Perceptual-Critic disagreement without weakening existing gates and add a diagnostic foreground-stability measurement",
   "priority_reason": "real Belye Stai vocal listening accepted a candidate that the intelligibility target rejected; KEYS/PLAYBACK and OH real source-bound runs remain blocked by unavailable raw stems",
   "existing_critic_changed": false,
@@ -39,10 +44,15 @@
     "revision": "An effectively silent candidate could otherwise appear perfectly stable after dB-floor analysis; baseline, candidate, and explicit activity reference now fail closed when effectively silent.",
     "thresholds_weakened_after_results": false
   },
-  "local_validation": {
-    "new_tests": 7,
-    "focused_related_tests": 41,
-    "focused_related_tests_status": "passed",
+  "validation": {
+    "local_new_tests": 7,
+    "local_focused_related_tests": 41,
+    "local_focused_related_tests_status": "passed",
+    "ci_workflow": "Tests",
+    "ci_run": 36011293502,
+    "ci_matrix": {"3.10":"success","3.11":"success","3.12":"success"},
+    "full_suite_test_count": null,
+    "full_suite_test_count_note": "all three CI test jobs completed successfully; no total test count inferred from status-only evidence",
     "module_sha256": "1d3bebdd639e75c5e20b3c96a3f92f66ba08731e11ca118b89c51d02ca190463",
     "test_sha256": "e059fc7ca253282d53fb6dda4d909f2ffc226b59cfa9bcf2e8ece30ca0be9838"
   },
@@ -57,5 +67,5 @@
   "paid_external_credits_used": false,
   "human_listening_required": true,
   "audio_baseline_promoted": false,
-  "next_goal": "after CI, integrate calibration evidence into STUDIO experiment reports as annotation only; then validate foreground-stability on real isolated vocal A/B when exact stems are available before considering any new production target threshold"
+  "next_goal": "integrate calibration evidence into STUDIO experiment reports as annotation only; then validate foreground-stability on real isolated vocal A/B when exact stems are available before considering any new production target threshold"
 }
