@@ -1,0 +1,61 @@
+{
+  "goal": "studio-perceptual-human-calibration-v1",
+  "status": "validation_pending_ci",
+  "base_commit": "415720116f73b7e297ca5e1a853fd06e28953705",
+  "bounded_task": "formalize human-vs-Perceptual-Critic disagreement without weakening existing gates and add a diagnostic foreground-stability measurement",
+  "priority_reason": "real Belye Stai vocal listening accepted a candidate that the intelligibility target rejected; KEYS/PLAYBACK and OH real source-bound runs remain blocked by unavailable raw stems",
+  "existing_critic_changed": false,
+  "existing_thresholds_changed": false,
+  "autonomous_baseline_promotion_changed": false,
+  "real_calibration_case": {
+    "song": "Belye Stai",
+    "candidate": "v2 balanced vocal first-compressor replacement",
+    "critic_target": "vocal_intelligibility",
+    "target_before": 0.6800658645341687,
+    "target_after": 0.6714029434943347,
+    "target_improvement": -0.008662921039834015,
+    "machine_decision": "rejected",
+    "machine_failures": ["target_not_improved"],
+    "protected_regressions": [],
+    "human_review": "accepted",
+    "human_observations": ["foreground_stability", "phrase_consistency", "stable_mix_position"],
+    "new_classification": "target_proxy_miss_candidate",
+    "historical_machine_result_preserved": true,
+    "baseline_promotion_allowed_by_calibration": false
+  },
+  "foreground_stability_metric": {
+    "status": "diagnostic_only",
+    "method": "fixed baseline-derived active windows; P90-P10 window RMS spread plus P95 absolute deviation; one constant candidate median-level match",
+    "acceptance_threshold_defined": false,
+    "synthetic_windows": 49,
+    "synthetic_spread_before_db": 8.318217182877603,
+    "synthetic_spread_after_db": 1.2965893279832414,
+    "synthetic_improvement_db": 7.021627854894362,
+    "synthetic_candidate_match_gain_db": -4.304595060939221,
+    "synthetic_median_match_error_db": 0.0,
+    "fail_closed_silence_guard": true
+  },
+  "self_review": {
+    "revision": "An effectively silent candidate could otherwise appear perfectly stable after dB-floor analysis; baseline, candidate, and explicit activity reference now fail closed when effectively silent.",
+    "thresholds_weakened_after_results": false
+  },
+  "local_validation": {
+    "new_tests": 7,
+    "focused_related_tests": 41,
+    "focused_related_tests_status": "passed",
+    "module_sha256": "1d3bebdd639e75c5e20b3c96a3f92f66ba08731e11ca118b89c51d02ca190463",
+    "test_sha256": "e059fc7ca253282d53fb6dda4d909f2ffc226b59cfa9bcf2e8ece30ca0be9838"
+  },
+  "blockers": {
+    "real_belye_foreground_stability_score": "isolated baseline/candidate foreground audio bytes not present in current runtime; do not infer from stereo masters",
+    "keys_playback_real_validation": "exact raw KEYS/PLAYBACK stems unavailable",
+    "overhead_real_validation": "exact raw OHL/OH_R stems unavailable"
+  },
+  "live_code_changed": false,
+  "mastering_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "human_listening_required": true,
+  "audio_baseline_promoted": false,
+  "next_goal": "after CI, integrate calibration evidence into STUDIO experiment reports as annotation only; then validate foreground-stability on real isolated vocal A/B when exact stems are available before considering any new production target threshold"
+}
