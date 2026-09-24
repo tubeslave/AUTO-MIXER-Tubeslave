@@ -70,7 +70,7 @@ def test_explicit_config_resolves_roles_names_and_exact_main_patch_contract():
 
 def test_selected_input_requires_explicit_role():
     config = _enabled_config()
-    with pytest.raises(LiveSessionConfigError, match="missing \[3\]"):
+    with pytest.raises(LiveSessionConfigError, match=r"missing \[3\]"):
         resolve_live_capture_bridge_config(
             config,
             mixer_type="wing",
@@ -101,7 +101,7 @@ def test_patch_routes_must_cover_declared_tap_exactly():
         {"usb_slot": 47, "source_group": "MAIN", "source_channel": 1},
     ]
 
-    with pytest.raises(LiveSessionConfigError, match="routes must cover exactly"):
+    with pytest.raises(LiveSessionConfigError, match="routes must exactly cover"):
         resolve_live_capture_bridge_config(config, mixer_type="wing")
 
 
