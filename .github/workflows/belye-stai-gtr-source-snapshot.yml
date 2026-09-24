@@ -8,7 +8,7 @@ permissions:
 jobs:
   snapshot:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Fetch public source and extract immutable GTR slice
         shell: bash
@@ -18,15 +18,32 @@ jobs:
           python - <<'PY'
           import json, urllib.parse, urllib.request
           public='https://disk.yandex.ru/d/OvdRlysTGFbxEQ'
-          path='/Vavi Live/GTR 0002 [2023-03-03 191740].wav'
-          q=urllib.parse.urlencode({'public_key':public,'path':path})
-          with urllib.request.urlopen('https://cloud-api.yandex.net/v1/disk/public/resources/download?'+q, timeout=60) as r:
+          target='GTR 0002 [2023-03-03 191740].wav'
+          api='https://cloud-api.yandex.net/v1/disk/public/resources'
+          def get(path):
+              q=urllib.parse.urlencode({'public_key':public,'path':path,'limit':1000})
+              with urllib.request.urlopen(api+'?'+q, timeout=60) as r: return json.load(r)
+          queue=['/']; found=None; seen=set()
+          while queue and found is None:
+              path=queue.pop(0)
+              if path in seen: continue
+              seen.add(path)
+              obj=get(path)
+              for item in obj.get('_embedded',{}).get('items',[]):
+                  if item.get('name')==target:
+                      found=item['path']; break
+                  if item.get('type')=='dir': queue.append(item['path'])
+          if found is None: raise SystemExit('target GTR source not found in public tree')
+          print('resolved',found)
+          q=urllib.parse.urlencode({'public_key':public,'path':found})
+          with urllib.request.urlopen(api+'/download?'+q, timeout=60) as r:
               href=json.load(r)['href']
-          with urllib.request.urlopen(href, timeout=180) as r, open('out/GTR_full.wav','wb') as f:
+          with urllib.request.urlopen(href, timeout=300) as r, open('out/GTR_full.wav','wb') as f:
               while True:
                   b=r.read(1024*1024)
                   if not b: break
                   f.write(b)
+          open('out/resolved_path.txt','w').write(found+'\n')
           PY
           ffmpeg -hide_banner -loglevel error -ss 1028 -t 207 -i out/GTR_full.wav -map 0:a:0 -c:a pcm_s24le out/03_GTR.wav
           test "$(stat -c%s out/03_GTR.wav)" = "27386144"
