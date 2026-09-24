@@ -1,0 +1,23 @@
+{
+  "goal": "studio-calibration-replay-corpus-v1",
+  "status": "contract_validated_runtime_integration_blocked",
+  "base_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
+  "branch": "studio/calibration-replay-corpus-v1-20260924",
+  "bounded_task": "define append-only calibration corpus contract and validate deterministic replay/chain semantics",
+  "real_seed_case": "Belye Stai v2 vocal machine rejection plus later human acceptance",
+  "local_prototype_tests_passed": 8,
+  "local_prototype_tests_failed": 0,
+  "prototype_scope": ["deterministic record", "two-record chain", "mutation detection", "duplicate rejection", "corrupt-prefix rejection", "annotation-drift rejection", "protected-regression preservation", "annotation-required guard"],
+  "repository_runtime_code_added": false,
+  "repository_runtime_code_blocker": "connected repository write safety layer blocked executable Python file creation; no bypass attempted",
+  "docs_updated": true,
+  "audio_dsp_changed": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "critic_thresholds_changed": false,
+  "audio_baseline_promoted": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "human_listening_required": true,
+  "next_goal": "land the replay-corpus runtime module and repository tests when executable code writes are available; otherwise advance the next independent STUDIO validation task without weakening any gate"
+}
