@@ -1,24 +1,37 @@
 {
   "goal": "full-mix-compression-context-v1",
-  "status": "validation_pending",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "d24d7656772e191969a98309d037fa961f3358de",
-  "priority_reason": "Compression Iteration Bridge v1 explicitly lacks complete-mix before/after evidence",
+  "priority_reason": "Compression Iteration Bridge v1 explicitly lacked complete-mix before/after evidence",
+  "pull_request": 122,
+  "tested_code_commit": "a545b5b0798bde52b69ba6f2b42e7e64fb274f04",
+  "merge_commit": "580482ce825cba4e533188f120674cb4d453b841",
   "scope": "STUDIO/offline one-source replacement -> full-mix Perceptual Critic -> existing Autonomous Iteration",
   "implementation": {
     "module": "audio_workbench/compression_mix_context.py",
     "test_file": "tests/test_studio_full_mix_compression_context_v1.py",
     "source_match": "fixed-reference-active RMS before insertion",
     "replacement_formula": "candidate_mix = baseline_mix - original_contribution + matched_candidate_contribution",
+    "protected_anchor_update": "same exact replacement for vocal or drum anchor when owned by target source",
+    "context_failures": "appended to existing compression objective veto path",
     "human_audition_export": "only when existing transition next_action == human_listening",
     "baseline_promotion_from_adapter": false
   },
-  "local_validation": {
+  "validation": {
+    "workflow_run": 35950882443,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "python_3_11_studio_boundary": {"passed": 21, "warnings": 1},
+    "python_3_11_full_suite": {"passed": 1239, "skipped": 2, "warnings": 2},
     "module_py_compile": "success",
     "test_file_py_compile": "success",
-    "full_repo_local_tests": "not available because repository cannot be cloned from the isolated container; exact branch CI required",
-    "real_context_script": "/mnt/data/context_adapter_run/real_context_experiment.py",
-    "real_context_evidence": "/mnt/data/context_adapter_run/full_mix_context/evidence.json"
+    "review": "self-review; no independent reviewer claimed",
+    "known_nonblocking_ci_warnings": [
+      "Matchering imports scipy.ndimage.filters.maximum_filter1d from a deprecated namespace",
+      "Optuna Study.set_metric_names is experimental",
+      "checkout cleanup reports missing .gitmodules URL for external/AutomaticMixingPapers",
+      "GitHub Actions warns Node.js 20 actions are being forced onto Node.js 24"
+    ]
   },
   "real_audio_experiment": {
     "song": "Belye Stai",
@@ -67,13 +80,28 @@
       "baseline_promoted": false
     }
   },
+  "limitations": [
+    "The real experiment is a controlled pre-bus context, not a rebuild of the previously delivered mix",
+    "Source-dependent FX/send ownership is not inferred; a complete routed contribution must be supplied explicitly",
+    "No candidate is ranked or accepted subjectively by this adapter",
+    "Rejected candidates intentionally produce no listening export",
+    "Human listening remains mandatory for any candidate that survives objective gates"
+  ],
   "constraints": {
     "live_code_changed": false,
     "backend_code_changed": false,
     "mastering_code_changed": false,
     "neural_audio_processing_used": false,
     "paid_services_used": false,
+    "delivered_mix_replaced": false,
+    "audio_baseline_promoted": false,
     "human_listening_required": true
   },
-  "next_gate": "require exact final-head Tests workflow on Python 3.10/3.11/3.12; accept/revise based on CI and patch review"
+  "artifacts": {
+    "real_context_script": "/mnt/data/context_adapter_run/real_context_experiment.py",
+    "real_context_evidence": "/mnt/data/context_adapter_run/full_mix_context/evidence.json",
+    "report": "/mnt/data/context_adapter_run/full_mix_context/REPORT_RU.md",
+    "bundle": "/mnt/data/Studio_Full_Mix_Compression_Context_v1_Evidence.zip"
+  },
+  "next_goal": "Routed Contribution Renderer v1: deterministically render a target source's complete dry plus explicitly owned send/return contribution from the session recipe, verify summation identity against the actual premaster, then feed all three Compression Director candidates through the full-mix context adapter"
 }
