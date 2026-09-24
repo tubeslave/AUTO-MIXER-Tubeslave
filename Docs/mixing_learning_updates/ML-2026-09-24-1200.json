@@ -1,0 +1,185 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-24-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-24T12:00:00+03:00",
+  "actual_start_msk": "2026-09-24T11:57:42+03:00",
+  "completed_msk": "2026-09-24T12:04:00+03:00",
+  "preceding_update_id": "ML-2026-09-24-0900",
+  "preceding_search_update_id": "ML-2026-09-24-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260924-0900-01",
+      "title": "MIDIBack: Harmony-Aware Singing Pitch Correction via Joint Vocal-Accompaniment Symbolic Modeling",
+      "url": "https://arxiv.org/html/2609.28008",
+      "stable_id": "arXiv:2609.28008v1",
+      "reading_depth": "full_text_rechecked",
+      "relationship": "primary_source",
+      "revisions": [
+        "targets are rounded GAME transcription pitches rather than independent scores",
+        "all baseline numbers are reproductions inside the same pseudo-target pipeline, not original published evaluations",
+        "the 80/10/10 split does not document singer-, artist-, song-family-, or source-dataset-disjoint grouping",
+        "the counterfactual backing-transposition case study demonstrates sensitivity, not correctness or human-like harmonic reasoning",
+        "no public MIDIBack code, checkpoint, exact GAME/MuScriptor configuration, split manifest, or waveform correction path was verified"
+      ],
+      "limited_conclusion": "MIDIBack is evidence that accompaniment tokens can help recover synthetic symbolic pitch shifts under a pseudo-target protocol; it is not independent evidence of perceptually correct or deployable vocal correction."
+    },
+    {
+      "id": "SRC-ML-20260915-1200-01",
+      "title": "BERT-APC: BERT-based Automatic Pitch Correction for Amateur Singing Voice",
+      "url": "https://arxiv.org/html/2511.20006v3",
+      "stable_id": "arXiv:2511.20006v3",
+      "reading_depth": "targeted_full_text_comparison",
+      "relationship": "dependent_method_family_comparator",
+      "revisions": [
+        "BERT-APC evaluates against score-derived ground truth and includes TD-PSOLA audio plus a listening test",
+        "MIDIBack reuses the learnable detuner scheme but substitutes rounded automatic transcriptions for score targets",
+        "MIDIBack's reproduced BERT-APC baseline is therefore not the original BERT-APC evaluation and cannot serve as independent confirmation"
+      ]
+    },
+    {
+      "id": "SRC-ML-20260924-0900-02",
+      "title": "A Multi-Resolution Spectrogram Approach for Estimating the Physical Parameters of a Plate Reverb",
+      "url": "https://arxiv.org/html/2609.28320",
+      "stable_id": "arXiv:2609.28320v1",
+      "reading_depth": "full_text_rechecked",
+      "relationship": "challenge_submission",
+      "revisions": [
+        "the 200-IR local table appears to be model-selection-adjacent but independence and seeds are not documented",
+        "the abstract's 5000-IR mean and the 200-IR table differ substantially without a reconciled protocol",
+        "no public submission code, checkpoint, configuration, or split manifest was found"
+      ]
+    },
+    {
+      "id": "SRC-ML-20260924-0900-03",
+      "title": "The 1st DAFx Challenge: Physical and Modal Parameter Estimation for Plate Reverberation",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_challenge_76.pdf",
+      "stable_id": "DAFx26_challenge_76",
+      "reading_depth": "full_text_rechecked",
+      "relationship": "official_dependent_benchmark_report",
+      "revisions": [
+        "participant timings were reported by participants rather than rerun on common hardware",
+        "organizers received code, but the inspected public repository exposes technical reports and organizer tools rather than the plate-paper participant implementation",
+        "for a real plate, the synthetic parameterization may lack a uniquely valid ground truth, so transfer is not merely ordinary distribution shift"
+      ]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20260924-1200-01",
+      "repository": "https://github.com/openvpi/GAME",
+      "revision": "f4239345f0fed21890d362c74a35fd857724aa82",
+      "reading_depth": "static_readme_algorithm_and_revision_audit",
+      "execution_status": "not_run",
+      "license": "MIT",
+      "status": "available_dependency / configuration_unpinned_by_midiback",
+      "findings": [
+        "GAME emits floating-point pitch and configurable note-boundary/note-presence decisions",
+        "MIDIBack does not identify the GAME checkpoint, revision, thresholds, slicer configuration, or adaptation from GAME's documented 44.1-kHz path to its 22.05-kHz mono pipeline",
+        "no oracle/manual-transcription ablation isolates GAME error propagation"
+      ]
+    },
+    {
+      "id": "ART-ML-20260924-1200-02",
+      "repository": "https://github.com/muscriptor/muscriptor",
+      "revision": "7f213afecf23bd6a1b8672aa223690ee9807cefb",
+      "reading_depth": "static_readme_license_and_revision_audit",
+      "execution_status": "not_run",
+      "license": "MIT code; CC BY-NC 4.0 weights",
+      "status": "available_dependency / exact_variant_unpinned_by_midiback",
+      "findings": [
+        "public code and small/medium/large checkpoints exist, but local use requires authenticated acceptance of the non-commercial weights license",
+        "MIDIBack does not state which MuScriptor model variant, checkpoint revision, decoding options, quantization, or instrument-presence settings produced accompaniment tokens",
+        "the audited repository revision postdates the MIDIBack submission and is not evidence of the authors' exact environment"
+      ]
+    },
+    {
+      "id": "ART-ML-20260924-0900-01",
+      "repository": "https://github.com/LOGUNIVPM/1st-DAFx-Challenge",
+      "revision": "7ff3859a2fae592a3f256649a0880149a98b653a",
+      "reading_depth": "recursive_tree_and_documentation_recheck",
+      "execution_status": "not_run",
+      "status": "organizer_benchmark / participant_code_not_publicly_verified / rights_verification_required",
+      "findings": [
+        "the public tree contains organizer Task A/Task B tools and participant technical-report PDFs",
+        "no directory, checkpoint, or runnable configuration for the plate-paper entry was found",
+        "the official statement that code was supplied to organizers does not establish public reproducibility"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260924-1200-01","claim":"Recovery against a rounded transcription target can measure consistency with the transcription stack rather than correctness against musical intent.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-02","claim":"MIDIBack's BERT-APC comparison is a reimplementation under pseudo-target conditions, not an independent reproduction of BERT-APC's score-grounded audio evaluation.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-03","claim":"The learned detuner links MIDIBack and BERT-APC into a dependent method family rather than two independent confirmations.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-04","claim":"Accompaniment improves synthetic global-shift recovery but worsens reported clean-note preservation, requiring an explicit reject gate.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-05","claim":"Following an artificially transposed accompaniment proves counterfactual sensitivity, not that the proposed note is musically correct.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-06","claim":"GAME and MuScriptor versions, checkpoints and decoding settings are latent experimental factors absent from MIDIBack's reproducibility record.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-07","claim":"A 1024-token maximum without a documented truncation/segmentation policy leaves long-form coverage and boundary behavior uncertain.","confidence":"medium"},
+    {"id":"KC-ML-20260924-1200-08","claim":"The combined MIDIBack corpus lacks a public per-source split and rights manifest, so it cannot be assumed reproducible or reusable.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-09","claim":"MuScriptor code is MIT but its checkpoints are CC BY-NC 4.0; code availability does not confer unrestricted weight use.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-10","claim":"The public DAFx challenge repository does not currently expose the plate-paper participant code or checkpoint even though code was supplied to organizers.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-11","claim":"The 5000-, 200-, and 16-IR plate results remain unreconciled protocols and cannot be pooled into one accuracy claim.","confidence":"high"},
+    {"id":"KC-ML-20260924-1200-12","claim":"Real-plate validation may lack a unique ground-truth mapping to the challenge's synthetic physical parameters; signal and perceptual endpoints are therefore required.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260924-1200-01","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"validating a pitch-target predictor","change":"score against an independent human score/performance target, not the predictor's own transcription stack","suggested_range":null,"number_provenance":"methodological control","protect":["target independence","musical intent"],"verify":"manual/oracle versus automatic-transcription ablation","cancel":"independent target is unavailable","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-02","source_ids":["ART-ML-20260924-1200-01","ART-ML-20260924-1200-02"],"status":"candidate","auto_apply":false,"applies_when":"using automatic symbolic inputs","change":"pin transcriber revision, checkpoint, model variant, thresholds, decoding, sample rate and segmentation","suggested_range":null,"number_provenance":"dependency audit","protect":["reproducibility","note boundaries","instrument identity"],"verify":"manifest plus cached symbolic outputs","cancel":"any dependency setting is unknown","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-03","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"accompaniment changes a proposed vocal note","change":"require a clean-note reject gate and human review for chromatic, blue-note, bend, vibrato and dissonant contexts","suggested_range":"no automatic cents threshold inferred from the paper","number_provenance":"91.3% clean RPA complete versus 94.6% without accompaniment","protect":["correct notes","expressive intonation"],"verify":"clean-note corruption plus blind preference","cancel":"the gate increases edits or removes intended expression","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-04","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"interpreting a counterfactual backing-track manipulation","change":"label the result sensitivity_test, not harmonic_correctness","suggested_range":"backing shifts only as preregistered diagnostic conditions","number_provenance":"paper case-study design","protect":["causal interpretation"],"verify":"independent musical annotation of acceptable targets","cancel":"manipulation has no musically valid target","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-05","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"claiming generalization from the mixed corpus","change":"publish song-family, singer, artist, source-dataset and 1024-token truncation manifests","suggested_range":null,"number_provenance":"audit of missing grouping policy","protect":["leakage control","long-form coverage"],"verify":"group-disjoint rerun and truncation report","cancel":"provenance cannot be reconstructed","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-06","source_ids":["SRC-ML-20260924-0900-02","ART-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"promoting a plate estimator beyond a paper result","change":"require public pinned code, checkpoint, configuration, split manifest and artifact license","suggested_range":null,"number_provenance":"public artifact audit","protect":["reproducibility","rights"],"verify":"cold static reproduction audit before compute","cancel":"participant implementation remains unavailable","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-07","source_ids":["SRC-ML-20260924-0900-03"],"status":"candidate","auto_apply":false,"applies_when":"testing on a measured physical plate","change":"evaluate signal reconstruction and listening endpoints instead of assuming synthetic parameter labels are uniquely valid","suggested_range":null,"number_provenance":"official benchmark's stated real-plate gap","protect":["causal validity","reverb quality"],"verify":"calibrated measured IR plus uncertainty and blind listening","cancel":"no physically defensible reference or signal endpoint exists","confidence":"high"},
+    {"id":"RULE-ML-20260924-1200-08","source_ids":["SRC-ML-20260924-0900-02","SRC-ML-20260924-0900-03"],"status":"candidate","auto_apply":false,"applies_when":"reporting plate accuracy","change":"keep 5000-, 200-, and 16-IR denominators and selection roles separate","suggested_range":null,"number_provenance":"protocol reconciliation","protect":["statistical interpretation"],"verify":"preregistered split ledger and confidence intervals","cancel":"sample provenance is unknown","confidence":"high"}
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20260924-1200-01","status":"not_run","title":"Automatic versus independent symbolic input for accompaniment-aware target prediction","baseline":"manual/oracle vocal and accompaniment note events feeding one fixed target predictor and one fixed bounded correction engine","variant":"GAME plus MuScriptor events feeding the same predictor and engine","single_factor":"symbolic input source","material":"rights-cleared multitracks with independent note and acceptable-target annotations","controls":["same audio","same note-matching policy","same predictor weights","same correction engine","same limits","same gain","same render path"],"loudness_matching":"retain raw safety renders; make separate integrated-loudness-matched blind copies","measurements":["input note precision/recall","target-note accuracy","clean-note corruption","boundary error","words","formants","consonant/HF residual","sample peak","true peak","stereo/mono residual","blind preference"],"protect":["lyrics","identity","expressive pitch","timing","transients","headroom"],"success":"automatic input preserves the oracle-input advantage without materially higher clean-note corruption or audible damage","cancel":"dependency versions are unpinned, targets are not independent, or protected qualities worsen"
+    },
+    {"id":"EXP-ML-20260924-1200-02","status":"not_run","title":"Rounded pseudo-target versus independent expert target","baseline":"score and select one fixed predictor against independent expert targets","variant":"score the identical outputs against rounded GAME transcription targets","single_factor":"evaluation target","controls":["same examples","same outputs","same matching tolerance"],"loudness_matching":"not applicable until the fixed audio engine stage","measurements":["RPA","pitch-class RPA","clean-note corruption","target disagreement by musical context"],"protect":["target independence"],"success":"ranking remains stable under independent targets","cancel":"expert target depends on GAME or model output"},
+    {"id":"EXP-ML-20260924-1200-03","status":"not_run","title":"Counterfactual accompaniment sensitivity versus musical validity","baseline":"unchanged accompaniment","variant":"one preregistered musically valid reharmonization or transposition","single_factor":"accompaniment tokens","controls":["same vocal","same predictor","same note boundaries","same seed"],"loudness_matching":"not applicable for symbolic stage; fixed-engine renders must be loudness matched separately","measurements":["prediction movement","expert target acceptability","clean-note corruption"],"protect":["melodic intent","expressive deviations"],"success":"movement tracks independently valid alternatives rather than arbitrary token shifts","cancel":"the manipulation lacks an independently acceptable target"},
+    {"id":"EXP-ML-20260924-1200-04","status":"not_run","title":"Plate phase-channel transfer with matched and deliberately mismatched holdouts","baseline":"downsampled multi-resolution magnitude model","variant":"same model with the paper's phase channel","single_factor":"phase channel","controls":["same split","same seeds","same capacity apart from input channel","absolute amplitude","same optimizer"],"loudness_matching":"separate loudness-matched listening copies only for full-band rendered comparisons","measurements":["coordinate error","physical-parameter error","calibration","noise/free-edge/OOD failure rate","signal reconstruction","sample/true peak","blind reverb preference"],"protect":["direct timing","decay","phase/mono","headroom"],"success":"phase benefit survives preregistered OOD/measured signal endpoints","cancel":"public code/checkpoint is unavailable, labels are ill-defined, or gains remain matched-simulator-only"}
+  ],
+  "queue": {
+    "video_queued_before": 38,
+    "video_queued_after": 38,
+    "videos_studied_this_run": 0,
+    "priorities": [
+      "independent-target and transcription-source null tests for MIDIBack",
+      "MIDIBack code, checkpoint, exact dependency settings and group-disjoint split manifest",
+      "public release or author clarification for the plate participant implementation and 5000/200/16-IR protocols",
+      "GeoAtt HRTF phase/ITD/localization artifact review",
+      "existing SpanSynth, DiffusionRIR, BSRNN and SRF-SVB controlled tests",
+      "permitted transcript retrieval for 38 queued videos",
+      "per-file rights-cleared rock multitracks with raw tracks, stems and final mix"
+    ]
+  },
+  "dedupe": {
+    "duplicates_removed": 0,
+    "version_families_merged": 0,
+    "notes": [
+      "BERT-APC is retained as a dependent method-family comparator, not independent confirmation of MIDIBack",
+      "the plate paper, its technical report and the official challenge report are linked benchmark evidence, not three replications"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "video_source_cards_added": 0,
+  "source_cards_added": 0,
+  "source_cards_updated": 4,
+  "artifact_cards_added": 2,
+  "artifact_cards_updated": 1,
+  "knowledge_cards_added": 12,
+  "candidate_rules_added": 8,
+  "experiments_added": 4,
+  "audio_modified": false,
+  "dsp_modified": false,
+  "runtime_modified": false,
+  "repositories_modified_outside_knowledge_base": false,
+  "models_or_checkpoints_run": false,
+  "handoff": "Treat MIDIBack as a transcription-dependent symbolic hypothesis generator. Pin GAME and MuScriptor, validate against independent targets, and reject clean-note damage before any fixed-engine audio A/B. The plate entry remains non-reproducible from public artifacts; keep simulator accuracy separate from measured signal and listening endpoints."
+}
