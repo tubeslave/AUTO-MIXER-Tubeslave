@@ -1,14 +1,44 @@
 {
   "goal": "studio-calibration-replay-corpus-v1",
-  "status": "contract_validated_integration_pending",
+  "status": "local_runtime_validated_remote_code_write_blocked",
   "base_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
-  "local_prototype_tests_passed": 8,
-  "real_seed_record_id": "ab77de5aa9e1cb7c2ae616ef4581cf3c3a50ec4250e53b47a6decd2d26c8e023",
-  "runtime_integration": "pending",
+  "bounded_task": "implement evidence-only corpus build, compare-and-append and deterministic replay for annotated studio-autonomous-iteration-v2 reports",
+  "repository_runtime_integration": "pending: create_file for audio_workbench/mixing/calibration_corpus.py was blocked before a commit was returned",
+  "write_blocker": "OpenAI tool response: could not determine the safety status of the request; no alternate code-write route attempted",
+  "container_git_blocker": "git ls-remote failed: Could not resolve host: github.com",
+  "local_validation": {
+    "command": "python -m pytest tests/test_studio_calibration_corpus_v1.py tests/test_studio_perceptual_calibration_v1.py -k 'not existing_annotation_api_integration' -q --tb=short --junitxml=evidence/local-unit-tests.xml",
+    "passed": 40,
+    "new_corpus_cases_passed": 33,
+    "existing_calibration_cases_passed": 7,
+    "deselected": 1,
+    "deselected_reason": "full studio_iteration import integration requires repository runtime unavailable in this container; test is written but not claimed passed",
+    "compileall_passed": true,
+    "full_repository_tests_run": false,
+    "ci_run_for_this_implementation": null,
+    "existing_classifier_git_blob_verified": "1800c10eb54471b8b61d224e392e01e5447aff12"
+  },
+  "local_artifact_sha256": {
+    "audio_workbench/mixing/calibration_corpus.py": "178c945cd4d7f847b2938f9383810743fc31bad384a78bc977f4d2304e982fba",
+    "tests/test_studio_calibration_corpus_v1.py": "daa8f3e53c2c2b43c9885ef2fede89736a795b3c4abd9846e23b73a13f7c71b6"
+  },
+  "synthetic_experiment": {
+    "records": 6,
+    "classification_outcomes": 6,
+    "head_record_id": "4d9afa0b2cb64f4b3fed9fefcdbb53bb8e7573cba67d441b4c1b1bddab27ffa2",
+    "trusted_head_checked": true,
+    "previous_bytes_preserved_after_each_append": true,
+    "real_listening_data": false
+  },
+  "prior_evidence_correction": "The earlier 8-passed claim is not reproducible from its supplied ZIP, which contains only a text result, report and seed. It is not used as validation for this implementation; the current executed pytest/JUnit evidence supersedes it.",
+  "legacy_prototype_seed_imported": false,
   "audio_dsp_changed": false,
   "mastering_changed": false,
   "live_code_changed": false,
   "critic_thresholds_changed": false,
   "audio_baseline_promoted": false,
-  "next_goal": "implement the validated replay corpus contract in runtime code and repository tests"
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "human_listening_required": true,
+  "next_goal": "land the prepared runtime and tests through an authorized working code-write path; run the actual annotation integration test and full CI before merge; import only source-verified annotated iteration reports, not a reconstructed historical render"
 }
