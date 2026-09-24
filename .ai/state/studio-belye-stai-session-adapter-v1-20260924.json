@@ -1,0 +1,45 @@
+{
+  "goal": "studio-belye-stai-session-adapter-v1",
+  "status": "validation_pending_ci",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "0bb9d2b5bc4693715c744ecfa307b34e3fdf2780",
+  "priority_reason": "recorded next blocker after Routed Contribution Renderer v1",
+  "bounded_task": "migrate the delivered Belye Stai offline mix graph behind SessionRender and prove a no-change rerender against the stored premaster before evaluating new compression candidates",
+  "scope": "studio/offline only; no mastering, live console, backend or paid external services",
+  "implementation": {
+    "module": "audio_workbench/belye_stai_session.py",
+    "sources": 18,
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "override_boundary": "raw source before all delivered source-dependent routing",
+    "anchors": ["mix", "vocal_bus", "drums_bus", "early_room"],
+    "file_writes_inside_renderer": false,
+    "learned_audio_models": false
+  },
+  "real_no_change_experiment": {
+    "source_hashes_rechecked_against_manifest": true,
+    "first_attempt": "rejected: base mix_dsp graph omitted the later documented refine_accent stage and therefore did not reproduce the stored delivery",
+    "revision": "incorporated the documented linked DRUMS-bus Gaussian accent refinement centered at 159.056 s, sigma 0.055 s, maximum reduction 3 dB",
+    "stored_premaster_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "adapter_pcm24_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "dither_seed": 20260924,
+    "byte_equal": true,
+    "decoded_pcm_max_abs_error": 0.0,
+    "decoded_pcm_rmse": 0.0,
+    "equal_sample_fraction": 1.0,
+    "observed_render_seconds": 55.190494537353516,
+    "baseline_promoted": false,
+    "human_listening": "not_required_for_no_change_identity; still mandatory for future subjective candidate acceptance"
+  },
+  "local_synthetic_validation": {
+    "repeat_render_max_abs_error": 0.0,
+    "source_override_changes_full_mix": true,
+    "required_session_anchors_present": true,
+    "sources_immutable": true
+  },
+  "ci": "pending exact branch",
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required_for_candidates": true,
+  "next_goal": "after exact-branch CI succeeds, run one real Compression Director candidate family through BelyeStaiSessionRenderer -> Routed Contribution -> Perceptual Critic, reject unsafe candidates and export only level-matched survivors for human A/B"
+}
