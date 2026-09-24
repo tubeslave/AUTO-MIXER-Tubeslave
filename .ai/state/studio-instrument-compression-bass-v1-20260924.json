@@ -1,0 +1,22 @@
+{
+  "goal": "instrument-specific-compression-bass-in-place-v1",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "5098d0a339209790caa757ac34ccaf3df47bfbca",
+  "priority_reason": "explicit user request after accepting v2 vocal compression",
+  "human_feedback": ".ai/feedback/belye-stai-v2-vocal-human-20260924.json",
+  "bounded_task": "bass-specific original first-compressor replacement with explicit frozen downstream controls and full-mix auditions",
+  "local_new_tests": 17,
+  "local_focused_tests_passed": 64,
+  "code_blob_identity_verified": true,
+  "bass_no_change_pcm_error": 0.0,
+  "full_v2_no_change_premaster_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+  "real_candidate_experiment": "in_progress_207_seconds_x_3",
+  "vocal_settings_changed": false,
+  "live_code_changed": false,
+  "mastering_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "audio_baseline_promoted": false,
+  "next_goal": "inspect completed bass evidence and exact PR CI; accept code only, keep new music awaiting human listening; then grouped kick/snare adapters and role-appropriate objective validation"
+}
