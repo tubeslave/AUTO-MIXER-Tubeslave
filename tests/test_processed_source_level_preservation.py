@@ -45,3 +45,12 @@ def test_excessive_makeup_cannot_silently_pass():
 def test_mismatched_shape_rejected():
     x=audio()
     with pytest.raises(ValueError):match_processed_source(x,x[:-1],48000)
+
+
+def test_level_match_cannot_promote_an_audible_candidate_by_itself():
+    from audio_workbench.quality_loop import evaluate_candidate
+    x=audio();_,r=match_processed_source(x,x*.98,48000)
+    plan={"confidence":{"cause":.9,"intervention":.9}}
+    v=evaluate_candidate(plan,{"id":"matched-source",**r},True,[],.95)
+    assert v["accepted"] is False
+    assert v["acceptance_state"]=="pending_human_review"
