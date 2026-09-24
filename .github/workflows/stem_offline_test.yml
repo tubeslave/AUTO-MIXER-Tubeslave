@@ -54,6 +54,7 @@ jobs:
             tests/test_live_iteration_coordinator.py \
             tests/test_live_usb_feature_stream.py \
             tests/test_live_audio_capture_bridge.py \
+            tests/test_live_audio_capture_session.py \
             tests/test_live_main_tap_patch_verify.py \
             tests/test_live_patch_startup.py \
             tests/test_live_wing_main_meter.py \
