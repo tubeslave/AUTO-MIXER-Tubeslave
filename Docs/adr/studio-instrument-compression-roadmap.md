@@ -13,23 +13,25 @@ Use the tested causal linked compressor, measured active-P95 GR calibration wher
 | Snare Top/Bottom | stable body while retaining crack and ghost notes | bottom polarity/processing, quiet hits, inter-hit bleed, attack/body contrast | grouped adapter + gate accepted; `tighter_body` is a technical A/B survivor only |
 | Toms | stable fill level and decay | attack, body→tail shape, quiet hits, no extra bleed | TOM_1/TOM_2/FLOOR adapters + gate accepted; common `preserve_attack` survivor is human-A/B only |
 | Guitar | stable rhythmic layer or lead sustain appropriate to role | pick articulation and accents; no forced compression of already-limited distortion | exact local adapter + no-change-first gate accepted; full-song GTR local spread 2.6685 dB is below the predeclared 2.8 dB action threshold, so zero candidates and current compressor retained |
-| Keys/playback | context-dependent consistency | stereo link, piano transient vs pad sustain, original programmed dynamics | **next**: separate source roles and prove an actionable problem before compression |
-| OH/cymbals | investigate only demonstrated level problems | stereo image, cymbal decay, no unnecessary pumping | no-change first, planned |
+| Keys/playback | context-dependent consistency | stereo link, piano transient vs pad sustain, original programmed dynamics | role-aware no-change-first gate implemented and synthetic-tested; KEYS and PLAYBACK have separate actionability/guards; real Belye Stai source validation is blocked because original KEYS_L/R and PLAYBACK_L/R stems are not present in the current runtime |
+| OH/cymbals | investigate only demonstrated level problems | stereo image, cymbal decay, no unnecessary pumping | next independent unblocked gate if KEYS/PLAYBACK source access remains unavailable |
 
 ## Implemented source-bound boundaries
 Belye Stai bass, Kick In/Out, Snare Top/Bottom, TOM_1/TOM_2/FLOOR and GTR now have exact no-change processor boundaries around their original compressor locations. Replacement candidates are inserted at the original compressor stage, never stacked after the already processed source. Source-bound downstream gains and other frozen controls cannot be silently re-estimated. Full-session rerender is mandatory for a surviving local candidate.
 
 Frozen arithmetic helpers are reused only to preserve the exact delivered DSP arithmetic. This is implementation reuse, not configuration transfer between musical roles. A future common frozen-DSP extraction must prove all affected adapters' no-change invariance before moving code.
 
-## Validation pattern established by bass/drums/guitar
-1. Reproduce the delivered local processor sample-for-sample.
+## Validation pattern established by bass/drums/guitar and extended to keys/playback
+1. Reproduce the delivered local processor sample-for-sample when a source-bound adapter exists.
 2. Detect source events or active windows once from a fixed pre-compression reference and reuse identical evidence definitions for baseline and candidates.
 3. First prove that the baseline has a role-specific actionable problem. If not, stop at `no_change`.
 4. Change only predeclared compressor dimensions; do not weaken thresholds after seeing results.
-5. Reject local candidates that fail the role-specific target or protected transient/bleed/decay/macro-dynamics metrics.
+5. Reject local candidates that fail the role-specific target or protected transient/bleed/decay/macro-dynamics/stereo metrics.
 6. Rerender any survivor through the complete routed session with the accepted vocal frozen at its approved local insert.
 7. Apply Perceptual Critic only as a protected-regression layer unless a role-specific perceptual target has actually been calibrated.
 8. Export level-matched A/B for human listening. Code/CI success never constitutes musical acceptance.
+
+For KEYS/PLAYBACK, large PLAYBACK section changes are specifically not treated as proof that a compressor is needed: the gate can return `review_section_level_ride_not_compression`. Stereo side/mid and L/R correlation are protected alongside transient and macro-dynamics evidence.
 
 Diagnostic event metrics are not note transcription or a music-quality score. Safe GR and reduced dynamic spread alone cannot select a winner. The guitar gate additionally demonstrates that *not changing* an already self-limited source is a successful autonomous decision.
 
