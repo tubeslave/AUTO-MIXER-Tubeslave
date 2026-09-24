@@ -1,8 +1,11 @@
 {
   "goal": "studio-belye-stai-session-renderer-v1",
-  "status": "validation_pending_ci",
+  "status": "accepted_machine_validation",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "0bb9d2b5bc4693715c744ecfa307b34e3fdf2780",
+  "pull_request": 125,
+  "tested_code_commit": "fb0499c2357587a357e0006e83658e112d68a271",
+  "merge_commit": "e74cd95bb6e3e13c7bf2cc0283f3e7ae327f6859",
   "priority_reason": "accepted routed contribution renderer recorded this adapter as the next blocker for real full-premaster compression evaluation",
   "bounded_task": "expose the delivered Belye Stai post-local-track-processing stage as a deterministic SessionRender callback and prove exact no-change reproduction of the stored premaster",
   "scope": "studio/offline only; no raw-track local-processing migration, no new mastering, no live control",
@@ -36,7 +39,26 @@
       "frozen PCM24 export is deterministic"
     ]
   },
-  "ci": "pending",
+  "ci": {
+    "workflow_run": 35956523545,
+    "python_matrix": {
+      "3.10": "success",
+      "3.11": "success",
+      "3.12": "success"
+    },
+    "compile_step": "success on all matrix jobs",
+    "studio_offline_boundary_step": "success on all matrix jobs",
+    "full_tests_step": "success on all matrix jobs",
+    "python_3_11_studio_boundary": "21 passed",
+    "python_3_11_full_suite": "1249 passed, 2 skipped",
+    "non_blocking_warnings": [
+      "Matchering scipy.ndimage.filters deprecation",
+      "Optuna Study.set_metric_names experimental API",
+      "AutomaticMixingPapers has no URL in .gitmodules during checkout cleanup",
+      "GitHub Actions Node 20 deprecation warning"
+    ]
+  },
+  "acceptance": "architecture, deterministic rerender and exact delivered-premaster reproduction accepted; no subjective audio result accepted",
   "review": "self-review only; no independent reviewer claimed",
   "neural_audio_used": false,
   "paid_services_used": false,
@@ -44,5 +66,11 @@
   "mastering_code_changed": false,
   "audio_baseline_promoted": false,
   "human_listening_required": true,
-  "next_goal": "after exact-branch CI, run one real Compression Director v1.1 candidate family at the explicit processed-track insert boundary through Routed Contribution Renderer -> Perceptual Critic -> level-matched human-review A/B"
+  "limitations": [
+    "override boundary is post-local-track-processing / pre-context, so candidate compression here is an insert after the frozen local track chain",
+    "raw-track local EQ/dynamics remain procedural and are not yet reusable session stages",
+    "Pedalboard Reverb is part of the frozen delivery recipe and exact reproduction is tied to the validated environment/version behavior",
+    "machine validation cannot select or promote a subjective musical winner"
+  ],
+  "next_goal": "run one real Compression Director v1.1 candidate family at the explicit processed-track insert boundary through Routed Contribution Renderer -> Perceptual Critic -> level-matched human-review A/B, reject machine-unsafe candidates, and export only surviving audition candidates without baseline promotion"
 }
