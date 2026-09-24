@@ -1,0 +1,61 @@
+{
+  "goal": "grouped-snare-compression-gate-v1",
+  "status": "code_pending_pr_ci_candidate_pending_human_listening",
+  "date": "2026-09-24",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "4d95c46c0406c68fe211c20eaf86f3aaf4e83e73",
+  "bounded_task": "SN_T/SN_B frozen preparation plus in-place compressor replacement and transient/body/ghost/bleed technical gate",
+  "local_validation": {
+    "new_tests_passed": 14,
+    "focused_studio_tests_passed": 49,
+    "full_local_repo_test_status": "not_valid_due_to_incomplete_saved_runtime_and_missing_pythonosc",
+    "full_local_repo_collection_errors": 7,
+    "real_song_duration_s": 207,
+    "sample_rate": 44100,
+    "no_change_sample_equal": true,
+    "no_change_max_error": 0.0,
+    "event_count": 880
+  },
+  "baseline": {
+    "bottom_polarity": -1,
+    "bottom_relative_match_gain_db": -5.812252814757382,
+    "compressor_threshold_dbfs": -37.57189773258226,
+    "ratio": 3.0,
+    "attack_ms": 14.0,
+    "release_ms": 110.0,
+    "knee_db": 5.0,
+    "max_gr_db": 5.0,
+    "body_spread_db": 17.660620825516133,
+    "median_attack_body_db": 6.047913194826233
+  },
+  "candidates": [
+    {"id": "preserve_crack", "attack_ms": 17.5, "release_ms": 93.5, "body_spread_delta_db": 0.1650680788701564, "survives": false},
+    {"id": "tighter_body", "attack_ms": 11.2, "release_ms": 88.0, "body_spread_delta_db": -0.2629936760198959, "attack_body_delta_db": 0.03560358647051132, "quiet_hit_delta_db": 0.06847944502710845, "between_hit_bleed_delta_db": 0.09231837330379022, "survives": true},
+    {"id": "longer_body", "attack_ms": 14.0, "release_ms": 137.5, "body_spread_delta_db": 0.2778309245093453, "survives": false}
+  ],
+  "full_mix_survivor_validation": {
+    "candidate": "tighter_body",
+    "protected_failures": [],
+    "foreground_delta_db": 0.0011442919666673212,
+    "vocal_intelligibility_delta": -0.0000630815458251277,
+    "punch_delta_db": 0.003773161345829834,
+    "harshness_delta": 0.0005862788407107189,
+    "depth_proxy_delta": -0.002717512333847677,
+    "width_delta_db": 0.011022599743686357,
+    "density_delta": 0.0,
+    "climax_lift_delta_db": 0.0
+  },
+  "execution_failures": [
+    "First interactive full-session invocation exceeded tool timeout; no partial result was used.",
+    "Full local repo pytest is not authoritative because the saved runtime snapshot omits some repo packages and pythonosc; exact GitHub PR CI is required."
+  ],
+  "accepted_vocal_changed": false,
+  "kick_candidate_promoted": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "next_goal": "after exact PR CI, keep tighter_body pending human A/B; next engineering target is grouped tom/floor transient-body-decay gate unless human review promotes kick/snare candidates first"
+}
