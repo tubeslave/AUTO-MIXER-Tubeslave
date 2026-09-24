@@ -1,0 +1,67 @@
+{
+  "goal": "guitar-compression-gate-v1",
+  "status": "implementation_and_real_experiment_complete_pending_pr_ci",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "5c81ce65642e55f418518612579e13321683543a",
+  "scope": "Belye Stai source-bound GTR local processor boundary plus no-change-first actionability gate",
+  "real_source": {
+    "resolved_public_path": "/GTR 0002 [2023-03-03 191740].wav",
+    "trim_start_s": 1028,
+    "duration_s": 207,
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "trimmed_wav_sha256": "5b274178a9afaa53a57ca904f23c8ae814be6c58462a7db669c6e5e27426ed2b"
+  },
+  "no_change_reproduction": {
+    "max_abs_error": 0.0,
+    "sample_equal": true,
+    "processed_float_pcm_sha256": "1f163ea07f33ee266bb126f0a1225fe17822f7b6a6835b7509075dad786cc375"
+  },
+  "baseline_compressor": {
+    "threshold_dbfs": -33.54279029228147,
+    "ratio": 2.0,
+    "attack_ms": 25.0,
+    "release_ms": 180.0,
+    "knee_db": 5.0,
+    "max_gr_db": 2.8,
+    "observed_max_gr_db": 2.7893166542053223,
+    "observed_p95_gr_db": 1.5665441751480103,
+    "frozen_final_gain_db": 4.833122565989203
+  },
+  "predeclared_policy": {
+    "actionable_local_spread_db": 2.8,
+    "min_local_spread_improvement_db": 0.1,
+    "max_pick_attack_loss_db": 0.25,
+    "max_macro_dynamics_change_db": 0.2,
+    "min_active_blocks": 12,
+    "min_pick_events": 24
+  },
+  "real_actionability": {
+    "active_block_count": 83,
+    "pick_event_count": 491,
+    "median_local_spread_db": 2.6684991715884046,
+    "macro_spread_db": 3.047319298256827,
+    "median_pick_attack_body_db": 1.4595091237709,
+    "actionable": false,
+    "failure": "no_actionable_local_dynamics_problem"
+  },
+  "director_decision": "no_change",
+  "candidate_count": 0,
+  "full_session_rerender_performed": false,
+  "full_session_rerender_reason": "No local candidate exists; rerendering an identical no-change session would add no evidence beyond the already established exact local boundary.",
+  "human_listening_required_for_subjective_audio_acceptance": true,
+  "local_new_tests_passed": 5,
+  "execution_failures": [
+    "Initial immutable-source workflow used a stale directory prefix and received HTTP 404; public-tree discovery resolved the file at repository root.",
+    "Second source workflow assumed ffmpeg on the hosted image; replaced by stdlib wave exact-frame extraction.",
+    "Independent archived recipe replay hit stale Numba dynamic-module cache metadata; rerun used the archived Python recurrence directly and produced exact 0.0 sample error."
+  ],
+  "thresholds_relaxed_after_results": false,
+  "accepted_vocal_changed": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "audio_baseline_promoted": false,
+  "next_goal": "Keys/playback dynamics actionability gate with stereo-link protection and source-role separation before any compression proposal."
+}
