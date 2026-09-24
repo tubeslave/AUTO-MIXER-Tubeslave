@@ -1,0 +1,184 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-24-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-24T09:00:00+03:00",
+  "actual_start_msk": "2026-09-24T08:59:23+03:00",
+  "completed_msk": "2026-09-24T09:18:00+03:00",
+  "preceding_update_id": "ML-2026-09-23-1800",
+  "preceding_search_update_id": "ML-2026-09-23-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "sources": [
+    {
+      "id": "SRC-ML-20260924-0900-01",
+      "title": "MIDIBack: Harmony-Aware Singing Pitch Correction via Joint Vocal-Accompaniment Symbolic Modeling",
+      "url": "https://arxiv.org/html/2609.28008",
+      "stable_id": "arXiv:2609.28008v1",
+      "publication_date": "2026-09-23",
+      "discovered_date": "2026-09-24",
+      "source_type": "preprint",
+      "reading_depth": "full_text",
+      "sections_read": ["method", "data", "perturbations", "tables", "ablations", "case_study", "conclusion"],
+      "limited_conclusion": "Accompaniment context improves recovery of synthetic global outshift in symbolic note space, but no end-to-end waveform correction or listening preference was evaluated.",
+      "limitations": [
+        "rounded transcription pitch is pseudo-ground truth rather than a verified score",
+        "corruptions are simulated",
+        "split grouping by song, singer, artist, or source dataset is not documented",
+        "audio is transcribed at 22.05 kHz mono and evaluation is symbolic",
+        "no public implementation was verified",
+        "independent replication is absent"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260924-0900-02",
+      "title": "A Multi-Resolution Spectrogram Approach for Estimating the Physical Parameters of a Plate Reverb",
+      "url": "https://arxiv.org/html/2609.28320",
+      "stable_id": "arXiv:2609.28320v1",
+      "publication_date": "2026-09-23",
+      "discovered_date": "2026-09-24",
+      "source_type": "DAFx-26 paper / arXiv",
+      "license": "CC BY 4.0 for the paper",
+      "reading_depth": "full_text",
+      "limited_conclusion": "A phase channel modestly reduces coordinate ambiguity in matched synthetic low-mode plate inversion; this does not establish real-plate robustness or full-band reverb quality.",
+      "limitations": [
+        "synthetic simulator-matched data",
+        "1470 Hz low-mode regime after factor-30 downsampling",
+        "no listening test",
+        "local and official evaluation protocols have different denominators",
+        "no measured plate validation"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260924-0900-03",
+      "title": "The 1st DAFx Challenge: Physical and Modal Parameter Estimation for Plate Reverberation",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_challenge_76.pdf",
+      "stable_id": "DAFx26_challenge_76",
+      "publication_date": "2026",
+      "discovered_date": "2026-09-24",
+      "source_type": "official benchmark report",
+      "reading_depth": "full_text",
+      "limited_conclusion": "The matched synthetic benchmark is useful for controlled inversion but cannot distinguish dense interpolation from a general inverse solver and is not real-world perceptual validation.",
+      "limitations": [
+        "16-IR hidden test",
+        "same generator and parameter ranges available to participants",
+        "no physical plate in the official test",
+        "metric choice changes modal-estimation rankings"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20260924-0900-01",
+      "repository": "https://github.com/LOGUNIVPM/1st-DAFx-Challenge",
+      "revision": "7ff3859a2fae592a3f256649a0880149a98b653a",
+      "reading_depth": "static_readme_and_metadata",
+      "execution_status": "not_run",
+      "status": "research_benchmark / rights_verification_required",
+      "findings": [
+        "NPZ displacement is the scientific input and normalized WAV is for listening",
+        "target ground truth is withheld while a training-data generator is provided",
+        "no root LICENSE file was found at the inspected revision",
+        "paper licensing does not automatically license repository code or data"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260924-0900-01","claim":"Accompaniment context strongly improves recovery of synthetic global outshift in MIDIBack's symbolic note space.","confidence":"medium"},
+    {"id":"KC-ML-20260924-0900-02","claim":"MIDIBack's pseudo-target is rounded source transcription, not a verified score or artistic target.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-03","claim":"A random 80/10/10 split is not evidence of song-, artist-, singer-, or dataset-disjoint evaluation.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-04","claim":"Harmony context trades ambiguity reduction against clean-note preservation in the reported ablation.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-05","claim":"Symbolic metrics after mono transcription do not evaluate waveform identity, artifacts, stereo, peaks, or preference.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-06","claim":"The 1470 Hz plate setup targets isolated modes and cannot support full-band reverb conclusions.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-07","claim":"A phase channel modestly reduces synthetic output-location ambiguity under matched conditions.","confidence":"medium"},
+    {"id":"KC-ML-20260924-0900-08","claim":"The 200-, 5000-, and 16-IR results are separate protocols and must retain their denominators.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-09","claim":"Official rank eight bounds the plate paper to a useful within-method phase ablation rather than a broad state-of-the-art claim.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-10","claim":"Same-generator/same-range benchmark success does not establish physical-plate or OOD identification.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-11","claim":"Peak-normalized WAV invalidates absolute-amplitude physical parameters such as surface density and modal gains.","confidence":"high"},
+    {"id":"KC-ML-20260924-0900-12","claim":"Paper licensing and repository/data licensing are separate; absent artifact licensing blocks reuse.","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {
+      "id":"RULE-ML-20260924-0900-01","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"a vocal note is ambiguous against accompaniment","change":"use harmonic context only as a target-note hypothesis","suggested_range":null,"number_provenance":"no correction range is proposed by the source","protect":["expressive bends","blue notes","vibrato","melodic intent"],"verify":"compare with vocal-only hypothesis and human annotation","cancel":"non-tonal, deliberately dissonant, or misleading accompaniment","confidence":"medium"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-02","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"evaluating a learned pitch-target model","change":"require song/singer/artist/source-disjoint split manifests","suggested_range":null,"number_provenance":"methodological control","protect":["generalization claim"],"verify":"rerun metrics by grouping level","cancel":"grouping cannot be reconstructed","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-03","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"adding accompaniment conditioning","change":"add a clean-note preservation gate","suggested_range":"tolerance set by listening panel, not inferred from the paper","number_provenance":"paper reports 91.3% clean RPA complete vs 94.6% without accompaniment","protect":["already-correct notes","expressive deviations"],"verify":"corruption rate and blind unchanged-note review","cancel":"clean-note edits rise without repeatable preference","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-04","source_ids":["SRC-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"a symbolic pitch model proposes corrections","change":"keep target prediction separate from the waveform correction engine","suggested_range":"bounded by the existing conventional correction baseline","number_provenance":"engineering control; no waveform settings are supplied by the paper","protect":["words","formants","consonants","timing","HF","stereo","peaks"],"verify":"fixed-engine loudness-matched blind A/B","cancel":"artifacts or identity loss outweigh pitch benefit","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-05","source_ids":["SRC-ML-20260924-0900-03"],"status":"candidate","auto_apply":false,"applies_when":"estimating physical plate parameters","change":"retain absolute-amplitude scientific IR and forbid peak normalization","suggested_range":null,"number_provenance":"official challenge input contract","protect":["amplitude calibration","surface density","modal gains"],"verify":"input-contract and round-trip amplitude check","cancel":"only normalized listening WAV exists","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-06","source_ids":["SRC-ML-20260924-0900-02"],"status":"candidate","auto_apply":false,"applies_when":"testing phase-aware inversion","change":"vary only the phase channel","suggested_range":"phase channel off/on","number_provenance":"paper ablation","protect":["timing","polarity","coordinate convention"],"verify":"identical split/model/seeds plus coordinate errors","cancel":"improvement disappears outside matched simulation","confidence":"medium"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-07","source_ids":["SRC-ML-20260924-0900-03"],"status":"candidate","auto_apply":false,"applies_when":"promoting simulator-trained system identification","change":"require noisy, boundary-shifted, parameter-OOD, and preferably measured holdouts","suggested_range":null,"number_provenance":"official report's stated future-test gaps","protect":["robustness","failure visibility"],"verify":"report each holdout separately","cancel":"only matched generator/range data exist","confidence":"high"
+    },
+    {
+      "id":"RULE-ML-20260924-0900-08","source_ids":["ART-ML-20260924-0900-01"],"status":"candidate","auto_apply":false,"applies_when":"reusing a challenge artifact","change":"require explicit code/data licenses, file manifest, hashes, and amplitude semantics","suggested_range":null,"number_provenance":"artifact audit","protect":["legal reuse","reproducibility"],"verify":"static license and manifest audit","cancel":"any required artifact has ambiguous rights or provenance","confidence":"high"
+    }
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20260924-0900-01","status":"not_run","title":"Accompaniment-guided target notes in a fixed correction engine","baseline":"vocal-only target-note predictor feeding one fixed bounded conventional pitch-correction engine","variant":"same predictor and engine with accompaniment tokens available","single_factor":"accompaniment context available to target-note predictor","material":"rights-cleared multitracks with independent human note annotations","controls":["same transcription","same note boundaries","same engine settings","same stems","same seeds","same gain","same render path","same correction limits"],"loudness_matching":"preserve raw safety renders and make separate integrated-loudness-matched blind copies","measurements":["target-note accuracy","clean-note corruption","cents error","onset/timing","formant proxy","consonant/HF residual","sample peak","true peak","mono/stereo residual","blind preference"],"protect":["lyrics","singer identity","expressive intonation","vibrato","consonants","timing","stereo","headroom"],"success":"repeatable gain on ambiguous notes without higher clean-note corruption or protected-quality loss","cancel":"split leakage, target leakage, more clean-note edits, audible artifacts, or non-repeatable preference"
+    },
+    {"id":"EXP-ML-20260924-0900-02","status":"not_run","title":"Pseudo-target versus expert target","single_factor":"rounded transcription target versus independent expert target","loudness_matching":"not applicable until a fixed audio correction engine is added","measurements":["target agreement","context-stratified note error","clean-note corruption"],"cancel":"expert annotations are not independent of evaluated transcription"},
+    {"id":"EXP-ML-20260924-0900-03","status":"not_run","title":"Phase-channel plate inversion","single_factor":"phase channel off/on","controls":["same IR sets","same preprocessing","same model capacity","same seeds","absolute amplitude retained"],"measurements":["coordinate error","physical-parameter error","calibration sensitivity","failure rate","runtime"],"cancel":"only matched synthetic evaluation is available"},
+    {"id":"EXP-ML-20260924-0900-04","status":"not_run","title":"Amplitude-contract null test","single_factor":"absolute NPZ displacement versus peak-normalized WAV","measurements":["surface-density error","modal-gain error","amplitude round-trip"],"cancel":"the scientific input amplitude contract cannot be verified"}
+  ],
+  "video_sources": [
+    {
+      "id":"VID-ML-20260924-0900-01","platform":"youtube","video_id":"RtMs8dyg_5Y","title":"Ultimate Bass Mixing on 7 Different Songs","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=RtMs8dyg_5Y","published_date":"2021-07-05","duration_seconds":3527,"reading_depth":"metadata_only","status":"queued_source","transcript_status":"track_present_content_fetch_blocked","content_claims":[]
+    },
+    {
+      "id":"VID-ML-20260924-0900-02","platform":"youtube","video_id":"0CR-Gnt32jo","title":"Ultimate GUITAR MIXING On 7 Different Songs","channel":"Produce Like A Pro","url":"https://www.youtube.com/watch?v=0CR-Gnt32jo","published_date":"2021-08-16","duration_seconds":2810,"reading_depth":"metadata_only","status":"queued_source","transcript_status":"track_present_content_fetch_blocked","content_claims":[]
+    }
+  ],
+  "queue": {
+    "video_queued_before": 36,
+    "video_queued_after": 38,
+    "videos_studied_total": 0,
+    "priorities": [
+      "MIDIBack split, pseudo-ground-truth, clean-note corruption, and code/demo audit",
+      "plate paper 5000/200/16-IR protocol reconciliation and real/OOD evidence search",
+      "GeoAtt HRTF code and artifact search",
+      "existing SpanSynth, DiffusionRIR, BSRNN, and SRF-SVB null tests",
+      "permitted transcript retrieval for 38 queued videos",
+      "per-file rights-cleared rock multitracks with raw tracks, stems, and final mix"
+    ]
+  },
+  "dedupe": {
+    "keys_checked": ["arXiv:2609.28008v1", "arXiv:2609.28320v1", "DAFx26_challenge_76", "youtube:RtMs8dyg_5Y", "youtube:0CR-Gnt32jo"],
+    "duplicates_removed": 0,
+    "version_families_merged": 0,
+    "notes": [
+      "MIDIBack is distinct from the guide-conditioned SRF-SVB/NSVB family",
+      "the plate paper is one submission to the official challenge and not independent confirmation"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "video_source_cards_added": 2,
+  "source_cards_added": 3,
+  "artifact_cards_added": 1,
+  "knowledge_cards_added": 12,
+  "candidate_rules_added": 8,
+  "experiments_added": 4,
+  "audio_modified": false,
+  "dsp_modified": false,
+  "runtime_modified": false,
+  "repositories_modified_outside_knowledge_base": false,
+  "models_or_checkpoints_run": false,
+  "handoff": "Treat accompaniment-aware pitch prediction as a hypothesis generator, require clean-note preservation and an independent target, keep the correction engine fixed in A/B tests, and preserve absolute amplitude and evaluation denominators in plate inversion."
+}
