@@ -1,9 +1,18 @@
 {
   "goal": "grouped-snare-compression-gate-v1",
-  "status": "code_pending_pr_ci_candidate_pending_human_listening",
+  "status": "accepted_machine_validation_candidate_pending_human_listening",
   "date": "2026-09-24",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "4d95c46c0406c68fe211c20eaf86f3aaf4e83e73",
+  "pull_request": 135,
+  "tested_code_commit": "6e9a9f611f18cafd798a94606aca908812d803b9",
+  "merge_commit": "6165b5b807ffb6aa9701a43e21e0c72adb354916",
+  "ci": {
+    "workflow_run": 35980138984,
+    "workflow_name": "Tests",
+    "conclusion": "success",
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"}
+  },
   "bounded_task": "SN_T/SN_B frozen preparation plus in-place compressor replacement and transient/body/ghost/bleed technical gate",
   "local_validation": {
     "new_tests_passed": 14,
@@ -47,7 +56,7 @@
   },
   "execution_failures": [
     "First interactive full-session invocation exceeded tool timeout; no partial result was used.",
-    "Full local repo pytest is not authoritative because the saved runtime snapshot omits some repo packages and pythonosc; exact GitHub PR CI is required."
+    "Full local repo pytest is not authoritative because the saved runtime snapshot omits some repo packages and pythonosc; exact GitHub PR CI is authoritative and passed."
   ],
   "accepted_vocal_changed": false,
   "kick_candidate_promoted": false,
@@ -57,5 +66,5 @@
   "paid_external_credits_used": false,
   "audio_baseline_promoted": false,
   "human_listening_required": true,
-  "next_goal": "after exact PR CI, keep tighter_body pending human A/B; next engineering target is grouped tom/floor transient-body-decay gate unless human review promotes kick/snare candidates first"
+  "next_goal": "build source-specific TOM_1/TOM_2/FLOOR transient-body-decay gates; exact no-change reproduction is already established locally for all three, then full-session rerender and human A/B for any survivor"
 }
