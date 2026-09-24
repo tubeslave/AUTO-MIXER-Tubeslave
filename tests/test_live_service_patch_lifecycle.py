@@ -1,11 +1,15 @@
 import os
 import sys
+import time
+
+import numpy as np
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
+from live_runtime.capture_bridge import LiveAudioCaptureBridge
 from live_runtime.contracts import ChannelFeatures, LiveMode, MixFeatures, SoundcheckState
 from live_runtime.feature_stream import MainFeatureEvidence
-from live_runtime.main_evidence import PostConsoleMainTap
+from live_runtime.main_evidence import PostConsoleMainTap, PostConsoleMainTapEvidenceProvider
 from live_runtime.patch_startup import MainTapPatchStartupCoordinator
 from live_runtime.patch_verify import (
     MainTapPatchContract,
@@ -49,6 +53,34 @@ class FakeMeterProvider:
     def read(self):
         self.calls += 1
         return self.evidence
+
+
+class FakeCapture:
+    sample_rate = 48_000
+    num_channels = 48
+
+    def __init__(self):
+        self._subscribers = {}
+        self._buffers = {
+            channel: np.zeros(2048, dtype=np.float32)
+            for channel in range(1, self.num_channels + 1)
+        }
+
+    def subscribe(self, name, callback):
+        self._subscribers[name] = callback
+
+    def unsubscribe(self, name):
+        self._subscribers.pop(name, None)
+
+    def get_buffer(self, channel, num_samples=0):
+        data = self._buffers[channel]
+        return data[-num_samples:].copy() if num_samples > 0 else data.copy()
+
+    def emit(self, block):
+        for channel in range(1, self.num_channels + 1):
+            self._buffers[channel] = np.asarray(block[:, channel - 1], dtype=np.float32).copy()
+        for callback in list(self._subscribers.values()):
+            callback()
 
 
 class ConnectedWingEngine:
@@ -146,6 +178,15 @@ def _service(client, meter):
     return service
 
 
+def _wait_for(predicate, timeout=1.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.005)
+    return predicate()
+
+
 def test_service_starts_in_discover_and_blocks_feature_loop_before_patch_verify():
     client = FakeWingClient(_routes())
     meter = FakeMeterProvider()
@@ -201,6 +242,50 @@ def test_service_patch_verify_route_failure_advances_to_hold_without_meter_read(
     assert status["patch_verify_reason"].startswith("route_failed:")
     assert meter.calls == 0
     assert all(values == () for _, values in client.sent)
+
+
+def test_capture_bridge_closes_discover_patch_verify_listen_seam():
+    client = FakeWingClient(_routes())
+    meter = FakeMeterProvider(
+        PhysicalMainMeterEvidence(
+            peak_dbfs=-6.02,
+            rms_dbfs=-6.02,
+            timestamp_s=10.02,
+            source="test-main-meter",
+        )
+    )
+    service = _service(client, meter)
+    capture = FakeCapture()
+    bridge = LiveAudioCaptureBridge(
+        capture,
+        service,
+        roles={},
+        snapshot_main_evidence_provider=PostConsoleMainTapEvidenceProvider(47, 48),
+        patch_contract=_contract(),
+        window_frames=2048,
+        analysis_interval_s=0.0,
+        wall_clock=lambda: 10.0,
+    )
+    block = np.zeros((2048, 48), dtype=np.float32)
+    block[:, 46] = 0.5
+    block[:, 47] = 0.5
+
+    bridge.start()
+    try:
+        capture.emit(block)
+        assert _wait_for(lambda: service.get_status()["soundcheck_state"] == "listen")
+        assert meter.calls == 1
+        assert bridge.status().snapshots_processed == 1
+        assert service.get_status()["patch_verify_verified"] is True
+
+        # The proof frame is consumed only by startup. A later coherent frame is
+        # the first one eligible for the normal Director/Critic loop.
+        capture.emit(block)
+        assert _wait_for(lambda: bridge.status().snapshots_processed == 2)
+        assert meter.calls == 1
+        assert service.get_status()["soundcheck_state"] not in {"discover", "patch_verify"}
+    finally:
+        bridge.stop()
 
 
 def test_stop_clears_startup_proof_state():
