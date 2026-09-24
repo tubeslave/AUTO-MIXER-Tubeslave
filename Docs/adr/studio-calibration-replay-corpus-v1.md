@@ -2,58 +2,61 @@
 
 ## Context
 
-Perceptual Human Calibration and Autonomous Iteration annotation already preserve machine decisions separately from later listening preferences. The missing piece is a replayable, append-only corpus of those annotated reports. Exact raw KEYS/PLAYBACK, OH and isolated vocal A/B bytes remain unavailable in the current runtime; this is an independent, audio-free validation task.
+The corpus is an evidence-only record of Perceptual Critic output and later human listening feedback. It must not change production thresholds, waive protected regressions, change Autonomous Iteration routing or promote an audio baseline.
 
-Status: runtime and tests implemented and tested locally, but executable repository write remains blocked. This ADR does not claim runtime integration, repository CI or merge.
+During the September 24 continuation, another implementation, tests and seed were added to the same feature branch while a separate local prototype was being developed. This was detected by a final branch comparison. The remote implementation was then independently read and copied with exact Git-blob verification: module `603e9808dcecf07d5c4dc23904d52068d83606da`, tests `e21ffe0eb0805f67c7cc79c79b487631d2fb219b`, reviewed at commit `2f0d9594e1eeca3e5713bf4a2fc24e559e82cd16`.
+
+Decision: **requires revision; do not merge yet**. The compatible integrity correction is tested locally but not written to GitHub. Earlier assertions that remote runtime code was absent were superseded by this reconciliation.
 
 ## Options considered
 
-1. Recompute or overwrite earlier machine decisions after human feedback: rejected.
-2. Store unverified classification labels in a flat JSON list: insufficient history integrity.
-3. Snapshot supplied annotated iteration reports in canonical, digest-linked JSONL and re-run the existing classifier: selected.
+1. Replace the newly added API with the separate whole-report prototype: rejected for this bounded task because it changes the record contract and would require explicit seed migration.
+2. Accept the remote code based on the old text-only prototype report: rejected; actual tests expose failures.
+3. Preserve the remote API and record representation while correcting append integrity: selected.
 
 ## Decision
 
-Use `build_calibration_record`, `append_calibration_report` and `replay_calibration_corpus` in the proposed `audio_workbench/mixing/calibration_corpus.py`. The existing classifier remains unchanged. A record binds the entire supplied report snapshot, its canonical SHA-256, stable source report ID, optional provenance references, previous record digest and full replay output. Caller-owned mutable values are detached.
+Keep the existing `build_calibration_record`, `append_calibration_record`, `load_calibration_corpus`, `replay_calibration_record` and `replay_calibration_corpus` API. Preserve canonical record identity for native JSON evidence and all evidence-only flags.
 
-The corpus is evidence-only. It cannot update production thresholds, waive protected regressions, change iteration transitions or delivery routing, or promote an audio baseline. Subjective acceptance still requires human listening.
-
-The expected annotation is reconstructed from the existing classifier and exact annotation-only flags. Unknown fields, changed flags, classifier drift or result drift fail closed. Every original critic failure and protected regression stays in the snapshot and replay result.
+The local compatible correction deep-copies JSON evidence before hashing, rejects a missing final newline before writing, serializes cooperating writers with an exclusive sidecar lock, validates the complete future chain before committing, and uses an fsynced same-directory temporary file with atomic replacement. Every previous corpus byte is preserved. Failed fsync/replace operations leave the old corpus intact and clean up this writer's temporary files. Stale locks are never automatically removed.
 
 ## Why this won
 
-One complete snapshot avoids silently losing audit fields as reports evolve. Canonical JSONL and record digests detect corruption; a required expected-head checkpoint on append prevents stale writers. The optional externally trusted head on read also detects suffix truncation. Duplicate source IDs and identical report snapshots under another ID are rejected.
+Three integrity defects were reproduced against the exact remote source:
+- without the final newline, append concatenates JSON objects, then raises after corrupting the corpus;
+- shallow copies allow caller list mutation to change a previously digested record;
+- concurrent writers can create two records with the same previous-record pointer.
 
-Canonical here means this schema's UTF-8 JSON with sorted string keys, compact separators and finite native JSON values; it is not a claim of RFC 8785 compliance. The report hash is over canonical report JSON, not the original file formatting. Provenance references are stored, not independently fetched or authenticated.
+An existing canonical-loader test also fails because its regex expects a different error description. The correction makes the parse error explicitly identify invalid canonical JSON; it does not weaken the test.
+
+The compatible patch fixes these defects without changing DSP, mastering, critic thresholds, human feedback, source data or the record format. A fixed native-JSON fixture retains its original digest.
 
 ## Rejected alternatives
 
-No machine-threshold fitting, inferred human feedback, automatic history migration or new production dependency. The legacy prototype seed is not silently imported: it lacks the complete annotated iteration report expected by the runtime. The historical Belye Stai v2 proxy-miss case remains a future source-verified import, not a newly reconstructed render record.
+No automatic baseline promotion, invented listening result, retrospective threshold adjustment or automatic schema migration. The separate local whole-report prototype is not the production candidate for this task. Its 40 passed tests and six synthetic records must not be attributed to the remote implementation.
+
+A hash chain is not a signature or WORM storage. Externally trusted checkpoints, bounded corpus sizes and complete annotated-report ingestion remain separate future improvements; they are not claimed implemented by this compatible correction.
 
 ## Implementation plan
 
-The local implementation validates incoming evidence, obtains an exclusive sidecar writer lock, verifies the complete bounded corpus and its expected head, rejects duplicates, writes a same-directory temporary file, flushes/fsyncs it and atomically replaces the corpus while preserving all prefix bytes. A final prefix comparison catches accidental noncooperating writes before replacement.
+Apply the minimal compatible patch to the reviewed remote module and add `tests/test_studio_calibration_corpus_integrity.py`. Patch SHA-256: `dead6659d3fa3bb54c616ad210eae33751d6b7d3260d1d1df0b6d7aef18143c6`.
 
-This is logical append-only storage, not WORM storage or a digital signature. Without a trusted external checkpoint, a valid shorter prefix or wholly rehashed history cannot be detected. Stale locks after process death require operator inspection, not automatic unlocking. Network filesystems, adversarial writers and power-loss durability of the directory entry are outside the v1 guarantee. Limits are 1 MiB per record and 32 MiB per corpus.
+Use one writer per task/branch. Re-read current source before application if the branch advances. Run actual repository CI on Python 3.10, 3.11 and 3.12 before merge. Do not overwrite concurrent work or import reconstructed historical renders as original evidence.
 
-Next: land the exact local module/tests through an authorized working code-write path, then run actual annotation integration and complete repository CI before merge. Only then import source-verified annotated reports.
+## Test plan and observed evidence
 
-## Test plan and observed validation
+Actual local environment: Python 3.13.5, a checksum-verified sparse corpus/calibration source subset rather than the full repository.
 
-Current actual local command:
+Before correction: **15 passed, 4 failed** (three new integrity regressions and one existing canonical-loader test).
 
-`python -m pytest tests/test_studio_calibration_corpus_v1.py tests/test_studio_perceptual_calibration_v1.py -k 'not existing_annotation_api_integration' -q --tb=short --junitxml=evidence/local-unit-tests.xml`
+After correction: **24 passed, 0 failed**: 9 existing corpus tests, 7 existing Perceptual Human Calibration tests and 8 integrity tests. The latter cover missing newline, input isolation, concurrent append, exact prefix preservation, injected fsync and replace failures, existing-lock preservation and unchanged record digest. Compileall passed. `git apply --check` and applying the patch in a clean sparse copy reproduced the tested bytes exactly.
 
-Observed: **40 passed, 1 deselected** (33 corpus cases and 7 existing calibration cases). The deselected test imports the full repository's `studio_iteration`; the container lacks that runtime. It is written but not claimed passed. Compileall passed. The dependency classifier copied from the supplied evidence archive exactly matches repository Git blob `1800c10eb54471b8b61d224e392e01e5447aff12`.
+Command: `python -m pytest tests -q --tb=short --junitxml=evidence/after-fix.xml`.
 
-Checks cover deterministic records, input isolation, exact-prefix preservation, full replay, duplicate IDs/content, mutation, rehashed annotation drift, malformed/noncanonical JSON, duplicate keys, NaN/infinity, incomplete records, stale checkpoints, truncation, protected conflicts, authority flags including integer/bool substitution, writer contention, concurrent writers, simulated fsync/replace failure, symlinks, record/corpus limits, classifier drift and record reordering.
-
-A separately executed six-record synthetic experiment reproduced all six disagreement outcomes once each, preserving the prefix after every append. Trusted head: `4d9afa0b2cb64f4b3fed9fefcdbb53bb8e7573cba67d441b4c1b1bddab27ffa2`. These are synthetic protocol fixtures, not human listening data or musical acceptance.
-
-Correction of the earlier ADR: the previous claim of eight passed prototype checks is not reproducible from the supplied ZIP, which contains a text result, report and seed but no executable test harness. It is not accepted as validation for this implementation. The actual pytest/JUnit run above supersedes it.
+Full repository tests, target-version CI, audio renders and human listening were not performed for this correction. The earlier eight-passed prototype claim is not reproducible from its supplied ZIP, which contains a text result, report and seed but no test harness; it is not acceptance evidence.
 
 ## Risks and rollback
 
-On validation or pre-replacement I/O failure, preserve prior corpus bytes and remove only this operation's temporary file/lock. The runtime is not in the repository yet: the attempted `create_file` for the Python module returned an OpenAI safety-status determination block, without a commit. No alternate code-write route was attempted. Documentation/state writes succeeded. Direct container Git also failed DNS resolution.
+This run's attempted Python `create_file` was blocked by an OpenAI safety-status determination failure. Documentation and state writes succeeded. No alternate code-write route was attempted. The compatible correction therefore remains a local patch, not a merged feature.
 
-No audio DSP, mastering, LIVE code, existing critic thresholds, accepted vocal settings, neural audio, paid services or audio baseline changed. A successful local test run is not a substitute for repository CI or human listening.
+Atomic replacement assumes a supported local filesystem and cooperating writers. Adversarial writes, network filesystems and directory-entry durability after sudden power loss are outside the guarantee. On validation/pre-commit failure preserve the original corpus. No audio DSP, mastering, LIVE code, neural inference, paid services or audio baseline changed. Subjective audio acceptance still requires human listening.
