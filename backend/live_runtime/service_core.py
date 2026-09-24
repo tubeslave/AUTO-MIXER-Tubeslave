@@ -808,6 +808,17 @@ class LiveSoundcheckService:
             raise first_error
         return True
 
+    def _selected_channel_ids(self) -> list[int]:
+        """Copy the explicit input selection; Main-return slots are not inferred."""
+        request = self._request
+        if request is None:
+            return []
+        if request.selected_channels:
+            return list(request.selected_channels)
+        if request.capture_bridge is not None:
+            return sorted(request.capture_bridge.roles)
+        return []
+
     def get_status(self) -> dict[str, Any]:
         """Return a transport-safe live status without exposing engine ownership."""
         engine = self._engine
@@ -837,6 +848,7 @@ class LiveSoundcheckService:
         if engine is None:
             return {
                 "state": "idle",
+                "selected_channels": [],
                 "mixer_connected": False,
                 "audio_running": False,
                 "control_plane_ready": False,
@@ -856,6 +868,7 @@ class LiveSoundcheckService:
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
         status = dict(raw or {})
+        status["selected_channels"] = self._selected_channel_ids()
         mode = self.active_mode
         if mode is not None:
             status["mode"] = mode.value

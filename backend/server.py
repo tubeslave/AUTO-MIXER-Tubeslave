@@ -45,7 +45,7 @@ from audio_capture import (
     detect_audio_device, find_device_by_name, list_audio_devices, HAS_SOUNDDEVICE,
 )
 from feedback_detector import FeedbackDetector
-from auto_soundcheck_engine import AutoSoundcheckEngine
+from live_runtime.service import LiveSoundcheckService
 from observation_mixer import ObservationMixerClient
 from mixer_discovery import discover_mixers, discover_mixer_auto, DiscoveredMixer
 from handlers import register_all_handlers
@@ -188,8 +188,8 @@ class AutoMixerServer:
         # Feedback detector
         self.feedback_detector: Optional[FeedbackDetector] = None
         
-        # Auto soundcheck engine (headless auto-mixing)
-        self.auto_soundcheck_engine: Optional[AutoSoundcheckEngine] = None
+        # Soundcheck lifecycle belongs to live_runtime, not a server-owned engine.
+        self._live_soundcheck_service: Optional[LiveSoundcheckService] = None
 
         # AI Mixing Agent (rules + optional LLM, suggest-first by default)
         self.mixing_agent = None
@@ -376,6 +376,18 @@ class AutoMixerServer:
                 logger.error(f"Error stopping Auto Compressor: {e}")
             self.auto_compressor_controller = None
         
+        # Stop the live service before unrelated server-owned audio/mixer handles.
+        # Keep the service reference for status/audit, even if teardown fails.
+        service = getattr(self, "_live_soundcheck_service", None)
+        if service is not None:
+            self._safe_cleanup_call(
+                service.stop,
+                "Error stopping live soundcheck service",
+                "Live soundcheck service stopped",
+            )
+            self.auto_soundcheck_running = False
+            self.auto_soundcheck_observe_only = False
+
         # Stop audio capture
         if self.audio_capture:
             try:
@@ -385,16 +397,6 @@ class AutoMixerServer:
                 logger.error(f"Error stopping audio capture: {e}")
             self.audio_capture = None
         
-        # Stop auto soundcheck engine
-        if self.auto_soundcheck_engine:
-            try:
-                self.auto_soundcheck_engine.stop()
-                logger.info("Auto soundcheck engine stopped")
-            except Exception as e:
-                logger.error(f"Error stopping auto soundcheck engine: {e}")
-            self.auto_soundcheck_engine = None
-            self.auto_soundcheck_running = False
-            self.auto_soundcheck_observe_only = False
 
         # Stop AI mixing agent
         if self.mixing_agent:
@@ -991,10 +993,9 @@ class AutoMixerServer:
                     selected.append(channel)
             return sorted(set(selected))
 
-        if self.auto_soundcheck_engine:
-            selected = self.auto_soundcheck_engine.get_status().get("selected_channels", [])
-            if selected:
-                return [int(ch) for ch in selected]
+        selected = self._sync_runtime_from_live_soundcheck().get("selected_channels", [])
+        if selected:
+            return [int(ch) for ch in selected]
 
         if self.audio_capture and getattr(self.audio_capture, "running", False):
             return list(range(1, min(self.audio_capture.num_channels, 48) + 1))
@@ -1041,7 +1042,7 @@ class AutoMixerServer:
 
     def collect_agent_channel_states(self, channels=None) -> Dict[int, dict]:
         """Collect current channel observations for the AI MixingAgent."""
-        self._sync_runtime_from_auto_soundcheck()
+        live_status = self._sync_runtime_from_live_soundcheck()
         selected_channels = self._selected_agent_channels(channels)
         names: Dict[int, str] = {}
 
@@ -1060,12 +1061,8 @@ class AutoMixerServer:
         except Exception as e:
             logger.debug("Agent channel recognition failed: %s", e)
 
-        engine_channels = {}
-        if self.auto_soundcheck_engine:
-            try:
-                engine_channels = self.auto_soundcheck_engine.get_status().get("channels", {})
-            except Exception:
-                engine_channels = {}
+        # Compatibility observations only; no mixer/audio handles leave the service.
+        engine_channels = live_status.get("channels", {}) or {}
 
         states: Dict[int, dict] = {}
         for ch in selected_channels:
@@ -1096,7 +1093,7 @@ class AutoMixerServer:
         """Feed one channel update from the soundcheck engine into the AI agent."""
         if not self.mixing_agent:
             return
-        self._sync_runtime_from_auto_soundcheck()
+        self._sync_runtime_from_live_soundcheck()
         self.mixing_agent.mixer = self.mixer_client
         state = self._agent_channel_state(
             int(channel),
@@ -1119,7 +1116,7 @@ class AutoMixerServer:
         from ai.llm_client import LLMClient
         from ai.rule_engine import RuleEngine
 
-        self._sync_runtime_from_auto_soundcheck()
+        self._sync_runtime_from_live_soundcheck()
         self._agent_force_auto_apply = bool(force_auto_apply)
         mode, allow_auto_apply = self._apply_llm_dry_run_overrides(
             mode=mode,
@@ -1187,22 +1184,18 @@ class AutoMixerServer:
 
         return self.mixing_agent
 
-    def _sync_runtime_from_auto_soundcheck(self):
-        """Expose the active AutoSoundcheckEngine runtime to server-level modules."""
-        engine = getattr(self, "auto_soundcheck_engine", None)
-        if not engine:
-            return
-
-        engine_mixer = getattr(engine, "mixer_client", None)
-        if engine_mixer is not None:
-            self.mixer_client = engine_mixer
-            self.connection_mode = getattr(engine, "mixer_type", None) or self.connection_mode
-            if self.mixing_agent is not None:
-                self.mixing_agent.mixer = engine_mixer
-
-        engine_audio = getattr(engine, "audio_capture", None)
-        if engine_audio is not None:
-            self.audio_capture = engine_audio
+    def _sync_runtime_from_live_soundcheck(self) -> Dict[str, Any]:
+        """Refresh display status only; never export live hardware ownership."""
+        service = getattr(self, "_live_soundcheck_service", None)
+        if service is None:
+            return {}
+        status = service.get_status()
+        self.auto_soundcheck_running = bool(service.is_active())
+        self.auto_soundcheck_observe_only = (
+            self.auto_soundcheck_running
+            and status.get("mode") in {"observe", "propose", "freeze"}
+        )
+        return status
 
     async def stop_mixing_agent(self):
         """Stop the AI MixingAgent loop while preserving its last status/history."""

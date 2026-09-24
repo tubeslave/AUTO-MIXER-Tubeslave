@@ -348,6 +348,7 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
         if engine is None:
             return {
                 "state": "idle",
+                "selected_channels": [],
                 "mixer_connected": False,
                 "audio_running": False,
                 "control_plane_ready": False,
@@ -369,6 +370,7 @@ class LiveSoundcheckService(_CoreLiveSoundcheckService):
 
         raw = engine.get_status() if hasattr(engine, "get_status") else {}
         status = dict(raw or {})
+        status["selected_channels"] = self._selected_channel_ids()
         mode = self.active_mode
         if mode is not None:
             status["mode"] = mode.value

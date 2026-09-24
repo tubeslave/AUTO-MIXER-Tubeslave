@@ -1,7 +1,7 @@
 """Live soundcheck message handlers.
 
 The websocket/UI layer does not construct, start, stop or inspect the legacy
-AutoSoundcheckEngine directly. Engine lifecycle is routed through
+soundcheck engine directly. Engine lifecycle is routed through
 ``live_runtime`` so the old engine can be decomposed without leaving parallel
 decision authorities in the composition root.
 """
@@ -213,7 +213,7 @@ def register_handlers(server):
             capture_bridge=capture_bridge,
         )
         try:
-            engine = service.start(
+            service.start(
                 request,
                 on_state_change=on_state,
                 on_channel_update=on_channel,
@@ -229,9 +229,6 @@ def register_handlers(server):
             })
             return
 
-        # Temporary compatibility alias for legacy server cleanup/sync code.
-        # New live handlers never use this alias for lifecycle decisions.
-        server.auto_soundcheck_engine = engine
         server.auto_soundcheck_running = True
         server.auto_soundcheck_observe_only = observe_only
 
@@ -251,7 +248,6 @@ def register_handlers(server):
 
     async def _stop_engine(websocket, *, soundcheck_events: bool):
         _service().stop()
-        server.auto_soundcheck_engine = None
         server.auto_soundcheck_running = False
         server.auto_soundcheck_observe_only = False
         await server.send_to_client(websocket, {

@@ -131,3 +131,20 @@ def test_compat_adapter_is_the_only_allowlisted_legacy_decision_import_holder():
     runtime_root = BACKEND_ROOT / "live_runtime"
     adapter = runtime_root / "legacy_soundcheck_adapter.py"
     assert _legacy_imports_in_source(adapter) == {"auto_soundcheck_engine"}
+
+
+def test_server_and_soundcheck_handler_cannot_reintroduce_engine_ownership():
+    forbidden = {"auto_soundcheck_engine", "AutoSoundcheckEngine", "active_engine", "_sync_runtime_from_auto_soundcheck"}
+    for relative in ("server.py", "handlers/soundcheck_handlers.py"):
+        path = BACKEND_ROOT / relative
+        assert "auto_soundcheck_engine" not in _legacy_imports_in_source(path)
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        found = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Name) and node.id in forbidden:
+                found.add(node.id)
+            elif isinstance(node, ast.Attribute) and node.attr in forbidden:
+                found.add(node.attr)
+            elif isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value in forbidden:
+                found.add(node.value)
+        assert not found, f"{relative}: forbidden live engine references {sorted(found)}"

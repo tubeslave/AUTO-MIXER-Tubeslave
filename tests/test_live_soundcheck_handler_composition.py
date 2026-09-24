@@ -59,7 +59,6 @@ class DummyServer:
         self._live_soundcheck_service = FakeLiveService()
         self.auto_soundcheck_running = False
         self.auto_soundcheck_observe_only = False
-        self.auto_soundcheck_engine = None
         self.sent = []
         self.send_to_client = AsyncMock(side_effect=self._send)
         self.broadcast = AsyncMock()
