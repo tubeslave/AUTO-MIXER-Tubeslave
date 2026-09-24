@@ -1,0 +1,19 @@
+{
+  "goal": "studio-compression-director-v1",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "6415aeffd337efef89610129f022c9cd6b7d8821",
+  "priority_reason": "next explicit blocker from accepted compression-v2 state: source-aware attack/release/threshold proposals and level-match/headroom resolution",
+  "scope": "opt-in offline Compression Director candidate generation and fair A/B gain planning",
+  "default_audio_path_changed": false,
+  "live_code_changed": false,
+  "backend_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "local_prototype_tests": {"passed": 12, "note": "quality-loop integration test is CI-only in the local minimal package"},
+  "prototype_revision": "naive waveform-scale event counting rejected; macro envelope smoothing/minimum spacing adopted after real Belye Stai inspection",
+  "human_listening_required": true,
+  "next_gate": "full exact-branch CI plus real-source compressor-only candidate renders and matched audition evidence"
+}
