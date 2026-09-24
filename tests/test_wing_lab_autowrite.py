@@ -26,6 +26,25 @@ class FakeWingTransport:
             "/ch/3/gate/f": 6500.0,
         }
         self.sends: list[tuple[str, object]] = []
+        self.boundary = None
+        self.token = None
+
+    def install_mutation_boundary(self, boundary):
+        assert self.boundary is None
+        self.boundary, self.token = boundary, object()
+        return self.token
+
+    def mutation_boundary_matches(self, token):
+        return self.boundary is not None and self.token is token
+
+    def remove_mutation_boundary(self, token):
+        if not self.mutation_boundary_matches(token):
+            return False
+        self.boundary = None
+        return True
+
+    def flush_pending_writes(self, timeout=2.0):
+        return True
 
     def connect(self, timeout: float = 5.0) -> bool:
         self.is_connected = True
@@ -38,6 +57,8 @@ class FakeWingTransport:
     def send(self, address: str, *values) -> bool:
         assert self.is_connected
         if values:
+            if self.boundary is None or not self.boundary(address, values):
+                return False
             self.sends.append((address, values[0]))
             if address != self.mismatch_address:
                 self.values[address] = values[0]

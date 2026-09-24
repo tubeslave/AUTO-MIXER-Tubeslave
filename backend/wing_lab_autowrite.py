@@ -10,12 +10,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import fcntl
+from functools import wraps
 import hashlib
 import ipaddress
 import json
 import math
 import os
 from pathlib import Path
+import threading
 import time
 from typing import Any, Callable, Mapping, Protocol
 import uuid
@@ -53,6 +55,13 @@ class WingLabTransport(Protocol):
     def disconnect(self) -> bool: ...
     def send(self, address: str, *values: Any) -> bool: ...
     def query_parameter(self, address: str, timeout: float = 0.5) -> Mapping[str, Any]: ...
+
+    def install_mutation_boundary(
+        self, boundary: Callable[[str, tuple[Any, ...]], bool]
+    ) -> object: ...
+    def remove_mutation_boundary(self, token: object) -> bool: ...
+    def mutation_boundary_matches(self, token: object) -> bool: ...
+    def flush_pending_writes(self, timeout: float = 2.0) -> bool: ...
 
 
 TransportFactory = Callable[[str, int], WingLabTransport]
@@ -304,6 +313,20 @@ def _matches(actual: Any, expected: Any, tolerance: float) -> bool:
     return actual == expected
 
 
+def _serialized(method):
+    @wraps(method)
+    def locked(self, *args, **kwargs):
+        with self._session_lock:
+            if self._active_call_thread == threading.get_ident():
+                raise RuntimeError("wing_lab_reentrant_session_call")
+            self._active_call_thread = threading.get_ident()
+            try:
+                return method(self, *args, **kwargs)
+            finally:
+                self._active_call_thread = None
+    return locked
+
+
 class WingLabAutowriteSession:
     def __init__(
         self,
@@ -329,6 +352,11 @@ class WingLabAutowriteSession:
         self._previous_hash = "sha256:" + "0" * 64
         self._wal_path: Path | None = None
         self._emergency_stopped = False
+        self._session_lock = threading.RLock()
+        self._active_call_thread: int | None = None
+        self._boundary_token: object | None = None
+        self._grant: tuple[str, Any, bool] | None = None
+        self._peer: tuple[str, int] | None = None
 
     def status(self) -> dict[str, Any]:
         return {
@@ -363,7 +391,12 @@ class WingLabAutowriteSession:
         encoded = _canonical_bytes(event) + b"\n"
         descriptor = os.open(self._wal_path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
         try:
-            os.write(descriptor, encoded)
+            remaining = memoryview(encoded)
+            while remaining:
+                written = os.write(descriptor, remaining)
+                if written <= 0:
+                    raise OSError("wing_lab_wal_short_write")
+                remaining = remaining[written:]
             os.fsync(descriptor)
         finally:
             os.close(descriptor)
@@ -384,12 +417,53 @@ class WingLabAutowriteSession:
             isinstance(receipt, Mapping)
             and receipt.get("status") == "received"
             and receipt.get("confirmed_round_trips") == 2
-            and receipt.get("peer_ip")
-            and isinstance(receipt.get("peer_port"), int)
+            and (receipt.get("peer_ip"), receipt.get("peer_port")) == self._peer
         ):
             raise RuntimeError(f"wing_lab_fresh_readback_failed:{address}")
         return receipt.get("value")
 
+    def _allows_write(self, address: str, values: tuple[Any, ...]) -> bool:
+        # Called under transport locks, including by the flusher: never acquire
+        # the session lock or perform I/O here.
+        grant = self._grant
+        if grant is None or self._session_id is None or len(values) != 1:
+            return False
+        expected_address, expected_value, restoring = grant
+        return bool(
+            address == expected_address
+            and type(values[0]) is type(expected_value)
+            and values[0] == expected_value
+            and (restoring or (
+                not self._emergency_stopped and self._clock() < self._expires_at
+            ))
+        )
+
+    def _send_owned(self, applied: Mapping[str, Any], *, restoring: bool = False) -> None:
+        transport = self._transport
+        if transport is None or self._boundary_token is None:
+            raise RuntimeError("wing_lab_transport_not_owned")
+        if not transport.mutation_boundary_matches(self._boundary_token):
+            raise RuntimeError("wing_lab_transport_ownership_lost")
+        self._grant = None
+        # Old queued commands must be denied before issuing another capability.
+        if not transport.flush_pending_writes(timeout=2.0):
+            raise RuntimeError("wing_lab_pending_writes_not_drained")
+        if not restoring:
+            self._ensure_active()
+        elif (not any(row is applied for row in self._applied)
+              or applied.get("physically_restored") is True):
+            raise RuntimeError("wing_lab_unowned_rollback")
+        value = applied["preimage"] if restoring else applied["target"]
+        self._grant = (applied["address"], value, restoring)
+        try:
+            if not transport.send(applied["address"], value):
+                raise RuntimeError(f"wing_lab_send_failed:{applied['address']}")
+            if not transport.flush_pending_writes(timeout=2.0):
+                raise RuntimeError("wing_lab_pending_writes_not_drained")
+        finally:
+            self._grant = None
+
+    @_serialized
     def arm(
         self,
         *,
@@ -401,8 +475,9 @@ class WingLabAutowriteSession:
     ) -> dict[str, Any]:
         if not self._enabled:
             raise PermissionError(f"wing_lab_disabled_set_{ENABLE_ENV}_to_1")
-        if self._session_id is not None:
+        if self._session_id is not None or self._transport is not None or self._lock_fd is not None:
             raise RuntimeError("wing_lab_session_already_armed")
+        self._emergency_stopped = False
         if console_model.strip().lower() != "wing rack":
             raise ValueError("wing_lab_console_model_must_be_wing_rack")
         if not isinstance(host, str) or not host.strip() or len(host) > 255:
@@ -435,24 +510,49 @@ class WingLabAutowriteSession:
             self._lock_fd = None
             raise RuntimeError("wing_lab_console_writer_lock_busy") from exc
 
-        transport = self._factory(host.strip(), port)
-        if not transport.connect(timeout=5.0):
-            self._release_lock()
-            raise RuntimeError("wing_lab_wing_connection_failed")
-        handshake_info = str(getattr(transport, "handshake_info", "") or "")
-        normalized_handshake = handshake_info.upper()
-        if "WING" not in normalized_handshake or "RACK" not in normalized_handshake:
-            transport.disconnect()
-            self._release_lock()
-            raise RuntimeError("wing_lab_wing_rack_identity_not_observed")
-        self._transport = transport
+        try:
+            for previous in lab_root.glob("*.jsonl"):
+                try:
+                    rows = [json.loads(line) for line in previous.read_text().splitlines()]
+                    previous_hash = "sha256:" + "0" * 64
+                    for row in rows:
+                        body = {k: v for k, v in row.items() if k != "event_sha256"}
+                        actual_hash = "sha256:" + hashlib.sha256(_canonical_bytes(body)).hexdigest()
+                        if (row.get("previous_event_sha256") != previous_hash
+                                or row.get("event_sha256") != actual_hash):
+                            raise ValueError("invalid_journal_chain")
+                        previous_hash = actual_hash
+                    if (not rows or rows[-1].get("phase") != "teardown_verified"
+                            or rows[-1].get("payload", {}).get("transport_disconnected") is not True):
+                        raise ValueError("journal_not_closed")
+                except (OSError, ValueError, TypeError, AttributeError) as exc:
+                    raise RuntimeError("wing_lab_previous_session_requires_recovery") from exc
+            transport = self._factory(host.strip(), port)
+            # Install before connect. Do not disconnect or revoke a transport
+            # that already belongs to another writer.
+            token = transport.install_mutation_boundary(self._allows_write)
+            self._transport = transport
+            self._boundary_token = token
+            self._peer = (host.strip(), port)
+            if not transport.connect(timeout=5.0):
+                raise RuntimeError("wing_lab_wing_connection_failed")
+            handshake_info = str(getattr(transport, "handshake_info", "") or "")
+            normalized_handshake = handshake_info.upper()
+            if "WING" not in normalized_handshake or "RACK" not in normalized_handshake:
+                raise RuntimeError("wing_lab_wing_rack_identity_not_observed")
+            if self._emergency_stopped:
+                raise RuntimeError("wing_lab_arm_cancelled")
+        except BaseException:
+            self._teardown()
+            raise
+        self._events = []
+        self._previous_hash = "sha256:" + "0" * 64
         self._session_id = f"wing-lab-{uuid.uuid4()}"
         self._expires_at = self._clock() + duration_sec
         self._max_corrections = max_corrections
         self._wal_path = lab_root / f"{self._session_id}.jsonl"
-        self._append_event(
-            "armed",
-            {
+        try:
+            self._append_event("armed", {
                 "host": host.strip(),
                 "port": port,
                 "console_model": "WING Rack",
@@ -460,8 +560,10 @@ class WingLabAutowriteSession:
                 "max_corrections": max_corrections,
                 "one_time_session_arm": True,
                 "per_decision_confirmation_required": False,
-            },
-        )
+            })
+        except BaseException:
+            self._teardown()
+            raise
         return self.status()
 
     def _ensure_active(self) -> None:
@@ -469,12 +571,18 @@ class WingLabAutowriteSession:
             raise RuntimeError("wing_lab_session_not_armed")
         if self._emergency_stopped:
             raise RuntimeError("wing_lab_emergency_stopped")
-        if self._clock() > self._expires_at:
-            self.emergency_stop(reason="session_expired")
+        if self._clock() >= self._expires_at:
+            self._emergency_stopped = True
             raise RuntimeError("wing_lab_session_expired")
 
+    @_serialized
     def apply_decisions(self, decisions: Any) -> dict[str, Any]:
-        self._ensure_active()
+        try:
+            self._ensure_active()
+        except RuntimeError:
+            if self._session_id is not None and self._emergency_stopped:
+                self._finish_stop(reason="inactive_batch", emergency=True)
+            raise
         if not isinstance(decisions, list) or not decisions:
             raise ValueError("wing_lab_decisions_must_be_nonempty_list")
         if len(self._applied) + len(decisions) > self._max_corrections:
@@ -490,6 +598,7 @@ class WingLabAutowriteSession:
         batch_results: list[dict[str, Any]] = []
         try:
             for operation in compiled:
+                self._ensure_active()
                 for address, expected in operation.preconditions:
                     observed = self._fresh_value(address)
                     if observed != expected:
@@ -513,13 +622,6 @@ class WingLabAutowriteSession:
                         "target": operation.value,
                     },
                 )
-                assert self._transport is not None
-                if not self._transport.send(operation.address, operation.value):
-                    raise RuntimeError(f"wing_lab_send_failed:{operation.address}")
-                self._append_event(
-                    "write_attempted",
-                    {"decision_id": operation.decision_id, "address": operation.address},
-                )
                 applied = {
                     "decision_id": operation.decision_id,
                     "family": operation.family,
@@ -531,9 +633,14 @@ class WingLabAutowriteSession:
                     "readback": None,
                     "tolerance": operation.tolerance,
                 }
-                # Once the write boundary is crossed, the preimage must be on
-                # the rollback stack even if verification fails.
+                # A send can deliver and then raise. Register recovery before
+                # granting any write, not after send or post-send WAL succeeds.
                 self._applied.append(applied)
+                self._send_owned(applied)
+                self._append_event(
+                    "write_attempted",
+                    {"decision_id": operation.decision_id, "address": operation.address},
+                )
                 observed = self._fresh_value(operation.address)
                 if not _matches(observed, operation.value, operation.tolerance):
                     raise RuntimeError(
@@ -542,12 +649,16 @@ class WingLabAutowriteSession:
                 applied["readback"] = observed
                 batch_results.append(dict(applied))
                 self._append_event("verified", applied)
-        except Exception as exc:
-            rollback = self._rollback_all(reason="batch_failure")
+                self._ensure_active()
+        except BaseException as exc:
+            self._grant = None
             self._emergency_stopped = True
-            self._append_event("emergency_stopped", {"reason": str(exc), "rollback": rollback})
-            if not rollback["failures"]:
-                self._teardown()
+            rollback = self._rollback_all(reason="batch_failure")
+            try:
+                self._append_event("emergency_stopped", {"reason": str(exc), "rollback": rollback})
+            finally:
+                if not rollback["failures"]:
+                    self._teardown()
             raise
 
         return {
@@ -562,45 +673,86 @@ class WingLabAutowriteSession:
     def _rollback_all(self, *, reason: str) -> dict[str, Any]:
         restored: list[str] = []
         failures: list[str] = []
+        blocked_addresses: set[str] = set()
+        if self._transport is None and self._applied:
+            return {"restored_decision_ids": [], "failures": ["transport_missing"]}
         if self._transport is not None:
-            for applied in reversed(self._applied):
+            for applied in list(reversed(self._applied)):
                 address = applied["address"]
+                if address in blocked_addresses:
+                    failures.append(f"{applied['decision_id']}:newer_restore_pending")
+                    continue
                 try:
-                    if not self._transport.send(address, applied["preimage"]):
-                        raise RuntimeError("send_failed")
-                    observed = self._fresh_value(address)
-                    if not _matches(observed, applied["preimage"], applied["tolerance"]):
-                        raise RuntimeError(f"readback_mismatch:{observed!r}")
-                    restored.append(applied["decision_id"])
+                    if not applied.get("physically_restored"):
+                        current = self._fresh_value(address)
+                        if not _matches(current, applied["preimage"], applied["tolerance"]):
+                            if not _matches(current, applied["target"], applied["tolerance"]):
+                                raise RuntimeError("concurrent_console_change")
+                            try:
+                                self._append_event("rollback_prepared", {**applied, "reason": reason})
+                            except Exception:
+                                # The durable original prepared record owns this
+                                # preimage even if the journal is now unavailable.
+                                pass
+                            self._send_owned(applied, restoring=True)
+                        observed = self._fresh_value(address)
+                        if not _matches(observed, applied["preimage"], applied["tolerance"]):
+                            raise RuntimeError(f"readback_mismatch:{observed!r}")
+                        # Audit retries must not replay intermediate values over
+                        # the original baseline restored by an older operation.
+                        applied["physically_restored"] = True
+                        applied["restored_at_epoch"] = self._clock()
                     self._append_event("rollback_verified", {**applied, "reason": reason})
+                    restored.append(applied["decision_id"])
+                    self._applied.remove(applied)
                 except Exception as exc:
+                    if not applied.get("physically_restored"):
+                        blocked_addresses.add(address)
                     failures.append(f"{applied['decision_id']}:{exc}")
-        if not failures:
-            self._applied.clear()
         return {"restored_decision_ids": restored, "failures": failures}
 
     def stop(self, *, restore: bool = True) -> dict[str, Any]:
-        self._ensure_active()
-        rollback = self._rollback_all(reason="session_stop") if restore else {
-            "restored_decision_ids": [],
-            "failures": [],
-        }
+        self._grant = None
+        self._emergency_stopped = True
+        if self._active_call_thread == threading.get_ident():
+            return {"schema": LAB_SCHEMA, "status": "stop_requested"}
+        return self._stop(restore=restore)
+
+    @_serialized
+    def _stop(self, *, restore: bool) -> dict[str, Any]:
         if not restore and self._applied:
             raise PermissionError("wing_lab_stop_without_restore_forbidden")
-        self._append_event("stopped", {"restore": restore, "rollback": rollback})
-        teardown = self._teardown()
-        return {"schema": LAB_SCHEMA, "status": "stopped", "rollback": rollback, **teardown}
+        return self._finish_stop(reason="session_stop", emergency=False)
 
     def emergency_stop(self, *, reason: str = "operator_emergency_stop") -> dict[str, Any]:
-        if self._session_id is None:
+        # Latch before waiting for the batch lock so the flusher and next
+        # operation immediately lose forward authority.
+        self._emergency_stopped = True
+        self._grant = None
+        if self._active_call_thread == threading.get_ident():
+            return {"schema": LAB_SCHEMA, "status": "stop_requested"}
+        return self._emergency_stop(reason=reason)
+
+    @_serialized
+    def _emergency_stop(self, *, reason: str) -> dict[str, Any]:
+        return self._finish_stop(reason=reason, emergency=True)
+
+    def _finish_stop(self, *, reason: str, emergency: bool) -> dict[str, Any]:
+        if self._session_id is None and self._transport is None:
             return {"schema": LAB_SCHEMA, "status": "already_stopped"}
         rollback = self._rollback_all(reason=reason)
         self._emergency_stopped = True
-        self._append_event("emergency_stopped", {"reason": reason, "rollback": rollback})
-        teardown = self._teardown()
+        phase = "emergency_stopped" if emergency else "stopped"
+        teardown = {}
+        try:
+            if self._wal_path is not None:
+                self._append_event(phase, {"reason": reason, "rollback": rollback})
+        finally:
+            if not rollback["failures"]:
+                teardown = self._teardown()
         return {
             "schema": LAB_SCHEMA,
-            "status": "emergency_stopped",
+            "status": "recovery_required" if rollback["failures"] else phase,
             "rollback": rollback,
             **teardown,
         }
@@ -622,9 +774,19 @@ class WingLabAutowriteSession:
                 self._lock_fd = None
 
     def _teardown(self) -> dict[str, Any]:
+        self._grant = None
         disconnected = True
         if self._transport is not None:
             disconnected = bool(self._transport.disconnect())
+            if not disconnected:
+                raise RuntimeError("wing_lab_disconnect_unverified")
+            if self._boundary_token is not None:
+                if not self._transport.remove_mutation_boundary(self._boundary_token):
+                    raise RuntimeError("wing_lab_boundary_release_unverified")
+                self._boundary_token = None
+        if self._session_id is not None and self._wal_path is not None:
+            self._append_event("teardown_verified", {"transport_disconnected": disconnected})
+        self._boundary_token = None
         self._transport = None
         self._release_lock()
         self._session_id = None
