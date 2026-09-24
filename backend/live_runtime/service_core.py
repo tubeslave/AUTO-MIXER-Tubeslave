@@ -1,10 +1,10 @@
 """Authoritative live soundcheck construction and lifecycle seam.
 
-This module is the only new-live layer allowed to construct the legacy
-``AutoSoundcheckEngine`` while its useful hardware/audio plumbing is migrated
-behind ``live_runtime`` interfaces. Callers depend on this service rather than
-constructing, starting, stopping or inspecting the legacy decision engine
-independently.
+Canonical configured sessions are owned entirely by ``live_runtime``. Frozen
+unconfigured compatibility sessions are constructed through the lazy
+``legacy_soundcheck_adapter``, keeping the legacy decision stack outside the
+canonical import graph while remaining available until runtime references and
+HIL gates are severed.
 
 The compatibility bridge is temporary. It removes parallel decision authority
 from the UI/transport layer without forcing a flag-day rewrite of WING/audio
@@ -102,9 +102,9 @@ class LiveSnapshotResult:
 class LiveSoundcheckService:
     """Authoritative lifecycle, decision-iteration and live-control seam.
 
-    ``AutoSoundcheckEngine`` remains an ADAPT dependency because it still owns
-    useful mixer discovery, connection and readback plumbing. New callers do
-    not own that engine directly: they start/stop/query this service.
+    The legacy soundcheck engine remains a frozen compatibility dependency only
+    for unconfigured sessions. Its construction lives in a lazy adapter; new
+    configured callers do not import or own that decision engine.
 
     WING mutations owned by the new architecture are executed through
     :class:`LiveControlPlane`. One-hypothesis proposal/verification is owned by
@@ -172,22 +172,6 @@ class LiveSoundcheckService:
     def control_audit_events(self) -> list[dict[str, Any]]:
         """Return a copy of new-runtime control decisions for HIL inspection."""
         return [dict(event) for event in self._control_audit]
-
-    @staticmethod
-    def _legacy_flags(mode: LiveMode) -> tuple[bool, bool]:
-        """Map new runtime modes onto the temporary legacy engine flags."""
-        if mode in (LiveMode.OBSERVE, LiveMode.PROPOSE, LiveMode.FREEZE):
-            return True, False
-        return False, True
-
-    def _factory(self) -> Callable[..., Any]:
-        factory = self._engine_factory
-        if factory is None:
-            # Sole compatibility import to delete once discovery/connection moves.
-            from auto_soundcheck_engine import AutoSoundcheckEngine
-
-            factory = AutoSoundcheckEngine
-        return factory
 
     def _record_control_audit(self, payload: dict[str, Any]) -> None:
         event = dict(payload)
@@ -704,23 +688,16 @@ class LiveSoundcheckService:
         on_channel_update=None,
         on_observation=None,
     ) -> Any:
-        """Construct an engine without starting it."""
-        observe_only, auto_apply = self._legacy_flags(request.mode)
-        engine = self._factory()(
-            mixer_type=request.mixer_type,
-            mixer_ip=request.mixer_ip,
-            mixer_port=request.mixer_port,
-            audio_device_name=request.audio_device_name,
-            num_channels=request.num_channels,
-            selected_channels=request.selected_channels,
-            observe_only=observe_only,
-            auto_apply=auto_apply,
+        """Construct the frozen compatibility engine without importing it eagerly."""
+        from .legacy_soundcheck_adapter import create_legacy_soundcheck_engine
+
+        return create_legacy_soundcheck_engine(
+            request,
+            engine_factory=self._engine_factory,
             on_state_change=on_state_change,
             on_channel_update=on_channel_update,
             on_observation=on_observation,
         )
-        setattr(engine, "live_runtime_mode", request.mode.value)
-        return engine
 
     def is_active(self) -> bool:
         engine = self._engine
