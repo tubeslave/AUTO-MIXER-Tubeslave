@@ -46,6 +46,7 @@ jobs:
             tests/test_live_runtime_service.py \
             tests/test_live_runtime_service_iteration.py \
             tests/test_live_service_patch_lifecycle.py \
+            tests/test_live_service_capture_bridge_lifecycle.py \
             tests/test_live_runtime_eq_composition.py \
             tests/test_live_control_plane.py \
             tests/test_live_wing_adapter.py \
