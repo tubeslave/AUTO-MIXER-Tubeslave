@@ -10,7 +10,12 @@ import asyncio
 import logging
 
 from live_runtime.contracts import LiveMode
+from live_runtime.feature_stream import USB_CHANNEL_COUNT
 from live_runtime.service import LiveSoundcheckService, LiveStartRequest
+from live_runtime.session_config import (
+    LiveSessionConfigError,
+    resolve_live_capture_bridge_config,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +130,22 @@ def register_handlers(server):
             })
             return
 
+        try:
+            capture_bridge = resolve_live_capture_bridge_config(
+                server.config,
+                mixer_type=mixer_type,
+                selected_channels=selected_channels,
+            )
+        except LiveSessionConfigError as exc:
+            await server.send_to_client(websocket, {
+                "type": "auto_soundcheck_status" if soundcheck_events else "auto_engine_status",
+                "status": "blocked",
+                "is_running": False,
+                "running": False,
+                "error": f"live capture config: {exc}",
+            })
+            return
+
         observe_only = mode in (LiveMode.OBSERVE, LiveMode.PROPOSE, LiveMode.FREEZE)
         loop = asyncio.get_running_loop()
 
@@ -176,14 +197,20 @@ def register_handlers(server):
             }
             _schedule(loop, server.send_to_client(websocket, payload), "live soundcheck observation send")
 
+        # The canonical WING feature ingress is always 48 channels.  A smaller
+        # UI selection controls which inputs have roles/decision authority; it
+        # must not shrink the underlying AudioCapture transport and accidentally
+        # remove the reserved post-console Main return channels.
+        capture_channels = USB_CHANNEL_COUNT if capture_bridge is not None else num_channels
         request = LiveStartRequest(
             mixer_type=mixer_type,
             mixer_ip=mixer_ip,
             mixer_port=mixer_port,
             audio_device_name=audio_device,
-            num_channels=num_channels,
+            num_channels=capture_channels,
             selected_channels=selected_channels,
             mode=mode,
+            capture_bridge=capture_bridge,
         )
         try:
             engine = service.start(
@@ -218,6 +245,7 @@ def register_handlers(server):
             "mixer_type": mixer_type,
             "mixer_ip": mixer_ip,
             "selected_channels": selected_channels,
+            "capture_bridge_configured": capture_bridge is not None,
             "message": "live_runtime soundcheck service started",
         })
 
