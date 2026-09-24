@@ -50,6 +50,65 @@ class FakeCaptureSession:
         return True
 
 
+class FakeMixerClient:
+    def __init__(self):
+        self.is_connected = True
+        self.disconnect_calls = 0
+        self.sent = []
+        self.subscriptions = []
+
+    def send(self, *args, **kwargs):
+        self.sent.append((args, kwargs))
+
+    def subscribe(self, *args, **kwargs):
+        self.subscriptions.append((args, kwargs))
+
+    def disconnect(self):
+        self.disconnect_calls += 1
+        self.is_connected = False
+
+
+@dataclass(frozen=True)
+class FakeMixerTarget:
+    mixer_type: str = "wing"
+    ip: str = "10.0.0.5"
+    port: int = 2223
+
+
+class FakeMixerSession:
+    instances = []
+    order = None
+
+    def __init__(self, config, *, audit_sink=None):
+        self.config = config
+        self.audit_sink = audit_sink
+        self.client = None
+        self.target = None
+        self.connected = False
+        type(self).instances.append(self)
+
+    def start(self):
+        self.client = FakeMixerClient()
+        self.target = FakeMixerTarget(
+            mixer_type=self.config.mixer_type or "wing",
+            ip=self.config.mixer_ip or "10.0.0.5",
+            port=self.config.mixer_port or 2223,
+        )
+        self.connected = True
+        if type(self).order is not None:
+            type(self).order.append("mixer_start")
+        return self.client
+
+    def stop(self):
+        if not self.connected:
+            return False
+        self.connected = False
+        self.client.disconnect()
+        if type(self).order is not None:
+            type(self).order.append("mixer_stop")
+        return True
+
+
 @dataclass(frozen=True)
 class FakeBridgeStatus:
     running: bool
@@ -94,6 +153,8 @@ class FakeBridge:
 
 class FakeEngine:
     order = None
+    legacy_discover_calls = 0
+    legacy_connect_calls = 0
 
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -103,6 +164,24 @@ class FakeEngine:
         self.stopped = False
         self.mixer_client = None
         self._real_mixer_client = None
+        self.mixer_type = kwargs.get("mixer_type")
+        self.mixer_ip = kwargs.get("mixer_ip")
+        self.mixer_port = kwargs.get("mixer_port")
+
+    def _discover_mixer(self):
+        type(self).legacy_discover_calls += 1
+        if type(self).order is not None:
+            type(self).order.append("legacy_mixer_discover")
+        return True
+
+    def _connect_mixer(self):
+        type(self).legacy_connect_calls += 1
+        if type(self).order is not None:
+            type(self).order.append("legacy_mixer_connect")
+        client = FakeMixerClient()
+        self.mixer_client = client
+        self._real_mixer_client = client
+        return True
 
     def _start_audio(self):
         if type(self).order is not None:
@@ -115,6 +194,8 @@ class FakeEngine:
         self.state = type("State", (), {"value": "starting"})()
         if type(self).order is not None:
             type(self).order.append("engine_start")
+        assert self._discover_mixer()
+        assert self._connect_mixer()
         self._start_audio()
         callback = self.kwargs.get("on_state_change")
         if callback is not None:
@@ -125,6 +206,11 @@ class FakeEngine:
             type(self).order.append("engine_stop")
         if self.audio_capture is not None:
             self.audio_capture.stop()
+        if self.mixer_client is not None:
+            try:
+                self.mixer_client.disconnect()
+            except Exception:
+                pass
         callback = self.kwargs.get("on_state_change")
         if callback is not None:
             callback("stopped", "stopped")
@@ -144,6 +230,8 @@ class FailingEngine(FakeEngine):
         self.started = True
         if type(self).order is not None:
             type(self).order.append("engine_start")
+        assert self._discover_mixer()
+        assert self._connect_mixer()
         self._start_audio()
         raise RuntimeError("engine boom")
 
@@ -185,6 +273,7 @@ def _service(engine_factory=FakeEngine):
         engine_factory=engine_factory,
         capture_bridge_factory=FakeBridge,
         audio_capture_session_factory=FakeCaptureSession,
+        mixer_session_factory=FakeMixerSession,
     )
 
 
@@ -194,12 +283,19 @@ def setup_function():
     FakeBridge.order = None
     FakeCaptureSession.instances = []
     FakeCaptureSession.order = None
+    FakeMixerSession.instances = []
+    FakeMixerSession.order = None
     FakeEngine.order = None
+    FakeEngine.legacy_discover_calls = 0
+    FakeEngine.legacy_connect_calls = 0
     FailingEngine.order = None
+    FailingEngine.legacy_discover_calls = 0
+    FailingEngine.legacy_connect_calls = 0
 
 
-def test_service_owns_physical_capture_before_legacy_engine_and_bridge_uses_it():
+def test_service_owns_physical_mixer_and_capture_before_legacy_engine_then_bridge_uses_capture():
     order = []
+    FakeMixerSession.order = order
     FakeCaptureSession.order = order
     FakeEngine.order = order
     FakeBridge.order = order
@@ -207,7 +303,17 @@ def test_service_owns_physical_capture_before_legacy_engine_and_bridge_uses_it()
 
     engine = service.start(_request())
 
-    assert order == ["audio_start", "engine_start", "bridge_start"]
+    assert order == ["mixer_start", "audio_start", "engine_start", "bridge_start"]
+    assert len(FakeMixerSession.instances) == 1
+    mixer_session = FakeMixerSession.instances[0]
+    assert mixer_session.config.mixer_type == "wing"
+    assert mixer_session.config.mixer_ip == "10.0.0.5"
+    assert mixer_session.config.mixer_port == 2223
+    assert FakeEngine.legacy_discover_calls == 0
+    assert FakeEngine.legacy_connect_calls == 0
+    assert engine.mixer_client is not mixer_session.client
+    assert service._active_wing_transport() is mixer_session.client
+
     assert len(FakeCaptureSession.instances) == 1
     session = FakeCaptureSession.instances[0]
     assert session.config.audio_device_name == "USB"
@@ -219,51 +325,67 @@ def test_service_owns_physical_capture_before_legacy_engine_and_bridge_uses_it()
     assert bridge.capture is session.capture
     assert engine.audio_capture.physical_capture is session.capture
     assert "legacy_audio_start" not in order
-    assert service.get_status()["audio_capture_owned_by_live_runtime"] is True
-    assert service.get_status()["capture_bridge_running"] is True
+    status = service.get_status()
+    assert status["mixer_transport_owned_by_live_runtime"] is True
+    assert status["mixer_connected"] is True
+    assert status["control_plane_ready"] is True
+    assert status["audio_capture_owned_by_live_runtime"] is True
+    assert status["capture_bridge_running"] is True
 
 
-def test_stop_order_keeps_seam_bound_until_legacy_stop_then_closes_physical_capture():
+def test_stop_order_keeps_seams_bound_until_legacy_stop_then_closes_physical_owners_once():
     order = []
+    FakeMixerSession.order = order
     FakeCaptureSession.order = order
     FakeEngine.order = order
     FakeBridge.order = order
     service = _service()
     service.start(_request())
-    session = FakeCaptureSession.instances[0]
+    audio_session = FakeCaptureSession.instances[0]
+    mixer_session = FakeMixerSession.instances[0]
     engine = service.active_engine
+    physical_client = mixer_session.client
     order.clear()
 
     assert service.stop() is True
 
-    assert order == ["bridge_stop", "engine_stop", "audio_stop"]
-    assert session.capture.stop_calls == 1
+    assert order == ["bridge_stop", "engine_stop", "audio_stop", "mixer_stop"]
+    assert audio_session.capture.stop_calls == 1
+    assert physical_client.disconnect_calls == 1
     assert engine.audio_capture is None
+    assert engine.mixer_client is None
+    assert engine._real_mixer_client is None
     assert engine.stopped is True
-    assert service.get_status()["audio_capture_owned_by_live_runtime"] is False
-    assert service.get_status()["capture_bridge_running"] is False
+    status = service.get_status()
+    assert status["audio_capture_owned_by_live_runtime"] is False
+    assert status["mixer_transport_owned_by_live_runtime"] is False
+    assert status["capture_bridge_running"] is False
 
 
-def test_bridge_start_failure_holds_but_does_not_fall_back_to_legacy_audio_owner():
+def test_bridge_start_failure_holds_without_falling_back_to_legacy_hardware_owners():
     FakeBridge.fail_start = True
     service = _service()
 
     engine = service.start(_request())
 
     assert engine.started is True
+    assert len(FakeMixerSession.instances) == 1
     assert len(FakeCaptureSession.instances) == 1
+    assert FakeEngine.legacy_connect_calls == 0
     assert engine.audio_capture.physical_capture is FakeCaptureSession.instances[0].capture
     status = service.get_status()
     assert status["soundcheck_state"] == "hold"
     assert status["capture_bridge_running"] is False
+    assert status["mixer_transport_owned_by_live_runtime"] is True
     assert status["audio_capture_owned_by_live_runtime"] is True
     assert "bridge boom" in status["capture_bridge_error"]
 
     service.stop()
 
 
-def test_legacy_start_failure_releases_owned_capture_after_legacy_cleanup():
+def test_legacy_start_failure_releases_capture_and_mixer_after_legacy_cleanup():
     order = []
+    FakeMixerSession.order = order
     FakeCaptureSession.order = order
     FailingEngine.order = order
     service = _service(FailingEngine)
@@ -271,27 +393,50 @@ def test_legacy_start_failure_releases_owned_capture_after_legacy_cleanup():
     with pytest.raises(RuntimeError, match="engine boom"):
         service.start(_request())
 
-    assert order == ["audio_start", "engine_start", "engine_stop", "audio_stop"]
-    session = FakeCaptureSession.instances[0]
-    assert session.capture.stop_calls == 1
-    assert session.running is False
+    assert order == [
+        "mixer_start",
+        "audio_start",
+        "engine_start",
+        "engine_stop",
+        "audio_stop",
+        "mixer_stop",
+    ]
+    audio_session = FakeCaptureSession.instances[0]
+    mixer_session = FakeMixerSession.instances[0]
+    assert audio_session.capture.stop_calls == 1
+    assert audio_session.running is False
+    assert mixer_session.client.disconnect_calls == 1
+    assert mixer_session.connected is False
     assert service.active_engine is None
-    assert service.get_status()["audio_capture_owned_by_live_runtime"] is False
+    status = service.get_status()
+    assert status["audio_capture_owned_by_live_runtime"] is False
+    assert status["mixer_transport_owned_by_live_runtime"] is False
 
 
-def test_unconfigured_compatibility_session_retains_legacy_audio_owner():
+def test_unconfigured_compatibility_session_retains_legacy_hardware_owners():
     order = []
+    FakeMixerSession.order = order
     FakeCaptureSession.order = order
     FakeEngine.order = order
     service = _service()
 
     engine = service.start(_request(capture_bridge=False))
 
+    assert FakeMixerSession.instances == []
     assert FakeCaptureSession.instances == []
-    assert order == ["engine_start", "legacy_audio_start"]
+    assert order == [
+        "engine_start",
+        "legacy_mixer_discover",
+        "legacy_mixer_connect",
+        "legacy_audio_start",
+    ]
+    assert FakeEngine.legacy_discover_calls == 1
+    assert FakeEngine.legacy_connect_calls == 1
     assert isinstance(engine.audio_capture, FakeCapture)
-    assert service.get_status()["capture_bridge_configured"] is False
-    assert service.get_status()["audio_capture_owned_by_live_runtime"] is False
-    assert service.get_status()["soundcheck_state"] == "discover"
+    status = service.get_status()
+    assert status["capture_bridge_configured"] is False
+    assert status["audio_capture_owned_by_live_runtime"] is False
+    assert status["mixer_transport_owned_by_live_runtime"] is False
+    assert status["soundcheck_state"] == "discover"
 
     service.stop()

@@ -1,238 +1,76 @@
-"""Authoritative live soundcheck construction and lifecycle seam.
+"""Canonical LIVE/SOUNDCHECK service with single-owner hardware lifecycle.
 
-This module is the only new-live layer allowed to construct the legacy
-``AutoSoundcheckEngine`` while its useful hardware/audio plumbing is migrated
-behind ``live_runtime`` interfaces. Callers depend on this service rather than
-constructing, starting, stopping or inspecting the legacy decision engine
-independently.
-
-The compatibility bridge is temporary. It removes parallel decision authority
-from the UI/transport layer without forcing a flag-day rewrite of WING/audio
-capture.
+The existing live decision/startup/audio lifecycle remains in ``service_core``.
+This facade completes the next migration seam by making ``LiveMixerSession``
+the owner of physical mixer discovery/connect/disconnect whenever the explicit
+canonical capture composition is enabled. The frozen legacy engine receives
+only ``LegacyExternalMixerSeam``'s read-only proxy; it cannot create a second
+connection or recover write authority, including in BENCH_TEST.
 """
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-import threading
-from typing import Any, Callable, Mapping
+from dataclasses import asdict
+from typing import Any, Callable
 
-from .audio_capture_session import LiveAudioCaptureConfig, LiveAudioCaptureSession
-from .capture_bridge import LiveAudioCaptureBridge
-from .contracts import (
-    EqBandLocator,
-    LiveMode,
-    MixFeatures,
-    ProposedAction,
-    SoundcheckState,
-    VerifiedAction,
-)
-from .control_plane import LiveControlPlane, RollbackExecution, WriteExecution
-from .decision_engine import LiveHypothesis, propose_one
-from .eq_locator import EqTargetEvidence, RealtimeEqLocatorSelector
-from .feature_stream import MainFeatureEvidence
-from .iteration import IterationCoordinator, IterationPhase, IterationResult
-from .legacy_audio_capture_seam import LegacyExternalAudioCaptureSeam
-from .main_evidence import PostConsoleMainTapEvidenceProvider
-from .patch_startup import MainTapPatchStartupCoordinator, PatchVerifyStartupResult
-from .patch_verify import MainTapPatchContract
-from .wing_adapter import WingWriteAdapter
+from .contracts import SoundcheckState
+from .legacy_mixer_seam import LegacyExternalMixerSeam
+from .mixer_session import LiveMixerConfig, LiveMixerSession
+from .service_core import LiveCaptureBridgeConfig, LiveSnapshotResult, LiveStartRequest
+from .service_core import LiveSoundcheckService as _CoreLiveSoundcheckService
+
+__all__ = [
+    "LiveCaptureBridgeConfig",
+    "LiveSnapshotResult",
+    "LiveStartRequest",
+    "LiveSoundcheckService",
+]
 
 
-@dataclass(frozen=True)
-class LiveCaptureBridgeConfig:
-    """Explicit production composition for the service-owned capture bridge.
+class LiveSoundcheckService(_CoreLiveSoundcheckService):
+    """Authoritative live service owning canonical mixer and audio sessions.
 
-    The patch contract is the single source of truth for reserved post-console
-    Main capture slots. The service derives the snapshot Main provider from
-    that contract, preventing callers from accidentally composing a mismatched
-    provider/route pair. Channel roles remain explicit evidence supplied by
-    the composition root; no legacy classifier or ``auto_*`` policy is reused.
+    Sessions with an explicit ``capture_bridge`` are the migrated production
+    composition and therefore receive single-owner mixer + audio lifecycle.
+    Sessions without it retain the legacy path temporarily for compatibility
+    evidence only; that path is not expanded with new decision features.
     """
-
-    patch_contract: MainTapPatchContract
-    roles: Mapping[int, str]
-    channel_names: Mapping[int, str] | None = None
-    window_frames: int = 2048
-    analysis_interval_s: float = 0.100
-
-    def __post_init__(self) -> None:
-        if not isinstance(self.patch_contract, MainTapPatchContract):
-            raise TypeError("patch_contract must be MainTapPatchContract")
-        if isinstance(self.window_frames, bool) or int(self.window_frames) <= 0:
-            raise ValueError("window_frames must be > 0")
-        if isinstance(self.analysis_interval_s, bool) or float(self.analysis_interval_s) < 0.0:
-            raise ValueError("analysis_interval_s must be >= 0")
-        object.__setattr__(self, "window_frames", int(self.window_frames))
-        object.__setattr__(self, "analysis_interval_s", float(self.analysis_interval_s))
-        object.__setattr__(
-            self,
-            "roles",
-            {int(channel): str(role) for channel, role in dict(self.roles).items()},
-        )
-        object.__setattr__(
-            self,
-            "channel_names",
-            {int(channel): str(name) for channel, name in dict(self.channel_names or {}).items()},
-        )
-
-
-@dataclass(frozen=True)
-class LiveStartRequest:
-    mixer_type: str
-    mixer_ip: str
-    mixer_port: int
-    audio_device_name: str
-    num_channels: int
-    selected_channels: list[int]
-    mode: LiveMode = LiveMode.OBSERVE
-    capture_bridge: LiveCaptureBridgeConfig | None = None
-
-
-@dataclass(frozen=True)
-class LiveSnapshotResult:
-    """One causal realtime snapshot step through the live soundcheck loop."""
-
-    state: SoundcheckState
-    hypothesis: LiveHypothesis | None = None
-    iteration: IterationResult | None = None
-    reason: str | None = None
-
-
-class LiveSoundcheckService:
-    """Authoritative lifecycle, decision-iteration and live-control seam.
-
-    ``AutoSoundcheckEngine`` remains an ADAPT dependency because it still owns
-    useful mixer discovery, connection and readback plumbing. New callers do
-    not own that engine directly: they start/stop/query this service.
-
-    WING mutations owned by the new architecture are executed through
-    :class:`LiveControlPlane`. One-hypothesis proposal/verification is owned by
-    :class:`IterationCoordinator`; the legacy engine never receives decision
-    authority from this service. The autonomous feature loop is additionally
-    gated by the canonical startup state machine: DISCOVER -> PATCH_VERIFY ->
-    LISTEN/HOLD.
-
-    When ``LiveStartRequest.capture_bridge`` is configured, this service owns
-    the physical ``AudioCapture`` through ``LiveAudioCaptureSession``. A
-    temporary non-owning seam lets the frozen legacy engine consume that stream
-    without opening or closing a second device. Teardown is deliberately
-    ordered: feature bridge -> legacy engine -> seam detach -> physical capture.
-    """
-
-    legacy_bridge = True
 
     def __init__(
         self,
-        engine_factory: Callable[..., Any] | None = None,
-        *,
-        audit_sink: Callable[[dict[str, Any]], None] | None = None,
-        iteration_verification_window_s: float = 1.0,
-        patch_startup_factory: Callable[..., MainTapPatchStartupCoordinator] | None = None,
-        capture_bridge_factory: Callable[..., LiveAudioCaptureBridge] | None = None,
-        audio_capture_session_factory: Callable[..., LiveAudioCaptureSession] | None = None,
-        legacy_audio_capture_seam_factory: Callable[..., LegacyExternalAudioCaptureSeam] | None = None,
-    ):
-        if iteration_verification_window_s < 0:
-            raise ValueError("iteration_verification_window_s must be >= 0")
-        self._engine_factory = engine_factory
-        self._patch_startup_factory = patch_startup_factory
-        self._capture_bridge_factory = capture_bridge_factory
-        self._audio_capture_session_factory = audio_capture_session_factory
-        self._legacy_audio_capture_seam_factory = legacy_audio_capture_seam_factory
-        self._engine: Any | None = None
-        self._request: LiveStartRequest | None = None
-        self._control_plane: LiveControlPlane | None = None
-        self._control_adapter: WingWriteAdapter | None = None
-        self._control_transport: Any | None = None
-        self._control_audit: list[dict[str, Any]] = []
-        self._external_audit_sink = audit_sink
-        self._iteration_verification_window_s = float(iteration_verification_window_s)
-        self._iteration: IterationCoordinator | None = None
-        self._iteration_hypothesis: LiveHypothesis | None = None
-        self._soundcheck_state: SoundcheckState | None = None
-        self._last_patch_verify: PatchVerifyStartupResult | None = None
-        self._capture_bridge: LiveAudioCaptureBridge | Any | None = None
-        self._capture_bridge_error: str | None = None
-        self._capture_bridge_lock = threading.RLock()
-        self._audio_capture_session: LiveAudioCaptureSession | Any | None = None
-        self._legacy_audio_capture_seam: LegacyExternalAudioCaptureSeam | Any | None = None
-        self._lifecycle_stopping = False
+        *args: Any,
+        mixer_session_factory: Callable[..., LiveMixerSession] | None = None,
+        legacy_mixer_seam_factory: Callable[..., LegacyExternalMixerSeam] | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self._mixer_session_factory = mixer_session_factory
+        self._legacy_mixer_seam_factory = legacy_mixer_seam_factory
+        self._mixer_session: LiveMixerSession | Any | None = None
+        self._legacy_mixer_seam: LegacyExternalMixerSeam | Any | None = None
 
-    @property
-    def active_engine(self) -> Any | None:
-        """Temporary compatibility view for legacy server cleanup/readback."""
-        return self._engine
-
-    @property
-    def active_mode(self) -> LiveMode | None:
-        return self._request.mode if self._request else None
-
-    @property
-    def control_audit_events(self) -> list[dict[str, Any]]:
-        """Return a copy of new-runtime control decisions for HIL inspection."""
-        return [dict(event) for event in self._control_audit]
-
-    @staticmethod
-    def _legacy_flags(mode: LiveMode) -> tuple[bool, bool]:
-        """Map new runtime modes onto the temporary legacy engine flags."""
-        if mode in (LiveMode.OBSERVE, LiveMode.PROPOSE, LiveMode.FREEZE):
-            return True, False
-        return False, True
-
-    def _factory(self) -> Callable[..., Any]:
-        factory = self._engine_factory
-        if factory is None:
-            # Sole compatibility import to delete once discovery/connection moves.
-            from auto_soundcheck_engine import AutoSoundcheckEngine
-
-            factory = AutoSoundcheckEngine
-        return factory
-
-    def _record_control_audit(self, payload: dict[str, Any]) -> None:
-        event = dict(payload)
-        self._control_audit.append(event)
-        if self._external_audit_sink is not None:
-            self._external_audit_sink(event)
-
-    def _reset_control_plane(self) -> None:
-        self._control_plane = None
-        self._control_adapter = None
-        self._control_transport = None
-
-    def _reset_iteration(self) -> None:
-        self._iteration = None
-        self._iteration_hypothesis = None
-
-    def _reset_startup(self) -> None:
-        self._soundcheck_state = None
-        self._last_patch_verify = None
-
-    def _build_owned_audio_capture(self) -> Any:
+    def _build_owned_mixer(self) -> Any:
         if self._request is None or self._request.capture_bridge is None:
-            raise RuntimeError("Canonical audio capture requires configured capture_bridge")
+            raise RuntimeError("Canonical mixer ownership requires configured capture_bridge")
         if self._engine is None:
-            raise RuntimeError("Legacy connection engine must exist before capture hand-off")
-        if self._audio_capture_session is not None or self._legacy_audio_capture_seam is not None:
-            raise RuntimeError("Canonical audio capture ownership is already established")
+            raise RuntimeError("Legacy compatibility engine must exist before mixer hand-off")
+        if self._mixer_session is not None or self._legacy_mixer_seam is not None:
+            raise RuntimeError("Canonical mixer ownership is already established")
 
-        config = self._request.capture_bridge
-        required_channels = set(config.roles)
-        required_channels.update(config.patch_contract.tap.channels)
-        capture_config = LiveAudioCaptureConfig(
-            audio_device_name=self._request.audio_device_name,
-            num_channels=self._request.num_channels,
-            sample_rate=48_000,
-            required_channel_ids=tuple(sorted(required_channels)),
+        config = LiveMixerConfig(
+            mixer_type=self._request.mixer_type,
+            mixer_ip=self._request.mixer_ip,
+            mixer_port=self._request.mixer_port,
+            auto_discover=True,
         )
-        session_factory = self._audio_capture_session_factory or LiveAudioCaptureSession
-        session = session_factory(capture_config, audit_sink=self._record_control_audit)
-        capture = session.start()
+        session_factory = self._mixer_session_factory or LiveMixerSession
+        session = session_factory(config, audit_sink=self._record_control_audit)
+        client = session.start()
         try:
-            seam_factory = self._legacy_audio_capture_seam_factory or LegacyExternalAudioCaptureSeam
+            seam_factory = self._legacy_mixer_seam_factory or LegacyExternalMixerSeam
             seam = seam_factory(
                 self._engine,
-                capture,
+                session,
                 audit_sink=self._record_control_audit,
             )
             seam.bind()
@@ -240,25 +78,26 @@ class LiveSoundcheckService:
             session.stop()
             raise
 
-        self._audio_capture_session = session
-        self._legacy_audio_capture_seam = seam
+        self._mixer_session = session
+        self._legacy_mixer_seam = seam
+        target = session.target
         self._record_control_audit(
             {
-                "event": "live_service_audio_capture_owned",
-                "channels": self._request.num_channels,
-                "sample_rate": 48_000,
-                "required_channel_ids": list(sorted(required_channels)),
+                "event": "live_service_mixer_owned",
+                "mixer_type": getattr(target, "mixer_type", None),
+                "ip": getattr(target, "ip", None),
+                "port": getattr(target, "port", None),
             }
         )
-        return capture
+        return client
 
-    def _release_owned_audio_capture(self) -> list[BaseException]:
-        """Detach legacy non-owner, then stop the physical stream exactly once."""
+    def _release_owned_mixer(self) -> list[BaseException]:
+        """Detach the legacy non-owner, then disconnect the physical mixer once."""
         errors: list[BaseException] = []
-        seam = self._legacy_audio_capture_seam
-        session = self._audio_capture_session
-        self._legacy_audio_capture_seam = None
-        self._audio_capture_session = None
+        seam = self._legacy_mixer_seam
+        session = self._mixer_session
+        self._legacy_mixer_seam = None
+        self._mixer_session = None
 
         if seam is not None:
             try:
@@ -267,7 +106,7 @@ class LiveSoundcheckService:
                 errors.append(exc)
                 self._record_control_audit(
                     {
-                        "event": "live_service_audio_capture_seam_detach_failed",
+                        "event": "live_service_mixer_seam_detach_failed",
                         "reason": f"{type(exc).__name__}: {exc}",
                     }
                 )
@@ -278,110 +117,16 @@ class LiveSoundcheckService:
                 errors.append(exc)
                 self._record_control_audit(
                     {
-                        "event": "live_service_audio_capture_stop_failed",
+                        "event": "live_service_mixer_stop_failed",
                         "reason": f"{type(exc).__name__}: {exc}",
                     }
                 )
         if not errors and (seam is not None or session is not None):
-            self._record_control_audit({"event": "live_service_audio_capture_released"})
+            self._record_control_audit({"event": "live_service_mixer_released"})
         return errors
 
-    def _build_capture_bridge(self, capture: Any) -> LiveAudioCaptureBridge | Any:
-        if self._request is None or self._request.capture_bridge is None:
-            raise RuntimeError("Live capture bridge is not configured")
-        config = self._request.capture_bridge
-        tap = config.patch_contract.tap
-        main_provider = PostConsoleMainTapEvidenceProvider(
-            tap.left_channel,
-            tap.right_channel,
-        )
-        factory = self._capture_bridge_factory or LiveAudioCaptureBridge
-        return factory(
-            capture,
-            self,
-            roles=config.roles,
-            channel_names=config.channel_names,
-            snapshot_main_evidence_provider=main_provider,
-            patch_contract=config.patch_contract,
-            window_frames=config.window_frames,
-            analysis_interval_s=config.analysis_interval_s,
-        )
-
-    def _try_start_capture_bridge(self) -> bool:
-        """Attach the canonical feature bridge once an AudioCapture exists."""
-        with self._capture_bridge_lock:
-            if self._lifecycle_stopping:
-                return False
-            if self._capture_bridge is not None:
-                return True
-            if self._capture_bridge_error is not None:
-                return False
-            if self._engine is None or self._request is None:
-                return False
-            config = self._request.capture_bridge
-            if config is None:
-                return False
-
-            capture = None
-            if self._audio_capture_session is not None:
-                capture = getattr(self._audio_capture_session, "capture", None)
-            if capture is None:
-                capture = getattr(self._engine, "audio_capture", None)
-            if capture is None:
-                return False
-            physical_capture = getattr(capture, "physical_capture", capture)
-
-            try:
-                bridge = self._build_capture_bridge(physical_capture)
-                bridge.start()
-            except Exception as exc:
-                self._capture_bridge_error = f"{type(exc).__name__}: {exc}"
-                previous = self._soundcheck_state
-                self._soundcheck_state = SoundcheckState.HOLD
-                self._record_control_audit(
-                    {
-                        "event": "live_capture_bridge_start_failed",
-                        "state_before": previous.value if previous is not None else None,
-                        "state_after": SoundcheckState.HOLD.value,
-                        "reason": self._capture_bridge_error,
-                    }
-                )
-                return False
-
-            self._capture_bridge = bridge
-            self._record_control_audit(
-                {
-                    "event": "live_capture_bridge_started",
-                    "reserved_main_channels": list(config.patch_contract.tap.channels),
-                    "role_count": len(config.roles),
-                    "window_frames": config.window_frames,
-                    "analysis_interval_s": config.analysis_interval_s,
-                }
-            )
-            return True
-
-    def _stop_capture_bridge(self) -> bool:
-        with self._capture_bridge_lock:
-            bridge = self._capture_bridge
-            self._capture_bridge = None
-        if bridge is None:
-            return False
-        try:
-            bridge.stop()
-        except Exception as exc:
-            self._capture_bridge_error = f"{type(exc).__name__}: {exc}"
-            self._record_control_audit(
-                {
-                    "event": "live_capture_bridge_stop_failed",
-                    "reason": self._capture_bridge_error,
-                }
-            )
-            return False
-        self._record_control_audit({"event": "live_capture_bridge_stopped"})
-        return True
-
     def _active_wing_transport(self) -> Any:
-        """Return the physical WING client owned by the migration bridge."""
+        """Return the live-runtime-owned physical WING client when migrated."""
         if self._engine is None or self._request is None:
             raise RuntimeError("Live soundcheck is not running")
 
@@ -391,343 +136,19 @@ class LiveSoundcheckService:
                 f"Authoritative live control adapter is not migrated for mixer type {self._request.mixer_type!r}"
             )
 
-        client = getattr(self._engine, "_real_mixer_client", None)
-        if client is None:
-            client = getattr(self._engine, "mixer_client", None)
+        session = self._mixer_session
+        if session is not None:
+            if not bool(getattr(session, "connected", False)):
+                raise RuntimeError("Canonical LiveMixerSession is not connected")
+            client = getattr(session, "client", None)
+        else:
+            return super()._active_wing_transport()
+
         if client is None:
             raise RuntimeError("Physical WING transport is not ready")
         if not hasattr(client, "send") or not hasattr(client, "subscribe"):
             raise TypeError("Active WING transport does not expose send/subscribe")
         return client
-
-    def _active_wing_adapter(self) -> WingWriteAdapter:
-        """Return one shared adapter for read-only evidence and control writes."""
-        client = self._active_wing_transport()
-        if self._control_adapter is None or self._control_transport is not client:
-            if (
-                self._control_transport is not None
-                and self._control_transport is not client
-                and self._iteration is not None
-                and self._iteration.has_active_hypothesis
-            ):
-                raise RuntimeError("Physical WING transport changed during an active live iteration")
-            self._control_transport = client
-            self._control_adapter = WingWriteAdapter(client)
-            self._control_plane = None
-        return self._control_adapter
-
-    def _active_control_plane(self) -> LiveControlPlane:
-        adapter = self._active_wing_adapter()
-        if self._control_plane is None:
-            self._control_plane = LiveControlPlane(
-                adapter,
-                audit_sink=self._record_control_audit,
-            )
-        return self._control_plane
-
-    def _active_iteration_coordinator(self) -> IterationCoordinator:
-        if self._request is None:
-            raise RuntimeError("Live soundcheck is not running")
-        if self._iteration is None:
-            self._iteration = IterationCoordinator(
-                self,
-                verification_window_s=self._iteration_verification_window_s,
-                audit_sink=self._record_control_audit,
-            )
-        return self._iteration
-
-    def _build_patch_startup_coordinator(self) -> MainTapPatchStartupCoordinator:
-        if self._request is None:
-            raise RuntimeError("Live soundcheck is not running")
-        adapter = self._active_wing_adapter()
-        if self._patch_startup_factory is not None:
-            coordinator = self._patch_startup_factory(
-                adapter,
-                self._request.mixer_ip,
-                self._record_control_audit,
-            )
-            if not isinstance(coordinator, MainTapPatchStartupCoordinator):
-                raise TypeError(
-                    "patch_startup_factory must return MainTapPatchStartupCoordinator"
-                )
-            return coordinator
-        return MainTapPatchStartupCoordinator.for_wing(
-            adapter,
-            self._request.mixer_ip,
-            audit_sink=self._record_control_audit,
-        )
-
-    def verify_main_tap_patch(
-        self,
-        contract: MainTapPatchContract,
-        tap_evidence: MainFeatureEvidence,
-    ) -> PatchVerifyStartupResult:
-        """Run the read-only Main PATCH_VERIFY gate for the active WING session."""
-        if self._engine is None or self._request is None:
-            raise RuntimeError("Live soundcheck is not running")
-        if self._soundcheck_state not in (
-            SoundcheckState.DISCOVER,
-            SoundcheckState.PATCH_VERIFY,
-        ):
-            current = self._soundcheck_state.value if self._soundcheck_state else "idle"
-            raise RuntimeError(
-                "Main PATCH_VERIFY may run only from DISCOVER/PATCH_VERIFY; "
-                f"current state is {current}"
-            )
-
-        if self._soundcheck_state is SoundcheckState.DISCOVER:
-            self._soundcheck_state = SoundcheckState.PATCH_VERIFY
-            self._record_control_audit(
-                {
-                    "event": "live_state_transition",
-                    "state_before": SoundcheckState.DISCOVER.value,
-                    "state_after": SoundcheckState.PATCH_VERIFY.value,
-                    "reason": "startup_patch_verify",
-                }
-            )
-
-        coordinator = self._build_patch_startup_coordinator()
-        result = coordinator.run(
-            SoundcheckState.PATCH_VERIFY,
-            contract,
-            tap_evidence,
-        )
-        self._last_patch_verify = result
-        self._soundcheck_state = result.state
-        return result
-
-    def select_eq_locator(
-        self,
-        channel: int,
-        evidence: EqTargetEvidence,
-    ) -> EqBandLocator | None:
-        """Resolve realtime spectral evidence against fresh physical WING bands."""
-        selector = RealtimeEqLocatorSelector(self._active_wing_adapter())
-        locator = selector.select(channel, evidence)
-        self._record_control_audit(
-            {
-                "event": "live_eq_locator_selected" if locator is not None else "live_eq_locator_unresolved",
-                "channel": channel,
-                "evidence": asdict(evidence),
-                "locator": asdict(locator) if locator is not None else None,
-            }
-        )
-        return locator
-
-    def propose_hypothesis(
-        self,
-        features: MixFeatures,
-        roles: dict[int, str],
-        *,
-        masking: dict[tuple[int, int], float] | None = None,
-        eq_evidence: dict[tuple[int, str], EqTargetEvidence] | None = None,
-    ) -> LiveHypothesis | None:
-        """Compose realtime evidence, physical band selection and the Director."""
-        locators: dict[tuple[int, str], EqBandLocator] = {}
-        for key, evidence in (eq_evidence or {}).items():
-            channel, _intent = key
-            locator = self.select_eq_locator(channel, evidence)
-            if locator is not None:
-                locators[key] = locator
-        return propose_one(
-            features,
-            roles,
-            masking=masking,
-            eq_locators=locators,
-        )
-
-    @staticmethod
-    def _snapshot_metrics(
-        features: MixFeatures,
-        hypothesis: LiveHypothesis,
-        verification_metrics: dict[str, Any] | None,
-        *,
-        operator_took_control: bool,
-    ) -> dict[str, Any]:
-        """Build Critic evidence from the actual sequential feature snapshot."""
-        metrics = dict(verification_metrics or {})
-        metrics["main_peak_dbfs"] = float(features.main_peak_dbfs)
-        metrics["operator_touch"] = bool(
-            operator_took_control or metrics.get("operator_touch", False)
-        )
-
-        if hypothesis.verify_metric == "harshness":
-            target = hypothesis.target
-            if target.startswith("ch:"):
-                try:
-                    channel = int(target.split(":", 1)[1])
-                except ValueError:
-                    channel = -1
-                for item in features.channels:
-                    if item.channel == channel and item.harshness is not None:
-                        metrics["harshness"] = float(item.harshness)
-                        break
-        return metrics
-
-    @staticmethod
-    def _state_for_iteration(result: IterationResult) -> SoundcheckState:
-        if result.phase in (IterationPhase.VERIFY_PENDING, IterationPhase.VERIFY_WAIT):
-            return SoundcheckState.VERIFY
-        if result.phase is IterationPhase.HOLD:
-            return SoundcheckState.HOLD
-        if result.phase is IterationPhase.APPLY_BLOCKED:
-            return SoundcheckState.PROPOSE
-        return SoundcheckState.LISTEN
-
-    def process_feature_snapshot(
-        self,
-        features: MixFeatures,
-        roles: dict[int, str],
-        *,
-        masking: dict[tuple[int, int], float] | None = None,
-        eq_evidence: dict[tuple[int, str], EqTargetEvidence] | None = None,
-        verification_metrics: dict[str, Any] | None = None,
-        operator_took_control: bool = False,
-        manual_freeze: bool = False,
-    ) -> LiveSnapshotResult:
-        """Advance the canonical one-hypothesis live loop by one feature frame."""
-        if self._request is None or self._engine is None:
-            raise RuntimeError("Live soundcheck is not running")
-        startup_state = self._soundcheck_state
-        if startup_state not in (
-            SoundcheckState.LISTEN,
-            SoundcheckState.PROPOSE,
-            SoundcheckState.APPLY,
-            SoundcheckState.VERIFY,
-        ):
-            if startup_state is None:
-                raise RuntimeError("Live soundcheck startup state is not initialized")
-            return LiveSnapshotResult(
-                state=startup_state,
-                reason=f"startup_state_blocked:{startup_state.value}",
-            )
-
-        coordinator = self._active_iteration_coordinator()
-        if coordinator.hold_reason is not None:
-            self._soundcheck_state = SoundcheckState.HOLD
-            return LiveSnapshotResult(
-                state=SoundcheckState.HOLD,
-                reason=coordinator.hold_reason,
-            )
-
-        if coordinator.has_active_hypothesis:
-            hypothesis = self._iteration_hypothesis
-            if hypothesis is None:
-                raise RuntimeError("Live iteration hypothesis ownership invariant failed")
-            metrics = self._snapshot_metrics(
-                features,
-                hypothesis,
-                verification_metrics,
-                operator_took_control=operator_took_control,
-            )
-            result = coordinator.verify(metrics, manual_freeze=manual_freeze)
-            state = self._state_for_iteration(result)
-            self._soundcheck_state = state
-            if result.phase not in (IterationPhase.VERIFY_PENDING, IterationPhase.VERIFY_WAIT):
-                self._iteration_hypothesis = None
-            return LiveSnapshotResult(
-                state=state,
-                hypothesis=hypothesis,
-                iteration=result,
-                reason=result.reason,
-            )
-
-        hypothesis = self.propose_hypothesis(
-            features,
-            roles,
-            masking=masking,
-            eq_evidence=eq_evidence,
-        )
-        if hypothesis is None:
-            self._soundcheck_state = SoundcheckState.LISTEN
-            return LiveSnapshotResult(state=SoundcheckState.LISTEN, reason="no_hypothesis")
-
-        metrics = self._snapshot_metrics(
-            features,
-            hypothesis,
-            verification_metrics,
-            operator_took_control=operator_took_control,
-        )
-        result = coordinator.start(
-            hypothesis,
-            metrics,
-            manual_freeze=manual_freeze,
-        )
-        if result.phase is IterationPhase.VERIFY_PENDING:
-            self._iteration_hypothesis = hypothesis
-        else:
-            self._iteration_hypothesis = None
-        state = self._state_for_iteration(result)
-        self._soundcheck_state = state
-        return LiveSnapshotResult(
-            state=state,
-            hypothesis=hypothesis,
-            iteration=result,
-            reason=result.reason,
-        )
-
-    def execute_action(
-        self,
-        action: ProposedAction,
-        *,
-        manual_freeze: bool = False,
-    ) -> WriteExecution:
-        """Execute one new-runtime action through the physical WING boundary."""
-        if self._request is None:
-            raise RuntimeError("Live soundcheck is not running")
-        return self._active_control_plane().execute(
-            action,
-            self._request.mode,
-            manual_freeze=manual_freeze,
-        )
-
-    def rollback_action(
-        self,
-        verified: VerifiedAction,
-        *,
-        manual_freeze: bool = False,
-    ) -> RollbackExecution:
-        """Restore an action through the same physical WING/readback boundary."""
-        if self._request is None:
-            raise RuntimeError("Live soundcheck is not running")
-        return self._active_control_plane().rollback(
-            verified,
-            self._request.mode,
-            manual_freeze=manual_freeze,
-        )
-
-    def create_engine(
-        self,
-        request: LiveStartRequest,
-        *,
-        on_state_change=None,
-        on_channel_update=None,
-        on_observation=None,
-    ) -> Any:
-        """Construct an engine without starting it."""
-        observe_only, auto_apply = self._legacy_flags(request.mode)
-        engine = self._factory()(
-            mixer_type=request.mixer_type,
-            mixer_ip=request.mixer_ip,
-            mixer_port=request.mixer_port,
-            audio_device_name=request.audio_device_name,
-            num_channels=request.num_channels,
-            selected_channels=request.selected_channels,
-            observe_only=observe_only,
-            auto_apply=auto_apply,
-            on_state_change=on_state_change,
-            on_channel_update=on_channel_update,
-            on_observation=on_observation,
-        )
-        setattr(engine, "live_runtime_mode", request.mode.value)
-        return engine
-
-    def is_active(self) -> bool:
-        engine = self._engine
-        if engine is None:
-            return False
-        state = getattr(getattr(engine, "state", None), "value", None)
-        return state not in ("stopped", "error")
 
     def start(
         self,
@@ -737,7 +158,7 @@ class LiveSoundcheckService:
         on_channel_update=None,
         on_observation=None,
     ) -> Any:
-        """Start one live session with single-owner audio when bridge is configured."""
+        """Start one session with canonical mixer+audio ownership when configured."""
         if self.is_active():
             raise RuntimeError("Live soundcheck engine already running")
 
@@ -749,6 +170,8 @@ class LiveSoundcheckService:
         self._capture_bridge_error = None
         self._audio_capture_session = None
         self._legacy_audio_capture_seam = None
+        self._mixer_session = None
+        self._legacy_mixer_seam = None
         self._lifecycle_stopping = False
 
         def lifecycle_state_change(state, message):
@@ -768,6 +191,7 @@ class LiveSoundcheckService:
         legacy_start_attempted = False
         try:
             if request.capture_bridge is not None:
+                self._build_owned_mixer()
                 self._build_owned_audio_capture()
             legacy_start_attempted = True
             engine.start_async()
@@ -787,6 +211,7 @@ class LiveSoundcheckService:
                             }
                         )
                 self._release_owned_audio_capture()
+                self._release_owned_mixer()
             finally:
                 self._engine = None
                 self._request = None
@@ -798,7 +223,7 @@ class LiveSoundcheckService:
         return engine
 
     def stop(self) -> bool:
-        """Stop bridge, legacy non-owner, seam, then the physical capture."""
+        """Stop bridge/legacy consumers before canonical audio and mixer owners."""
         engine = self._engine
         if engine is None:
             return False
@@ -817,9 +242,12 @@ class LiveSoundcheckService:
                         "reason": f"{type(exc).__name__}: {exc}",
                     }
                 )
-            release_errors = self._release_owned_audio_capture()
-            if first_error is None and release_errors:
-                first_error = release_errors[0]
+            for exc in self._release_owned_audio_capture():
+                if first_error is None:
+                    first_error = exc
+            for exc in self._release_owned_mixer():
+                if first_error is None:
+                    first_error = exc
         finally:
             self._engine = None
             self._request = None
@@ -832,8 +260,41 @@ class LiveSoundcheckService:
         return True
 
     def get_status(self) -> dict[str, Any]:
-        """Return a transport-safe live status without exposing engine ownership."""
+        """Expose physical ownership without probing the legacy write-blocking proxy."""
+        session = self._mixer_session
+        if session is None:
+            status = super().get_status()
+            status["mixer_transport_owned_by_live_runtime"] = False
+            return status
+
         engine = self._engine
+        if engine is None:
+            return {
+                "state": "idle",
+                "mixer_connected": False,
+                "audio_running": False,
+                "control_plane_ready": False,
+                "control_audit_count": len(self._control_audit),
+                "iteration_active": False,
+                "iteration_hold_reason": None,
+                "soundcheck_state": "idle",
+                "patch_verify_verified": None,
+                "patch_verify_reason": None,
+                "patch_verify_physical_source": None,
+                "capture_bridge_configured": False,
+                "capture_bridge_running": False,
+                "capture_bridge_error": self._capture_bridge_error,
+                "capture_bridge": None,
+                "audio_capture_owned_by_live_runtime": False,
+                "mixer_transport_owned_by_live_runtime": False,
+            }
+
+        raw = engine.get_status() if hasattr(engine, "get_status") else {}
+        status = dict(raw or {})
+        mode = self.active_mode
+        if mode is not None:
+            status["mode"] = mode.value
+
         iteration_active = bool(self._iteration and self._iteration.has_active_hypothesis)
         iteration_hold_reason = self._iteration.hold_reason if self._iteration else None
         soundcheck_state = (
@@ -857,41 +318,16 @@ class LiveSoundcheckService:
         bridge_configured = bool(self._request and self._request.capture_bridge is not None)
         audio_owned = self._audio_capture_session is not None
 
-        if engine is None:
-            return {
-                "state": "idle",
-                "mixer_connected": False,
-                "audio_running": False,
-                "control_plane_ready": False,
-                "control_audit_count": len(self._control_audit),
-                "iteration_active": False,
-                "iteration_hold_reason": None,
-                "soundcheck_state": "idle",
-                "patch_verify_verified": None,
-                "patch_verify_reason": None,
-                "patch_verify_physical_source": None,
-                "capture_bridge_configured": False,
-                "capture_bridge_running": False,
-                "capture_bridge_error": self._capture_bridge_error,
-                "capture_bridge": None,
-                "audio_capture_owned_by_live_runtime": False,
-            }
-
-        raw = engine.get_status() if hasattr(engine, "get_status") else {}
-        status = dict(raw or {})
-        mode = self.active_mode
-        if mode is not None:
-            status["mode"] = mode.value
-
-        transport = getattr(engine, "_real_mixer_client", None)
-        if transport is None:
-            transport = getattr(engine, "mixer_client", None)
+        connected = bool(getattr(session, "connected", False))
+        client = getattr(session, "client", None)
         mixer_type = str(self._request.mixer_type if self._request else "").strip().lower().replace("-", "_")
+        status["mixer_connected"] = connected
         status["control_plane_ready"] = (
-            mixer_type in {"wing", "wing_rack", "behringer_wing"}
-            and transport is not None
-            and hasattr(transport, "send")
-            and hasattr(transport, "subscribe")
+            connected
+            and mixer_type in {"wing", "wing_rack", "behringer_wing"}
+            and client is not None
+            and hasattr(client, "send")
+            and hasattr(client, "subscribe")
         )
         status["control_audit_count"] = len(self._control_audit)
         status["iteration_active"] = iteration_active
@@ -909,4 +345,5 @@ class LiveSoundcheckService:
         status["capture_bridge_error"] = self._capture_bridge_error
         status["capture_bridge"] = bridge_status
         status["audio_capture_owned_by_live_runtime"] = audio_owned
+        status["mixer_transport_owned_by_live_runtime"] = True
         return status
