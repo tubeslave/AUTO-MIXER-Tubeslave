@@ -1,8 +1,17 @@
 {
   "goal": "guitar-compression-gate-v1",
-  "status": "implementation_and_real_experiment_complete_pending_pr_ci",
+  "status": "accepted_machine_validation_no_change",
   "base_branch": "audio-workbench-mcp-v0.1",
   "base_commit": "5c81ce65642e55f418518612579e13321683543a",
+  "pull_request": 137,
+  "tested_head_commit": "790845ecfa8c8c2d1a6ef1725983453af765bf6f",
+  "merge_commit": "b52118a3329282671cc88236f0a372b61b7862fa",
+  "ci": {
+    "workflow_run": 35991540877,
+    "python_3_10": "success",
+    "python_3_11": "success",
+    "python_3_12": "success"
+  },
   "scope": "Belye Stai source-bound GTR local processor boundary plus no-change-first actionability gate",
   "real_source": {
     "resolved_public_path": "/GTR 0002 [2023-03-03 191740].wav",
@@ -48,7 +57,7 @@
   "director_decision": "no_change",
   "candidate_count": 0,
   "full_session_rerender_performed": false,
-  "full_session_rerender_reason": "No local candidate exists; rerendering an identical no-change session would add no evidence beyond the already established exact local boundary.",
+  "full_session_rerender_reason": "No local candidate exists; rerendering an identical no-change session would add no evidence beyond the exact local boundary and would manufacture an A/B with no signal change.",
   "human_listening_required_for_subjective_audio_acceptance": true,
   "local_new_tests_passed": 5,
   "execution_failures": [
