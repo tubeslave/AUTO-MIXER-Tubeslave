@@ -45,6 +45,7 @@ jobs:
             tests/test_live_decision_engine.py \
             tests/test_live_runtime_service.py \
             tests/test_live_runtime_service_iteration.py \
+            tests/test_live_runtime_import_boundary.py \
             tests/test_live_service_patch_lifecycle.py \
             tests/test_live_service_capture_bridge_lifecycle.py \
             tests/test_live_session_lifecycle.py \
