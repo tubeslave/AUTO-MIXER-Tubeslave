@@ -1,0 +1,27 @@
+{
+  "goal": "belye-stai-local-vocal-processor-adapter-v1",
+  "status": "validation_pending",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "7f3f9d3065fe64d4c9e49f4cc581460b58c657d4",
+  "scope": "raw VALERA_VOX local DSP chain through explicit first-compressor replacement boundary",
+  "real_audio_proof": {
+    "source": "18_VALERA_VOX.wav",
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "precompression_max_abs_error": 0.0,
+    "precompression_pcm_sha256": "0925bca62f2c44b78ac999c1522697228d116681d1dc0390d047dc2c335cfb2f",
+    "processed_max_abs_error": 0.0,
+    "processed_sample_equal": true,
+    "processed_pcm_sha256": "64123ff2668b9f3ebf9ef4657c3af2416a4939abecb5972448caffa994df8d26",
+    "input_unchanged": true
+  },
+  "local_contract_tests": {"passed": 4},
+  "ci": "pending",
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required_for_replacement": true,
+  "next_goal": "generate Compression Director v1.1 candidates from the exact pre-first-compressor signal, replace the original first compressor in place, rerender the full Belye Stai session, then evaluate with Perceptual Critic and Autonomous Iteration"
+}
