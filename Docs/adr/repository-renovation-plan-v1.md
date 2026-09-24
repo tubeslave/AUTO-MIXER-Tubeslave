@@ -173,7 +173,7 @@ R2/R3 are active for the WING control path:
 - `backend/live_runtime/control_plane.py` is the canonical authorization/write/readback/verification boundary;
 - `backend/live_runtime/wing_adapter.py` adapts the existing WING OSC transport and requires fresh inbound readback rather than trusting the optimistic `WingClient.state` cache;
 - `backend/live_runtime/service.py` composes that control plane for an active WING session and owns the control audit trail;
-- the temporary `AutoSoundcheckEngine` remains only as an ADAPT bridge for discovery/audio/mixer connection plumbing while its heuristic policy is retired;
+- canonical configured LIVE/SOUNDCHECK sessions no longer construct `AutoSoundcheckEngine`; the frozen unconfigured compatibility path is isolated behind the lazy `backend/live_runtime/legacy_soundcheck_adapter.py` while remaining server/handler references are severed;
 - channel and Main faders are migrated transport surfaces;
 - relative fader proposals use `fader_delta_db`, are resolved against fresh console state inside `LiveControlPlane`, and cannot exceed their own declared `max_step` even in BENCH_TEST;
 - the new `main_headroom_protection` hypothesis requests a relative `-0.5 dB` move rather than the unsafe ambiguous absolute value `-0.5 dB`.
@@ -239,6 +239,13 @@ Automated replacement evidence covers callback-driven channel/Main fader readbac
 Legacy `MasterFaderMove` references remain in `live_shared_mix.py`, `auto_soundcheck_engine.py` and `autofoh_safety.py`. `backend/server.py` still imports the legacy `AutoEQController`, `AutoFaderController`, `AutoCompressorController` and `AutoSoundcheckEngine`. Those paths remain ARCHIVE/ADAPT candidates, not deletion candidates, until the new runtime owns their required behavior and HIL proves the replacements.
 
 No legacy module is promoted to DELETE_AFTER_PROOF by this pass. The old fader/EQ/evaluation implementations still have runtime/import references and therefore remain ARCHIVE candidates only.
+
+
+R3 legacy-import quarantine is now executable rather than conventional:
+- `service_core.py` no longer names or imports `AutoSoundcheckEngine`; compatibility construction is delegated lazily to `legacy_soundcheck_adapter.py`;
+- a fresh-process import test proves that importing and constructing the canonical service loads neither the compatibility adapter nor forbidden legacy decision modules;
+- an AST source guard scans `backend/live_runtime/*.py` and rejects direct imports of legacy decision roots everywhere except the single compatibility adapter, which is constrained to import only `auto_soundcheck_engine`;
+- configured canonical sessions do not call the adapter, so BENCH_TEST/production mode authority remains in the new control plane rather than reopening heuristic write authority.
 
 See also `Docs/adr/live-channel-eq-cutover-v1.md`, `Docs/adr/live-eq-locator-selector-v1.md`, `Docs/adr/live-eq-evidence-service-composition-v1.md`, `Docs/adr/live-verified-rollback-v1.md`, `Docs/adr/live-one-hypothesis-iteration-v1.md`, `Docs/adr/live-main-evidence-post-console-tap-v1.md`, `Docs/adr/live-main-level-coherence-v1.md` and `Docs/adr/live-native-main-meter-provider-v1.md` for the current WING control migration contracts and HIL gates.
 
