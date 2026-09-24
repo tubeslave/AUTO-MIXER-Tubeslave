@@ -1,12 +1,18 @@
 import threading
 import time
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 
 from backend.live_runtime.capture_bridge import LiveAudioCaptureBridge
+from backend.live_runtime.contracts import SoundcheckState
 from backend.live_runtime.feature_stream import MainFeatureEvidence
-from backend.live_runtime.main_evidence import PostConsoleMainTapEvidenceProvider
+from backend.live_runtime.main_evidence import PostConsoleMainTap, PostConsoleMainTapEvidenceProvider
+from backend.live_runtime.patch_verify import (
+    MainTapPatchContract,
+    MainTapRouteExpectation,
+)
 
 
 class FakeCapture:
@@ -47,12 +53,41 @@ class FakeService:
         return "processed"
 
 
+class FakePatchService(FakeService):
+    def __init__(self):
+        super().__init__()
+        self.state = SoundcheckState.DISCOVER
+        self.patch_calls = []
+        self.patch_called = threading.Event()
+
+    def process_feature_snapshot(self, features, roles, **kwargs):
+        self.calls.append((features, roles, threading.get_ident()))
+        self.called.set()
+        return SimpleNamespace(state=self.state)
+
+    def verify_main_tap_patch(self, contract, tap_evidence):
+        self.patch_calls.append((contract, tap_evidence, threading.get_ident()))
+        self.state = SoundcheckState.LISTEN
+        self.patch_called.set()
+        return SimpleNamespace(state=self.state, verified=True)
+
+
 def _main_at(timestamp_s):
     return MainFeatureEvidence(
         rms_dbfs=-18.0,
         peak_dbfs=-6.0,
         crest_db=12.0,
         timestamp_s=timestamp_s,
+    )
+
+
+def _patch_contract():
+    return MainTapPatchContract(
+        tap=PostConsoleMainTap(left_channel=47, right_channel=48),
+        routes=(
+            MainTapRouteExpectation(usb_slot=47, source_channel=1),
+            MainTapRouteExpectation(usb_slot=48, source_channel=2),
+        ),
     )
 
 
@@ -96,6 +131,17 @@ def test_bridge_requires_exactly_one_authoritative_main_provider():
             roles={},
             main_evidence_provider=_main_at,
             snapshot_main_evidence_provider=tap,
+        )
+
+
+def test_automatic_patch_verify_requires_coherent_snapshot_main_evidence():
+    with pytest.raises(ValueError, match="coherent snapshot Main evidence"):
+        LiveAudioCaptureBridge(
+            FakeCapture(),
+            FakePatchService(),
+            roles={},
+            main_evidence_provider=_main_at,
+            patch_contract=_patch_contract(),
         )
 
 
@@ -195,6 +241,49 @@ def test_snapshot_main_tap_is_time_coherent_and_excluded_from_channel_decisions(
         assert features.timestamp_s == 42.0
         assert features.main_peak_dbfs == pytest.approx(-6.0206, abs=0.01)
         assert bridge.status().snapshots_processed == 1
+    finally:
+        bridge.stop()
+
+
+def test_first_coherent_snapshot_runs_patch_verify_and_is_not_reused_for_proposal():
+    capture = FakeCapture()
+    service = FakePatchService()
+    tap = PostConsoleMainTapEvidenceProvider(47, 48)
+    contract = _patch_contract()
+    bridge = LiveAudioCaptureBridge(
+        capture,
+        service,
+        roles={1: "kick"},
+        snapshot_main_evidence_provider=tap,
+        patch_contract=contract,
+        window_frames=2048,
+        analysis_interval_s=0.0,
+        wall_clock=lambda: 10.0,
+    )
+    block = np.zeros((2048, 48), dtype=np.float32)
+    block[:, 0] = 0.1
+    block[:, 46] = 0.5
+    block[:, 47] = 0.5
+
+    bridge.start()
+    try:
+        capture.emit(block)
+        assert service.patch_called.wait(1.0)
+        assert len(service.calls) == 1
+        assert len(service.patch_calls) == 1
+        observed_contract, observed_main, worker_thread = service.patch_calls[0]
+        assert observed_contract == contract
+        assert observed_main.timestamp_s == 10.0
+        assert observed_main.peak_dbfs == pytest.approx(-6.0206, abs=0.01)
+        assert worker_thread != threading.get_ident()
+        assert service.state is SoundcheckState.LISTEN
+        assert bridge.status().snapshots_processed == 1
+
+        # Only a later frame may enter the normal Director/Critic feature path.
+        capture.emit(block)
+        assert _wait_for(lambda: len(service.calls) == 2)
+        assert len(service.patch_calls) == 1
+        assert bridge.status().snapshots_processed == 2
     finally:
         bridge.stop()
 
