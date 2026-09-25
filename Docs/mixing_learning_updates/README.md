@@ -59,6 +59,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-24-1500 | [Report](ML-2026-09-24-1500.md), [JSON patch](ML-2026-09-24-1500.json) | Search: 2 fresh full-text spatial-audio preprints, 1 fully studied Puremix/CLA video and 1 new metadata-only queued video; 2 source cards, 2 video cards, 12 Knowledge Cards, 8 candidate rules, 39 queued videos and 4 unrun experiments; SMA-ground-truth, simulated-single-source, stereo-link and loudness-match limits recorded |
 | ML-2026-09-24-1800 | [Report](ML-2026-09-24-1800.md), [JSON patch](ML-2026-09-24-1800.json) | Deep review: Herglotz criterion/sign and count-ratio audit, same-family DAFx resynthesis linkage, Neural FoV supervision/split/protocol audit, 1 full fixed-FoV comparator; 1 source card added, 3 updated, 12 Knowledge Cards, 8 candidate rules, 39 carried queued videos and 4 unrun experiments |
 | ML-2026-09-25-0900 | [Report](ML-2026-09-25-0900.md), [JSON patch](ML-2026-09-25-0900.json) | Search: 2 fresh full-text preprints plus 2 artifact audits; 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new metadata-only queued videos, 41 queued videos and 4 unrun experiments; synthetic-target, HFE, pseudo-stem, prompt-provenance, identity and reproducibility limits recorded |
+| ML-2026-09-25-1200 | [Report](ML-2026-09-25-1200.md), [JSON patch](ML-2026-09-25-1200.json) | Deep review: RESTORE HFE/additivity, steerability, FAD and baseline-parity audit plus SSE skip/conservation and listening-protocol audit; 2 source cards updated, 2 primary comparators and 1 artifact audit added, 12 Knowledge Cards, 8 candidate rules, 41 carried queued videos and 4 unrun experiments |
 
 ## Dynamics package: publication and safety
 
@@ -75,6 +76,8 @@ This transfer intentionally does not inject raw candidates into `backend/source_
 Earlier `R-20260911-1200-*` and `R-20260911-1500-*` references in the package refer to research updates seen in the original study. Their presence in the runtime registry is not asserted by this transfer.
 
 ## Handoff for mixing agents
+
+ML-2026-09-25-1200 (`deep_review`, preceding search `ML-2026-09-25-0900`): treat RESTORE's five-stem mixture-consistent path and unconstrained HFE path separately. Do not accept gain/RMS rank correlation as semantic steerability or unqualified FAD as fidelity. For SSE, require skip-path leakage and decoded target-plus-residual conservation tests. Keep controls opt-in and listening loudness-matched and blind. Next test: `EXP-ML-20260925-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-SPATIAL-2026-09-11-155446: distinguish dry position, source width, relative depth and ambience. Pre-delay is not a distance scale. Choose pan/width operators and musical priority by section role. Preserve mono compatibility, attack, groove and the intended rhythm-guitar foundation. Next proposed test: EXP-SP-20260911-155446-01, wet contribution versus pre-delay, blind and loudness-matched; `not_run`.
 

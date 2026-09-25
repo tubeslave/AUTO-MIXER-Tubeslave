@@ -1,0 +1,174 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-25-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-25T12:00:00+03:00",
+  "actual_start_msk": "2026-09-25T11:59:54+03:00",
+  "completed_msk": "2026-09-25T12:08:14+03:00",
+  "preceding_update_id": "ML-2026-09-25-0900",
+  "preceding_search_update_id": "ML-2026-09-25-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260925-0900-01",
+      "operation": "update",
+      "stable_id": "arXiv:2609.28683v1",
+      "url": "https://arxiv.org/html/2609.28683",
+      "reading_depth": "full_html_re_read_losses_data_baselines_tables_runtime_limitations",
+      "findings": [
+        "mixture consistency covers the five band-limited stems and explicitly excludes HFE",
+        "gain-versus-RMS Spearman correlation primarily verifies monotonic scaling, not semantic disentanglement",
+        "projection-based music bleed is not an audible preservation measure",
+        "the 30-item synthetic test lacks published corpus-song-degradation split manifest and uncertainty",
+        "historic FAD reference distribution and sample-count correction are not disclosed",
+        "runtime and GUI baselines use different hardware and measurement paths"
+      ],
+      "revised_conclusion": "Separate the additive existing-band path from unconstrained HFE; keep HFE opt-in pending paired full-band, listener, transient, stereo, mono and peak validation."
+    },
+    {
+      "id": "SRC-ML-20260925-0900-02",
+      "operation": "update",
+      "stable_id": "arXiv:2609.29169v1",
+      "url": "https://arxiv.org/html/2609.29169",
+      "reading_depth": "full_html_re_read_codec_skips_flow_target_data_inference_ablations_subjective_protocol",
+      "findings": [
+        "degraded-input codec skips can preserve content or leak degradation and the two effects are not isolated",
+        "stacking target and residual latents does not impose a decoded waveform mixture-consistency constraint",
+        "four inference steps were selected in testing without a separately described tuning split",
+        "SSE trails VisAH-FM on reported single-ground-truth envelope magnitude and Wasserstein measures",
+        "each reported subjective pair totals 90 choices despite 10 listeners and 10 clips, with incomplete trial accounting",
+        "loudness matching screening full blinding and multiple-comparison correction are not documented"
+      ],
+      "revised_conclusion": "Require skip-path leakage, conservation, no-generation baseline, prompt-provenance and complete loudness-matched listening tests before any music transfer."
+    },
+    {
+      "id": "SRC-ML-20260925-1200-01",
+      "operation": "add",
+      "title": "Adapting Frechet Audio Distance for Generative Music Evaluation",
+      "stable_id": "arXiv:2311.01616v2",
+      "url": "https://arxiv.org/html/2311.01616",
+      "publication_date": "2024-03-05",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_sample_size_embeddings_reference_bias_listening_correlation",
+      "review_status": "preprint",
+      "findings": [
+        "FAD is biased by finite sample size and varies with embedding and reference distribution",
+        "reference-set genre and instrument bias can dominate comparisons",
+        "VGGish-FAD did not correlate well with the reported audio- or musical-quality listening scores",
+        "FAD_inf is proposed to reduce sample-count bias"
+      ],
+      "limited_conclusion": "Disclose reference, N, embedding and preprocessing; report uncertainty or FAD_inf and do not treat FAD as preference or restoration fidelity."
+    },
+    {
+      "id": "SRC-ML-20260925-1200-02",
+      "operation": "add",
+      "title": "A Diffusion-based generative equalizer for music restoration",
+      "stable_id": "arXiv:2403.18636v2",
+      "url": "https://arxiv.org/html/2403.18636",
+      "publication_date": "2025-03-13",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_training_adaptation_historical_evaluation_metrics_limitations",
+      "review_status": "preprint",
+      "artifact_id": "ART-ML-20260925-1200-01",
+      "findings": [
+        "output is explicitly a hybrid of original audio and learned prior with training-data-dependent reconstruction and hallucination",
+        "historical FAD protocol identifies MAESTRO as reference and uses multiple embeddings",
+        "singing restoration supports per-singer fine-tuning omitted by RESTORE's generic-checkpoint comparison",
+        "RESTORE does not provide a parity-controlled full-band HFE comparison with BABE-2"
+      ],
+      "limited_conclusion": "Useful primary comparator, but parity requires the same full-band target, adaptation policy, reference protocol and raw safety checks."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260925-0900-01",
+      "operation": "update",
+      "repository_url": "https://github.com/MelissaChen15/restore",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["repository remains empty", "no commit license code weights or configuration can be pinned"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-0900-02",
+      "operation": "update",
+      "project_url": "https://sse-ai.notion.site/",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["project or code remains unavailable", "split weights and inference cannot be pinned"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-1200-01",
+      "operation": "add",
+      "source_id": "SRC-ML-20260925-1200-02",
+      "repository_url": "https://github.com/eloimoliner/BABE2-music-restoration",
+      "status": "static_audit_only",
+      "checked_date": "2026-09-25",
+      "license": "MIT",
+      "findings": ["public repository", "inference and configuration documentation present", "checkpoint links present", "no code checkpoint or audio executed"],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    "RESTORE mixture consistency excludes HFE and constrains only five existing-band stems.",
+    "A separately gainable HFE stem improves auditability but not truthfulness.",
+    "Gain-versus-RMS correlation mostly verifies scalar monotonicity rather than semantic disentanglement.",
+    "Projection-based music-bleed can miss audible wanted-content damage.",
+    "Reference-free FAD still needs a disclosed reference distribution; it means unpaired, not reference-less.",
+    "FAD varies with sample count, embedding and reference bias, and VGGish-FAD need not track listening quality.",
+    "Thirty synthetic items and point estimates without uncertainty do not establish universal generalization.",
+    "RESTORE does not present a parity-controlled full-band HFE comparison with BABE-2.",
+    "Cross-hardware runtime and manually timed GUI baselines are not deployment-parity evidence.",
+    "SSE degraded-input codec skips require separate preservation and degradation-leakage tests.",
+    "Stacked target and residual outputs are not a mixture-consistency guarantee without an explicit sum constraint.",
+    "SSE subjective evidence needs complete trial accounting loudness control screening blinding and multiplicity reporting."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260925-1200-01","when":"evaluating RESTORE HFE","change":"treat the five-stem sum and HFE as separate paths and compare HFE gain 0 versus 1","numeric_provenance":"RESTORE off/on ablation endpoints, not a preset range","protect":["identity","attacks","stereo","mono","headroom"],"verify":["paired clean target","raw peaks","loudness-matched blind AB"],"cancel":"invented events or safety failure","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-02","when":"claiming stem steerability","change":"require more than gain-versus-RMS rank correlation","numeric_provenance":"no preset range","protect":["semantic independence","non-target sources"],"verify":["cross-talk matrix","source residual","listening"],"cancel":"only scalar monotonicity is shown","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-03","when":"reporting FAD","change":"record reference N embedding version preprocessing and FAD_inf or bootstrap interval","numeric_provenance":"FAD comparator protocol","protect":["metric provenance"],"verify":["protocol-complete rerun"],"cancel":"a required field is missing or protocols differ","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-04","when":"claiming restoration generalization","change":"require corpus song and degradation-disjoint splits with per-domain uncertainty","numeric_provenance":"no preset range","protect":["identity","failure visibility"],"verify":["held-out real domains","per-item review"],"cancel":"evidence remains matched synthetic or aggregate-only","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-05","when":"comparing restoration baselines","change":"match full-band target adaptation hardware path and settings","numeric_provenance":"baseline parity requirement","protect":["causal attribution","fairness"],"verify":["parity table","raw output checks"],"cancel":"baseline target adaptation or timing path differs","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-06","when":"enabling degraded-input codec skips","change":"expose a bypass or skip ablation","numeric_provenance":"no recommended gain","protect":["content","degradation rejection"],"verify":["leakage residual by degradation","blind review"],"cancel":"skip path carries objectionable noise or reverb","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-07","when":"producing target and residual channels","change":"require decoded sum and null conservation plus finite and peak checks","numeric_provenance":"no preset range","protect":["complete input","phase","gain"],"verify":["waveform null","alignment","sample peak","true peak","mono"],"cancel":"loss duplication drift or non-finite output","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1200-08","when":"running generative preference tests","change":"loudness-match blind screen listeners and report exclusions trials and multiplicity","numeric_provenance":"protocol requirement, no preset range","protect":["interpretation","listener safety"],"verify":["protocol audit before score use"],"cancel":"incomplete accounting or loudness advantage","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260925-1200-01","status":"not_run","baseline":"sum of five mixture-consistent non-HFE RESTORE stems","variant":"identical sum plus HFE at gain 1","single_factor":"HFE contribution 0 versus 1","loudness_matching":"separate BS.1770 blind copies while preserving raw safety outputs","measure":["above-cutoff spectral error","harmonic and event precision","onsets","transient envelope","sample peak","true peak","stereo correlation","mono residual","artifact count","blind preference"],"protect":["drum attacks","guitar and bass identity","sibilance","stereo image","mono","headroom"],"success":"bandwidth or preference improves without invented events transient image mono or peak failure","cancel":"hallucination brittle HF correlated errors or loudness explains preference"},
+    {"id":"EXP-ML-20260925-1200-02","status":"not_run","baseline":"ordinary VGGish-FAD at available item count","variant":"FAD_inf with same audio reference embedding and preprocessing","single_factor":"sample-size correction estimator","loudness_matching":"not applicable; fixed audio","measure":["point estimate","bootstrap interval","rank stability","sample-size sensitivity"],"protect":["metric interpretation"],"success":"ranking is stable and uncertainty bounded","cancel":"ranking changes with N or intervals materially overlap"},
+    {"id":"EXP-ML-20260925-1200-03","status":"not_run","baseline":"shared DACVAE reconstruction without degraded-input skips","variant":"SkipDACVAE reconstruction with same latent input","single_factor":"skip connections enabled","loudness_matching":"separate blind copies while preserving raw safety outputs","measure":["clean-target residual","retained noise and reverb","onset and transient error","phase","mono","sample peak","true peak","blind preference"],"protect":["wanted events","timing","attacks","ambience intent"],"success":"preservation improves without material degradation leakage","cancel":"skip path bypasses cleanup or adds peak or phase failure"},
+    {"id":"EXP-ML-20260925-1200-04","status":"not_run","baseline":"codec-only reconstruction of degraded input","variant":"decoded SSE target plus decoded residual re-summed","single_factor":"SSE generative target-residual path","loudness_matching":"separate blind copies while preserving raw safety outputs","measure":["sum null residual","alignment","gain","missing or duplicated events","phase","mono","sample peak","true peak","blind preference"],"protect":["complete performance","audiovisual sync","headroom"],"success":"intended edit with bounded conservation error and no safety failure","cancel":"deletion duplication drift non-finite output or codec or gain advantage"}
+  ],
+  "video_updates": [],
+  "queue": {
+    "video_count_before": 41,
+    "video_count_after": 41,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "deep_review_priority": [
+      "RESTORE HFE additivity and paired full-band safety",
+      "RESTORE FAD reference and uncertainty",
+      "SSE skip-path leakage and conservation",
+      "Korneff permitted transcript",
+      "Sturgis permitted transcript"
+    ]
+  },
+  "reference_updates": [],
+  "multitrack_updates": [],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "paid_services_used": false,
+    "external_audio_upload": false
+  }
+}
