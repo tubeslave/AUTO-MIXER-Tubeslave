@@ -1,0 +1,192 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-25-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-25T18:00:00+03:00",
+  "actual_start_msk": "2026-09-25T17:57:04+03:00",
+  "completed_msk": "2026-09-25T18:09:10+03:00",
+  "preceding_update_id": "ML-2026-09-25-1500",
+  "preceding_search_update_id": "ML-2026-09-25-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260925-1500-01",
+      "operation": "update",
+      "stable_id": "arXiv:2609.29320v1",
+      "url": "https://arxiv.org/html/2609.29320",
+      "reading_depth": "full_text_reread_data_controls_metrics_inference_sweeps_limitations",
+      "findings": [
+        "Unif-ParamOnly uses the same shared-token architecture as JDF and isolates conditional-edge training from full-time-square training",
+        "Surge real-audio MSS is 7.68 for JDF and 11.35 for Unif-ParamOnly but the comparison still bundles training support and objective",
+        "JDF and JDF-A remain essentially tied on off-manifold MSS 7.68 versus 7.69",
+        "the test pool mixes Freesound with a proprietary one-shot library and many samples contain silent tails",
+        "tau near 0.1 is selected from the reported inference sweep without a separately described locked tuning protocol"
+      ],
+      "limited_conclusion": "The same-architecture control strengthens evidence for full-time-square training, but the real-audio marginal and tau setting remain unvalidated for production use."
+    },
+    {
+      "id": "SRC-ML-20260925-1800-01",
+      "operation": "add",
+      "title": "Audio synthesizer inversion in symmetric parameter spaces with approximately equivariant flow matching",
+      "stable_id": "arXiv:2506.07199v1",
+      "url": "https://arxiv.org/html/2506.07199",
+      "publication_date": "2025-06-08",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_task_data_models_ood_results_appendices_repository_link",
+      "review_status": "foundational_same_family_preprint",
+      "artifact_id": "ART-ML-20260925-1800-01",
+      "findings": [
+        "the study deliberately restricts its main task to on-manifold inversion to avoid the general-audio projection confound",
+        "it establishes the Param2Tok and permutation-symmetry lineage later used by synth-JDF",
+        "its Surge Full task includes 165 parameters and fixed Chorus Delay and Reverb II routing",
+        "it uses 100 RK4 steps while synth-JDF reports 20 Euler steps",
+        "same-author same-method lineage means it is not independent confirmation of the later off-manifold claim"
+      ],
+      "limited_conclusion": "Use as foundational lineage and task-contract evidence, not as independent replication or a numerically comparable benchmark."
+    },
+    {
+      "id": "SRC-ML-20260925-1500-02",
+      "operation": "update",
+      "stable_id": "arXiv:2609.29071v1",
+      "url": "https://arxiv.org/html/2609.29071",
+      "reading_depth": "full_text_reread_ASO_equations_compute_editing_real_transfer_artifact_statement",
+      "findings": [
+        "ASO explicitly falls back to raw note magnitudes with mixture phase when all ownership weights are zero and therefore trades off perfect mixture consistency",
+        "NoteSep median SI-SDR is 7.39 dB versus 5.09 dB for NoteGrab Selective but target gain remains 0.83",
+        "editing resums stored estimates and does not subtract a target estimate from the input mixture",
+        "a two-second 16-query input needs 16 NoteGrab passes plus ASO and is reported at 454.7 plus 32.7 ms on an NVIDIA A10",
+        "selective HPSS uses max 30 or f0 minus 60 Hz as a study-specific high-pass rule"
+      ],
+      "limited_conclusion": "Treat ASO as learned ownership reallocation rather than exact waveform mixture consistency and require raw sum-null, latency and low-frequency preservation tests."
+    },
+    {
+      "id": "SRC-ML-20260925-1500-03",
+      "operation": "update",
+      "stable_id": "arXiv:2609.27187v1",
+      "url": "https://arxiv.org/html/2609.27187",
+      "reading_depth": "full_text_reread_grouping_holdouts_baselines_metrics_limitations",
+      "findings": [
+        "clips are grouped by exact source-label set and embeddings are averaged before source contributions are fit",
+        "repeated holdouts move combinations back to training as needed so every held-out source remains known during fitting",
+        "FSD50K CLAP CKA is 0.60 plus or minus 0.02 versus 0.21 permutation and 0.52 label-overlap",
+        "CHiME-Home CLAP CKA is 0.76 plus or minus 0.06 versus 0.73 permutation and 0.62 label-overlap",
+        "semantic labels are correlated and potentially incomplete and need not correspond to independent physical sources"
+      ],
+      "limited_conclusion": "The method predicts means of unseen combinations of known semantic labels, not per-clip source separation, unseen-source discovery or mix control."
+    },
+    {
+      "id": "SRC-ML-20260925-1800-02",
+      "operation": "add",
+      "title": "Evaluating Compositional Structure in Audio Representations",
+      "stable_id": "arXiv:2603.13685v1",
+      "url": "https://arxiv.org/html/2603.13685",
+      "publication_date": "2026-03-14",
+      "discovery_date": "2026-09-25",
+      "doi": "10.1109/ICASSP55912.2026.11465018",
+      "reading_depth": "full_html_generator_tasks_controls_statistics_results_conclusion",
+      "review_status": "peer_reviewed_icassp_2026_independent_synthetic_comparator",
+      "findings": [
+        "A-COAT tests additive transformation consistency and A-TRE reconstructibility from timbre pitch rate and amplitude attributes",
+        "the benchmark uses controlled 10-second 32-kHz synthetic scenes with one to four normalized DX7-like sources",
+        "a linear Downsample baseline achieves A-COAT 1.00 plus or minus 0.01 but A-TRE only 0.23 plus or minus 0.16",
+        "CLAP reaches A-COAT 0.39 plus or minus 0.20 and A-TRE 0.90 plus or minus 0.05",
+        "the authors leave natural-recording transfer and downstream relevance for future work"
+      ],
+      "limited_conclusion": "Additive geometry and useful semantic factorization are distinct; this independent comparator is synthetic and does not validate natural-mix control."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260925-1500-01",
+      "operation": "update",
+      "source_id": "SRC-ML-20260925-1500-01",
+      "status": "artifact_partial_demo_only",
+      "checked_date": "2026-09-25",
+      "findings": ["no public synth-JDF code weights environment or exact training manifest verified", "the older synth-permutations repository does not reproduce JDF"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-1500-02",
+      "operation": "update",
+      "source_id": "SRC-ML-20260925-1500-02",
+      "repository_url": "https://github.com/ben2002chou/notesep",
+      "pinned_commit": "f963948502772f5a685a71779af72aa6af85c392",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["repository remains a coming-soon README", "paper artifact statement is not satisfied by the current public repository"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-1800-01",
+      "operation": "add",
+      "source_id": "SRC-ML-20260925-1800-01",
+      "repository_url": "https://github.com/ben-hayes/synth-permutations",
+      "pinned_commit": "2936bc0bd4c08cb6233e726b9069fb8c26e63997",
+      "license": "MIT",
+      "status": "static_code_available_weights_unverified",
+      "checked_date": "2026-09-25",
+      "findings": ["source configs tests presets and dataset-generation scripts are present", "prediction scripts resolve checkpoints from local W&B run directories", "no packaged checkpoint manifest or hashes found", "repository is for the foundational model not synth-JDF"],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    "A same-architecture conditional-edge control is stronger causal evidence than comparison with a differently conditioned encoder baseline.",
+    "Full-time-square JDF training is supported as a bundled objective and support change; the unpaired-real marginal is not.",
+    "A hyperparameter selected from a displayed test sweep must be reselected on validation and locked before held-out evaluation.",
+    "Synth-inversion metrics cannot be compared across papers when active parameters effects solver and data contracts differ.",
+    "Source-family silence-ratio and transient-versus-sustain strata are necessary for mixed off-manifold pools.",
+    "NoteSep ASO reduces ownership conflicts but explicitly does not guarantee perfect mixture consistency.",
+    "Stored-estimate editing reconstructs unchanged material and therefore requires an unedited-sum null.",
+    "Note-level inference cost scales with query count and can become material in dense arrangements.",
+    "The max 30 or f0 minus 60 Hz selective high-pass is a paper preprocessing rule not a production EQ preset.",
+    "CLAP reconstruction predicts mean embeddings of label combinations not individual clips or isolated physical sources.",
+    "Combination-disjoint evaluation with all sources known does not test unseen-source generalization.",
+    "A perfect linear A-COAT baseline shows that additive geometry and useful semantic decomposition are distinct properties."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260925-1800-01","when":"attributing synth-JDF gains","change":"compare JDF with same-architecture Unif-ParamOnly under equal budget","numeric_provenance":"paper Surge real-audio MSS 7.68 versus 11.35 is evidence not a setting","protect":["causal attribution","equal training budget"],"verify":["identical data architecture steps and seeds","uncertainty intervals"],"cancel":"another factor differs or gain vanishes with uncertainty","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-02","when":"choosing conditioning noise","change":"select tau on validation and lock before test","numeric_provenance":"tau near 0.1 comes from the paper inference sweep","protect":["detail","attack","reproducibility"],"verify":["preregistered grid","held-out test","seed intervals"],"cancel":"selected value moves materially or only one metric improves","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-03","when":"comparing inversion studies","change":"require matching synth effect solver and data contracts before numeric ranking","numeric_provenance":"older work uses 100 RK4 steps and effects while synth-JDF uses 20 Euler steps and disables effects","protect":["valid interpretation"],"verify":["contract table","same-renderer rerun"],"cancel":"active effects or parameter spaces differ","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-04","when":"evaluating real-audio inversion","change":"stratify by source family silence fraction and transient-versus-sustain role","numeric_provenance":"paper notes production one-shots and silent tails; no processing range","protect":["attacks","tails","identity"],"verify":["per-stratum metrics","blind listening"],"cancel":"gain is concentrated in silence or one library","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-05","when":"using ASO note estimates","change":"treat ASO as learned reallocation and require a raw unedited-sum null","numeric_provenance":"paper explicitly trades off perfect mixture consistency in fallback bins","protect":["unchanged material","sum","attacks"],"verify":["sample and STFT residual","leakage matrix"],"cancel":"residual deletion or duplicated energy exceeds baseline","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-06","when":"enabling NoteSep selective high-pass","change":"test the filter as an ablation variable","numeric_provenance":"paper rule max 30 or f0 minus 60 Hz","protect":["fundamental","body","phase"],"verify":["off-on target energy","blind comparison"],"cancel":"target low-frequency loss or worse separation","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-07","when":"applying NoteSep to dense sections","change":"budget inference by concurrent note queries","numeric_provenance":"paper 16-query A10 timing 454.7 plus 32.7 ms and peak allocation 840.1 plus 828.5 MiB","protect":["timing","dropouts","tails"],"verify":["target-device p95 p99 latency","memory","xruns"],"cancel":"deadline miss memory spike or truncated notes","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1800-08","when":"using CLAP composition for mixing","change":"keep it a mean-semantic diagnostic paired with calibrated waveform measures","numeric_provenance":"representation-study protocol; no production range","protect":["levels","pan","dynamics","phase","performance"],"verify":["exact-stem controls","fader perturbations","listening"],"cancel":"result is non-monotonic or conflicts with signal truth","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260925-1800-01","status":"not_run","baseline":"Unif-ParamOnly trained only on the conditional inversion edge","variant":"JDF with the same shared-token architecture trained over the full time square","single_factor":"training support and objective over the time square","loudness_matching":"preserve raw renders and create separate BS.1770-matched blind copies","measure":["MSS","wMFCC","SOT","RMS envelope","onset decay error","sample peak","true peak","seed spread","blind match and preference","library silence and transient strata"],"protect":["identity","pitch","attacks","tails","stereo","headroom"],"success":"improvement beyond uncertainty across strata without SOT attack or preference loss","cancel":"gain is explained by silence library mix loudness or unmatched budget","blocker":"public JDF code and weights unavailable"},
+    {"id":"EXP-ML-20260925-1800-02","status":"not_run","baseline":"clean conditioning tau 1.0 in the paper convention","variant":"one tau selected only on a separate validation set from a preregistered grid including the paper near-0.1 region","single_factor":"conditioning-noise level","loudness_matching":"preserve raw safety outputs and create separate blind copies","measure":["MSS","wMFCC","SOT","RMS envelope","transient error","parameter stability","seed spread","blind match"],"protect":["source specificity","attacks"],"success":"locked test improvement across metrics and strata","cancel":"value shifts across splits SOT or attack worsens or benefit disappears outside tuning pool"},
+    {"id":"EXP-ML-20260925-1800-03","status":"not_run","baseline":"independently summed NoteGrab Selective estimates","variant":"the same estimates after ASO","single_factor":"ASO ownership and reallocation","loudness_matching":"raw sums for conservation plus separate loudness-matched blind copies","measure":["sample residual","STFT residual","target gain","off-target energy","SI-SDR","octave confusion","onset tail error","phase","mono","sample peak","true peak"],"protect":["unchanged notes","fundamentals","attacks","ambience"],"success":"lower leakage and sum residual without target loss or new artifacts","cancel":"fallback produces larger residual deletes low energy or only changes loudness","blocker":"public NoteSep code and checkpoints unavailable"},
+    {"id":"EXP-ML-20260925-1800-04","status":"not_run","baseline":"rights-cleared fixed stem mix","variant":"same mix with one preregistered source fader changed by plus 3 dB","single_factor":"one source level","numeric_provenance":"plus 3 dB is an experimental probe not a recommended mix move","loudness_matching":"preserve calibrated raw signals and create separate BS.1770-matched copies only for blind evaluation","measure":["CLAP embedding delta","explicit source level","integrated loudness","short-term loudness","crest","waveform difference","sample peak","true peak","blind detection and preference"],"protect":["no processing decision from CLAP alone"],"success":"repeatable monotonic response distinguishable from total-loudness change across songs and sections","cancel":"response is smaller than seed or preprocessing variance non-monotonic or contradicted by calibrated measurements"}
+  ],
+  "video_updates": [],
+  "queue": {
+    "video_count_before": 43,
+    "video_count_after": 43,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "deep_review_priority": [
+      "public synth-JDF artifact and locked tau protocol",
+      "NoteSep runnable release and ASO sum-conservation audit",
+      "rights-cleared stem-level CLAP fader perturbation",
+      "Ian Shepherd permitted transcript",
+      "Future Music and Universal Audio permitted transcript"
+    ]
+  },
+  "reference_updates": [],
+  "multitrack_candidates": [],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "paid_services_used": false,
+    "external_audio_upload": false
+  }
+}
