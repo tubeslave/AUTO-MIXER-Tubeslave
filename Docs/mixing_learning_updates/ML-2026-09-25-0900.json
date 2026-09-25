@@ -1,0 +1,124 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-25-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-25T09:00:00+03:00",
+  "actual_start_msk": "2026-09-25T09:02:38+03:00",
+  "completed_msk": "2026-09-25T09:12:20+03:00",
+  "preceding_update_id": "ML-2026-09-24-1800",
+  "preceding_search_update_id": "ML-2026-09-24-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260925-0900-01",
+      "operation": "add",
+      "title": "RESTORE: REal-time Steerable Music resTORation and bandwidth Extension via stem disentanglement",
+      "stable_id": "arXiv:2609.28683v1",
+      "url": "https://arxiv.org/html/2609.28683",
+      "publication_date": "2026-09-23",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_text_methods_results_tables_limitations",
+      "review_status": "preprint",
+      "artifact_id": "ART-ML-20260925-0900-01",
+      "findings": [
+        "HTDemucs is adapted to six additive stems: vocals, music, broadband hiss, transient noise, residual, and HFE",
+        "training degradations and the 30-item paired test are synthetic; distortion and groove echo are omitted",
+        "real historical recordings have no clean target and are assessed with reference-free distribution metrics",
+        "HFE is not uniformly favourable across reported CLAP-FAD categories and no listening study is reported",
+        "approximately 50-times-real-time throughput is measured on one A100 and does not establish CPU or low-latency deployment"
+      ],
+      "limited_conclusion": "Mixture-consistent semantic stems and isolated HFE are promising controls; HFE must remain opt-in and requires identity, transient, stereo, mono, peak, and listener validation."
+    },
+    {
+      "id": "SRC-ML-20260925-0900-02",
+      "operation": "add",
+      "title": "Spot, Separate, and Enhance: Fully Generative Approach for Audio Mixing",
+      "stable_id": "arXiv:2609.29169v1",
+      "url": "https://arxiv.org/html/2609.29169",
+      "publication_date": "2026-09-24",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_text_data_model_metrics_ablations_subjective_protocol",
+      "review_status": "preprint",
+      "artifact_id": "ART-ML-20260925-0900-02",
+      "findings": [
+        "SSE is a multimodal generative UGC or movie-audio enhancement model, not a conventional multitrack music mixer",
+        "DegradedMix uses separator-derived pseudo-stems followed by synthetic gain, noise, and reverberation changes",
+        "text instructions are generated from the clean target and may provide privileged information unavailable in ordinary prompts",
+        "the roughly three-billion-parameter large model is trained on two RTX PRO 6000 Blackwell GPUs",
+        "main objective metrics do not protect waveform identity, transients, phase, loudness, or true peak",
+        "the 10-participant 10-video pairwise study does not document loudness matching, listener screening, or equivalence bounds"
+      ],
+      "limited_conclusion": "Generative UGC enhancement candidate, not evidence for autonomous music mixing; require no-generation baselines, source-preservation measures, and loudness-matched listening before transfer."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260925-0900-01",
+      "source_id": "SRC-ML-20260925-0900-01",
+      "project_url": "https://melissachen15.github.io/restore-audio-demo/",
+      "repository_url": "https://github.com/MelissaChen15/restore",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["official page links to repository", "repository is empty", "no commit license checkpoint environment or inference script can be pinned"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-0900-02",
+      "source_id": "SRC-ML-20260925-0900-02",
+      "project_url": "https://sse-ai.notion.site/",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["project page unavailable", "no public code weights or split manifest verified"],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    "Exact additive reconstruction constrains the sum but does not prove semantic correctness of each stem.",
+    "Generated high-frequency extension should be isolated and opt-in.",
+    "Reference-free FAD on historical recordings is distribution evidence, not archival fidelity or preference.",
+    "RESTORE HFE is not uniformly favourable across its own reported CLAP-FAD categories.",
+    "Single-A100 throughput does not guarantee CPU, plug-in, memory, or low-latency performance.",
+    "An empty linked repository blocks reproducibility despite public demonstrations.",
+    "SSE concerns generative UGC or movie enhancement rather than multitrack music mixing.",
+    "Separator-produced pseudo-stems can transfer leakage and artefacts into targets and evaluation.",
+    "Clean-target-generated instructions can be oracle-like compared with real ambiguous prompts.",
+    "Embedding and distribution metrics do not protect waveform identity, attacks, phase, loudness, or true peak.",
+    "A small preference test without documented loudness matching or screening is limited task evidence.",
+    "Generative replacement and conservative enhancement need separate baselines and acceptance criteria."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260925-0900-01","when":"designing restoration outputs","change":"expose content noise residual and HFE contributions separately and retain an untouched path","numeric_provenance":"RESTORE topology; no preset value","protect":["performance","gain","additivity"],"verify":["sum null test","finite output","scale","stem leakage"],"cancel":"non-additive reconstruction or audible music hidden in removal stems","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-02","when":"using bandwidth extension","change":"keep HFE opt-in and compare gain 0 versus 1","numeric_provenance":"RESTORE paper off/on ablation endpoints, not a recommended setting range","protect":["harmonics","attacks","sibilance","stereo phase","mono","headroom"],"verify":["raw safety render","loudness-matched blind AB"],"cancel":"invented events brittle HF image damage or peak growth","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-03","when":"reporting unpaired restoration quality","change":"label FAD and CLAP-FAD as reference-free distribution evidence","numeric_provenance":"metric definitions in RESTORE","protect":["provenance","claim scope"],"verify":["listening","paired synthetic controls"],"cancel":"reference-free score is presented as fidelity","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-04","when":"transferring synthetic restoration to archives","change":"stratify unseen distortion groove echo noise bandwidth and era","numeric_provenance":"paper limitations and omitted degradations","protect":["wanted distortion","groove","transients","identity"],"verify":["held-out real recordings","failure review"],"cancel":"benefit exists only for matched simulation","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-05","when":"describing SSE","change":"call it generative UGC or movie enhancement, not automatic music mixing","numeric_provenance":"paper task and dataset","protect":["task clarity","domain clarity"],"verify":["real isolated multitrack transfer test"],"cancel":"source roles or output identity cannot be audited","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-06","when":"evaluating generative remixing","change":"include unchanged-input or codec-only and conservative-DSP baselines","numeric_provenance":"evaluation gap, no parameter range","protect":["identity","timing","attacks","phase","peaks"],"verify":["residual","onset","true peak","mono","blind preference"],"cancel":"generated replacement or loudness explains cleanup","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-07","when":"constructing targets from pseudo-stems","change":"pin separator revision and quantify leakage","numeric_provenance":"DegradedMix construction","protect":["source identity","independent errors"],"verify":["manual subset audit","oracle-stem comparator"],"cancel":"target artifacts dominate or correlate with tested model","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-0900-08","when":"testing text-guided enhancement","change":"add human ambiguous paraphrased and contradictory prompts","numeric_provenance":"clean-target caption provenance","protect":["control robustness","content preservation"],"verify":["prompt-stratified compliance","safety"],"cancel":"success depends on privileged wording","confidence":"medium-high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260925-0900-01","status":"not_run","baseline":"RESTORE HFE gain 0","variant":"same render HFE gain 1","single_factor":"HFE stem gain","loudness_matching":"separate BS.1770 blind copies; preserve raw safety outputs","measure":["above-cutoff spectral error","harmonic and onset consistency","sample peak","true peak","stereo correlation","mono residual","artifact count","blind preference"],"protect":["identity","drum attacks","guitar texture","sibilance","stereo image","headroom"],"success":"bandwidth preference improves without hallucination transient mono stereo or peak failure","cancel":"invented events brittle HF image instability or loudness advantage"},
+    {"id":"EXP-ML-20260925-0900-02","status":"not_run","baseline":"original degraded input","variant":"sum of all RESTORE estimates with HFE disabled","single_factor":"reconstruction through separated additive path","loudness_matching":"not used for null and gain checks; optional separate listening copies","measure":["null residual","alignment","gain ratio","finite output","sample peak","true peak","music bleed","mono stereo parity"],"protect":["complete signal","timing"],"success":"stable reconstruction and acceptable semantic leakage","cancel":"scale drift missing samples non-finite output or wanted events in removal stems"},
+    {"id":"EXP-ML-20260925-0900-03","status":"not_run","baseline":"unchanged-input or codec-only reconstruction","variant":"SSE with fixed enhancement instruction","single_factor":"generative enhancement path","loudness_matching":"separate blind copies; preserve raw safety outputs","measure":["identity residual","onset timing","transient envelope","audiovisual sync","loudness","sample peak","true peak","mono compatibility","blind preference"],"protect":["performance","words","effects timing","music identity","headroom"],"success":"intended cleanup without material replacement timing or peak failure","cancel":"generated content loudness or codec difference explains preference"},
+    {"id":"EXP-ML-20260925-0900-04","status":"not_run","baseline":"clean-target-generated caption","variant":"human ambiguous prompt with same intent","single_factor":"prompt provenance and wording","loudness_matching":"separate blind copies","measure":["control compliance","source retention","identity residual","prompt sensitivity","peaks","preference"],"protect":["performance identity","non-target ambience"],"success":"safe comparable behavior across realistic paraphrases","cancel":"ordinary wording collapses control or increases replacement"}
+  ],
+  "video_updates": [
+    {"id":"VID-ML-20260925-0900-01","operation":"add","youtube_id":"xytsTq_Wolg","title":"Heavy Rock Mixing Masterclass with Dan Korneff (featuring Breaking Benjamin)","channel":"SonicScoop","url":"https://www.youtube.com/watch?v=xytsTq_Wolg","duration_displayed":"1:01:00","reading_depth":"metadata_only","status":"queued_source","transcript_status":"blocked_by_human_verification","technical_claims_extracted":false},
+    {"id":"VID-ML-20260925-0900-02","operation":"add","youtube_id":"UqNeSAffRpY","title":"Mastering a sick metal mix with Joey Sturgis!","channel":"URM Academy","url":"https://www.youtube.com/watch?v=UqNeSAffRpY","duration_displayed":"14:31","reading_depth":"metadata_only","status":"queued_source","transcript_status":"blocked_by_human_verification","technical_claims_extracted":false}
+  ],
+  "dedupe": [
+    {"key":"youtube:cgfBcFTbir4","resolution":"existing_fully_studied","existing_id":"VID-ML-20260913-1200-03"},
+    {"key":"youtube:Z0eqw_3cY2A","resolution":"existing_fully_studied_in_ML-2026-09-24-1500"},
+    {"key":"youtube:QSj2m9oUJno","resolution":"existing_queued_source_not_added_again"}
+  ],
+  "queue": {"video_count_before":39,"video_count_after":41,"studied_video_count_this_run":0,"new_metadata_only_video_count":2,"deep_review_priority":["RESTORE artifact and HFE isolation","RESTORE additivity and semantic leakage","SSE pseudo-stems prompt provenance and trial accounting","Korneff permitted transcript","Sturgis permitted transcript"]},
+  "reference_updates": [],
+  "multitrack_candidates": [{"url":"https://theweebdungeon.bandcamp.com/album/feast-of-the-deceased-multitracks","status":"rejected_rights_not_clear_for_reuse","license_displayed":"all rights reserved","downloaded":false}],
+  "safety": {"audio_changed":false,"dsp_changed":false,"runtime_changed":false,"models_changed":false,"active_rules_changed":false,"paid_services_used":false,"external_audio_upload":false}
+}
