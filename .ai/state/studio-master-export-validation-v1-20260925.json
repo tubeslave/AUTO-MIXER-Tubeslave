@@ -1,0 +1,25 @@
+{
+  "goal": "studio-master-export-validation-v1",
+  "status": "implementation_pending_ci",
+  "base_commit": "86083c93db8ce42b9e7c87dcc9400158d1ecb04a",
+  "bounded_task": "make deliver_master validate written/decoded exports against the requested mastering ceiling instead of a hard-coded -1.0 dBTP gate",
+  "implementation_commits": {
+    "validator": "95f9cf029c6dc82797d6ada8b7bcec2446b65baf",
+    "tests": "78f56d196b3fcbafa0005bfa32bf7812cdda7c92",
+    "deliver_master_integration": "ca9599fcfe0b12a4dbb477c56d21f9c9384f0e78"
+  },
+  "requested_ceiling_enforced": true,
+  "absolute_export_true_peak_ceiling_dbtp": -1.0,
+  "format_tolerance_can_weaken_absolute_ceiling": false,
+  "standards_loudness_required": true,
+  "frame_count_checked": true,
+  "sample_rate_checked": true,
+  "baseline_eligible": false,
+  "human_listening_required": true,
+  "mastering_dsp_changed": false,
+  "critic_thresholds_changed": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "next_gate": "full repository CI on Python 3.10/3.11/3.12"
+}
