@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -97,6 +99,8 @@ def build_calibration_record(
         "baseline_promotion_allowed": False,
         "requires_human_listening": True,
     }
+    # Detach nested caller-owned lists/dicts before assigning the immutable digest.
+    record = json.loads(_canonical_json(record))
     record["record_id"] = calibration_record_id(record)
     return record
 
@@ -187,13 +191,15 @@ def load_calibration_corpus(path: str | Path) -> list[dict[str, Any]]:
         text = corpus.read_text(encoding="utf-8")
     except OSError as exc:
         raise ValueError(f"cannot read calibration corpus: {corpus}") from exc
+    if text and not text.endswith("\n"):
+        raise ValueError("incomplete calibration corpus: missing final newline")
     for lineno, line in enumerate(text.splitlines(), 1):
         if not line.strip():
             raise ValueError(f"blank calibration corpus line at {lineno}")
         try:
             value = json.loads(line)
         except json.JSONDecodeError as exc:
-            raise ValueError(f"invalid calibration corpus JSON at line {lineno}") from exc
+            raise ValueError(f"invalid canonical calibration corpus JSON at line {lineno}") from exc
         if not isinstance(value, dict):
             raise ValueError(f"calibration corpus line {lineno} must be an object")
         if line != _canonical_json(value):
@@ -210,31 +216,56 @@ def append_calibration_record(
     critic_result: dict[str, Any],
     human_review: dict[str, Any],
 ) -> dict[str, Any]:
-    """Replay the full prefix, then append exactly one canonical record.
+    """Replay and atomically append while preserving all prior bytes.
 
-    Existing bytes are never rewritten.  If validation or duplicate detection
-    fails, no write is attempted.
+    An exclusive sidecar lock serializes cooperating writers. A stale lock after
+    process death requires inspection; this function never force-unlocks it.
+    This is logical append-only storage, not WORM or a signature. Network
+    filesystems, noncooperating writers and power-loss durability are not covered.
     """
     corpus = Path(path)
-    existing = load_calibration_corpus(corpus)
-    summary = replay_calibration_corpus(existing)
-    source_key = _source_key(source_evidence)
-    if any(str(record.get("source_key")) == source_key for record in existing):
-        raise ValueError("duplicate calibration corpus source evidence")
-
-    record = build_calibration_record(
-        source_evidence=source_evidence,
-        subject=subject,
-        critic_result=critic_result,
-        human_review=human_review,
-        previous_record_id=summary["last_record_id"],
-    )
+    if corpus.is_symlink():
+        raise ValueError("calibration corpus must not be a symlink")
     corpus.parent.mkdir(parents=True, exist_ok=True)
-    encoded = _canonical_json(record) + "\n"
-    with corpus.open("a", encoding="utf-8", newline="") as handle:
-        handle.write(encoded)
-        handle.flush()
-
-    replayed = load_calibration_corpus(corpus)
-    replay_calibration_corpus(replayed)
+    lock = corpus.with_name(corpus.name + ".lock")
+    try:
+        fd = os.open(lock, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise ValueError("calibration corpus writer lock exists") from exc
+    temporary: str | None = None
+    try:
+        os.close(fd)
+        prefix = corpus.read_bytes() if corpus.exists() else b""
+        existing = load_calibration_corpus(corpus)
+        summary = replay_calibration_corpus(existing)
+        source_key = _source_key(source_evidence)
+        if any(str(record.get("source_key")) == source_key for record in existing):
+            raise ValueError("duplicate calibration corpus source evidence")
+        record = build_calibration_record(
+            source_evidence=source_evidence,
+            subject=subject,
+            critic_result=critic_result,
+            human_review=human_review,
+            previous_record_id=summary["last_record_id"],
+        )
+        # Validate before the only corpus mutation, not after a failed append.
+        replay_calibration_corpus([*existing, record])
+        payload = prefix + (_canonical_json(record) + "\n").encode("utf-8")
+        with tempfile.NamedTemporaryFile(
+            mode="wb", dir=corpus.parent, prefix=corpus.name + ".",
+            suffix=".tmp", delete=False,
+        ) as handle:
+            temporary = handle.name
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        current = corpus.read_bytes() if corpus.exists() else b""
+        if corpus.is_symlink() or current != prefix:
+            raise ValueError("calibration corpus changed during append")
+        os.replace(temporary, corpus)
+        temporary = None
+    finally:
+        if temporary is not None:
+            Path(temporary).unlink(missing_ok=True)
+        lock.unlink(missing_ok=True)
     return record
