@@ -1,6 +1,6 @@
 {
   "goal": "studio-master-export-validation-v1",
-  "status": "implementation_pending_ci",
+  "status": "merged_experimental_validation_pending",
   "base_commit": "86083c93db8ce42b9e7c87dcc9400158d1ecb04a",
   "bounded_task": "make deliver_master validate written/decoded exports against the requested mastering ceiling instead of a hard-coded -1.0 dBTP gate",
   "implementation_commits": {
@@ -8,6 +8,7 @@
     "tests": "78f56d196b3fcbafa0005bfa32bf7812cdda7c92",
     "deliver_master_integration": "ca9599fcfe0b12a4dbb477c56d21f9c9384f0e78"
   },
+  "merge_policy": "user explicitly requested useful STUDIO updates be merged even when full validation is still pending; regressions should be found by integrated testing and reverted or revised if needed",
   "requested_ceiling_enforced": true,
   "absolute_export_true_peak_ceiling_dbtp": -1.0,
   "format_tolerance_can_weaken_absolute_ceiling": false,
@@ -16,10 +17,13 @@
   "sample_rate_checked": true,
   "baseline_eligible": false,
   "human_listening_required": true,
+  "full_repository_ci_before_merge_required": false,
+  "validation_status": "pending integrated repository CI and real delivery exercises",
   "mastering_dsp_changed": false,
   "critic_thresholds_changed": false,
   "live_code_changed": false,
   "neural_audio_used": false,
   "paid_external_credits_used": false,
-  "next_gate": "full repository CI on Python 3.10/3.11/3.12"
+  "rollback_policy": "revert or revise only if integrated tests or real delivery evidence expose a regression",
+  "next_goal": "exercise the merged export gate in normal STUDIO mastering runs and fix any reproduced regression"
 }
