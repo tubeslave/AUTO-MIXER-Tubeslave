@@ -12,6 +12,7 @@ import numpy as np
 import soundfile as sf
 
 from .analyzer import analyze
+from .export_validation import validate_master_exports
 from .pipeline import MasteringConfig
 from .target_controller import MasteringTargetController, MasteringTargetSearchConfig
 
