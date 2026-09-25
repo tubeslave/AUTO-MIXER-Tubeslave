@@ -1,19 +1,21 @@
 {
   "goal": "studio-calibration-replay-corpus-v1",
-  "status": "remote_implementation_requires_integrity_revision_local_compatible_fix_validated",
+  "status": "integrity_fix_committed_pending_repository_ci",
   "base_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
+  "observed_current_base_commit": "76e93e1fc02fb15045b088657731a14f6d12998b",
+  "observed_base_changes": "three unrelated state-only commits; no production code overlap",
   "reviewed_remote_commit": "2f0d9594e1eeca3e5713bf4a2fc24e559e82cd16",
   "reviewed_module_git_blob": "603e9808dcecf07d5c4dc23904d52068d83606da",
   "reviewed_tests_git_blob": "e21ffe0eb0805f67c7cc79c79b487631d2fb219b",
   "bounded_task": "harden append integrity in the actual remotely added corpus implementation without replacing its public API or record format",
-  "concurrent_change_reconciliation": "During this run a separate implementation, tests and seed appeared on the same feature branch. Earlier local whole-report prototype results do not validate that remote implementation. Remote code was read and copied with exact Git-blob verification before review. It was not overwritten.",
+  "concurrent_change_reconciliation": "During the September 24 run a separate implementation, tests and seed appeared on the same feature branch. Earlier local whole-report prototype results do not validate that remote implementation. Remote code was read and copied with exact Git-blob verification before review. The September 25 retry applies only the compatible correction to that verified source.",
   "confirmed_remote_failures": [
     "append to a valid record lacking its final newline writes concatenated invalid JSON and only then raises, leaving corrupted history",
     "build_calibration_record aliases nested caller-owned lists; later input mutation changes a supposedly digested record",
     "two overlapping writers can append records with the same previous_record_id and break replay",
     "an existing loader test fails because its expected canonical/line-2 error does not match the actual line-1 parse error"
   ],
-  "local_compatible_fix": [
+  "compatible_fix": [
     "deep JSON snapshot before assigning record digest",
     "fail closed on missing final newline",
     "exclusive sidecar writer lock without auto-unlock",
@@ -23,7 +25,6 @@
   ],
   "actual_validation": {
     "python": "3.13.5",
-    "command": "python -m pytest tests -q --tb=short --junitxml=evidence/after-fix.xml",
     "scope": "checksum-verified sparse corpus/calibration source subset, not the full repository",
     "before_fix_passed": 15,
     "before_fix_failed": 4,
@@ -32,16 +33,23 @@
     "new_integrity_tests": 8,
     "existing_corpus_tests": 9,
     "existing_calibration_tests": 7,
-    "compileall_passed": true,
-    "git_apply_check_and_byte_verification_passed": true,
+    "prior_compileall_passed": true,
+    "prior_git_apply_check_and_byte_verification_passed": true,
+    "retry_date": "2026-09-25",
+    "retry_command": "python -m pytest tests -q --tb=short --junitxml=evidence/retry-20260925.xml",
+    "retry_passed": 24,
+    "retry_failed": 0,
     "full_repository_ci_run": false
   },
   "local_patch_sha256": "dead6659d3fa3bb54c616ad210eae33751d6b7d3260d1d1df0b6d7aef18143c6",
-  "local_fixed_module_sha256": "0f5a4d89c5194ee2b6e31d10969cfe57111c796af606487d14446ab7ff4c073d",
-  "write_status": "This run's create_file call for its separate Python implementation was blocked by an OpenAI safety-status determination failure. Documentation/state updates succeeded. No alternate code-write route attempted; the compatible correction patch remains local.",
-  "container_git_status": "DNS failure resolving github.com",
-  "prior_evidence_correction": "Do not treat the earlier text-only 8-passed prototype artifact as reproducible test evidence. The separate local 40-passed prototype is also not the remotely added implementation. Current compatible-patch acceptance evidence is the 24-test run above.",
-  "merge_decision": "do_not_merge_until_integrity_fix_and_actual_repository_CI",
+  "fixed_module_sha256": "0f5a4d89c5194ee2b6e31d10969cfe57111c796af606487d14446ab7ff4c073d",
+  "fixed_module_git_blob": "b5b4c291f8e29e96e3499c45c5c53e968c350426",
+  "integrity_fix_commit": "f9d817bb8b48d84d4db7c986bde4151cd622769e",
+  "integrity_tests_commit": "5e96d150ebc1c66e1c72fe1c4b5484ac7b23d9ae",
+  "write_status": "September 25 authorized GitHub update_file and create_file calls succeeded; the compatible correction and eight integrity tests are now committed. Earlier safety-status failures remain historical, not current results.",
+  "container_git_status": "September 25 git ls-remote still fails: Could not resolve host github.com; full local clone is unavailable",
+  "prior_evidence_correction": "Do not treat the earlier text-only 8-passed prototype artifact as reproducible test evidence. The separate local 40-passed prototype is also not the remotely added implementation. Current compatible-patch local acceptance evidence is the repeated 24-test run above.",
+  "merge_decision": "wait_for_actual_repository_ci_on_python_3_10_3_11_3_12",
   "audio_dsp_changed": false,
   "mastering_changed": false,
   "live_code_changed": false,
@@ -50,5 +58,5 @@
   "neural_audio_used": false,
   "paid_external_credits_used": false,
   "human_listening_required": true,
-  "next_goal": "integrate the minimal compatible integrity patch through an authorized working writer, run full Python 3.10/3.11/3.12 repository CI, then validate source-bound corpus ingestion; coordinate one writer per branch"
+  "next_goal": "open the STUDIO pull request, inspect full repository CI on the exact proposed head, then accept or revise; source-bound annotated-report ingestion remains the next bounded engineering goal"
 }
