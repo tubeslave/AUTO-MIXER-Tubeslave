@@ -120,17 +120,18 @@ def deliver_master(source_path: str | Path, output_dir: str | Path, *,
             'wav': analyze(wav_audio, wav_sr, include_true_peak=True, include_loudness=True),
             'mp3_decoded': analyze(pcm, sr, include_true_peak=True, include_loudness=True),
         }
-        failures = []
-        for fmt, metrics in report['export_measurements'].items():
-            if not np.isfinite(metrics['true_peak_dbtp']) or metrics['true_peak_dbtp'] > -1.0:
-                failures.append(f'{fmt}_true_peak_exceeds_minus_1_dbtp')
-            lu = metrics['integrated_lufs']
-            if lu is None or not np.isfinite(lu) or abs(lu-target_lufs) > .6:
-                failures.append(f'{fmt}_loudness_target_missed')
-        if len(wav_audio) != len(x) or len(pcm) != len(x):
-            failures.append('export_length_mismatch')
-        report['export_failures'] = failures
-        if failures:
+        export_validation = validate_master_exports(
+            report['export_measurements'],
+            target_lufs=target_lufs,
+            requested_ceiling_dbtp=ceiling_dbtp,
+            expected_frames=len(x),
+            export_frames={'wav': len(wav_audio), 'mp3_decoded': len(pcm)},
+            expected_sample_rate=int(sr),
+            export_sample_rates={'wav': int(wav_sr), 'mp3_decoded': int(sr)},
+        )
+        report['export_validation'] = export_validation
+        report['export_failures'] = list(export_validation['failures'])
+        if not export_validation['accept_technical_delivery']:
             report['status'] = 'rejected_export_validation'
         report['artifacts'] = {f.name: hashlib.sha256(f.read_bytes()).hexdigest() for f in (wav, mp3)}
     if hashlib.sha256(source_path.read_bytes()).hexdigest() != source_file_hash:
