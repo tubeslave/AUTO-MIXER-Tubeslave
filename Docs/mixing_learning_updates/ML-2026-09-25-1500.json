@@ -1,0 +1,165 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-25-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-25T15:00:00+03:00",
+  "actual_start_msk": "2026-09-25T15:02:00+03:00",
+  "completed_msk": "2026-09-25T15:14:30+03:00",
+  "preceding_update_id": "ML-2026-09-25-1200",
+  "preceding_search_update_id": "ML-2026-09-25-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260925-1500-01",
+      "operation": "add",
+      "title": "Off-manifold robustness in synthesizer inversion with joint distribution flow matching",
+      "stable_id": "arXiv:2609.29320v1",
+      "url": "https://arxiv.org/html/2609.29320",
+      "publication_date": "2026-09-24",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_methods_data_inference_metrics_results_ablations_limitations",
+      "review_status": "preprint_ismir_2026_project_claim",
+      "artifact_id": "ART-ML-20260925-1500-01",
+      "findings": [
+        "synth inversion from real audio is an ambiguous projection onto the synthesizer manifold rather than unique parameter recovery",
+        "JDF improves several off-manifold metrics over an encoder-conditioned baseline but worsens Surge SOT from 0.232 to 0.317",
+        "JDF-A with unpaired real audio is almost tied with JDF without it on Surge off-manifold MSS 7.69 versus 7.68",
+        "the conditional baseline also differs architecturally, limiting causal attribution to the training objective",
+        "conditioning noise and CFG responses are model and domain dependent",
+        "the study uses isolated three-second one-shots and no human evaluation"
+      ],
+      "limited_conclusion": "Treat output as a plausible synth-manifold projection; separate objective, architecture and unpaired-data effects and require multi-metric plus loudness-matched listening validation."
+    },
+    {
+      "id": "SRC-ML-20260925-1500-02",
+      "operation": "add",
+      "title": "On a Separate Note: Robust Score-Informed Note Separation with a Two-Stream TFC-TDF U-Net and Adaptive Set Ownership",
+      "stable_id": "arXiv:2609.29071v1",
+      "url": "https://arxiv.org/html/2609.29071",
+      "publication_date": "2026-09-24",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_architecture_compute_datasets_baselines_metrics_editing_real_transfer",
+      "review_status": "preprint",
+      "artifact_id": "ART-ML-20260925-1500-02",
+      "findings": [
+        "NoteSep requires aligned pitch onset and offset for every queried note and is not autonomous transcription",
+        "Adaptive Set Ownership reallocates mixture energy among concurrent independent note estimates",
+        "SCNS-Eval median SI-SDR is 7.39 dB versus 2.49 dB for score-informed NMF",
+        "Melodyne is not directly comparable because it receives no score and matched only 54.42 percent of scored notes",
+        "the signal contract is 16 kHz mono and the editing test uses stored note estimates rather than subtraction from the input",
+        "real transfer is limited to four PHENICX-Anechoic pieces and ten Bach10 quartets with no listening test"
+      ],
+      "limited_conclusion": "Use only with a trustworthy aligned score and audit independent-note sum consistency, octave leakage and preservation before local pre-mix editing."
+    },
+    {
+      "id": "SRC-ML-20260925-1500-03",
+      "operation": "add",
+      "title": "Do Audio Representations Compose Additively?",
+      "stable_id": "arXiv:2609.27187v1",
+      "url": "https://arxiv.org/html/2609.27187",
+      "publication_date": "2026-09-23",
+      "discovery_date": "2026-09-25",
+      "doi": null,
+      "reading_depth": "full_html_data_cca_additive_reconstruction_baselines_metrics_results_limitations",
+      "review_status": "preprint",
+      "findings": [
+        "CLAP beats permuted and label-overlap baselines on larger FSD50K combination holdouts while speech models do not consistently do so",
+        "all representations retain non-additive residuals",
+        "the diagnostic uses clip-level unordered semantic source labels",
+        "the study does not cover level pan dynamics phase temporal arrangement stems or mix quality"
+      ],
+      "limited_conclusion": "Use CLAP source-vector arithmetic only as a secondary diagnostic and retain waveform conservation, calibrated signal metrics and listening checks."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260925-1500-01",
+      "source_id": "SRC-ML-20260925-1500-01",
+      "project_url": "https://benhayes.net/synth-jdf/",
+      "status": "artifact_partial_demo_only",
+      "checked_date": "2026-09-25",
+      "findings": ["audio examples and supplementary material available", "no public code repository weights environment or training manifest verified"],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260925-1500-02",
+      "source_id": "SRC-ML-20260925-1500-02",
+      "repository_url": "https://github.com/ben2002chou/notesep",
+      "pinned_commit": "f963948502772f5a685a71779af72aa6af85c392",
+      "status": "reproducibility_blocked",
+      "checked_date": "2026-09-25",
+      "findings": ["repository contains only a coming-soon README", "no code models dataset release license environment or runnable configuration"],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    "Real-audio synth inversion returns a plausible projection onto the synthesizer manifold, not uniquely recovered ground truth.",
+    "In synth-JDF, joint-density training explains most of the reported gain; the added unpaired-real marginal is nearly tied with JDF alone.",
+    "Improved MSS, wMFCC and RMS can coexist with worse SOT; one aggregate metric cannot certify timbral match.",
+    "Conditioning noise near tau 0.1 is a paper-specific sweep result, not a reusable setting.",
+    "CFG can help or hurt under domain shift and must be swept per model and task.",
+    "One-shot inversion does not validate full-song reference matching, effect automation or mix control.",
+    "NoteSep requires aligned pitch, onset and offset for every note and is not autonomous transcription or correction.",
+    "Independently estimated notes can violate mixture consistency; joint ownership can reduce but not eliminate that risk.",
+    "A 16-kHz mono separation result does not validate full-band stereo rock editing.",
+    "Synthetic stored-estimate editing metrics are not listener evidence for transparent in-mix edits.",
+    "CLAP embeddings are partially, not perfectly, additive across semantic source labels.",
+    "Embedding additivity does not imply waveform additivity or invariance to reverb, masking, time, level, pan or dynamics."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260925-1500-01","when":"matching a real sound with synth parameters","change":"describe output as a plausible projection retain the reference and audition alternatives","numeric_provenance":"no preset range","protect":["identity","role","attacks","envelope"],"verify":["multi-metric panel","loudness-matched blind comparison"],"cancel":"output is described as recovered truth or loses musical role","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-02","when":"claiming benefit from unpaired real audio","change":"isolate JDF from JDF-A with identical architecture and training budget","numeric_provenance":"paper ablation MSS 7.68 versus 7.69 is evidence of a near-tie not a setting","protect":["causal attribution"],"verify":["paired ablation","uncertainty"],"cancel":"result is a near-tie or architecture also changes","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-03","when":"evaluating synth inversion","change":"require MSS wMFCC SOT RMS and listening rather than one score","numeric_provenance":"paper metric panel","protect":["fine spectrum","envelope","preference"],"verify":["preregistered metric panel"],"cancel":"a key anchor worsens materially despite average gain","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-04","when":"selecting conditioning noise or CFG","change":"sweep per pinned model and domain","numeric_provenance":"tau 0.1 is only the paper-specific observed neighbourhood","protect":["specificity","attacks","stability"],"verify":["raw outputs","seed spread","listening"],"cancel":"benefit reverses by metric or domain or detail collapses","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-05","when":"attempting note-level editing","change":"require a validated aligned score with pitch onset and offset confidence","numeric_provenance":"NoteSep conditioning contract; no preset range","protect":["timing","articulation","unedited notes"],"verify":["alignment audit before processing"],"cancel":"score ambiguity drift or missing overlapping notes","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-06","when":"summing separated notes","change":"compare independent estimates with joint ownership or reallocation","numeric_provenance":"ASO ablation; no production range","protect":["mixture sum","octave separation","attacks"],"verify":["unedited-sum null","cross-talk matrix","listening"],"cancel":"duplication deletion or worse target leakage","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-07","when":"transferring NoteSep to production rock","change":"reject 16-kHz mono output as production-ready until full-band stereo reconstruction passes","numeric_provenance":"paper signal contract","protect":["HF","stereo","phase","mono","peaks"],"verify":["full-band stereo paired test"],"cancel":"bandwidth phase room or peak failure","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260925-1500-08","when":"using CLAP arithmetic for mix decisions","change":"keep it diagnostic and pair with explicit waveform gain phase onset and peak measures","numeric_provenance":"representation study limitations; no preset range","protect":["performance","physical signal"],"verify":["controlled source add or remove experiment"],"cancel":"embedding result conflicts with waveform or listening evidence","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260925-1500-01","status":"not_run","baseline":"pinned JDF trained on paired synthesizer audio only","variant":"identical JDF-A with unpaired-real audio marginal enabled","single_factor":"unpaired-real marginal training","loudness_matching":"separate BS.1770 blind copies; preserve raw safety outputs","measure":["MSS","wMFCC","SOT","RMS envelope","onset error","sample peak","true peak","seed spread","blind match and preference"],"protect":["identity","attack","decay","pitch","stereo","headroom"],"success":"consistent improvement beyond uncertainty without loss on SOT attacks or preference","cancel":"near-tie metric reversal unstable seeds or loudness advantage","blocker":"public code weights and free reproducible configuration unavailable"},
+    {"id":"EXP-ML-20260925-1500-02","status":"not_run","baseline":"same pinned inversion model with clean conditioning tau 1.0 in the paper convention","variant":"partial conditioning noise tau 0.1","single_factor":"conditioning noise level","loudness_matching":"separate blind copies; preserve raw safety outputs","measure":["MSS","wMFCC","SOT","RMS envelope","transient error","parameter stability","seed spread","sample peak","true peak","blind match"],"protect":["recognizable source detail","attacks"],"success":"robust off-manifold match without detail loss or metric reversal","cancel":"coarse approximation wins only MSS or RMS while SOT attack or preference worsens"},
+    {"id":"EXP-ML-20260925-1500-03","status":"not_run","baseline":"independently summed NoteGrab estimates","variant":"same estimates after Adaptive Set Ownership","single_factor":"ASO ownership and reallocation stage","loudness_matching":"separate blind copies; preserve raw safety outputs","measure":["unedited-sum null","SI-SDR","off-target energy","octave confusion","onsets","phase","mono","sample peak","true peak","blind transparency"],"protect":["attacks","note tails","concurrent voices","unchanged material"],"success":"reduced duplication and leakage with better sum conservation and no attack or ambience damage","cancel":"score mismatch deleted notes new artifacts or only loudness improvement","blocker":"public code and checkpoints coming soon"},
+    {"id":"EXP-ML-20260925-1500-04","status":"not_run","baseline":"embedding predicted by adding isolated source contributions","variant":"embedding measured from exact linear waveform sum","single_factor":"additive embedding prediction versus observed mixed-waveform embedding","loudness_matching":"not applicable; source gains are fixed and calibrated","measure":["cosine","relative Frobenius error","CKA","retrieval","waveform null","loudness","onset","phase"],"protect":["no acceptance or audio-processing decision from CLAP alone"],"success":"bounded repeatable residual and correct directional response to one source mute","cancel":"residual is scene-dependent sign or direction is wrong or CLAP conflicts with waveform truth"}
+  ],
+  "video_updates": [
+    {"id":"VID-ML-20260925-1500-01","operation":"add","youtube_id":"O67lpW63Qq0","title":"Mastering Essentials Part 2 - The Three Ms of Mastering","channel":"Sound On Sound / Ian Shepherd","url":"https://www.youtube.com/watch?v=O67lpW63Qq0","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_available_via_permitted_connector","technical_claims_extracted":false},
+    {"id":"VID-ML-20260925-1500-02","operation":"add","youtube_id":"9Q-pyk806jw","title":"The Mixdown with Universal Audio: Part 6 - Mastering","channel":"Future Music / Universal Audio","url":"https://www.youtube.com/watch?v=9Q-pyk806jw","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_available_via_permitted_connector","technical_claims_extracted":false}
+  ],
+  "dedupe": [
+    {"key":"arXiv:2609.29320v1","resolution":"new_unique_by_stable_id_and_normalized_title"},
+    {"key":"arXiv:2609.29071v1","resolution":"new_unique_by_stable_id_and_normalized_title"},
+    {"key":"arXiv:2609.27187v1","resolution":"new_unique_by_stable_id_and_normalized_title"},
+    {"key":"youtube:wrbD8nN5B4o","resolution":"rejected_low_specificity_for_queue_after_metadata_check","reason":"general explainer from a non-specialist channel for this topic rotation"}
+  ],
+  "queue": {
+    "video_count_before": 41,
+    "video_count_after": 43,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 2,
+    "deep_review_priority": [
+      "synth-JDF objective architecture and unpaired-data attribution",
+      "NoteSep mixture consistency score contract and artifact availability",
+      "CLAP additivity residual and mix-control limits",
+      "Ian Shepherd permitted transcript",
+      "Future Music and Universal Audio permitted transcript"
+    ]
+  },
+  "reference_updates": [],
+  "multitrack_candidates": [],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "paid_services_used": false,
+    "external_audio_upload": false
+  }
+}
