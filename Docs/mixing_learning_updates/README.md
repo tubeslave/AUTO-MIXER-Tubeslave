@@ -64,6 +64,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-25-1800 | [Report](ML-2026-09-25-1800.md), [JSON patch](ML-2026-09-25-1800.json) | Deep review: synth-JDF same-architecture attribution and tau-selection audit, NoteSep ASO/sum/compute correction, CLAP mean-combination contract plus 2 full primary comparators; 3 source cards updated, 2 added, 1 repository audit added, 12 Knowledge Cards, 8 candidate rules, 43 carried queued videos and 4 unrun experiments |
 | ML-2026-09-26-0900 | [Report](ML-2026-09-26-0900.md), [JSON patch](ML-2026-09-26-0900.json) | Search: no fresh weekend arXiv submissions; 3 older full-text metric gaps, 2 artifact audits, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new metadata-only queued rock-guitar videos, 45 queued videos and 4 unrun experiments; stem-specific metric, weighting-direction, GCC-PHAT and evidence-family limits recorded |
 | ML-2026-09-26-1200 | [Report](ML-2026-09-26-1200.md), [JSON patch](ML-2026-09-26-1200.json) | Deep review: bake-off endpoint/QC/licence corrections, full MERT-metric comparator and implementation audit, Binaural-MUSDB additivity and causal/listener-protocol audit; 3 source cards updated, 1 added, 2 artifact audits updated, 1 added, 12 Knowledge Cards, 8 candidate rules, 45 carried queued videos and 4 unrun experiments |
+| ML-2026-09-26-1500 | [Report](ML-2026-09-26-1500.md), [JSON patch](ML-2026-09-26-1500.json) | Search: no fresh afternoon arXiv posting; 2 older full DAFx-26 gaps, 2 artifact audits, 1 restricted dataset card, 12 Knowledge Cards, 8 candidate rules, 0 studied and 2 new metadata-only queued mix-bus/loudness videos, 47 queued videos and 4 unrun experiments; trajectory-attribution, song-leakage, additive-contract, statistics and rights limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -80,6 +81,8 @@ This transfer intentionally does not inject raw candidates into `backend/source_
 Earlier `R-20260911-1200-*` and `R-20260911-1500-*` references in the package refer to research updates seen in the original study. Their presence in the runtime registry is not asserted by this transfer.
 
 ## Handoff for mixing agents
+
+ML-2026-09-26-1500 (`search`, preceding successful search `ML-2026-09-26-0900`): treat SEND only as an opt-in structural-window proposer, not an automatic panner, and hold the trajectory fixed when comparing window timing. Treat PAEDB as CCD+ELAE imitation, group partitions by source song and require a raw `mixture - primary - ambience` null. Reject ripped YouTube test media and do not transfer `12 ms`, `150 Hz` or `200 Hz` as rock presets. Next test: `EXP-ML-20260926-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-26-1200 (`deep_review`, preceding search `ML-2026-09-26-0900`): the bake-off supports artifact-only as the stronger endpoint but not an interior preset; rerun five- and ten-point QC policies with participant/track clustering. Keep MERT metrics secondary until within-model and held-out-model validation, and never use mono embeddings as stereo/phase/HF/peak proof. Require `mixture - sum(stems)` nulls for synthetic separation data and match augmentations in stereo/binaural A/B. Next test: `EXP-ML-20260926-1200-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
