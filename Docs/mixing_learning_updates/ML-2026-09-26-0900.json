@@ -1,0 +1,192 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-26-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-26T09:00:00+03:00",
+  "actual_start_msk": "2026-09-26T09:03:11+03:00",
+  "completed_msk": "2026-09-26T09:14:18+03:00",
+  "preceding_update_id": "ML-2026-09-25-1800",
+  "preceding_search_update_id": "ML-2026-09-25-1500",
+  "citation_check": "partial",
+  "search_window": {
+    "after_successful_search": "2026-09-25T15:00:00+03:00",
+    "fresh_arxiv_eess_as_cs_sd_submissions_found": 0,
+    "older_gap_sources_added": 3
+  },
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260926-0900-01",
+      "operation": "add",
+      "title": "Musical Source Separation Bake-Off: Comparing Objective Metrics with Human Perception",
+      "stable_id": "arXiv:2507.06917v3",
+      "url": "https://arxiv.org/html/2507.06917v3",
+      "doi": "10.48550/arXiv.2507.06917",
+      "publication_date": "2025-07-09",
+      "latest_version_date": "2025-09-30",
+      "discovery_date": "2026-09-26",
+      "reading_depth": "full_html_v3_protocol_quality_controls_metrics_tables_results_limitations_data_link",
+      "review_status": "WASPAA_2025_peer_reviewed_conference_version_claimed",
+      "artifact_id": "ART-ML-20260926-0900-01",
+      "findings": [
+        "the released CSV contains 5889 repeated rating rows from 209 sessions, 50 tracks and four stems",
+        "traditional SDR had the highest reported vocal Kendall tau 0.316 in this pool",
+        "SI-SAR had the highest reported average among the displayed scale-dependent and invariant panel at tau 0.218",
+        "CLAP-LAION-music FAD reached tau 0.253 drums, 0.188 bass and 0.000 vocals",
+        "IRM1 oracle masking did not perceptually outperform the strongest learned systems",
+        "the Figure 3 and Section 4.2 direction for interference versus artifact weighting contradicts the abstract and conclusion"
+      ],
+      "limited_conclusion": "Use stem-specific metric panels and blinded listening; keep the interference-versus-artifact weighting claim verification_required until recomputed."
+    },
+    {
+      "id": "SRC-ML-20260926-0900-02",
+      "operation": "add",
+      "title": "Spacing Out: On the Reliability of Binaural Music Source Separation Metrics",
+      "stable_id": "arXiv:2607.25919v1",
+      "url": "https://arxiv.org/pdf/2607.25919",
+      "doi": "10.48550/arXiv.2607.25919",
+      "publication_date": "2026-07-28",
+      "discovery_date": "2026-09-26",
+      "reading_depth": "full_pdf_model_training_listening_protocol_metrics_results_gcc_variants_noise_stress_limitations",
+      "review_status": "accepted_ISMIR_2026",
+      "artifact_id": "ART-ML-20260926-0900-02",
+      "findings": [
+        "26 screened participants contributed 96 pairwise comparisons and 132 localization observations with at least three responses per condition",
+        "Bi-SCNet was preferred overall but not significantly for centered sources",
+        "delta ILD and SRR aligned more consistently with listener choices than delta ITD and SSR in this experiment",
+        "GCC-PHAT delta ITD often collapsed bass estimates to zero microseconds regardless of azimuth",
+        "bass ITD failure appeared around 45 dB SNR in the synthetic noise stress test",
+        "beta zero improved robustness while beta one better matched clean HRIR ground truth, exposing a robustness-accuracy tradeoff"
+      ],
+      "limited_conclusion": "Do not use one binaural metric as a production gate; GCC-PHAT delta ITD is especially unreliable for separated narrow-band bass."
+    },
+    {
+      "id": "SRC-ML-20260926-0900-03",
+      "operation": "add",
+      "title": "Do Music Source Separation Models Preserve Spatial Information in Binaural Audio?",
+      "stable_id": "arXiv:2507.00155v1",
+      "url": "https://arxiv.org/html/2507.00155v1",
+      "doi": "10.48550/arXiv.2507.00155",
+      "publication_date": "2025-06-30",
+      "discovery_date": "2026-09-26",
+      "reading_depth": "full_html_dataset_synthesis_metrics_models_results_limitations_artifact_links",
+      "review_status": "ISMIR_2025",
+      "artifact_id": "ART-ML-20260926-0900-02",
+      "evidence_family": "same_lead_author_dataset_and_metric_lineage_as_SRC-ML-20260926-0900-02",
+      "findings": [
+        "Binaural-MUSDB mono-averages MUSDB18-HQ stems and convolves one SADIE II subject HRIR at one static azimuth per source",
+        "source angles are sampled once per song in 10 degree increments without overlap",
+        "the study used objective metrics plus preliminary author listening rather than a controlled perceptual validation",
+        "the later 2026 paper directly narrows confidence in the earlier delta ITD conclusions"
+      ],
+      "limited_conclusion": "Treat this as foundational same-family context, not independent confirmation or a raw rock multitrack reference."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260926-0900-01",
+      "source_id": "SRC-ML-20260926-0900-01",
+      "record_url": "https://zenodo.org/records/15843081",
+      "stable_id": "DOI:10.5281/zenodo.15843081",
+      "status": "public_listener_data_verified_audio_rights_inheritance_requires_review",
+      "checked_date": "2026-09-26",
+      "license_record": "CC-BY-4.0",
+      "csv_sha256": "c7cbe61e82fb33d0b9ab7dbc58f67f51870a0f60c671fb62e2a97b8caa02cd97",
+      "findings": [
+        "listener CSV is public, 635598 bytes, 5889 rows plus header, 209 sessions, 50 tracks and four stem classes",
+        "violation counts reproduce the paper: 2371 zero, 1778 one, 1284 two, 396 three, 60 four",
+        "the 1284062239-byte separated-audio archive was not downloaded",
+        "underlying MUSDB and SiSEC excerpt rights must be checked separately before audio reuse"
+      ],
+      "executed": false,
+      "audio_downloaded": false
+    },
+    {
+      "id": "ART-ML-20260926-0900-02",
+      "source_ids": ["SRC-ML-20260926-0900-02", "SRC-ML-20260926-0900-03"],
+      "repository_url": "https://github.com/richa-namballa/binaural-mss",
+      "pinned_commit": "988fe786a94d0cc4b6d2a3837d71f106f462d4d8",
+      "status": "partial_same_family_artifact_rights_verification_required",
+      "checked_date": "2026-09-26",
+      "findings": [
+        "repository contains 2025 synthesis, inference and metric scripts plus result CSVs",
+        "no root license was found",
+        "no public 2026 Bi-SCNet training weights, perceptual responses, PHAT-beta or masked GCC-PHAT implementation found",
+        "eval/interaural_metrics.py implements fixed full PHAT",
+        "documented -s and --sources option is malformed in code as concatenated -s--sources"
+      ],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    "Separation-metric validity is stem- and failure-mode-specific; a global average can conceal reversals.",
+    "Traditional SDR can outperform scale-invariant metrics when gain and spatial fidelity are perceptually relevant.",
+    "SI-SAR can better follow instrument-stem judgments but is not a universal production threshold.",
+    "CLAP-FAD is distributional and showed modest instrument agreement and zero vocal correlation in this pool.",
+    "Internally contradictory metric-weight interpretations remain verification_required.",
+    "Repeated ratings require participant- and track-aware uncertainty rather than row-level independence.",
+    "An oracle mask is not necessarily a perceptual upper bound.",
+    "Binaural metric agreement changes with source position, especially for centered sources.",
+    "Full-whitening GCC-PHAT can collapse narrow-band bass ITD under low-energy artifacts.",
+    "Reducing PHAT whitening improves robustness but can reduce clean-reference accuracy.",
+    "Delta ILD and SRR can track level and residual error without proving localization fidelity.",
+    "Single-HRTF static synthetic scenes do not validate measured rooms or ordinary stereo-rock mix controls."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260926-0900-01","when":"accepting separated stems","change":"use a stem-specific metric panel plus blinded listening","numeric_provenance":"no production range","protect":["identity","attacks","leakage","level"],"verify":["SDR","SI-SAR","fixed FAD where relevant","raw waveform checks","blind listening"],"cancel":"metrics disagree materially or listening rejects","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-02","when":"evaluating vocals","change":"retain a scale and spatial sensitive metric beside SI metrics","numeric_provenance":"paper vocal SDR tau 0.316 is evidence not a threshold","protect":["gain","centre","consonants","phase"],"verify":["raw level and spatial checks","loudness-matched blind listening"],"cancel":"gain or spatial changes are normalized away","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-03","when":"using FAD or CLAP for separation","change":"keep it secondary and stem-specific","numeric_provenance":"paper tau 0.253 drums, 0.188 bass, 0.000 vocals","protect":["waveform fidelity","identity"],"verify":["target-domain per-stem correlation","listening"],"cancel":"vocal use, distribution shift or per-clip disagreement","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-04","when":"weighting interference versus artifacts","change":"do not select a weight until the v3 direction conflict is recomputed","numeric_provenance":"published equation, Figure 3 and conclusion conflict","protect":["causal interpretation"],"verify":["pinned code","endpoint labels","participant and track bootstrap"],"cancel":"caption code and conclusion still disagree","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-05","when":"reporting listener statistics","change":"preserve participant and track clustering plus quality-control strata","numeric_provenance":"5889 rows, 209 sessions, 50 tracks","protect":["uncertainty","generalization"],"verify":["cluster bootstrap","strict and permissive QC sensitivity"],"cancel":"conclusion depends on row independence","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-06","when":"measuring bass ITD after separation","change":"do not use GCC-PHAT delta ITD alone","numeric_provenance":"paper noise failure around 45 dB SNR; no beta preset","protect":["bass localization","phase"],"verify":["HRIR truth","noise and artifact sweep","listening"],"cancel":"zero-lag collapse or beta-dependent reversal","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-07","when":"using delta ILD or SRR","change":"label them level and residual diagnostics, not localization proof","numeric_provenance":"2026 listener agreement analysis","protect":["position","width","immersion"],"verify":["robust timing and spectral cues","localization listening"],"cancel":"better score comes from gain normalization or leakage only","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-0900-08","when":"claiming benefit from binaural training","change":"match architecture budget and augmentations and hold out HRTF room and source conditions","numeric_provenance":"no production range","protect":["causal attribution","transfer"],"verify":["same-recipe stereo versus binaural A/B","unseen HRTFs"],"cancel":"only one synthetic subject or static scene improves","confidence":"medium-high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260926-0900-01","status":"not_run","baseline":"pinned rights-cleared reference stem and separator A output","variant":"same input with separator B output","single_factor":"separator","loudness_matching":"preserve raw outputs; separate BS.1770-matched randomized blind copies","measure":["per-stem SDR","SI-SAR","SI-SDR","fixed CLAP-FAD","leakage","onset and tail error","sample and true peak","mono and stereo residual","blind quality"],"protect":["identity","words","bass pitch and body","drum attacks","ambience","headroom"],"success":"preregistered stem panel improves beyond uncertainty without blind rejection","cancel":"aggregate gain hides a stem reversal, loudness drives preference, or FAD conflicts with waveform or listener evidence"},
+    {"id":"EXP-ML-20260926-0900-02","status":"not_run","baseline":"interference-only endpoint of published reweighted formula","variant":"artifact-only endpoint","single_factor":"error weight","loudness_matching":"not applicable to metric recomputation; audio estimates fixed","measure":["Kendall tau by stem","endpoint labels","monotonicity","cluster-bootstrap intervals","QC sensitivity"],"protect":["equation and sign provenance","correlated observations"],"success":"code, figure direction and interpretation agree under both QC strata","cancel":"endpoint mapping remains ambiguous or conclusion reverses by defensible QC","blocker":"exact published metric implementation and estimate archive not yet pinned and run"},
+    {"id":"EXP-ML-20260926-0900-03","status":"not_run","baseline":"GCC-PHAT-beta beta 1 fully whitened","variant":"beta 0 ordinary GCC","single_factor":"beta","loudness_matching":"not applicable because audio is unchanged","measure":["ITD error to HRIR truth","zero-lag collapse rate","variance by SNR and azimuth","frame continuity"],"protect":["accurate off-centre localization"],"success":"preregistered operating region improves robustness without unacceptable truth drift","cancel":"apparent gain is only centering or accuracy and robustness cannot be jointly bounded"},
+    {"id":"EXP-ML-20260926-0900-04","status":"not_run","baseline":"small SCNet trained on stereo MUSDB under locked recipe","variant":"identical architecture and recipe trained on binauralized MUSDB","single_factor":"training-domain rendering","loudness_matching":"preserve raw outputs; separate -12 LUFS or BS.1770-matched randomized headphone copies","measure":["SRR","delta ILD","robust timing and position metrics","leakage","mono and phase","peaks","localization error","spread","blind reference similarity"],"protect":["separation quality","source position","width","bass phase","transients","headroom"],"success":"unseen-condition localization and preference improve without separation or safety regression","cancel":"benefit is confined to training HRTF/static angles or follows level/leakage only","blocker":"public 2026 Bi-SCNet weights training code and multi-HRTF test manifest not found"}
+  ],
+  "video_updates": [
+    {"id":"VID-ML-20260926-0900-01","operation":"add","youtube_id":"h9Zpp7i-8Mw","title":"Big Guitars Production Trick","channel":"Warren Huart / Produce Like A Pro","url":"https://www.youtube.com/watch?v=h9Zpp7i-8Mw","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_available_via_permitted_transcript_export","technical_claims_extracted":false},
+    {"id":"VID-ML-20260926-0900-02","operation":"add","youtube_id":"H68fEmnFsTE","title":"Recording Rock Guitars With Bradley Cook","channel":"Warren Huart / Produce Like A Pro","url":"https://www.youtube.com/watch?v=H68fEmnFsTE","reading_depth":"metadata_only","status":"queued_source","transcript_status":"not_available_via_permitted_transcript_export","technical_claims_extracted":false}
+  ],
+  "dedupe": [
+    {"key":"arXiv:2507.06917","resolution":"new_unique_version_family_latest_read_v3"},
+    {"key":"arXiv:2607.25919","resolution":"new_unique_by_stable_id_and_normalized_title"},
+    {"key":"arXiv:2507.00155","resolution":"new_unique_but_linked_as_same_author_dataset_metric_family_to_2607.25919"},
+    {"key":"youtube:h9Zpp7i-8Mw","resolution":"new_unique_metadata_only"},
+    {"key":"youtube:H68fEmnFsTE","resolution":"new_unique_metadata_only"}
+  ],
+  "queue": {
+    "video_count_before": 43,
+    "video_count_after": 45,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 2,
+    "deep_review_priority": [
+      "recompute bake-off interference-versus-artifact weight direction with clustered uncertainty",
+      "audit Spacing Out exact statistics and search for 2026 code and perceptual responses",
+      "pin and test binaural metric implementations against HRIR truth",
+      "Warren Huart Big Guitars transcript if permitted availability changes",
+      "Bradley Cook rock-guitar transcript if permitted availability changes"
+    ]
+  },
+  "reference_updates": [],
+  "multitrack_candidates": [
+    {"id":"DATASET-CAND-ML-20260926-0900-01","title":"Binaural-MUSDB and bake-off separated excerpts","status":"not_added_as_reference","reason":"research derivatives with inherited MUSDB or SiSEC audio rights and synthetic or processed stems; not verified raw rights-cleared rock production multitracks"}
+  ],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "paid_services_used": false,
+    "external_audio_upload": false,
+    "commercial_audio_downloaded": false
+  }
+}
