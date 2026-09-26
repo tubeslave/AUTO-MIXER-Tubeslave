@@ -1,0 +1,121 @@
+{
+  "goal": "overhead-cymbal-no-change-first-compression-gate-v1",
+  "status": "accepted_machine_validation_real_song_source_blocked",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "b9a677c4c195fa6dd7e2c35e11c06ed80bfede88",
+  "tested_code_commit": "b81141eb2fe4f07dbd343058a7922b613aa19b73",
+  "pull_request": 140,
+  "merge_commit": "1bc995c4041836877e3eb8db6eb5c6d8f968f5c6",
+  "ci": {
+    "workflow_run": 36004393624,
+    "workflow": "Tests",
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"}
+  },
+  "bounded_task": "add a source-bound Belye Stai overhead boundary plus a no-change-first linked-stereo compression gate that protects cymbal decay, inter-event ambience and stereo image",
+  "repository_inspection": {
+    "roadmap_next_unblocked": "OH/cymbals",
+    "keys_playback_real_validation": "blocked_by_missing_original_stems_in_current_runtime",
+    "existing_Belye_Stai_OH_recipe": {
+      "right_calibration_db": 3.0,
+      "highpass_hz": 190,
+      "lowpass_hz": 13500,
+      "eq": [[6000, -1.2, 0.7]],
+      "target_active_rms_dbfs": -34.0,
+      "active_percentile": 65,
+      "compressor": "none",
+      "time_or_polarity_changes": false
+    }
+  },
+  "source_manifest_evidence": {
+    "OHL_file": "11_OHL.wav",
+    "OHL_sha256": "8db4b38fbff7f3c8e1471911be72a283a8a18ca3a3fa56805bd77ef25a6fdf16",
+    "OH_R_file": "10_OH_R.wav",
+    "OH_R_sha256": "994c93094b97fb1458cc99ed19fdab602913f1981449294d86d386a4ec314126",
+    "frames_each": 9128700,
+    "sample_rate": 44100,
+    "raw_bytes_available_in_current_runtime": false,
+    "real_song_render_claimed": false
+  },
+  "implementation": {
+    "director_module": "audio_workbench/mixing/overhead_director.py",
+    "song_adapter": "audio_workbench/belye_stai_overhead.py",
+    "explicit_stereo_required": true,
+    "fixed_event_band_hz": [3200, 12000],
+    "protected_metrics": [
+      "bright peak-excess consistency",
+      "90-260 ms decay shape",
+      "pre-event floor to body relationship",
+      "2 s macro dynamics",
+      "side/mid energy",
+      "L/R correlation"
+    ],
+    "candidate_change_scope": "attack_release_only",
+    "no_makeup_gain": true,
+    "automatic_baseline_promotion": false,
+    "human_listening_required": true
+  },
+  "local_validation": {
+    "new_tests_passed": 10,
+    "focused_tests_passed": 50,
+    "compile": "passed",
+    "synthetic_sample_rate": 16000,
+    "synthetic_duration_s": 24,
+    "stable_case": {
+      "events": 49,
+      "active_blocks": 12,
+      "bright_peak_excess_p95_db": 8.401256123001469,
+      "bright_peak_excess_spread_db": 1.5467237914546992,
+      "actionable": false,
+      "decision": "no_change",
+      "failure": "bright_peak_excess_already_consistent"
+    },
+    "unstable_case": {
+      "events": 60,
+      "active_blocks": 12,
+      "bright_peak_excess_p95_db": 12.5803051758983,
+      "bright_peak_excess_spread_db": 24.28673027104549,
+      "actionable": true,
+      "candidate_results": {
+        "preserve_decay": {
+          "peak_excess_spread_delta_db": -0.27185412646685947,
+          "decay_drop_delta_db": 0.2330289352803554,
+          "floor_ratio_delta_db": 0.7800927919467,
+          "technically_survives": false,
+          "failure": "inter_event_floor_relationship_changed"
+        },
+        "balanced": {
+          "peak_excess_spread_delta_db": -0.49185205031523793,
+          "decay_drop_delta_db": 0.14766564858942033,
+          "floor_ratio_delta_db": 0.8514963946238758,
+          "technically_survives": false,
+          "failure": "inter_event_floor_relationship_changed"
+        },
+        "catch_bright_peaks": {
+          "peak_excess_spread_delta_db": -0.7869269887285704,
+          "decay_drop_delta_db": 0.04174362650615393,
+          "floor_ratio_delta_db": 0.9220639683833483,
+          "technically_survives": false,
+          "failure": "inter_event_floor_relationship_changed"
+        }
+      },
+      "technical_survivors": []
+    },
+    "interpretation": "the gate can distinguish already-consistent OH from an actionable synthetic problem and fails closed when compression improves bright-peak consistency but changes the relative inter-event ambience too much"
+  },
+  "execution_failures": [
+    "Initial local broader pytest referenced two stale/nonexistent test filenames and exited before collecting tests; corrected focused suite passed 50 tests.",
+    "Initial metric concept used bright-peak P95 as the primary target; before repository commit, synthetic evidence showed local-reference coupling made it unsuitable as the sole target, so the final gate uses peak-excess spread as the improvement target and P95 only as an upper-tail guard. Final candidates still failed the independent floor/body guard; thresholds were not weakened."
+  ],
+  "limitations": [
+    "Synthetic evidence validates control logic only; it does not prove Belye Stai needs OH compression.",
+    "The exact Belye Stai OHL/OH_R source hashes are known from the preserved source manifest, but the raw WAV bytes are absent from the current runtime.",
+    "No full routed session rerender, Perceptual Critic result or human A/B is claimed for real Belye Stai OH in this task."
+  ],
+  "live_code_changed": false,
+  "accepted_vocal_changed": false,
+  "mastering_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "audio_baseline_promoted": false,
+  "next_goal": "restore exact OHL/OH_R bytes and run the gate on the real song; if sources remain unavailable, advance a source-independent Perceptual Critic calibration task using existing human-vs-proxy evidence without changing acceptance thresholds to force agreement"
+}

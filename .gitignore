@@ -87,4 +87,5 @@ backend/models/
 frontend/dist/
 frontend/node_modules/
 backend/venv/
-sessions/test_*.json
+sessions/
+!sessions/.gitkeep

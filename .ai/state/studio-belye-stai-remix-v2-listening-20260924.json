@@ -1,0 +1,46 @@
+{
+  "goal": "belye-stai-first-compressor-replacement-remix-v2",
+  "user_request": "Сведи Белые стаи с новыми вводными",
+  "status": "diagnostic_audio_delivered_pending_human_listening",
+  "engine_commit": "fbe5813affb6ec36a04cc59e0230673ca5f9bc7d",
+  "scope": "full 207-second first original lead-vocal compressor replacement, full downstream SessionRenderer, existing Perceptual Critic and Autonomous Iteration; fresh conventional two-stage broadband mastering",
+  "source_count": 18,
+  "source_sha256_matches": 18,
+  "sample_rate": 44100,
+  "frames": 9128700,
+  "no_change": {
+    "delivered_premaster_file_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "reproduced_premaster_file_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "max_pcm_error": 0.0
+  },
+  "compression_trials": [
+    {"id":"preserve_transient","actual_active_p95_gr_db":2.278339147567749,"intelligibility_delta":-0.013034235588099907,"verdict":"rejected","failures":["target_not_improved"]},
+    {"id":"balanced","actual_active_p95_gr_db":3.219698905944824,"intelligibility_delta":-0.008662921039834015,"verdict":"rejected","failures":["target_not_improved"]},
+    {"id":"control","actual_active_p95_gr_db":3.4817535877227783,"intelligibility_delta":-0.005663940382120591,"verdict":"rejected","failures":["target_not_improved"]}
+  ],
+  "diagnostic_delivery": {
+    "variant": "balanced",
+    "reason": "new full-mix audition requested by user; unranked middle proposal, not an automatically selected musical winner",
+    "surviving_candidate": false,
+    "mix_hypothesis_accepted": false,
+    "disclosure": "All intelligibility hypotheses failed their improvement target; no protected metric regressions were found. Diagnostic delivery does not override the failed target gate.",
+    "first_compressor": {"threshold_dbfs":-36.6640625,"ratio":3.2,"attack_ms":51.0,"release_ms":234.0,"knee_db":6.0,"max_gr_db":4.738962173461914},
+    "fixed_mask_source_match_error_db": 0.0000004887071440862201,
+    "mastering": {"limiter_1_max_gr_db":2.6497981548309326,"limiter_2_max_gr_db":1.450002670288086,"master_candidates":5,"master_candidates_rejected_for_crest_loss":2,"wav_ffmpeg_lufs":-15.13,"wav_ffmpeg_dbtp":-1.62,"mp3_ffmpeg_dbtp":-1.58,"lra_lu":4.0,"clipped_samples":0},
+    "master_wav_sha256":"ff167ba9fa33413e78e337c429d2b23b3ff5c125000d0b2f52b76a067f591227",
+    "master_mp3_sha256":"90a2568462d791684ea5cef30159ac1c222d58b0a10b427b66e3be18b4e54dd9",
+    "premaster_sha256":"73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+    "matched_AB_decoded_mp3_lufs": [-15.99,-15.99],
+    "local_delivery":"/mnt/data/belye_stai_v2/delivery"
+  },
+  "validation": {"local_targeted_tests_passed":22,"existing_adapter_ci_run_verified":35963306396,"existing_adapter_ci_python_matrix":["3.10 success","3.11 success","3.12 success"],"local_script_full_ci_claimed":false,"new_master_wav_reproduced_identically_after_parser_retry":true},
+  "execution_failures_resolved": ["FFmpeg JSON trailer: parse with JSONDecoder.raw_decode", "Numba dynamic module cache: normal import and fresh isolated cache"],
+  "previous_deliveries_unchanged": true,
+  "audio_baseline_promoted": false,
+  "automatic_transition": "rollback_candidate",
+  "human_listening_required": true,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "next_goal": "human level-matched A/B of the requested diagnostic mix; do not call it a surviving candidate or promote baseline. Investigate whether energy-ratio intelligibility is the appropriate improvement target for transient/body compression; retain all safety and protected-regression gates."
+}

@@ -1,0 +1,69 @@
+{
+  "goal": "studio-autonomous-calibration-annotation-v1",
+  "status": "accepted_machine_validation",
+  "base_commit": "dea8b0d5bea4a96627a85e01db5dc2fa3c130a70",
+  "pull_request": 142,
+  "tested_head": "2065911cc71d493d7c8d50acf82ddb9dce022ced",
+  "merge_commit": "9502dec16e43f791e4576398b8895f16b14e9806",
+  "ci_run": 36017988556,
+  "ci_matrix": {"3.10":"success","3.11":"success","3.12":"success"},
+  "bounded_task": "integrate Perceptual Human Calibration evidence into ordinary STUDIO Autonomous Iteration reports as annotation-only metadata",
+  "priority_reason": "Perceptual Human Calibration v1 existed, but its evidence was not attached to the normal iteration audit record; real KEYS/PLAYBACK, OH and isolated vocal scoring remain blocked by unavailable raw bytes",
+  "implementation": {
+    "report_schema_changed": false,
+    "annotation_key": "human_calibration",
+    "post_hoc_persistence_supported": true,
+    "missing_review_is_noop": true,
+    "invalid_review_fails_closed": true,
+    "silent_overwrite_allowed": false,
+    "deep_copy_preserves_input": true
+  },
+  "protected_invariants": [
+    "iteration status",
+    "Perceptual Critic historical result",
+    "transition status and next action",
+    "transition baseline before/after",
+    "transition promotion/rollback flags",
+    "transition protected regressions",
+    "delivery role/source/rollback routing",
+    "baseline_promoted",
+    "baseline_after"
+  ],
+  "validation": {
+    "new_tests_added": 7,
+    "ci_workflow": "Tests",
+    "ci_run": 36017988556,
+    "ci_matrix": {"3.10":"success","3.11":"success","3.12":"success"},
+    "compile_step": "success on all matrix jobs",
+    "studio_offline_boundary_step": "success on all matrix jobs",
+    "full_tests_step": "success on all matrix jobs",
+    "full_suite_test_count": null,
+    "full_suite_test_count_note": "all three full test jobs completed successfully; no test total inferred from status-only evidence"
+  },
+  "self_review": {
+    "pr_patch_inspected": true,
+    "decision_state_snapshot_enforced": true,
+    "historical_critic_evidence_mutated": false,
+    "thresholds_weakened_after_results": false,
+    "base_advanced_during_task": true,
+    "base_advance_note": "base moved by one calibration-state-only commit; GitHub reported the PR mergeable and no DSP/code overlap was present"
+  },
+  "execution_failures": [
+    "An attempt to fetch an in-progress Python 3.11 job log returned transient BlobNotFound; the job later completed successfully and no result was inferred from the failed log fetch."
+  ],
+  "existing_critic_thresholds_changed": false,
+  "autonomous_baseline_promotion_changed": false,
+  "live_code_changed": false,
+  "mastering_changed": false,
+  "audio_dsp_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "blockers": {
+    "real_belye_foreground_stability_score": "exact isolated baseline/candidate vocal audio bytes are not present in the current runtime",
+    "keys_playback_real_validation": "exact raw KEYS/PLAYBACK stems unavailable",
+    "overhead_real_validation": "exact raw OHL/OH_R stems unavailable"
+  },
+  "next_goal": "build an append-only STUDIO calibration replay/corpus from machine-critic plus human-annotation records and test deterministic replay/immutability; keep it evidence-only and define no production threshold until multiple exact human-labeled audio comparisons exist"
+}

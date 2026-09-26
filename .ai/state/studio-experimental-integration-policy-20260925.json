@@ -1,0 +1,16 @@
+{
+  "policy": "studio-experimental-integration",
+  "effective_date": "2026-09-25",
+  "scope": "STUDIO/offline branch only",
+  "directive": "merge useful bounded STUDIO engineering changes into audio-workbench-mcp-v0.1 even when full validation is pending, so integration testing exercises the real combined system",
+  "requirements": [
+    "mark unverified work explicitly as experimental or validation_pending",
+    "never invent successful tests, renders, listening results or CI",
+    "preserve human-listening requirement for subjective audio acceptance",
+    "do not weaken safety/protected regression gates merely to make experimental code pass",
+    "when integrated testing reproduces a regression, revise or revert the responsible change",
+    "do not reintroduce stale superseded implementations over newer evolved versions"
+  ],
+  "paid_external_credits_without_approval": false,
+  "live_scope_changed": false
+}

@@ -1,0 +1,74 @@
+{
+  "goal": "grouped-kick-original-compressor-adapter-and-transient-body-gate-v1",
+  "status": "accepted_machine_validation_audio_candidate_pending_human_listening",
+  "date": "2026-09-24",
+  "base_commit": "683dfb65f040715445905b117175b92ecf0fc441",
+  "pull_request": 133,
+  "tested_head_commit": "226ec49097854192aa0f02a7b798701d24a53877",
+  "merge_commit": "5abc9bb8abe7ef5919018aae6a3f132fc4ade8c6",
+  "ci": {
+    "workflow_run": 35974776892,
+    "conclusion": "success",
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"}
+  },
+  "bounded_task": "Expose exact KICK_IN/KICK_OUT grouped compressor boundary, propose bounded timing-only replacements, gate on fixed event windows, and rerender surviving candidates through the full Belye Stai session.",
+  "local_validation": {
+    "new_tests_passed": 12,
+    "focused_tests_passed": 26,
+    "real_song_duration_s": 207,
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "no_change_processed_kick_pcm_error": 0.0,
+    "v2_full_session_reexport_byte_identical": true,
+    "v2_premaster_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59"
+  },
+  "baseline_compressor": {
+    "threshold_dbfs": -34.54161600635366,
+    "ratio": 3.0,
+    "attack_ms": 22,
+    "release_ms": 115,
+    "knee_db": 5.0,
+    "max_gr_db": 4.5,
+    "observed_max_gr_db": 3.8280980587005615,
+    "observed_p95_gr_db": 2.594486713409424
+  },
+  "candidate_family": [
+    {"id": "more_punch", "result": "rejected", "body_spread_delta_db": 0.12696706700070592, "attack_body_delta_db": 0.02810323580466445, "quiet_hit_delta_db": 0.2554787190614718, "between_hit_floor_delta_db": 0.1130618270408803},
+    {"id": "tighter_body", "result": "technical_survivor_pending_human_listening", "body_spread_delta_db": -0.28583296912567846, "attack_body_delta_db": 0.021536498175578345, "quiet_hit_delta_db": 0.17535952842058578, "between_hit_floor_delta_db": 0.13379856861340045},
+    {"id": "longer_body", "result": "rejected", "body_spread_delta_db": 0.10032675052075746, "attack_body_delta_db": 0.0149273179659275, "quiet_hit_delta_db": -0.19789910707142155, "between_hit_floor_delta_db": -0.17191499447744718}
+  ],
+  "full_mix_protected_deltas_tighter_body": {
+    "foreground_db": 0.00033852066483497367,
+    "vocal_intelligibility": -0.00021681774598747428,
+    "punch_db": -0.09802571950333316,
+    "harshness": 0.00011953048157908874,
+    "density": 0.0,
+    "depth_proxy": -0.00003691127498611779,
+    "width_db": 0.009666453653025542,
+    "climax_lift_db": 0.0,
+    "protected_failures": []
+  },
+  "decision": "accept_kick_processor_and_gate_code_keep_tighter_body_as_human_audition_only",
+  "audio_baseline_promoted": false,
+  "accepted_vocal_changed": false,
+  "bass_baseline_changed": false,
+  "mastering_changed": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "human_listening_required_for_subjective_acceptance": true,
+  "next_goal_probe": {
+    "source_group": ["SN_T", "SN_B"],
+    "existing_snare_no_change_pcm_error": 0.0,
+    "bottom_polarity": -1,
+    "bottom_relative_gain_db": -5.812252814757382,
+    "bottom_expansion_threshold_dbfs": -59.92695773879325,
+    "baseline_compressor_threshold_dbfs": -37.57189773258226,
+    "baseline_ratio": 3.0,
+    "baseline_attack_ms": 14,
+    "baseline_release_ms": 110,
+    "baseline_max_gr_db": 5.0,
+    "simple_precompression_event_probe_count": 925
+  },
+  "next_goal": "SN_T/SN_B synchronized snare adapter with polarity preservation, bottom-mic expansion freeze, ghost-note/body/bleed gate, then full-session audition."
+}
