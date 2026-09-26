@@ -22,7 +22,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import pyloudnorm as pyln
@@ -64,6 +64,7 @@ from cross_adaptive_eq import CrossAdaptiveEQ  # noqa: E402
 from ml.style_transfer import InstrumentStyle, StyleProfile, StyleTransfer  # noqa: E402
 from output_paths import ai_logs_path, ai_mixing_path, ensure_ai_output_dirs, ensure_parent_dir  # noqa: E402
 from perceptual import PerceptualConfig, PerceptualEvaluator  # noqa: E402
+from evaluation import MuQEvalService  # noqa: E402
 from source_knowledge import (  # noqa: E402
     DecisionTrace,
     FeedbackRecord,
@@ -4724,6 +4725,348 @@ def _make_offline_perceptual_evaluator(
             "log_path": str(section.get("log_path", "")),
             "error": str(exc),
         }
+
+
+def _load_yaml_mapping(path: str | Path | None) -> dict[str, Any]:
+    if not path:
+        return {}
+    resolved = Path(path).expanduser()
+    if not resolved.is_absolute():
+        resolved = REPO_ROOT / resolved
+    if not resolved.exists():
+        return {}
+    with resolved.open("r", encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    return dict(payload) if isinstance(payload, dict) else {}
+
+
+def _make_offline_muq_stem_drift_service(
+    args: argparse.Namespace,
+    config: dict[str, Any],
+) -> tuple[MuQEvalService | None, dict[str, Any]]:
+    """Create the optional MuQ per-stem EWMA drift service for offline reports."""
+
+    section = dict((config or {}).get("muq_eval") or {})
+    config_path = Path(str(getattr(args, "muq_eval_config", "config/muq_eval.yaml") or ""))
+    file_section = _load_yaml_mapping(config_path)
+    if file_section:
+        section.update(file_section)
+
+    stem_drift = dict(section.get("stem_drift") or {})
+    if getattr(args, "muq_stem_drift_enable", False):
+        stem_drift["enabled"] = True
+    section["stem_drift"] = stem_drift
+
+    if getattr(args, "muq_stem_drift_window_sec", None) is not None:
+        section["window_sec"] = float(args.muq_stem_drift_window_sec)
+    if getattr(args, "muq_stem_drift_hop_sec", None) is not None:
+        section["hop_sec"] = float(args.muq_stem_drift_hop_sec)
+
+    if section.get("log_path"):
+        section["log_path"] = _repo_resolved_config_path(section["log_path"])
+    if section.get("training_log_path"):
+        section["training_log_path"] = _repo_resolved_config_path(section["training_log_path"])
+
+    enabled = bool(stem_drift.get("enabled", False))
+    report = {
+        "enabled": enabled,
+        "config_path": str((REPO_ROOT / config_path).resolve() if not config_path.is_absolute() else config_path),
+        "window_sec": float(section.get("window_sec", 10.0)),
+        "hop_sec": float(section.get("hop_sec", 5.0)),
+        "log_path": str(getattr(args, "muq_stem_drift_log", "") or ai_logs_path("offline_muq_stem_drift.jsonl")),
+        "osc_endpoint": str(
+            ((stem_drift.get("visualization") or {}).get("osc_endpoint"))
+            if isinstance(stem_drift.get("visualization"), dict)
+            else "/autofoh/muq_drift"
+        ),
+        "error": "",
+    }
+    if not enabled:
+        report["reason"] = "disabled_by_config"
+        return None, report
+
+    try:
+        service = MuQEvalService(section)
+        report.update({
+            "model_status": service.model_status,
+            "fallback_enabled": bool(service.config.fallback_enabled),
+            "stem_groups": sorted((stem_drift.get("groups") or {}).keys()),
+        })
+        return service, report
+    except Exception as exc:
+        report.update({
+            "enabled": False,
+            "error": str(exc),
+            "reason": "service_init_failed",
+        })
+        return None, report
+
+
+def _mono_for_muq(audio: np.ndarray) -> np.ndarray:
+    arr = normalize_audio_shape(audio)
+    if arr.ndim == 1:
+        return arr.astype(np.float32, copy=False)
+    return np.mean(arr, axis=1).astype(np.float32, copy=False)
+
+
+def _sum_stem_audio(existing: np.ndarray | None, addition: np.ndarray, target_len: int) -> np.ndarray:
+    add = normalize_audio_shape(addition)
+    if add.ndim == 1:
+        add = np.column_stack([add, add])
+    if len(add) < target_len:
+        pad = np.zeros((target_len - len(add), add.shape[1]), dtype=np.float32)
+        add = np.vstack([add, pad])
+    add = add[:target_len, :2].astype(np.float32, copy=False)
+    if existing is None:
+        return np.array(add, dtype=np.float32, copy=True)
+    return (existing + add).astype(np.float32, copy=False)
+
+
+def _plan_snapshot_for_muq(plan: ChannelPlan) -> dict[str, Any]:
+    return {
+        "name": plan.name,
+        "instrument": plan.instrument,
+        "trim_db": round(float(plan.trim_db), 4),
+        "fader_db": round(float(plan.fader_db), 4),
+        "pan": round(float(plan.pan), 4),
+        "hpf": round(float(plan.hpf), 4),
+        "lpf": round(float(plan.lpf), 4) if plan.lpf else None,
+        "eq_bands": [
+            [round(float(freq), 4), round(float(gain), 4), round(float(q), 4)]
+            for freq, gain, q in plan.eq_bands
+        ],
+        "compressor": {
+            "threshold_db": round(float(plan.comp_threshold_db), 4),
+            "ratio": round(float(plan.comp_ratio), 4),
+            "attack_ms": round(float(plan.comp_attack_ms), 4),
+            "release_ms": round(float(plan.comp_release_ms), 4),
+        },
+        "phase_invert": bool(plan.phase_invert),
+        "delay_ms": round(float(plan.delay_ms), 4),
+    }
+
+
+def _build_muq_stem_audio(
+    service: MuQEvalService,
+    rendered_channels: Mapping[int, np.ndarray],
+    fx_returns: Mapping[str, np.ndarray],
+    plans: Mapping[int, ChannelPlan],
+    mix: np.ndarray,
+    target_len: int,
+) -> tuple[OrderedDict[str, np.ndarray], dict[str, dict[str, Any]]]:
+    monitor = service.stem_drift_monitor
+    stems: OrderedDict[str, np.ndarray] = OrderedDict()
+    params: dict[str, dict[str, Any]] = {}
+
+    for channel, rendered in rendered_channels.items():
+        plan = plans[channel]
+        group = monitor.infer_group(plan.instrument or plan.name)
+        stem = group if group != "default" else plan.instrument or plan.name
+        stems[stem] = _sum_stem_audio(stems.get(stem), rendered, target_len)
+        params.setdefault(stem, {"group": group, "channels": []})
+        params[stem]["channels"].append({"channel": int(channel), **_plan_snapshot_for_muq(plan)})
+
+    if fx_returns:
+        fx_sum: np.ndarray | None = None
+        for name, rendered in fx_returns.items():
+            fx_sum = _sum_stem_audio(fx_sum, rendered, target_len)
+            params.setdefault("fx", {"group": "fx", "returns": []})
+            params["fx"].setdefault("returns", [])
+            params["fx"]["returns"].append(str(name))
+        if fx_sum is not None:
+            stems["fx"] = _sum_stem_audio(stems.get("fx"), fx_sum, target_len)
+
+    stems["bus"] = normalize_audio_shape(mix).astype(np.float32, copy=False)
+    params.setdefault("bus", {"group": "bus", "channels": ["mix_bus"]})
+    return stems, params
+
+
+def _muq_frequency_masks_for_group(service: MuQEvalService, group: str) -> dict[str, Any]:
+    masks = service.stem_drift_monitor.config.get("frequency_masks", {})
+    if not isinstance(masks, Mapping):
+        return {}
+    group_masks = masks.get(group, {})
+    return dict(group_masks) if isinstance(group_masks, Mapping) else {}
+
+
+def _score_muq_audio(service: MuQEvalService, audio: np.ndarray, sr: int, timestamp: float) -> dict[str, Any]:
+    score = service.evaluate(audio, sr, timestamp=timestamp)
+    return {
+        "score": float(score.quality_score),
+        "confidence": float(score.confidence),
+        "model_status": score.model_status,
+        "impression": score.musical_impression,
+        "window_sec": float(score.audio_window_sec),
+    }
+
+
+def _score_muq_band_masks(
+    service: MuQEvalService,
+    mono: np.ndarray,
+    sr: int,
+    group: str,
+    timestamp: float,
+) -> dict[str, dict[str, Any]]:
+    band_scores: dict[str, dict[str, Any]] = {}
+    for mask_name, profile in _muq_frequency_masks_for_group(service, group).items():
+        if not isinstance(profile, Mapping):
+            continue
+        band = profile.get("band_hz")
+        if not isinstance(band, (list, tuple)) or len(band) != 2:
+            continue
+        try:
+            low_hz = float(band[0])
+            high_hz = float(band[1])
+            filtered = _bandpass_zero_phase(mono, sr, low_hz, high_hz)
+            band_scores[str(mask_name)] = _score_muq_audio(service, filtered, sr, timestamp)
+        except Exception as exc:
+            band_scores[str(mask_name)] = {
+                "score": None,
+                "error": str(exc),
+                "band_hz": [band[0], band[1]],
+            }
+    return band_scores
+
+
+def _write_muq_stem_drift_log(log_path: str | Path, rows: list[dict[str, Any]]) -> str:
+    if not rows:
+        return ""
+    resolved = ensure_parent_dir(str(log_path))
+    with resolved.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(row, ensure_ascii=True) + "\n")
+    return str(resolved)
+
+
+def _record_offline_muq_stem_drift(
+    service: MuQEvalService | None,
+    rendered_channels: Mapping[int, np.ndarray],
+    fx_returns: Mapping[str, np.ndarray],
+    plans: Mapping[int, ChannelPlan],
+    mix: np.ndarray,
+    sr: int,
+    *,
+    target_len: int,
+    report_seed: Mapping[str, Any],
+    log_path: str | Path,
+    max_windows: int = 0,
+) -> dict[str, Any]:
+    if service is None or not service.stem_drift_monitor.enabled:
+        return {**dict(report_seed), "enabled": False}
+
+    window_sec = max(0.25, float(service.config.window_sec))
+    hop_sec = max(0.25, float(service.config.hop_sec))
+    window = max(1, int(round(window_sec * sr)))
+    hop = max(1, int(round(hop_sec * sr)))
+    starts = list(range(0, max(1, target_len - window + 1), hop))
+    if not starts or starts[-1] + window < target_len:
+        starts.append(max(0, target_len - window))
+    if max_windows and max_windows > 0:
+        starts = starts[: int(max_windows)]
+
+    stem_audio, params_by_stem = _build_muq_stem_audio(
+        service,
+        rendered_channels,
+        fx_returns,
+        plans,
+        mix,
+        target_len,
+    )
+    updates: list[dict[str, Any]] = []
+    osc_payloads: list[dict[str, Any]] = []
+    log_rows: list[dict[str, Any]] = []
+    last_start_sec = 0.0
+
+    for idx, start in enumerate(starts):
+        end = min(target_len, start + window)
+        start_sec = start / float(sr)
+        dt = 0.0 if idx == 0 else max(0.0, start_sec - last_start_sec)
+        last_start_sec = start_sec
+        timestamp = time.time()
+        batch: dict[str, Any] = {}
+        observation_meta: dict[str, Any] = {}
+        for stem, audio in stem_audio.items():
+            segment = normalize_audio_shape(audio[start:end])
+            if len(segment) < max(128, int(0.1 * sr)):
+                continue
+            mono = _mono_for_muq(segment)
+            group = str(params_by_stem.get(stem, {}).get("group") or service.stem_drift_monitor.infer_group(stem))
+            full_score = _score_muq_audio(service, mono, sr, timestamp)
+            bands = _score_muq_band_masks(service, mono, sr, group, timestamp)
+            batch[stem] = {
+                "score": full_score["score"],
+                "group": group,
+                "bands": {
+                    name: value["score"]
+                    for name, value in bands.items()
+                    if value.get("score") is not None
+                },
+            }
+            observation_meta[stem] = {
+                "group": group,
+                "full_band": full_score,
+                "bands": bands,
+            }
+
+        drift_update = service.update_stem_score_batch(
+            batch,
+            dt,
+            params_by_stem=params_by_stem,
+            timestamp=timestamp,
+        )
+        update_row = {
+            "window_index": idx,
+            "start_sec": round(float(start_sec), 3),
+            "end_sec": round(float(end / float(sr)), 3),
+            "dt": round(float(dt), 3),
+            "observations": observation_meta,
+            "drift": drift_update,
+        }
+        updates.append(update_row)
+        log_rows.append(update_row)
+        for stem, stem_result in drift_update.get("stems", {}).items():
+            full_band = (stem_result.get("masks") or {}).get("full_band", {})
+            osc_payloads.append({
+                "endpoint": stem_result.get("osc_endpoint", f"/autofoh/muq_drift/{stem}"),
+                "stem": stem,
+                "state": stem_result.get("state", "NORMAL"),
+                "ewma": full_band.get("ewma"),
+                "drift": full_band.get("drift"),
+                "warn_timer": full_band.get("warn_timer"),
+                "crit_timer": full_band.get("crit_timer"),
+                "frozen": stem_result.get("frozen", False),
+                "actions": stem_result.get("actions", []),
+                "window_index": idx,
+            })
+
+    written_log = _write_muq_stem_drift_log(log_path, log_rows)
+    final_states = {
+        stem: stem_result.get("state", "NORMAL")
+        for stem, stem_result in (updates[-1]["drift"].get("stems", {}) if updates else {}).items()
+    }
+    state_counts = {state: list(final_states.values()).count(state) for state in ("NORMAL", "WARN", "CRIT")}
+    summary = (
+        "MuQ stem EWMA drift offline: "
+        f"windows={len(updates)} stems={len(stem_audio)} "
+        f"NORMAL={state_counts.get('NORMAL', 0)} "
+        f"WARN={state_counts.get('WARN', 0)} CRIT={state_counts.get('CRIT', 0)}"
+    )
+    return {
+        **dict(report_seed),
+        "enabled": True,
+        "summary": summary,
+        "window_sec": round(float(window_sec), 3),
+        "hop_sec": round(float(hop_sec), 3),
+        "windows": len(updates),
+        "stems": list(stem_audio.keys()),
+        "params_by_stem": params_by_stem,
+        "final_states": final_states,
+        "frozen_stems": service.stem_drift_monitor.frozen_stems(),
+        "updates": updates,
+        "osc_payloads": osc_payloads,
+        "log_path": written_log or str(log_path),
+        "model_status": service.model_status,
+    }
 
 
 def _record_offline_perceptual_mix_bus(
@@ -9844,6 +10187,12 @@ def main() -> int:
     parser.add_argument("--mert-local-files-only", action="store_true", help="Load the MERT model only from the local HuggingFace cache.")
     parser.add_argument("--perceptual-log", default=str(ai_logs_path("perceptual_decisions.jsonl")), help="Override perceptual/MERT JSONL log path for the offline pass.")
     parser.add_argument("--perceptual-window-sec", type=float, default=8.0, help="Audio window length used by offline perceptual/MERT scoring.")
+    parser.add_argument("--muq-eval-config", default="config/muq_eval.yaml", help="YAML config for optional MuQ-Eval and per-stem EWMA drift.")
+    parser.add_argument("--muq-stem-drift-enable", action="store_true", help="Enable offline per-stem MuQ EWMA drift even when the config default is off.")
+    parser.add_argument("--muq-stem-drift-log", default=str(ai_logs_path("offline_muq_stem_drift.jsonl")), help="JSONL log for offline MuQ stem EWMA drift visualization.")
+    parser.add_argument("--muq-stem-drift-window-sec", type=float, default=None, help="Override MuQ stem drift window length from config.")
+    parser.add_argument("--muq-stem-drift-hop-sec", type=float, default=None, help="Override MuQ stem drift hop length from config.")
+    parser.add_argument("--muq-stem-drift-max-windows", type=int, default=0, help="Limit offline MuQ stem drift windows; 0 means full song.")
     parser.add_argument("--source-rules-mert-only", action="store_true", help="Experimental offline render: build DSP only from measured metrics, rules.jsonl, and MERT shadow scoring; skip built-in project mix passes.")
     args = parser.parse_args()
     audio_dir, logs_dir = ensure_ai_output_dirs()
@@ -9915,6 +10264,8 @@ def main() -> int:
     source_knowledge_report["session_id"] = source_session_id
     source_knowledge_report["channel_candidate_logs_requested"] = 0
     perceptual_report["session_id"] = source_session_id
+    muq_stem_drift_service, muq_stem_drift_report = _make_offline_muq_stem_drift_service(args, config)
+    muq_stem_drift_report["session_id"] = source_session_id
     if args.source_rules_mert_only:
         phase_report = {
             "enabled": False,
@@ -10322,6 +10673,24 @@ def main() -> int:
         final_lufs = float(meter.integrated_loudness(mix))
     except Exception:
         pass
+    muq_stem_drift_report = _record_offline_muq_stem_drift(
+        muq_stem_drift_service,
+        rendered_channels,
+        fx_returns,
+        plans,
+        mix,
+        sr,
+        target_len=target_len,
+        report_seed=muq_stem_drift_report,
+        log_path=args.muq_stem_drift_log,
+        max_windows=int(args.muq_stem_drift_max_windows or 0),
+    )
+    if muq_stem_drift_report.get("enabled", False):
+        print(muq_stem_drift_report.get("summary", "MuQ stem EWMA drift offline complete"), file=sys.stderr)
+        print(
+            f"OSC visualization endpoint: {muq_stem_drift_report.get('osc_endpoint', '/autofoh/muq_drift')}",
+            file=sys.stderr,
+        )
     perceptual_mix_bus = _record_offline_perceptual_mix_bus(
         perceptual_evaluator,
         before_audio=perceptual_before_master,
@@ -10375,6 +10744,7 @@ def main() -> int:
         "layer_group_mix": layer_group_mix,
         "source_knowledge": source_knowledge_report,
         "perceptual": perceptual_report,
+        "muq_stem_drift": muq_stem_drift_report,
         "duration_sec": round(target_len / sr, 3),
         "final_peak_dbfs": round(amp_to_db(float(np.max(np.abs(mix)))), 2),
         "final_lufs": round(final_lufs, 2) if final_lufs is not None and np.isfinite(final_lufs) else None,

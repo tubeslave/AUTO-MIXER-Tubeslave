@@ -46,19 +46,28 @@ def _audio_files(path: Path) -> Iterable[Path]:
 
 def infer_stem_role(name: str) -> str:
     """Infer a broad stem role from a filename or channel label."""
-    label = name.lower().replace("-", "_").replace(" ", "_")
+    label = Path(name).stem.lower().replace("-", "_").replace(" ", "_")
+    tokens = {part for part in label.split("_") if part}
+    if "synth" in tokens and {"perc", "percussion"} & tokens and {"pad", "pads"} & tokens:
+        return "playback"
     checks = [
         ("lead_vocal", ("leadvox", "lead_vocal", "vocal_main", "main_vocal", "vox_lead")),
         ("backing_vocal", ("backing", "back_vox", "bgv", "bvox", "harmony")),
         ("vocal", ("vocal", "vox", "voice")),
         ("kick", ("kick", "bd", "bass_drum")),
         ("snare", ("snare", "sn", "clap")),
-        ("drums", ("drum", "oh", "overhead", "cymbal", "hat", "tom", "perc")),
+        ("floor_tom", ("floor_tom", "ftom", "f_tom")),
+        ("tom", ("tom", "rack_tom")),
+        ("hihat", ("hihat", "hi_hat", "hh", "hat")),
+        ("ride", ("ride",)),
+        ("percussion", ("percussion", "perc")),
+        ("drums", ("drum", "oh", "overhead", "cymbal")),
         ("bass", ("bass", "sub", "808")),
         ("guitars", ("gtr", "guitar", "strat", "tele", "riff")),
-        ("keys", ("keys", "piano", "organ", "rhodes", "synth", "pad")),
+        ("synth", ("synth", "lead_synth")),
+        ("playback", ("playback", "track", "tracks", "music", "pad", "pads")),
+        ("keys", ("keys", "piano", "organ", "rhodes")),
         ("accordion", ("accordion", "bayan")),
-        ("playback", ("playback", "track", "tracks", "music")),
         ("fx", ("fx", "reverb", "delay", "return", "riser")),
     ]
     for role, tokens in checks:
