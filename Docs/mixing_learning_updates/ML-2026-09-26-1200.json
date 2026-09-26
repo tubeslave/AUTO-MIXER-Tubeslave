@@ -1,0 +1,208 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-26-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-26T12:00:00+03:00",
+  "actual_start_msk": "2026-09-26T12:00:11+03:00",
+  "completed_msk": "2026-09-26T12:12:50+03:00",
+  "preceding_update_id": "ML-2026-09-26-0900",
+  "preceding_search_update_id": "ML-2026-09-26-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260926-0900-01",
+      "operation": "update",
+      "title": "Musical Source Separation Bake-Off: Comparing Objective Metrics with Human Perception",
+      "stable_id": "arXiv:2507.06917v3",
+      "url": "https://arxiv.org/html/2507.06917v3",
+      "published_doi": "10.1109/WASPAA66052.2025.11230942",
+      "reading_depth": "full_protocol_reread_released_readme_csv_endpoint_and_qc_audit",
+      "findings": [
+        "Table 2 reports SI-SAR greater than SI-SIR for all four stems, resolving artifact-only as the stronger endpoint in this pool",
+        "Section 4.2 and the Figure 3 caption still conflict about sweep direction, so the interior curve remains verification_required",
+        "paper says reference-anchor spread greater than 10 while README and all CSV flags implement reference-anchor spread at least 5",
+        "implementing the paper literally as violation at spread at most 10 changes 359 flags, 65 permissive inclusions and 90 strict inclusions",
+        "the 5889 rows come from 209 sessions and 50 tracks; no participant-track clustered interval is reported"
+      ],
+      "revised_conclusion": "Use artifact error only as the stronger published endpoint; do not choose a weight or threshold until exact estimates, code, QC threshold and clustered uncertainty are pinned."
+    },
+    {
+      "id": "SRC-ML-20260926-0900-02",
+      "operation": "update",
+      "title": "Spacing Out: On the Reliability of Binaural Music Source Separation Metrics",
+      "stable_id": "arXiv:2607.25919v1",
+      "url": "https://arxiv.org/pdf/2607.25919",
+      "reading_depth": "full_protocol_reread_training_factor_listening_unit_and_public_branch_audit",
+      "findings": [
+        "Bi-SCNet versus SCNet changes both training domain and augmentation policy",
+        "stimuli are peak-RMS-selected ten-second passages normalized to minus 12 LUFS",
+        "the statistical unit for 96 pairwise comparisons is not clearly identified as condition majority or individual response",
+        "no participant-clip repeated-measures model, effect interval or multiplicity correction is described",
+        "public unmerged itd branch implements PHAT-beta but not masked GCC, listening data or trained Bi-SCNet artifacts"
+      ],
+      "revised_conclusion": "Retain the metric-failure evidence but do not treat Bi-SCNet preference or significance as a one-factor causal result."
+    },
+    {
+      "id": "SRC-ML-20260926-0900-03",
+      "operation": "update",
+      "title": "Do Music Source Separation Models Preserve Spatial Information in Binaural Audio?",
+      "stable_id": "arXiv:2507.00155v1",
+      "url": "https://arxiv.org/html/2507.00155v1",
+      "reading_depth": "full_text_retained_synthesis_contract_deep_static_audit",
+      "findings": [
+        "dataset generator writes unscaled convolved stems but independently peak-normalizes only mixture.wav",
+        "stored mixture therefore generally does not equal the sum of stored stems",
+        "mixture-only normalization can confound training target scale, separation metrics and gain interpretation"
+      ],
+      "revised_conclusion": "Treat Binaural-MUSDB as a synthetic benchmark requiring an additive null audit before training or metric use."
+    },
+    {
+      "id": "SRC-ML-20260926-1200-01",
+      "operation": "add",
+      "title": "Embedding-Based Intrusive Evaluation Metrics for Musical Source Separation Using MERT Representations",
+      "stable_id": "arXiv:2604.20270v1",
+      "url": "https://arxiv.org/html/2604.20270v1",
+      "doi": "10.48550/arXiv.2604.20270",
+      "publication_date": "2026-04-22",
+      "discovery_date": "2026-09-26",
+      "review_status": "DAGA_2026_preprint",
+      "reading_depth": "full_text_equations_datasets_correlation_tables_limitations_and_code_path",
+      "artifact_id": "ART-ML-20260926-1200-01",
+      "independence": "independent authors and metric method but reuses bake-off listener data for four-stem result",
+      "findings": [
+        "MERT-MSE pooled SRCC is 0.65 bass, 0.61 drums, 0.73 other and 0.78 vocals on the bake-off aggregate",
+        "per-song MERT-FAD pooled SRCC is 0.66 bass, 0.65 drums, 0.69 other and 0.73 vocals",
+        "correlations pool songs across four model tiers without within-model or leave-one-model-out validation",
+        "point coefficients are reported without model-song grouped intervals",
+        "per-song FAD covariance is rank deficient when frames are fewer than 768 embedding dimensions"
+      ],
+      "limited_conclusion": "MERT metrics are promising secondary intrusive diagnostics, not production gates; require pinned preprocessing, numerical stability, within-model and held-out-model validation."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260926-0900-01",
+      "operation": "update",
+      "source_id": "SRC-ML-20260926-0900-01",
+      "record_url": "https://zenodo.org/records/15843081",
+      "stable_id": "DOI:10.5281/zenodo.15843081",
+      "status": "rights_and_protocol_conflict_verification_required",
+      "checked_date": "2026-09-26",
+      "license_conflict": {
+        "zenodo_api": "CC-BY-4.0",
+        "record_readme": "CC-BY-NC-SA-4.0"
+      },
+      "findings": [
+        "CSV flags exactly match a less-than-5 reference-anchor spread rule",
+        "paper text says a greater-than-10 spread requirement",
+        "paper-literal spread at most 10 recomputation retains 5368 permissive and 2281 strict rows versus 5433 and 2371 released",
+        "no objective-metric table or analysis code is included",
+        "1284062239-byte audio archive was not downloaded"
+      ],
+      "executed": false,
+      "audio_downloaded": false
+    },
+    {
+      "id": "ART-ML-20260926-0900-02",
+      "operation": "update",
+      "source_ids": ["SRC-ML-20260926-0900-02", "SRC-ML-20260926-0900-03"],
+      "repository_url": "https://github.com/richa-namballa/binaural-mss",
+      "main_commit": "988fe786a94d0cc4b6d2a3837d71f106f462d4d8",
+      "itd_branch_commit": "689849b1c7897dba05f98c891c955c68ea705a31",
+      "status": "static_audit_only_rights_verification_required",
+      "checked_date": "2026-09-26",
+      "findings": [
+        "unmerged itd branch adds PHAT-beta, Hann 0.5-second framing and fixes source CLI flags",
+        "framing code tests length modulo frame count rather than frame width and can mishandle non-aligned lengths",
+        "masked GCC, perceptual responses, training code and Bi-SCNet weights are absent",
+        "synthesis peak-normalizes only mixture.wav and breaks exact stored mixture-stem additivity",
+        "no root licence found and official demo has blank artifact links"
+      ],
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20260926-1200-01",
+      "operation": "add",
+      "source_id": "SRC-ML-20260926-1200-01",
+      "repository_url": "https://github.com/pablebe/mert-emb-eval",
+      "pinned_commit": "1d0118171f96fa0cf78dfb77e7531a3d433e1d03",
+      "status": "static_audit_only_reproducibility_partial_rights_verification_required",
+      "checked_date": "2026-09-26",
+      "findings": [
+        "no root licence, dependency lock, generated metric outputs or model revision hash found",
+        "MERT loads with trust_remote_code true and no pinned Hugging Face revision",
+        "audio is converted to mono 24 kHz 16-bit PCM before embeddings",
+        "ratings are aggregated with median although the paper says averaged",
+        "correlation code pools models and songs without grouped intervals",
+        "BSS baseline calls pass sample rate in a third positional argument that is not sample rate in current TorchMetrics documentation"
+      ],
+      "executed": false,
+      "audio_downloaded": false
+    }
+  ],
+  "knowledge_cards": [
+    "Endpoint tables can resolve a prose-direction conflict while leaving an interior sweep unreproduced.",
+    "Quality-control thresholds are part of the scientific result and must agree across paper, README and flags.",
+    "A five-versus-ten-point anchor threshold changes both strict and permissive bake-off inclusion sets.",
+    "Conflicting record and README licences require fail-closed rights handling.",
+    "Pooling songs across model tiers can inflate metric correlation without proving within-model ranking ability.",
+    "An independent metric analysis reusing listener data is methodological support, not a listener replication.",
+    "Per-song FAD with fewer frames than embedding dimensions has rank-deficient covariance and needs stability checks.",
+    "Mono-resampled embedding metrics cannot certify stereo image, phase, bandwidth or peak safety.",
+    "Binaural-versus-stereo training is not a one-factor comparison when augmentation policies differ.",
+    "Loudness-normalized listening can answer preference while hiding output-gain fidelity.",
+    "Repeated participants and clips require explicit unit-of-analysis, clustering and multiplicity handling.",
+    "A mixture normalized independently of its stems fails the additive null and can confound training."
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20260926-1200-01","when":"interpreting error components","change":"treat artifact-only as the stronger published endpoint but do not choose an interior weight","numeric_provenance":"Table 2 SI-SAR exceeds SI-SIR for every stem","protect":["causal interpretation"],"verify":["pinned Eq. 8 and Figure 3 recomputation"],"cancel":"endpoint or curve changes under reproducible code","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-02","when":"filtering listener data","change":"pin executable QC threshold and report sensitivity","numeric_provenance":"released violation below 5 versus paper requirement above 10","protect":["participant validity","uncertainty"],"verify":["both threshold policies","participant-track bootstrap"],"cancel":"conclusion depends on undocumented threshold","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-03","when":"reusing released data or audio","change":"fail closed on conflicting licence fields","numeric_provenance":"Zenodo API CC-BY-4.0 versus README CC-BY-NC-SA-4.0","protect":["legal provenance"],"verify":["depositor clarification","upstream terms"],"cancel":"licence remains inconsistent","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-04","when":"validating a learned metric","change":"report pooled, within-model and leave-one-model-out results","numeric_provenance":"no production threshold","protect":["generalization","failure visibility"],"verify":["grouped intervals by song model and stem"],"cancel":"gain exists only across model tiers","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-05","when":"using MERT-MSE or per-song FAD","change":"pin model revision, layer, preprocessing and clip length","numeric_provenance":"MERT-v1-95M layer 12 at 24 kHz from paper","protect":["identity","metric reproducibility"],"verify":["repeat runs","rank and conditioning diagnostics","listening"],"cancel":"result is revision or length sensitive","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-06","when":"applying embedding metrics to a mix","change":"keep stereo phase HF and peak gates separate","numeric_provenance":"public pipeline downmixes to mono 24 kHz PCM16","protect":["image","mono","attacks","headroom"],"verify":["raw two-channel waveform metrics","blind listening"],"cancel":"mono metric improves while protected qualities regress","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-07","when":"training on synthesized stems","change":"require raw mixture-minus-sum null before training","numeric_provenance":"public generator normalizes mixture only","protect":["level","additivity","causal interpretation"],"verify":["sample-aligned null","per-song gain","peak"],"cancel":"mixture-only scaling or clipping is present","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260926-1200-08","when":"claiming binaural-training benefit","change":"match architecture optimizer budget and augmentations","numeric_provenance":"no production range","protect":["causal attribution","transfer"],"verify":["domain-only A/B","unseen HRTFs and rooms"],"cancel":"more than training domain changes","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260926-1200-01","status":"not_run","baseline":"published pooled SRCC on 800 song-stem-model points","variant":"within-model plus leave-one-model-out evaluation on identical points","single_factor":"grouping and evaluation protocol","loudness_matching":"not applicable; audio and ratings fixed","measure":["pooled and within-model SRCC PCC Kendall","grouped intervals","leave-one-model-out rank","model-identity baseline"],"protect":["generalization","stem-specific failures"],"success":"MERT gain persists within models and on held-out model beyond clustered uncertainty","cancel":"advantage is explained by model identity aggregation or overlapping intervals","blocker":"published metric outputs audio and unambiguous reuse rights not locally available"},
+    {"id":"EXP-ML-20260926-1200-02","status":"not_run","baseline":"released less-than-5 anchor-spread flag with violation_total at most 2","variant":"paper requirement spread greater than 10 implemented as violation at most 10","single_factor":"anchor-spread threshold","loudness_matching":"not applicable; ratings and objective scores fixed","measure":["retained rows and sessions","per-stem and system correlation","rank order","clustered intervals"],"protect":["traceable exclusions","participant-track dependence"],"success":"conclusions and ranks remain stable with bounded uncertainty","cancel":"winner error-term conclusion or metric rank changes materially","blocker":"objective score table and exact analysis code not released with CSV"},
+    {"id":"EXP-ML-20260926-1200-03","status":"not_run","baseline":"current generator with mixture-only peak normalization","variant":"same stems and mixture with one shared gain","single_factor":"normalization contract","loudness_matching":"not applicable until additive null passes","measure":["mixture-minus-sum residual","per-song gain","clipping","sample and true peak","ILD and ITD","separator loss scale"],"protect":["exact additivity","target level","phase","headroom"],"success":"shared-gain output reaches numerical and file-format tolerance without clipping or spatial change","cancel":"hidden per-stem scaling clipping length mismatch or excessive residual","blocker":"upstream audio rights must be resolved"},
+    {"id":"EXP-ML-20260926-1200-04","status":"not_run","baseline":"small SCNet trained on stereo MUSDB with locked matched augmentations","variant":"identical recipe trained on additive-correct binauralized MUSDB","single_factor":"training-domain rendering","loudness_matching":"preserve raw outputs; separate BS.1770-matched randomized headphone copies","measure":["separation and leakage","delta ILD","robust timing and localization","zero-lag rate","phase and mono","sample and true peak","direction and spread","blind reference similarity"],"protect":["stem identity","attacks","bass phase","source position","width","headroom"],"success":"unseen-condition localization and preference improve without separation or safety regression","cancel":"benefit follows level leakage unmatched augmentation or fails transfer","blocker":"Bi-SCNet code weights licensed inputs and multi-HRTF manifest unavailable"}
+  ],
+  "video_updates": [],
+  "dedupe": [
+    {"key":"arXiv:2604.20270","resolution":"new_independent_metric_method_but_bakeoff_listener_data_reused"},
+    {"key":"DOI:10.1109/WASPAA66052.2025.11230942","resolution":"published_version_family_linked_to_arXiv_2507.06917"},
+    {"key":"github:richa-namballa/binaural-mss:itd","resolution":"unmerged_companion_branch_linked_to_existing_artifact"}
+  ],
+  "queue": {
+    "video_count_before": 45,
+    "video_count_after": 45,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "deep_review_priority": [
+      "obtain or reproduce bake-off objective scores and rerun both QC thresholds with clustering",
+      "test MERT metrics within model and leave one model out",
+      "resolve Zenodo licence conflict before any audio reuse",
+      "audit Binaural-MUSDB additive null on rights-cleared inputs",
+      "obtain 2026 Bi-SCNet training and perceptual-study artifacts if published"
+    ]
+  },
+  "reference_updates": [],
+  "multitrack_candidates": [],
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "paid_services_used": false,
+    "external_audio_upload": false,
+    "commercial_audio_downloaded": false
+  }
+}
