@@ -1,0 +1,196 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-27-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-27T15:00:00+03:00",
+  "actual_start_msk": "2026-09-27T15:00:48+03:00",
+  "completed_msk": "2026-09-27T15:11:25+03:00",
+  "preceding_update_id": "ML-2026-09-27-1200",
+  "preceding_search_update_id": "ML-2026-09-27-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "fresh_relevant_arxiv_sources_found": 0,
+    "older_peer_reviewed_full_text_gaps_added": 2,
+    "repository_static_audits_added": 2,
+    "code_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260927-1500-01",
+      "operation": "add",
+      "title": "Gradient Descent Optimization of Room Impulse Responses with Parameter-Efficient Differentiable Feedback Delay Networks",
+      "stable_id": "DAFx-26:paper_10",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_10.pdf",
+      "publication_date": "2026",
+      "discovery_date": "2026-09-27",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_method_loss_dataset_baselines_ablation_compute_limitations",
+      "findings": [
+        "sixteen-delay-line mono FDN at 48 kHz fitted on nine curated OpenAIR RIRs",
+        "no formal listening test and only informal perceptual comparison",
+        "noise-shaped baseline benefits strongly from the composite loss so architecture and loss effects are confounded",
+        "trainable delays can become near-commensurate and cause metallic ringing",
+        "fixed-delay fixed-Hadamard variant is presented as more robust at small objective cost",
+        "PEQ-10 is an RIR-specific compromise rather than a mix-EQ preset",
+        "multiplications per sample and state memory do not prove target-host callback latency"
+      ],
+      "limited_conclusion": "Use only as an opt-in RIR-matching candidate with independent listening, metallicity, peak and out-of-set-room checks."
+    },
+    {
+      "id": "SRC-ML-20260927-1500-02",
+      "operation": "add",
+      "title": "Perceptual Optimisation of Loudspeaker-Based Reproduction",
+      "stable_id": "DAFx-26:paper_13",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_13.pdf",
+      "accepted_manuscript_url": "https://openresearch.surrey.ac.uk/esploro/outputs/conferencePaper/Perceptual-Optimisation-of-Loudspeaker-Based-Reproduction/99995812002346",
+      "publication_date": "2026",
+      "discovery_date": "2026-09-27",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_method_four_tasks_loss_evaluation_limitations",
+      "findings": [
+        "differentiable FIR optimisation through localisation uncertainty coloration and IPD models",
+        "validation uses ideal free-field point sources one virtual source symmetric KU100 HRIRs and integer-sample delays",
+        "known panning crosstalk-cancellation and beamforming solutions are recovered under matched simulation",
+        "multi-attribute optimisation and evaluation reuse the same perceptual models",
+        "loss weights were selected by trial and error",
+        "no formal listening measured-room multi-source true-peak or headroom validation"
+      ],
+      "limited_conclusion": "Research framework only; do not transfer to rock pan or width rules without independent listeners/models and measured-room multi-source validation."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260927-1500-01",
+      "operation": "add",
+      "source_id": "SRC-ML-20260927-1500-01",
+      "repository_url": "https://github.com/ilias-audio/DAFX26_DiffReverb",
+      "commit": "144266cb17c1cc9634cc464fcabc97cc19b5626c",
+      "license": "MIT_code_OpenAIR_inputs_named_per_file_downstream_rights_not_verified",
+      "status": "static_audit_only_public_code_audio_examples_and_expected_metrics_available",
+      "findings": [
+        "nine paper targets and lossless headline WAVs are included",
+        "trainable and fixed-delay modes are exposed separately with public default seed 999",
+        "NoiseShaper and DFDN baselines are runnable while RIR2FDN depends on external MATLAB workflow",
+        "repository has two commits and most Python dependencies are lower-bounded rather than locked",
+        "patched FLAMO submodule is required",
+        "GPU results are declared non-bit-deterministic",
+        "expected metrics cover one studio target rather than all nine rooms"
+      ],
+      "executed": false,
+      "audio_analyzed": false,
+      "integration_rights_verified": false
+    },
+    {
+      "id": "ART-ML-20260927-1500-02",
+      "operation": "add",
+      "source_id": "SRC-ML-20260927-1500-02",
+      "repository_url": "https://github.com/IoSR-Surrey/POLAR",
+      "status": "repository_link_unavailable_or_404",
+      "findings": [
+        "IoSR-Surrey organization is reachable",
+        "no public POLAR repository was verified during this run"
+      ],
+      "executed": false,
+      "audio_analyzed": false
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260927-1500-01",
+      "operation": "add",
+      "title": "Mastering A Pop/Rock Song with Ian Shepherd",
+      "youtube_id": "3pZlasr3e9Q",
+      "url": "https://www.youtube.com/watch?v=3pZlasr3e9Q",
+      "official_companion_url": "https://producelikeapro.com/blog/mastering-poprock-song-ian-shepherd/",
+      "channel_context": "Produce Like A Pro / Warren Huart with Ian Shepherd",
+      "reading_depth": "metadata_and_official_summary_only",
+      "status": "queued_source",
+      "transcript_available": false,
+      "techniques_extracted": false,
+      "settings_extracted": false
+    },
+    {
+      "id": "VID-ML-20260927-1500-02",
+      "operation": "add",
+      "title": "4 Different Master Bus Chains From 4 Different Mixers",
+      "youtube_id": "aTIK75TG-gw",
+      "url": "https://www.youtube.com/watch?v=aTIK75TG-gw",
+      "official_companion_url": "https://producelikeapro.com/blog/four-mixers-four-master-bus-chains/",
+      "channel_context": "Produce Like A Pro",
+      "reading_depth": "metadata_and_official_summary_only",
+      "status": "queued_source",
+      "transcript_available": false,
+      "techniques_extracted": false,
+      "settings_extracted": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260927-1500-01","claim":"Lower aggregate RIR error can coexist with audible metallic ringing.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-02","claim":"Architecture and objective contributions must be separated when a baseline improves under the new loss.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-03","claim":"Nine curated RIRs do not establish broad room noise or truncation robustness.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-04","claim":"Informal listening without protocol is not perceptual validation.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-05","claim":"RIR attenuation-filter band counts are not transferable mix-EQ presets.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-06","claim":"Operations per sample and state memory do not establish target-host callback latency.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-07","claim":"Fixed delays and mixing are a robustness baseline when delay learning creates near-commensurate modes.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-08","claim":"Differentiable perceptual optimisation is model optimisation rather than proof of human perceptual benefit.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-09","claim":"Evaluation by the same perceptual model used in the loss is circular.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-10","claim":"Free-field single-source simulation does not validate real-room multi-source spatial processing.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-11","claim":"Trial-and-error multi-loss weights are experimental variables rather than universal constants.","confidence":"high"},
+    {"id":"KC-ML-20260927-1500-12","claim":"Recovering known spatial solutions under matched simulation validates implementation rather than creative stereo superiority.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260927-1500-01","source":"SRC-ML-20260927-1500-01","apply_when":"comparing differentiable reverbs","change":"isolate architecture and loss in separate A/Bs","must_not_damage":["causal attribution","decay","coloration"],"verify":"factorial architecture-by-loss comparison","cancel":"more than one factor changes","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-02","source":"SRC-ML-20260927-1500-01","apply_when":"learning FDN delay lengths","change":"compare trainable versus fixed delays with all other parameters frozen","must_not_damage":["smoothness","decay","attacks","peaks"],"verify":"modal spectral and blind tests across rooms and seeds","cancel":"metallic modes or unstable seed spread appears","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-03","source":"SRC-ML-20260927-1500-01","apply_when":"accepting an RIR fit","change":"require raw technical checks and loudness-matched blind listening in addition to objective metrics","must_not_damage":["timbre","preference validity","headroom"],"verify":"metric and blind preference triangulation","cancel":"coloration or preference regresses","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-04","source":"SRC-ML-20260927-1500-01","apply_when":"selecting attenuation bands","change":"treat PEQ-10 as source-specific and sweep band count independently","must_not_damage":["spectral smoothness","training stability"],"verify":"held-out band-count sweep","cancel":"band count is used as a mix preset","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-05","source":"ART-ML-20260927-1500-01","apply_when":"considering deployment","change":"benchmark callback time memory peak and headroom on the target host","must_not_damage":["real-time safety","headroom"],"verify":"worst-case host callback test","cancel":"only theoretical multiply counts exist","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-06","source":"SRC-ML-20260927-1500-02","apply_when":"evaluating a spatial loss","change":"use an independent perceptual model or listeners","must_not_damage":["localisation","uncertainty","coloration","timbre"],"verify":"rank agreement and listener validation","cancel":"optimiser and evaluator are identical","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-07","source":"SRC-ML-20260927-1500-02","apply_when":"transferring loudspeaker optimisation to music","change":"require measured-room off-axis head-variation and multi-source validation","must_not_damage":["spatial target","timbre","interference robustness"],"verify":"measured-room music tests","cancel":"robustness or interference fails","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1500-08","source":"SRC-ML-20260927-1500-02","apply_when":"combining perceptual attributes","change":"log and sweep weights while monitoring FIR headroom and true peak","must_not_damage":["headroom","localisation","coloration"],"verify":"held-out weight sensitivity","cancel":"conclusion depends on an unreported weight set","confidence":"medium","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260927-1500-01","status":"not_run","title":"trained-delay metallicity A/B","baseline":"fixed delays and fixed Hadamard mixing","variant":"trainable delays","single_factor":"delay state","loudness_matching":"none for raw metrics; separate BS.1770-matched randomized copies for listening","measure":["RIR metrics","delay ratios","modal spectral peaks","EDR smoothness","sample peak","true peak","seed spread","blind preference"],"protect":["decay","non-metallic timbre","attacks","headroom"],"cancel":"near-commensurate modes ringing peak regression or preference loss appears"},
+    {"id":"EXP-ML-20260927-1500-02","status":"not_run","title":"architecture-versus-loss attribution","baseline":"NoiseShaper with original multi-resolution STFT loss","variant":"identical NoiseShaper with composite loss","single_factor":"loss","loudness_matching":"none for raw metrics; separate BS.1770-matched copies for listening","measure":["RIR metrics","seed variance","spectral residual","decay residual","blind preference"],"protect":["causal attribution","decay","coloration","peaks"],"cancel":"implementation or training budget changes with the loss"},
+    {"id":"EXP-ML-20260927-1500-03","status":"not_run","title":"POLAR independent-endpoint check","baseline":"evaluation with the same perceptual models used in the loss","variant":"evaluation with an independent listener or model endpoint","single_factor":"evaluation endpoint","loudness_matching":"identical raw renders; matched copies only for blind preference","measure":["localisation error","uncertainty","coloration","IPD","preference","rank disagreement"],"protect":["evaluation independence","timbre"],"cancel":"no independent endpoint is available"},
+    {"id":"EXP-ML-20260927-1500-04","status":"not_run","title":"free-field-to-measured-room robustness","baseline":"free-field propagation","variant":"measured-room transfer functions","single_factor":"propagation model","loudness_matching":"none for safety metrics; separate BS.1770-matched randomized copies for preference","measure":["localisation","uncertainty","coloration","IPD","sample peak","true peak","filter headroom","blind preference"],"protect":["source position","tonal balance","transients","headroom"],"cancel":"spatial target clips or coloration and preference regress beyond preregistered bounds"}
+  ],
+  "deduplication": [
+    {"key":"arXiv:2609.02835","resolution":"existing_source_not_added"},
+    {"key":"arXiv:2608.05506","resolution":"existing_source_not_added"},
+    {"key":"arXiv:2608.05442","resolution":"existing_source_not_added"},
+    {"key":"youtube:SG5rkdYwFDE","resolution":"existing_video_source_card_not_added"},
+    {"key":"DAFx-26:paper_10","resolution":"new_unique_source"},
+    {"key":"DAFx-26:paper_13","resolution":"new_unique_source"}
+  ],
+  "queue": {
+    "video_count_before": 49,
+    "video_count_after": 51,
+    "videos_searched_this_run": 3,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 2,
+    "duplicates_removed": 1,
+    "deep_review_priority": [
+      "DiffReverb loss metric parity and OpenAIR per-file rights",
+      "POLAR implementation availability and independent evaluation endpoint",
+      "permitted transcripts for VID-ML-20260927-1500-01 and VID-ML-20260927-1500-02",
+      "clean manifest-bound adaptive-EQ reproduction retained from ML-2026-09-27-1200"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
