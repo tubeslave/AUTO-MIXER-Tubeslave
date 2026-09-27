@@ -1,0 +1,169 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-27-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-27T09:00:00+03:00",
+  "actual_start_msk": "2026-09-27T09:02:35+03:00",
+  "completed_msk": "2026-09-27T09:12:07+03:00",
+  "preceding_update_id": "ML-2026-09-26-1800",
+  "preceding_search_update_id": "ML-2026-09-26-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "fresh_arxiv_after_previous_search": 0,
+    "older_peer_reviewed_gaps_fully_read": 2,
+    "repositories_statically_audited": 1,
+    "code_executed": false,
+    "audio_analyzed": false,
+    "commercial_audio_extracted": false,
+    "external_audio_present_in_audit_clone": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260927-0900-01",
+      "operation": "add",
+      "title": "A DDSP Framework for Adaptive Room Equalization",
+      "stable_id": "DAFx-26:paper_48",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_48.pdf",
+      "publication_date": "2026",
+      "discovery_date": "2026-09-27",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_framework_methods_experiments_ablations_compute_limitations",
+      "artifact_id": "ART-ML-20260927-0900-01",
+      "findings": [
+        "the system adapts a playback or room equalizer and is not a creative track equalizer",
+        "the target response is derived from the initial measured room impulse response rather than an independent artistic or multi-position target",
+        "evaluation uses ten MedleyDB full mixes in a controlled linear simulation driven by measured SoundCam room impulse responses",
+        "the 8192-sample frame, 5 percent new estimate and 95 percent history, and optimizer settings are experiment-specific parameters rather than live-sound presets",
+        "runtime was measured on an RTX 5090 without audio I/O or operating-system jitter",
+        "crowd noise at low SNR, electroacoustic nonlinearities, converter quantization, thermal drift and uncontrolled listener motion were excluded"
+      ],
+      "limited_conclusion": "Treat the method as evidence for differentiable closed-loop room-calibration research, not as a creative mix-EQ rule or proof of safe deployment on the project's target hardware."
+    },
+    {
+      "id": "SRC-ML-20260927-0900-02",
+      "operation": "add",
+      "title": "A Clipping Prevention Method for All-Pass Digital Filters with Time-Varying Coefficients",
+      "stable_id": "DAFx-26:paper_45",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_45.pdf",
+      "publication_date": "2026",
+      "discovery_date": "2026-09-27",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_derivation_first_and_second_order_case_studies_discussion_limitations",
+      "artifact_id": "ART-ML-20260927-0900-02",
+      "findings": [
+        "the method algebraically limits coefficient increments for first- and second-order time-varying all-pass filters when the input is already sample bounded",
+        "the guard diverts coefficients from their commanded trajectory and therefore changes phase and group-delay behavior for a finite interval",
+        "the stated output bound applies to Direct Form I sample output and does not establish internal-state safety for other realizations",
+        "sample-peak protection is not reconstructed true-peak or intersample-peak protection",
+        "the equal split of the second-order clipping-prevention budget is a heuristic rather than a proven optimum",
+        "evidence consists of controlled near-full-scale sinusoid tests and one music excerpt without a listening test or broad program corpus"
+      ],
+      "limited_conclusion": "Use the guard only as a topology-specific candidate safety layer whose coefficient error, phase trajectory, internal states and true peak still require independent testing; it is not a general limiter or declipper."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260927-0900-01",
+      "operation": "add",
+      "source_id": "SRC-ML-20260927-0900-01",
+      "repository_url": "https://github.com/fermarcosmac/DDSP-adaptive-EQ-26",
+      "commit": "09232c0160d9828100732562d60ae59fa82c8d45",
+      "status": "static_audit_only_rights_and_result_provenance_blocked",
+      "checked_date": "2026-09-27",
+      "findings": [
+        "the repository has no root licence; the paper's CC-BY-4.0 notice does not establish code or bundled-audio rights",
+        "bundled SoundCam RIRs and MedleyDB mixes have no per-file rights manifest and were not accepted as project references",
+        "the save path independently peak-normalizes each input, desired, no-EQ and EQ WAV before the metrics script reloads them",
+        "independent serialization normalization invalidates absolute-gain and LUFS-difference interpretation and can change waveform metric rankings",
+        "the packaged config declares max_num_songs equal to 2 while the packaged metrics report n_files equal to 10, so they cannot be attributed to one reproducible run without reconciliation",
+        "the environment omits optional metric dependencies and the shipped table records missing MRSTFT and spectral-centroid values",
+        "the repository target builder includes an undocumented factor of one half that requires an explicit sensitivity audit"
+      ],
+      "executed": false,
+      "audio_analyzed": false,
+      "integration_rights_verified": false
+    },
+    {
+      "id": "ART-ML-20260927-0900-02",
+      "operation": "add",
+      "source_id": "SRC-ML-20260927-0900-02",
+      "status": "no_public_implementation_found_reproduction_blocked",
+      "checked_date": "2026-09-27",
+      "findings": [
+        "targeted searches found the official paper but no public code, deterministic implementation or test vectors",
+        "the derivation could not be checked against a runnable implementation"
+      ],
+      "executed": false,
+      "audio_downloaded": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260927-0900-01","claim":"Adaptive room equalization evidence does not establish a creative track-EQ rule.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-02","claim":"An adaptive calibration target must be independently defined and spatially scoped before optimization.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-03","claim":"Online transfer-function estimator confidence is part of controller safety, not merely measurement quality.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-04","claim":"Frame, smoothing and optimizer values from one simulated room are scenario-specific rather than portable presets.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-05","claim":"Kernel runtime without I/O, scheduling jitter and target-hardware tests is not deployment latency.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-06","claim":"Independent per-render peak normalization destroys absolute-gain and loudness-difference evidence.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-07","claim":"A saved config and metrics table with incompatible file counts do not describe one reproducible run.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-08","claim":"Paper, code, dataset and bundled-audio rights require separate verification.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-09","claim":"An all-pass clipping guard changes the commanded coefficient and phase trajectory.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-10","claim":"A discrete sample-output bound is not an internal-state or reconstructed true-peak bound.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-11","claim":"A Direct Form I proof cannot be transferred to arbitrary all-pass realizations without state analysis.","confidence":"high"},
+    {"id":"KC-ML-20260927-0900-12","claim":"A sine case study and one music excerpt without listening do not prove perceptual transparency.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260927-0900-01","source":"SRC-ML-20260927-0900-01","apply_when":"evaluating adaptive room or playback calibration","change":"keep it outside creative track processing and require an explicit listening-position scope","must_not_damage":["mix decisions","tonal intent","headroom","stability"],"verify":"fixed-program multi-position raw A/B with independent target","cancel":"one position improves while other protected positions regress or the mix target is altered","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-02","source":"SRC-ML-20260927-0900-01","apply_when":"defining an adaptive equalization objective","change":"use an independently specified target and document position or zone weighting","must_not_damage":["spatial consistency","spectral intent"],"verify":"compare initial-RIR-derived and external targets with optimizer fixed","cancel":"the controller merely preserves an arbitrary initial transfer or creates position-dependent harm","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-03","source":"SRC-ML-20260927-0900-01","apply_when":"the online room estimate is low-information or non-finite","change":"freeze or fail closed using a preregistered estimator-confidence gate","must_not_damage":["stability","speaker safety","continuity"],"verify":"dropout, low-SNR, silence and motion stress tests","cancel":"coefficients move during invalid or low-confidence estimates","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-04","source":"ART-ML-20260927-0900-01","apply_when":"computing gain, loudness or waveform metrics","change":"retain gain-preserving float outputs and forbid independent per-render peak normalization","must_not_damage":["absolute level","headroom","metric causality"],"verify":"in-memory versus serialized null and metric agreement","cancel":"serialization changes a metric or system ranking","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-05","source":"ART-ML-20260927-0900-01","apply_when":"accepting packaged experiment results","change":"require config hash, input manifest, code revision and consistent file counts","must_not_damage":["provenance","reproducibility"],"verify":"reconstruct every result row from one manifest","cancel":"saved config and metric cardinality cannot be reconciled","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-06","source":"SRC-ML-20260927-0900-02","apply_when":"considering an all-pass clipping guard","change":"limit use to a verified Direct Form I path with bounded input and observed states","must_not_damage":["phase intent","stability","true peak"],"verify":"sample, reconstructed true-peak and internal-state stress tests","cancel":"topology differs, input bound is violated or internal state clips","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-07","source":"SRC-ML-20260927-0900-02","apply_when":"protecting rapid all-pass automation","change":"log commanded and applied coefficients plus phase and group-delay error","must_not_damage":["attacks","stereo image","automation intent"],"verify":"raw null, coefficient lag and blind transient checks","cancel":"the guard audibly smears attacks, moves the image or creates unacceptable phase-path error","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-0900-08","source":"SRC-ML-20260927-0900-02","apply_when":"deciding whether to deploy the guard","change":"keep it disabled until true peak, states, rapid automation, real music and target hardware pass","must_not_damage":["headroom","phase","transients","latency"],"verify":"preregistered corpus and hardware A/B","cancel":"any safety or perceptual gate fails","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260927-0900-01","status":"not_run","title":"gain-preserving serialization metric audit","baseline":"current independently peak-normalized saved WAV path","variant":"float gain-preserving serialization of the same in-memory outputs","single_factor":"serialization normalization","loudness_matching":"none for raw metrics; separate BS.1770-matched copies only for blind listening","measure":["serialization null","sample peak","integrated loudness difference","RMSE","SI-SDR","metric rank agreement"],"protect":["absolute level","headroom","causal comparison","transients"],"success":"serialized raw metrics reproduce in-memory metrics within declared numeric tolerance and rankings remain stable","cancel":"normalization or serialization changes any decision metric or ranking"},
+    {"id":"EXP-ML-20260927-0900-02","status":"not_run","title":"adaptive room-EQ target-anchor A/B","baseline":"target derived from the initial room impulse response","variant":"independently predefined target with identical controller","single_factor":"target definition","loudness_matching":"separate BS.1770-matched blind copies only","measure":["multi-position response error","coefficient slew","gain","true peak","stability","blind preference"],"protect":["tonal intent","headroom","spatial consistency"],"cancel":"benefit is position-specific, unstable or preference is loudness-driven"},
+    {"id":"EXP-ML-20260927-0900-03","status":"not_run","title":"online estimator oracle-gap test","baseline":"true simulated transfer-function gradient","variant":"online estimated gradient","single_factor":"gradient source","loudness_matching":"separate blind copies only","measure":["relative response error","estimator error","divergence rate","EQ slew","sample peak","true peak"],"protect":["stability","continuity","speaker safety"],"cancel":"estimated path diverges, chatters or updates during invalid estimates"},
+    {"id":"EXP-ML-20260927-0900-04","status":"not_run","title":"time-varying all-pass guard A/B","baseline":"unprotected coefficient trajectory","variant":"algebraically guarded trajectory","single_factor":"guard state","loudness_matching":"none for safety metrics; separate BS.1770-matched blind copies","measure":["sample peak","reconstructed true peak","internal-state maximum","command-to-applied coefficient error","phase","group delay","attack envelope","stereo and mono residual","blind preference"],"protect":["phase intent","transients","stereo image","headroom"],"cancel":"true peak or a state clips, phase error is excessive, attacks smear or image stability regresses"}
+  ],
+  "video_updates": [
+    {"id":"VID-ML-20260927-0900-01","operation":"add","title":"Scheps Omni Channel 2 - Tutorial with Andrew Scheps","channel":"Waves Audio","url":"https://www.youtube.com/watch?v=2MkAB1yEfHA","youtube_id":"2MkAB1yEfHA","duration":"PT21M03S","reading_depth":"metadata_and_official_chapters_only","status":"queued_source","transcript_available":false,"findings_extracted":false,"note":"Official chapter labels were recorded for retrieval only and were not treated as studied technique content."},
+    {"id":"VID-ML-20260927-0900-02","operation":"add","title":"Mixing - How to Mix A Vocal Using Analog Console and Rear Bus Compression","channel":"Puremix","url":"https://www.youtube.com/watch?v=v0qxwFq1KCg","youtube_id":"v0qxwFq1KCg","duration":"PT6M26S","reading_depth":"metadata_only","status":"queued_source","transcript_available":false,"findings_extracted":false}
+  ],
+  "deduplication": [
+    {"key":"DAFx-26:paper_30","resolution":"existing_conference_lineage_not_added_again"},
+    {"key":"arXiv:2608.30559","resolution":"existing_SPHERE_source_not_added_again"},
+    {"key":"arXiv:2608.05506","resolution":"existing_Sequential_Stem_Blending_source_not_added_again"},
+    {"key":"youtube:2MkAB1yEfHA","resolution":"new_unique_video_id"},
+    {"key":"youtube:v0qxwFq1KCg","resolution":"new_unique_video_id"}
+  ],
+  "queue": {
+    "video_count_before": 47,
+    "video_count_after": 49,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 2,
+    "deep_review_priority": [
+      "recompute adaptive-EQ metrics from gain-preserving outputs and reconcile the 2-versus-10-file provenance mismatch",
+      "audit the target-response one-half factor and initial-RIR target dependence",
+      "derive and test the all-pass guard against true peak and internal-state clipping",
+      "retry the two new video transcripts only through permitted transcript paths",
+      "continue unresolved SEND and PAEDB validation from ML-2026-09-26-1800"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
