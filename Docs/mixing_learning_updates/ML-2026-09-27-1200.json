@@ -1,0 +1,150 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-27-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-27T12:00:00+03:00",
+  "actual_start_msk": "2026-09-27T12:01:17+03:00",
+  "completed_msk": "2026-09-27T12:13:20+03:00",
+  "preceding_update_id": "ML-2026-09-27-0900",
+  "preceding_search_update_id": "ML-2026-09-27-0900",
+  "citation_check": "partial",
+  "quota_policy": {"scite":"skipped_until_2026-10-01_utc","consensus":"not_retried_no_confirmed_free_reset"},
+  "review_summary": {
+    "full_sources_reread": 2,
+    "metadata_abstract_sources_added": 1,
+    "repository_static_audits_deepened": 1,
+    "code_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260927-0900-01",
+      "operation": "update",
+      "title": "A DDSP Framework for Adaptive Room Equalization",
+      "stable_id": "DAFx-26:paper_48",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_48.pdf",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_reread_method_target_initialization_table1_ablation_compute_limitations_checked_against_code",
+      "findings": [
+        "paper Table 1 and bundled repository results use different transition times and algorithm sets",
+        "paper midpoint and zero-gain initialization is replaced by random initialization of all 21 normalized EQ parameters in public code",
+        "the first public-code gradient path starts from the target response rather than the initial RIR when use_true_LEM is false",
+        "target minimum-phase conversion includes an undocumented division by two and evaluation adds a fixed 300-sample reference delay",
+        "negative SI-SDR does not establish minimal change or phase preservation",
+        "the informal listening statement lacks a reproducible protocol"
+      ],
+      "limited_conclusion": "The paper supports calibration research, but public defaults and bundled results are not a parity reproduction and require clean manifested raw-output evaluation."
+    },
+    {
+      "id": "SRC-ML-20260927-0900-02",
+      "operation": "update",
+      "title": "A Clipping Prevention Method for All-Pass Digital Filters with Time-Varying Coefficients",
+      "stable_id": "DAFx-26:paper_45",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_45.pdf",
+      "review_status": "peer_reviewed_DAFx_2026",
+      "reading_depth": "full_pdf_reread_assumptions_coefficient_paths_direct_form_scope_budget_runtime_music_example",
+      "findings": [
+        "the Direct Form I discrete-sample bound does not prove reconstructed true-peak or other-topology internal-state safety",
+        "the second-order equal headroom split is sufficient but not demonstrated optimal",
+        "the guard changes the coefficient and phase trajectory beyond the dangerous instant",
+        "reported runtime is batch throughput rather than worst-case callback latency",
+        "one music example without controlled listening cannot establish transparency"
+      ],
+      "limited_conclusion": "Treat the method as a topology-specific sample-safety candidate requiring independent state, true-peak, phase and listening tests."
+    },
+    {
+      "id": "SRC-ML-20260927-1200-01",
+      "operation": "add",
+      "title": "Clipping prevention in time-varying parametric equalizers based on first-order allpass filters",
+      "stable_id": "hdl:10589/240671",
+      "url": "https://hdl.handle.net/10589/240671",
+      "publication_date": "2025-07-23",
+      "discovery_date": "2026-09-27",
+      "review_status": "masters_thesis_metadata_abstract_only_fulltext_unavailable_all_rights_reserved",
+      "reading_depth": "official_metadata_and_abstract_only",
+      "findings": [
+        "same first author supervisors and first-order all-pass method as the DAFx paper",
+        "PDF is unavailable and all rights reserved",
+        "lineage evidence rather than independent replication"
+      ],
+      "limited_conclusion": "Record as same-family metadata only and do not infer inaccessible content."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260927-0900-01",
+      "operation": "update",
+      "source_id": "SRC-ML-20260927-0900-01",
+      "repository_url": "https://github.com/fermarcosmac/DDSP-adaptive-EQ-26",
+      "commit": "09232c0160d9828100732562d60ae59fa82c8d45",
+      "status": "static_audit_only_provenance_contaminated_paper_code_parity_failed",
+      "findings": [
+        "independent peak normalization invalidates gain LUFS and gain-sensitive evidence but not scale-invariant SI-SDR by scaling alone",
+        "current config requests two songs while saved metrics report ten files",
+        "Git history non-clearing output directory and wildcard discovery provide a stale-file contamination path",
+        "bundled conditions do not reproduce paper Table 1",
+        "random filter initialization contradicts paper initialization",
+        "first gradient-path estimate uses target response rather than initial RIR",
+        "target division by two and fixed 300-sample evaluation delay lack published derivation"
+      ],
+      "executed": false,
+      "audio_analyzed": false,
+      "integration_rights_verified": false
+    },
+    {
+      "id": "ART-ML-20260927-0900-02",
+      "operation": "update",
+      "source_id": "SRC-ML-20260927-0900-02",
+      "status": "no_public_implementation_found_same_family_thesis_only",
+      "findings": ["abstract-only thesis adds lineage but no accessible code or independent results","clean-room reproduction remains required"],
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260927-1200-01","claim":"Independent peak normalization destroys gain-dependent evidence but not scale-invariant SI-SDR by scaling alone.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-02","claim":"Raw gain-preserving outputs and loudness-matched listening copies serve different evaluation purposes.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-03","claim":"Reused result directories plus wildcard aggregation can contaminate experiment cardinality and rankings.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-04","claim":"A bundled result subset with different conditions is not a reproduction of a paper main table.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-05","claim":"Random filter initialization is not equivalent to midpoint parameters with zero gains.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-06","claim":"A target-response gradient-path initialization is not perfect initial-RIR knowledge.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-07","claim":"An undocumented target factor of one half is a controller-level gain choice rather than neutral serialization.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-08","claim":"A fixed reference delay needs derivation or an alignment sensitivity sweep for every RIR.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-09","claim":"Negative SI-SDR cannot by itself prove minimal change or phase preservation.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-10","claim":"An informal listening statement without protocol is not perceptual evidence.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-11","claim":"A Direct Form I discrete-sample bound does not generalize to reconstructed true peak or arbitrary internal states.","confidence":"high"},
+    {"id":"KC-ML-20260927-1200-12","claim":"A same-author predecessor abstract establishes lineage rather than independent replication.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260927-1200-01","source":"ART-ML-20260927-0900-01","apply_when":"saving evaluation renders","change":"preserve raw float gain and make loudness-matched copies only for blind listening","must_not_damage":["gain","peaks","transients"],"verify":"in-memory versus serialized null and metric agreement","cancel":"serialization changes gain-dependent metrics","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-02","source":"ART-ML-20260927-0900-01","apply_when":"aggregating a run","change":"use an empty content-addressed directory and exact hashed manifest","must_not_damage":["provenance","cardinality"],"verify":"result count equals manifest count","cancel":"any unmanifested file is discovered","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-03","source":"SRC-ML-20260927-0900-01","apply_when":"reproducing the paper","change":"initialize bounded parameters at midpoints and band gains at zero and log the vector","must_not_damage":["causal attribution","stability"],"verify":"initialization parity test","cancel":"random or undeclared initial state remains","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-04","source":"ART-ML-20260927-0900-01","apply_when":"starting online adaptation","change":"initialize the gradient path from the measured initial RIR or declare target initialization as a new variant","must_not_damage":["first-update validity","stability"],"verify":"inspect first gradient and update","cancel":"target and physical paths are silently conflated","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-05","source":"ART-ML-20260927-0900-01","apply_when":"constructing target and references","change":"preregister target scale and derive alignment without unexplained one-half gain or fixed delay","must_not_damage":["gain","phase","timing"],"verify":"scale and delay sensitivity sweeps","cancel":"conclusion changes across plausible scale or alignment","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-06","source":"SRC-ML-20260927-0900-01","apply_when":"interpreting fidelity","change":"do not infer minimal change from negative SI-SDR and add raw null aligned error phase group delay and blind listening","must_not_damage":["waveform identity","phase","preference validity"],"verify":"metric triangulation","cancel":"one misaligned metric drives acceptance","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-07","source":"SRC-ML-20260927-0900-02","apply_when":"implementing the all-pass guard","change":"restrict proof to verified Direct Form I and test states plus reconstructed true peak","must_not_damage":["headroom","phase","internal states"],"verify":"sample true-peak and state stress tests","cancel":"topology differs or any state or reconstructed peak overloads","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1200-08","source":"SRC-ML-20260927-0900-02","apply_when":"allocating second-order prevention budget","change":"log coefficient lag and compare allocations treating equal split as baseline","must_not_damage":["phase path","attacks","stereo image"],"verify":"coefficient phase and transient A/B","cancel":"safety gain costs unacceptable phase or transient damage","confidence":"medium","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260927-1200-01","status":"not_run","title":"metric serialization audit","baseline":"independently peak-normalized serialization","variant":"raw gain-preserving float serialization of identical tensors","single_factor":"serialization scaling","loudness_matching":"none for raw metrics; separate BS.1770-matched copies only for listening","measure":["serialization null","gain","sample peak","true peak","LUFS difference","RMSE","SI-SDR","ranking"],"protect":["absolute level","headroom","transients","metric causality"],"cancel":"raw output is not traceable or unexplained metric drift remains"},
+    {"id":"EXP-ML-20260927-1200-02","status":"not_run","title":"result-discovery provenance audit","baseline":"reusable output directory with wildcard discovery","variant":"empty content-addressed directory with exact manifest","single_factor":"result file selection","loudness_matching":"not applicable","measure":["file count","hashes","group cardinality","aggregates","rank changes"],"protect":["provenance","reproducibility"],"cancel":"an unmanifested or stale file contributes"},
+    {"id":"EXP-ML-20260927-1200-03","status":"not_run","title":"first-step transfer initialization","baseline":"target-response initialization","variant":"measured initial-RIR response","single_factor":"gradient-path initialization source","loudness_matching":"none for controller metrics","measure":["first gradient","first update","response error","coefficient slew","peak","divergence"],"protect":["stability","continuity","speaker headroom"],"cancel":"either path becomes non-finite or paper condition cannot be reconstructed"},
+    {"id":"EXP-ML-20260927-1200-04","status":"not_run","title":"all-pass guard safety and transparency A/B","baseline":"unprotected coefficient command","variant":"guarded command","single_factor":"guard state","loudness_matching":"none for safety metrics; separate BS.1770-matched randomized copies for preference","measure":["sample peak","reconstructed true peak","internal-state maximum","coefficient lag","phase","group delay","attack envelope","stereo and mono residual","blind preference"],"protect":["phase intent","attacks","stereo image","headroom"],"cancel":"overload remains or attacks and image regress beyond preregistered limit"}
+  ],
+  "deduplication": [
+    {"key":"hdl:10589/240671","resolution":"same_family_predecessor_not_independent_confirmation"},
+    {"key":"DAFx-26:paper_45","resolution":"existing_source_updated_not_duplicated"},
+    {"key":"DAFx-26:paper_48","resolution":"existing_source_updated_not_duplicated"}
+  ],
+  "queue": {
+    "video_count_before": 49,
+    "video_count_after": 49,
+    "videos_searched_this_run": 0,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "deep_review_priority": ["clean manifest-bound adaptive-EQ reproduction","target-scale and alignment audit","clean-room all-pass test vectors","continue SEND and PAEDB validation"]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {"audio_modified":false,"dsp_modified":false,"runtime_modified":false,"models_modified":false,"active_rules_modified":false,"all_rules_auto_apply":false,"all_experiments_not_run":true}
+}
