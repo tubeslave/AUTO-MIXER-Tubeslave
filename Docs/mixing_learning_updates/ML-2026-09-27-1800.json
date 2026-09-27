@@ -1,0 +1,164 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-27-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-27T18:00:00+03:00",
+  "actual_start_msk": "2026-09-27T17:58:14+03:00",
+  "completed_msk": "2026-09-27T18:07:52+03:00",
+  "preceding_update_id": "ML-2026-09-27-1500",
+  "preceding_search_update_id": "ML-2026-09-27-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "full_text_sources_re_read": 2,
+    "artifact_audits_updated": 2,
+    "code_executed": false,
+    "models_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true,
+    "primary_correction": "public_fixed_delays_front_door_is_not_paper_fixed_hadamard_fixed_er_baseline"
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260927-1500-01",
+      "operation": "update",
+      "stable_id": "DAFx-26:paper_10",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_10.pdf",
+      "reading_depth": "full_pdf_re_read_topology_configs_initialization_loss_training_dataset_baselines_ablation_costs_limitations",
+      "findings": [
+        "paper fixed configuration freezes delays normalized Hadamard matrix and ER taps",
+        "paper fixed-delay-train-mix is a distinct configuration",
+        "paper delay vector is 487 through 3361 samples or about 10 to 70 ms at 48 kHz",
+        "paper attenuation shelves initialize at 100 Hz and 12 kHz",
+        "paper bandpass initializes at 100 Hz and 18 kHz",
+        "paper tone PEQ is inside Branch A before the sum",
+        "nine loss weights were selected by isolated sweeps on one unidentified held-out RIR",
+        "noise-shaped baseline improvement shows that the composite loss materially drives results",
+        "each RIR is fitted independently and no formal listening test is reported"
+      ],
+      "revised_conclusion": "Exact paper-row reproduction requires a full parameter and topology manifest; the public CLI labels alone are insufficient."
+    },
+    {
+      "id": "SRC-ML-20260927-1500-02",
+      "operation": "update",
+      "stable_id": "DAFx-26:paper_13",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_13.pdf",
+      "accepted_manuscript_url": "https://openresearch.surrey.ac.uk/esploro/outputs/conferenceProceeding/Perceptual-Optimisation-of-Loudspeaker-Based-Reproduction/991143996602346",
+      "reading_depth": "full_manuscript_re_read_four_tasks_simulation_positions_weights_results_limitations",
+      "findings": [
+        "multi-attribute optimization uses 30 virtual listeners and reports three excluded positions",
+        "low-frequency overlap with nearby optimized points is expected",
+        "multi-attribute evaluation reuses the optimization model family and is explicitly circular",
+        "weights were chosen by trial and error",
+        "formal listening measured-room multi-source head-motion and true-peak validation are absent"
+      ],
+      "revised_conclusion": "Three excluded positions do not establish independent perceptual generalization; listener or independent-model validation remains required."
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20260927-1500-01",
+      "operation": "update",
+      "repository_url": "https://github.com/ilias-audio/DAFX26_DiffReverb",
+      "commit": "144266cb17c1cc9634cc464fcabc97cc19b5626c",
+      "reading_depth": "static_line_by_line_front_door_model_data_validation_loss_metrics_expected_smoke_dependencies_history_license",
+      "findings": [
+        "ReverbConfig.fixed only disables delay training while orthogonal matrix training remains enabled",
+        "public high-level path always keeps ER tap positions and gains trainable",
+        "public default delay_range_scale 0.6 yields nominal 6 to 42 ms rather than paper 10 to 70 ms",
+        "public shared attenuation shelves initialize at 50 Hz and 16 kHz rather than paper 100 Hz and 12 kHz",
+        "public bandpass starts at 20 Hz and 20 kHz rather than paper 100 Hz and 18 kHz",
+        "public tone PEQ is post-sum and therefore also shapes direct and early-reflection branch",
+        "train and validation use the same impulse-target pair",
+        "EXPECTED covers one studio target and smoke_test is not a numeric paper-result check",
+        "written target initial and optimized WAVs are independently peak-normalized",
+        "most dependencies are lower-bounded and GPU output is not bit-deterministic"
+      ],
+      "executed": false,
+      "audio_analyzed": false,
+      "paper_exact_fixed_baseline_front_door": false,
+      "reproduction_status": "partial_static_parity_blocked_for_exact_fixed_baseline"
+    },
+    {
+      "id": "ART-ML-20260927-1500-02",
+      "operation": "update",
+      "repository_url": "https://github.com/IoSR-Surrey/POLAR",
+      "status": "repository_unavailable_no_public_replacement_verified",
+      "executed": false,
+      "audio_analyzed": false,
+      "reproduction_status": "blocked"
+    }
+  ],
+  "corrections": [
+    {
+      "prior_item": "EXP-ML-20260927-1500-01",
+      "prior_assumption": "public fixed-delays mode can instantiate fixed-delay fixed-Hadamard baseline",
+      "correction": "public front door leaves orthogonal matrix and ER taps trainable and changes other defaults",
+      "status": "blocked_by_missing_public_front_door"
+    },
+    {
+      "prior_item": "ART-ML-20260927-1500-01",
+      "prior_assumption": "headline trainable and fixed-delay modes are sufficient to reproduce the paper comparison",
+      "correction": "fixed-delay CLI corresponds to a different paper row and multiple initializations and topology differ",
+      "status": "updated"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260927-1800-01","claim":"A fixed-delays CLI label does not establish the complete fixed-paper baseline; enumerate every trainable parameter.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-02","claim":"Fixed delays with a trainable orthogonal matrix is not the fixed-Hadamard condition.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-03","claim":"Trainable early-reflection taps confound a delay-state A/B unless frozen.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-04","claim":"A hidden delay-range scale changes modal density before optimization.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-05","claim":"Filter-initialization drift is a reproduction failure until isolated.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-06","claim":"Moving tone EQ across a branch sum changes which components are colored.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-07","claim":"Clean validation on the fitted RIR is an optimization monitor rather than held-out-room evidence.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-08","claim":"A one-target expected file and gradient smoke test do not reproduce a nine-room ablation table.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-09","claim":"Independently peak-normalized artifacts cannot validate absolute gain or headroom.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-10","claim":"Loss weights selected on one unidentified held-out RIR have unresolved robustness.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-11","claim":"Three excluded virtual-listener positions do not remove same-model circularity.","confidence":"high"},
+    {"id":"KC-ML-20260927-1800-12","claim":"Model-based spatial trade-offs need independent endpoints before perceptual promotion.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260927-1800-01","source":"ART-ML-20260927-1500-01","apply_when":"preparing a paper-code A/B","change":"export and compare a manifest of every trainable parameter","must_not_damage":["causal attribution","reproducibility"],"verify":"named-paper-row versus code manifest","cancel":"any unexplained mismatch remains","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-02","source":"SRC-ML-20260927-1500-01","apply_when":"using the robust fixed FDN baseline","change":"freeze delays normalized Hadamard mixing and ER taps explicitly","must_not_damage":["causal attribution","coloration"],"verify":"requires_grad and parameter-diff manifest","cancel":"front door cannot express the state","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-03","source":"ART-ML-20260927-1500-01","apply_when":"initializing FDN delays","change":"record the exact sample vector","must_not_damage":["modal density","mixing time"],"verify":"sample-vector equality and GCD ratios","cancel":"hidden scaling changes the vector","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-04","source":"ART-ML-20260927-1500-01","apply_when":"reproducing paper metrics","change":"match shelves bandpass cutoffs and tone topology","must_not_damage":["spectral attribution","early-field attribution"],"verify":"initialization and graph-topology manifest","cancel":"topology drift remains","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-05","source":"ART-ML-20260927-1500-01","apply_when":"reporting validation","change":"label same-target clean validation as optimization monitoring","must_not_damage":["generalization claims"],"verify":"disjoint target identity for any held-out claim","cancel":"no disjoint target exists","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-06","source":"ART-ML-20260927-1500-01","apply_when":"rendering evaluation artifacts","change":"preserve unnormalized renders and create separate normalized copies","must_not_damage":["gain","peak","headroom provenance"],"verify":"raw hashes gain and peak log","cancel":"only peak-normalized outputs remain","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-07","source":"ART-ML-20260927-1500-01","apply_when":"claiming table reproduction","change":"require full-table scripts and manifests or label result partial","must_not_damage":["result provenance"],"verify":"all rooms configurations and metrics covered","cancel":"one-room expected file is presented as full reproduction","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260927-1800-08","source":"SRC-ML-20260927-1500-02","apply_when":"evaluating POLAR filters","change":"use independent listeners or models and measured-room multi-source audio","must_not_damage":["timbre","localization","headroom"],"verify":"independent rank and listening endpoint","cancel":"approval remains same-model only","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260927-1800-01","status":"not_run","title":"delay-range parity A/B","baseline":"paper delay vector 487 to 3361 samples","variant":"public scaled delay vector nominally 6 to 42 ms","single_factor":"delay initialization range","controls":["fixed normalized Hadamard","frozen ER taps","identical filters and topology","same RIR loss seed epochs and gain"],"loudness_matching":"raw for metrics and safety; separate BS.1770-matched randomized copies for listening","measure":["delay ratios","modal peaks","EDP","EDR","T30","late-field smoothness","sample peak","true peak","seed spread","blind preference"],"protect":["decay","non-metallic timbre","mixing time","attacks","headroom"],"cancel":"exact fixed-Hadamard fixed-ER configuration cannot be instantiated and manifest-verified"},
+    {"id":"EXP-ML-20260927-1800-02","status":"not_run","title":"tone-filter placement A/B","baseline":"tone PEQ inside Branch A before sum","variant":"identical tone PEQ after branch sum","single_factor":"tone-filter placement","loudness_matching":"raw for null and safety; separate matched copies for blind preference","measure":["direct and ER null residual","early-energy ratios","spectrum","EDR","sample peak","true peak","blind timbre preference"],"protect":["direct sound","early reflections","late decay","transients","headroom"],"cancel":"coefficients or another topology differ"},
+    {"id":"EXP-ML-20260927-1800-03","status":"not_run","title":"fixed-Hadamard versus train-mix A/B","baseline":"fixed delays fixed normalized Hadamard and fixed ER taps","variant":"identical model with only orthogonal mixing matrix trainable","single_factor":"mixing-matrix state","loudness_matching":"raw for metrics and safety; separate BS.1770-matched copies for listening","measure":["paper RIR metrics","matrix orthogonality","modal peaks","sample peak","true peak","seed spread","blind preference"],"protect":["decay-coloration separation","late-field smoothness","headroom"],"cancel":"ER or delay state changes or matrix state is not logged"},
+    {"id":"EXP-ML-20260927-1800-04","status":"not_run","title":"POLAR independent-endpoint check","baseline":"same perceptual models as optimization","variant":"independent listener or model endpoint","single_factor":"evaluation endpoint","loudness_matching":"identical raw renders; matched copies only for blind preference","measure":["localization","uncertainty","coloration","IPD","preference","rank disagreement","true peak"],"protect":["evaluator independence","timbre","transients","headroom"],"cancel":"no independent endpoint or measured-room program is available"}
+  ],
+  "queue": {
+    "video_count_before": 51,
+    "video_count_after": 51,
+    "videos_searched_this_run": 0,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "carried_queued_video_ids": ["VID-ML-20260927-1500-01", "VID-ML-20260927-1500-02"],
+    "deep_review_priority": [
+      "paper-exact DiffReverb configuration adapter and manifest test",
+      "EXP-ML-20260927-1800-01 delay-range parity",
+      "POLAR public implementation or independent endpoint",
+      "permitted transcripts for two queued mastering videos"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
