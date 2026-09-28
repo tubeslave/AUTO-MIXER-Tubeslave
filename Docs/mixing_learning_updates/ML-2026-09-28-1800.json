@@ -1,0 +1,274 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-28-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-28T18:00:00+03:00",
+  "actual_start_msk": "2026-09-28T17:55:42+03:00",
+  "completed_msk": "2026-09-28T18:04:37+03:00",
+  "preceding_update_id": "ML-2026-09-28-1500",
+  "preceding_search_update_id": "ML-2026-09-28-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "full_text_sources_read": 2,
+    "source_cards_added": 2,
+    "source_cards_updated": 1,
+    "artifact_audits_added": 2,
+    "video_source_cards_updated": 1,
+    "new_videos_studied": 0,
+    "new_videos_queued": 0,
+    "code_executed": false,
+    "models_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260928-1800-01",
+      "operation": "add",
+      "title": "A Stem-Agnostic Single-Decoder System for Music Source Separation Beyond Four Stems",
+      "stable_id": "arXiv:2406.18747",
+      "venue": "ISMIR_2024",
+      "url": "https://arxiv.org/abs/2406.18747",
+      "reading_depth": "complete_nine_page_paper_methods_data_all_results_limitations_ethics_and_artifact_links",
+      "method": {
+        "name": "Banquet",
+        "query_encoder": "OpenMIC_PaSST",
+        "separator": "single_Bandit_encoder_decoder_with_query_conditioning_and_complex_mask",
+        "trainable_parameters_full": 24900000,
+        "trainable_parameters_frozen_encoder": 13500000
+      },
+      "data_protocol": {
+        "dataset": "MoisesDB",
+        "songs": 240,
+        "train_validation_test": [144, 48, 48],
+        "train_chunk_seconds": 6,
+        "query_seconds": 10,
+        "test_chunk_seconds": 6,
+        "test_hop_seconds": 0.5,
+        "sample_rate_hz": 44100,
+        "channels": 2
+      },
+      "findings": [
+        "same_song_and_different_song_query_medians_within_0_2_dB",
+        "best_VDBGP_medians_vocals_7_6_lead_vocals_7_9_drums_9_5_bass_11_0_guitar_3_3_piano_2_5_dB",
+        "no_long_tail_sample_above_5_dB_in_Q_ALL",
+        "long_tail_SNR_correlated_with_target_RMS_spearman_0_78_to_0_81",
+        "genre_and_cultural_data_bias_acknowledged"
+      ],
+      "limited_conclusion": "Single query-conditioned decoder supports more labels and useful VDBGP separation; long-tail reliability, instance identity, blind discovery and mix control remain unvalidated.",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260928-1800-02",
+      "operation": "add",
+      "title": "A conditioned UNet for Music Source Separation",
+      "stable_id": "arXiv:2512.15532v1",
+      "url": "https://arxiv.org/abs/2512.15532",
+      "publication_date": "2025-12-17",
+      "review_status": "preprint",
+      "reading_depth": "complete_HTML_paper_rationale_architecture_data_queries_training_metrics_results_and_limitations",
+      "method": {
+        "name": "QSCNet",
+        "query_encoder": "OpenMIC_PaSST_768d",
+        "conditioning": "one_FiLM_after_encoder_before_dual_path_recurrent_neck",
+        "trainable_parameters": 10200000
+      },
+      "data_protocol": {
+        "dataset": "MoisesDB",
+        "train_validation_test": [144, 48, 48],
+        "train_clip_seconds": 10,
+        "random_unrelated_stem_mixtures": true,
+        "query_zero_sample_max_fraction": 0.2,
+        "epochs": 300,
+        "gpu": "single_A100_80GB"
+      },
+      "reported_comparison": {
+        "QSCNet_Avg5_median_SNR_dB": 8.5,
+        "Banquet_Avg5_median_SNR_dB": 6.9,
+        "QSCNet_Avg9_median_SNR_dB": 6.3,
+        "Banquet_Avg9_median_SNR_dB": 5.3
+      },
+      "limitations": [
+        "preprint_not_peer_reviewed",
+        "architecture_training_recipe_and_conditioning_location_change_together",
+        "no_one_factor_Banquet_ablation",
+        "no_listening_test_or_uncertainty_intervals",
+        "no_exact_code_or_weights_linked"
+      ],
+      "limited_conclusion": "Independent counterevidence to blanket UNet-unsuitability; reported gains do not isolate topology or FiLM placement as the cause.",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260928-1500-01",
+      "operation": "update",
+      "title": "Music Source Separation via Stem Discovery",
+      "stable_id": "arXiv:2609.30912v1",
+      "added_findings": [
+        "Banquet_comparator_uses_different_song_same_stem_label_query",
+        "on_common_detected_VDBGP_Banquet_SNR_7_6_exceeds_MuS3D_DiT_Sep_6_5_dB",
+        "on_same_subset_MuS3D_DiT_Sep_Judge_4_7_exceeds_Banquet_4_1_and_MERT_MSE_0_12_beats_0_14",
+        "surpasses_claim_must_be_metric_and_subset_qualified",
+        "QSCNet_relevant_comparator_absent_without_inferred_reason"
+      ]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20260928-1800-01",
+      "title": "Banquet_code_splits_results_and_weights",
+      "repository": "https://github.com/kwatcharasupat/query-bandit",
+      "commit": "79ed5bb75e5c3a40cd319d9d990cee913fc65c26",
+      "license": "MIT",
+      "weights_doi": "10.5281/zenodo.13694558",
+      "weights_version": "v1",
+      "weights_total_gb": 8.7,
+      "checkpoint_files": 14,
+      "checksums": "MD5_per_file",
+      "present": [
+        "inference_command",
+        "test_config",
+        "split_csv",
+        "test_query_indices",
+        "per_song_result_CSVs",
+        "evaluation_notebooks"
+      ],
+      "limitations": [
+        "no_root_requirements_txt_at_pinned_commit",
+        "dependency_versions_not_locked_in_README",
+        "requires_user_supplied_clean_query_WAV",
+        "dataset_access_and_license_separate"
+      ],
+      "status": "statically_auditable_not_runtime_verified",
+      "reproduction_status": "not_run"
+    },
+    {
+      "id": "ART-ML-20260928-1800-02",
+      "title": "QSCNet_artifact_availability",
+      "paper_url": "https://arxiv.org/abs/2512.15532",
+      "code_linked": false,
+      "weights_linked": false,
+      "result_archive_linked": false,
+      "exact_split_referenced": "Banquet_144_48_48",
+      "artifact_available": false,
+      "reproduction_status": "not_run"
+    }
+  ],
+  "video_source_card_updates": [
+    {
+      "id": "VID-ML-20260928-1500-02",
+      "operation": "update",
+      "primary_source_checked": "https://tapeop.com/interviews/25/andy-wallace",
+      "reading_depth": "targeted_relevant_workflow_signature_passage_and_term_search",
+      "findings": [
+        "no_1073_compressor_or_35_40Hz_chain_found",
+        "Wallace_rejects_fixed_signature_sound_and_prioritizes_band_context_and_part_definition"
+      ],
+      "attribution_status": "unverified",
+      "limited_conclusion": "Primary interview supports context-first mixing but neither confirms nor disproves use of the third-party demonstrated chain elsewhere."
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260928-1800-01","claim":"Query-conditioned separator comparisons are not one-factor tests when query source architecture loss mixture construction and output representation differ.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-02","claim":"Same- versus different-song query medians within 0.2 dB support category robustness not instance-specific identity.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-03","claim":"Banquet long-tail results are strongly target-level and support confounded and require stratified reporting.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-04","claim":"QSCNet counters blanket UNet unsuitability but compound changes do not prove topology causality.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-05","claim":"Public weights results and splits improve auditability but are not runtime reproduction without environment and data query contracts.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-06","claim":"Disagreement among learned Judge waveform SNR and representation distance requires metric-qualified conclusions and separate listening.","confidence":"high"},
+    {"id":"KC-ML-20260928-1800-07","claim":"A primary context-first philosophy argues against preset doctrine but absence of one chain in one interview is not refutation.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260928-1800-01","source_ids":["SRC-ML-20260928-1800-01","SRC-ML-20260928-1800-02","SRC-ML-20260928-1500-01"],"when_to_apply":"ranking_query_conditioned_separators","change":"align_target_split_query_input_training_and_metrics_before_ranking","protect":"causal_attribution","cancel":"more_than_architecture_changes","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-02","source_ids":["SRC-ML-20260928-1800-01"],"when_to_apply":"using_audio_queries","change":"version_query_provenance_label_duration_activity_and_embedding_distance","protect":"identity_and_repeatability","cancel":"query_selection_changes_conclusion","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-03","source_ids":["SRC-ML-20260928-1800-01"],"when_to_apply":"reporting_long_tail_stems","change":"stratify_by_support_and_target_level","protect":"rare_and_quiet_sources","cancel":"aggregate_tracks_RMS_or_prevalence_without_stratification","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-04","source_ids":["SRC-ML-20260928-1800-02"],"when_to_apply":"interpreting_QSCNet_gain","change":"require_matched_ablation_before_UNet_or_FiLM_rule","protect":"architecture_causality","cancel":"loss_data_or_compute_differs","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-05","source_ids":["ART-ML-20260928-1800-01","ART-ML-20260928-1800-02"],"when_to_apply":"claiming_reproducibility","change":"distinguish_paper_weights_static_audit_and_runtime_verified","protect":"reproducibility_claim","cancel":"environment_hash_query_or_data_unresolved","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-06","source_ids":["SRC-ML-20260928-1500-01","SRC-ML-20260928-1800-01"],"when_to_apply":"metrics_disagree","change":"use_metric_panel_and_loudness_matched_blind_listening","protect":"phase_artifacts_leakage_stereo_peaks_preference","cancel":"winner_based_on_one_metric","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1800-07","source_ids":["VID-ML-20260928-1500-02"],"when_to_apply":"citing_attributed_Wallace_bass_chain","change":"keep_source_specific_and_third_party_until_primary_confirmation","protect":"provenance_and_material_context","cancel":"cancel_attribution_not_hypothesis_if_unconfirmed","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260928-1800-01",
+      "status": "not_run",
+      "title": "Banquet_query_timbre_sensitivity",
+      "baseline": "same_label_same_genre_different_artist_query_near_target_in_PaSST_space",
+      "variant": "same_label_different_artist_query_from_far_PaSST_distance_quartile",
+      "single_factor": "query_identity_timbre",
+      "controls": ["commit","checkpoint_hash","window_and_hop","query_duration_activity_RMS","label","hierarchy","mixture_gain","overlap_add","device","seed"],
+      "loudness_matching": "raw_renders_for_signal_metrics_separate_BS1770_matched_randomized_full_mix_copies",
+      "measure": ["pinned_SNR_SDR","leakage","PaSST_distance","output_null","crest","stereo_correlation","sample_peak","true_peak","blind_identity_artifact_preference"],
+      "protect": ["identity","attacks","ambience","stereo_mono","additive_balance","headroom"],
+      "cancel": "environment_checkpoint_or_query_pool_not_pinned_label_differs_or_matching_materially_alters_query"
+    },
+    {
+      "id": "EXP-ML-20260928-1800-02",
+      "status": "not_run",
+      "title": "Banquet_versus_QSCNet_architecture_isolation",
+      "baseline": "Banquet_separator_and_conditioning_position",
+      "variant": "QSCNet_separator_and_conditioning_position",
+      "single_factor": "architecture_only_after_full_recipe_matching",
+      "controls": ["split","vocabulary","training_clips_and_mixtures","queries","augmentation","loss","optimizer","updates","validation_selection","compute_budget","inference","metrics"],
+      "loudness_matching": "raw_outputs_for_signal_metrics_separate_BS1770_matched_randomized_copies",
+      "measure": ["song_grouped_stemwise_SNR_SDR","leakage","additive_residual","stereo_phase","compute_memory_RTF","sample_peak","true_peak","blind_artifacts_preference"],
+      "protect": ["identity","rare_quiet_stems","attacks","space","stereo","headroom"],
+      "cancel": "exact_QSCNet_artifact_or_matched_budget_unavailable"
+    },
+    {
+      "id": "EXP-ML-20260928-1800-03",
+      "status": "not_run",
+      "title": "end_to_end_coverage_accounting",
+      "baseline": "common_correct_detection_subset_only",
+      "variant": "all_active_targets_with_miss_duplicate_and_mislabel_penalties",
+      "single_factor": "evaluation_policy",
+      "controls": ["stored_outputs","matcher","hierarchy","activity_thresholds","segment_song_grouping","metrics"],
+      "loudness_matching": "not_applicable_same_stored_outputs_non_listening_accounting_test",
+      "measure": ["target_weighted_utility","song_weighted_utility","precision_recall_F1","count_error","matched_quality","miss_duplicate_mislabel_rates","song_grouped_bootstrap_intervals"],
+      "protect": ["denominator_transparency","rare_sources","failure_visibility"],
+      "cancel": "raw_predictions_or_targets_unavailable_or_matching_differs"
+    },
+    {
+      "id": "EXP-ML-20260928-1500-03",
+      "operation": "carry",
+      "status": "not_run",
+      "title": "parallel_mid_high_bass_saturation",
+      "single_factor": "saturation_return_state",
+      "loudness_matching": "raw_metrics_plus_BS1770_matched_randomized_full_mix_copies",
+      "next_practical_project_audio_test": true
+    }
+  ],
+  "deduplication": {
+    "Banquet_paper_repo_weights": "one_evidence_package_not_independent_confirmations",
+    "QSCNet_independence": "independent_authors_but_reuses_Banquet_split_and_reported_values",
+    "MuS3D_revision": "surpasses_narrowed_to_reported_metric_and_common_detection_subset",
+    "Wallace_chain": "attribution_unverified_not_refuted"
+  },
+  "queue": {
+    "video_catalogue_count_before": 56,
+    "video_catalogue_count_after": 56,
+    "queued_video_count_before": 52,
+    "queued_video_count_after": 52,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 0,
+    "deep_review_priority": [
+      "exact_QSCNet_code_weights_or_author_artifact",
+      "pinned_Banquet_environment_and_query_manifest",
+      "MuS3D_code_weights_config_and_end_to_end_scoring_after_release",
+      "authorized_content_or_captions_for_youtube_rsXMR83Co78",
+      "EXP_ML_20260928_1500_03_on_project_owned_bass_only"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "rules_auto_apply": false,
+    "experiments_run": false,
+    "audio_uploaded_to_third_parties": false,
+    "paid_services_used": false,
+    "audio_or_DSP_changed": false,
+    "runtime_or_models_changed": false,
+    "model_training_claimed": false
+  }
+}
