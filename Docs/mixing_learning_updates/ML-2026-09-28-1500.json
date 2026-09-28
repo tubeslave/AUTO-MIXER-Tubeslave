@@ -1,0 +1,229 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-28-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-28T15:00:00+03:00",
+  "actual_start_msk": "2026-09-28T15:07:13+03:00",
+  "completed_msk": "2026-09-28T15:13:32+03:00",
+  "preceding_update_id": "ML-2026-09-28-1200",
+  "preceding_search_update_id": "ML-2026-09-28-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "publication_date_of_added_source": "2026-09-25",
+    "discovery_date": "2026-09-28",
+    "freshness_note": "missed_from_morning_index_not_published_after_noon",
+    "full_text_sources_added": 1,
+    "artifact_availability_checks_added": 1,
+    "new_videos_studied_from_complete_auto_captions": 2,
+    "new_metadata_only_videos_queued": 1,
+    "duplicate_video_candidates_removed": 1,
+    "code_executed": false,
+    "models_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260928-1500-01",
+      "operation": "add",
+      "title": "Music Source Separation via Stem Discovery",
+      "stable_id": "arXiv:2609.30912v1",
+      "doi": "10.48550/arXiv.2609.30912",
+      "url": "https://arxiv.org/abs/2609.30912",
+      "publication_date": "2026-09-25",
+      "discovery_date": "2026-09-28",
+      "review_status": "preprint_submitted_to_ICASSP_2027",
+      "reading_depth": "complete_five_page_pdf_algorithm_data_tables_listening_protocol_limitations_and_artifact_links",
+      "method": {
+        "stem_embedding_generator": "37M_parameter_DiT_recursive_128d_PaSST_PCA_queries",
+        "termination": "cosine_to_stop_symbol_above_0_9_with_max_16_iterations",
+        "separators": ["medium_BS_Locoformer", "approximately_2_2B_parameter_DiT_Sep"],
+        "inference_steps": 32
+      },
+      "data": {
+        "train_songs": 279,
+        "validation_songs": 26,
+        "test_songs": 48,
+        "test_segments_10s": 1062,
+        "mean_active_groups": 4.5,
+        "mean_active_instruments": 7.0,
+        "bleeding_tracks_excluded": true
+      },
+      "findings": [
+        "SEG_group_F1_0_88_precision_0_92_recall_0_86_count_error_0_67",
+        "SEG_instrument_F1_0_74_precision_0_77_recall_0_72_count_error_1_26",
+        "conditioning_on_previous_estimated_residual_degraded_all_reported_discovery_metrics",
+        "generated_and_oracle_queries_nearly_match_only_on_correctly_detected_sources",
+        "objective_separation_evaluation_uses_common_detection_intersection_3422_group_and_5197_instrument_targets",
+        "all_objective_metrics_are_mono",
+        "raw_ground_truth_beats_autoencoded_ground_truth_in_selected_listening_test",
+        "whole_song_query_consistency_and_live_causal_operation_are_unvalidated"
+      ],
+      "listening_test": {
+        "participants": 13,
+        "excerpt_seconds": 4,
+        "songs_per_instrument": 2,
+        "instruments": ["vocals", "drums", "bass", "guitar", "piano"],
+        "limitations": [
+          "correctly_detected_targets_only",
+          "small_song_set",
+          "effect_sizes_and_intervals_not_reported",
+          "multiple_comparison_correction_not_reported"
+        ]
+      },
+      "limited_conclusion": "Generated audio queries can replace oracle queries without measured loss after correct detection on selected ten-second mono evaluations; end-to-end blind discovery, full-song identity, stereo integrity, live operation and automatic mix control remain unvalidated.",
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20260928-1500-01",
+      "repository": "REMUS-Aalto/Mus3D",
+      "url": "https://github.com/REMUS-Aalto/Mus3D",
+      "status_at_discovery": "http_404_paper_says_will_be_available_upon_acceptance",
+      "demo_url": "https://research.spa.aalto.fi/publications/papers/mus3d/",
+      "demo_status_at_discovery": "http_502_from_current_environment",
+      "artifact_available": false,
+      "execution_status": "not_run"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260928-1500-01",
+      "operation": "add",
+      "title": "Mixing Basics: Bass - Warren Huart: Produce Like A Pro",
+      "stable_id": "youtube:btsWALco8Xk",
+      "youtube_id": "btsWALco8Xk",
+      "url": "https://www.youtube.com/watch?v=btsWALco8Xk",
+      "channel": "Produce Like A Pro",
+      "published": "2019-09-25",
+      "duration_seconds": 1054,
+      "reading_depth": "complete_timestamped_auto_generated_english_captions_00_00_to_17_34_plus_youtube_metadata",
+      "status": "studied_asr_numbers_source_specific_some_upper_mid_values_require_visual_verification",
+      "independence": "single_engineer_single_song_DI_demonstration_no_blind_or_stored_render_analysis",
+      "categories": ["EQ", "compression", "ratio", "saturation", "parallel_processing", "kick_bass_space", "bass", "mix_context"],
+      "traceable_findings": [
+        "DI_split_near_200_Hz_into_low_and_mid_high_paths",
+        "low_path_serial_compression_spoken_as_3_to_1_then_about_22_5_to_1",
+        "duplicate_mid_high_path_hard_saturated_and_blended_low",
+        "bus_high_pass_near_50_to_60_Hz_at_12_dB_per_octave_and_gentle_80_to_100_Hz_emphasis",
+        "untreated_and_processed_bass_compared_at_similar_level_in_arrangement"
+      ],
+      "numeric_claims": [
+        {"value":"split_near_200_Hz","timestamp":"03:44-06:58","status":"ASR_source_specific"},
+        {"value":"low_path_serial_ratios_3_to_1_and_about_22_5_to_1","timestamp":"06:28-06:40","status":"ASR_source_specific"},
+        {"value":"bus_HPF_50_to_60_Hz_12_dB_per_octave","timestamp":"10:17-10:44","status":"ASR_source_specific"},
+        {"value":"gentle_emphasis_around_80_to_100_Hz","timestamp":"10:46-11:17","status":"ASR_source_specific"},
+        {"value":"3_kHz_upper_mid_example","timestamp":"11:58-12:13","status":"ASR_source_specific"},
+        {"value":"other_upper_mid_frequency_values","timestamp":"11:45-12:40","status":"ASR_corrupted_visual_verification_required"}
+      ],
+      "limited_conclusion": "Band splitting may decouple low-end consistency from audibility and distortion, but coherent recombination and project-specific A/B are required."
+    },
+    {
+      "id": "VID-ML-20260928-1500-02",
+      "operation": "add",
+      "title": "Andy Wallace Bass EQ Trick | Get Huge, Tight Bass In Your Mix",
+      "stable_id": "youtube:zrWA9rglG24",
+      "youtube_id": "zrWA9rglG24",
+      "url": "https://www.youtube.com/watch?v=zrWA9rglG24",
+      "channel": "Green Light Sound",
+      "published": "2021-03-22",
+      "duration_seconds": 268,
+      "reading_depth": "complete_timestamped_auto_generated_english_captions_00_00_to_04_28_plus_youtube_metadata",
+      "status": "studied_third_party_attribution_not_primary_engineer_source",
+      "independence": "third_party_single_excerpt_recreation_with_brand_emulations_no_blind_or_controlled_test",
+      "categories": ["EQ", "compression", "ratio", "DI_amp_bus", "automation", "bass"],
+      "traceable_findings": [
+        "DI_and_amp_bussed_before_Neve_style_low_band_pre_emphasis",
+        "demonstrated_35_Hz_control_followed_by_HPF_near_40_Hz",
+        "demonstrated_240_Hz_cut_of_1_6_dB_and_4_to_1_compression",
+        "DI_amp_automation_proposed_as_follow_up"
+      ],
+      "limited_conclusion": "Fundamental pre-emphasis into filtering and compression is an auditionable source-specific gain-staging move, not a fixed EQ preset; attribution needs a primary source."
+    },
+    {
+      "id": "VID-ML-20260928-1500-03",
+      "operation": "add",
+      "title": "BR00TAL BASS AND GUITAR TONE w/ Buster Odeholm & Born Of Osiris",
+      "stable_id": "youtube:rsXMR83Co78",
+      "youtube_id": "rsXMR83Co78",
+      "url": "https://www.youtube.com/watch?v=rsXMR83Co78",
+      "channel": "URM Academy",
+      "published": "2021-07-20",
+      "duration_seconds": 801,
+      "reading_depth": "metadata_only",
+      "status": "queued_source",
+      "transcript_status": "captions_disabled",
+      "content_claims": []
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260928-1500-01","claim":"Generated-query versus oracle-query parity is conditional on correct stem discovery and is not end-to-end blind-separation parity.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-02","claim":"Common-detection filtering can hide misses and alter the evaluated difficulty distribution.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-03","claim":"Many segments from few songs require song-grouped uncertainty rather than treating segments as independent recordings.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-04","claim":"Ten-second discovery does not validate cross-segment identity ordering or whole-song stem continuity.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-05","claim":"Mono Judge SNR and MERT-MSE do not validate stereo phase additivity peak safety or mix preference.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-06","claim":"Raw ground truth beating autoencoded ground truth identifies a codec ceiling only within the selected small listening set.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-07","claim":"A repository promised after acceptance is not a currently reproducible artifact.","confidence":"high"},
+    {"id":"KC-ML-20260928-1500-08","claim":"Split DI processing can decouple low-end consistency from midrange audibility only when recombination remains coherent.","confidence":"medium"},
+    {"id":"KC-ML-20260928-1500-09","claim":"Parallel mid-high saturation can improve audibility but can flatten attacks and bias preference through loudness.","confidence":"medium"},
+    {"id":"KC-ML-20260928-1500-10","claim":"Extreme fundamental pre-emphasis into compression is source-specific indirect engineering evidence and not a fixed preset.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260928-1500-01","source_ids":["SRC-ML-20260928-1500-01"],"apply_when":"evaluating blind stem discovery","change":"score missed duplicated and mislabelled targets in addition to quality on correct detections","must_not_damage":["end_to_end_claim_validity"],"verify":"complete target accounting and common_subset_sensitivity","cancel":"parity_is_reported_only_on_common_detections","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-02","source_ids":["SRC-ML-20260928-1500-01"],"apply_when":"multiple excerpts come from one song","change":"group uncertainty and resampling by song","must_not_damage":["statistical_independence"],"verify":"song_grouped_intervals","cancel":"significance_relies_on_segment_independence","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-03","source_ids":["SRC-ML-20260928-1500-01"],"apply_when":"using segmentwise stem discovery for editing or mixing","change":"require whole_song query_identity and continuity checks","must_not_damage":["source_identity","tails","arrangement_transitions"],"verify":"swap_duplicate_miss_and_boundary_audit","cancel":"swaps_duplicates_misses_or_boundary_artifacts_occur","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-04","source_ids":["SRC-ML-20260928-1500-01"],"apply_when":"a separator contains a lossy codec","change":"compare raw_ground_truth codec_ground_truth and separated_output separately","must_not_damage":["causal_attribution"],"verify":"three_way_metric_and_listening_control","cancel":"codec_floor_is_not_isolated","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-05","source_ids":["VID-ML-20260928-1500-01"],"apply_when":"splitting a bass DI into low and mid_high paths","change":"use complementary crossover and verify null polarity and latency after nonlinear or oversampled stages","must_not_damage":["low_end","attack","mono","headroom"],"verify":"null_latency_polarity_and_full_mix_A_B","cancel":"combing_delayed_attack_or_sub_loss","confidence":"medium_high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-06","source_ids":["VID-ML-20260928-1500-01"],"apply_when":"testing bass saturation","change":"hold_clean_low_path_fixed_and_change_only_mid_high_saturation_return_state_or_level","must_not_damage":["pitch","attack","guitar_separation","headroom"],"verify":"raw_metrics_plus_loudness_matched_blind_full_mix_A_B","cancel":"wins_only_by_level_or_adds_fizz","confidence":"medium","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-07","source_ids":["VID-ML-20260928-1500-01","VID-ML-20260928-1500-02"],"apply_when":"transferring demonstrated bass settings","change":"treat quoted frequencies ratios and gains as source_specific starting points","must_not_damage":["kick_space","note_equality","translation","headroom"],"verify":"project_material_section_conditioned_A_B","cancel":"pumping_thinness_bloom_or_translation_loss","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-1500-08","source_ids":["VID-ML-20260928-1500-02"],"apply_when":"a third_party video attributes a trick to another engineer","change":"seek primary citation before promoting to project doctrine","must_not_damage":["provenance"],"verify":"original_interview_or_engineer_demonstration","cancel":"primary_source_cannot_be_found","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260928-1500-01","status":"not_run","title":"generated_versus_oracle_query_same_separator","baseline":"oracle_embedding_from_held_out_target","variant":"MuS3D_generated_embedding_matched_to_same_target","single_factor":"query_source","controls":["checkpoint","mixture","target","hierarchy","sampler_seed_set","steps","codec","gain","segment","renderer"],"loudness_matching":"raw_outputs_for_signal_metrics_separate_BS1770_matched_randomized_copies_for_listening","measure":["pinned_SNR_SDR","MERT_distance","additive_residual","stereo_phase_correlation","boundary_continuity","sample_peak","true_peak","blind_artifact_preference"],"protect":["identity","attacks","pitch","ambience","stereo_mono","leakage","headroom"],"cancel":"exact_checkpoint_or_code_unavailable_or_matching_uses_ground_truth_asymmetrically"},
+    {"id":"EXP-ML-20260928-1500-02","status":"not_run","title":"independent_segments_versus_whole_song_query_tracking","baseline":"independent_query_discovery_per_10s_segment","variant":"query_identity_carried_or_matched_across_segments","single_factor":"identity_policy","controls":["checkpoint","audio","segment_grid","source_count_cap","stop_threshold","sampler_seeds","separator","reconstruction"],"loudness_matching":"raw_outputs_for_signal_metrics_separate_matched_copies_for_blind_continuity","measure":["swaps","duplicates","misses","embedding_trajectory","boundary_clicks","additive_residual","section_leakage","stereo_mono","sample_peak","true_peak"],"protect":["identity","entrances_exits","tails","transitions","groove","headroom"],"cancel":"variant_changes_weights_or_receives_extra_labels"},
+    {"id":"EXP-ML-20260928-1500-03","status":"not_run","title":"parallel_mid_high_bass_saturation","baseline":"complementary_low_and_mid_high_DI_recombined_clean","variant":"same_split_plus_one_fixed_saturation_processor_on_duplicate_mid_high_return","single_factor":"saturation_return_state","controls":["crossover","phase_mode","latency_compensation","low_path","EQ","compression","faders","section","master_chain"],"loudness_matching":"raw_metrics_plus_BS1770_matched_randomized_full_mix_copies","measure":["null_polarity_latency","low_band_RMS","onset_crest","harmonic_distribution","kick_masking","guitar_bass_separation","mono_residual","sample_peak","true_peak","blind_preference"],"protect":["fundamental","attack","kick_space","guitar_edge","mono","headroom"],"cancel":"compensation_fails_wins_only_by_level_sub_weakens_or_guitars_harden"},
+    {"id":"EXP-ML-20260928-1500-04","status":"not_run","title":"fundamental_pre_emphasis_into_compression","baseline":"flat_pre_EQ_into_fixed_channel_chain","variant":"one_low_band_boost_near_measured_fundamental_before_same_chain","single_factor":"pre_emphasis","controls":["DI_amp_balance","HPF","compressor_parameters","makeup_gain","upper_EQ","automation","master_chain"],"loudness_matching":"raw_metrics_plus_BS1770_matched_randomized_section_copies","measure":["gain_reduction_distribution","low_note_variance","kick_masking","sub_translation","crest","sample_peak","true_peak","blind_preference"],"protect":["pitch","transient","kick_separation","note_equality","small_speaker_audibility","headroom"],"cancel":"downstream_GR_not_comparable_chain_overloads_notes_bloom_or_wins_only_by_level"}
+  ],
+  "deduplication": [
+    {"key":"arXiv:2609.30912v1","normalized_title":"music source separation via stem discovery","resolution":"new_unique_full_text_source"},
+    {"key":"youtube:btsWALco8Xk","normalized_title":"mixing basics bass warren huart produce like a pro","resolution":"new_unique_studied"},
+    {"key":"youtube:zrWA9rglG24","normalized_title":"andy wallace bass eq trick get huge tight bass in your mix","resolution":"new_unique_studied"},
+    {"key":"youtube:rsXMR83Co78","normalized_title":"br00tal bass and guitar tone buster odeholm born of osiris","resolution":"new_unique_queued_captions_disabled"},
+    {"key":"youtube:RtMs8dyg_5Y","normalized_title":"ultimate bass mixing on 7 different songs","resolution":"existing_ML_2026_09_24_0900_not_readded"}
+  ],
+  "queue": {
+    "video_catalogue_count_before": 53,
+    "video_catalogue_count_after": 56,
+    "queued_video_count_before": 51,
+    "queued_video_count_after": 52,
+    "studied_video_count_this_run": 2,
+    "new_metadata_only_video_count": 1,
+    "duplicates_removed": 1,
+    "new_queued_video_ids": ["VID-ML-20260928-1500-03"],
+    "deep_review_priority": [
+      "exact_MuS3D_code_weights_config_split_manifest_and_whole_song_identity_protocol",
+      "end_to_end_discovery_evaluation_including_misses_duplicates_and_mislabels",
+      "primary_source_for_attributed_Andy_Wallace_chain",
+      "authorized_content_or_captions_for_youtube_rsXMR83Co78",
+      "EXP_ML_20260928_1500_03_on_project_owned_bass_only"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "third_party_audio_uploaded": false,
+    "paid_services_used": false
+  }
+}
