@@ -1,0 +1,176 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-28-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-28T09:00:00+03:00",
+  "actual_start_msk": "2026-09-28T09:00:43+03:00",
+  "completed_msk": "2026-09-28T09:15:53+03:00",
+  "preceding_update_id": "ML-2026-09-27-1800",
+  "preceding_search_update_id": "ML-2026-09-27-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "latest_feed_publication_date": "2026-09-25",
+    "fresh_relevant_abstract_only_sources_added": 1,
+    "older_full_text_gaps_added": 1,
+    "new_videos_studied_from_complete_auto_captions": 2,
+    "duplicate_video_candidates_removed": 3,
+    "code_executed": false,
+    "models_executed": false,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260928-0900-01",
+      "operation": "add",
+      "title": "Real-Time Music Source Separation on a Low-Power Audio DSP",
+      "stable_id": "arXiv:2609.12201v1",
+      "doi": "10.48550/arXiv.2609.12201",
+      "url": "https://arxiv.org/abs/2609.12201",
+      "publication_date": "2026-09-10",
+      "discovery_date": "2026-09-28",
+      "review_status": "preprint_submitted_to_ICASSP_2027",
+      "reading_depth": "full_five_page_pdf_budget_architecture_training_dataset_metrics_device_results_limitations",
+      "findings": [
+        "reset block-wise evaluation hid near-silent collapse within about two seconds of continuous inference",
+        "continuous-context training restored frame-by-frame performance while recurrent-state carry alone did not",
+        "parameter count failed as a compute proxy because weight reuse spanned two orders of magnitude",
+        "deployed full-band model measured 10.43 ms mean and 10.44 ms worst case inside an 11.6 ms frame deadline",
+        "plain-energy cSDR and BSSEval-v4 differed by minus 1.33 to plus 1.21 dB per stem with inconsistent sign",
+        "strictly causal deep filtering improved the matched full-band model but the cropped slim model benefited mainly from look-ahead",
+        "fixed-point accuracy energy consumption and out-of-domain robustness were not measured"
+      ],
+      "limited_conclusion": "Require uninterrupted streaming parity, exact metric semantics and measured target-host timing before deployment; SDR is not mix-control or preference evidence."
+    },
+    {
+      "id": "SRC-ML-20260928-0900-02",
+      "operation": "add",
+      "title": "Room Impulse Response Embeddings for Speech Enhancement in Noisy and Reverberant Environments",
+      "stable_id": "arXiv:2609.31041v1",
+      "doi": "10.48550/arXiv.2609.31041",
+      "url": "https://arxiv.org/abs/2609.31041",
+      "publication_date": "2026-09-25",
+      "discovery_date": "2026-09-28",
+      "review_status": "preprint_submitted_to_ICASSP_2027",
+      "reading_depth": "metadata_and_complete_abstract_only",
+      "status": "queued_source",
+      "abstract_level_finding": "Self-supervised RIR embeddings are evaluated through room-parameter estimation and reportedly improve a conditioned speech-enhancement model across all evaluated metrics including WER.",
+      "limitations_unread": ["full methods", "room and noise splits", "leakage controls", "metric denominators", "code", "music-domain transfer"]
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260928-0900-01",
+      "operation": "add",
+      "title": "Modern Rock Drums — Full Processing Chain Tutorial",
+      "stable_id": "youtube:C25tHMuMrM0",
+      "youtube_id": "C25tHMuMrM0",
+      "url": "https://www.youtube.com/watch?v=C25tHMuMrM0",
+      "channel": "HoRNet Plugins",
+      "published": "2026-05-07",
+      "duration_seconds": 1534,
+      "reading_depth": "complete_timestamped_auto_generated_english_captions_00_00_to_25_33_plus_official_companion_metadata",
+      "status": "studied_asr_numbers_require_visual_verification",
+      "independence": "manufacturer_demo_of_own_plugins_one_session_no_blind_or_controlled_level_matched_test",
+      "categories": ["EQ", "auto_EQ", "compression", "attack_release_ratio_GR", "saturation", "room_ambience", "kick", "snare", "toms", "overheads", "drum_bus", "stereo"],
+      "traceable_findings": [
+        "full-kit balance established before channel processing",
+        "automatic EQ nodes repeatedly auditioned and sometimes rejected or reduced",
+        "room microphones heavily compressed then blended low for cohesion",
+        "spoken attack and release description self-corrects and conflicts within one sentence"
+      ],
+      "numeric_claims": [
+        {"value": "drum bus 4:1 30 ms attack auto release about 4 dB movement", "timestamp": "01:00-01:35", "status": "ASR_source_specific"},
+        {"value": "kick and snare 4:1 slow attack fast release about 5 dB GR", "timestamp": "05:00-05:55 and 09:19-10:30", "status": "ASR_source_specific"},
+        {"value": "overheads about 2:1 with brief detector activity", "timestamp": "11:55-12:46", "status": "ASR_source_specific"},
+        {"value": "room roughly 20 dB compression", "timestamp": "14:42-15:09", "status": "ASR_visual_verification_required_due_to_attack_release_self_correction"}
+      ]
+    },
+    {
+      "id": "VID-ML-20260928-0900-02",
+      "operation": "add",
+      "title": "Why I HATE Mixing with Reference Tracks — Joe Chiccarelli Rates Mix Tips",
+      "stable_id": "youtube:NpQWYv4Mr-k",
+      "youtube_id": "NpQWYv4Mr-k",
+      "url": "https://www.youtube.com/watch?v=NpQWYv4Mr-k",
+      "official_companion_url": "https://www.waves.com/mix-trick-or-trash-episode-2-joe-chiccarelli",
+      "channel": "Waves Audio",
+      "published": "2026-02-05",
+      "duration_seconds": 713,
+      "reading_depth": "complete_timestamped_auto_generated_english_captions_00_00_to_11_49_plus_official_chapter_list",
+      "status": "studied_engineer_opinion_not_controlled_evidence",
+      "categories": ["EQ", "high_pass", "reference_matching", "mono", "drum_timing", "monitoring", "tom_tuning", "automation", "mix_bus", "reverb", "kick_snare", "sidechain", "gain_staging"],
+      "traceable_findings": [
+        "high-pass and low-cut moves should respond to an audible problem rather than a universal rule",
+        "reference use can be appropriate for competitive pop but may narrow artist-specific exploration",
+        "live-drum quantisation is style-dependent and should preserve intentional feel",
+        "starting every drum mix by soloing kick and snare ignores the arrangement",
+        "preloaded track plugins should follow listening rather than precede it"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260928-0900-01","claim":"Reset block-wise evaluation can conceal catastrophic continuous-stream failure.","confidence":"high_reported_system_medium_generalisation"},
+    {"id":"KC-ML-20260928-0900-02","claim":"Parameter count cannot substitute for per-frame compute when weight reuse differs across architectures.","confidence":"high"},
+    {"id":"KC-ML-20260928-0900-03","claim":"MAC estimates are insufficient without measured worst-case time memory bandwidth allocation and state precision.","confidence":"high"},
+    {"id":"KC-ML-20260928-0900-04","claim":"SDR rankings require identical metric implementation silent-frame policy and channel aggregation.","confidence":"high"},
+    {"id":"KC-ML-20260928-0900-05","claim":"Source-separation SDR does not establish musical preference additive reconstruction phase integrity or mix-control suitability.","confidence":"high"},
+    {"id":"KC-ML-20260928-0900-06","claim":"Automatic EQ output requires full-kit audition and manual rejection.","confidence":"medium"},
+    {"id":"KC-ML-20260928-0900-07","claim":"Aggressive room compression is a style and session choice whose useful blend may be low.","confidence":"medium_low"},
+    {"id":"KC-ML-20260928-0900-08","claim":"Full-arrangement context should precede or accompany soloed drum processing.","confidence":"medium"},
+    {"id":"KC-ML-20260928-0900-09","claim":"Reference tracks can serve competitive translation but mandatory use can conflict with artist-specific differentiation.","confidence":"medium"},
+    {"id":"KC-ML-20260928-0900-10","claim":"A self-corrected ASR attack or release statement cannot support numeric transfer without visual verification.","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260928-0900-01","source_ids":["SRC-ML-20260928-0900-01"],"apply_when":"evaluating a causal or streaming separator","change":"run uninterrupted frame-by-frame inference with deployment-equivalent cache and state carry","must_not_damage":["continuity","non-target leakage","headroom"],"verify":"per-second metrics state and cache extrema output energy additivity and drift","cancel":"collapse drift or hidden resets appear","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-02","source_ids":["SRC-ML-20260928-0900-01"],"apply_when":"claiming embedded deployment","change":"budget memory measured worst-case callback time and sustained bandwidth separately","must_not_damage":["deadline margin","state precision"],"verify":"target-host end-to-end measurement","cancel":"any target-host gate is unmeasured","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-03","source_ids":["SRC-ML-20260928-0900-01"],"apply_when":"comparing separator SDR","change":"pin metric window silence gate channel aggregation and version","must_not_damage":["ranking validity"],"verify":"same stored estimates through both metric implementations","cancel":"definitions differ","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-04","source_ids":["VID-ML-20260928-0900-01","VID-ML-20260928-0900-02"],"apply_when":"processing rock drums","change":"establish full-kit and full-mix context before solo work and return after each change","must_not_damage":["groove","cymbal continuity","room continuity","instrument role"],"verify":"context A B plus low-level and mono checks","cancel":"solo improvement worsens full mix","confidence":"medium","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-05","source_ids":["VID-ML-20260928-0900-01"],"apply_when":"using automatic EQ suggestions","change":"treat nodes as proposals and bypass at matched output level","must_not_damage":["body","brightness","kit stability"],"verify":"node-wise and full-kit A B","cancel":"body thins brightness hardens or role worsens","confidence":"medium","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-06","source_ids":["VID-ML-20260928-0900-01"],"apply_when":"testing crushed room ambience","change":"hold routing and EQ fixed and vary only compressor state or return level per pass","must_not_damage":["attacks","cymbal smoothness","stereo image","mono","headroom"],"verify":"raw metrics plus loudness-matched blind full-mix A B","cancel":"effect wins only by level or smears dense sections","confidence":"medium_low","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-07","source_ids":["VID-ML-20260928-0900-02"],"apply_when":"considering a reference track","change":"use it only for an explicit creative or competitive target with compatible role and section","must_not_damage":["artist identity","arrangement intent"],"verify":"no-reference versus reference-guided pass","cancel":"reference erases intended differentiation","confidence":"medium","auto_apply":false},
+    {"id":"RULE-ML-20260928-0900-08","source_ids":["VID-ML-20260928-0900-01"],"apply_when":"transferring a caption-derived compressor number","change":"verify visible controls when speech self-corrects or conflicts","must_not_damage":["parameter provenance"],"verify":"timestamped visual inspection","cancel":"control state remains ambiguous","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260928-0900-01","status":"not_run","title":"continuous-context streaming parity","baseline":"zero-padded independently trained chunks","variant":"continuous 500-frame training segments","single_factor":"training context","controls":["same split augmentation optimiser seeds steps precision architecture STFT hop cache and selection rule"],"loudness_matching":"raw renders for signal metrics; separate BS.1770-matched randomized copies for listening","measure":["per-second cSDR and uSDR","output reference energy ratio","silence ratio","state and cache extrema","additive residual","discontinuities","sample peak","true peak","target-host deadline misses"],"protect":["continuity","attacks","ambience","stereo and mono","non-target leakage","headroom"],"cancel":"exact implementation unavailable or any non-context factor differs"},
+    {"id":"EXP-ML-20260928-0900-02","status":"not_run","title":"causal versus one-frame-look-ahead deep filter","baseline":"Q equals 0","variant":"Q equals 1","single_factor":"look-ahead order","controls":["same checkpoint family backbone filter order crop precision reconstruction material host"],"loudness_matching":"raw renders for signal and safety; separate matched randomized copies for listening","measure":["cSDR","uSDR","per-stem delta","measured latency","callback margin","memory","additivity","phase","sample peak","true peak","blind artifacts and preference"],"protect":["live-monitor latency","attacks","stereo integrity","continuity","headroom"],"cancel":"architecture or training factors differ or latency exceeds use case"},
+    {"id":"EXP-ML-20260928-0900-03","status":"not_run","title":"crushed-room contribution in modern rock drums","baseline":"fixed room EQ and routing with compressor bypassed","variant":"identical chain with one visually verified heavy-compression state","single_factor":"room-compressor state","controls":["same excerpt kit balance sample state polarity alignment master chain automation"],"loudness_matching":"operational raw comparison plus separate BS.1770-matched randomized full-mix copies","measure":["gain reduction","attack body","room decay","cymbal crest and splash","stereo correlation","mono residual","sample peak","true peak","section blind preference"],"protect":["kick and snare impact","cymbal smoothness","room continuity","groove","width","headroom"],"cancel":"settings unverified effect wins only by level or dense sections smear"}
+  ],
+  "deduplication": [
+    {"key":"youtube:0jZCqDwIpgw","resolution":"existing_initial_queue_not_added"},
+    {"key":"youtube:Z0eqw_3cY2A","resolution":"existing_fully_studied_ML-2026-09-24-1500_not_added"},
+    {"key":"youtube:dOnrcpm_hSc","resolution":"existing_fully_studied_ML-2026-09-12-1500_not_added"},
+    {"key":"arXiv:2609.12201v1","resolution":"new_unique_older_gap"},
+    {"key":"arXiv:2609.31041v1","resolution":"new_unique_fresh_abstract_only"}
+  ],
+  "queue": {
+    "video_catalogue_count_before": 51,
+    "video_catalogue_count_after": 53,
+    "videos_searched_this_run": 5,
+    "studied_video_count_this_run": 2,
+    "new_metadata_only_video_count": 0,
+    "duplicates_removed": 3,
+    "carried_queued_video_ids": ["VID-ML-20260927-1500-01", "VID-ML-20260927-1500-02"],
+    "deep_review_priority": [
+      "arXiv 2609.12201 code and runtime release plus exact continuous-context parity",
+      "full text review of arXiv 2609.31041",
+      "visual attack and release verification for youtube C25tHMuMrM0",
+      "EXP-ML-20260928-0900-01 when exact implementation is available"
+    ]
+  },
+  "reference_cards_added": 0,
+  "licensed_raw_multitracks_added": 0,
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
