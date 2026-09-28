@@ -1,0 +1,144 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-28-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-28T12:00:00+03:00",
+  "actual_start_msk": "2026-09-28T11:57:00+03:00",
+  "completed_msk": "2026-09-28T12:03:20+03:00",
+  "preceding_update_id": "ML-2026-09-28-0900",
+  "preceding_search_update_id": "ML-2026-09-28-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "full_papers_read": 2,
+    "sources_promoted_abstract_to_full_text": 1,
+    "source_cards_updated": 2,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 10,
+    "candidate_rules_added": 8,
+    "experiments_planned": 4,
+    "experiments_run": 0,
+    "new_reference_cards": 0,
+    "new_licensed_raw_multitracks": 0
+  },
+  "source_updates": [
+    {
+      "source_id": "SRC-ML-20260928-0900-01",
+      "stable_id": "arXiv:2609.12201v1",
+      "url": "https://arxiv.org/abs/2609.12201",
+      "reading_depth": "full_text_reread",
+      "status": "preprint_icassp_2027_submission",
+      "artifact_available": false,
+      "revisions": [
+        "blockwise_metrics_cover_50_tracks_but_continuous_failure_trajectory_covers_8",
+        "reported_target_margin_is_1_16_ms_with_77_kb_l2_and_65_kb_l1_remaining",
+        "runtime_profiler_checkpoint_and_manifest_are_promised_not_available"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "source_id": "SRC-ML-20260928-0900-02",
+      "stable_id": "arXiv:2609.31041v1",
+      "url": "https://arxiv.org/abs/2609.31041",
+      "reading_depth_before": "metadata_and_abstract",
+      "reading_depth_after": "full_text",
+      "status": "preprint_icassp_2027_submission",
+      "domain": "single_channel_synthetic_speech_enhancement",
+      "revisions": [
+        "all_metric_gains_are_relative_to_corresponding_unconditioned_enhancer",
+        "weak_asr_wer_remains_worse_than_raw_input_for_all_reported_enhanced_conditions",
+        "no_music_bleed_multichannel_dynamic_room_listener_or_realtime_cost_evidence"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "artifact_id": "ART-ML-20260928-1200-01",
+      "repository": "sp-uhh/rir-encoder",
+      "revision": "8ee0ba7e083c8e38170dc13632cc9937a702d0f0",
+      "url": "https://github.com/sp-uhh/rir-encoder/commit/8ee0ba7e083c8e38170dc13632cc9937a702d0f0",
+      "license": "MIT",
+      "relationship": "official_predecessor_auxiliary_code_not_exact_new_paper_implementation",
+      "available_scope": [
+        "reverberant_contrastive_encoder_training",
+        "conformer_and_resnet_encoders",
+        "embedding_extraction_template",
+        "predecessor_checkpoint_link"
+      ],
+      "missing_scope": [
+        "noisy_reverberant_stage_2",
+        "teacher_student_stage_3",
+        "p_0_7_noise_pairing",
+        "rir_parameter_probes",
+        "film_dfn3_two_step_training",
+        "metrics_and_wer_evaluation",
+        "paper_table_reproduction"
+      ],
+      "static_findings": [
+        "hard_coded_paths_and_output_directory",
+        "no_cli_config_seed_run_manifest_or_checkpoint_checksum",
+        "several_unpinned_dependencies",
+        "dataset_getitem_ignores_index_and_randomly_samples_utterances_and_rirs"
+      ],
+      "execution_status": "not_run"
+    }
+  ],
+  "knowledge_card_ids": [
+    "KC-ML-20260928-1200-01",
+    "KC-ML-20260928-1200-02",
+    "KC-ML-20260928-1200-03",
+    "KC-ML-20260928-1200-04",
+    "KC-ML-20260928-1200-05",
+    "KC-ML-20260928-1200-06",
+    "KC-ML-20260928-1200-07",
+    "KC-ML-20260928-1200-08",
+    "KC-ML-20260928-1200-09",
+    "KC-ML-20260928-1200-10"
+  ],
+  "candidate_rules": [
+    {"rule_id":"RULE-ML-20260928-1200-01","auto_apply":false,"confidence":"high"},
+    {"rule_id":"RULE-ML-20260928-1200-02","auto_apply":false,"confidence":"high"},
+    {"rule_id":"RULE-ML-20260928-1200-03","auto_apply":false,"confidence":"high"},
+    {"rule_id":"RULE-ML-20260928-1200-04","auto_apply":false,"confidence":"high"},
+    {"rule_id":"RULE-ML-20260928-1200-05","auto_apply":false,"confidence":"medium"},
+    {"rule_id":"RULE-ML-20260928-1200-06","auto_apply":false,"confidence":"medium_high"},
+    {"rule_id":"RULE-ML-20260928-1200-07","auto_apply":false,"confidence":"high"},
+    {"rule_id":"RULE-ML-20260928-1200-08","auto_apply":false,"confidence":"high"}
+  ],
+  "experiments": [
+    {"experiment_id":"EXP-ML-20260928-1200-01","name":"full_manifest_continuous_streaming_parity","status":"not_run"},
+    {"experiment_id":"EXP-ML-20260928-1200-02","name":"measured_host_margin_stress_test","status":"not_run"},
+    {"experiment_id":"EXP-ML-20260928-1200-03","name":"rir_identity_vs_matched_shuffled_conditioning","status":"not_run"},
+    {"experiment_id":"EXP-ML-20260928-1200-04","name":"global_embedding_under_room_transition","status":"not_run"}
+  ],
+  "video_state": {
+    "broad_search_performed": false,
+    "catalogued_sources": 53,
+    "queued_sources": 51,
+    "newly_studied": 0,
+    "hornet_visual_verification": "not_completed_black_or_stalled_cloud_playback_frame",
+    "numeric_transfer_allowed": false
+  },
+  "queue": {
+    "top_priorities": [
+      "exact_runtime_profiler_checkpoint_and_manifest_for_arxiv_2609_12201",
+      "exact_three_stage_rir_and_film_code_for_arxiv_2609_31041",
+      "visual_verification_of_hornet_attack_release_controls",
+      "EXP-ML-20260928-1200-01_when_artifacts_exist"
+    ],
+    "carried_metadata_only_mastering_videos": 2
+  },
+  "safety": {
+    "audio_changed": false,
+    "dsp_engine_changed": false,
+    "runtime_changed": false,
+    "models_changed": false,
+    "active_rules_changed": false,
+    "third_party_audio_uploaded": false,
+    "paid_services_used": false
+  }
+}
