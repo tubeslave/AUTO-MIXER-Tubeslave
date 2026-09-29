@@ -1,0 +1,487 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-29-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-29T15:00:00+03:00",
+  "actual_start_msk": "2026-09-29T14:55:41+03:00",
+  "completed_msk": "2026-09-29T15:03:00+03:00",
+  "preceding_update_id": "ML-2026-09-29-1200",
+  "preceding_search_update_id": "ML-2026-09-29-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "new_full_text_scientific_sources": 1,
+    "new_full_public_educational_sources": 1,
+    "new_video_cards_metadata_only": 3,
+    "videos_fully_studied": 0,
+    "video_duplicates_removed": 3,
+    "new_reference_cards": 0,
+    "new_knowledge_cards": 8,
+    "new_rule_candidates": 6,
+    "new_experiment_plans": 3,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260929-1500-01",
+      "operation": "add",
+      "type": "proceedings_paper_arxiv_version",
+      "title": "Simulation-Based Inference for Plate Reverb System Identification",
+      "stable_id": "arxiv:2609.35295",
+      "doi": null,
+      "urls": [
+        "https://arxiv.org/abs/2609.35295",
+        "https://arxiv.org/pdf/2609.35295"
+      ],
+      "authors": [
+        "Dylan Sechet",
+        "Marc Evrard",
+        "Matthieu Kowalski"
+      ],
+      "venue": "DAFx-26",
+      "publication_date": "2026-09",
+      "arxiv_submission_date": "2026-09-28",
+      "discovery_date": "2026-09-29",
+      "license": "CC BY 4.0",
+      "reading_depth": "full_text_complete_4_pages",
+      "evidence_type": "simulation_based_system_identification",
+      "independence": "primary_paper_no_independent_reproduction_found",
+      "method": {
+        "input": "single_5_second_44.1_kHz_unnormalised_IR",
+        "targets": [
+          "mu",
+          "D_over_mu",
+          "T0_over_mu",
+          "Ly",
+          "xo",
+          "yo"
+        ],
+        "conditioner": "three_resolution_spectrogram_CNN_plus_log_RMS",
+        "posterior": "neural_spline_flow_8_transforms_256_hidden_features",
+        "training_pairs": 60000,
+        "epochs": 145,
+        "batch_size": 128,
+        "optimizer": "Adam_1e-3",
+        "reported_compute": "about_26_A100_hours",
+        "refinement": "3_rounds_x_10000_simulations_about_2.5_A100_hours_per_observation"
+      },
+      "reported_results": {
+        "test_count": 50,
+        "global_NMSE_x1e_3": {
+          "PSO": 50.56,
+          "offline": 2.17,
+          "refined": 3.8,
+          "selected": 0.47,
+          "oracle": 0.34
+        },
+        "refinement_improved_cases": "40_of_50",
+        "median_NMSE_x1e_3": "0.75_to_0.13",
+        "calibration": "offline_only_500_held_out_simulated_plates_slightly_overconfident"
+      },
+      "limitations": [
+        "same_simulator_domain",
+        "small_main_test_50",
+        "no_measured_plate_IR",
+        "no_noise_or_model_mismatch_stress",
+        "no_listening_test",
+        "no_music_mix_evaluation",
+        "refinement_calibration_not_established"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260929-1500-02",
+      "operation": "add",
+      "type": "official_educational_editorial_article",
+      "title": "How to get huge-sounding drums when you recorded in a small room (ft. Intervals)",
+      "stable_id": "url:https://www.nailthemix.com/intervals-drums-sam-guaiana-mix-tricks",
+      "url": "https://www.nailthemix.com/intervals-drums-sam-guaiana-mix-tricks",
+      "author": "Nail The Mix Staff",
+      "publication_date": "2025-05-29",
+      "discovery_date": "2026-09-29",
+      "reading_depth": "complete_public_article",
+      "independent_of_paid_session": false,
+      "verified_content": [
+        "mono_corridor_room_filtered_for_midrange_vibe",
+        "dynamic_EQ_only_for_harsh_cymbal_transients",
+        "synthetic_room_selective_prefader_kick_snare_tom_sends",
+        "room_sample_sustain_reduced_about_20_percent",
+        "VCA_room_compressor_detector_HPF_about_70_Hz",
+        "cleanup_EQ_after_compression"
+      ],
+      "number_provenance": "single_source_session_not_transferable_preset",
+      "limitations": [
+        "no_controlled_listening_test",
+        "no_raw_session",
+        "no_public_transcript",
+        "no_reproducible_DAW_state",
+        "no_statistics",
+        "linked_session_and_multitracks_paid_not_accessed"
+      ]
+    }
+  ],
+  "video_source_card_updates": [
+    {
+      "id": "VID-ML-20260929-1500-01",
+      "operation": "add",
+      "stable_id": "youtube:nk5-RhC_COY",
+      "title": "Mixing Drums: Clean Snare Reverb",
+      "publisher": "Waves Audio / Jack Joseph Puig",
+      "publication_date": "2011-02-01",
+      "duration": "2:32",
+      "url": "https://www.youtube.com/watch?v=nk5-RhC_COY",
+      "official_page": "https://www.waves.com/mixing-drums-clean-snare-reverb",
+      "reading_depth": "metadata_and_official_page_summary_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "verified_topic_only": "limiting_hi_hat_bleed_into_snare_reverb",
+      "technical_claims_extracted_from_video": false
+    },
+    {
+      "id": "VID-ML-20260929-1500-02",
+      "operation": "add",
+      "stable_id": "youtube:kk2IQK_JnlM",
+      "title": "Parallel Compression for Drums – Tony Maserati’s SSL Tip #1",
+      "publisher": "Waves Audio / Tony Maserati",
+      "publication_date": "2017-10-03",
+      "duration": "5:26",
+      "url": "https://www.youtube.com/watch?v=kk2IQK_JnlM",
+      "official_page": "https://www.waves.com/parallel-compression-for-drums-tony-maserati-ssl",
+      "reading_depth": "metadata_and_official_page_summary_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "official_page_topics": [
+        "selective_sends",
+        "attack_release_relation_to_transients_and_room_decay"
+      ],
+      "technical_claims_extracted_from_video": false
+    },
+    {
+      "id": "VID-ML-20260929-1500-03",
+      "operation": "add",
+      "stable_id": "youtube:e0l8A1Oae4Y",
+      "title": "EQing Parallel Drums – Tony Maserati’s SSL Tip #3",
+      "publisher": "Waves Audio / Tony Maserati",
+      "publication_date": "2017-11-16",
+      "duration": "7:15",
+      "url": "https://www.youtube.com/watch?v=e0l8A1Oae4Y",
+      "official_page": "https://www.waves.com/eq-parallel-drums-tony-maserati-ssl-3",
+      "reading_depth": "metadata_and_official_page_summary_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "official_page_topics": [
+        "post_fader_sidechain_trigger",
+        "selective_send_balance"
+      ],
+      "technical_claims_extracted_from_video": false
+    }
+  ],
+  "deduplication": [
+    {
+      "stable_id": "youtube:dOnrcpm_hSc",
+      "resolution": "existing_fully_studied_ML-2026-09-12-1500"
+    },
+    {
+      "stable_id": "youtube:XDtFX1Nbl_o",
+      "resolution": "existing_fully_studied_ML-2026-09-13-0900"
+    },
+    {
+      "stable_id": "youtube:2MkAB1yEfHA",
+      "resolution": "existing_queued_ML-2026-09-27-0900"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260929-1500-01",
+      "claim": "If raw amplitude carries target-parameter information, peak normalisation can reduce identifiability; this does not justify raw gain as a creative matching objective.",
+      "confidence": "high_within_simulated_task"
+    },
+    {
+      "id": "KC-ML-20260929-1500-02",
+      "claim": "Per-observation refinement can improve median error while worsening mean error through rare catastrophic failures; report tail risk.",
+      "confidence": "high_within_reported_test"
+    },
+    {
+      "id": "KC-ML-20260929-1500-03",
+      "claim": "Waveform reconstruction error is an imperfect proxy for physical-parameter error and selectors need target-level failure analysis.",
+      "confidence": "high_within_reported_test"
+    },
+    {
+      "id": "KC-ML-20260929-1500-04",
+      "claim": "Offline posterior calibration does not establish refined-posterior calibration.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20260929-1500-05",
+      "claim": "Exact-simulator performance does not establish measured-plate, noisy, model-mismatched, mix-quality or preference performance.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20260929-1500-06",
+      "claim": "A drum-room role can be split into low-frequency weight and midrange ambience; filtering is context-bound.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20260929-1500-07",
+      "claim": "Selective close-mic sends can define synthetic-room excitation independently of dry faders, subject to routing and musical checks.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20260929-1500-08",
+      "claim": "About 20 percent sustain reduction and about 70 Hz detector HPF are one-session values requiring controlled transfer tests.",
+      "confidence": "medium_for_provenance_low_for_transfer"
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260929-1500-01",
+      "source_ids": [
+        "SRC-ML-20260929-1500-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "physical_parameter_ID_from_IR_where_absolute_amplitude_is_informative",
+      "change": "retain_raw_gain_and_log_calibration_then_ablate_normalisation",
+      "suggested_range": null,
+      "number_provenance": "identifiability_argument_not_mix_setting",
+      "protect": [
+        "finite_input",
+        "calibration_validity",
+        "headroom",
+        "repeatability"
+      ],
+      "verify": "raw_vs_normalised_parameter_NMSE_coverage_and_waveform_error",
+      "cancel": "gain_uncontrolled_or_model_gain_invariant",
+      "confidence": "high_within_task"
+    },
+    {
+      "id": "RULE-ML-20260929-1500-02",
+      "source_ids": [
+        "SRC-ML-20260929-1500-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "per_observation_simulation_refinement_is_considered",
+      "change": "retain_offline_baseline_and_accept_refinement_only_via_predeclared_selector_and_tail_gates",
+      "suggested_range": null,
+      "number_provenance": "3x10000_and_2.5h_are_paper_specific",
+      "protect": [
+        "worst_case_error",
+        "compute_budget",
+        "deterministic_replay",
+        "offline_baseline"
+      ],
+      "verify": "median_mean_p95_worst_selector_error_and_calibration",
+      "cancel": "tail_or_selector_failure_exceeds_offline_baseline",
+      "confidence": "high_within_task"
+    },
+    {
+      "id": "RULE-ML-20260929-1500-03",
+      "source_ids": [
+        "SRC-ML-20260929-1500-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "considering_measured_plate_or_creative_matching",
+      "change": "require_measured_IR_noise_model_mismatch_and_listening_validation",
+      "suggested_range": null,
+      "number_provenance": "scope_limit",
+      "protect": [
+        "reverb_character",
+        "decay",
+        "spectral_balance",
+        "gain",
+        "peaks",
+        "compute"
+      ],
+      "verify": "held_out_measured_plates_plus_objective_and_loudness_matched_listening_gates",
+      "cancel": "only_simulated_same_model_evidence",
+      "confidence": "high"
+    },
+    {
+      "id": "RULE-ML-20260929-1500-04",
+      "source_ids": [
+        "SRC-ML-20260929-1500-02"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "mono_room_has_excess_lows_or_intermit_cymbal_harshness",
+      "change": "audition_static_HPF_and_dynamic_EQ_only_for_verified_transient_harshness",
+      "suggested_range": null,
+      "number_provenance": "none_public",
+      "protect": [
+        "kick_tom_weight",
+        "room_identity",
+        "cymbal_naturalness",
+        "groove"
+      ],
+      "verify": "loudness_matched_kit_AB_spectrum_decay_mono",
+      "cancel": "room_size_loss_pumping_or_level_only_improvement",
+      "confidence": "medium"
+    },
+    {
+      "id": "RULE-ML-20260929-1500-05",
+      "source_ids": [
+        "SRC-ML-20260929-1500-02"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "overhead_or_room_capture_is_too_thin_for_intended_depth",
+      "change": "compare_current_ambience_with_matched_close_mic_kick_snare_tom_excitation",
+      "suggested_range": null,
+      "number_provenance": "topology_from_article_test_gains_project_designed",
+      "protect": [
+        "dry_attack",
+        "groove",
+        "ghost_notes",
+        "cymbal_clarity",
+        "kick_bass_relation",
+        "mono"
+      ],
+      "verify": "matched_input_and_return_loudness_decay_crest_onsets_Dmitry_blind_rating",
+      "cancel": "pumping_detached_tail_cymbal_wash_softened_hits_or_no_preference",
+      "confidence": "medium"
+    },
+    {
+      "id": "RULE-ML-20260929-1500-06",
+      "source_ids": [
+        "SRC-ML-20260929-1500-02"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "room_sample_rings_too_long_or_kick_overdrives_room_compressor",
+      "change": "test_sustain_reduction_or_detector_HPF_as_separate_experiments",
+      "suggested_range": "first_probes_20_percent_sustain_reduction_or_70_Hz_detector_HPF",
+      "number_provenance": "single_Intervals_session",
+      "protect": [
+        "room_size",
+        "snare_body",
+        "kick_impact",
+        "groove",
+        "low_frequency_cohesion"
+      ],
+      "verify": "one_factor_AB_return_loudness_match_decay_GR_trace_Dmitry_rating",
+      "cancel": "size_collapse_kick_disconnect_worse_pumping_or_level_only_win",
+      "confidence": "low-medium_for_transfer"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260929-1500-01",
+      "status": "not_run",
+      "title": "raw gain versus peak-normalised plate IR identification",
+      "baseline": "calibrated_unnormalised_IR",
+      "variant": "peak_normalised_same_IR_all_else_unchanged",
+      "single_factor": "input_amplitude_normalisation",
+      "loudness_matching": "none_for_ID_separate_matched_renders_only_if_future_listening",
+      "measure": [
+        "six_parameter_NMSE",
+        "waveform_L2",
+        "posterior_coverage_width",
+        "selector_choices",
+        "median_mean_p95_worst_error",
+        "runtime"
+      ],
+      "protect": [
+        "finite_values",
+        "capture_calibration",
+        "input_headroom",
+        "reproducibility"
+      ],
+      "success": "quantify_identifiability_change_without_hidden_preprocessing",
+      "cancel": "no_ground_truth_or_calibrated_amplitude_or_unpinned_estimator"
+    },
+    {
+      "id": "EXP-ML-20260929-1500-02",
+      "status": "not_run",
+      "title": "drum-room excitation topology",
+      "baseline": "current_overhead_or_room_fed_ambience",
+      "variant": "same_reverb_return_excited_by_close_mic_only_kick_snare_tom_composite",
+      "single_factor": "reverb_input_topology",
+      "loudness_matching": "match_reverb_input_energy_keep_raw_safety_then_BS1770_match_listening_copies",
+      "measure": [
+        "return_decay_by_band",
+        "drum_bus_crest_onsets",
+        "low_band_build_up",
+        "kick_snare_clarity",
+        "mono_difference",
+        "sample_peak",
+        "true_peak",
+        "Dmitry_blind_rating"
+      ],
+      "protect": [
+        "groove",
+        "ghost_notes",
+        "dry_attack",
+        "cymbal_clarity",
+        "kick_bass_relation",
+        "section_depth"
+      ],
+      "success": "preferred_size_without_softened_hits_excess_tail_pumping_or_wash",
+      "cancel": "level_only_win_or_loss_of_groove_attack_or_isolation"
+    },
+    {
+      "id": "EXP-ML-20260929-1500-03",
+      "status": "not_run",
+      "title": "room-sample sustain probe",
+      "baseline": "current_room_sample_sustain_0_percent",
+      "variant": "same_chain_sustain_minus_20_percent",
+      "single_factor": "room_sample_sustain_amount",
+      "number_provenance": "source_session_first_probe_only",
+      "loudness_matching": "raw_safety_plus_separate_BS1770_matched_randomized_listening_copies",
+      "measure": [
+        "decay_by_band",
+        "onset_to_tail_ratio",
+        "drum_bus_crest",
+        "sample_peak",
+        "true_peak",
+        "snare_tom_continuity",
+        "Dmitry_blind_rating"
+      ],
+      "protect": [
+        "room_size",
+        "snare_body",
+        "tom_length",
+        "groove",
+        "natural_decay"
+      ],
+      "success": "tighter_tail_without_truncation_or_lost_room_impression",
+      "cancel": "chopped_decay_smaller_kit_transient_exaggeration_or_level_only_preference"
+    }
+  ],
+  "queue": {
+    "video_catalogue_count_before": 59,
+    "video_catalogue_count_after": 62,
+    "queued_video_count_before": 55,
+    "queued_video_count_after": 58,
+    "studied_video_count_this_run": 0,
+    "fully_read_written_source_count": 2,
+    "video_duplicates_removed": 3,
+    "new_reference_cards": 0,
+    "remaining_priority": [
+      "permitted_transcripts_for_nk5_RhC_COY_kk2IQK_JnlM_e0l8A1Oae4Y",
+      "measured_or_noisy_model_mismatched_validation_and_artifacts_for_arxiv_2609_35295",
+      "permitted_content_for_y116iwNcD90_and_zhatRrATVwA",
+      "file_level_rights_and_manifest_for_Stay_New",
+      "exact_QSCNet_code_weights_or_author_artifact",
+      "EXP_ML_20260929_1500_02_on_project_owned_audio"
+    ]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
