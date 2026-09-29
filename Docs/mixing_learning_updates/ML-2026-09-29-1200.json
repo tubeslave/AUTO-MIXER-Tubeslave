@@ -1,0 +1,304 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-29-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-29T12:00:00+03:00",
+  "actual_start_msk": "2026-09-29T12:00:59+03:00",
+  "completed_msk": "2026-09-29T12:03:10+03:00",
+  "preceding_update_id": "ML-2026-09-29-0900",
+  "preceding_search_update_id": "ML-2026-09-29-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "deep_review_summary": {
+    "full_public_written_sources_read": 1,
+    "queued_video_cards_updated": 1,
+    "videos_fully_studied": 0,
+    "reference_rights_cards_updated": 1,
+    "new_knowledge_cards": 5,
+    "new_rule_candidates": 4,
+    "new_experiment_plans": 2,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260929-1200-01",
+      "operation": "add",
+      "type": "official_educational_article",
+      "title": "Mixing Guitars: 10 Helpful Tricks for Incredible Tone",
+      "stable_id": "url:https://producelikeapro.com/blog/10-tricks-mixing-guitars/",
+      "url": "https://producelikeapro.com/blog/10-tricks-mixing-guitars/",
+      "author": "Max McAllister",
+      "publisher": "Produce Like A Pro",
+      "publication_date": "2023-06-15",
+      "discovery_date": "2026-09-29",
+      "reading_depth": "complete_public_article",
+      "related_video_stable_id": "youtube:zpVBC1UtALg",
+      "evidence_type": "engineering_education_not_controlled_science",
+      "independent_of_video": false,
+      "verified_content": [
+        "HPF_starting_suggestion_around_80_Hz_conditioned_on_tuning_and_context",
+        "short_stereo_delay_suggestion_60_to_100_ms_for_false_doubling",
+        "independent_double_tracks_not_duplicate_mono_for_width",
+        "mono_reverb_return_for_positionable_space",
+        "restrained_distortion_midrange_focus_LPF_bussing_and_full_mix_context",
+        "arrangement_and_layering_as_alternative_to_more_processing"
+      ],
+      "limitations": [
+        "no_controlled_listening_test",
+        "no_dataset_or_sample_count",
+        "no_blinding_or_statistics",
+        "no_reproducible_session"
+      ]
+    }
+  ],
+  "video_source_card_updates": [
+    {
+      "id": "VID-ML-20260929-0900-01",
+      "operation": "update",
+      "stable_id": "youtube:zpVBC1UtALg",
+      "video_reading_depth": "metadata_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "linked_companion_source_id": "SRC-ML-20260929-1200-01",
+      "companion_reading_depth": "complete_public_article",
+      "technical_claims_extracted_from_video": false,
+      "technical_claims_extracted_from_companion": true
+    }
+  ],
+  "reference_card_updates": [
+    {
+      "id": "REF-ML-20260929-0900-01",
+      "operation": "update_rights_audit",
+      "title": "Stay New educational multitracks",
+      "status": "limited_candidate_rights_check_partial",
+      "verified_permissions": [
+        "free_download_offer",
+        "completed_mix_may_be_used_in_resume"
+      ],
+      "form_requirements": [
+        "first_name",
+        "email",
+        "marketing_opt_in_or_opt_out"
+      ],
+      "unverified": [
+        "file_level_licence",
+        "attribution_wording",
+        "redistribution",
+        "public_dataset_use",
+        "automated_analysis",
+        "model_training",
+        "manifest",
+        "checksums",
+        "raw_processed_final_versions"
+      ],
+      "account_created": false,
+      "audio_downloaded": false,
+      "dsp_metrics": null
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260929-1200-01",
+      "claim": "Two genuinely different performances can create width and depth that a duplicated mono take cannot reproduce; this remains a production hypothesis.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20260929-1200-02",
+      "claim": "A guitar HPF around 80 Hz is a source-stated context-dependent starting suggestion, not a preset.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20260929-1200-03",
+      "claim": "A 60–100 ms stereo delay is a source-stated false-doubling range requiring mono and transient checks.",
+      "confidence": "low-medium"
+    },
+    {
+      "id": "KC-ML-20260929-1200-04",
+      "claim": "A mono reverb return can be tested when a guitar needs depth with tighter positional control.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20260929-1200-05",
+      "claim": "Guitar processing should be judged in the arrangement; an arrangement change may solve a role problem better than added processing.",
+      "confidence": "medium"
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260929-1200-01",
+      "source_ids": [
+        "SRC-ML-20260929-1200-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "low guitar energy audibly masks bass or kick in a specific section",
+      "change": "audition one minimum-phase HPF on the rhythm-guitar group",
+      "suggested_range": "start_near_80_Hz_then_move_only_as_role_and_tuning_permit",
+      "number_provenance": "source_suggestion_not_scientific_threshold_or_project_preset",
+      "protect": [
+        "guitar_body",
+        "low_tuned_fundamentals",
+        "palm_muted_impact",
+        "bass_kick_relation"
+      ],
+      "verify": "loudness_matched_section_AB_spectrum_mono_Dmitry_rating",
+      "cancel": "body_or_impact_loss_or_no_reliable_masking_improvement",
+      "confidence": "medium"
+    },
+    {
+      "id": "RULE-ML-20260929-1200-02",
+      "source_ids": [
+        "SRC-ML-20260929-1200-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "wide rock rhythm role is intended and two independent takes exist",
+      "change": "compare the pair at two pan widths and do not create the second side by copying one mono take",
+      "suggested_range": null,
+      "number_provenance": "project_test_values_only",
+      "protect": [
+        "center_stability",
+        "timing_clarity",
+        "groove",
+        "mono_compatibility",
+        "lead_vocal_space"
+      ],
+      "verify": "randomized_loudness_matched_stereo_and_mono_AB",
+      "cancel": "smear_weakened_center_timing_distraction_or_mono_collapse",
+      "confidence": "medium"
+    },
+    {
+      "id": "RULE-ML-20260929-1200-03",
+      "source_ids": [
+        "SRC-ML-20260929-1200-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "single guitar is too narrow and another performance is unavailable or undesirable",
+      "change": "audition one short stereo-delay treatment",
+      "suggested_range": "60_to_100_ms",
+      "number_provenance": "source_stated_educational_range",
+      "protect": [
+        "attack",
+        "rhythmic_precision",
+        "mono_tone",
+        "center_image",
+        "lead_intelligibility"
+      ],
+      "verify": "loudness_matched_stereo_mono_AB_plus_comb_and_onset_inspection",
+      "cancel": "audible_echo_flamming_comb_coloration_transient_blur_or_role_conflict",
+      "confidence": "low-medium"
+    },
+    {
+      "id": "RULE-ML-20260929-1200-04",
+      "source_ids": [
+        "SRC-ML-20260929-1200-01"
+      ],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "guitar needs depth in a dense section but a wide return obscures placement",
+      "change": "compare current ambience with one mono return at the intended side",
+      "suggested_range": null,
+      "number_provenance": "none",
+      "protect": [
+        "dry_attack",
+        "section_depth",
+        "center_focus",
+        "stereo_balance"
+      ],
+      "verify": "level_matched_full_mix_AB_and_mono_check",
+      "cancel": "apparent_narrowing_detached_ambience_clutter_or_loss_of_front_back_intent",
+      "confidence": "medium"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260929-1200-01",
+      "status": "not_run",
+      "title": "pan width of genuine rhythm doubles",
+      "baseline": "current approved panning of two existing independent rhythm takes",
+      "variant": "move both pans 15 percentage points toward centre with all else unchanged",
+      "single_factor": "rhythm_double_pan_width",
+      "number_provenance": "project_designed_probe_not_source_preset",
+      "loudness_matching": "raw_safety_copies_plus_separate_BS1770_matched_randomized_listening_copies",
+      "measure": [
+        "section_loudness",
+        "LR_balance",
+        "band_limited_MS_energy",
+        "interchannel_correlation",
+        "mono_difference",
+        "onset_clarity",
+        "Dmitry_blind_ratings"
+      ],
+      "protect": [
+        "rhythm_wall_drive",
+        "groove",
+        "center_stability",
+        "lead_vocal_space",
+        "mono_tone"
+      ],
+      "success": "preferred image without reliable loss of drive clarity or mono compatibility",
+      "cancel": "wins_only_by_loudness_or_weakens_intended_width_center_or_hierarchy"
+    },
+    {
+      "id": "EXP-ML-20260929-1200-02",
+      "status": "not_run",
+      "title": "rhythm-group HPF",
+      "baseline": "current approved rhythm-guitar group",
+      "variant": "add one minimum-phase HPF at 80 Hz using the project fixed test slope",
+      "single_factor": "rhythm_guitar_HPF",
+      "number_provenance": "80_Hz_source_starting_suggestion_slope_project_defined_and_logged",
+      "loudness_matching": "raw_safety_copies_plus_separate_BS1770_matched_randomized_listening_copies",
+      "measure": [
+        "active_section_low_band_energy",
+        "bass_kick_to_guitar_relation",
+        "group_crest_and_onsets",
+        "sample_peak",
+        "true_peak",
+        "mono_compatibility",
+        "Dmitry_blind_ratings"
+      ],
+      "protect": [
+        "low_tuned_note_weight",
+        "palm_muted_impact",
+        "bass_kick_authority",
+        "groove"
+      ],
+      "success": "cleaner_low_frequency_role_separation_without_reliable_loss_of_body_or_impact",
+      "cancel": "thinning_pitch_dependent_holes_no_masking_benefit_or_level_only_win"
+    }
+  ],
+  "queue": {
+    "video_catalogue_count_before": 59,
+    "video_catalogue_count_after": 59,
+    "queued_video_count_before": 55,
+    "queued_video_count_after": 55,
+    "studied_video_count_this_run": 0,
+    "fully_read_companion_source_count": 1,
+    "remaining_priority": [
+      "permitted_transcript_or_content_for_youtube_y116iwNcD90_and_zhatRrATVwA",
+      "file_level_rights_and_manifest_for_Stay_New_multitracks",
+      "exact_QSCNet_code_weights_or_author_artifact",
+      "pinned_Banquet_environment_and_query_manifest",
+      "MuS3D_release_artifacts_and_end_to_end_scoring",
+      "EXP_ML_20260929_1200_01_on_project_owned_audio"
+    ]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
