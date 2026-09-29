@@ -1,0 +1,173 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-29-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-29T18:00:00+03:00",
+  "actual_start_msk": "2026-09-29T18:02:41+03:00",
+  "completed_msk": "2026-09-29T18:06:35+03:00",
+  "preceding_update_id": "ML-2026-09-29-1500",
+  "preceding_search_update_id": "ML-2026-09-29-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "new_full_text_sources": 2,
+    "source_cards_updated": 2,
+    "artifact_audits_added": 2,
+    "new_knowledge_cards": 8,
+    "new_rule_candidates": 6,
+    "new_experiment_plans": 3,
+    "videos_studied": 0,
+    "new_reference_cards": 0,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260929-1500-01",
+      "operation": "update",
+      "stable_ids": ["arxiv:2609.35295", "DAFx26_challenge_84"],
+      "reading_depth": "full_text_rechecked_plus_official_benchmark_comparison",
+      "official_result": {
+        "rank": 4,
+        "mean_parameter_NMSE": 0.0004689,
+        "median_parameter_NMSE": 0.00002962,
+        "mean_SMSE": 0.384,
+        "inference_seconds": "0.05_plus_9000"
+      },
+      "limitations_added": ["official_test_count_16", "exact_same_simulator", "refined_posterior_calibration_not_shown"]
+    },
+    {
+      "id": "SRC-ML-20260929-1800-01",
+      "operation": "add",
+      "type": "peer_reviewed_proceedings_paper",
+      "title": "Simulation-Based Plate-Reverb Parameter Estimation from a Single Impulse Response",
+      "stable_ids": ["arxiv:2608.00656", "DAFx26_challenge_81"],
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_challenge_81.pdf",
+      "authors": ["Minhui Lu", "Joshua D. Reiss"],
+      "publication_date": "2026-08",
+      "discovery_date": "2026-09-29",
+      "license": "CC_BY_4_0",
+      "reading_depth": "full_text_complete_4_pages",
+      "method": {
+        "features": 372,
+        "estimators": ["ExtraTrees", "HistGradientBoosting", "unweighted_average"],
+        "training_examples": 1000,
+        "validation_1": 24,
+        "validation_2": 12,
+        "inference": "15.03_seconds_for_16_IRs_on_M1_Pro"
+      },
+      "reported_results": {
+        "validation_1_ensemble_NMSE": 0.011886,
+        "validation_2_ensemble_NMSE": 0.012935,
+        "validation_2_HGB_NMSE": 0.012063,
+        "official_rank": 9,
+        "official_mean_NMSE": 0.010,
+        "official_median_NMSE": 0.006,
+        "official_mean_SMSE": 0.558,
+        "official_median_SMSE": 0.550
+      },
+      "limitations": ["exact_simulator", "small_validation", "no_uncertainty", "no_measured_or_noisy_test", "no_listening_or_mix_test", "method_artifact_not_found_in_inspected_sources"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260929-1800-02",
+      "operation": "add",
+      "type": "peer_reviewed_proceedings_paper",
+      "title": "Accurate Plate Reverb Parameter Estimation Using Two-Stage Evolutionary Search",
+      "stable_ids": ["arxiv:2608.28818", "DAFx26_challenge_83"],
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_challenge_83.pdf",
+      "authors": ["Byunghoo Park", "Jayeon Yi", "Takyoung Kim", "Minje Kim"],
+      "publication_date": "2026-08",
+      "discovery_date": "2026-09-29",
+      "license": "CC_BY_4_0",
+      "reading_depth": "full_text_complete_4_pages",
+      "method": {
+        "IR_duration_seconds": 0.25,
+        "stage_1": "CMA_ES_peak_normalised_five_shape_parameters_uncompressed_L1_STFT_4096_hop_1024",
+        "stage_2": "50_iteration_ternary_search_raw_amplitude_mu",
+        "stage_1_runtime_seconds_median_mean": [32.6, 76.9],
+        "stage_2_runtime_seconds_mean": 0.62
+      },
+      "reported_results": {
+        "exact_simulator_plain_L1_STFT_geomean_NMSE": 4.9e-14,
+        "exact_simulator_convergence": "50_of_50",
+        "stage_2_improved": "49_of_50",
+        "median_NMSE_before_after": [0.00191, 1.34e-14],
+        "official_rank": 2,
+        "official_mean_NMSE": 1.933e-11,
+        "official_median_NMSE": 3.103e-14,
+        "official_mean_SMSE": 6.836e-10,
+        "official_median_SMSE": 3.738e-10
+      },
+      "limitations": ["exact_known_simulator", "official_test_count_16", "boundary_coordinate_failure", "runtime_long_tail", "no_measured_or_noisy_test", "no_listening_or_mix_test", "method_artifact_not_found_in_inspected_sources"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260924-0900-03",
+      "operation": "update",
+      "reading_depth": "relevant_sections_and_tables_reread",
+      "finding": "official_16_IR_exact_simulator_benchmark_cannot_distinguish_generator_inverse_from_general_solver"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20260929-1800-01",
+      "source_id": "SRC-ML-20260929-1800-01",
+      "status": "artifact_not_found_in_inspected_sources",
+      "missing": ["feature_code", "training_script", "saved_estimators", "pinned_environment"],
+      "reproduction": "not_run"
+    },
+    {
+      "id": "ART-ML-20260929-1800-02",
+      "source_id": "SRC-ML-20260929-1800-02",
+      "status": "artifact_not_found_in_inspected_sources",
+      "missing": ["optimizer_code", "restart_seed_manifest", "exact_loss_code", "pinned_environment"],
+      "reproduction": "not_run"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20260929-1800-01","claim":"Amplitude normalisation is parameter-conditional; a declared normalised shape stage is valid only with separate validated raw-amplitude scale recovery.","confidence":"high_within_exact_simulator"},
+    {"id":"KC-ML-20260929-1800-02","claim":"Independent-method agreement is corroboration within the shared simulator, not independent real-world validation.","confidence":"high_for_benchmark_low_for_transfer"},
+    {"id":"KC-ML-20260929-1800-03","claim":"Near-machine-precision recovery from 0.25 seconds indicates known-generator inverse closure, not perceptually complete reverb reconstruction.","confidence":"high"},
+    {"id":"KC-ML-20260929-1800-04","claim":"The log-compressed-loss failure is task-specific and does not transfer to creative reference matching.","confidence":"high_for_scope_limit"},
+    {"id":"KC-ML-20260929-1800-05","claim":"Parameter error and response similarity can disagree; report both plus central and tail statistics.","confidence":"high"},
+    {"id":"KC-ML-20260929-1800-06","claim":"The tree ensemble is a fast CPU baseline but has small validation sets, no uncertainty and higher official error.","confidence":"high_within_benchmark"},
+    {"id":"KC-ML-20260929-1800-07","claim":"Boundary pickup coordinates can create extreme amplitude sensitivity and require dedicated stress tests.","confidence":"high_within_reported_case"},
+    {"id":"KC-ML-20260929-1800-08","claim":"Missing method artifacts blocks independent reproduction despite an available official simulator.","confidence":"high_for_current_availability"}
+  ],
+  "rule_candidates": [
+    {"id":"RULE-ML-20260929-1800-01","source_ids":["SRC-ML-20260929-1800-02"],"applies_when":"parameters_partition_into_shape_and_scale","change":"normalise_only_declared_shape_stage_and_recover_scale_from_raw_amplitude","protect":["calibration","headroom","identifiability"],"verify":"per_parameter_mean_median_p95_worst_error","cancel":"uncontrolled_gain_or_cross_stage_leakage","confidence":"high_within_task","auto_apply":false},
+    {"id":"RULE-ML-20260929-1800-02","source_ids":["SRC-ML-20260929-1500-01","SRC-ML-20260929-1800-02"],"applies_when":"selecting_offline_vs_refined_estimates","change":"compare_waveform_L2_and_uncompressed_L1_STFT_against_parameter_oracle","protect":["offline_fallback","compute_budget"],"verify":"selector_false_choices_and_tail_error","cancel":"selector_tail_exceeds_offline","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260929-1800-03","source_ids":["SRC-ML-20260929-1800-02"],"applies_when":"claiming_transfer_beyond_exact_simulator","change":"stress_boundaries_noise_and_model_mismatch","protect":["finite_output","decay","spectrum","raw_gain"],"verify":"edge_and_mismatch_stratified_metrics","cancel":"edge_failure_or_unstable_runtime","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260929-1800-04","source_ids":["SRC-ML-20260929-1800-02"],"applies_when":"choosing_perceptual_or_creative_matching_loss","change":"do_not_transfer_exact_search_log_loss_result","protect":["perceptual_quality","loudness","mix_role"],"verify":"task_specific_objective_plus_loudness_matched_listening","cancel":"only_exact_parameter_evidence","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260929-1800-05","source_ids":["SRC-ML-20260929-1500-01","SRC-ML-20260929-1800-01"],"applies_when":"costly_refinement_is_considered","change":"retain_fast_offline_or_tree_fallback_and_gate_refinement","protect":["tail_error","runtime","replay"],"verify":"mean_median_p95_worst_runtime_selector","cancel":"no_safe_fallback_or_tail_regression","confidence":"medium-high","auto_apply":false},
+    {"id":"RULE-ML-20260929-1800-06","source_ids":["SRC-ML-20260929-1800-01","SRC-ML-20260929-1800-02"],"applies_when":"reproduction_is_claimed","change":"require_pinned_code_preprocessing_seeds_restarts_environment","protect":["provenance","repeatability"],"verify":"independent_rerun","cancel":"artifact_or_manifest_missing","confidence":"high","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20260929-1800-01","status":"not_run","title":"refinement selector metric","baseline":"waveform_L2_selector","variant":"uncompressed_L1_STFT_selector","single_factor":"selector_metric","loudness_matching":"none_for_ID","measure":["oracle_false_choice_rate","parameter_NMSE_mean_median_p95_worst","waveform_L2","L1_STFT","runtime"],"protect":["offline_estimate","raw_gain","finite_output","deterministic_manifest"],"success":"fewer_false_selections_without_worse_tail","cancel":"estimates_or_test_manifest_unavailable"},
+    {"id":"EXP-ML-20260929-1800-02","status":"not_run","title":"shape_scale_normalisation_topology","baseline":"single_raw_amplitude_six_parameter_optimisation","variant":"peak_normalised_five_parameter_shape_stage_plus_raw_mu_stage","single_factor":"estimation_topology","loudness_matching":"none_for_ID","measure":["per_parameter_mean_median_p95_worst_NMSE","SMSE","edge_failures","runtime","seed_variance"],"protect":["raw_input","bounds","finite_output","reproducibility"],"success":"variant_matches_or_improves_accuracy_and_cost_without_edge_regression","cancel":"hidden_preprocessing_or_unavailable_ground_truth"},
+    {"id":"EXP-ML-20260929-1800-03","status":"not_run","title":"early_window_sufficiency","baseline":"full_5_second_IR","variant":"first_0.25_second_IR","single_factor":"IR_duration","loudness_matching":"none_for_ID","measure":["per_parameter_error","tail_error","SMSE","runtime","noise_and_mismatch_sensitivity"],"protect":["raw_gain","onset_alignment","sample_rate","window_contract"],"success":"short_window_preserves_accuracy_and_robustness_at_lower_cost","cancel":"duration_requires_architecture_change"}
+  ],
+  "queue": {
+    "video_catalogue_count": 62,
+    "queued_video_count": 58,
+    "studied_video_count_this_run": 0,
+    "remaining_priority": ["permitted_transcripts_for_nk5_RhC_COY_kk2IQK_JnlM_e0l8A1Oae4Y", "public_artifacts_or_independent_reconstruction_for_plate_estimators", "measured_noisy_model_mismatched_plate_validation", "EXP_ML_20260929_1500_02_on_project_owned_audio"]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
