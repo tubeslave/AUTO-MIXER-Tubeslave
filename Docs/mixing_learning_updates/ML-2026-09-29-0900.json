@@ -1,0 +1,247 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-29-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-29T09:00:00+03:00",
+  "actual_start_msk": "2026-09-29T08:56:03+03:00",
+  "completed_msk": "2026-09-29T09:00:03+03:00",
+  "preceding_update_id": "ML-2026-09-28-1800",
+  "preceding_search_update_id": "ML-2026-09-28-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "new_relevant_scientific_publications_after_preceding_search": 0,
+    "full_public_official_pages_read": 2,
+    "new_videos_studied": 0,
+    "new_metadata_only_videos_queued": 3,
+    "new_reference_candidates": 1,
+    "confirmed_licensed_raw_multitracks_added": 0,
+    "scientific_duplicates_removed": 4,
+    "video_duplicates_removed": 1,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20260929-0900-01",
+      "operation": "add",
+      "type": "official_educational_companion_page",
+      "title": "Mixing Pop/Rock: Guitars, Synths & Keys",
+      "stable_id": "url:https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "url": "https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "publication_date": "2017-01-24",
+      "discovery_date": "2026-09-29",
+      "reading_depth": "complete_public_companion_page_embedded_video_not_obtained",
+      "verified_scope": [
+        "production_and_arrangement_choices",
+        "electric_guitar_EQ_and_width",
+        "interaction_of_layered_guitars_keys_synths_and_strings"
+      ],
+      "limited_conclusion": "The page verifies topic and a free multitrack offer, not the video's demonstrated settings or audible results."
+    },
+    {
+      "id": "SRC-ML-20260929-0900-02",
+      "operation": "add",
+      "type": "official_video_landing_page",
+      "title": "How to Mix Lead and Rhythm Guitars",
+      "stable_id": "url:https://www.waves.com/mixing-lead-and-rhythm-guitars",
+      "url": "https://www.waves.com/mixing-lead-and-rhythm-guitars",
+      "publication_date": "2016-03-07",
+      "discovery_date": "2026-09-29",
+      "reading_depth": "complete_public_landing_page_embedded_video_not_obtained",
+      "verified_scope": [
+        "lead_and_rhythm_guitar_interaction",
+        "compression_and_EQ_using_API_Collection"
+      ],
+      "limited_conclusion": "The page exposes no chain order, settings, timestamps or A/B protocol; it supports metadata only."
+    }
+  ],
+  "video_source_card_updates": [
+    {
+      "id": "VID-ML-20260929-0900-01",
+      "operation": "add",
+      "stable_id": "youtube:zpVBC1UtALg",
+      "youtube_id": "zpVBC1UtALg",
+      "title": "Mixing Guitars - Warren Huart: Produce Like A Pro",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=zpVBC1UtALg",
+      "reading_depth": "metadata_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "technical_claims_extracted": false
+    },
+    {
+      "id": "VID-ML-20260929-0900-02",
+      "operation": "add",
+      "stable_id": "youtube:y116iwNcD90",
+      "youtube_id": "y116iwNcD90",
+      "title": "Mixing Pop/Rock: Guitars, Synths, Keys",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=y116iwNcD90",
+      "publication_date": "2017-01-24",
+      "reading_depth": "metadata_and_official_companion_scope_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "technical_claims_extracted": false
+    },
+    {
+      "id": "VID-ML-20260929-0900-03",
+      "operation": "add",
+      "stable_id": "youtube:zhatRrATVwA",
+      "youtube_id": "zhatRrATVwA",
+      "title": "How to Mix Lead and Rhythm Guitars",
+      "channel": "Waves Audio",
+      "url": "https://www.youtube.com/watch?v=zhatRrATVwA",
+      "publication_date": "2016-03-07",
+      "reading_depth": "metadata_and_official_landing_page_scope_only",
+      "status": "queued_source",
+      "transcript_status": "not_obtained_via_permitted_source",
+      "technical_claims_extracted": false
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20260929-0900-01",
+      "operation": "add_limited_candidate",
+      "title": "Stay New educational multitracks",
+      "provider": "Produce Like A Pro",
+      "offer_url": "https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "download_form_url": "https://producelikeapro.activehosted.com/f/44",
+      "status": "metadata_and_offer_terms_only_rights_review_required",
+      "observed_permission": "official page says completed mixes may be used in a resume",
+      "unverified": [
+        "file_level_licence",
+        "redistribution_rights",
+        "automated_analysis_rights",
+        "model_training_rights",
+        "file_manifest",
+        "raw_processed_final_versions",
+        "checksums"
+      ],
+      "account_created": false,
+      "raw_audio_downloaded": false,
+      "raw_processed_final_mix_triplet": false,
+      "dsp_metrics": null
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260929-0900-01",
+      "claim": "An official companion page can verify a tutorial topic but does not substitute for the audiovisual demonstration when settings and A/B content are absent.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20260929-0900-02",
+      "claim": "A free download offer and permission to show a completed mix in a resume do not establish redistribution, dataset, model-training or automated-analysis rights.",
+      "confidence": "high"
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260929-0900-01",
+      "source_ids": ["SRC-ML-20260929-0900-01", "SRC-ML-20260929-0900-02"],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "only video metadata or a short companion page is available",
+      "change": "record topic and access state only; do not infer chain order parameters or audible result",
+      "suggested_range": null,
+      "number_provenance": "none",
+      "protect": ["provenance", "reproducibility"],
+      "verify": "obtain permitted full content or primary transcript",
+      "cancel": "any technical claim is unsupported by obtained content",
+      "confidence": "high"
+    },
+    {
+      "id": "RULE-ML-20260929-0900-02",
+      "source_ids": ["REF-ML-20260929-0900-01"],
+      "status": "candidate",
+      "auto_apply": false,
+      "applies_when": "considering offered educational multitracks",
+      "change": "verify file-level licence attribution redistribution and automation terms plus manifest and checksums",
+      "suggested_range": null,
+      "number_provenance": "none",
+      "protect": ["contributor_rights", "corpus_provenance"],
+      "verify": "manual terms and archive manifest audit",
+      "cancel": "terms are absent or incompatible",
+      "confidence": "high"
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260929-0900-01",
+      "status": "not_run",
+      "title": "rhythm support under a lead-guitar entrance",
+      "baseline": "current approved balance and processing",
+      "variant": "automate only the rhythm-guitar group by minus 1.0 dB during the lead phrase",
+      "single_factor": "rhythm_guitar_group_level_envelope",
+      "number_provenance": "project_designed_probe_not_source_preset",
+      "loudness_matching": "raw copies for safety; separate BS.1770-matched randomized copies for listening",
+      "measure": [
+        "section_loudness",
+        "lead_to_rhythm_level_relation",
+        "guitar_bus_crest_and_onset",
+        "sample_peak",
+        "true_peak",
+        "mono_compatibility",
+        "Dmitry_blind_ratings"
+      ],
+      "protect": [
+        "groove",
+        "rhythm_wall_drive",
+        "lead_phrasing",
+        "vocal_role",
+        "stereo_anchor",
+        "headroom"
+      ],
+      "success": "lead phrases are easier to follow without reliable loss of rhythm weight or section energy",
+      "cancel": "variant wins only by level or rhythm collapses lead detaches or intended hierarchy weakens"
+    }
+  ],
+  "deduplication": [
+    {"key": "arXiv:2608.05442", "normalized_title": "diff2mix controllable music mixing via diffusion models and differentiable audio effects", "resolution": "existing_source_not_added"},
+    {"key": "arXiv:2608.05506", "normalized_title": "rethinking automatic music mixing as sequential stem blending", "resolution": "existing_source_not_added"},
+    {"key": "arXiv:2608.30559", "normalized_title": "sphere automatic music upmixing via audio language model post training with spatial heuristic rewards", "resolution": "existing_source_not_added"},
+    {"key": "arXiv:2606.16551", "normalized_title": "learning input channel permutation equivariance for multi channel source separation reducing bleeding in small music ensembles", "resolution": "existing_source_not_added"},
+    {"key": "youtube:SG5rkdYwFDE", "normalized_title": "rock mix bus processing with bob marlette and ulrich wild", "resolution": "existing_video_not_added"},
+    {"key": "youtube:zpVBC1UtALg", "resolution": "new_unique_metadata_only"},
+    {"key": "youtube:y116iwNcD90", "resolution": "new_unique_metadata_only"},
+    {"key": "youtube:zhatRrATVwA", "resolution": "new_unique_metadata_only"}
+  ],
+  "queue": {
+    "video_catalogue_count_before": 56,
+    "video_catalogue_count_after": 59,
+    "queued_video_count_before": 52,
+    "queued_video_count_after": 55,
+    "studied_video_count_this_run": 0,
+    "new_metadata_only_video_count": 3,
+    "duplicates_removed": 5,
+    "new_queued_video_ids": [
+      "VID-ML-20260929-0900-01",
+      "VID-ML-20260929-0900-02",
+      "VID-ML-20260929-0900-03"
+    ],
+    "deep_review_priority": [
+      "permitted_captions_or_content_for_three_new_guitar_videos",
+      "file_level_rights_and_manifest_for_Stay_New_multitracks",
+      "exact_QSCNet_code_weights_or_author_artifact",
+      "pinned_Banquet_environment_and_query_manifest",
+      "MuS3D_code_weights_config_and_end_to_end_scoring_after_release",
+      "EXP_ML_20260929_0900_01_on_project_owned_audio"
+    ]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false
+  }
+}
