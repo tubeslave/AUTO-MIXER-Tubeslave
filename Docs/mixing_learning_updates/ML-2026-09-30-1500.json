@@ -1,0 +1,347 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-30-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-30T15:00:00+03:00",
+  "actual_start_msk": "2026-09-30T15:03:26+03:00",
+  "completed_msk": "2026-09-30T15:15:20+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-09-30-1200",
+  "preceding_search_update_id": "ML-2026-09-30-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "new_scientific_sources": 1,
+    "new_scientific_publications_after_preceding_search": 0,
+    "older_missing_sources_added": 1,
+    "scientific_duplicates_removed": 4,
+    "new_video_cards": 3,
+    "videos_studied": 0,
+    "new_reference_cards": 0,
+    "audio_analyzed": false
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260930-1500-01",
+      "stable_ids": [
+        "doi:10.17743/jaes.2022.0277",
+        "arxiv:2608.02918"
+      ],
+      "canonical_title": "Efficient Audio Enhancement with a Differentiable Psychoacoustic Loss",
+      "version_family": "JAES_74_6_430_444_and_author_accepted_arxiv_v1",
+      "journal_publication_date": "2026-06-08",
+      "arxiv_submission_date": "2026-08-03",
+      "discovery_date": "2026-09-30",
+      "urls": [
+        "https://doi.org/10.17743/jaes.2022.0277",
+        "https://arxiv.org/abs/2608.02918"
+      ],
+      "reading_depth": "full_relevant_text_method_datasets_protocol_results_discussion_conclusion",
+      "unread": [
+        "supplemental_exact_pairwise_significance_tables",
+        "every_repository_file"
+      ],
+      "method_scope": [
+        "11.025_to_44.1kHz_bandwidth_extension",
+        "32kbps_MP3_enhancement"
+      ],
+      "listening_protocol": {
+        "label": "custom_MUSHRA_like_not_standard_MUSHRA",
+        "subjects_per_experiment": 20,
+        "tracks_piano": 12,
+        "tracks_MUSDB": 12,
+        "ratings_per_signal": 10,
+        "hidden_reference": false,
+        "anchors": 1,
+        "randomized": true,
+        "environment": "isolated_lab_HD265"
+      },
+      "key_results": {
+        "bandlimited_MUSDB_mean_listening": {
+          "AERO": 60.03,
+          "AEROMamba": 66.47,
+          "AEROMamba_P": 79.26
+        },
+        "bandlimited_piano_mean_listening": {
+          "AEROMamba_HQ": 84.41,
+          "AEROMamba_P_HQ": 78.76
+        },
+        "MP3_MUSDB_mean_listening": {
+          "low_bitrate": 50.7,
+          "AEROMamba": 49.8,
+          "AEROMamba_P": 49.7,
+          "AEROMamba_P_no_STFT": 75.6
+        },
+        "efficiency_RTX3090": {
+          "AERO": {
+            "vram_mb": 17091,
+            "seconds_per_10s": 1.246
+          },
+          "AEROMamba": {
+            "vram_mb": 3000,
+            "seconds_per_10s": 0.087
+          }
+        }
+      },
+      "limitations": [
+        "restoration_not_mixing",
+        "same_author_method_and_evaluation",
+        "PAQM_used_for_loss_and_validation",
+        "AudioSR_not_in_subjective_test_and_had_MUSDB_exposure",
+        "gamma_not_extensively_tuned",
+        "fixed_rate_and_cutoff",
+        "exact_supplemental_pairwise_tests_not_fully_audited"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ARTIFACT-ML-20260930-1500-01",
+      "url": "https://github.com/aeromamba-paqm/aeromamba-paqm",
+      "status": "public_repository_readme_and_root_listing_audited",
+      "observed_stack": [
+        "Python_3.10",
+        "PyTorch_1.12.1",
+        "CUDA_11.3"
+      ],
+      "checkpoint_host": "Google_Drive_linked_from_README",
+      "license_status": "no_LICENSE_visible_in_root_listing_not_fully_audited",
+      "reproducibility_risk": "README_says_invalid_PAQM_backprop_batches_are_discarded",
+      "exact_revision_pinned": false,
+      "executed": false
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VIDEO-ML-20260930-1500-01",
+      "stable_id": "youtube:0zowlxekXS0",
+      "title": "Mix Breakdown Start to Finish: Mixing Masterclass with Chris Lord-Alge",
+      "channel": "Chris Lord-Alge",
+      "published": "2026-08-18",
+      "duration": "PT56M8S",
+      "url": "https://www.youtube.com/watch?v=0zowlxekXS0",
+      "reading_depth": "metadata_only",
+      "transcript_status": "not_available",
+      "status": "queued_source"
+    },
+    {
+      "id": "VIDEO-ML-20260930-1500-02",
+      "stable_id": "youtube:3rw0cIilsnk",
+      "title": "How to Nail a Classic Rock Vocal Mix: Eddie Kramer (Led Zeppelin, Jimi Hendrix)",
+      "channel": "Waves Audio",
+      "published": "2020-11-24",
+      "duration": "PT6M57S",
+      "url": "https://www.youtube.com/watch?v=3rw0cIilsnk",
+      "reading_depth": "metadata_only",
+      "transcript_status": "captions_unavailable_and_export_no_transcript",
+      "status": "queued_source"
+    },
+    {
+      "id": "VIDEO-ML-20260930-1500-03",
+      "stable_id": "youtube:TRkEGhGiDj0",
+      "title": "Produce Indie Rock Vocals: My Top 5 Techniques",
+      "channel": "The Indie Music Lab",
+      "published": "2022-12-22",
+      "duration": "PT13M59S",
+      "url": "https://www.youtube.com/watch?v=TRkEGhGiDj0",
+      "reading_depth": "metadata_only",
+      "transcript_status": "captions_unavailable",
+      "status": "queued_source"
+    }
+  ],
+  "duplicates": [
+    {
+      "stable_id": "arxiv:2608.05442",
+      "action": "collapsed_into_existing_source_family"
+    },
+    {
+      "stable_id": "arxiv:2609.02835",
+      "action": "collapsed_into_existing_source_family"
+    },
+    {
+      "stable_id": "arxiv:2608.05506",
+      "action": "collapsed_into_existing_source_family"
+    },
+    {
+      "stable_id": "arxiv:2608.30559",
+      "action": "collapsed_into_existing_source_family"
+    },
+    {
+      "stable_ids": [
+        "doi:10.17743/jaes.2022.0277",
+        "arxiv:2608.02918"
+      ],
+      "action": "single_version_family_not_independent_confirmations"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20260930-1500-01",
+      "claim": "A_metric_used_as_loss_and_model_selection_signal_cannot_be_its_own_independent_acceptance_endpoint.",
+      "confidence": "high_for_evaluation_scope"
+    },
+    {
+      "id": "KC-ML-20260930-1500-02",
+      "claim": "Psychoacoustic_loss_benefit_is_content_and_degradation_dependent.",
+      "confidence": "medium_high_within_source_scope"
+    },
+    {
+      "id": "KC-ML-20260930-1500-03",
+      "claim": "A_custom_test_without_hidden_reference_is_not_standard_MUSHRA.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20260930-1500-04",
+      "claim": "Discarding_invalid_training_batches_without_distribution_analysis_is_a_reproducibility_and_bias_risk.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20260930-1500-05",
+      "claim": "Restoration_evidence_does_not_validate_balance_masking_loudness_width_or_section_role_decisions.",
+      "confidence": "high"
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260930-1500-01",
+      "source_ids": [
+        "SRC-ML-20260930-1500-01"
+      ],
+      "applies_when": "learned_processor_trained_or_selected_with_perceptual_metric",
+      "change": "require_less_coupled_metric_explicit_signal_checks_and_loudness_matched_blind_listening",
+      "setting_range": null,
+      "number_origin": "evaluation_protocol_not_DSP_preset",
+      "protect": [
+        "attacks",
+        "spectral_naturalness",
+        "stereo_mono",
+        "headroom",
+        "section_intent"
+      ],
+      "verify": "pre_register_endpoint_roles_and_non_inferiority_gates",
+      "cancel": "only_optimized_metric_improves_or_protected_endpoint_regresses",
+      "confidence": "high_for_evaluation_low_for_mixing_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260930-1500-02",
+      "source_ids": [
+        "SRC-ML-20260930-1500-01"
+      ],
+      "applies_when": "auditioning_bandwidth_or_codec_restoration",
+      "change": "stratify_transient_dense_and_tonal_sustained_excerpts",
+      "setting_range": "source_boundaries_11.025_to_44.1kHz_and_32kbps_MP3_are_provenance_only",
+      "number_origin": "source_experiment_not_production_recommendation",
+      "protect": [
+        "drum_attack",
+        "cymbal_texture",
+        "vocal_consonants_when_present",
+        "guitar_bite",
+        "noise_character",
+        "headroom"
+      ],
+      "verify": "separate_metrics_and_listening_by_stratum",
+      "cancel": "added_percussion_energy_ghost_lines_clicks_or_listener_rejection",
+      "confidence": "medium_within_restoration_low_for_mixing",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260930-1500-03",
+      "source_ids": [
+        "ARTIFACT-ML-20260930-1500-01"
+      ],
+      "applies_when": "reproducing_differentiable_psychoacoustic_loss_training",
+      "change": "log_each_failure_rejected_batch_and_distribution_shift",
+      "setting_range": null,
+      "number_origin": "repository_reproducibility_issue",
+      "protect": [
+        "reproducibility",
+        "coverage",
+        "absence_of_content_selection_bias"
+      ],
+      "verify": "compare_rejected_and_retained_distributions",
+      "cancel": "unresolved_failure_incomplete_logs_or_class_correlated_rejection",
+      "confidence": "high_for_reproducibility",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260930-1500-01",
+      "status": "not_run",
+      "title": "independent_metric_response_to_known_bandlimit",
+      "material": "two_project_owned_rock_excerpts_transient_dense_and_tonal_sustained",
+      "baseline": "approved_full_band_lossless_render",
+      "variant": "downsample_to_11.025kHz_with_antialias_then_resample_to_44.1kHz",
+      "single_factor": "known_high_frequency_bandwidth_removal",
+      "number_origin": "source_experiment_not_mix_recommendation",
+      "loudness_matching": "retain_raw_diagnostics_and_create_separate_BS1770_integrated_matched_listening_copies",
+      "measure": [
+        "PAQM_if_locally_licensed_and_verified",
+        "less_coupled_metric_if_available",
+        "band_log_spectral_error",
+        "true_peak",
+        "crest_transient",
+        "mid_side_spectra",
+        "mono_fold_down",
+        "blind_detectability_and_quality"
+      ],
+      "protect": [
+        "drum_attack",
+        "cymbal_texture",
+        "guitar_bite",
+        "chosen_lead_intelligibility",
+        "stereo_image",
+        "headroom"
+      ],
+      "success": "directional_metric_response_without_interchangeability_and_listening_remains_acceptance_authority",
+      "cancel": "unresolved_license_nonfinite_output_level_mismatch_unintended_resampling_artifact_or_paid_external_compute"
+    }
+  ],
+  "queue": {
+    "video_catalogue_before": 64,
+    "video_catalogue_after": 67,
+    "queued_video_before": 60,
+    "queued_video_after": 63,
+    "studied_video_count_this_run": 0,
+    "scientific_priority": [
+      "PAQM_supplemental_pairwise_significance",
+      "repository_and_checkpoint_licenses_and_revisions",
+      "SAGE_artifact_reavailability",
+      "YuE2_generation_editing_outside_current_scope"
+    ],
+    "video_priority": [
+      "0zowlxekXS0",
+      "3rw0cIilsnk",
+      "TRkEGhGiDj0",
+      "nk5-RhC_COY",
+      "kk2IQK_JnlM",
+      "e0l8A1Oae4Y",
+      "NDfT-3KvqOM",
+      "Jsxg11Yh3Ns"
+    ],
+    "audio_priority": [
+      "EXP-ML-20260929-1500-02",
+      "EXP-ML-20260930-1500-01",
+      "EXP-ML-20260930-0900-01",
+      "EXP-ML-20260930-1200-01"
+    ]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
