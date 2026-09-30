@@ -78,6 +78,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-29-1200 | [Report](ML-2026-09-29-1200.md), [JSON patch](ML-2026-09-29-1200.json) | Deep review: 1 official companion article read in full; 1 queued video card and 1 rights-limited multitrack card updated, 5 Knowledge Cards, 4 candidate rules, 55 queued videos retained and 2 unrun experiments; filtering, width, mono and rights limits recorded |
 | ML-2026-09-29-1500 | [Report](ML-2026-09-29-1500.md), [JSON patch](ML-2026-09-29-1500.json) | Search: 1 fresh full-text DAFx/arXiv plate-identification paper and 1 full public drum-room article, 3 new metadata-only queued videos, 8 Knowledge Cards, 6 candidate rules, 3 unrun experiments; 3 video duplicates removed, 62 catalogued / 58 queued videos |
 | ML-2026-09-29-1800 | [Report](ML-2026-09-29-1800.md), [JSON patch](ML-2026-09-29-1800.json) | Deep review: 2 independent same-benchmark plate estimators read in full and checked against official results; 2 source cards added, 2 updated, 2 artifact audits, 8 Knowledge Cards, 6 candidate rules, 62 catalogued / 58 queued videos and 3 unrun experiments; shape/scale normalisation, exact-simulator, boundary, selector and reproducibility limits recorded |
+| ML-2026-09-30-0900 | [Report](ML-2026-09-30-0900.md), [JSON patch](ML-2026-09-30-0900.json) | Search: 1 SAGE source read through selected full-text sections, 1 YuE2 abstract-only source, 2 new metadata-only queued videos, 1 video and 2 scientific duplicates removed, 4 Knowledge Cards, 1 candidate rule, 64 catalogued / 60 queued videos and 1 unrun experiment; representation-metric, best-of-N and transcript boundaries recorded |
 
 ## Dynamics package: publication and safety
 
@@ -94,6 +95,8 @@ This transfer intentionally does not inject raw candidates into `backend/source_
 Earlier `R-20260911-1200-*` and `R-20260911-1500-*` references in the package refer to research updates seen in the original study. Their presence in the runtime registry is not asserted by this transfer.
 
 ## Handoff for mixing agents
+
+ML-2026-09-30-0900 (`search`, preceding successful search `ML-2026-09-29-1500`): treat SAGE as autoencoder-evaluation evidence, not a mixing validator; keep lossless, explicit stereo/transient/peak metrics and loudness-matched listening. YuE2 remains abstract-only and both new official videos remain metadata-only because captions were unavailable. Next practical A/B remains `EXP-ML-20260929-1500-02`; auxiliary representation test `EXP-ML-20260930-0900-01` is `not_run`; all rules remain `candidate / auto_apply:false`.
 
 ML-2026-09-26-1500 (`search`, preceding successful search `ML-2026-09-26-0900`): treat SEND only as an opt-in structural-window proposer, not an automatic panner, and hold the trajectory fixed when comparing window timing. Treat PAEDB as CCD+ELAE imitation, group partitions by source song and require a raw `mixture - primary - ambience` null. Reject ripped YouTube test media and do not transfer `12 ms`, `150 Hz` or `200 Hz` as rock presets. Next test: `EXP-ML-20260926-1500-01`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
