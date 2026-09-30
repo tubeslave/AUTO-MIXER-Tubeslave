@@ -4,7 +4,7 @@
   "mode": "search",
   "scheduled_slot_msk": "2026-09-30T09:00:00+03:00",
   "actual_start_msk": "2026-09-30T08:55:35+03:00",
-  "completed_msk": "2026-09-30T09:04:17+03:00",
+  "completed_msk": "2026-09-30T09:12:02+03:00",
   "slot_assumption": false,
   "preceding_update_id": "ML-2026-09-29-1800",
   "preceding_search_update_id": "ML-2026-09-29-1500",
