@@ -1,0 +1,152 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-30-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-09-30T09:00:00+03:00",
+  "actual_start_msk": "2026-09-30T08:55:35+03:00",
+  "completed_msk": "2026-09-30T09:04:17+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-09-29-1800",
+  "preceding_search_update_id": "ML-2026-09-29-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "new_source_cards": 2,
+    "selected_full_text_sources": 1,
+    "abstract_metadata_only_sources": 1,
+    "new_video_cards": 2,
+    "videos_studied": 0,
+    "video_duplicates_removed": 1,
+    "scientific_duplicates_removed": 2,
+    "new_knowledge_cards": 4,
+    "new_rule_candidates": 1,
+    "new_experiment_plans": 1,
+    "new_reference_cards": 0,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20260930-0900-01",
+      "type": "preprint",
+      "title": "SAGE: Semantic Audio Generative Encoder",
+      "stable_ids": ["arxiv:2609.32755", "doi:10.48550/arXiv.2609.32755"],
+      "url": "https://arxiv.org/abs/2609.32755",
+      "publication_date": "2026-09-26",
+      "discovery_date": "2026-09-30",
+      "reading_depth": "selected_full_text_sections_abstract_introduction_method_2_1_to_2_3_setup_3_1",
+      "unread": ["complete_result_tables", "appendices", "full_listening_protocol", "code_and_weights"],
+      "project_scope": "audio_autoencoder_evaluation_not_mixing_validation",
+      "limitations": ["preprint", "no_controlled_rock_mixing_test", "high_reported_training_compute", "code_weights_not_executed", "licence_not_audited"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260930-0900-02",
+      "type": "technical_report_preprint",
+      "title": "YuE2: Unifying Symbolic and Audio Music Generation at Frontier Quality",
+      "stable_ids": ["arxiv:2609.33757", "doi:10.48550/arXiv.2609.33757"],
+      "url": "https://arxiv.org/abs/2609.33757",
+      "publication_date": "2026-09-27",
+      "discovery_date": "2026-09-30",
+      "reading_depth": "metadata_and_abstract_only",
+      "queued_sections": ["MERT2_method_splits_metrics_failures", "SheetSage2_method_splits_metrics_failures", "candidate_selection_protocol"],
+      "limitations": ["full_56_page_report_not_read", "generation_not_mixing", "best_of_8_selection_changes_comparison", "no_DSP_rule_supported"],
+      "citation_check": "partial"
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VIDEO-ML-20260930-0900-01",
+      "stable_id": "youtube:NDfT-3KvqOM",
+      "title": "Master Bus Compression: Hardware vs. Plugins",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=NDfT-3KvqOM",
+      "duration": "42:46",
+      "reading_depth": "metadata_only",
+      "captions": "unavailable_on_checked_watch_page",
+      "status": "queued_source",
+      "techniques_extracted": false
+    },
+    {
+      "id": "VIDEO-ML-20260930-0900-02",
+      "stable_id": "youtube:Jsxg11Yh3Ns",
+      "title": "Mastering Essentials Part 3 - How loud should you master?",
+      "channel": "Sound On Sound magazine",
+      "url": "https://www.youtube.com/watch?v=Jsxg11Yh3Ns",
+      "duration": "31:23",
+      "reading_depth": "metadata_only",
+      "captions": "unavailable_on_checked_watch_page",
+      "status": "queued_source",
+      "techniques_extracted": false
+    }
+  ],
+  "deduplication": [
+    {"key": "youtube:SG5rkdYwFDE", "resolution": "existing_video_not_added"},
+    {"key": "arxiv:2609.30540", "resolution": "existing_source_not_added"},
+    {"key": "arxiv:2609.30912", "resolution": "existing_source_not_added"}
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260930-0900-01", "claim": "Learned audio reconstruction needs an explicit stereo objective or measurement; the reported 12 dB side-loss ablation is implementation-scoped, not a mix target.", "confidence": "medium_high_within_source_scope"},
+    {"id": "KC-ML-20260930-0900-02", "claim": "Semantic probes, distributional fidelity, explicit signal metrics and listening preference answer different questions and must not be substituted for one another.", "confidence": "high_for_evaluation_protocol"},
+    {"id": "KC-ML-20260930-0900-03", "claim": "Best-of-N generation results must disclose N, selector and compute and are not directly comparable with an unselected baseline.", "confidence": "high_for_reporting_scope"},
+    {"id": "KC-ML-20260930-0900-04", "claim": "Video metadata without transcript or viewed content supports cataloguing only, not technique or parameter extraction.", "confidence": "high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260930-0900-01",
+      "source_ids": ["SRC-ML-20260930-0900-01"],
+      "applies_when": "evaluating_codec_latent_or_learned_audio_transform_for_analysis_or_reference_workflow",
+      "change": "retain_lossless_baseline_and_report_explicit_level_peak_spectral_transient_stereo_mono_and_blind_listening_outcomes_alongside_learned_metrics",
+      "setting_range": null,
+      "number_origin": "no_DSP_numbers_transferred; measurement axes derived from source methodology and project safety contract",
+      "protect": ["attacks", "cymbal_texture", "low_end", "stereo_image", "mono_compatibility", "headroom", "section_intent"],
+      "verify": "pre_registered_non_inferiority_gates_plus_loudness_matched_blind_listening",
+      "cancel": "missing_licence_or_harness_or_uncontrolled_level_or_material_protected_quality_regression",
+      "confidence": "medium_high_for_evaluation_low_for_mixing_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260930-0900-01",
+      "status": "not_run",
+      "title": "lossless_vs_SAGE_round_trip",
+      "material": "project_owned_stereo_rock_excerpts_only",
+      "baseline": "lossless_identity_export",
+      "variant": "one_SAGE_encode_decode_round_trip_if_free_local_weights_licence_and_environment_are_verified",
+      "single_factor": "learned_autoencoder_round_trip",
+      "loudness_matching": "post_render_BS1770_integrated_match_with_gain_offset_logged; unmatched_copy_retained_for_null_and_peak_diagnostics",
+      "measure": ["sample_aligned_null", "true_peak", "integrated_loudness", "band_log_spectral_error", "crest_and_transient_change", "mid_side_energy_by_band", "inter_channel_correlation", "mono_fold_down_residual", "blind_preference"],
+      "protect": ["attack", "cymbal_texture", "low_end", "stereo_image", "mono_compatibility", "headroom"],
+      "success": "pre_registered_objective_non_inferiority_and_no_reliable_blind_preference_loss",
+      "cancel": "unverified_weights_or_licence_or_environment_or_alignment_or_non_finite_output_or_failed_protected_quality_gate"
+    }
+  ],
+  "queue": {
+    "video_catalogue_before": 62,
+    "video_catalogue_after": 64,
+    "queued_video_before": 58,
+    "queued_video_after": 60,
+    "studied_video_count_this_run": 0,
+    "scientific_priority": ["SAGE_results_MUSHRA_appendices_code_weights_licence", "YuE2_MERT2_SheetSage2_methods_splits_failures"],
+    "video_priority": ["permitted_transcript_NDfT_3KvqOM_or_Jsxg11Yh3Ns", "permitted_transcripts_nk5_RhC_COY_kk2IQK_JnlM_e0l8A1Oae4Y"],
+    "artifact_priority": ["plate_estimator_public_artifacts_or_independent_reconstruction", "measured_noisy_model_mismatched_plate_validation"],
+    "audio_priority": ["EXP-ML-20260929-1500-02", "EXP-ML-20260930-0900-01"]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
