@@ -1,0 +1,100 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-30-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-30T12:00:00+03:00",
+  "actual_start_msk": "2026-09-30T12:02:08+03:00",
+  "completed_msk": "2026-09-30T12:09:00+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-09-30-0900",
+  "preceding_search_update_id": "ML-2026-09-30-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "source_cards_upgraded": 2,
+    "artifact_audits": 3,
+    "new_knowledge_cards": 5,
+    "new_rule_candidates": 3,
+    "experiment_plans_added": 1,
+    "experiment_plans_revised": 1,
+    "videos_studied": 0,
+    "new_reference_cards": 0,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20260930-0900-01",
+      "stable_ids": ["arxiv:2609.32755", "doi:10.48550/arXiv.2609.32755"],
+      "reading_depth": "full_text_method_main_results_listening_relevant_ablations",
+      "paper_license": "CC_BY_4_0",
+      "key_results": {
+        "perceptual_distributional_wins": "23_of_25_reported_measurements",
+        "mushra": {"retained_raters": 21, "excerpts": 10, "excerpt_seconds": 10, "SAGE": 81.6, "SAME_L": 81.8, "interpretation": "overlapping_95CI_not_separated"},
+        "metric_disagreement": "SAME_L_has_higher_SDR_on_MoisesDB_mixtures_and_stems_and_lower_PANN_FAD_on_mixtures",
+        "stereo_ablation": "sum_difference_loss_materially_repairs_side_level_width_and_side_SI_SDR_without_material_mid_SI_SDR_change"
+      },
+      "limitations": ["preprint", "codec_not_mixing_test", "same_author_study", "high_training_compute", "linked_repository_404", "no_artifact_licence_or_revision_verified"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260930-0900-02",
+      "stable_ids": ["arxiv:2609.33757", "doi:10.48550/arXiv.2609.33757"],
+      "reading_depth": "targeted_full_text_MERT2_SheetSage2_evaluation_and_protocol_appendices",
+      "key_results": {
+        "MERT2": "30s_branch_above_listed_external_baselines_on_14_of_15_MARBLE_metrics;_fullsong_on_13_of_15",
+        "SheetSage2": "highest_point_estimate_on_12_of_15_pairs_not_statistical_significance",
+        "generated_label_training": {"recordings": 441094, "hours": 28434},
+        "preprocessing": "24kHz_mono",
+        "model_card_caveat": "external_baseline_scores_not_rerun_and_protocols_may_differ"
+      },
+      "limitations": ["preprint", "generation_and_transcription_not_mixing", "generated_supervision_not_independent_ground_truth", "comparison_protocol_differences", "mono_24kHz_boundary", "weights_CC_BY_NC_4_0", "trust_remote_code_not_reviewed"],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {"id": "ARTIFACT-ML-20260930-1200-01", "url": "https://github.com/francescobrigante/SAGE", "status": "404_at_review_time", "verified": false, "blocks": ["code_revision", "weights", "evaluation_harness", "artifact_license"]},
+    {"id": "ARTIFACT-ML-20260930-1200-02", "urls": ["https://huggingface.co/m-a-p/MERT-v2-30s", "https://huggingface.co/m-a-p/MERT-v2-FullSong"], "status": "model_cards_accessible", "license": "CC_BY_NC_4_0", "executed": false},
+    {"id": "ARTIFACT-ML-20260930-1200-03", "url": "https://huggingface.co/m-a-p/SheetSage2", "status": "model_card_accessible_access_required", "license": "CC_BY_NC_4_0", "trust_remote_code": true, "output_affecting_card_fixes": ["2026-09-21", "2026-09-24"], "executed": false}
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260930-1200-01", "claim": "Codec_quality_requires_separate_distributional_waveform_stereo_and_listener_endpoints.", "confidence": "high_for_evaluation_scope"},
+    {"id": "KC-ML-20260930-1200-02", "claim": "Explicit_stereo_objectives_can_prevent_side_failure_even_when_mid_fidelity_is_unchanged;_source_numbers_are_not_mix_targets.", "confidence": "medium_high_within_source_scope"},
+    {"id": "KC-ML-20260930-1200-03", "claim": "Generated_training_labels_are_not_independent_ground_truth_even_when_the_student_beats_the_label_generator_on_some_benchmarks.", "confidence": "high"},
+    {"id": "KC-ML-20260930-1200-04", "claim": "A_24kHz_mono_embedding_cannot_certify_stereo_phase_or_content_above_12kHz.", "confidence": "high"},
+    {"id": "KC-ML-20260930-1200-05", "claim": "Reproducibility_requires_reachable_licensed_pinned_reviewed_artifacts_not_only_a_paper_link_or_live_card.", "confidence": "high"}
+  ],
+  "rule_candidates": [
+    {"id": "RULE-ML-20260930-1200-01", "source_ids": ["SRC-ML-20260930-0900-01"], "applies_when": "evaluating_learned_audio_transform", "change": "separate_waveform_learned_perceptual_stereo_peak_and_listener_endpoints", "setting_range": null, "number_origin": "evaluation_protocol_not_DSP_preset", "protect": ["attacks", "cymbal_texture", "low_end", "stereo_image", "mono_compatibility", "headroom"], "verify": "pre_registered_multiaxis_gates_and_loudness_matched_blind_listening", "cancel": "material_protected_dimension_regression", "confidence": "high_for_evaluation_low_for_mixing_transfer", "auto_apply": false},
+    {"id": "RULE-ML-20260930-1200-02", "source_ids": ["SRC-ML-20260930-0900-02", "ARTIFACT-ML-20260930-1200-02", "ARTIFACT-ML-20260930-1200-03"], "applies_when": "proposing_musical_annotations_for_human_review", "change": "treat_MERT2_and_SheetSage2_outputs_as_hypotheses_only", "setting_range": null, "number_origin": "24kHz_mono_is_source_preprocessing_not_mix_setting", "protect": ["groove", "section_boundaries", "stereo_and_full_band_information", "non_vocal_lead_roles"], "verify": "compare_with_audible_events_and_project_intent", "cancel": "annotation_disagreement_or_decision_requires_unobserved_stereo_HF_information", "confidence": "medium_for_annotation_triage_low_for_mix_control", "auto_apply": false},
+    {"id": "RULE-ML-20260930-1200-03", "source_ids": ["ARTIFACT-ML-20260930-1200-01", "ARTIFACT-ML-20260930-1200-02", "ARTIFACT-ML-20260930-1200-03"], "applies_when": "before_model_based_audio_AB", "change": "require_reachable_licensed_pinned_reviewed_local_artifact", "setting_range": null, "number_origin": "reproducibility_and_rights_gate", "protect": ["reproducibility", "rights", "source_privacy", "compute_budget"], "verify": "record_revision_hash_dependencies_license_and_remote_code_review", "cancel": "404_gated_unclear_rights_unpinned_or_paid_GPU_only_path", "confidence": "high", "auto_apply": false}
+  ],
+  "experiments": [
+    {"id": "EXP-ML-20260930-0900-01", "status": "not_run", "revision": "deep_review_refinement", "blockers": ["SAGE_repository_404", "artifact_license_unverified", "weights_unverified"], "baseline": "lossless_identity_export", "variant": "one_pinned_SAGE_round_trip_after_artifact_clearance", "single_factor": "learned_round_trip", "loudness_matching": "separate_BS1770_matched_listening_copy_with_unmatched_diagnostic_copy_retained", "measure": ["aligned_residual", "SDR_diagnostic_only", "true_peak", "crest_transient", "band_log_spectral_error", "mid_side_by_band_and_section", "width_correlation", "mono_fold_down", "blind_MUSHRA_style_ratings"], "success": "pre_registered_non_inferiority_and_no_reliable_listening_loss", "cancel": "unresolved_rights_revision_alignment_nonfinite_or_protected_quality_failure"},
+    {"id": "EXP-ML-20260930-1200-01", "status": "not_run", "title": "MERT2_role_change_sensitivity_audit", "material": "project_owned_rock_chorus_only", "baseline": "approved_static_balance", "variant": "rhythm_guitar_bus_plus_1dB", "single_factor": "rhythm_guitar_bus_gain", "number_origin": "local_diagnostic_perturbation_not_published_recommendation", "loudness_matching": "raw_renders_for_gain_peak_plus_separate_BS1770_matched_listening_copies", "measure": ["MERT2_layerwise_and_pooled_distance_after_documented_preprocessing", "section_loudness", "band_energy", "crest_true_peak", "masking_proxy", "mid_side", "mono_fold_down", "blind_preference"], "protect": ["groove", "snare_attack", "bass_definition", "guitar_foundation", "chosen_lead_role", "stereo_image", "headroom"], "success": "repeatable_embedding_response_interpreted_only_with_explicit_signal_and_listening_results", "cancel": "no_compatible_local_compute_or_unreviewed_remote_code_or_unstable_response_or_stereo_quality_substitution"}
+  ],
+  "queue": {
+    "video_catalogue": 64,
+    "queued_video": 60,
+    "studied_video_count_this_run": 0,
+    "scientific_remaining": ["SAGE_artifact_reavailability_and_license", "YuE2_generation_and_editing_claims_outside_current_scope"],
+    "video_priority": ["nk5-RhC_COY", "kk2IQK_JnlM", "e0l8A1Oae4Y", "NDfT-3KvqOM", "Jsxg11Yh3Ns"],
+    "audio_priority": ["EXP-ML-20260929-1500-02", "EXP-ML-20260930-0900-01", "EXP-ML-20260930-1200-01"]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}

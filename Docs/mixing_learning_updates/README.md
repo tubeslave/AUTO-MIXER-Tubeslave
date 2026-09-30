@@ -79,6 +79,7 @@ This directory is part of the shared knowledge base on the repository's default 
 | ML-2026-09-29-1500 | [Report](ML-2026-09-29-1500.md), [JSON patch](ML-2026-09-29-1500.json) | Search: 1 fresh full-text DAFx/arXiv plate-identification paper and 1 full public drum-room article, 3 new metadata-only queued videos, 8 Knowledge Cards, 6 candidate rules, 3 unrun experiments; 3 video duplicates removed, 62 catalogued / 58 queued videos |
 | ML-2026-09-29-1800 | [Report](ML-2026-09-29-1800.md), [JSON patch](ML-2026-09-29-1800.json) | Deep review: 2 independent same-benchmark plate estimators read in full and checked against official results; 2 source cards added, 2 updated, 2 artifact audits, 8 Knowledge Cards, 6 candidate rules, 62 catalogued / 58 queued videos and 3 unrun experiments; shape/scale normalisation, exact-simulator, boundary, selector and reproducibility limits recorded |
 | ML-2026-09-30-0900 | [Report](ML-2026-09-30-0900.md), [JSON patch](ML-2026-09-30-0900.json) | Search: 1 SAGE source read through selected full-text sections, 1 YuE2 abstract-only source, 2 new metadata-only queued videos, 1 video and 2 scientific duplicates removed, 4 Knowledge Cards, 1 candidate rule, 64 catalogued / 60 queued videos and 1 unrun experiment; representation-metric, best-of-N and transcript boundaries recorded |
+| ML-2026-09-30-1200 | [Report](ML-2026-09-30-1200.md), [JSON patch](ML-2026-09-30-1200.json) | Deep review: SAGE full method/results/MUSHRA/stereo audit and targeted MERT2/SheetSage2 method/evaluation/licence audit; 2 source cards upgraded, 3 artifact audits, 5 Knowledge Cards, 3 candidate rules, 64 catalogued / 60 queued videos and 2 unrun experiments; metric disagreement, generated-label, mono-bandwidth and artifact-readiness limits recorded |
 
 ## Dynamics package: publication and safety
 
@@ -95,6 +96,8 @@ This transfer intentionally does not inject raw candidates into `backend/source_
 Earlier `R-20260911-1200-*` and `R-20260911-1500-*` references in the package refer to research updates seen in the original study. Their presence in the runtime registry is not asserted by this transfer.
 
 ## Handoff for mixing agents
+
+ML-2026-09-30-1200 (`deep_review`, preceding search `ML-2026-09-30-0900`): SAGE and SAME-L trade places across metric families and are tied in the reported 21-rater MUSHRA; keep waveform, learned/perceptual, stereo and listener endpoints separate. The linked SAGE repository is currently 404, so its round-trip experiment remains blocked/not_run. MERT2/SheetSage2 use 24-kHz mono input, generated labels and CC BY-NC weights; keep them annotation-only and human-reviewed. Next practical A/B remains `EXP-ML-20260929-1500-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-30-0900 (`search`, preceding successful search `ML-2026-09-29-1500`): treat SAGE as autoencoder-evaluation evidence, not a mixing validator; keep lossless, explicit stereo/transient/peak metrics and loudness-matched listening. YuE2 remains abstract-only and both new official videos remain metadata-only because captions were unavailable. Next practical A/B remains `EXP-ML-20260929-1500-02`; auxiliary representation test `EXP-ML-20260930-0900-01` is `not_run`; all rules remain `candidate / auto_apply:false`.
 
@@ -133,6 +136,8 @@ ML-2026-09-13-0900: timeline offset is not a depth cue. Evaluate early-reflectio
 ML-2026-09-13-1200: do not trust one global reference vector for rock; constrain by role and section. Validate every exposed DDSP parameter with a sensitivity/null test before calling it editable or interpretable. Keep no-compression as an explicit candidate. For parallel drums compare shell-only and weighted full-kit routing at matched return loudness. All rules remain `candidate`, `auto_apply:false`; experiments remain `not_run`.
 
 ## Latest handoff
+
+ML-2026-09-30-1200 (`deep_review`, preceding search `ML-2026-09-30-0900`): SAGE and SAME-L trade places across metric families and are tied in the reported 21-rater MUSHRA; keep waveform, learned/perceptual, stereo and listener endpoints separate. The linked SAGE repository is currently 404, so its round-trip experiment remains blocked/not_run. MERT2/SheetSage2 use 24-kHz mono input, generated labels and CC BY-NC weights; keep them annotation-only and human-reviewed. Next practical A/B remains `EXP-ML-20260929-1500-02`; all rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
 ML-2026-09-29-1800 (`deep_review`, preceding search `ML-2026-09-29-1500`): amplitude normalisation is parameter-conditional: preserve raw calibration, and use a normalised shape stage only with separately validated raw-amplitude scale recovery. Exact-simulator near-machine precision and task-specific log-loss results do not transfer to measured plates or creative matching. Report parameter and response errors plus tails, and stress boundary cases. Next research test: `EXP-ML-20260929-1800-01`; next project-owned audio test: `EXP-ML-20260929-1500-02`. All rules remain `candidate / auto_apply:false`, all experiments `not_run`.
 
