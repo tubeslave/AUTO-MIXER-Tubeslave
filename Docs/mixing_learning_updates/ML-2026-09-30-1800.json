@@ -1,0 +1,217 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-09-30-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-09-30T18:00:00+03:00",
+  "actual_start_msk": "2026-09-30T17:58:35+03:00",
+  "completed_msk": "2026-09-30T18:13:49+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-09-30-1500",
+  "preceding_search_update_id": "ML-2026-09-30-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "skipped_until_2026-10-01_utc",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "review_summary": {
+    "source_cards_added": 1,
+    "source_cards_updated": 1,
+    "artifact_audits_added": 1,
+    "artifact_audits_updated": 1,
+    "videos_studied": 0,
+    "video_catalogue": 67,
+    "metadata_only_video_queue": 63,
+    "audio_analyzed": false,
+    "code_executed": false,
+    "new_reference_cards": 0
+  },
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20260930-1500-01",
+      "action": "update",
+      "stable_ids": ["doi:10.17743/jaes.2022.0277", "arxiv:2608.02918"],
+      "reading_depth": "full_relevant_article_plus_complete_public_statistical_tables",
+      "statistical_findings": {
+        "bandlimited_MUSDB": {
+          "AEROMamba_vs_AEROMamba_P": "p<0.0001",
+          "AERO_vs_AEROMamba_P": "p<0.0001"
+        },
+        "bandlimited_PianoEval": {
+          "AEROMamba_HQ_vs_AEROMamba_P_HQ": "p=0.0101_direction_favors_AEROMamba_HQ",
+          "low_resolution_vs_AEROMamba_P_HQ": "p=0.0587_not_significant",
+          "AERO_vs_AEROMamba_P_HQ": "p=0.2975_not_significant"
+        },
+        "MP3_MUSDB": {
+          "low_vs_AEROMamba": "p=0.7390_not_significant",
+          "low_vs_AEROMamba_P": "p=0.8233_not_significant",
+          "AEROMamba_vs_AEROMamba_P": "p=0.8751_not_significant",
+          "no_STFT_variant_vs_each_other_system": "p<0.0001"
+        },
+        "MP3_PianoEval": {
+          "enhanced_variant_pairwise_p": [0.9193, 0.7168, 0.7034]
+        }
+      },
+      "new_limits": [
+        "no_multiple_comparison_correction_disclosed_in_read_text_or_public_table",
+        "analysis_unit_and_pairing_not_clear_enough_for_reanalysis",
+        "raw_ratings_not_found"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20260930-1800-01",
+      "action": "add",
+      "stable_ids": ["doi:10.1109/TASLP.2021.3069302", "arxiv:2110.11438"],
+      "canonical_title": "Objective Measures of Perceptual Audio Quality Reviewed: An Evaluation of Their Application Domain Dependence",
+      "publication_date": "2021-03-29",
+      "discovery_date": "2026-09-30",
+      "urls": ["https://doi.org/10.1109/TASLP.2021.3069302", "https://arxiv.org/abs/2110.11438"],
+      "reading_depth": "full_relevant_methods_aggregation_results_discussion_conclusion",
+      "method": "seven_audio_coding_and_seven_source_separation_listening_tests_with_Fisher_z_aggregation",
+      "key_results": {
+        "two_f_model_audio_coding_rho": 0.90,
+        "two_f_model_source_separation_rho": 0.86
+      },
+      "bounded_conclusion": "objective_perceptual_metrics_remain_domain_and_distortion_dependent",
+      "limitations": ["not_rock_mixing", "does_not_test_this_PAQM_implementation", "small_impairment_transfer_not_established"],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ARTIFACT-ML-20260930-1500-01",
+      "action": "update",
+      "url": "https://github.com/aeromamba-paqm/aeromamba-paqm",
+      "commit": "350b0ab0ec2f2be6805584171f883a331957b506",
+      "commit_date": "2026-06-15",
+      "executed": false,
+      "findings": [
+        "nonfinite_loss_skips_batch",
+        "broad_backward_exception_skips_batch",
+        "epoch_average_denominator_includes_skipped_iterations",
+        "no_accepted_rejected_counts_or_sample_ids",
+        "no_root_LICENSE_visible"
+      ],
+      "integration_status": "blocked"
+    },
+    {
+      "id": "ARTIFACT-ML-20260930-1800-01",
+      "action": "add",
+      "url": "https://github.com/bvm810/torchpaqm",
+      "commit": "b3046dbe5280985519e996a773a913e3a808e4ef",
+      "commit_date": "2025-03-21",
+      "reading_depth": "README_pyproject_root_license_core_and_selected_tests",
+      "executed": false,
+      "positive_evidence": ["gradient_flow_test", "MATLAB_fixture_comparisons", "batch_and_signal_level_outputs"],
+      "limitations": ["one_bin_level_parity_assertion_commented_out_for_peak_differences"],
+      "license_status": "conflict_root_GPL-3.0_README_and_pyproject_MIT",
+      "integration_status": "licence_conflict_do_not_integrate"
+    }
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20260930-1800-01", "claim": "PAQM_significance_is_condition_specific", "confidence": "high_within_reported_tests"},
+    {"id": "KC-ML-20260930-1800-02", "claim": "less_coupled_metric_is_not_universal_ground_truth", "confidence": "high_for_evaluation_design"},
+    {"id": "KC-ML-20260930-1800-03", "claim": "skipped_batches_require_accepted_count_denominator_and_identity_logging", "confidence": "high"},
+    {"id": "KC-ML-20260930-1800-04", "claim": "conflicting_license_declarations_block_integration", "confidence": "high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20260930-1500-01",
+      "action": "revise",
+      "source_ids": ["SRC-ML-20260930-1500-01", "SRC-ML-20260930-1800-01"],
+      "applies_when": "processor_is_trained_tuned_or_selected_with_perceptual_metric",
+      "change": "preregister_optimized_less_coupled_signal_and_listening_endpoint_roles",
+      "setting_range": null,
+      "number_origin": "evaluation_protocol_not_DSP_preset",
+      "protect": ["attacks", "spectral_naturalness", "stereo_mono", "headroom", "section_intent"],
+      "verify": "stratified_metrics_and_loudness_matched_blind_listening",
+      "cancel": "only_optimized_metric_improves_or_protected_endpoint_regresses",
+      "confidence": "high_for_evaluation_low_for_mixing_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260930-1800-01",
+      "action": "add",
+      "source_ids": ["SRC-ML-20260930-1500-01"],
+      "applies_when": "many_pairwise_audio_quality_tests_are_reported",
+      "change": "record_family_correction_analysis_unit_pairing_and_uncertainty",
+      "setting_range": null,
+      "number_origin": "review_protocol",
+      "protect": ["false_positive_control", "honest_uncertainty"],
+      "verify": "source_or_raw_data_exposes_fields",
+      "cancel": "downgrade_confidence_if_fields_missing",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260930-1500-03",
+      "action": "revise",
+      "source_ids": ["ARTIFACT-ML-20260930-1500-01", "ARTIFACT-ML-20260930-1800-01"],
+      "applies_when": "differentiable_audio_loss_can_fail",
+      "change": "log_reason_identity_attempted_accepted_rejected_and_average_over_accepted_only",
+      "setting_range": null,
+      "number_origin": "code_audit",
+      "protect": ["coverage", "reproducibility", "minority_material"],
+      "verify": "zero_silent_skips_and_stable_rejection_by_content",
+      "cancel": "stop_if_identity_missing_or_rejection_unexplained",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260930-1800-02",
+      "action": "add",
+      "source_ids": ["ARTIFACT-ML-20260930-1800-01"],
+      "applies_when": "repository_and_package_license_declarations_conflict",
+      "change": "do_not_install_copy_or_integrate_until_rights_holder_clarifies",
+      "setting_range": null,
+      "number_origin": "rights_audit",
+      "protect": ["project_licensing", "redistributability"],
+      "verify": "root_package_and_release_license_agree",
+      "cancel": "unresolved_conflict",
+      "confidence": "high",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20260930-1500-01",
+      "action": "revise",
+      "status": "not_run",
+      "baseline_A": "project_owned_full_band_lossless_render",
+      "variant_B": "same_render_antialiased_11.025kHz_then_resampled_to_44.1kHz",
+      "single_factor": "high_frequency_bandwidth_removal",
+      "loudness_alignment": "raw_safety_plus_separate_BS1770_integrated_matched_randomized_copies",
+      "measurements": ["band_log_spectral_error", "true_peak", "crest_and_onsets", "mid_side", "mono", "licensed_PAQM_or_ViSQOL_if_available", "Dmitry_blind_rating"],
+      "protect": ["drum_attack", "cymbal_texture", "guitar_bite", "lead_intelligibility", "stereo_image", "headroom"],
+      "success": "known_degradation_detected_without_metric_as_sole_acceptance",
+      "cancel": "license_nonfinite_level_resampling_or_external_compute_failure"
+    },
+    {
+      "id": "EXP-ML-20260929-1500-02",
+      "action": "carry_as_next_practical",
+      "status": "not_run",
+      "baseline_A": "approved_overhead_room_fed_ambience",
+      "variant_B": "same_reverb_return_excited_by_close_mic_kick_snare_tom_composite",
+      "single_factor": "reverb_input_topology",
+      "loudness_alignment": "matched_reverb_input_energy_plus_separate_BS1770_listening_copies",
+      "measurements": ["return_decay_by_band", "drum_bus_crest_onsets", "low_band_build_up", "kick_snare_clarity", "mono_difference", "true_peak", "Dmitry_blind_rating"],
+      "protect": ["groove", "ghost_notes", "dry_attack", "cymbal_clarity", "kick_bass_relation", "section_depth"],
+      "success": "preferred_depth_without_softened_hits_low_tail_pumping_or_wash",
+      "cancel": "level_only_preference_or_topology_not_isolated"
+    }
+  ],
+  "video_queue": {
+    "catalogue_count": 67,
+    "metadata_only_count": 63,
+    "studied_this_run": 0,
+    "carried_ids": ["youtube:0zowlxekXS0", "youtube:3rw0cIilsnk", "youtube:TRkEGhGiDj0"],
+    "reason": "no_permitted_transcript_available"
+  },
+  "safety": {
+    "auto_apply": false,
+    "audio_modified": false,
+    "dsp_or_runtime_modified": false,
+    "external_audio_upload": false,
+    "paid_services_or_compute": false
+  }
+}
