@@ -1,0 +1,143 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-01-1500",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-10-01T15:00:00+03:00",
+  "actual_start_msk": "2026-10-01T14:55:18+03:00",
+  "completed_msk": "2026-10-01T15:00:00+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-10-01-1200",
+  "preceding_search_update_id": "ML-2026-10-01-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "not_retried_after_same_day_paid_plan_or_trial_requirement",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "summary": {
+    "source_cards_added": 1,
+    "video_source_cards_added": 3,
+    "videos_transcript_complete": 0,
+    "videos_partial_content_reviewed": 1,
+    "videos_metadata_only_added": 2,
+    "scientific_duplicates_removed": 8,
+    "knowledge_cards_added": 4,
+    "rule_candidates_added": 1,
+    "experiment_plans_added": 1,
+    "video_catalogue": 73,
+    "transcript_complete_video_count": 4,
+    "partial_content_video_count": 1,
+    "metadata_only_video_queue": 68,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261001-1500-01",
+      "stable_ids": ["arxiv:2606.21277v1", "title:compiling-differentiable-audio-graphs-to-real-time-dsp"],
+      "url": "https://arxiv.org/pdf/2606.21277",
+      "code_url": "https://github.com/cucuwritescode/adac",
+      "publication_date": "2026-06-19",
+      "discovery_date": "2026-10-01",
+      "reading_depth": "full_text_plus_author_readme",
+      "code_license": "MIT",
+      "code_executed": false,
+      "bounded_conclusion": "future_LTI_research_export_gate_not_mix_quality_or_production_validation",
+      "reported_not_reproduced": {
+        "max_ir_difference_relative_to_peak": "7e-5",
+        "unit_tests": 201,
+        "fdn_32_line_speed_on_Apple_M2_48k": "approximately_90x_realtime",
+        "fdn_64_line_speed_on_Apple_M2_48k": "approximately_14x_realtime"
+      },
+      "limits": ["demo_paper", "LTI_FDN_SDN_scope", "fractional_delay_rounding", "nonlinear_time_varying_guarantees_not_established", "not_locally_reproduced"],
+      "citation_check": "partial"
+    }
+  ],
+  "scientific_duplicates": [
+    "arxiv:2608.05506", "arxiv:2608.05442", "arxiv:2608.30559", "arxiv:2608.10573",
+    "arxiv:2609.02835", "arxiv:2607.23846", "conference:dafx:2026:DAFx26_paper_14", "conference:dafx:2026:DAFx26_paper_19"
+  ],
+  "videos_added": [
+    {
+      "id": "VID-ML-20261001-1500-01",
+      "stable_id": "youtube:8_J9DP4EsFk",
+      "url": "https://www.youtube.com/watch?v=8_J9DP4EsFk",
+      "title": "Mix buss & drum processing with Andrew Scheps",
+      "reading_depth": "partial_third_party_timestamped_summary_no_transcript",
+      "status": "partial_content_review",
+      "timestamps": ["05:27_drums_dirt", "06:16_parallel_compression", "07:40_room_tracks", "08:20_snare_reverb", "12:11_kick_snare_parallel_compression", "15:35_short_bright_snare_ambience", "18:23_room_miked_amp_reamp"],
+      "numeric_settings_extracted": false,
+      "requires_first_party_verification": true
+    },
+    {
+      "id": "VID-ML-20261001-1500-02",
+      "stable_id": "youtube:0SH30uvx19Y",
+      "url": "https://www.youtube.com/watch?v=0SH30uvx19Y",
+      "publisher_page": "https://www.recordproduction.com/techniques/parallel-compression-for-drums-with-clint-murphy",
+      "title": "Clint Murphy on Parallel Drum Compression",
+      "reading_depth": "metadata_only",
+      "status": "queued_source"
+    },
+    {
+      "id": "VID-ML-20261001-1500-03",
+      "stable_id": "youtube:9tf7HXK5fXk",
+      "url": "https://www.youtube.com/watch?v=9tf7HXK5fXk",
+      "official_page": "https://www.toontrack.com/news/parallel-processing-with-jakob-herrmann/",
+      "title": "Parallel Processing with Jakob Herrmann",
+      "published": "2023-11-07",
+      "reading_depth": "metadata_only",
+      "status": "queued_source"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261001-1500-01","claim":"export_requires_semantic_graph_equivalence_not_parameter_name_matching","confidence":"high_within_LTI_graph_scope"},
+    {"id":"KC-ML-20261001-1500-02","claim":"feedback_stability_must_be_checked_on_quantized_emitted_parameters","confidence":"high_within_source_scope"},
+    {"id":"KC-ML-20261001-1500-03","claim":"implementation_fidelity_and_runtime_headroom_do_not_establish_musical_preference","confidence":"high"},
+    {"id":"KC-ML-20261001-1500-04","claim":"secondary_timestamped_summaries_seed_verification_but_not_numeric_rules_or_full_study_status","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261001-1500-01",
+      "source_ids": ["SRC-ML-20261001-1500-01"],
+      "applies_when": "approved_isolated_research_branch_exports_a_differentiable_LTI_audio_graph",
+      "change": "require_IR_equivalence_delay_direct_path_checks_emitted_parameter_stability_and_deadline_profiling",
+      "setting_range": null,
+      "protect": ["bounded_output", "feedback_stability", "latency_alignment", "decay", "automation_continuity", "CPU_headroom", "recall"],
+      "verify": "deterministic_impulses_programme_audio_null_decay_true_peak_xrun_and_randomized_loudness_matched_listening",
+      "cancel": "unsupported_nonlinear_or_time_varying_graph_alignment_change_indeterminate_stability_deadline_or_quality_regression",
+      "confidence": "medium_for_future_LTI_research_export_none_for_current_mix_quality",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261001-1500-01",
+      "status": "not_run",
+      "precondition": "separate_approval_for_isolated_research_branch",
+      "baseline": "frozen_source_framework_FDN_render",
+      "variant": "FAUST_render_compiled_from_same_frozen_graph_and_parameters",
+      "single_changed_factor": "execution_export_implementation_path",
+      "number_origin": "project_numeric_tolerance_must_be_preregistered_paper_7e-5_is_not_adopted_threshold",
+      "level_control": "raw_null_and_peak_copies_plus_separate_randomized_BS1770_integrated_loudness_matched_listening_copies",
+      "measurements": ["sample_alignment", "max_absolute_error", "null_residual_spectrum", "RT60_decay", "direct_path_timing", "true_peak", "CPU_p95_p99", "xruns"],
+      "protect": ["transient_timing", "stereo_image", "decay_envelope", "noise_floor", "automation_continuity", "bounded_feedback", "realtime_headroom"],
+      "listener_protocol": "Dmitry_three_randomized_repeats_repeats_not_independent_listeners",
+      "success": "declared_numeric_gate_decay_direct_path_and_deadline_pass_with_no_consistent_audible_difference",
+      "cancel": "hidden_resampling_or_parameter_change_unverified_level_match_instability_true_peak_regression_deadline_miss_or_repeatable_audible_difference"
+    }
+  ],
+  "priority_queue": [
+    "verify_first_party_content_for_VID-ML-20261001-1500-01",
+    "obtain_transcript_for_VID-ML-20261001-1500-02",
+    "obtain_transcript_for_VID-ML-20261001-1500-03",
+    "retain_EXP-ML-20260929-1500-02_as_next_practical_audio_AB",
+    "inspect_ADAC_tests_only_if_research_export_becomes_relevant"
+  ],
+  "safety": {
+    "auto_apply": false,
+    "experiments_run": false,
+    "audio_uploaded": false,
+    "paid_services_used": false,
+    "runtime_or_dsp_changed": false
+  }
+}
+
