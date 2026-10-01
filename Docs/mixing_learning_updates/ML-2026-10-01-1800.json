@@ -1,0 +1,159 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-01-1800",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-10-01T18:00:00+03:00",
+  "actual_start_msk": "2026-10-01T17:55:44+03:00",
+  "completed_msk": "2026-10-01T18:02:06+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-10-01-1500",
+  "preceding_search_update_id": "ML-2026-10-01-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "not_retried_after_same_day_paid_plan_or_trial_requirement",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "summary": {
+    "source_cards_updated": 1,
+    "artifact_audits_added": 1,
+    "video_source_cards_updated": 1,
+    "videos_transcript_complete_upgraded": 1,
+    "knowledge_cards_added": 5,
+    "rule_candidates_added": 1,
+    "rule_candidates_narrowed": 1,
+    "experiment_plans_added": 1,
+    "video_catalogue": 73,
+    "transcript_complete_video_count": 5,
+    "partial_content_video_count": 0,
+    "metadata_only_video_queue": 68,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "sources_updated": [
+    {
+      "id": "SRC-ML-20261001-1500-01",
+      "stable_ids": ["arxiv:2606.21277v1", "title:compiling-differentiable-audio-graphs-to-real-time-dsp"],
+      "url": "https://arxiv.org/abs/2606.21277",
+      "code_url": "https://github.com/cucuwritescode/adac",
+      "reading_depth": "full_text_plus_repository_implementation_ci_and_issue_audit",
+      "code_executed": false,
+      "independence": "author_team_primary_evidence_only",
+      "bounded_conclusion": "isolated_LTI_research_candidate_only_after_clean_integration_reproduction",
+      "new_limits": [
+        "default_ci_excludes_integration_tests",
+        "integration_test_skips_without_external_stack",
+        "integration_test_contains_author_local_absolute_paths",
+        "default_ir_comparison_uses_4096_samples_mean_error_lt_0_01_decay_correlation_gt_0_5",
+        "certificate_frequency_grid_default_1024",
+        "marginally_stable_passes_default_export",
+        "strict_false_override_exists",
+        "fractional_delay_and_module_support_conflicts_with_open_issues_14_and_11",
+        "numerical_precision_issue_12_open",
+        "no_independent_reproduction"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261001-1800-01",
+      "stable_id": "github:cucuwritescode/adac@6045856b214ed22e14c1b8342312a709d50dc47a",
+      "files_read": [
+        ".github/workflows/ci.yml",
+        "tests/integration/test_ir_comparison.py",
+        "src/adac/certificate.py",
+        "src/adac/export.py",
+        "README.md",
+        "open_issues"
+      ],
+      "reproduction_status": "not_run",
+      "license": "MIT"
+    }
+  ],
+  "videos_updated": [
+    {
+      "id": "VID-ML-20261001-1500-01",
+      "stable_id": "youtube:8_J9DP4EsFk",
+      "url": "https://www.youtube.com/watch?v=8_J9DP4EsFk",
+      "title": "Mix buss & drum processing with Andrew Scheps",
+      "publisher": "Mix with the Masters",
+      "published": "2020-09-02",
+      "playable_duration_seconds": 513,
+      "reading_depth": "first_party_timestamped_transcript_complete_for_playable_excerpt_0_00_to_8_24",
+      "status": "transcript_complete",
+      "integrity_note": "transcript_rows_after_8_33_were_rejected_as_beyond_player_duration",
+      "accepted_timestamps": [
+        "00:40_mix_bus_EQ_plus_2_5_dB_at_100_Hz_plus_4_dB_broad_at_10_kHz",
+        "01:35_limiter_input_minus_0_25_dB_ceiling_minus_0_1_dB",
+        "02:01_slowest_attack_fastest_release_auto_gain_and_comp_off",
+        "03:17_approximately_4_to_5_dB_peak_gain_reduction_in_this_mix",
+        "05:43_HPF_then_lofi_clipping_then_heavy_clipping_then_corrective_EQ",
+        "06:05_automated_into_pushes_and_choruses",
+        "07:31_dry_kit_level_unchanged_parallel_path_adds_density",
+        "07:48_room_tracks_added_for_pushes",
+        "08:24_end_of_accepted_transcript"
+      ],
+      "removed_provisional_timestamps": ["12:11", "15:35", "18:23"],
+      "numeric_settings_are_source_specific": true
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261001-1800-01","claim":"unit_test_count_does_not_establish_end_to_end_export_equivalence_when_integration_is_excluded_or_machine_specific","confidence":"high"},
+    {"id":"KC-ML-20261001-1800-02","claim":"grid_sampled_small_gain_certificate_is_sufficient_only_within_supported_LTI_topology_and_marginal_or_overridden_verdicts_need_rejection_policy","confidence":"high_within_audited_code"},
+    {"id":"KC-ML-20261001-1800-03","claim":"capability_tables_must_be_reconciled_with_current_code_tests_and_open_issues","confidence":"high"},
+    {"id":"KC-ML-20261001-1800-04","claim":"section_automated_parallel_density_can_increase_perceived_drum_size_without_changing_dry_kit_level","confidence":"medium_single_engineer_single_excerpt"},
+    {"id":"KC-ML-20261001-1800-05","claim":"spoken_EQ_and_limiter_values_are_mix_specific_not_transferable_defaults","confidence":"high"}
+  ],
+  "rules_narrowed": [
+    {
+      "id": "RULE-ML-20261001-1500-01",
+      "revision": "require_clean_no_skip_integration_CI_pinned_toolchain_supported_operator_manifest_and_target_host_tests_reject_all_non_certified_stable_and_strict_false_exports",
+      "confidence": "medium_for_isolated_LTI_research_after_clean_reproduction_none_for_current_mix_quality",
+      "auto_apply": false
+    }
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261001-1800-01",
+      "source_ids": ["VID-ML-20261001-1500-01"],
+      "applies_when": "dense_build_or_chorus_makes_an_intentionally_dark_or_dry_rock_kit_lose_perceived_size_after_dry_balance_is_approved",
+      "change": "audition_a_fixed_parallel_HPF_clipping_saturation_corrective_EQ_bus_automated_only_into_target_sections",
+      "setting_range": "no_transferable_amount_source_topology_only_all_values_set_by_local_signal",
+      "protect": ["kick_snare_transient_identity", "cymbal_smoothness", "groove", "kit_width", "room_coherence", "vocal_guitar_balance", "true_peak_headroom"],
+      "verify": "raw_safety_render_plus_randomized_loudness_matched_identical_section_AB",
+      "cancel": "preference_disappears_after_level_match_or_harshness_pumping_blur_masking_or_peak_regression_occurs",
+      "confidence": "medium_single_engineer_demonstration",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261001-1800-01",
+      "status": "not_run",
+      "baseline": "approved_drum_mix_with_candidate_parallel_bus_muted_in_one_dense_section",
+      "variant": "same_render_with_one_frozen_parallel_bus_unmuted_only_in_that_section",
+      "single_changed_factor": "parallel_bus_contribution",
+      "number_origin": "no_source_default_amount_all_local_values_preregistered",
+      "level_control": "raw_AB_for_safety_plus_separate_randomized_BS1770_integrated_loudness_matched_identical_boundaries",
+      "measurements": ["integrated_and_short_term_loudness", "sample_peak", "true_peak", "crest_factor", "peak_timing", "band_energy_delta", "stereo_correlation", "boundary_discontinuity"],
+      "protect": ["kick_snare_attack_and_length", "hat_cymbal_smoothness", "groove", "room_depth", "width", "vocal_guitar_readability", "headroom"],
+      "listener_protocol": "Dmitry_three_randomized_repeats_repeats_not_independent_listeners",
+      "success": "variant_consistently_preferred_for_density_after_level_match_without_protected_quality_or_headroom_regression",
+      "cancel": "variant_wins_only_when_louder_or_adds_harshness_pumping_transient_blur_image_collapse_masking_or_clicks"
+    }
+  ],
+  "priority_queue": [
+    "run_EXP-ML-20261001-1800-01_only_on_project_owned_audio",
+    "retain_EXP-ML-20260929-1500-02",
+    "obtain_transcript_for_VID-ML-20261001-1500-02",
+    "obtain_transcript_for_VID-ML-20261001-1500-03",
+    "adac_clean_stack_reproduction_only_after_separate_approval"
+  ],
+  "safety": {
+    "auto_apply": false,
+    "experiments_run": false,
+    "audio_uploaded": false,
+    "paid_services_used": false,
+    "runtime_or_dsp_changed": false
+  }
+}
