@@ -1,0 +1,126 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-01-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-10-01T12:00:00+03:00",
+  "actual_start_msk": "2026-10-01T12:02:47+03:00",
+  "completed_msk": "2026-10-01T12:08:00+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-10-01-0900",
+  "preceding_search_update_id": "ML-2026-10-01-0900",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "not_retried_after_same_day_paid_plan_or_trial_requirement",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "summary": {
+    "source_cards_updated": 1,
+    "source_cards_added": 1,
+    "knowledge_cards_added": 5,
+    "rule_candidates_added": 1,
+    "rule_candidates_narrowed": 1,
+    "experiment_plans_added": 1,
+    "videos_studied": 0,
+    "video_catalogue": 70,
+    "metadata_only_video_queue": 66,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261001-0900-01",
+      "stable_ids": ["conference:dafx:2026:DAFx26_paper_34", "dafx_archive:UNNytCTePoNgsd28yb9K7A"],
+      "reading_depth": "full_text_method_metric_listening_statistics_conclusion_rights_audit",
+      "material": "39_monophonic_VSL_SOL_forte_or_fortissimo_samples_13_per_technique",
+      "analysis_settings": {
+        "sample_rate_hz": 44100,
+        "window": "zero_phase_noncausal_Hann_M_equals_6_T0_fs",
+        "overlap": "50_percent",
+        "fft_size": "24M",
+        "max_partials": 100,
+        "ddm_order": 3,
+        "source_specific_not_mixing_settings": true
+      },
+      "listening": {
+        "participants_completed": 13,
+        "participants_excluded": 8,
+        "participants_retained": 5,
+        "sounds": 18,
+        "sounds_per_technique": 6,
+        "ratings_per_model_technique_cell": 30,
+        "independent_listener_n": 5,
+        "one_celesta_reference_rating_removed": true,
+        "model_technique_interaction": "F(8,32)=10.94_p=2.83e-7",
+        "reference_vs_ddm": "p=0.0091_Holm_Bonferroni"
+      },
+      "corrections": [
+        "cell_rating_count_is_not_listener_count",
+        "almost_indistinguishable_is_not_equivalence_evidence",
+        "significant_interaction_qualifies_main_effect",
+        "peak_selection_partly_confounds_model_family",
+        "srr_is_waveform_residual_not_direct_onset_quality"
+      ],
+      "rights": "paper_CC_BY_4_0_does_not_establish_VSL_SOL_or_companion_audio_rights",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261001-1200-01",
+      "type": "official_standard",
+      "stable_id": "itu-r:BS.1534-3:2015",
+      "url": "https://www.itu.int/rec/R-REC-BS.1534-3-201510-I",
+      "reading_depth": "selected_full_text_assessor_post_screening",
+      "bounded_conclusion": "screening_thresholds_match_standard_but_standard_does_not_validate_final_n_or_DAFx_claims"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261001-1200-01","claim":"unique_listeners_stimuli_and_repeated_ratings_must_be_reported_separately","confidence":"high"},
+    {"id":"KC-ML-20261001-1200-02","claim":"significant_model_by_material_interaction_requires_section_stratified_reporting","confidence":"high_within_source"},
+    {"id":"KC-ML-20261001-1200-03","claim":"indistinguishable_or_equivalent_requires_explicit_equivalence_design","confidence":"high"},
+    {"id":"KC-ML-20261001-1200-04","claim":"different_peak_selection_and_failed_convergence_limit_estimator_attribution","confidence":"high_within_source"},
+    {"id":"KC-ML-20261001-1200-05","claim":"article_and_companion_audio_licences_are_separate","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261001-1200-01",
+      "source_ids": ["SRC-ML-20261001-0900-01", "SRC-ML-20261001-1200-01"],
+      "applies_when": "evidence_uses_repeated_ratings_across_excerpts_sections_or_takes",
+      "change": "separate_unique_listeners_from_trials_stratify_interactions_and_reserve_equivalence_language_for_equivalence_designs",
+      "setting_range": null,
+      "protect": ["transients","groove","cymbal_texture","pick_definition","bass_articulation","lead_intelligibility","stereo_mono","true_peak_headroom"],
+      "verify": "randomized_loudness_matched_listening_plus_raw_safety_listener_level_and_section_level_results",
+      "cancel": "pseudo_replication_headline_reference_contradiction_or_undocumented_screening_or_level_match",
+      "confidence": "high_for_reporting_structure_low_for_direct_mixing_transfer",
+      "auto_apply": false
+    }
+  ],
+  "rule_revisions": [
+    {
+      "id": "RULE-ML-20261001-0900-01",
+      "revision": "SRR_is_waveform_residual_not_direct_onset_quality_require_explicit_onset_event_measure_plus_listening",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261001-1200-01",
+      "status": "not_run",
+      "baseline": "current_approved_mix_bus_compressor",
+      "variant": "identical_except_next_slower_attack_or_exactly_2x_current_attack_capped_by_plugin_range",
+      "single_changed_factor": "attack_time",
+      "number_origin": "project_sensitivity_step_not_source_preset",
+      "sections": ["drum_led_verse","fill_transition","dense_chorus"],
+      "level_control": "raw_safety_copies_plus_separate_randomized_BS1770_integrated_loudness_matched_listening_copies",
+      "measurements": ["true_peak","integrated_and_short_term_loudness","peak_to_RMS_crest","onset_peak","first_50ms_energy","gain_reduction_trace","band_limited_spectral_delta","mid_side_balance","mono_fold_down"],
+      "listener_protocol": "Dmitry_three_randomized_repeats_per_excerpt_repeats_not_independent_listeners",
+      "success": "B_chosen_at_least_two_of_three_repeats_on_both_transient_excerpts_not_worse_in_dense_chorus_all_safety_gates_pass",
+      "cancel": "non_attack_parameter_diff_unverifiable_level_match_level_only_preference_safety_regression_protected_quality_damage_or_inconsistent_repeats"
+    }
+  ],
+  "safety": {
+    "auto_apply": false,
+    "experiments_run": false,
+    "audio_uploaded": false,
+    "paid_services_used": false,
+    "runtime_or_dsp_changed": false
+  }
+}
