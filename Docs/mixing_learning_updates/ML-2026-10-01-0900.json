@@ -1,0 +1,164 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-01-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-10-01T09:00:00+03:00",
+  "actual_start_msk": "2026-10-01T09:02:03+03:00",
+  "completed_msk": "2026-10-01T09:10:08+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-09-30-1800",
+  "preceding_search_update_id": "ML-2026-09-30-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "one_post_reset_probe_returned_paid_plan_or_active_trial_required; no_retry",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "search_summary": {
+    "new_source_cards": 1,
+    "full_relevant_section_sources": 1,
+    "new_video_cards": 3,
+    "videos_studied": 0,
+    "video_duplicates_removed": 3,
+    "scientific_duplicates_removed": 1,
+    "new_knowledge_cards": 4,
+    "new_rule_candidates": 1,
+    "new_experiment_plans": 1,
+    "new_reference_cards": 0,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261001-0900-01",
+      "type": "peer_reviewed_conference_paper",
+      "title": "Using the Distribution Derivative Method to Model Acoustic Musical Instrument Sounds with Polynomial AM-FM Sinusoids",
+      "author": "Marcelo Caetano",
+      "stable_ids": ["conference:dafx:2026:DAFx26_paper_34", "dafx_archive:UNNytCTePoNgsd28yb9K7A"],
+      "urls": ["https://dafx.de/paper-archive/details/UNNytCTePoNgsd28yb9K7A", "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_34.pdf"],
+      "publication_date": "2026-09-04",
+      "discovery_date": "2026-10-01",
+      "license": "CC-BY-4.0_as_stated_in_paper",
+      "reading_depth": "full_relevant_abstract_method_evaluation_results_posthoc_conclusion",
+      "method": "DDM_cubic_polynomial_AM_FM_sinusoidal_model_vs_SMplus_and_eaQHM_on_39_monophonic_instrument_sounds",
+      "evaluation": {
+        "objective": ["RMS_log_spectral_measure", "Itakura_Saito_divergence", "signal_to_residual_ratio"],
+        "subjective": "within_subject_MUSHRA_18_selected_sounds",
+        "participants_entered": 13,
+        "participants_retained": 5,
+        "screened_out": 8,
+        "multiple_comparison_control": "Holm_Bonferroni"
+      },
+      "bounded_conclusion": "metric_rankings_can_diverge_for_nonstationary_energy; supports_multi_axis_transient_evaluation_not_DSP_setting",
+      "limitations": ["monophonic_isolated_acoustic_sounds", "forte_or_fortissimo_only", "fixed_peak_selection_and_cubic_model", "no_rock_mix", "no_dynamics_processor_intervention", "five_retained_listeners", "no_independent_replication_found"],
+      "citation_check": "partial"
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VIDEO-ML-20261001-0900-01",
+      "stable_id": "youtube:eAgy6SLhjlk",
+      "title": "You're Mixing Wrong: Loud + Clean Happens Before Mastering",
+      "channel": "TheCosmicAcademy",
+      "published": "2025-11-09",
+      "url": "https://www.youtube.com/watch?v=eAgy6SLhjlk",
+      "duration": "PT9M21S",
+      "reading_depth": "metadata_only",
+      "captions": "unavailable_on_checked_watch_page",
+      "status": "queued_source",
+      "techniques_extracted": false
+    },
+    {
+      "id": "VIDEO-ML-20261001-0900-02",
+      "stable_id": "youtube:Urimnh4j2BI",
+      "title": "Absurdly LOUD Mixes and How The Pros Actually Do It",
+      "channel": "Alex Emrich | Audio Edges",
+      "published": "2025-06-20",
+      "url": "https://www.youtube.com/watch?v=Urimnh4j2BI",
+      "duration": "PT17M46S",
+      "reading_depth": "metadata_only",
+      "captions": "unavailable_on_checked_watch_page",
+      "status": "queued_source",
+      "techniques_extracted": false
+    },
+    {
+      "id": "VIDEO-ML-20261001-0900-03",
+      "stable_id": "youtube:api8s3a_GZA",
+      "title": "Why other mixes sound louder than yours (it's not mastering)",
+      "channel": "Big Z",
+      "published": "2025-11-09",
+      "url": "https://www.youtube.com/watch?v=api8s3a_GZA",
+      "duration": "PT8M34S",
+      "reading_depth": "metadata_only",
+      "captions": "unavailable_on_checked_watch_page",
+      "status": "queued_source",
+      "techniques_extracted": false
+    }
+  ],
+  "deduplication": [
+    {"key": "normalized_title:evaluating_dynamic_range_compressor_models_using_control_voltage_measurements", "resolution": "existing_source_not_added"},
+    {"key": "youtube:-AIxQcWfkpA", "resolution": "existing_video_not_added"},
+    {"key": "youtube:QSj2m9oUJno", "resolution": "existing_video_not_added"},
+    {"key": "youtube:lPwVsU3uLRM", "resolution": "existing_video_not_added"}
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20261001-0900-01", "claim": "spectral_distance_and_transient_preservation_are_separate_evaluation_axes", "confidence": "high_within_source_scope"},
+    {"id": "KC-ML-20261001-0900-02", "claim": "listener_screening_changes_effective_evidence_size_and_must_be_reported", "confidence": "high"},
+    {"id": "KC-ML-20261001-0900-03", "claim": "isolated_monophonic_resynthesis_does_not_establish_mix_bus_behavior", "confidence": "high"},
+    {"id": "KC-ML-20261001-0900-04", "claim": "metadata_only_video_cards_support_cataloguing_not_technique_extraction", "confidence": "high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261001-0900-01",
+      "source_ids": ["SRC-ML-20261001-0900-01"],
+      "applies_when": "processor_may_change_attacks_or_crest_behavior",
+      "change": "add_onset_time_domain_and_loudness_matched_blind_endpoints_beside_spectral_loudness_and_peak_metrics",
+      "setting_range": null,
+      "number_origin": "evaluation_protocol_only_no_DDM_or_DSP_numbers_transferred",
+      "protect": ["drum_attack", "cymbal_texture", "guitar_pick_definition", "bass_articulation", "lead_intelligibility", "stereo_mono", "true_peak_headroom"],
+      "verify": "raw_safety_checks_plus_randomized_BS1770_matched_section_stratified_AB",
+      "cancel": "metric_preference_reversal_or_level_only_preference_or_protected_quality_regression",
+      "confidence": "high_for_evaluation_structure_low_for_mixing_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261001-0900-01",
+      "status": "not_run",
+      "title": "mix_bus_compressor_attack_sensitivity",
+      "material": "project_owned_drum_led_rock_excerpt_only",
+      "baseline": "current_approved_mix_bus_compressor_state",
+      "variant": "identical_state_except_attack_next_slower_reproducible_setting_or_2x_current_capped_by_plugin_range",
+      "single_factor": "compressor_attack_time",
+      "number_origin": "engineering_sensitivity_test_not_from_source_and_not_recommended_preset",
+      "loudness_matching": "raw_safety_copies_plus_separate_BS1770_integrated_matched_randomized_listening_copies_with_gain_offset_logged",
+      "measure": ["true_peak", "integrated_and_short_term_loudness", "section_crest", "onset_peak_and_rise_time", "band_log_spectral_change", "gain_reduction_trace_if_available", "mid_side", "mono_fold_down", "Dmitry_blind_rating"],
+      "protect": ["punch", "groove", "ghost_notes", "cymbal_texture", "guitar_bite", "low_end_stability", "lead_intelligibility", "stereo_image", "headroom"],
+      "success": "variant_preferred_or_noninferior_for_punch_and_clarity_without_peak_pumping_mono_or_section_balance_regression",
+      "cancel": "attack_not_only_factor_or_uncontrolled_loudness_or_required_GR_unavailable_or_protected_quality_failure"
+    }
+  ],
+  "queue": {
+    "video_catalogue_before": 67,
+    "video_catalogue_after": 70,
+    "queued_video_before": 63,
+    "queued_video_after": 66,
+    "studied_video_count_this_run": 0,
+    "scientific_priority": ["SRC-ML-20261001-0900-01_replication_companion_audio_listener_screening_peak_selection", "existing_direct_control_voltage_compressor_source"],
+    "video_priority": ["youtube:eAgy6SLhjlk", "youtube:Urimnh4j2BI", "youtube:api8s3a_GZA", "youtube:0zowlxekXS0", "youtube:3rw0cIilsnk", "youtube:TRkEGhGiDj0"],
+    "audio_priority": ["EXP-ML-20260929-1500-02", "EXP-ML-20261001-0900-01"]
+  },
+  "safety": {
+    "audio_modified": false,
+    "dsp_modified": false,
+    "runtime_modified": false,
+    "models_modified": false,
+    "active_rules_modified": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true,
+    "paid_services_used": false,
+    "accounts_created": false,
+    "commercial_audio_extracted": false,
+    "user_audio_uploaded": false
+  }
+}
