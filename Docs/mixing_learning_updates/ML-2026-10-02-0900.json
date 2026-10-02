@@ -1,0 +1,203 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-02-0900",
+  "mode": "search",
+  "scheduled_slot_msk": "2026-10-02T09:00:00+03:00",
+  "actual_start_msk": "2026-10-02T09:03:50+03:00",
+  "completed_msk": "2026-10-02T09:13:22+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-10-01-1800",
+  "preceding_search_update_id": "ML-2026-10-01-1500",
+  "citation_check": "partial",
+  "quota_policy": {
+    "scite": "not_retried_after_2026-10-01_paid_plan_or_trial_requirement",
+    "consensus": "not_retried_no_confirmed_free_reset"
+  },
+  "summary": {
+    "source_cards_added": 2,
+    "full_text_sources_read": 2,
+    "duplicates_removed": 5,
+    "video_source_cards_added": 2,
+    "videos_transcript_complete_added": 0,
+    "knowledge_cards_added": 6,
+    "rule_candidates_added": 2,
+    "experiment_plans_added": 1,
+    "video_catalogue": 75,
+    "transcript_complete_video_count": 5,
+    "partial_content_video_count": 0,
+    "metadata_only_video_queue": 70,
+    "audio_analyzed": false,
+    "queue_preserved": true
+  },
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261002-0900-01",
+      "stable_ids": [
+        "conference:dafx:2026:DAFx26_paper_02",
+        "title:group-delay-manipulation-for-creative-sound-transformation-with-the-giant-fft"
+      ],
+      "title": "Group Delay Manipulation for Creative Sound Transformation with the Giant FFT",
+      "authors": ["Ted Apel"],
+      "published": "2026-09-01/2026-09-04",
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_02.pdf",
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_text_6_pages_all_sections",
+      "evidence": [
+        "synthetic_four_note_reordering",
+        "recorded_glockenspiel_reordering",
+        "harpsichord_partial_displacement",
+        "periodic_group_delay_modulation",
+        "qualitative_audio_and_spectrogram_examples"
+      ],
+      "limitations": [
+        "no_controlled_listening_test",
+        "no_quantitative_windowed_baseline",
+        "best_for_pitched_non_overlapping_events",
+        "shared_frequency_bins_cannot_be_moved_independently",
+        "segment_width_artifact_tradeoff",
+        "no_verified_public_implementation",
+        "single_author_no_independent_reproduction"
+      ],
+      "bounded_conclusion": "offline_creative_candidate_for_isolated_events_not_transparent_editing_or_multichannel_phase_alignment",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261002-0900-02",
+      "stable_ids": [
+        "conference:dafx:2026:DAFx26_paper_20",
+        "title:perceptually-motivated-alignment-and-interpolation-of-pitch-aligned-time-frequency-representations"
+      ],
+      "title": "Perceptually Motivated Alignment and Interpolation of Pitch-Aligned Time-Frequency Representations",
+      "authors": ["Shahan Nercessian", "Jeff Sontag", "Alejandro Koretzky"],
+      "published": "2026-09-01/2026-09-04",
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_20.pdf",
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_text_8_pages_all_sections",
+      "evidence": [
+        "synthetic_alignment_example",
+        "1024_random_chromagram_pair_optimizer_evaluation",
+        "C_major_to_C_minor_interpolation_example",
+        "106_internally_constructed_scale_profiles",
+        "20000_training_steps_for_geometric_scale_representation"
+      ],
+      "limitations": [
+        "no_listener_study",
+        "no_real_rock_multitrack_test",
+        "no_held_out_external_scale_corpus",
+        "representation_distance_not_mix_quality",
+        "author_team_only_evidence"
+      ],
+      "bounded_conclusion": "harmonic_arrangement_candidate_only_not_waveform_timing_or_phase_alignment",
+      "citation_check": "partial"
+    }
+  ],
+  "duplicates_removed": [
+    {"stable_id":"arxiv:2606.16551","reason":"already_indexed_ML-2026-09-14-1800"},
+    {"stable_id":"title:instructfx2fx","reason":"already_indexed_ML-2026-09-19-0900"},
+    {"stable_id":"title:a-production-oriented-framework-for-evaluation-of-sfx-generation","reason":"already_indexed_ML-2026-09-20-0900"},
+    {"stable_id":"title:ddspmm-guided-audio-manipulation","reason":"already_indexed_and_deep_reviewed_2026-09-20"},
+    {"stable_id":"arxiv:2608.05506","reason":"sequential_mixing_source_already_present"}
+  ],
+  "videos_added": [
+    {
+      "id": "VID-ML-20261002-0900-01",
+      "stable_id": "youtube:Cmhd8fZ28fk",
+      "url": "https://www.youtube.com/watch?v=Cmhd8fZ28fk",
+      "title": "Mixing Bass Guitar | Fat Bottomed Tips by Joe Barresi",
+      "publisher": "Waves Audio",
+      "publisher_verified": true,
+      "published": "2018-08-20",
+      "duration_seconds": 460,
+      "reading_depth": "metadata_and_visible_description_only",
+      "transcript_status": "captions_unavailable_no_content_obtained",
+      "status": "queued_source",
+      "topics_from_metadata_only": ["bass", "DI_amp_blend", "hard_rock"]
+    },
+    {
+      "id": "VID-ML-20261002-0900-02",
+      "stable_id": "youtube:obfqS95rLfc",
+      "url": "https://www.youtube.com/watch?v=obfqS95rLfc",
+      "title": "How to Get MASSIVE Rock Guitars with Ulrich Wild, Bob Marlette & Warren Huart",
+      "publisher": "Produce Like A Pro",
+      "publisher_verified": true,
+      "published": "2018-05-16",
+      "duration_seconds": 1094,
+      "reading_depth": "metadata_description_and_chapter_titles_only",
+      "transcript_status": "official_panel_present_rows_failed_to_populate_after_initial_attempt_and_one_reload_reopen",
+      "status": "queued_source",
+      "topics_from_metadata_only": ["rock_guitars", "hybrid_mixing", "in_the_box", "production"]
+    }
+  ],
+  "video_duplicates_removed": [
+    "youtube:lhvllefJuao",
+    "youtube:zrWA9rglG24",
+    "youtube:JSttlIYSk_Q",
+    "youtube:h9Zpp7i-8Mw",
+    "youtube:0zowlxekXS0"
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261002-0900-01","claim":"coherent_event_displacement_requires_preserving_relative_group_delay_across_all_bins_belonging_to_the_event","confidence":"high_within_primary_method"},
+    {"id":"KC-ML-20261002-0900-02","claim":"shared_frequency_bins_make_selective_giant_FFT_event_displacement_ambiguous","confidence":"high_primary_limitation"},
+    {"id":"KC-ML-20261002-0900-03","claim":"unchanged_magnitude_spectrum_does_not_establish_transparent_editing_after_phase_or_group_delay_change","confidence":"high"},
+    {"id":"KC-ML-20261002-0900-04","claim":"pitch_representation_alignment_and_waveform_time_phase_alignment_are_distinct_domains","confidence":"high"},
+    {"id":"KC-ML-20261002-0900-05","claim":"PTFR_optimizer_distance_improvement_is_not_listener_preference_or_mix_quality_evidence","confidence":"high"},
+    {"id":"KC-ML-20261002-0900-06","claim":"youtube_chapters_and_description_are_metadata_not_studied_content_without_transcript_or_permitted_content_access","confidence":"high"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261002-0900-01",
+      "source_ids": ["SRC-ML-20261002-0900-01"],
+      "applies_when": "consciously_creative_offline_audition_on_isolated_pitched_event_or_short_low_overlap_sequence",
+      "change": "uniformly_displace_one_preregistered_coherent_spectral_group_once",
+      "setting_range": "no_transferable_range_paper_8000_to_12000_bin_example_not_portable_local_values_logged",
+      "protect": ["onset_identity", "attack_decay", "groove", "pitch_envelope", "stereo_mono_compatibility", "boundaries", "headroom"],
+      "verify": "raw_safety_render_plus_randomized_BS1770_loudness_matched_AB_and_temporal_phase_peak_image_checks",
+      "cancel": "residual_original_energy_adjacent_event_motion_ringing_smearing_image_or_mono_regression_or_level_match_preference_loss",
+      "confidence": "low_to_medium_single_primary_creative_method_no_listening_test",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261002-0900-02",
+      "source_ids": ["SRC-ML-20261002-0900-02"],
+      "applies_when": "cataloguing_or_prototyping_harmonic_layer_or_arrangement_matching_only",
+      "change": "keep_PTFR_TIV_outputs_out_of_mic_alignment_EQ_gain_dynamics_and_mix_bus_controls",
+      "setting_range": "none_paper_weights_are_representation_research_parameters_not_audio_settings",
+      "protect": ["key_and_voicing_intent", "chromatic_colour", "riff_identity", "section_role"],
+      "verify": "independent_real_music_corpus_plus_blind_preference_and_role_tests",
+      "cancel": "only_self_defined_distance_improves_or_harmonic_identity_changes",
+      "confidence": "medium_for_domain_separation_low_for_mix_utility",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261002-0900-01",
+      "status": "not_run",
+      "prerequisite": "separately_approved_offline_prototype_and_project_owned_isolated_event",
+      "baseline": "approved_isolated_event_without_group_delay_transform",
+      "variant": "same_event_with_one_preregistered_coherent_spectral_group_uniformly_displaced_once",
+      "single_changed_factor": "time_displacement_of_one_spectral_group",
+      "number_origin": "no_source_default_local_displacement_and_segmentation_preregistered_and_logged",
+      "level_control": "raw_AB_for_artifact_diagnostics_plus_separate_randomized_BS1770_integrated_loudness_matched_identical_boundaries",
+      "measurements": ["integrated_and_short_term_loudness", "sample_peak", "true_peak", "crest_factor", "onset_timing", "energy_centroid_timing", "magnitude_spectrum_delta", "group_delay_discontinuity", "pre_post_boundary_energy", "stereo_correlation", "mono_difference"],
+      "protect": ["attack_identity", "pitch_envelope", "groove", "decay", "no_pre_echo_or_smear", "boundary_continuity", "width", "headroom"],
+      "listener_protocol": "Dmitry_three_randomized_repeats_repeats_not_independent_listeners",
+      "success": "variant_consistently_preferred_for_intended_creative_motion_after_level_match_without_protected_quality_regression",
+      "cancel": "loudness_only_win_residual_duplicate_onset_adjacent_event_motion_ringing_smearing_image_or_mono_regression_or_boundary_artifact"
+    }
+  ],
+  "priority_queue": [
+    "retain_EXP-ML-20261001-1800-01_as_next_immediately_executable_project_audio_test",
+    "retry_official_transcript_panel_for_VID-ML-20261002-0900-02_later",
+    "keep_VID-ML-20261002-0900-01_VID-ML-20261001-1500-02_and_VID-ML-20261001-1500-03_metadata_only",
+    "audit_PTFR_demo_and_independent_listener_evidence_only_if_harmonic_arrangement_tooling_is_prioritized",
+    "keep_group_delay_manipulation_offline_creative_only"
+  ],
+  "safety": {
+    "auto_apply": false,
+    "experiments_run": false,
+    "audio_uploaded": false,
+    "paid_services_used": false,
+    "runtime_or_dsp_changed": false
+  }
+}
