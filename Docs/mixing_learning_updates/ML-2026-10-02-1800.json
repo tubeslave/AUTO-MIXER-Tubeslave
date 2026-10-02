@@ -1,0 +1,122 @@
+{
+  "update_id": "ML-2026-10-02-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-02T18:00:00+03:00",
+  "actual_start": "2026-10-02T17:57:23+03:00",
+  "completed_at": "2026-10-02T17:59:51+03:00",
+  "preceding_update": "ML-2026-10-02-1500",
+  "preceding_search": "ML-2026-10-02-1500",
+  "citation_check": "partial",
+  "queue_counters": {
+    "video_total": 78,
+    "transcript_complete": 6,
+    "transcript_partial": 0,
+    "metadata_only": 72,
+    "changed": false
+  },
+  "source_card_revisions": [
+    {
+      "id": "SRC-ML-20261002-1500-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_06",
+      "reading_depth": "full_text_reaudited_pages_1_8",
+      "revised_conclusion": "Useful synthesis-design hypothesis and domain boundary; no evidence yet for out-of-sample prediction, room realism, perceptual preference, or production readiness.",
+      "method_limits": [
+        "Numerical nRMSE screening threshold not reported",
+        "No rejection count by source library or source-stratified sampling",
+        "All descriptors calculated on resynthesised rather than original IRs",
+        "PCA and IRLS diagnostics are fit on the retained corpus",
+        "No held-out set, cross-validation, external corpus, or confidence interval described",
+        "Generated preset placement is a range check in the same descriptor space, not independent validation",
+        "Mode count remapped to 1000-8000 for compute",
+        "Random phase and frequency jitter require deterministic seed control",
+        "Early-reflection shape is a fixed corpus-mean 256-tap FIR template",
+        "No formal listener evaluation"
+      ]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261002-1800-01",
+      "source_id": "SRC-ML-20261002-1500-01",
+      "claimed_url": "https://github.com/Nemus-Project/DAFx26_ModalReverb",
+      "observed_status": "unavailable_and_absent_from_public_org_listing",
+      "verified_commit": null,
+      "verified_license": null,
+      "verified_dependencies": null,
+      "tests_run": false,
+      "reproduction_status": "blocked_artifact_unavailable",
+      "audio_downloaded": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20261002-1800-01", "claim": "R2rob on IRLS inliers from the fitted corpus is an in-sample fit diagnostic, not held-out accuracy.", "confidence": "high_as_methodological_boundary"},
+    {"id": "KC-ML-20261002-1800-02", "claim": "Descriptors extracted from resynthesis evaluate the chosen representation internally and do not independently establish preservation of the original IR.", "confidence": "high_as_methodological_boundary"},
+    {"id": "KC-ML-20261002-1800-03", "claim": "Projection of generated presets into their construction descriptor space is a range check, not independent perceptual validation.", "confidence": "high_as_methodological_boundary"},
+    {"id": "KC-ML-20261002-1800-04", "claim": "Scaling one mean early FIR changes early-late energy but not room-specific early-reflection geometry.", "confidence": "high_for_implementation_description"},
+    {"id": "KC-ML-20261002-1800-05", "claim": "Random phase and diffusion jitter are uncontrolled A/B factors unless seed and mode bank are frozen.", "confidence": "high"},
+    {"id": "KC-ML-20261002-1800-06", "claim": "A corpus amplitude constant absorbed by output normalization is not a transferable gain setting.", "confidence": "high"}
+  ],
+  "rule_revisions": [
+    {
+      "id": "RULE-ML-20261002-1500-01",
+      "status": "blocked_artifact_unavailable",
+      "change": "Vary one early-late energy control without regenerating the mode bank",
+      "freeze": ["code_revision", "random_seed", "mode_frequencies", "mode_phases", "decay", "warmth", "brightness", "room_size", "diffusion", "FIR_shape", "pre_delay", "filters", "stereo_topology", "dry_balance", "routing"],
+      "range_origin": "central corpus-supported region; normalized 0-1 p5-p95 map is not a recommendation",
+      "protected_qualities": ["attack", "groove", "cymbal_definition", "snare_tail_identity", "mono", "width", "headroom"],
+      "verification": "Wet diagnostics plus randomized BS.1770-matched full-mix A/B and Dmitry preference",
+      "cancel_when": "Any stochastic mismatch, artifact, masking, image instability, or loudness-only preference",
+      "confidence": "low",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261002-1500-02",
+      "status": "retained_with_project_constraint",
+      "constraint": "Use only when a hard gate is intentionally retained; do not introduce a gate where the project baseline is no gate.",
+      "confidence": "moderate_for_workflow_low_for_generalization",
+      "auto_apply": false
+    }
+  ],
+  "experiment_revisions": [
+    {
+      "id": "EXP-ML-20261002-1500-01",
+      "status": "not_run",
+      "single_factor": "Pre-reverb compressor enabled versus bypassed",
+      "stage_1_match": "Match A/B reverb-feed integrated loudness within 0.1 LU; retain unmatched raw renders",
+      "stage_2_match": "Independently match final excerpts within 0.1 LU integrated under BS.1770",
+      "frozen": ["send_source", "reverb_algorithm_or_IR", "decay", "pre_delay", "filters", "modulation", "width", "wet_routing", "automation", "downstream_processing"],
+      "measurements": ["send_loudness", "wet_return_loudness", "short_term_loudness", "sample_peak", "true_peak", "crest_factor", "gain_reduction_trace", "wet_temporal_envelope", "mono_fold_down", "stereo_correlation", "headroom"],
+      "listening": "Randomized labels; three repeats per verse and chorus; repeats measure one-listener consistency and do not increase independent n",
+      "protected_qualities": ["kick_snare_attack", "groove", "cymbal_definition", "snare_decay_identity", "vocal_guitar_masking", "stereo_stability", "headroom"],
+      "success": "B consistently preferred in both sections after both matches with no protected-quality regression",
+      "cancel": "Preference vanishes after matching, or pumping, wash, masking, image change, or headroom loss appears"
+    }
+  ],
+  "new_experiments": [
+    {
+      "id": "EXP-ML-20261002-1800-01",
+      "status": "not_run_blocked",
+      "single_factor": "Early-late energy ratio within the central corpus range",
+      "requirements": ["public licensed revision or approved local prototype", "fixed random seed", "identical mode bank", "successful identical-setting null test", "fixed output-normalization path"],
+      "cancel": "Identical-setting null test fails or early-late change cannot be separated from global wet level"
+    }
+  ],
+  "priority_queue": [
+    {"rank": 1, "id": "EXP-ML-20261001-1800-01", "status": "next_executable"},
+    {"rank": 2, "id": "EXP-ML-20261002-1500-01", "status": "not_run_revised"},
+    {"rank": 3, "id": "EXP-ML-20261002-1800-01", "status": "blocked_artifact_unavailable"},
+    {"rank": 4, "id": "youtube:x3a4_spQCkc", "status": "queued_source_metadata_only"},
+    {"rank": 5, "id": "youtube:3JsIp8wl63o", "status": "queued_source_metadata_only_low_priority"}
+  ],
+  "unresolved": [
+    "Exact nRMSE screening threshold",
+    "Source-library composition after screening",
+    "Public companion repository and license",
+    "Held-out or source-stratified validation",
+    "Independent formal listening evaluation"
+  ],
+  "audio_downloaded": false,
+  "multitracks_added": [],
+  "runtime_or_dsp_changed": false
+}
+
