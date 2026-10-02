@@ -1,0 +1,139 @@
+{
+  "schema_version": "mixing-learning-patch/1.0",
+  "update_id": "ML-2026-10-02-1200",
+  "mode": "deep_review",
+  "scheduled_slot_msk": "2026-10-02T12:00:00+03:00",
+  "actual_start_msk": "2026-10-02T12:01:10+03:00",
+  "completed_msk": "2026-10-02T12:12:00+03:00",
+  "slot_assumption": false,
+  "preceding_update_id": "ML-2026-10-02-0900",
+  "preceding_search_update_id": "ML-2026-10-02-0900",
+  "citation_check": "partial",
+  "summary": {
+    "source_cards_added": 0,
+    "source_cards_revised": 2,
+    "artifact_audits_added": 2,
+    "full_text_sources_rechecked": 2,
+    "official_demo_pages_inspected": 2,
+    "knowledge_cards_added": 8,
+    "rule_candidates_revised": 2,
+    "experiment_plans_revised": 1,
+    "video_catalogue": 75,
+    "transcript_complete_video_count": 5,
+    "partial_content_video_count": 0,
+    "metadata_only_video_queue": 70,
+    "audio_downloaded_or_analyzed": false,
+    "queue_preserved": true
+  },
+  "source_revisions": [
+    {
+      "id": "SRC-ML-20261002-0900-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_02",
+      "reading_depth": "full_text_plus_official_demo_structure_and_asset_manifest",
+      "revisions": [
+        "exact_reconstruction_applies_to_no_transform_path_only",
+        "segment_width_in_bins_depends_on_sample_rate_padded_fft_length_and_duration",
+        "stft_spectral_delay_comparison_is_conceptual_not_empirical",
+        "official_demo_has_eight_wav_players_with_unequal_durations",
+        "article_CC_BY_does_not_establish_demo_audio_or_code_rights",
+        "no_verified_public_code_or_independent_reproduction"
+      ],
+      "bounded_conclusion": "offline_creative_hypothesis_requiring_same_path_null_and_frozen_manifest",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261002-0900-02",
+      "stable_ids": [
+        "conference:dafx:2026:DAFx26_paper_20",
+        "arxiv:2609.31971v1"
+      ],
+      "version_resolution": "arxiv_is_alternate_version_not_independent_confirmation",
+      "reading_depth": "full_text_table_by_table_plus_official_demo_structure",
+      "revisions": [
+        "no_optimizer_wins_all_four_table_1_columns",
+        "argsort_2opt_worsens_musical_matrix_vs_argsort_100_266_to_107_568",
+        "hungarian_2opt_worsens_musical_vector_vs_hungarian_7_622_to_7_891",
+        "single_c_major_to_c_minor_interpolation_is_qualitative_author_interpretation",
+        "106_scale_profiles_are_internal_full_batch_without_holdout",
+        "official_demo_has_32_audio_players_but_no_linked_code_dataset_or_asset_license"
+      ],
+      "bounded_conclusion": "harmonic_arrangement_research_only_objective_specific_no_mix_or_waveform_alignment_rule",
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261002-1200-01",
+      "stable_id": "web:vud.org:giant-fft-group-delay:observed-2026-10-02",
+      "url": "https://vud.org/giant-fft-group-delay/",
+      "observed": ["page_descriptions", "eight_embedded_wav_urls", "browser_reported_durations"],
+      "not_observed": ["source_code", "version_or_commit", "checksums", "dependency_manifest", "per_example_analysis_settings", "demo_asset_license", "matched_listening_protocol", "quantitative_outputs"],
+      "reproduction_status": "not_run"
+    },
+    {
+      "id": "ART-ML-20261002-1200-02",
+      "stable_id": "web:tiv-ext.netlify.app:observed-2026-10-02",
+      "url": "https://tiv-ext.netlify.app/",
+      "observed": ["complete_visible_page_structure", "32_embedded_wav_players"],
+      "not_observed": ["public_code", "dataset", "commit_or_revision", "checksums", "asset_license", "held_out_corpus", "listener_protocol", "raw_numerical_results"],
+      "reproduction_status": "not_run"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261002-1200-01","claim":"no_transform_analysis_synthesis_null_does_not_establish_transparency_after_segmentation_or_group_delay_editing","confidence":"high"},
+    {"id":"KC-ML-20261002-1200-02","claim":"giant_fft_widths_in_bins_are_coupled_to_sample_rate_padded_fft_length_and_duration","confidence":"high"},
+    {"id":"KC-ML-20261002-1200-03","claim":"conceptual_stft_comparison_is_not_an_empirical_baseline","confidence":"high"},
+    {"id":"KC-ML-20261002-1200-04","claim":"unequal_example_durations_and_boundaries_invalidate_naive_whole_file_loudness_or_preference_comparison","confidence":"high"},
+    {"id":"KC-ML-20261002-1200-05","claim":"PTFR_table_1_has_objective_dependent_winners_and_no_universal_optimizer","confidence":"high_primary_table"},
+    {"id":"KC-ML-20261002-1200-06","claim":"2opt_is_not_monotonically_beneficial_in_reported_PTFR_results","confidence":"high_primary_table"},
+    {"id":"KC-ML-20261002-1200-07","claim":"same_author_demo_and_arxiv_conference_versions_are_not_independent_confirmations","confidence":"high"},
+    {"id":"KC-ML-20261002-1200-08","claim":"article_openness_does_not_automatically_establish_code_dataset_or_demo_audio_reuse_rights","confidence":"high"}
+  ],
+  "rule_revisions": [
+    {
+      "id": "RULE-ML-20261002-0900-01",
+      "revision": "require_same_path_noop_null_complete_analysis_manifest_and_frozen_segmentation_before_listening_AB",
+      "manifest": ["source_checksum", "sample_rate", "original_length", "padded_length", "fft_length", "smoothing_width", "peak_threshold", "segment_width", "group_delay_tolerance", "zeroing_state", "target_group", "displacement_ms"],
+      "cancel_before_listening": "noop_null_failure_grouping_instability_frequency_overlap_or_unequal_boundaries",
+      "confidence": "low_single_primary_creative_method_no_listener_or_matched_baseline",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261002-0900-02",
+      "revision": "name_exact_representation_objective_and_data_regime_for_any_PTFR_optimizer_claim_and_never_assume_2opt_improves",
+      "verify": "held_out_real_music_corpus_plus_blind_harmonic_role_or_arrangement_judgments_separate_from_mix_waveform_metrics",
+      "confidence": "high_for_domain_separation_low_for_project_utility",
+      "auto_apply": false
+    }
+  ],
+  "experiment_revisions": [
+    {
+      "id": "EXP-ML-20261002-0900-01",
+      "status": "not_run",
+      "blocked_on": "separately_approved_offline_prototype_and_project_owned_isolated_pitched_event",
+      "preflight": "delta_t_zero_complete_path_near_null_against_untouched_source_over_identical_padded_boundaries",
+      "baseline": "frozen_analysis_synthesis_and_segmentation_path_with_delta_t_zero",
+      "variant": "same_frozen_path_with_one_preregistered_target_group_displacement_in_milliseconds",
+      "diagnostic_c": "untouched_source_for_traversal_error_only_not_preference_baseline",
+      "single_changed_factor": "one_target_group_displacement",
+      "level_boundary_control": "equal_raw_boundaries_plus_separate_randomized_BS1770_matched_AB_over_same_active_region",
+      "measurements": ["max_abs_and_RMS_preflight_null", "integrated_and_short_term_loudness", "sample_and_true_peak", "crest_factor", "onset_timing", "energy_centroid_timing", "magnitude_delta", "group_delay_discontinuity", "boundary_energy", "stereo_correlation", "mono_difference"],
+      "protect": ["attack_identity", "pitch_envelope", "groove", "decay", "no_duplicate_onset_pre_echo_ringing_or_smear", "boundary_continuity", "width", "headroom"],
+      "listener_protocol": "Dmitry_three_randomized_repeats_repeats_not_independent_listeners",
+      "cancel": "noop_null_failure_grouping_instability_loudness_only_win_adjacent_event_motion_residual_onset_ringing_smear_boundary_mono_image_or_headroom_regression"
+    }
+  ],
+  "priority_queue": [
+    "run_EXP-ML-20261001-1800-01_as_next_immediately_executable_project_audio_test",
+    "keep_EXP-ML-20261002-0900-01_blocked_until_same_path_noop_null_and_manifest_gate_pass",
+    "keep_VID-ML-20261002-0900-01_and_VID-ML-20261002-0900-02_metadata_only",
+    "defer_PTFR_evaluation_unless_harmonic_arrangement_tooling_becomes_project_priority"
+  ],
+  "safety": {
+    "auto_apply": false,
+    "experiments_run": false,
+    "audio_downloaded_or_uploaded": false,
+    "paid_services_used": false,
+    "runtime_or_dsp_changed": false
+  }
+}
