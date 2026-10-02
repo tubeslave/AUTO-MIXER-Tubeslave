@@ -1,0 +1,157 @@
+{
+  "update_id": "ML-2026-10-02-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-02T15:00:00+03:00",
+  "actual_start": "2026-10-02T15:02:56+03:00",
+  "completed_at": "2026-10-02T15:20:59+03:00",
+  "preceding_update": "ML-2026-10-02-1200",
+  "preceding_search": "ML-2026-10-02-0900",
+  "citation_check": "partial",
+  "dedupe": {
+    "keys": ["doi", "stable_id", "normalized_title", "version", "youtube_video_id"],
+    "excluded_existing": [
+      "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements",
+      "Diff2Mix",
+      "youtube:jbWvrrxEApA"
+    ]
+  },
+  "queue_counters": {
+    "before": {"video_total": 75, "transcript_complete": 5, "transcript_partial": 0, "metadata_only": 70},
+    "after": {"video_total": 78, "transcript_complete": 6, "transcript_partial": 0, "metadata_only": 72}
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261002-1500-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_06",
+      "title": "A Corpus-Driven Parametric Modal Reverberator",
+      "authors": ["Michele Ducceschi", "Leonardo Gabrielli", "Riccardo Simionato", "Riccardo Russo"],
+      "venue": "DAFx-26",
+      "publication_year": 2026,
+      "discovered_at": "2026-10-02",
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_06.pdf",
+      "reading_depth": "full_text_pages_1_8",
+      "license": "CC BY 4.0",
+      "artifact_status": "not_verified_not_run",
+      "bounded_conclusion": "The work supports a corpus-driven parameterization hypothesis for project-owned synthetic reverb, but not perceptual superiority or preferred settings.",
+      "limitations": [
+        "No formal listening test",
+        "Density regressions are weaker than damping regressions",
+        "Extreme control corners extrapolate outside the corpus p5-p95 region",
+        "Underlying IR redistribution rights are not established",
+        "Linked code was not independently opened or executed"
+      ]
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VID-ML-20261002-1500-01",
+      "stable_id": "youtube:Dw9-wG6UMho",
+      "title": "Mixing Drums That Feel Live and Loud | UAD Spotlight",
+      "channel": "Universal Audio",
+      "published_at": "2025-10-23",
+      "duration": "PT19M12S",
+      "url": "https://www.youtube.com/watch?v=Dw9-wG6UMho",
+      "reading_depth": "transcript_complete_00_00_to_18_48",
+      "categories": ["compression", "gating_bleed", "transient_control", "ambience", "reverb", "saturation", "overheads", "drum_bus", "parallel_compression"],
+      "explicit_numbers": [
+        {"value": "30 Hz", "context": "post-compressor kick boost", "status": "video_specific_example"},
+        {"value": "1 s", "context": "EMT 250 decay", "status": "video_specific_example"},
+        {"value": "36 Hz", "context": "drum-bus high-pass filter", "status": "video_specific_example"},
+        {"value": "400 ms / 8 = 50 ms", "context": "Neve 2254 release marking as described by presenter", "status": "video_specific_example"}
+      ],
+      "not_stated": ["ratio", "threshold", "gain_reduction", "send_level"],
+      "limitations": ["Single vendor-produced tutorial", "No explicit loudness matching stated"]
+    },
+    {
+      "id": "VID-ML-20261002-1500-02",
+      "stable_id": "youtube:x3a4_spQCkc",
+      "title": "Mixing Basics: Drums",
+      "channel": "Produce Like A Pro",
+      "duration": "PT32M09S",
+      "url": "https://www.youtube.com/watch?v=x3a4_spQCkc",
+      "reading_depth": "metadata_only",
+      "transcript_status": "unavailable",
+      "status": "queued_source",
+      "license_note": "Description-linked multitracks were not followed or license-audited; no audio downloaded."
+    },
+    {
+      "id": "VID-ML-20261002-1500-03",
+      "stable_id": "youtube:3JsIp8wl63o",
+      "title": "Andrew Scheps mixing Way Down We Go by KALEO | Trailer",
+      "channel": "Mix with the Masters",
+      "duration": "PT2M39S",
+      "url": "https://www.youtube.com/watch?v=3JsIp8wl63o",
+      "reading_depth": "metadata_only",
+      "transcript_status": "unavailable",
+      "status": "queued_source",
+      "priority": "low",
+      "reason": "Short official trailer for paid full series; insufficient content for settings or workflow claims."
+    }
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20261002-1500-01", "claim": "Linear modal late-reverb models require a domain boundary for nonlinear or strongly spectrally processed IRs.", "source_ids": ["SRC-ML-20261002-1500-01"], "confidence": "moderate"},
+    {"id": "KC-ML-20261002-1500-02", "claim": "Room-reverb descriptors and user controls may be correlated; slider independence is not causal independence.", "source_ids": ["SRC-ML-20261002-1500-01"], "confidence": "moderate"},
+    {"id": "KC-ML-20261002-1500-03", "claim": "The reported corpus predicts modal density less reliably than damping, so uncertainty must be band-specific.", "source_ids": ["SRC-ML-20261002-1500-01"], "confidence": "moderate"},
+    {"id": "KC-ML-20261002-1500-04", "claim": "Regression fit and corpus placement do not establish audible preference or realism without listener evaluation.", "source_ids": ["SRC-ML-20261002-1500-01"], "confidence": "high_as_methodological_boundary"},
+    {"id": "KC-ML-20261002-1500-05", "claim": "EQ/compressor order changes compressor-detector exposure and can be isolated as one controlled mixing factor.", "source_ids": ["VID-ML-20261002-1500-01"], "confidence": "moderate_for_mechanism"},
+    {"id": "KC-ML-20261002-1500-06", "claim": "Whole-subgroup and individual parallel-compression sends are contextual alternatives, not universal defaults.", "source_ids": ["VID-ML-20261002-1500-01"], "confidence": "moderate_for_presenter_workflow_low_for_generalization"}
+  ],
+  "rule_candidates": [
+    {
+      "id": "RULE-ML-20261002-1500-01",
+      "source_ids": ["SRC-ML-20261002-1500-01"],
+      "applicability": "Project-owned synthetic reverb prototype on a dry or compact drum section",
+      "change": "Vary only normalized early/late balance while freezing all other reverb, routing, width, EQ, and dry-balance factors",
+      "range": "0-1 normalized",
+      "range_origin": "Paper's p5-p95 corpus mapping, not a production recommendation",
+      "protected_qualities": ["attack", "groove", "cymbal_definition", "snare_tail_identity", "mono_compatibility", "stereo_image", "headroom"],
+      "verification": "Endpoint inspection plus randomized BS.1770 loudness-matched A/B and Dmitry preference",
+      "cancel_when": "Preference disappears after matching or artifacts, masking, image collapse, or headroom loss appear",
+      "confidence": "low_to_moderate",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261002-1500-02",
+      "source_ids": ["VID-ML-20261002-1500-01"],
+      "applicability": "A deliberately retained hard gate truncates a snare that should sound larger than the recorded room",
+      "change": "Add one ambience/reverb path or one sustain-restoration stage, without simultaneously changing the gate",
+      "range": "Baseline plus one preregistered variant",
+      "range_origin": "The video's 1 s EMT 250 decay is an example only, not a project range",
+      "protected_qualities": ["transient_identity", "groove", "cymbal_separation", "natural_bleed_intent", "mono_compatibility", "width", "headroom"],
+      "verification": "Randomized loudness-matched section-context A/B; solo only as diagnostic",
+      "cancel_when": "Smearing, excess bleed, unstable image, or loudness-only preference occurs",
+      "confidence": "moderate_for_workflow_low_for_generalization",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261002-1500-01",
+      "status": "not_run",
+      "question": "Does pre-reverb feed compression improve rock-drum density after loudness matching without weakening attack or increasing cymbal wash?",
+      "material": "Project-owned representative verse and chorus drum sections",
+      "variant_a": "Current reverb send and return; no pre-reverb compressor",
+      "variant_b": "Same routing, send, reverb, filters, decay, pre-delay, width, and return level; one pre-reverb compressor enabled",
+      "single_factor": "Pre-reverb compressor enabled versus disabled",
+      "loudness_matching": "Trim return contribution so full-mix excerpts match within 0.1 LU integrated under BS.1770; verify peaks and true peak separately",
+      "measurements": ["integrated_loudness", "short_term_loudness", "sample_peak", "true_peak", "crest_factor", "return_gain_reduction_trace", "mono_fold_down", "stereo_correlation"],
+      "protected_qualities": ["kick_snare_attack", "groove", "cymbal_definition", "snare_decay_identity", "vocal_guitar_masking", "stereo_stability", "headroom"],
+      "success": "Randomized preference for B in both sections with no protected-quality regression and no loudness-only advantage",
+      "cancel": "Inconsistent preference after matching, added pumping or wash, or any protected-quality regression",
+      "decision_owner": "Dmitry"
+    }
+  ],
+  "priority_queue": [
+    {"rank": 1, "id": "EXP-ML-20261001-1800-01", "status": "next_executable"},
+    {"rank": 2, "id": "EXP-ML-20261002-1500-01", "status": "not_run"},
+    {"rank": 3, "id": "youtube:x3a4_spQCkc", "status": "queued_source_metadata_only"},
+    {"rank": 4, "id": "youtube:3JsIp8wl63o", "status": "queued_source_metadata_only_low_priority"},
+    {"rank": 5, "id": "EXP-ML-20261002-0900-01", "status": "blocked_pending_same_path_null_or_prototype"}
+  ],
+  "multitracks_added": [],
+  "audio_downloaded": false,
+  "runtime_or_dsp_changed": false,
+  "scite_status": "not_retried_post_reset_check_already_failed_on_2026_10_01",
+  "consensus_status": "not_retried_free_access_not_confirmed"
+}
+
