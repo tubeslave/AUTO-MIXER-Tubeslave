@@ -1,0 +1,2 @@
+# Mixing Director v1.3 Space
+Create a coherent shared-room model after balance, masking and dynamics. One common room establishes depth before source-specific FX. Keep bass essentially dry. Dense sections may receive slightly less wet level to avoid wash. Vocal remains comparatively forward. Source-specific plate/delay throws belong to the later Vocal/Instrument Directors, not this milestone.

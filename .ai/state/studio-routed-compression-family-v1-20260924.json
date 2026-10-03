@@ -1,0 +1,62 @@
+{
+  "goal": "studio-routed-compression-family-v1",
+  "status": "accepted_machine_validation",
+  "pull_request": 126,
+  "merge_commit": "d8efd0e914dc0e3d7f1d77a67fd8b78a04221cfa",
+  "workflow_run": 35958901206,
+  "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+  "scope": "evaluate the complete three-candidate Compression Director v1.1 family through authoritative full-session rerenders, Perceptual Critic and Autonomous Iteration without ranking or baseline promotion",
+  "implementation": {
+    "module": "audio_workbench/routed_compression_family.py",
+    "test": "tests/test_studio_routed_compression_family_v1.py",
+    "candidate_order": ["preserve_transient", "balanced", "control"],
+    "winner_allowed": false,
+    "baseline_promotion_allowed": false,
+    "survivor_meaning": "level-matched audition reached human-listening gate only"
+  },
+  "real_audio_experiment": {
+    "song": "Belye Stai",
+    "source_id": "VALERA_VOX",
+    "boundary": "post_local_track_processing_pre_context_routing",
+    "important_scope": "additional processed-stage compression; not replacement of the original raw-track compressor",
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "duration_seconds": 207.0,
+    "baseline_reproduction": {
+      "stored_premaster_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+      "rerender_export_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+      "file_identical": true,
+      "no_change_max_abs_error": 0.0
+    },
+    "director_analysis": {
+      "event_count": 337,
+      "median_attack_ms": 60.0,
+      "median_recovery_ms": 170.0,
+      "median_inter_event_ms": 485.0,
+      "active_p90_dbfs": -22.03564678821503,
+      "attack_censored_count": 91,
+      "recovery_censored_count": 40
+    },
+    "candidates": [
+      {"id": "preserve_transient", "target_active_p95_gr_db": 2.25, "actual_active_p95_gr_db": 2.303614854812622, "max_gr_db": 3.7010505199432373, "vocal_intelligibility_delta": 0.008441871543984014, "machine_result": "rejected", "failure": "target_not_improved", "audition_exported": false},
+      {"id": "balanced", "target_active_p95_gr_db": 3.25, "actual_active_p95_gr_db": 3.2998368740081787, "max_gr_db": 4.680887699127197, "vocal_intelligibility_delta": 0.011320712358081186, "machine_result": "rejected", "failure": "target_not_improved", "audition_exported": false},
+      {"id": "control", "target_active_p95_gr_db": 3.5, "actual_active_p95_gr_db": 3.486927032470703, "max_gr_db": 4.897120475769043, "vocal_intelligibility_delta": 0.015209880577448986, "machine_result": "rejected", "failure": "target_not_improved", "audition_exported": false}
+    ],
+    "surviving_auditions": [],
+    "winner": null,
+    "ranking": null,
+    "baseline_promoted": false,
+    "human_listening_required": true
+  },
+  "failures_and_limits": [
+    "all three post-local vocal compression hypotheses failed the existing +0.02 full-mix vocal-intelligibility improvement gate",
+    "the experiment does not show that compression is musically worse; it shows that stacking extra compression after the original local vocal chain did not clear the objective proxy threshold",
+    "current Belye Stai SessionRenderer cannot replace the original raw/local compressor because its insert point is after local processing"
+  ],
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "audio_baseline_promoted": false,
+  "next_goal": "Belye Stai Local Vocal Processor Adapter v1: expose raw VALERA_VOX local EQ/expansion/ride/compression/de-ess/level as a deterministic reusable stage with compressor replacement hooks, prove no-change reproduction of the accepted processed VALERA_VOX, then evaluate Compression Director candidates at the original compressor position through the exact full-session renderer"
+}

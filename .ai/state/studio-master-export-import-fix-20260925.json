@@ -1,0 +1,39 @@
+{
+  "goal": "studio-master-export-import-fix",
+  "date": "2026-09-25",
+  "status": "integrated_experimental_validation_pending",
+  "inspected_base_commit": "d66fd8e5d81204ca60d3086aaf42d6afcb259d95",
+  "fix_commit": "1d53f99dc38bc7e1b930ac99c854a45960776430",
+  "fixed_offline_module_git_blob": "5831ef84e2b85791a45baed1b247aa37342d965b",
+  "change": "Add the missing relative import of validate_master_exports; verified diff is one added import line only.",
+  "reproduced_failure_evidence": {
+    "ci_run": 36104007281,
+    "read_job": 107972420931,
+    "test": "tests/test_infrastructure/test_studio_autonomous_iteration_v2.py::test_real_iteration_delivery_exports_audition_without_promoting_baseline",
+    "error": "NameError: name 'validate_master_exports' is not defined",
+    "boundary_step_result": "1 failed, 20 passed, 1 warning",
+    "full_suite_reached": false
+  },
+  "post_fix_validation": {
+    "test_run": 36104812085,
+    "stem_offline_run": 36104812078,
+    "observed_status_at_checkpoint": "in_progress",
+    "success_claimed": false,
+    "local_runtime_tests_performed": false,
+    "container_clone_failure": "Could not resolve host: github.com"
+  },
+  "readiness": {
+    "scope": "experimental STUDIO test from the updated checkout, not a verified complete VAVI song render",
+    "automatic_update_of_other_runtimes_claimed": false,
+    "post_compression_level_preservation": "match_processed_source is an explicitly called helper; each song runner must wire it before the downstream full-session render",
+    "requires_exact_source_inventory": true,
+    "requires_new_render_and_level_matched_audition": true,
+    "human_listening_required": true
+  },
+  "audio_dsp_changed": false,
+  "live_code_changed": false,
+  "critic_thresholds_changed": false,
+  "audio_baseline_promoted": false,
+  "paid_external_credits_used": false,
+  "next_goal": "Verify integrated CI and run one source-complete VAVI song through the updated runner, recording code revision and actually executed stages."
+}

@@ -1,0 +1,48 @@
+{
+  "goal": "belye-stai-bass-processor-v1",
+  "status": "implementation_pending_ci",
+  "priority_reason": "user approved the new vocal compression and explicitly asked for instrument-specific compression for the remaining sources; bass is the next high-impact low-end source",
+  "scope": "replace the first existing bass compressor in-place while freezing downstream settings and full-session routing",
+  "human_feedback_context": "new vocal compression subjectively accepted by user as more stable and better seated; do not copy its settings to bass",
+  "local_validation": {
+    "focused_tests_passed": 84,
+    "test_scope": [
+      "Belye Stai bass adapter",
+      "Compression Director v1/v1.1",
+      "shared compressor v2",
+      "Belye Stai vocal adapter"
+    ],
+    "full_suite_claimed": false
+  },
+  "real_audio": {
+    "song": "Belye Stai",
+    "source": "BASS",
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "duration_seconds": 207,
+    "frozen_processed_bass_sha256": "a91affd0d0f39ee900f0f4ee71dc670cb92f3ea6b236f3ce48a3b3f2571f433b",
+    "baseline_adapter_pcm_error": 0.0,
+    "baseline_adapter_sample_equal": true,
+    "generic_family": [
+      {"id": "preserve_transient", "target_active_p95_gr_db": 1.8, "actual_active_p95_gr_db": 1.7576146125793457, "body_spread_db": 4.625990060883904},
+      {"id": "balanced", "target_active_p95_gr_db": 2.6, "actual_active_p95_gr_db": 2.6668636798858643, "body_spread_db": 3.9164071938841296},
+      {"id": "control", "target_active_p95_gr_db": 3.4, "actual_active_p95_gr_db": 3.4512133598327637, "body_spread_db": 3.2378208971895575}
+    ],
+    "current_body_spread_db": 2.7812366372897834,
+    "generic_family_result": "rejected_for_bass_stability_objective",
+    "full_graph_no_change_proof_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+    "human_listening_required": true,
+    "audio_baseline_promoted": false
+  },
+  "interpretation": [
+    "The generic bass family converged technically but all three variants made note/body level less consistent than the current bass.",
+    "The generic role formula produced much slower releases than the delivered bass first stage and targeted substantially less GR.",
+    "No generic candidate is accepted as a musical or technical improvement.",
+    "The adapter itself is separable from candidate quality and can be accepted after CI because it exactly reproduces the frozen no-change chain and fails closed on source/control mismatch."
+  ],
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "next_goal": "Bass Compression Director v1: bounded event-body stability proposals with transient-preservation and recovery constraints, full-session rerender validation, then level-matched human A/B only for technically surviving candidates"
+}
