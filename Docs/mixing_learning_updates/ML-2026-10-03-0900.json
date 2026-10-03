@@ -1,0 +1,168 @@
+{
+  "update_id": "ML-2026-10-03-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-03T09:00:00+03:00",
+  "actual_start": "2026-10-03T08:57:17+03:00",
+  "completed_at": "2026-10-03T09:04:02+03:00",
+  "preceding_update": "ML-2026-10-02-1800",
+  "preceding_search": "ML-2026-10-02-1500",
+  "citation_check": "partial",
+  "queue_counters": {
+    "video_total": 81,
+    "transcript_complete": 6,
+    "transcript_partial": 0,
+    "metadata_only": 75,
+    "added_metadata_only": 3
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261003-0900-01",
+      "stable_id": "conference:dafx:2026:DAFx26_demo_57",
+      "title": "A Perceptually Inspired Single-Parameter Auditory Distance Renderer for Music Production",
+      "authors": ["Stefanos Biliousis", "Cumhur Erkut"],
+      "published": "2026-09-01",
+      "venue": "DAFx-26 demo proceedings",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_57.pdf",
+      "reading_depth": "full_text_all_3_pages_methods_tables_evaluation_conclusion",
+      "license": "CC-BY-4.0",
+      "bounded_conclusion": "Correlated distance cues are a credible production hypothesis and the small in-study comparison favors the coupled renderer over the authors' manual baseline; exact mappings and preference do not yet generalize to rock arrangements, loudspeakers, other reverbs, or other listeners.",
+      "reported_evaluation": {
+        "participants": 18,
+        "audio_engineers": 9,
+        "musicians": 4,
+        "non_experts": 5,
+        "scene": "one shared three-source music scene",
+        "plugin_mae_slider_points": 7.3,
+        "manual_baseline_mae_slider_points": 15.3,
+        "plugin_mean_spearman_rho": 0.86,
+        "manual_baseline_mean_spearman_rho": 0.56,
+        "plugin_order_correct_percent": 89,
+        "manual_baseline_order_correct_percent": 50,
+        "plugin_preferred_over_baseline": "18_of_18_on_composite_spatial_quality"
+      },
+      "limits": [
+        "three-page demo paper",
+        "baseline construction and randomization not detailed",
+        "individual ratings confidence intervals and inferential statistics not reported",
+        "remote headphones",
+        "one author-controlled scene",
+        "hyper-real HF mapping is explicitly artistic",
+        "no independent replication located"
+      ]
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20261003-0900-01",
+      "source_id": "SRC-ML-20261003-0900-01",
+      "repository": "https://github.com/stefbil/distance-space",
+      "revision": "81dc17bb39ad9f84c00e3e5867a9b5888d330543",
+      "reading_depth": "repository_README_license_and_commit_metadata_only",
+      "license": "Apache-2.0",
+      "tests_run": false,
+      "built": false,
+      "integrated": false,
+      "status": "queued_for_source_and_evaluation_audit"
+    }
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20261003-0900-01", "claim": "Auditory distance is a correlated-cue problem; reverb amount alone is not a coherent distance model.", "confidence": "moderate"},
+    {"id": "KC-ML-20261003-0900-02", "claim": "A deterministic macro can be one experimental factor even when it derives multiple preregistered parameters.", "confidence": "high_as_experiment_design"},
+    {"id": "KC-ML-20261003-0900-03", "claim": "The renderer's exact cue mappings are implementation facts including explicitly hyper-real choices, not transferable presets.", "confidence": "high"},
+    {"id": "KC-ML-20261003-0900-04", "claim": "The reported 18-of-18 preference is bounded to one author-controlled scene and comparator.", "confidence": "high_as_methodological_boundary"}
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261003-0900-01",
+      "source": "SRC-ML-20261003-0900-01",
+      "apply_when": "Moving a non-lead source backward while preserving a coherent section hierarchy",
+      "change": "One deterministic distance macro jointly deriving direct level wet balance spectral tilt and pre-delay",
+      "range": "d=0.10-0.25",
+      "range_origin": "DAFx26 tested renderer mapping; experiment bounds not recommendations",
+      "freeze": ["source_edit", "pan", "polarity", "non_distance_processing", "reverb_algorithm_or_IR", "decay", "modulation", "stereo_topology", "routing", "automation", "render_state", "random_seed_if_applicable"],
+      "protected_qualities": ["source_identity", "intelligibility", "groove", "transient_definition", "foreground_hierarchy", "mono_compatibility", "stereo_stability", "headroom"],
+      "verification": "Randomized full-mix A/B after global BS.1770 matching plus direct-wet diagnostics and Dmitry ratings",
+      "cancel_when": "Source disappears, hierarchy is damaged, preference is loudness-only, or mono/stereo stability regresses",
+      "confidence": "low_to_moderate_for_hypothesis_low_for_transfer",
+      "auto_apply": false
+    }
+  ],
+  "planned_experiments": [
+    {
+      "id": "EXP-ML-20261003-0900-01",
+      "status": "not_run",
+      "material": "Project-owned verse and chorus using a backing guitar room layer or other intentionally rear-plane source",
+      "a": "Current placement d=0",
+      "b": "Identical render d=0.10; expand to 0.25 only if preregistered and first step is too weak",
+      "single_factor": "distance_macro_value",
+      "loudness_match": "Preserve source-relative level cue; global post-render trim of complete excerpts to within 0.1 LU integrated BS.1770",
+      "measurements": ["integrated_loudness", "short_term_loudness", "sample_peak", "true_peak", "crest_factor", "target_source_direct_wet_energy", "mono_fold_down", "stereo_correlation", "headroom"],
+      "listening": "Randomized labels and three repeats for verse and chorus; separate distance coherence identity and preference ratings",
+      "success": "B is rated farther and at least as coherent in both sections without protected-quality regression and preference survives matching",
+      "cancel": "Distance rating inconsistent, B merely quieter, source loses identity or attack, or masking image instability or headroom loss appears"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VSC-ML-20261003-0900-01",
+      "stable_id": "youtube:GF2SpC1OCNY",
+      "title": "How Loud Is Modern Metal in 2026?",
+      "channel": "Mastering Explained",
+      "url": "https://www.youtube.com/watch?v=GF2SpC1OCNY",
+      "duration": "00:17:43",
+      "reading_depth": "public_page_metadata_only",
+      "transcript_status": "unavailable",
+      "status": "queued_source",
+      "conclusions_extracted": false
+    },
+    {
+      "id": "VSC-ML-20261003-0900-02",
+      "stable_id": "youtube:gC3sxJ3cNMw",
+      "title": "Metal Production 2006 vs 2026 - How Mixing and Production Changed in 20 Years",
+      "channel": "Joey Sturgis Tones",
+      "url": "https://www.youtube.com/watch?v=gC3sxJ3cNMw",
+      "duration": "00:07:47",
+      "reading_depth": "public_page_metadata_only",
+      "transcript_status": "unavailable",
+      "status": "queued_source",
+      "conclusions_extracted": false
+    },
+    {
+      "id": "VSC-ML-20261003-0900-03",
+      "stable_id": "youtube:fIy_khP3MBs",
+      "title": "How to Master Modern Metal - Loud and Heavy",
+      "channel": "MO Metal Productions",
+      "url": "https://www.youtube.com/watch?v=fIy_khP3MBs",
+      "duration": "00:19:24",
+      "reading_depth": "public_page_metadata_only",
+      "transcript_status": "unavailable",
+      "status": "queued_source",
+      "conclusions_extracted": false
+    }
+  ],
+  "deduplication": {
+    "keys": ["doi", "arxiv_id", "conference_paper_id", "normalized_title", "author_version_lineage", "youtube_video_id"],
+    "excluded_existing": [
+      "Diff2Mix",
+      "Rethinking Automatic Music Mixing as Sequential Stem Blending",
+      "SPHERE Automatic Music Upmixing",
+      "Compiling Differentiable Audio Graphs to Real-Time DSP",
+      "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements"
+    ]
+  },
+  "priority_queue": [
+    {"rank": 1, "id": "SRC-ML-20261003-0900-01", "status": "repository_and_evaluation_deep_review"},
+    {"rank": 2, "id": "youtube:GF2SpC1OCNY", "status": "queued_source_metadata_only"},
+    {"rank": 3, "id": "youtube:gC3sxJ3cNMw", "status": "queued_source_metadata_only"},
+    {"rank": 4, "id": "youtube:fIy_khP3MBs", "status": "queued_source_metadata_only"},
+    {"rank": 5, "id": "EXP-ML-20261001-1800-01", "status": "next_immediately_executable_project_test"},
+    {"rank": 6, "id": "EXP-ML-20261003-0900-01", "status": "not_run_mapping_preregistration_required"}
+  ],
+  "multitracks_added": [],
+  "reference_cards_added": [],
+  "audio_downloaded": false,
+  "runtime_or_dsp_changed": false,
+  "scite_retried": false,
+  "consensus_retried": false
+}
+
