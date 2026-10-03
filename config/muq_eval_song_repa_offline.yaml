@@ -1,0 +1,93 @@
+enabled: true
+device: auto
+window_sec: 10
+hop_sec: 5
+sample_rate: 24000
+fallback_enabled: true
+log_scores: true
+shadow_mode: true
+log_path: ~/Desktop/Ai LOGS/SONG_REPA_EWMA_MUQ_STEM_DRIFT_muq_eval.jsonl
+training_log_path: ~/Desktop/Ai LOGS/SONG_REPA_EWMA_MUQ_STEM_DRIFT_rewards.jsonl
+model_repo_id: zhudi2825/MuQ-Eval-A1
+local_files_only: true
+muq_eval_root: external/MuQ-Eval
+max_gain_change_db_per_step: 1.0
+max_eq_gain_change_db_per_step: 1.0
+max_compressor_threshold_change_db_per_step: 2.0
+min_seconds_between_quality_decisions: 5.0
+stem_drift:
+  enabled: true
+  freeze_normal_seconds: 5.0
+  default:
+    tau: 12.0
+    warn_T: 0.06
+    crit_T: 0.12
+    debounce_warn: 2.0
+    debounce_crit: 5.0
+  groups:
+    vox:
+      tau: 9.0
+      warn_T: 0.05
+      crit_T: 0.10
+      debounce_warn: 1.5
+      debounce_crit: 4.0
+    drums:
+      tau: 7.0
+      warn_T: 0.07
+      crit_T: 0.14
+      debounce_warn: 1.2
+      debounce_crit: 4.0
+    bass:
+      tau: 10.0
+      warn_T: 0.06
+      crit_T: 0.12
+      debounce_warn: 2.0
+      debounce_crit: 5.0
+    guitars:
+      tau: 12.0
+      warn_T: 0.06
+      crit_T: 0.12
+      debounce_warn: 2.0
+      debounce_crit: 5.0
+    keys:
+      tau: 14.0
+      warn_T: 0.06
+      crit_T: 0.12
+      debounce_warn: 2.0
+      debounce_crit: 5.0
+    fx:
+      tau: 18.0
+      warn_T: 0.08
+      crit_T: 0.16
+      debounce_warn: 2.5
+      debounce_crit: 6.0
+    bus:
+      tau: 15.0
+      warn_T: 0.05
+      crit_T: 0.10
+      debounce_warn: 2.0
+      debounce_crit: 4.0
+  frequency_masks:
+    vox:
+      low_mid_300_800:
+        band_hz: [300, 800]
+        tau: 7.0
+        warn_T: 0.04
+        crit_T: 0.08
+        debounce_warn: 1.2
+        debounce_crit: 3.0
+    drums:
+      body_120_400:
+        band_hz: [120, 400]
+        tau: 5.0
+        warn_T: 0.06
+        crit_T: 0.12
+    bus:
+      presence_2500_6000:
+        band_hz: [2500, 6000]
+        tau: 10.0
+        warn_T: 0.04
+        crit_T: 0.09
+  visualization:
+    osc_endpoint: /autofoh/muq_drift/song_repa
+    emit_observation: true

@@ -1,0 +1,389 @@
+profiles:
+  lead_vocal:
+    description: "Главный вокал, должен быть впереди микса"
+    target_profile: "lead_vocal_pop_presence"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: foreground
+    low_cut_hz: [70, 120]
+    high_cut_hz: [12000, 16000]
+    important_zones:
+      body: [150, 350]
+      intelligibility: [1000, 2500]
+      presence: [2500, 5000]
+      air: [8000, 14000]
+    avoid:
+      mud: [180, 400]
+      harshness: [2500, 4500]
+      sibilance: [5500, 9000]
+    max_eq_gain_db: 3.0
+    max_eq_cut_db: -4.0
+
+  backing_vocal:
+    description: "Бэк-вокал должен поддерживать lead vocal и не конкурировать с ним"
+    target_profile: "backing_vocal_blend"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: background
+    low_cut_hz: [100, 180]
+    high_cut_hz: [9000, 12000]
+    important_zones:
+      body: [200, 500]
+      blend: [800, 2500]
+    avoid:
+      lead_conflict: [2500, 6000]
+      sibilance: [5500, 9000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -4.0
+
+  kick:
+    description: "Бочка: фундамент, удар, читаемость атаки"
+    target_profile: "kick_foundation_punch"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: midground
+    low_cut_hz: [25, 40]
+    high_cut_hz: [8000, 12000]
+    important_zones:
+      sub: [40, 70]
+      punch: [70, 120]
+      click: [2500, 5000]
+    avoid:
+      mud: [180, 400]
+      boxiness: [400, 700]
+    max_eq_gain_db: 3.0
+    max_eq_cut_db: -5.0
+
+  snare:
+    description: "Малый барабан: тело, щелчок, присутствие"
+    target_profile: "snare_body_snap"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: midground
+    low_cut_hz: [80, 150]
+    high_cut_hz: [10000, 16000]
+    important_zones:
+      body: [150, 250]
+      crack: [1500, 3500]
+      snap: [4000, 8000]
+    avoid:
+      ring: [500, 1000]
+      harshness: [2500, 6000]
+    max_eq_gain_db: 3.0
+    max_eq_cut_db: -5.0
+
+  tom:
+    description: "Том: резонансная нота, атака и контроль коробочности"
+    target_profile: "tom_body_attack_control"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: midground
+    low_cut_hz: [45, 80]
+    high_cut_hz: [7000, 12000]
+    important_zones:
+      fundamental: [80, 180]
+      attack: [2500, 5000]
+    avoid:
+      mud: [180, 400]
+      boxiness: [400, 800]
+      ring: [600, 1200]
+      cymbal_bleed: [5000, 9000]
+    max_eq_gain_db: 2.5
+    max_eq_cut_db: -5.0
+
+  floor_tom:
+    description: "Floor tom: низкое тело без гула и лишней мутности"
+    target_profile: "floor_tom_low_body_control"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: midground
+    low_cut_hz: [35, 60]
+    high_cut_hz: [6000, 10000]
+    important_zones:
+      low_body: [60, 140]
+      attack: [2000, 4500]
+    avoid:
+      sub_rumble: [25, 45]
+      mud: [150, 350]
+      boxiness: [350, 700]
+      ring: [500, 1000]
+    max_eq_gain_db: 2.5
+    max_eq_cut_db: -5.0
+
+  hihat:
+    description: "Hi-hat: артикуляция и движение без режущей яркости"
+    target_profile: "hihat_articulation_smooth_top"
+    guide: custom
+    slope_db_per_oct: -1.5
+    front_back_position: midground
+    low_cut_hz: [250, 500]
+    high_cut_hz: [14000, 18000]
+    important_zones:
+      tick: [3000, 6000]
+      shimmer: [8000, 14000]
+    avoid:
+      low_bleed: [80, 300]
+      clang: [1000, 2500]
+      harshness: [5000, 9000]
+      brittle_air: [10000, 16000]
+    max_eq_gain_db: 1.5
+    max_eq_cut_db: -5.0
+
+  ride:
+    description: "Ride: пинг и шимер без маскировки вокала и резкости"
+    target_profile: "ride_ping_shimmer_control"
+    guide: custom
+    slope_db_per_oct: -1.5
+    front_back_position: midground
+    low_cut_hz: [200, 450]
+    high_cut_hz: [14000, 18000]
+    important_zones:
+      ping: [2500, 5000]
+      shimmer: [7000, 14000]
+    avoid:
+      low_bleed: [80, 300]
+      gong: [500, 1200]
+      harshness: [4000, 9000]
+      vocal_conflict: [1500, 4500]
+    max_eq_gain_db: 1.5
+    max_eq_cut_db: -5.0
+
+  bass:
+    description: "Бас должен дружить с бочкой и не мутить низ"
+    target_profile: "bass_foundation_definition"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: midground
+    low_cut_hz: [30, 45]
+    high_cut_hz: [5000, 9000]
+    important_zones:
+      fundamental: [40, 120]
+      note_definition: [700, 1500]
+      attack: [1500, 3000]
+    avoid:
+      mud: [150, 350]
+      kick_conflict: [45, 100]
+    max_eq_gain_db: 2.5
+    max_eq_cut_db: -4.0
+
+  electric_guitar:
+    description: "Гитара должна занимать midrange, но не забивать вокал"
+    target_profile: "electric_guitar_midrange"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: midground
+    low_cut_hz: [80, 150]
+    high_cut_hz: [8000, 12000]
+    important_zones:
+      body: [150, 350]
+      bite: [1500, 3500]
+      presence: [3500, 6000]
+    avoid:
+      mud: [180, 400]
+      vocal_conflict: [1000, 5000]
+      fizz: [6000, 10000]
+    max_eq_gain_db: 2.5
+    max_eq_cut_db: -4.0
+
+  acoustic_guitar:
+    description: "Акустическая гитара: читаемость, атака, воздух без маскировки вокала"
+    target_profile: "acoustic_guitar_clarity_air"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: midground
+    low_cut_hz: [80, 160]
+    high_cut_hz: [12000, 16000]
+    important_zones:
+      body: [150, 350]
+      clarity: [2000, 5000]
+      air: [8000, 14000]
+    avoid:
+      boom: [100, 250]
+      mud: [200, 500]
+      harshness: [3000, 7000]
+      vocal_conflict: [1000, 5000]
+    max_eq_gain_db: 2.5
+    max_eq_cut_db: -4.0
+
+  keys:
+    description: "Клавиши должны заполнять пространство, но уступать вокалу и солирующим партиям"
+    target_profile: "keys_support_space"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: background
+    low_cut_hz: [60, 150]
+    high_cut_hz: [10000, 16000]
+    important_zones:
+      warmth: [150, 500]
+      clarity: [1000, 4000]
+      air: [8000, 14000]
+    avoid:
+      low_mid_masking: [200, 600]
+      vocal_conflict: [1000, 5000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -4.0
+
+  synth:
+    description: "Synth: управляемая яркость, ширина и читаемость без конфликта с lead"
+    target_profile: "synth_texture_definition"
+    guide: custom
+    slope_db_per_oct: -3.0
+    front_back_position: background
+    low_cut_hz: [40, 140]
+    high_cut_hz: [10000, 16000]
+    important_zones:
+      weight: [80, 250]
+      tone: [500, 2000]
+      texture: [3000, 8000]
+    avoid:
+      sub_build_up: [30, 80]
+      low_mid_masking: [200, 600]
+      vocal_conflict: [1000, 5000]
+      fizz: [7000, 12000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -4.0
+
+  percussion:
+    description: "Перкуссия: транзиенты и ритм без грязи, звона и колкой верхушки"
+    target_profile: "percussion_transient_control"
+    guide: custom
+    slope_db_per_oct: -2.5
+    front_back_position: midground
+    low_cut_hz: [80, 250]
+    high_cut_hz: [12000, 16000]
+    important_zones:
+      body: [150, 500]
+      attack: [2000, 6000]
+      air: [8000, 14000]
+    avoid:
+      low_bleed: [50, 180]
+      boxiness: [400, 900]
+      harshness: [3000, 8000]
+      brittle_air: [9000, 16000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -4.0
+
+  overheads:
+    description: "Оверхеды: тарелки, воздух, общая картинка барабанов"
+    target_profile: "overheads_air_control"
+    guide: custom
+    slope_db_per_oct: -1.5
+    front_back_position: midground
+    low_cut_hz: [150, 400]
+    high_cut_hz: [14000, 18000]
+    important_zones:
+      cymbal_body: [3000, 7000]
+      air: [8000, 16000]
+    avoid:
+      harshness: [3000, 8000]
+      low_bleed: [80, 300]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -5.0
+
+  drums_bus:
+    description: "Drums bus: вся барабанная шина, сохраняет kick/body и контролирует только избытки"
+    target_profile: "drums_bus_full_kit_balance"
+    guide: custom
+    slope_db_per_oct: -4.0
+    front_back_position: midground
+    low_cut_hz: [20, 35]
+    high_cut_hz: [12000, 18000]
+    important_zones:
+      kick_foundation: [45, 100]
+      snare_body: [150, 250]
+      kit_attack: [2000, 5000]
+      cymbal_air: [8000, 14000]
+    avoid:
+      sub_rumble: [20, 35]
+      mud: [220, 500]
+      boxiness: [500, 900]
+      harshness: [3000, 8000]
+      brittle_air: [10000, 16000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -3.0
+
+  room:
+    description: "Room должен добавлять глубину, а не грязь"
+    target_profile: "room_depth_control"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: background
+    low_cut_hz: [80, 200]
+    high_cut_hz: [8000, 14000]
+    important_zones:
+      space: [500, 3000]
+      air: [7000, 12000]
+    avoid:
+      mud: [150, 500]
+      harsh_reflections: [2000, 6000]
+    max_eq_gain_db: 2.0
+    max_eq_cut_db: -5.0
+
+  fx_return:
+    description: "FX returns поддерживают глубину и не должны забирать фокус"
+    target_profile: "fx_return_background_depth"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: background
+    low_cut_hz: [120, 250]
+    high_cut_hz: [8000, 14000]
+    important_zones:
+      space: [800, 3000]
+      tail_air: [7000, 12000]
+    avoid:
+      low_mud: [150, 500]
+      vocal_conflict: [1000, 5000]
+      splash: [5000, 9000]
+    max_eq_gain_db: 1.5
+    max_eq_cut_db: -4.0
+
+  playback:
+    description: "Playback / tracks: combined synth, percussion and pads should support the song without fighting live sources"
+    target_profile: "playback_synth_percussion_pad_support"
+    guide: custom
+    slope_db_per_oct: -4.5
+    front_back_position: background
+    low_cut_hz: [40, 120]
+    high_cut_hz: [10000, 16000]
+    important_zones:
+      glue: [150, 600]
+      rhythmic_detail: [1500, 5000]
+      width_air: [7000, 14000]
+    avoid:
+      sub_conflict: [35, 100]
+      low_mid_masking: [200, 700]
+      vocal_conflict: [1000, 5000]
+      harsh_loops: [3000, 9000]
+    max_eq_gain_db: 1.5
+    max_eq_cut_db: -4.0
+
+  mix_bus:
+    description: "Микс-шина: мягкий общий spectral tilt без агрессивного match EQ"
+    target_profile: "mix_bus_soft_tilt"
+    guide: pink
+    slope_db_per_oct: -3.0
+    front_back_position: midground
+    low_cut_hz: [20, 30]
+    high_cut_hz: [16000, 20000]
+    important_zones: {}
+    avoid:
+      low_mid_buildup: [180, 500]
+      harshness: [2500, 6000]
+      brittle_air: [9000, 16000]
+    max_eq_gain_db: 1.0
+    max_eq_cut_db: -1.5
+
+  unknown:
+    description: "Fallback profile: analysis only unless role confidence is high"
+    target_profile: "unknown_safe_flat"
+    guide: pink
+    slope_db_per_oct: -3.0
+    front_back_position: midground
+    low_cut_hz: [60, 120]
+    high_cut_hz: [12000, 16000]
+    important_zones: {}
+    avoid:
+      mud: [180, 500]
+      harshness: [2500, 7000]
+    max_eq_gain_db: 1.0
+    max_eq_cut_db: -2.0
