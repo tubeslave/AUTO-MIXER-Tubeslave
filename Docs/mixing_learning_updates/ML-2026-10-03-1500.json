@@ -1,0 +1,164 @@
+{
+  "update_id": "ML-2026-10-03-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-03T15:00:00+03:00",
+  "actual_start": "2026-10-03T14:58:45+03:00",
+  "completed_at": "2026-10-03T15:08:57+03:00",
+  "preceding_update": "ML-2026-10-03-1200",
+  "preceding_search": "ML-2026-10-03-0900",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261003-1500-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_04",
+      "title": "Fast Parametric Matrices for Lossless Feedback Delay Networks",
+      "authors": ["Andrea Coppola"],
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_04.pdf",
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-01/2026-09-04",
+      "reading_depth": "official_metadata_abstract_and_first_page_excerpt",
+      "status": "queued_source",
+      "priority": "high",
+      "confidence": "metadata_abstract_only"
+    },
+    {
+      "id": "SRC-ML-20261003-1500-02",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_01",
+      "title": "A Unified Framework for Real-Time Concatenation-Driven Convolution",
+      "authors": ["Niccolo Abate", "Brian Hansen"],
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_01.pdf",
+      "publication": "DAFx-26",
+      "publication_date": "2026-09-01/2026-09-04",
+      "reading_depth": "official_metadata_abstract_intro_and_conclusion_excerpt",
+      "status": "queued_source",
+      "priority": "medium_high",
+      "confidence": "limited_excerpt_only"
+    }
+  ],
+  "deduplication": [
+    {
+      "id": "DEDUP-ML-20261003-1500-01",
+      "duplicate": "conference:dafx:2026:DAFx26_paper_30",
+      "canonical": "arXiv:2606.18573 / SRC-ML-20260914-0900-01",
+      "match_basis": ["normalized_title", "authors", "dataset_DOI", "version_lineage"],
+      "counted_as_independent_evidence": false
+    }
+  ],
+  "video_sources": [
+    {
+      "id": "VID-ML-20261003-1500-01",
+      "stable_id": "youtube:IfmB4UAg18g",
+      "title": "Behind the Guitar Tone of Periphery's A Pale White Dot",
+      "channel": "Neural DSP",
+      "url": "https://www.youtube.com/watch?v=IfmB4UAg18g",
+      "published": "2026-08-31",
+      "duration": "PT17M14S",
+      "reading_depth": "complete_visible_youtube_transcript_with_timestamps",
+      "status": "studied",
+      "independence": "first_party_artist_plugin_walkthrough_not_independent_validation",
+      "raw_audio_access": false,
+      "techniques": [
+        {"timestamp":"04:23-05:40","category":"guitar_tone_reference","finding":"retain demo/plugin tone when reamp shootout does not improve the established album sound"},
+        {"timestamp":"06:47-08:23","category":"rhythm_guitar_tone","finding":"part-specific amp drive compressor and cabinet choices; product-specific positions require visual verification before numeric transfer"},
+        {"timestamp":"08:58-10:08","category":"layering_and_performance","finding":"judge unusual layers and take tightness in arrangement context rather than solo"},
+        {"timestamp":"10:44-11:24","category":"editing_delay","finding":"nudge delayed DI layers to musical context because pre-amp timing errors repeat; grid is not automatically the target"},
+        {"timestamp":"12:53-13:59","category":"stereo_width_lead_placement","finding":"clear center with a widened texture layer when a central chorus role needs space; no numeric amount stated"},
+        {"timestamp":"14:19-14:42","category":"quad_guitar_voicing","finding":"test complementary amp voicings with similar cabinet settings; stylistic and product-specific"}
+      ]
+    },
+    {
+      "id": "VID-ML-20261003-1500-02",
+      "stable_id": "youtube:s4IGWJ1J3WM",
+      "title": "How I Make Metal Guitars Sound Amazing With EQ in 4 Steps",
+      "channel": "Chernobyl Audio",
+      "url": "https://www.youtube.com/watch?v=s4IGWJ1J3WM",
+      "published": "2025-06-07",
+      "duration": "PT20M37S",
+      "reading_depth": "metadata_only_transcript_panel_exposed_but_remained_loading_no_readable_segments",
+      "status": "queued_source",
+      "conclusions_extracted": false
+    },
+    {
+      "id": "VID-ML-20261003-1500-03",
+      "stable_id": "youtube:At25V53hDYQ",
+      "title": "The Metal Tone Secret EVERY Pro Uses (But Nobody Explains)",
+      "channel": "Andrew Barr",
+      "url": "https://www.youtube.com/watch?v=At25V53hDYQ",
+      "published": "2026-09-09",
+      "duration": "PT12M54S",
+      "reading_depth": "metadata_and_visible_chapters_only_transcript_panel_exposed_but_remained_loading_no_readable_segments",
+      "status": "queued_source",
+      "conclusions_extracted": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261003-1500-01","claim":"When a demo tone shaped composition and arrangement reamping must beat the unchanged demo comparator rather than being treated as an automatic upgrade.","confidence":"moderate_first_party_single_case"},
+    {"id":"KC-ML-20261003-1500-02","claim":"Isolated timbral oddness can be intentional when the full arrangement rewards the layer combination.","confidence":"moderate_first_party_single_case"},
+    {"id":"KC-ML-20261003-1500-03","claim":"For delay-before-distortion guitar layers DI timing edits alter every generated repeat and should be judged against musical groove rather than grid alone.","confidence":"moderate_first_party_single_case"},
+    {"id":"KC-ML-20261003-1500-04","claim":"Center clearance is a section-role decision and width changes require mono timbre and stereo stability gates.","confidence":"moderate_first_party_single_case"},
+    {"id":"KC-ML-20261003-1500-05","claim":"Chapters comments and transcript-button presence do not support technique extraction without readable transcript segments.","confidence":"high_process_rule"}
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261003-1500-01",
+      "apply_when": "a guitar tone used during composition already defines arrangement interaction and reamping is proposed",
+      "change": "compare preserved demo/plugin print against exactly one reamp chain",
+      "range_origin": "no_transferable_settings_project_specific_Neural_DSP_transcript_04:23-05:40",
+      "protected_qualities": ["performance_character", "pick_definition", "low_mid_weight", "arrangement_fit", "section_impact", "headroom"],
+      "verification": "raw_safety_metrics_plus_randomized_full_mix_AB_on_separate_loudness_matched_copies",
+      "cancel_when": "reamp_has_no_repeatable_preference_or_damages_protected_quality",
+      "confidence": "moderate_as_test_policy_low_for_general_tone_claim",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261003-1500-02",
+      "apply_when": "a non_foundational_distorted_or_delayed_guitar_texture_masks_a_deliberately_central_section_role",
+      "change": "test_one_bounded_width_center_clear_treatment_on_texture_only",
+      "range_origin": "no_numeric_value_stated_start_from_current_width_and_preregister_one_conservative_variant",
+      "protected_qualities": ["texture_identity", "attack", "mono_level_and_tone", "stereo_stability", "lead_clarity", "rhythm_foundation", "headroom"],
+      "verification": "MS_energy_banded_correlation_mono_fold_down_masking_proxy_peaks_and_randomized_loudness_matched_full_mix_AB",
+      "cancel_when": "benefit_is_level_only_mono_or_tone_degrades_image_unstable_or_preference_not_repeatable",
+      "confidence": "moderate_first_party_single_case",
+      "auto_apply": false
+    }
+  ],
+  "planned_experiments": [
+    {
+      "id": "EXP-ML-20261003-1500-01",
+      "status": "not_run",
+      "material": "project_owned_chorus_with_central_lead_role_and_one_distorted_or_delayed_guitar_texture",
+      "a": "current_texture_width_and_routing",
+      "b": "one_preregistered_conservative_center_clear_width_treatment_on_texture_only",
+      "single_factor": "texture_center_clear_width_treatment_enabled",
+      "fixed": ["source_edit", "gain", "pan_anchors", "polarity", "delay", "reverb", "EQ", "distortion", "automation", "bus_processing", "render_start", "random_state"],
+      "loudness_match": "texture_active_RMS_or_short_term_match_first_then_separate_complete_mix_copies_within_0.1_LU_integrated_BS1770",
+      "measurements": ["texture_MS_energy", "banded_correlation", "mono_fold_down_level_and_spectrum", "lead_texture_overlap_proxy", "integrated_loudness", "short_term_loudness", "sample_peak", "true_peak", "crest_onset", "headroom"],
+      "protected_qualities": ["lead_clarity", "texture_identity", "attack", "mono_tone", "stereo_stability", "rhythm_foundation", "headroom"],
+      "success": "repeatable_lead_clarity_and_section_separation_without_protected_quality_regression",
+      "cancel": "benefit_disappears_after_level_match_mono_or_stereo_regression_new_masking_or_preference_reversal"
+    }
+  ],
+  "queue_counters": {
+    "video_total": 84,
+    "transcript_complete": 7,
+    "transcript_partial": 0,
+    "metadata_only": 77,
+    "literature_added_metadata_or_limited_excerpt": 2
+  },
+  "priority_queue": [
+    {"rank":1,"id":"SRC-ML-20261003-1500-01","status":"queued_full_text_deep_review"},
+    {"rank":2,"id":"SRC-ML-20261003-1500-02","status":"queued_full_text_deep_review"},
+    {"rank":3,"id":"VID-ML-20261003-1500-02","status":"queued_transcript_retry_only_if_readable"},
+    {"rank":4,"id":"VID-ML-20261003-1500-03","status":"queued_transcript_retry_only_if_readable"},
+    {"rank":5,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":6,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":7,"id":"EXP-ML-20261003-1500-01","status":"not_run_requires_preregistration"}
+  ],
+  "multitracks_added": [],
+  "reference_cards_added": [],
+  "audio_downloaded": false,
+  "external_code_built_or_run": false,
+  "runtime_or_dsp_changed": false,
+  "scite_retried": false,
+  "consensus_retried": false
+}
