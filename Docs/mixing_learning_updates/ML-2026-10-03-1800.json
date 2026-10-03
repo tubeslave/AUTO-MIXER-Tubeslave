@@ -1,0 +1,117 @@
+{
+  "update_id": "ML-2026-10-03-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-03T18:00:00+03:00",
+  "actual_start": "2026-10-03T17:56:54+03:00",
+  "completed_at": "2026-10-03T18:04:20+03:00",
+  "preceding_update": "ML-2026-10-03-1500",
+  "preceding_search": "ML-2026-10-03-1500",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261003-1500-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_04",
+      "reading_depth": "full_text_methods_equations_benchmarks_applications_limitations_references",
+      "status": "reviewed_full_text",
+      "bounded_conclusion": "Efficient orthogonal FDN feedback-matrix family suitable for controlled creative experiments; no perceptual or target-host validation.",
+      "limitations": ["no_controlled_listening_test", "no_public_implementation", "no_target_host_tail_latency", "companion_audio_license_unconfirmed"]
+    },
+    {
+      "id": "SRC-ML-20261003-1500-02",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_01",
+      "reading_depth": "full_text_methods_equations_evaluation_raw_csv_repository_limitations_references",
+      "status": "reviewed_full_text_and_public_data",
+      "bounded_conclusion": "Single-state Cartesian kernel interpolation is a credible hypothesis for rapid IR changes relative to the tested zero-state dual-engine baseline; perceptual and end-to-end reproduction remain open.",
+      "limitations": ["no_controlled_listening_test", "chosen_baseline_only", "mean_cpu_one_host", "cartesian_phase_cancellation", "implementation_unavailable", "license_unconfirmed"]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261003-1800-01",
+      "repository": "https://github.com/andrea-coppola-arturia/andrea-coppola-arturia.github.io",
+      "revision": "32e7780f3eb5e3cb36bbecf151b9372537f0e60b",
+      "companion_revision": "d9a6b28ba6523d129ea54454e67676214e46ec83",
+      "observed": {"files": 45, "wav": 18, "png": 10, "pdf": 2, "html": 2, "code_files": 0, "license_files": 0},
+      "status": "demonstration_only_not_reproducible_end_to_end",
+      "executed": false,
+      "audio_downloaded": false
+    },
+    {
+      "id": "ART-ML-20261003-1800-02",
+      "repository": "https://github.com/NiccoloAbate/concatenation-driven-convolution",
+      "revision": "a768a10c845ff9c32a510036c1d1d7d05f534f4e",
+      "observed": {"files": 165, "test_files": 148, "csv": 104, "wav": 31, "png": 28, "code_files": 0, "license_files": 0},
+      "csvs_read": ["tests/Drums_Baseline_continuous.csv", "tests/Drums_Experimental_continuous.csv", "tests/Piano_Baseline_continuous.csv", "tests/Piano_Experimental_continuous.csv"],
+      "status": "raw_outputs_available_generator_unavailable",
+      "executed": false,
+      "audio_downloaded": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261003-1800-01","claim":"Instantaneous orthogonality is not perceptual transparency or preference.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-02","claim":"Kronecker benchmark crossover is specific to dense baselines, host and compiler; FWHT and target callback tails were not tested.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-03","claim":"Published FDN modulation ranges are demonstration parameters, not portable mix settings.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-04","claim":"FDN companion lacks implementation, tests and repository license.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-05","claim":"CDC energy advantage is relative to a zero-state dual-engine output-crossfade baseline.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-06","claim":"Cartesian kernel interpolation preserves one state but can cancel near-antiphase bins.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-07","claim":"Mean CPU and RMS continuity do not establish callback-tail safety or inaudibility.","confidence":"high"},
+    {"id":"KC-ML-20261003-1800-08","claim":"Raw render CSVs improve auditability but do not reproduce an unavailable renderer/test harness.","confidence":"high"}
+  ],
+  "rule_updates": [
+    {"id":"RULE-ML-20260919-1800-01","change":"Add raw transition diagnostics before separate randomized loudness-matched preference copies.","confidence":"high","auto_apply":false},
+    {"id":"RULE-ML-20260919-1800-04","change":"Fix block/partition/update occupancy and require median p95 p99 max deadline misses xruns allocations thermal and multi-instance target-host metrics.","confidence":"high","auto_apply":false}
+  ],
+  "rules_added": [
+    {
+      "id":"RULE-ML-20261003-1800-01",
+      "source":"conference:dafx:2026:DAFx26_paper_01",
+      "applies_when":"frequent dynamic IR changes are required",
+      "change":"compare one explicitly defined transition topology at a time",
+      "protect":["transient_clarity","tonal_continuity","stereo_position","mono_compatibility","decay_continuity","real_time_safety"],
+      "verify":["raw_transition_metrics","cpu_tail_metrics","randomized_bs1770_matched_preference"],
+      "cancel":["phase_cancellation","zipper_or_click","tone_or_pan_jump","deadline_miss","no_repeatable_preference"],
+      "confidence":"medium",
+      "auto_apply":false
+    }
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20261003-1800-01",
+      "status":"not_run",
+      "blocked_by":["no_public_CDC_implementation","licensed_corpus_not_established"],
+      "a":"dual_engine_zero_state_output_crossfade",
+      "b":"single_engine_cartesian_fft_kernel_interpolation",
+      "single_factor":"ir_transition_topology",
+      "loudness_matching":"measure_raw_transition_first_then_match_separate_listening_copies_to_0.1_LU_BS1770",
+      "measurements":["transition_rms_envelope","band_energy","spectrogram_difference","stereo_correlation","sample_peak","true_peak","click_zipper","cpu_median_p95_p99_max","deadline_misses"],
+      "protect":["tonal_continuity","spatial_stability","attack_clarity","headroom"],
+      "success":"reduced_energy_loss_and_cpu_tail_with_no_new_artifacts_and_repeatable_blinded_preference",
+      "cancel":"advantage_disappears_with_fair_warmup_or_artifacts_deadlines_or_rights_fail"
+    },
+    {
+      "id":"EXP-ML-20261003-1800-02",
+      "status":"not_run",
+      "blocked_by":["no_public_reference_implementation"],
+      "a":"same_FDN_no_matrix_modulation",
+      "b":"one_kernel_2pct_pi_at_0.1Hz",
+      "number_origin":"lower_edge_of_author_demonstration_range_not_recommendation",
+      "single_factor":"feedback_matrix_modulation_enabled",
+      "loudness_matching":"separate_listening_copies_to_0.1_LU_BS1770",
+      "measurements":["band_energy_variance","decay","IACC_or_correlation","sample_peak","true_peak","crest_onset","modulation_sidebands","cpu_tail"],
+      "protect":["pitch_stability","stereo_and_mono_image","transient_clarity","headroom"],
+      "success":"repeatable_ringing_reduction_without_pitch_width_transient_or_peak_penalty",
+      "cancel":"smear_pitch_or_width_instability_peak_growth_no_preference_or_multiple_factors"
+    }
+  ],
+  "video_queue_after_run": {"total":84,"transcript_complete":7,"partial":0,"metadata_only":77},
+  "new_multitracks": 0,
+  "scite_status":"paid_plan_or_free_trial_required_after_one_post_reset_check_no_subscription_started",
+  "consensus_status":"not_retried",
+  "next_executable_experiment":"EXP-ML-20261001-1800-01",
+  "next_after":"EXP-ML-20261002-1500-01",
+  "audio_changed": false,
+  "dsp_changed": false,
+  "runtime_changed": false,
+  "model_changed": false,
+  "auto_apply": false
+}
