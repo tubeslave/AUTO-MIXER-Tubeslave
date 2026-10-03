@@ -1,0 +1,124 @@
+{
+  "update_id": "ML-2026-10-03-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-03T12:00:00+03:00",
+  "actual_start": "2026-10-03T11:55:41+03:00",
+  "completed_at": "2026-10-03T12:01:00+03:00",
+  "preceding_update": "ML-2026-10-03-0900",
+  "preceding_search": "ML-2026-10-03-0900",
+  "citation_check": "partial",
+  "source_revisions": [
+    {
+      "id": "SRC-ML-20261003-0900-01",
+      "stable_id": "conference:dafx:2026:DAFx26_demo_57",
+      "reading_depth": "full_paper_plus_core_DSP_mapping_processor_editor_benchmark_build_and_license_source_audit",
+      "repository": "https://github.com/stefbil/distance-space",
+      "revision": "81dc17bb39ad9f84c00e3e5867a9b5888d330543",
+      "independent_replication_found": false,
+      "raw_evaluation_data_found": false,
+      "analysis_scripts_found": false,
+      "bounded_conclusion": "Code implements the advertised steady-state mappings closely enough to define a manual controlled experiment, but the public artifact does not independently substantiate the paper's evaluation effect sizes or production transfer."
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261003-1200-01",
+      "artifact": "stefbil/distance-space@81dc17bb39ad9f84c00e3e5867a9b5888d330543",
+      "files_read": [
+        "README.md",
+        "LICENSE",
+        "CMakeLists.txt",
+        "CMakePresets.json",
+        "src/PluginProcessor.cpp",
+        "src/PluginProcessor.h",
+        "src/PluginEditor.cpp",
+        "src/PluginEditor.h",
+        "src/utils/ParameterMapping.h",
+        "src/utils/BenchmarkRunner.cpp",
+        "src/utils/BenchmarkRunner.h",
+        "src/dsp/DistanceChain.cpp",
+        "src/dsp/DistanceChain.h",
+        "src/dsp/GainStage.h",
+        "src/dsp/SpectralStage.h",
+        "src/dsp/ReverbStage.cpp",
+        "src/dsp/ReverbStage.h",
+        "src/dsp/HrtfStage.h"
+      ],
+      "build": "not_run_hardcoded_author_local_JUCE_path",
+      "tests": "none_located_not_run",
+      "ci": "none_located",
+      "committed_benchmark_results": false,
+      "evaluation_data": "not_located",
+      "code_license": "Apache-2.0",
+      "embedded_HRTF_asset_license": "unverified",
+      "issues": [
+        "paper_promises further repository data and analysis but none were located",
+        "headless/default-HRTF initialization depends on GUI construction",
+        "HRTF 50ms smoother is advanced once per block and is block-size dependent",
+        "benchmark has no correctness assertions and reuses recursively processed input",
+        "custom IR state stores an absolute nonportable file path",
+        "ParameterMapping gain endpoint comment says -14.3dB while formula and paper give approximately -26dB"
+      ],
+      "integration_status": "blocked_pending_reproducible_build_tests_asset_rights_and_headless_fix"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261003-1200-01","claim":"Paper-to-code formula correspondence does not reproduce or independently verify a listening-test effect size.","confidence":"high"},
+    {"id":"KC-ML-20261003-1200-02","claim":"A deterministic macro must enumerate every derived control, including room size damping and HRTF blend in this implementation.","confidence":"high"},
+    {"id":"KC-ML-20261003-1200-03","claim":"GUI-dependent DSP-resource initialization is unsafe for headless and automated rendering.","confidence":"high_from_source_audit"},
+    {"id":"KC-ML-20261003-1200-04","claim":"A sample-count smoother advanced once per block has block-size-dependent real-time duration.","confidence":"high_from_source_audit"},
+    {"id":"KC-ML-20261003-1200-05","claim":"A CPU timing benchmark without assertions or reference output is not a signal-quality validation.","confidence":"high"},
+    {"id":"KC-ML-20261003-1200-06","claim":"Repository code licence and third-party bundled-asset redistribution rights must be checked separately.","confidence":"high"},
+    {"id":"KC-ML-20261003-1200-07","claim":"The implemented gain formula and paper agree at approximately -26dB even though the adjacent source comment is wrong.","confidence":"high"}
+  ],
+  "rule_revisions": [
+    {
+      "id": "RULE-ML-20261003-0900-01",
+      "apply_when": "A non-lead source intentionally needs a rear-plane move and a level-only move has been judged insufficient",
+      "change": "Enable one preregistered coupled non-level cue bundle while holding the target direct attenuation equal between A and B",
+      "initial_bound": "d=0.10_study_condition_not_preset",
+      "exclude": ["HRTF", "custom_IR", "external_repository_binary_or_code"],
+      "protected_qualities": ["source_identity", "transient_definition", "groove", "section_hierarchy", "masking", "mono_compatibility", "stereo_stability", "headroom"],
+      "verification": "randomized section-specific full-mix A/B with identical target direct attenuation and global BS.1770 matching",
+      "cancel_when": "effect is loudness-only inconsistent HRTF-dependent or damages a protected quality",
+      "confidence": "low_for_transfer_moderate_as_controlled_hypothesis",
+      "auto_apply": false
+    }
+  ],
+  "planned_experiments": [
+    {
+      "id": "EXP-ML-20261003-1200-01",
+      "status": "not_run",
+      "material": "project-owned verse and chorus with one intentionally rear-plane non-lead source",
+      "a": "level-only control at -9.2dB target direct attenuation with current EQ reverb and predelay",
+      "b": "same direct attenuation plus d=0.10 bundle: shelf -1.4dB at 7.122kHz wet 14 percent predelay 3ms low-mid +0.25dB at 300Hz Q1; HRTF off",
+      "single_factor": "coupled_non_level_distance_bundle_enabled",
+      "loudness_match": "global post-render trim of complete excerpts to within 0.1 LU integrated BS.1770 after preserving equal target direct attenuation",
+      "measurements": ["target_direct_wet_energy", "source_relative_level", "integrated_loudness", "short_term_loudness", "sample_peak", "true_peak", "crest_onset", "mono_fold_down", "stereo_correlation", "headroom"],
+      "protected_qualities": ["source_identity", "attack", "groove", "hierarchy", "masking", "mono", "stereo_image", "headroom"],
+      "success": "B is consistently farther and at least as coherent in both sections without protected-quality regression and preference survives matching",
+      "cancel": "B is merely duller or wetter judgments reverse benefit is unlabelled playback-mode-specific or a protected quality regresses"
+    }
+  ],
+  "queue_counters": {
+    "video_total": 81,
+    "transcript_complete": 6,
+    "transcript_partial": 0,
+    "metadata_only": 75,
+    "changed": false
+  },
+  "priority_queue": [
+    {"rank":1,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":2,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":3,"id":"EXP-ML-20261003-1200-01","status":"not_run_preregistration_required"},
+    {"rank":4,"id":"ART-ML-20261003-1200-01","status":"integration_blocked"}
+  ],
+  "new_video_sources": [],
+  "multitracks_added": [],
+  "reference_cards_added": [],
+  "audio_downloaded": false,
+  "external_code_built_or_run": false,
+  "runtime_or_dsp_changed": false,
+  "scite_retried": false,
+  "consensus_retried": false
+}
