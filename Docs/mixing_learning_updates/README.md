@@ -282,3 +282,12 @@ ML-2026-10-04-1200 (`deep_review`, preceding search `ML-2026-10-04-0900`): analy
 | `ML-2026-10-04-0900` | [Report](ML-2026-10-04-0900.md) · [JSON patch](ML-2026-10-04-0900.json) · [ADR](../adr/mixing-learning-2026-10-04-0900.md) | Search: 1 full-text DAFx-26 modal-plate SSM source, 1 limited-depth Klein-bottle plate candidate, 1 transcript-complete mix-bus video and 2 metadata-only videos; 5 literature/version and 2 video duplicates removed; 5 Knowledge Cards, 2 bounded candidate rules and 1 unrun experiment; no audio, code, DSP or runtime change |
 
 ML-2026-10-04-0900 (`search`, preceding successful search `ML-2026-10-03-1500`): synthetic plate-IR reconstruction and parameter recovery are distinct evidence; no perceptual claim was promoted. A fixed stereo-bus chain is queued only as a late, loudness-matched workflow hypothesis. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
+
+## 2026-10-04 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| `ML-2026-10-04-1500` | [Report](ML-2026-10-04-1500.md) · [JSON patch](ML-2026-10-04-1500.json) · [ADR](../adr/mixing-learning-2026-10-04-1500.md) | Search: 1 new full-text Count-Density source, existing official challenge card rechecked and Matrix-Pencil hidden result reconciled, 1 placeholder artifact audit, 2 metadata-only videos; 6 Knowledge Cards, 1 narrowed and 1 new bounded rule, 1 blocked unrun experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-04-1500 (`search`, preceding successful search `ML-2026-10-04-0900`): the official modal metric can hide bulk gain bias, so per-mode and reconstructed-response metrics must be paired. Matrix Pencil `3-B` is now tied to its official hidden result rather than left unresolved. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
+
