@@ -1,0 +1,154 @@
+{
+  "update_id": "ML-2026-10-04-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-04T12:00:00+03:00",
+  "actual_start": "2026-10-04T12:02:06+03:00",
+  "completed_at": "2026-10-04T12:08:57+03:00",
+  "preceding_update": "ML-2026-10-04-0900",
+  "preceding_search": "ML-2026-10-04-0900",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261004-0900-02",
+      "stable_id": "dafx:2026:DAFx26_paper_11",
+      "title": "Modal Structure of Plate Boundaries and Klein Bottle Reverberation",
+      "authors": ["Jin Woo Lee", "Mark Rau"],
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_11.pdf",
+      "project_url": "https://kleinreverb.github.io/",
+      "demo_url": "https://jnwoo.com/assets/demos/kleinreverb.html",
+      "publication": "DAFx-26",
+      "publication_date": "2026",
+      "reading_depth": "full_text_all_8_pages_equations_boundary_tables_FDTD_metrics_discussion_conclusion_references_project_page_and_browser_demo_inspected_no_audio_playback",
+      "previous_status": "queued_full_text_deep_review",
+      "status": "studied",
+      "bounded_findings": {
+        "model": "idealized_2D_scalar_wave_on_flat_quotient_spaces_constant_wave_speed",
+        "topologies": ["dirichlet_rectangle", "neumann_rectangle", "torus", "mobius_strip", "klein_bottle", "real_projective_plane"],
+        "FDTD": {"grid_m": 0.01, "stencil": "explicit_five_point", "courant_relation": "cT=h/sqrt(2)", "time_step_us_approx": 20.6, "nominal_nyquist_khz": 24.3, "displayed_validation_max_hz": 1000},
+        "mean_relative_frequency_error_percent": "0.02_to_0.03",
+        "MAC": {"neumann": 0.875, "dirichlet": 0.944, "mobius": 0.944, "torus": 0.834, "klein": 0.932, "real_projective_plane": 0.929},
+        "window_main_lobe_hz": 50,
+        "controlled_listener_study": false,
+        "independent_physical_measurement": false
+      },
+      "limits": ["shared_model_assumptions_between_analytic_and_FDTD", "no_measured_plate_or_room", "no_formal_listener_study", "windowing_affects_MAC", "creative_damping_not_validated", "no_stereo_or_mix_utility_evidence"],
+      "confidence": "high_for_analytic_and_self_consistency_evidence_low_for_physical_perceptual_and_mix_transfer"
+    },
+    {
+      "id": "SRC-ML-20261004-0900-01",
+      "stable_id": "dafx:2026:DAFx26_paper_03",
+      "status": "studied_conclusion_narrowed",
+      "related_source": {
+        "stable_id": "dafx:2026:DAFx26_challenge_86",
+        "title": "Non-Iterative Modal Parameter Estimation for Plate Reverbs via Matrix-Pencil-Guided State Space Model Initialization",
+        "authors": ["Matthias Bittner", "Axel Jantsch"],
+        "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_challenge_86.pdf",
+        "reading_depth": "full_text_all_4_pages_method_protocol_table_compute_limits_references",
+        "independence": "same_first_author_and_method_lineage_not_independent_confirmation",
+        "training": "mode_count_estimator_fit_on_128_same_distribution_synthetic_IRs",
+        "evaluation": "17_self_generated_synthetic_IRs_hidden_official_16_item_ground_truth_result_not_published",
+        "baseline_to_proposed": {"RE": [1.96, 0.78], "RE0": [0.98, 0.67], "frequency_error": [0.98, 0.27], "decay_error": [0.98, 0.77], "gain_error": [0.98, 0.97], "count_error": [3239, 335]},
+        "compute": "about_30_seconds_per_5s_44.1k_IR_and_42_minutes_for_16_files_on_dual_Xeon_Gold_5118_GPU_state_scan_above_about_2000_states_reported_memory_blocked"
+      },
+      "revised_conclusion": "supports_mode_count_and_frequency_initialization_more_than_gain_recovery_measured_transfer_or_perceptual_quality",
+      "confidence": "moderate_for_research_experiment_design_low_for_measured_or_perceptual_transfer"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261004-1200-01",
+      "artifact": "Klein reverb browser demo",
+      "url": "https://jnwoo.com/assets/demos/kleinreverb.html",
+      "status": "partial_browser_demo_only",
+      "inspected_facts": {"sample_rate_hz": 44100, "IR_duration_s": 6, "default_modal_cutoff_hz": 2000, "receiver": "fixed_domain_center", "channels": "mono", "peak_normalization": 0.85, "rayleigh_damping_examples": ["T60_2s_at_125Hz", "T60_0.5s_at_4kHz"]},
+      "missing": ["source_repository", "tests", "revision_manifest", "explicit_code_license", "explicit_audio_license", "referenced_analyze_synthesize_and_WaveSimulator_sources"],
+      "reuse_allowed": false,
+      "code_or_audio_copied": false
+    },
+    {
+      "id": "ART-ML-20261004-1200-02",
+      "artifact": "1st DAFx Challenge official repository",
+      "url": "https://github.com/LOGUNIVPM/1st-DAFx-Challenge",
+      "status": "benchmark_plumbing_available_paper_specific_method_absent",
+      "available": ["dataset_generation", "baseline", "evaluation", "synthetic_data", "unnormalized_NPZ_scientific_input", "peak_normalized_WAV_listening_files"],
+      "missing": ["top_level_license", "paper_specific_spectral_richness_isotonic_method", "paper_specific_matrix_pencil_method", "paper_specific_least_squares_SSM_method"],
+      "evaluation_implementation": "Hungarian_assignment_and_RE_equals_RE0_plus_min_1_DeltaM_over_M",
+      "documentation_drift": "module_or_README_text_still_mentions_closest_match_and_unnormalized_DeltaM_wording",
+      "external_code_built_or_run": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261004-1200-01","claim":"Quotient-space boundary identification changes allowed modes, mode shapes and receiver nulls; frequency-formula similarity alone does not predict the response.","confidence":"high_for_idealized_model"},
+    {"id":"KC-ML-20261004-1200-02","claim":"The analytic/FDTD comparison is a self-consistency check within shared assumptions, not independent physical or perceptual validation.","confidence":"high"},
+    {"id":"KC-ML-20261004-1200-03","claim":"Reported frequency error and MAC are method-specific objective values affected by windowing and are not transferable listening-quality scores.","confidence":"high_for_table_low_for_production_transfer"},
+    {"id":"KC-ML-20261004-1200-04","claim":"The source supplies no formal listener study; rendered examples cannot establish preference or discrimination.","confidence":"high"},
+    {"id":"KC-ML-20261004-1200-05","claim":"The browser demo is mono, peak-normalized, fixed-receiver and fixed-damping; it cannot support stereo, absolute-gain or parameter-general claims.","confidence":"high_for_inspected_implementation"},
+    {"id":"KC-ML-20261004-1200-06","claim":"The same-lineage challenge extension improves count and frequency estimation but leaves gain error almost unchanged at 0.97 versus 0.98.","confidence":"high_for_synthetic_table_low_for_measured_or_perceptual_transfer"},
+    {"id":"KC-ML-20261004-1200-07","claim":"The official challenge repository supports benchmark plumbing, not paper-specific reproduction; rights and evaluation-documentation drift remain unresolved.","confidence":"high_for_repository_inspection"}
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20261004-0900-01",
+      "change_type": "narrowed",
+      "apply_when": "offline_research_comparison_for_modal_or_plate_parameter_initialization",
+      "change": "compare_matrix_pencil_and_baseline_at_fixed_state_size_optimizer_loss_and_budget_and_score_frequency_decay_gain_count_and_response_separately",
+      "range_origin": "paper_tested_H_128_256_512_1024_2048_synthetic_benchmark_not_production_setting",
+      "protected_qualities": ["absolute_gain", "decay_envelope", "modal_density", "spectral_envelope", "onset", "numerical_stability", "compute_budget"],
+      "verification": "rights_clear_implementation_disjoint_held_out_measured_IRs_hidden_challenge_or_independent_equivalent_gain_recovery_target_host_runtime_randomized_loudness_matched_listening",
+      "cancel_when": "gain_unresolved_tail_errors_dominate_measured_transfer_fails_compute_impractical_or_no_repeatable_perceptual_benefit",
+      "confidence": "moderate_for_experiment_design_low_for_measured_or_perceptual_transfer",
+      "auto_apply": false
+    }
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261004-1200-01",
+      "source": ["SRC-ML-20261004-0900-02", "ART-ML-20261004-1200-01"],
+      "apply_when": "sparse_rock_transition_or_exposed_snare_or_lead_guitar_send_deliberately_needs_non_realistic_resonant_colour",
+      "change": "topology_only_torus_vs_klein_in_same_renderer",
+      "range_origin": "no_preset_identical_source_receiver_dimensions_modal_cutoff_IR_length_damping_and_send_demo_numbers_only_as_controls",
+      "protected_qualities": ["attack", "tonal_hierarchy", "masking", "groove", "section_role", "mono_compatibility", "stereo_stability", "headroom"],
+      "verification": "rights_clear_implementation_raw_spectral_decay_diagnostics_and_randomized_loudness_matched_full_mix_AB_by_Dmitry",
+      "cancel_when": "ringing_masks_arrangement_attack_tonal_mono_stereo_or_headroom_regresses_section_role_fails_or_preference_disappears_after_matching",
+      "confidence": "low_creative_engineering_hypothesis",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261004-1200-01",
+      "status": "not_run_blocked_artifact_rights_and_reproducibility",
+      "material": "project_owned_sparse_rock_transition_snare_and_lead_guitar_send_roles_separately",
+      "a": "torus_topology_in_one_fixed_modal_renderer",
+      "b": "klein_bottle_topology_in_same_renderer",
+      "single_factor": "boundary_topology_torus_vs_klein",
+      "fixed": ["source_position", "receiver_position", "dimensions", "wave_speed", "damping", "modal_cutoff", "IR_duration", "pre_delay", "filters", "wet_send_level", "render_start", "dry_mix"],
+      "loudness_match": "match_wet_returns_by_preregistered_RMS_or_short_term_procedure_then_randomized_full_mix_copies_within_0.1_LU_BS1770_keep_raw_renders_for_gain_peak_headroom",
+      "measurements": ["banded_decay", "modal_peak_count_spacing", "spectrogram", "onset_crest", "true_peak", "headroom", "stereo_correlation_if_stereo_renderer", "mono_fold_down"],
+      "protected_qualities": ["attack", "tonal_hierarchy", "masking", "groove", "section_role", "mono_compatibility", "stereo_stability", "headroom"],
+      "success": "B_repeatably_preferred_as_section_appropriate_texture_without_protected_quality_regression",
+      "cancel": "preference_disappears_after_matching_ringing_masking_transient_mono_stereo_or_headroom_regression_or_unlicensed_unversioned_dependency"
+    }
+  ],
+  "video_queue_after_run": {"total": 87, "transcript_complete": 8, "transcript_partial": 0, "metadata_only": 79, "reviewed_this_run": 0},
+  "priority_queue": [
+    {"rank":1,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":2,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":3,"id":"EXP-ML-20261004-0900-01","status":"not_run_requires_preregistration"},
+    {"rank":4,"id":"VID-ML-20261004-0900-03","status":"queued_transcript_retry_only_if_readable_permitted_content"},
+    {"rank":5,"id":"VID-ML-20261004-0900-02","status":"queued_transcript_retry_only_if_readable_permitted_content"},
+    {"rank":6,"id":"EXP-ML-20261004-1200-01","status":"blocked_rights_and_reproducibility"}
+  ],
+  "new_multitracks": [],
+  "new_reference_cards": [],
+  "scite_status": "not_retried_single_post_reset_check_2026-10-03_required_paid_or_trial_access",
+  "consensus_status": "not_retried_free_quota_recovery_unconfirmed",
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "next_after": "EXP-ML-20261002-1500-01",
+  "audio_downloaded_or_changed": false,
+  "external_code_built_or_run": false,
+  "dsp_changed": false,
+  "runtime_changed": false,
+  "model_changed": false,
+  "auto_apply": false
+}
