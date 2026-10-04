@@ -291,3 +291,11 @@ ML-2026-10-04-0900 (`search`, preceding successful search `ML-2026-10-03-1500`):
 
 ML-2026-10-04-1500 (`search`, preceding successful search `ML-2026-10-04-0900`): the official modal metric can hide bulk gain bias, so per-mode and reconstructed-response metrics must be paired. Matrix Pencil `3-B` is now tied to its official hidden result rather than left unresolved. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
 
+
+## 2026-10-04 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| `ML-2026-10-04-1800` | [Report](ML-2026-10-04-1800.md) · [JSON patch](ML-2026-10-04-1800.json) · [ADR](../adr/mixing-learning-2026-10-04-1800.md) | Deep review: Count-Density protocol, architecture, official results and public artifacts reconciled; GitHub placeholder pinned, Hugging Face metadata checked; 7 Knowledge Cards, 1 strengthened and 1 new bounded rule, 1 blocked unrun experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-04-1800 (`deep_review`, preceding search `ML-2026-10-04-1500`): close local and hidden scores are matched-generator repeatability, not external generalization. B1 is the stronger benchmark comparator; absolute-scale conditioning remains an unproven ablation hypothesis. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
