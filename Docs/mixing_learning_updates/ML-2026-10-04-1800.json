@@ -1,0 +1,139 @@
+{
+  "update_id": "ML-2026-10-04-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-04T18:00:00+03:00",
+  "actual_start": "2026-10-04T18:01:23+03:00",
+  "completed_at": "2026-10-04T18:03:47+03:00",
+  "preceding_update": "ML-2026-10-04-1500",
+  "preceding_search": "ML-2026-10-04-1500",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261004-1500-01",
+      "stable_id": "dafx:2026:DAFx26_challenge_87",
+      "status": "studied_deep_reconciled",
+      "reading_depth_this_run": "preprocessing_scale_contract_targets_architectures_training_local_table_official_hidden_table_response_plots_artifacts",
+      "protocol": {
+        "training_IRs": 327680,
+        "local_test_IRs": 100,
+        "official_hidden_IRs": 16,
+        "relationship": "separate_seeds_same_generator_and_default_ranges_not_external_generalization"
+      },
+      "architecture": {
+        "B1_parameters_million": 3.1,
+        "B1_scale_conditioning": "log_gx_plus_global_gain_RMS_head",
+        "B2_real_parameter_equivalent_million": 99.6,
+        "B2_scale_handling": "per_IR_RMS_normalized_complex_spectrum_signed_gain_regression_then_common_output_rescale"
+      },
+      "results": {
+        "B1_local_RE": 0.3180,
+        "B1_official_RE": 0.328,
+        "B1_official_gain": 0.847,
+        "B1_official_decay": 0.058,
+        "B1_official_response_L1": 0.882,
+        "B1_official_response_rank": 3,
+        "B2_local_RE": 0.3301,
+        "B2_official_RE": 0.337,
+        "B2_official_gain": 0.925,
+        "B2_official_decay": 0.023,
+        "B2_official_response_L1": 2.983,
+        "B2_official_response_rank": 10
+      },
+      "bounded_conclusion": "B1_strongest_of_two_on_matched_synthetic_benchmark_no_measured_perceptual_or_target_host_claim",
+      "confidence": "high_for_reported_benchmark_low_for_external_transfer"
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20261004-1500-01",
+      "url": "https://github.com/davidmarttila/dafx_challenge",
+      "revision": "4cf5307f5fa7ad299bdf2c41e697f05ab999035e",
+      "status": "blocked_placeholder_only",
+      "root_files": [{"path":"README.md","size_bytes":94}],
+      "commit_count": 2,
+      "branches": ["main"],
+      "missing": ["implementation", "config", "checkpoint_pointer", "environment", "tests", "CI", "evaluation_manifest", "license"],
+      "downloaded_or_run": false
+    },
+    {
+      "id": "ART-ML-20261004-1800-01",
+      "stable_id": "hf:model:ptablasdepaula/complex-valued-modal-plate-transformer",
+      "url": "https://huggingface.co/ptablasdepaula/complex-valued-modal-plate-transformer",
+      "status": "metadata_verified_files_and_reproduction_unverified",
+      "metadata": {"author":"ptablasdepaula","library":"pytorch","license":"mit","updated":"2026-06-07","downloads_at_inspection":18},
+      "readme_returned": false,
+      "file_manifest_returned": false,
+      "local_hf_cli": "command_not_found",
+      "weights_downloaded": false,
+      "inference_or_job_run": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261004-1800-01","claim":"local_and_hidden_agreement_is_same_generator_repeatability_not_external_generalization","confidence":"high"},
+    {"id":"KC-ML-20261004-1800-02","claim":"B1_dominates_B2_overall_gain_response_with_about_32x_fewer_parameters_while_B2_improves_decay","confidence":"high_within_benchmark_low_outside"},
+    {"id":"KC-ML-20261004-1800-03","claim":"representative_B2_bulk_gain_miss_shows_saturated_per_mode_metric_can_hide_reconstruction_failure","confidence":"high_for_reported_case"},
+    {"id":"KC-ML-20261004-1800-04","claim":"explicit_scale_conditioning_may_explain_B1_gain_advantage_but_needs_ablation","confidence":"low_to_moderate"},
+    {"id":"KC-ML-20261004-1800-05","claim":"A100_vs_EPYC_timings_do_not_establish_speedup_or_target_host_viability","confidence":"high"},
+    {"id":"KC-ML-20261004-1800-06","claim":"HF_license_metadata_and_checkpoint_presence_do_not_equal_reproducible_method_package","confidence":"high"},
+    {"id":"KC-ML-20261004-1800-07","claim":"GitHub_placeholder_and_HF_model_are_separate_artifacts_with_separate_rights_and_provenance","confidence":"high"}
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20261004-1500-01",
+      "change_type": "strengthened",
+      "apply_when": "evaluating_modal_estimator_for_IR_reconstruction",
+      "change": "paired_per_mode_count_bulk_gain_response_and_overlap_band_metrics_plus_checkpoint_preprocessing_environment_script_manifest_gate",
+      "range_origin": "official_four_frequency_bands_as_evaluation_provenance_not_mix_settings",
+      "protected_qualities": ["absolute_scale", "low_frequency_peaks", "high_frequency_density", "decay", "onset", "stability", "tails", "provenance"],
+      "verification": "matched_OOD_noisy_free_edge_measured_IRs_mean_median_p95_worst_target_host_then_separate_listening",
+      "cancel_when": "scale_lost_metric_masks_bias_artifacts_unpinned_or_gain_disappears_OOD",
+      "confidence": "high_for_evaluation_design_low_for_direct_mixing_action",
+      "auto_apply": false
+    }
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261004-1800-01",
+      "source": ["SRC-ML-20261004-1500-01", "SRC-ML-20260924-0900-03"],
+      "apply_when": "normalized_IR_neural_estimator_must_recover_absolute_modal_gains",
+      "change": "expose_calibrated_input_scale_as_explicit_conditioning_variable",
+      "range_origin": "B1_log_gx_and_global_gain_head_as_experimental_provenance_only",
+      "protected_qualities": ["frequency", "decay", "count", "response_shape", "absolute_gain", "stability", "compute"],
+      "verification": "same_architecture_data_seeds_scale_conditioning_enabled_vs_ablated_matched_and_OOD_raw_then_matched_listening",
+      "cancel_when": "gain_response_not_improved_other_errors_worsen_or_benefit_fails_OOD_measured",
+      "confidence": "low_to_moderate_engineering_hypothesis",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261004-1800-01",
+      "status": "not_run_blocked_paper_specific_code_checkpoint_and_manifest",
+      "material": "rights_clear_absolute_scale_matched_OOD_noisy_free_edge_and_measured_plate_IR_partitions",
+      "a": "fixed_B1_like_architecture_with_log_gx_replaced_by_constant",
+      "b": "same_architecture_with_actual_calibrated_log_gx_conditioning",
+      "single_factor": "absolute_scale_conditioning_available",
+      "fixed": ["manifests", "architecture_except_scalar_input", "optimizer", "epochs", "preprocessing", "decoder", "seeds", "hardware", "evaluation"],
+      "loudness": "none_for_identification_separate_randomized_BS1770_matched_convolutions_after_raw_validation",
+      "measurements": ["gain_error", "bulk_dB_offset", "full_and_four_band_response_L1", "frequency", "decay", "count", "mean", "median", "p95", "worst", "runtime", "memory", "failure_rate"],
+      "protected_qualities": ["frequency_count", "decay", "response_shape", "onset", "stability", "raw_calibration", "deterministic_provenance"],
+      "success": "B_reduces_gain_and_response_bias_matched_and_OOD_measured_without_worse_protected_metrics_or_tails",
+      "cancel": "missing_artifacts_normalization_leakage_compound_changes_in_distribution_only_gain_or_no_repeatable_listening_benefit"
+    }
+  ],
+  "video_queue_after_run": {"total":89,"transcript_complete":8,"transcript_partial":0,"metadata_only":81,"reviewed_this_run":0},
+  "priority_queue": [
+    {"rank":1,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":2,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":3,"id":"EXP-ML-20261004-0900-01","status":"not_run_requires_preregistration"},
+    {"rank":4,"id":"VID-ML-20261004-0900-03","status":"permitted_transcript_retry"},
+    {"rank":5,"id":"VID-ML-20261004-1500-01","status":"permitted_transcript_retry"},
+    {"rank":6,"id":"VID-ML-20261004-1500-02","status":"permitted_transcript_retry"},
+    {"rank":7,"id":"EXP-ML-20261004-1800-01","status":"not_run_blocked"}
+  ],
+  "scite_status": "not_retried_after_2026-10-03_paid_plan_or_trial_wall",
+  "consensus_status": "not_retried_prior_optional_quota_state_retained",
+  "audio_changed": false,
+  "dsp_or_runtime_changed": false,
+  "model_trained": false
+}
