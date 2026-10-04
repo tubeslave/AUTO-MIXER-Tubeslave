@@ -1,0 +1,138 @@
+{
+  "update_id": "ML-2026-10-04-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-04T15:00:00+03:00",
+  "actual_start": "2026-10-04T15:02:05+03:00",
+  "completed_at": "2026-10-04T15:08:10+03:00",
+  "preceding_update": "ML-2026-10-04-1200",
+  "preceding_search": "ML-2026-10-04-0900",
+  "citation_check": "partial",
+  "sources": [
+    {
+      "id": "SRC-ML-20261004-1500-01",
+      "stable_id": "dafx:2026:DAFx26_challenge_87",
+      "title": "Count-Density Networks for Modal Plate Parameter Estimation",
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_challenge_87.pdf",
+      "publication": "DAFx-26",
+      "publication_date": "2026",
+      "discovered_date": "2026-10-04",
+      "reading_depth": "full_text_all_3_pages_preprocessing_architectures_training_loss_results_compute_conclusion_references",
+      "status": "studied",
+      "training": {
+        "domain": "same_reference_simulator_default_ranges",
+        "ir_count": 327680,
+        "duration_s": 5,
+        "sample_rate_hz": 44100,
+        "B1_parameters_million": 3.1,
+        "B2_real_parameter_equivalent_million": 99.6
+      },
+      "local_100_ir_results": {
+        "B1_RE": 0.3180,
+        "B1_gain_error": 0.8525,
+        "B2_RE": 0.3301,
+        "B2_gain_error": 0.9207
+      },
+      "limits": ["same_generator_and_ranges", "no_real_plate", "no_noise_or_boundary_OOD", "no_listener_study", "cross_hardware_runtime_not_comparable", "public_repository_placeholder_only"],
+      "confidence": "high_for_stated_matched_synthetic_protocol_low_for_measured_perceptual_and_production_transfer"
+    },
+    {
+      "id": "SRC-ML-20260924-0900-03",
+      "stable_id": "dafx:2026:DAFx26_challenge_76",
+      "status": "existing_card_rechecked_not_duplicated",
+      "reading_depth_this_run": "Task_B_metric_final_hidden_table_frequency_response_generalization_conclusion",
+      "official_hidden_16_ir": {
+        "count_density_B1": {"RE": 0.328, "frequency": 0.013, "decay": 0.058, "gain": 0.847, "count_error": 135, "response_L1": 0.882, "response_rank": 3},
+        "count_density_B2": {"RE": 0.337, "frequency": 0.016, "decay": 0.023, "gain": 0.925, "count_error": 125, "response_L1": 2.983, "response_rank": 10},
+        "matrix_pencil_3B": {"RE": 0.743, "rank": 5, "frequency": 0.249, "decay": 0.760, "gain": 0.970, "count_error": 509, "response_L1": 1.561, "response_rank": 7}
+      },
+      "correction": "official_hidden_result_absent_from_participant_paper_but_available_in_existing_organizer_report_no_longer_unresolved"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261004-1500-01",
+      "url": "https://github.com/davidmarttila/dafx_challenge",
+      "status": "placeholder_no_implementation_no_license",
+      "reading_depth": "repository_metadata_and_README_only",
+      "repository_created": "2026-07-17",
+      "README": "QMUL submission to the 1st DAFX parameter estimation challenge, coming soon",
+      "external_code_downloaded_or_run": false,
+      "reuse_allowed": false
+    }
+  ],
+  "dedupe": [
+    {"stable_id":"dafx:2026:DAFx26_challenge_76","action":"merged_into_existing_card","canonical_id":"SRC-ML-20260924-0900-03"},
+    {"stable_id":"dafx:2026:DAFx26_challenge_86","action":"same_lineage_not_independent","canonical_lineage":"SRC-ML-20261004-0900-01"}
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261004-1500-01","claim":"count_density_can_score_well_above_modal_overlap_without_unique_pole_recovery","confidence":"high_for_organizer_analysis_low_for_measured_transfer"},
+    {"id":"KC-ML-20261004-1500-02","claim":"local_100_and_official_16_IR_results_are_separate_non_independent_same_generator_protocols","confidence":"high"},
+    {"id":"KC-ML-20261004-1500-03","claim":"componentwise_modal_metric_can_hide_bulk_gain_bias_pair_with_reconstructed_response","confidence":"high"},
+    {"id":"KC-ML-20261004-1500-04","claim":"matrix_pencil_3B_official_RE_0_743_gain_0_970_response_rank_7_narrows_claim","confidence":"high_for_hidden_table"},
+    {"id":"KC-ML-20261004-1500-05","claim":"normalized_WAV_is_insufficient_for_modal_gain_evaluation","confidence":"high_within_benchmark"},
+    {"id":"KC-ML-20261004-1500-06","claim":"named_repository_is_currently_rights_unclear_placeholder_not_reproducible_artifact","confidence":"high_for_current_availability"}
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20261004-0900-01",
+      "change_type": "further_narrowed",
+      "apply_when": "offline_modal_plate_estimator_comparison_only",
+      "change": "retain_matrix_pencil_as_comparator_and_report_official_frequency_decay_gain_count_and_response_separately",
+      "protected_qualities": ["absolute_gain", "resolvable_low_frequency_peaks", "high_frequency_density", "decay", "onset", "stability", "compute"],
+      "verification": "rights_clear_identical_inputs_paired_metrics_overlap_split_OOD_noise_boundaries_measured_plate_then_listening",
+      "cancel_when": "gain_or_response_bias_OOD_failure_missing_reproducibility_or_no_repeatable_listening_benefit",
+      "confidence": "moderate_for_comparator_design_low_for_measured_or_perceptual_transfer",
+      "auto_apply": false
+    }
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261004-1500-01",
+      "source": ["SRC-ML-20261004-1500-01", "SRC-ML-20260924-0900-03"],
+      "apply_when": "evaluating_a_modal_estimator_intended_to_reconstruct_an_IR",
+      "change": "pair_per_mode_response_gain_count_and_resolvable_overlap_band_metrics",
+      "range_origin": "official_20_200_200_1000_1000_3000_3000_10000_Hz_evaluation_bins_not_mix_settings",
+      "protected_qualities": ["raw_amplitude", "decay", "modal_density", "spectral_envelope", "onset", "reproducibility"],
+      "verification": "matched_and_OOD_noisy_free_edge_measured_IRs_with_preregistered_thresholds",
+      "cancel_when": "amplitude_ground_truth_absent_metrics_saturate_or_estimator_unreproducible",
+      "confidence": "high_for_evaluation_design_low_for_direct_mixing_action",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261004-1500-01",
+      "status": "not_run_blocked_implementations_and_rights_clear_measured_IRs",
+      "a": "rights_clear_count_density_B1",
+      "b": "rights_clear_matrix_pencil_3B",
+      "single_factor": "estimator_family",
+      "fixed": ["input_IRs", "sample_rate", "modal_band", "output_convention", "evaluation_code"],
+      "loudness": "no_matching_for_identification_absolute_gain_is_target_separate_randomized_BS1770_matched_listening_copies_after_raw_scoring",
+      "measurements": ["per_mode_frequency_decay_gain", "count_error", "log_response_L1_four_bands", "bulk_gain_bias", "runtime", "memory", "failure_rate"],
+      "protected_qualities": ["absolute_gain", "low_frequency_peaks", "high_frequency_density", "decay", "onset", "stability", "deterministic_provenance"],
+      "success": "advantage_persists_outside_matched_generator_without_worse_gain_response_tails",
+      "cancel": "missing_code_license_checkpoint_amplitude_normalization_split_leakage_compound_preprocessing_or_measured_OOD_failure"
+    }
+  ],
+  "videos_added": [
+    {"id":"VID-ML-20261004-1500-01","youtube_id":"77IZ_ea_me0","title":"LIMITING VS CLIPPING FOR MASTERING?? w/ Mike Kalajian","channel":"URM Academy","url":"https://www.youtube.com/watch?v=77IZ_ea_me0","duration":"5:11","published":"2019-01-15","reading_depth":"metadata_and_direct_player_caption_check_only","status":"queued_source","transcript":"unavailable"},
+    {"id":"VID-ML-20261004-1500-02","youtube_id":"Phs51IiTSOo","title":"How to Correctly Clip Your Master Bus","channel":"Black Ghost Audio","url":"https://www.youtube.com/watch?v=Phs51IiTSOo","duration":"6:58","published":"2020-03-25","reading_depth":"metadata_and_direct_player_caption_check_only","status":"queued_source","transcript":"unavailable"}
+  ],
+  "video_queue_after_run": {"total": 89, "transcript_complete": 8, "transcript_partial": 0, "metadata_only": 81, "reviewed_this_run": 0},
+  "reference_cards_added": 0,
+  "priority_queue": [
+    {"rank":1,"id":"SRC-ML-20261004-1500-01","status":"deep_artifact_review_when_code_license_public"},
+    {"rank":2,"id":"VID-ML-20261004-0900-03","status":"permitted_transcript_retry"},
+    {"rank":3,"id":"VID-ML-20261004-1500-01","status":"permitted_transcript_retry"},
+    {"rank":4,"id":"VID-ML-20261004-1500-02","status":"permitted_transcript_retry"},
+    {"rank":5,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":6,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":7,"id":"EXP-ML-20261004-0900-01","status":"not_run_requires_preregistration"},
+    {"rank":8,"id":"EXP-ML-20261004-1500-01","status":"not_run_blocked"}
+  ],
+  "scite_status": "not_retried_open_primary_sources_sufficient",
+  "consensus_status": "not_retried_prior_optional_quota_state_retained",
+  "audio_changed": false,
+  "dsp_or_runtime_changed": false,
+  "model_trained": false
+}
