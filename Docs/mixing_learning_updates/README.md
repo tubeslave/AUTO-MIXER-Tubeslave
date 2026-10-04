@@ -267,6 +267,14 @@ ML-2026-10-03-1500 (`search`, preceding successful search `ML-2026-10-03-0900`):
 
 ML-2026-10-03-1800 (`deep_review`, preceding search `ML-2026-10-03-1500`): orthogonality, IACC, pole histograms, RMS continuity and mean CPU are engineering evidence, not perceptual validation. Dynamic-IR comparisons must separate raw transition diagnostics from randomized BS.1770-matched preference copies. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all new experiments `not_run`.
 
+## 2026-10-04 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| `ML-2026-10-04-1200` | [Report](ML-2026-10-04-1200.md) · [JSON patch](ML-2026-10-04-1200.json) · [ADR](../adr/mixing-learning-2026-10-04-1200.md) | Deep review: Klein-bottle/modal-boundary source upgraded to full text, same-lineage Matrix-Pencil challenge extension and 2 public artifacts audited; 7 Knowledge Cards, 1 narrowed and 1 new bounded rule, 1 rights/reproducibility-blocked experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-04-1200 (`deep_review`, preceding search `ML-2026-10-04-0900`): analytic/FDTD agreement is self-consistency evidence, not a listening study or real-plate validation. Matrix-Pencil evidence now supports count/frequency initialisation more than gain recovery. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
+
 ## 2026-10-04 09:00 MSK — search
 
 | Update | Artifacts | Outcome |
