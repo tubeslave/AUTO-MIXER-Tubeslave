@@ -266,3 +266,11 @@ ML-2026-10-03-1500 (`search`, preceding successful search `ML-2026-10-03-0900`):
 | `ML-2026-10-03-1800` | [Report](ML-2026-10-03-1800.md) · [JSON patch](ML-2026-10-03-1800.json) · [ADR](../adr/mixing-learning-2026-10-03-1800.md) | Full review of two DAFx-26 papers and public artifacts; FDN companion has demonstrations but no code/license, CDC has raw outputs but no renderer/license; 8 Knowledge Cards, 2 rule updates, 1 new candidate rule and 2 blocked unrun experiments; no audio, DSP or runtime change |
 
 ML-2026-10-03-1800 (`deep_review`, preceding search `ML-2026-10-03-1500`): orthogonality, IACC, pole histograms, RMS continuity and mean CPU are engineering evidence, not perceptual validation. Dynamic-IR comparisons must separate raw transition diagnostics from randomized BS.1770-matched preference copies. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all new experiments `not_run`.
+
+## 2026-10-04 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| `ML-2026-10-04-0900` | [Report](ML-2026-10-04-0900.md) · [JSON patch](ML-2026-10-04-0900.json) · [ADR](../adr/mixing-learning-2026-10-04-0900.md) | Search: 1 full-text DAFx-26 modal-plate SSM source, 1 limited-depth Klein-bottle plate candidate, 1 transcript-complete mix-bus video and 2 metadata-only videos; 5 literature/version and 2 video duplicates removed; 5 Knowledge Cards, 2 bounded candidate rules and 1 unrun experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-04-0900 (`search`, preceding successful search `ML-2026-10-03-1500`): synthetic plate-IR reconstruction and parameter recovery are distinct evidence; no perceptual claim was promoted. A fixed stereo-bus chain is queued only as a late, loudness-matched workflow hypothesis. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
