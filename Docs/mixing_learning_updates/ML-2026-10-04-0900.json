@@ -1,0 +1,162 @@
+{
+  "update_id": "ML-2026-10-04-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-04T09:00:00+03:00",
+  "actual_start": "2026-10-04T09:02:30+03:00",
+  "completed_at": "2026-10-04T09:09:35+03:00",
+  "preceding_update": "ML-2026-10-03-1800",
+  "preceding_search": "ML-2026-10-03-1500",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261004-0900-01",
+      "stable_id": "dafx:2026:DAFx26_paper_03",
+      "title": "Diagonal Complex-Valued State Space Models for System Identification and Modeling of Metal Plate Reverbs",
+      "authors": ["Matthias Bittner", "Matthias Wess", "Dominik Dallinger", "Daniel Schnoll", "Axel Jantsch"],
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_03.pdf",
+      "publication": "DAFx-26",
+      "publication_date": "2026",
+      "reading_depth": "full_text_all_7_pages_equations_methods_tables_limits_references",
+      "status": "studied",
+      "priority": 2,
+      "confidence": "high_for_reported_synthetic_benchmark_low_for_perceptual_transfer"
+    },
+    {
+      "id": "SRC-ML-20261004-0900-02",
+      "stable_id": "dafx:2026:DAFx26_paper_11",
+      "title": "Modal Structure of Plate Boundaries and Klein Bottle Reverberation",
+      "authors": ["Jin Woo Lee", "Mark Rau"],
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_11.pdf",
+      "project_url": "https://kleinreverb.github.io/",
+      "publication": "DAFx-26",
+      "publication_date": "2026",
+      "reading_depth": "official_abstract_introduction_and_project_page_method_result_summaries_no_audio_playback",
+      "status": "queued_full_text_deep_review",
+      "priority": 1,
+      "confidence": "low_until_full_text_review"
+    }
+  ],
+  "deduplication": [
+    {"id":"DEDUP-ML-20261004-0900-01","duplicate":"DAFx26 compressor-model paper version","canonical":"arXiv:2606.18573 / SRC-ML-20260914-0900-01","match_basis":"normalized_title_authors_version_lineage","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-02","duplicate":"A Clipping Prevention Method for Guitar Distortion Effects","canonical":"existing reviewed card","match_basis":"normalized_title","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-03","duplicate":"Perceptual Optimisation of a Shimmer Reverberation Effect","canonical":"existing reviewed card","match_basis":"normalized_title","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-04","duplicate":"Fast Parametric Matrices for Feedback Delay Network Reverberation","canonical":"ML-2026-10-03-1500/1800 lineage","match_basis":"normalized_title_and_version","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-05","duplicate":"Cascaded Dynamic Convolution for Real-time Time-Varying Filter Computation","canonical":"ML-2026-10-03-1500/1800 lineage","match_basis":"normalized_title_and_version","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-06","duplicate":"youtube:QSj2m9oUJno","canonical":"existing video queue entry","match_basis":"youtube_video_id","counted_as_independent_evidence":false},
+    {"id":"DEDUP-ML-20261004-0900-07","duplicate":"youtube:kD5aUVVaP78","canonical":"existing video queue entry","match_basis":"youtube_video_id","counted_as_independent_evidence":false}
+  ],
+  "video_sources": [
+    {
+      "id": "VID-ML-20261004-0900-01",
+      "stable_id": "youtube:jSDI7Q58o3w",
+      "title": "Mind Blowing Mix Bus Tips from UA's Technical Guru!",
+      "channel": "Distant Sun Studios",
+      "url": "https://www.youtube.com/watch?v=jSDI7Q58o3w",
+      "published": "2024-06-06",
+      "duration": "PT7M21S",
+      "reading_depth": "complete_visible_youtube_transcript_with_timestamps_0:00-7:07_auto_translated_asr",
+      "status": "studied",
+      "independence": "single_engineer_interview_not_independent_validation",
+      "raw_audio_access": false,
+      "techniques": [
+        {"timestamp":"00:23-01:04","category":"eq_stereo_low_end","finding":"gentle high_pass_and_low_frequency_mono_maker_numbers_require_visual_verification"},
+        {"timestamp":"01:16-02:10","category":"mix_bus_eq","finding":"broad_gentle_mastering_eq_as_personal_workflow_not_comparative_evidence"},
+        {"timestamp":"02:13-03:20","category":"compression_width_tape","finding":"bus_compressor_then_imager_then_tape_personal_chain_order"},
+        {"timestamp":"03:41-04:00","category":"saturation_limiting","finding":"optional_saturation_before_eq_tape_before_limiter"},
+        {"timestamp":"04:03-04:38","category":"loudness_workflow","finding":"limiter_bypassed_while_working_periodic_checks_print_without_limiter"},
+        {"timestamp":"05:07-06:33","category":"mix_bus_workflow","finding":"make_mix_viable_bypassed_then_enable_fixed_chain_late_as_enhancement_source_reports_60_to_80_percent_context"}
+      ],
+      "numeric_settings_status": "asr_numbers_require_visual_or_audio_verification_not_transferable_defaults"
+    },
+    {
+      "id": "VID-ML-20261004-0900-02",
+      "stable_id": "youtube:N4IAipx6WdM",
+      "title": "Fab Dupont on the Sound of Pultec | Inside Flux Studios",
+      "channel": "Pultec - Pulse Techniques",
+      "url": "https://www.youtube.com/watch?v=N4IAipx6WdM",
+      "duration": "PT4M57S",
+      "reading_depth": "metadata_and_player_only_no_readable_transcript",
+      "status": "queued_source",
+      "conclusions_extracted": false,
+      "raw_audio_access": false
+    },
+    {
+      "id": "VID-ML-20261004-0900-03",
+      "stable_id": "youtube:N8rmgzf30lI",
+      "title": "How to Mix Drums Like a Pro with UAD Plug-Ins | UAD Spotlight",
+      "channel": "Universal Audio",
+      "url": "https://www.youtube.com/watch?v=N8rmgzf30lI",
+      "duration": "PT14M45S",
+      "reading_depth": "metadata_and_player_only_no_readable_transcript",
+      "status": "queued_source",
+      "conclusions_extracted": false,
+      "raw_audio_access": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261004-0900-01","claim":"The restricted diagonal complex SSM used in the paper is equivalent to a parallel bank of second-order all-pole modal filters.","confidence":"high_for_stated_model_class"},
+    {"id":"KC-ML-20261004-0900-02","claim":"Matrix-Pencil pole initialisation improved synthetic plate-IR reconstruction against S5 initialisation at every reported state size.","confidence":"high_for_benchmark_low_for_perceptual_transfer"},
+    {"id":"KC-ML-20261004-0900-03","claim":"Output reconstruction and modal-parameter recovery can diverge; reported gain recovery worsened with larger state size despite improved waveform and spectral errors.","confidence":"high_for_table_moderate_for_interpretation"},
+    {"id":"KC-ML-20261004-0900-04","claim":"A fixed mix-bus chain can be evaluated as a late enhancement against a mix that remains acceptable when bypassed.","confidence":"moderate_single_engineer_workflow_hypothesis"},
+    {"id":"KC-ML-20261004-0900-05","claim":"Limiter-on monitoring and limiter-free print are distinct workflow decisions; periodic checks can test mix sensitivity without committing the print.","confidence":"moderate_single_engineer_workflow_hypothesis"}
+  ],
+  "candidate_rules": [
+    {
+      "id":"RULE-ML-20261004-0900-01",
+      "apply_when":"prototyping_an_offline_modal_or_plate_IR_surrogate",
+      "change":"compare_matrix_pencil_and_baseline_initialization_at_fixed_state_size_optimizer_loss_and_budget",
+      "range_origin":"paper_tested_H_128_256_512_1024_2048_synthetic_benchmark_not_production_recommendation",
+      "protected_qualities":["decay_shape","modal_density","spectral_envelope","transient_onset","numerical_stability","compute_budget"],
+      "verification":"held_out_measured_and_synthetic_IRs_reconstruction_and_parameter_error_runtime_and_controlled_loudness_matched_listening",
+      "cancel_when":"gain_outliers_poor_held_out_behavior_instability_or_no_repeatable_perceptual_benefit",
+      "confidence":"moderate_for_experiment_design_low_for_preferred_sound",
+      "auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20261004-0900-02",
+      "apply_when":"balance_and_arrangement_are_viable_with_stereo_bus_chain_bypassed",
+      "change":"enable_one_fixed_preregistered_bus_chain_as_a_single_late_stage_AB_factor_and_revise_tracks_if_bypass_exposes_unresolved_balance",
+      "range_origin":"no_transferable_processor_settings_60_to_80_percent_is_source_reported_context_only",
+      "protected_qualities":["section_impact","kick_snare_attack","bass_definition","role_balance","mono_compatibility","stereo_stability","headroom"],
+      "verification":"randomized_BS1770_loudness_matched_full_mix_AB_true_peak_crest_onset_low_band_stereo_and_mono_checks",
+      "cancel_when":"preference_disappears_after_level_match_bypass_is_unresolved_or_protected_quality_regresses",
+      "confidence":"moderate_single_engineer_workflow_hypothesis",
+      "auto_apply":false
+    }
+  ],
+  "planned_experiments": [
+    {
+      "id":"EXP-ML-20261004-0900-01",
+      "status":"not_run",
+      "material":"project_owned_near_final_rock_chorus_plus_full_song_context",
+      "a":"current_mix_fixed_stereo_bus_chain_bypassed_safety_metering_only",
+      "b":"identical_render_fixed_chain_enabled_no_parameter_edits_between_trials",
+      "single_factor":"fixed_mix_bus_chain_enabled",
+      "fixed":["source_edits","track_levels","pan","track_EQ","track_dynamics","sends","automation","bus_chain_parameters","render_start","random_state"],
+      "loudness_match":"separate_randomized_listening_copies_within_0.1_LU_integrated_BS1770_raw_renders_retained_for_safety_diagnostics",
+      "measurements":["integrated_loudness","short_term_loudness","sample_peak","true_peak","crest_onset","low_band_MS_energy","banded_correlation","mono_fold_down"],
+      "protected_qualities":["section_impact","kick_snare_attack","bass_definition","role_balance","mono_compatibility","stereo_stability","headroom"],
+      "success":"B_repeatably_preferred_for_cohesion_and_impact_A_remains_musically_viable_no_protected_quality_regression",
+      "cancel":"preference_vanishes_after_matching_chain_masks_track_problem_or_transient_low_end_mono_stereo_headroom_regression_or_preference_reversal"
+    }
+  ],
+  "queue_counters": {"video_total":87,"transcript_complete":8,"transcript_partial":0,"metadata_only":79,"literature_added_full_text":1,"literature_added_limited_depth":1},
+  "priority_queue": [
+    {"rank":1,"id":"SRC-ML-20261004-0900-02","status":"queued_full_text_deep_review"},
+    {"rank":2,"id":"SRC-ML-20261004-0900-01","status":"queued_artifact_and_held_out_evidence_audit"},
+    {"rank":3,"id":"VID-ML-20261004-0900-03","status":"queued_transcript_retry_only_if_readable"},
+    {"rank":4,"id":"VID-ML-20261004-0900-02","status":"queued_transcript_retry_only_if_readable"},
+    {"rank":5,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":6,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":7,"id":"EXP-ML-20261004-0900-01","status":"not_run_requires_preregistration"}
+  ],
+  "multitracks_added": [],
+  "reference_cards_added": [],
+  "audio_downloaded": false,
+  "external_code_built_or_run": false,
+  "runtime_or_dsp_changed": false,
+  "model_changed": false,
+  "auto_apply": false,
+  "scite_retried": false,
+  "consensus_retried": false
+}
