@@ -1,0 +1,138 @@
+{
+  "update_id": "ML-2026-10-05-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-05T12:00:00+03:00",
+  "actual_start": "2026-10-05T12:01:38+03:00",
+  "completed_at": "2026-10-05T12:05:00+03:00",
+  "preceding_update": "ML-2026-10-04-1800",
+  "preceding_search": "ML-2026-10-04-1500",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261005-1200-01",
+      "stable_id": "arxiv:2509.15622",
+      "aliases": ["dafx:2026:DAFx26_paper_26"],
+      "title": "Deep Regularized RNNs for Virtual Analog Modeling",
+      "urls": ["https://arxiv.org/abs/2509.15622", "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_26.pdf"],
+      "published": "2025-09-19",
+      "revised": "2026-06-24",
+      "reading_depth": "full_8_page_paper_method_datasets_metrics_results_limitations_artifact_links",
+      "status": "studied_full_text_version_family_deduplicated",
+      "limitations": ["validation_reused_as_test", "best_of_three_runs_without_dispersion", "zero_input_control_noise_only", "no_formal_listening_test", "no_target_host_realtime_benchmark", "time_varying_controls_absent_from_training"],
+      "bounded_conclusion": "stability_regularisation_reduced_reported_zero_input_control_noise_but_program_audio_automation_and_preference_remain_unverified",
+      "confidence": "moderate_for_test_design_low_for_direct_model_choice"
+    },
+    {
+      "id": "SRC-ML-20261005-1200-02",
+      "stable_id": "url:producelikeapro:2026-09-21:billy-decker-vocal-template",
+      "title": "Mixing Pop, Rock, and Country Vocals With the Same Template Approach",
+      "url": "https://producelikeapro.com/blog/mixing-pop-rock-and-country-vocals-with-the-same-template-approach-billy-decker-shows-you-how/",
+      "published": "2026-09-21",
+      "reading_depth": "full_official_publisher_companion_article",
+      "status": "studied_full_article_associated_video_transcript_unavailable",
+      "bounded_conclusion": "template_is_routing_scaffold_not_fixed_settings",
+      "confidence": "moderate_engineering_practice"
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20261005-1200-01",
+      "url": "https://codeberg.org/rantlivelintkale/dr-rnn-va",
+      "revision": "f57742b1f46227f1e669f25c0f5f047fc8854c2d",
+      "status": "static_metadata_partial",
+      "visible_commit_count": 1,
+      "visible_branches": 2,
+      "visible_tags": 0,
+      "root_paths": ["scripts/", "src/asymptotically_stable_training/", ".gitignore", ".python-version", "LICENSE", "pyproject.toml", "README.md", "uv.lock"],
+      "license": "file_present_content_unverified_codeberg_anti_scraper_replacement_and_raw_block",
+      "downloaded_or_run": false
+    }
+  ],
+  "videos_added": [
+    {"id":"VID-ML-20261005-1200-01","youtube_id":"zees-BXNYBw","url":"https://www.youtube.com/watch?v=zees-BXNYBw","title":"Mixing VOCALS Using A Template With Billy Decker - 3 Styles","duration":"29:26","reading_depth":"metadata_plus_full_official_companion_article","transcript":"unavailable","status":"queued_source_not_video_studied"},
+    {"id":"VID-ML-20261005-1200-02","youtube_id":"kTtbOqJbVz0","url":"https://www.youtube.com/watch?v=kTtbOqJbVz0","title":"Cameron Webb Hybrid Vocal Mixing","duration":"0:45_current_youtube_item","reading_depth":"metadata_plus_full_official_companion_article","transcript":"unavailable","status":"queued_source_not_video_studied"}
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261005-1200-01","claim":"static_control_fit_does_not_establish_safe_control_automation","confidence":"high_for_evaluation_design"},
+    {"id":"KC-ML-20261005-1200-02","claim":"reported_control_noise_test_is_zero_input_not_program_audio_automation","confidence":"high"},
+    {"id":"KC-ML-20261005-1200-03","claim":"validation_as_test_and_best_of_three_reporting_limit_generalisation_and_variance_claims","confidence":"high"},
+    {"id":"KC-ML-20261005-1200-04","claim":"stability_regularisation_trades_modelling_accuracy_for_lower_reported_control_noise","confidence":"moderate_within_paper"},
+    {"id":"KC-ML-20261005-1200-05","claim":"deeper_narrower_recurrence_is_efficiency_hypothesis_not_universal_ranking","confidence":"moderate_within_tested_devices"},
+    {"id":"KC-ML-20261005-1200-06","claim":"vocal_template_is_routing_scaffold_and_settings_follow_voice_section","confidence":"moderate_engineering_practice"},
+    {"id":"KC-ML-20261005-1200-07","claim":"vocal_reverb_HF_damping_may_reduce_propagated_sibilance_but_can_dull_presence","confidence":"low_to_moderate"},
+    {"id":"KC-ML-20261005-1200-08","claim":"repository_and_license_filename_do_not_establish_reproducibility_or_rights","confidence":"high"}
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261005-1200-01",
+      "source": ["SRC-ML-20261005-1200-01"],
+      "apply_when": "learned_recurrent_virtual_analogue_effect_exposes_time_varying_controls",
+      "change": "require_static_fit_plus_silent_and_program_audio_ramp_step_adversarial_control_tests",
+      "range_origin": "full_documented_control_domain_at_target_sample_rates_and_block_sizes_not_mix_preset",
+      "protected_qualities": ["phase", "dry_wet_null", "attacks", "tails", "intended_saturation", "state_recovery", "headroom", "realtime_stability"],
+      "verification": "raw_safety_metrics_then_separate_randomized_loudness_matched_preference",
+      "cancel_when": "only_silence_passes_program_artifacts_seed_device_instability_or_material_quality_loss",
+      "confidence": "moderate_test_design_low_model_choice",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261005-1200-02",
+      "source": ["SRC-ML-20261005-1200-02"],
+      "apply_when": "mixing_lead_or_background_vocals_in_dense_rock_pop_rock_sections",
+      "change": "keep_useful_routing_fixed_but_retune_thresholds_bands_rides_and_FX_to_voice_performance_section",
+      "range_origin": "source_numbers_are_demonstration_provenance_only",
+      "protected_qualities": ["articulation", "intelligibility", "character", "sibilance", "dynamics", "depth", "instrument_space", "headroom"],
+      "verification": "one_factor_at_a_time_full_mix_BS1770_matched_randomized_Dmitry_evaluation",
+      "cancel_when": "loudness_only_dull_detached_pumped_or_unnatural",
+      "confidence": "moderate_engineering_hypothesis",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261005-1200-01",
+      "status": "not_run_requires_reproduction_and_rights_clear_audio",
+      "a": "unregularised_4x64_GFB_loss_LSTM",
+      "b": "same_with_L2_stability_regularisation",
+      "single_factor": "stability_regularisation_enabled",
+      "fixed": ["manifests", "architecture", "optimiser", "epochs", "preprocessing", "initialisation_seeds", "control_trajectories", "sample_rate", "block_sizes", "hardware"],
+      "loudness": "none_for_raw_safety_then_separate_randomized_BS1770_matched_preference",
+      "measurements": ["control_noise_energy", "peaks", "residual_spectrum", "ESR", "MRSTFT", "GFB", "phase", "dry_wet_error", "state_recovery", "callback_p95_p99", "xruns", "failures_by_seed"],
+      "protected_qualities": ["fit", "transients", "tails", "phase", "preference", "realtime_stability"],
+      "cancel": "unreproducible_silence_only_gain_latency_or_protected_quality_regression"
+    },
+    {
+      "id": "EXP-ML-20261005-1200-02",
+      "status": "not_run",
+      "a": "approved_current_vocal_reverb_mix",
+      "b": "same_with_only_reverb_HF_damping_adjusted",
+      "single_factor": "reverb_tail_HF_damping",
+      "fixed": ["dry_vocal", "deesser", "send", "decay", "predelay", "early_late", "automation", "stereo", "master_chain"],
+      "loudness": "full_mix_BS1770_within_0.1_LU_randomized",
+      "measurements": ["tail_sibilance", "articulation", "presence", "intelligibility", "depth", "naturalness", "instrument_separation", "stereo", "true_peak"],
+      "protected_qualities": ["presence", "articulation", "intelligibility", "depth", "naturalness", "guitar_snare_space", "stereo", "headroom"],
+      "cancel": "dull_detached_shallower_worse_intelligibility_or_loudness_only"
+    }
+  ],
+  "deduplication": {
+    "existing_scientific_rejected": ["arxiv:2609.02835", "existing_DAFx_CLAP_probing", "existing_FDN_Sandbox", "existing_SEND"],
+    "version_family_merged": ["arxiv:2509.15622v2", "dafx:2026:DAFx26_paper_26"],
+    "new_video_ids_verified_absent": ["zees-BXNYBw", "kTtbOqJbVz0"]
+  },
+  "video_queue_after_run": {"total":91,"transcript_complete":8,"transcript_partial":0,"metadata_only":83,"reviewed_video_content_this_run":0,"full_publisher_articles_read":2},
+  "priority_queue": [
+    {"rank":1,"id":"EXP-ML-20261001-1800-01","status":"next_immediately_executable_project_test"},
+    {"rank":2,"id":"EXP-ML-20261002-1500-01","status":"next_after_parallel_drums"},
+    {"rank":3,"id":"EXP-ML-20261004-0900-01","status":"not_run_requires_preregistration"},
+    {"rank":4,"id":"VID-ML-20261005-1200-01","status":"permitted_transcript_retry"},
+    {"rank":5,"id":"VID-ML-20261005-1200-02","status":"permitted_transcript_retry"},
+    {"rank":6,"id":"EXP-ML-20261005-1200-02","status":"not_run"},
+    {"rank":7,"id":"EXP-ML-20261005-1200-01","status":"not_run_blocked"}
+  ],
+  "scite_status": "not_retried_after_paid_plan_or_trial_wall",
+  "consensus_status": "not_retried_prior_optional_quota_state_retained",
+  "multitracks_added": 0,
+  "audio_changed": false,
+  "dsp_or_runtime_changed": false,
+  "model_trained": false
+}
