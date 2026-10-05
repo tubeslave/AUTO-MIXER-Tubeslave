@@ -1,0 +1,249 @@
+{
+  "update_id": "ML-2026-10-05-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-05T18:00:00+03:00",
+  "actual_start": "2026-10-05T18:00:22+03:00",
+  "completed_at": "2026-10-05T18:08:45+03:00",
+  "preceding_update": "ML-2026-10-05-1500",
+  "preceding_search": "ML-2026-10-05-1500",
+  "preceding_search_report": "Docs/mixing_learning_updates/ML-2026-10-05-1500.md",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261005-1500-02",
+      "stable_ids": [
+        "doi:10.1111/nyas.70306",
+        "pmcid:PMC13390590",
+        "pmid:42301156"
+      ],
+      "status_before": "queued_source_not_full_text",
+      "status_after": "studied_full_text_peer_reviewed",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13390590/",
+      "reading_depth": "full_article_intro_two_methods_stimuli_models_results_discussion_limitations_conclusion",
+      "samples": [
+        {
+          "experiment": 1,
+          "n": 20,
+          "retained_observations": 899
+        },
+        {
+          "experiment": 2,
+          "n": 10,
+          "retained_observations": 837
+        }
+      ],
+      "bounded_conclusion": "acoustic_onset_is_not_perceived_timing_and_attack_role_matters_but_20_40_80ms_are_not_edit_thresholds",
+      "limitations": [
+        "small_expert_samples",
+        "experiment_2_all_male",
+        "fixed_pairs_not_full_mix",
+        "loudness_matched_by_ear",
+        "coarse_offset_steps",
+        "no_direct_preference_or_mix_quality_test",
+        "bimodality_does_not_prove_two_heard_events"
+      ],
+      "confidence": "moderate_lab_effect_low_direct_mix_transfer"
+    },
+    {
+      "id": "SRC-ML-20261005-1500-03",
+      "stable_id": "arxiv:2608.01093v1",
+      "status_before": "queued_source_not_full_text",
+      "status_after": "studied_full_text_conference_preprint",
+      "url": "https://arxiv.org/html/2608.01093",
+      "venue": "ISMIR_2026_accepted",
+      "reading_depth": "complete_open_html_method_data_training_metrics_tables_results_ablations_limitations",
+      "key_results": {
+        "MDB_overall_F1": {
+          "ADTOF": 0.795,
+          "LarsNet": 0.613,
+          "MSG_LD_OB": 0.707
+        },
+        "ENST_overall_F1": {
+          "ADTOF": 0.709,
+          "LarsNet": 0.493,
+          "MSG_LD_OB": 0.64
+        }
+      },
+      "bounded_conclusion": "beats_LarsNet_overall_but_not_ADTOF_overall_and_editable_stem_quality_not_listener_validated",
+      "limitations": [
+        "mono_16kHz_limits_high_frequency_classes",
+        "about_25_seconds_per_10_second_clip_on_RTX6000_Ada",
+        "no_formal_stem_listening_test",
+        "no_independent_reproduction"
+      ],
+      "confidence": "medium_benchmark_low_production_transfer"
+    }
+  ],
+  "artifacts_added": [
+    {
+      "id": "ART-ML-20261005-1800-01",
+      "source": "SRC-ML-20261005-1500-03",
+      "repository": "https://github.com/ddman1101/Separate-and-detect",
+      "pinned_revision": "0ac2fe6a35a7968d70ecfb8866cad025c350f5bd",
+      "code_license": "MIT",
+      "license_sha": "e9a8b5b7a7f8b809361367f29061ea4f48e263ff",
+      "model_repo": "https://huggingface.co/ddman1101/Separate-and-Detect",
+      "model_metadata_updated": "2026-08-13",
+      "model_license_tag": "mit",
+      "checkpoints": [
+        "msgld_ob.ckpt",
+        "msgld_obtb.ckpt"
+      ],
+      "status": "static_audit_only_not_run",
+      "blockers": [
+        "two_conda_environments",
+        "external_datasets",
+        "separate_VAE_and_HiFiGAN_checkpoints",
+        "manual_path_configuration",
+        "manual_madmom_compatibility_patch",
+        "dataset_and_audio_rights_separate_from_code_license",
+        "no_independent_reproduction"
+      ]
+    }
+  ],
+  "knowledge_cards_added": [
+    {
+      "id": "KC-ML-20261005-1800-01",
+      "claim": "acoustic_onset_and_perceived_timing_are_not_identical_and_fast_attacks_can_dominate_compounds",
+      "confidence": "moderate_within_lab_stimuli"
+    },
+    {
+      "id": "KC-ML-20261005-1800-02",
+      "claim": "bimodal_probe_placements_do_not_prove_two_heard_events",
+      "confidence": "high_interpretation_limit"
+    },
+    {
+      "id": "KC-ML-20261005-1800-03",
+      "claim": "20_40_80ms_conditions_are_not_production_thresholds",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261005-1800-04",
+      "claim": "Separate_and_Detect_beats_LarsNet_overall_not_ADTOF_overall_and_is_class_specific_vs_ADTOF",
+      "confidence": "high_reported_tables"
+    },
+    {
+      "id": "KC-ML-20261005-1800-05",
+      "claim": "50ms_matching_tolerance_is_evaluation_protocol_not_edit_window",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261005-1800-06",
+      "claim": "mel_MSE_FAD_and_event_F1_do_not_establish_editable_stem_preference",
+      "confidence": "high_evaluation_design"
+    },
+    {
+      "id": "KC-ML-20261005-1800-07",
+      "claim": "open_code_and_checkpoints_do_not_equal_independent_reproduction",
+      "confidence": "high"
+    }
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261005-1800-01",
+      "source": [
+        "SRC-ML-20261005-1500-02"
+      ],
+      "apply_when": "cross_instrument_timing_edit_in_named_section",
+      "change": "measure_onset_classify_attack_roles_and_compare_unedited_with_one_event_specific_grouped_correction",
+      "range_origin": "event_measurement_and_creative_brief_no_universal_ms",
+      "protected_qualities": [
+        "push_pull",
+        "groove",
+        "flams",
+        "kick_bass_pocket",
+        "attack_character",
+        "multimic_phase",
+        "room_image",
+        "cymbal_tails"
+      ],
+      "verification": "raw_onset_and_envelope_diagnostics_then_randomized_BS1770_matched_repeated_full_mix_preference",
+      "cancel_when": "perceptual_anchors_split_feel_is_lost_multimic_image_changes_or_preference_disappears",
+      "confidence": "moderate_psychoacoustic_low_direct_mix_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261005-1800-02",
+      "source": [
+        "SRC-ML-20261005-1500-03",
+        "ART-ML-20261005-1800-01"
+      ],
+      "apply_when": "evaluating_generated_or_separated_drum_stems",
+      "change": "require_class_specific_event_accuracy_stem_quality_bandwidth_leakage_and_full_mix_preference_with_baselines",
+      "range_origin": "no_production_range_detector_hyperparameters_are_not_mix_settings",
+      "protected_qualities": [
+        "transients",
+        "cymbal_bandwidth",
+        "tails",
+        "room_image",
+        "groove",
+        "naturalness",
+        "interclass_separation"
+      ],
+      "verification": "class_PRF_leakage_residual_sum_reconstruction_randomized_loudness_matched_full_mix_listening_latency",
+      "cancel_when": "HF_blur_false_events_generated_sound_sum_deviation_or_failed_preference",
+      "confidence": "medium_protocol_low_production_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-20261005-1500-01",
+      "status": "not_run",
+      "revision": "P_center_aware_event_specific_grouped_timing_no_research_threshold",
+      "A": "approved_eight_bar_dense_rock_chorus",
+      "B": "same_with_selected_kick_bass_or_kick_percussion_pairs_corrected_and_drum_mics_grouped",
+      "single_factor": "selected_pair_relative_timing",
+      "loudness": "randomized_full_mix_BS1770_within_0.1_LU_three_repeats_Dmitry"
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261005-1800-01",
+      "status": "not_run_blocked_by_large_model_dataset_rights_and_compute_audit",
+      "A": "fixed_Demucs_plus_LarsNet",
+      "B": "same_front_end_and_detector_plus_MSG_LD_OB",
+      "single_factor": "five_stem_separator",
+      "loudness": "reinsert_summed_drums_into_identical_residual_then_randomized_BS1770_match_within_0.1_LU",
+      "protected_qualities": [
+        "transients",
+        "hats_cymbals",
+        "tails",
+        "room_image",
+        "groove",
+        "naturalness",
+        "headroom"
+      ],
+      "no_paid_gpu_jobs_or_spaces": true
+    }
+  ],
+  "videos": {
+    "studied_new": 0,
+    "catalogue": {
+      "total": 93,
+      "transcript_complete": 8,
+      "partial": 0,
+      "metadata_only": 85
+    }
+  },
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "ART-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1800-01"
+  ],
+  "project_state": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_code_changed": false,
+    "model_state_changed": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
