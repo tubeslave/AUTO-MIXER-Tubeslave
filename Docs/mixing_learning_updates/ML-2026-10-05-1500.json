@@ -1,0 +1,196 @@
+{
+  "update_id": "ML-2026-10-05-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-05T15:00:00+03:00",
+  "actual_start": "2026-10-05T15:04:12+03:00",
+  "completed_at": "2026-10-05T15:11:21+03:00",
+  "preceding_update": "ML-2026-10-05-1200",
+  "preceding_search": "ML-2026-10-04-1500",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261005-1500-01",
+      "stable_id": "arxiv:2605.10281",
+      "doi": "10.48550/arXiv.2605.10281",
+      "title": "Drum Synthesis from Expressive Drum Grids via Neural Audio Codecs",
+      "url": "https://arxiv.org/abs/2605.10281",
+      "project_url": "https://github.com/kostantinos-soiledis/midigroove_poc",
+      "published": "2026-05-11",
+      "reading_depth": "full_relevant_open_html_intro_representation_method_dataset_metrics_results_conclusion_limitations",
+      "status": "studied_full_relevant_text_preprint",
+      "limitations": [
+        "no_human_listening_study",
+        "no_formal_statistical_testing",
+        "no_live_multitrack_bleed_or_phase_alignment_test",
+        "objective_scores_do_not_establish_perceived_groove"
+      ],
+      "bounded_conclusion": "preserve_approved_event_timing_and_velocity_then_validate_transients_tails_multimic_coherence_and_preference_separately",
+      "confidence": "medium_test_design_low_direct_transfer"
+    },
+    {
+      "id": "SRC-ML-20261005-1500-02",
+      "stable_id": "doi:10.1111/nyas.70306",
+      "pubmed_id": "42301156",
+      "title": "All About That Bass Drum? Asynchrony Effects on the Perceived Timing of Compound Musical Sounds",
+      "url": "https://nyaspubs.onlinelibrary.wiley.com/doi/abs/10.1111/nyas.70306",
+      "published": "2026-06-16",
+      "reading_depth": "publisher_abstract_graphical_abstract_and_metadata_only",
+      "status": "queued_source_not_full_text",
+      "bounded_conclusion": "no_rule_or_edit_threshold_pending_full_methods_results_and_limitations",
+      "confidence": "low_pending_full_text"
+    },
+    {
+      "id": "SRC-ML-20261005-1500-03",
+      "stable_id": "arxiv:2608.01093",
+      "title": "Separate-and-Detect: Unified Drum Transcription and Stem Generation via Latent Diffusion",
+      "url": "https://arxiv.org/abs/2608.01093",
+      "venue": "ISMIR_2026_accepted_author_metadata",
+      "reading_depth": "title_abstract_and_bibliographic_metadata_only",
+      "status": "queued_source_not_full_text",
+      "bounded_conclusion": "transcription_F1_does_not_establish_stem_fidelity_or_mix_preference",
+      "confidence": "low_pending_full_review"
+    }
+  ],
+  "videos_added": [
+    {
+      "id": "VID-ML-20261005-1500-01",
+      "youtube_id": "aeMXWCINc3Y",
+      "url": "https://www.youtube.com/watch?v=aeMXWCINc3Y",
+      "title": "Adam Nolly Getgood Mixing Masterclass part 2 of 2: Bass, guitar, and vocals",
+      "channel": "GGD",
+      "published": "2018-12-14",
+      "reading_depth": "first_party_metadata_description_only",
+      "transcript": "unavailable",
+      "status": "queued_source_not_studied"
+    },
+    {
+      "id": "VID-ML-20261005-1500-02",
+      "youtube_id": "4ZAJHl02X7s",
+      "url": "https://www.youtube.com/watch?v=4ZAJHl02X7s",
+      "title": "Capturing and Transferring Expressive Microtiming in Drumming - Eemi Fagerlund - ADCx Copenhagen 2026",
+      "official_page": "https://conference.audio.dev/mastodon/capturing-and-transferring-expressive-microtiming-in-drumming-eemi-fagerlund-adcx-copenhagen-2",
+      "published_page": "2026-08-05",
+      "reading_depth": "official_conference_metadata_summary_only",
+      "transcript": "unavailable",
+      "status": "queued_source_not_studied"
+    }
+  ],
+  "video_catalogue": {
+    "total": 93,
+    "transcript_complete": 8,
+    "partial": 0,
+    "metadata_only": 85
+  },
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261005-1500-01",
+      "claim": "event_timing_and_velocity_are_preservation_contract_not_proof_of_groove",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261005-1500-02",
+      "claim": "onset_matching_tolerance_is_evaluation_setting_not_edit_range",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261005-1500-03",
+      "claim": "codec_metrics_transcription_F1_and_FAD_do_not_alone_establish_stem_usability_or_preference",
+      "confidence": "high_evaluation_design"
+    },
+    {
+      "id": "KC-ML-20261005-1500-04",
+      "claim": "larger_capacity_did_not_monotonically_improve_reported_drum_synthesis",
+      "confidence": "medium_within_preprint"
+    },
+    {
+      "id": "KC-ML-20261005-1500-05",
+      "claim": "P_center_result_remains_abstract_only_and_no_threshold_is_accepted",
+      "confidence": "low_pending_full_text"
+    }
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261005-1500-01",
+      "source": [
+        "SRC-ML-20261005-1500-01"
+      ],
+      "apply_when": "drum_replacement_rendering_or_humanization_from_approved_performance",
+      "change": "preserve_event_onset_velocity_and_role_and_move_selected_multimic_event_as_group",
+      "range_origin": "measured_performance_and_creative_brief_no_universal_numeric_range_paper_50ms_is_evaluation_only",
+      "protected_qualities": [
+        "groove",
+        "intentional_flams",
+        "ghost_notes",
+        "kick_snare_relation",
+        "overhead_room_phase",
+        "cymbal_continuity",
+        "transient_shape",
+        "bass_pocket"
+      ],
+      "verification": "event_onset_transient_tail_envelope_multimic_lag_polarity_coherence_and_randomized_loudness_matched_full_mix_preference",
+      "cancel_when": "stiff_groove_lost_flams_or_ghosts_phase_or_image_change_broken_tails_weaker_transients_or_no_matched_preference",
+      "confidence": "medium_preprint_objective_only",
+      "auto_apply": false
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261005-1500-01",
+      "title": "grouped_drum_event_timing_edit",
+      "status": "not_run",
+      "A": "current_approved_eight_bar_dense_rock_chorus_edit",
+      "B": "same_render_with_only_manually_selected_compound_kick_snare_events_moved_as_multimic_groups",
+      "single_factor": "grouped_timing_edits_for_selected_events",
+      "offset_origin": "measured_event_to_groove_offsets_and_Dmitry_approval_not_research_tolerance",
+      "loudness": "randomized_full_mix_BS1770_match_within_0.1_LU_after_raw_diagnostics",
+      "measurements": [
+        "event_offsets_vs_bass_and_guitar_anchors",
+        "within_kit_inter_mic_lag_or_GCC_PHAT",
+        "polarity_and_correlation",
+        "peak_true_peak_and_crest",
+        "section_boundary_discontinuity"
+      ],
+      "protected_qualities": [
+        "groove",
+        "flams",
+        "ghost_notes",
+        "kick_snare_punch",
+        "overhead_room_image",
+        "cymbal_tails",
+        "bass_pocket",
+        "guitar_vocal_readability",
+        "headroom"
+      ],
+      "success": "repeated_tighter_pocket_preference_without_stiffness_or_phase_transient_regression",
+      "cancel_when": "matched_preference_disappears_groove_stiffens_intent_lost_room_or_cymbal_image_changes_clicks_or_headroom_regresses"
+    }
+  ],
+  "deduplicated": [
+    "arxiv:2603.15995",
+    "arxiv:2608.30559",
+    "dafx:2026:DAFx26_paper_21",
+    "dafx:2026:DAFx26_paper_34",
+    "dafx:2026:DAFx26_paper_50",
+    "arxiv:2609.04224",
+    "youtube:cgfBcFTbir4",
+    "youtube:wSNdwTi6xsc",
+    "youtube:8_J9DP4EsFk"
+  ],
+  "queue": [
+    "EXP-ML-20261001-1800-01",
+    "SRC-ML-20261005-1500-02",
+    "SRC-ML-20261005-1500-03",
+    "ART-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1500-01"
+  ],
+  "multitracks_added": [],
+  "audio_downloaded": false,
+  "audio_metrics_claimed_without_signal": false,
+  "auto_apply": false,
+  "audio_or_dsp_changed": false,
+  "model_trained": false
+}
