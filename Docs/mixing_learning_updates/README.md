@@ -317,3 +317,11 @@ ML-2026-10-05-1200 (`deep_review`, preceding successful search `ML-2026-10-04-15
 | ML-2026-10-05-1500 | [Report](ML-2026-10-05-1500.md) · [JSON patch](ML-2026-10-05-1500.json) · [ADR](../adr/mixing-learning-2026-10-05-1500.md) | Search: 1 full-relevant-text drum-synthesis preprint, 2 abstract/metadata-only scientific candidates and 2 metadata-only videos; 9 scientific/video rediscoveries removed; 5 Knowledge Cards, 1 bounded candidate rule and 1 unrun grouped-timing A/B; no multitrack, audio, code or DSP change |
 
 ML-2026-10-05-1500 (search, preceding successful search ML-2026-10-04-1500): event timing and velocity should remain explicit in drum replacement/rendering, but objective codec/transcription metrics do not prove groove. Research tolerances of ±50 ms and 40 ms are not edit thresholds. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
+
+## 2026-10-05 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-05-1800 | [Report](ML-2026-10-05-1800.md) · [JSON patch](ML-2026-10-05-1800.json) · [ADR](../adr/mixing-learning-2026-10-05-1800.md) | Full review of the P-center paper and Separate-and-Detect, plus pinned GitHub and Hugging Face metadata audit; 2 Source Cards upgraded, 1 Artifact Audit, 7 Knowledge Cards, 2 bounded candidate rules, 1 revised and 1 blocked unrun experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-05-1800 (deep_review, preceding successful search ML-2026-10-05-1500): the P-center study does not establish a universal 40 ms editing boundary, and Separate-and-Detect is class-specific rather than an overall F1 win over direct ADT. Generated-stem editability still requires leakage, bandwidth, reconstruction and loudness-matched listening checks. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
