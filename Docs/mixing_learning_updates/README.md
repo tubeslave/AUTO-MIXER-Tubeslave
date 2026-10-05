@@ -299,3 +299,12 @@ ML-2026-10-04-1500 (`search`, preceding successful search `ML-2026-10-04-0900`):
 | `ML-2026-10-04-1800` | [Report](ML-2026-10-04-1800.md) · [JSON patch](ML-2026-10-04-1800.json) · [ADR](../adr/mixing-learning-2026-10-04-1800.md) | Deep review: Count-Density protocol, architecture, official results and public artifacts reconciled; GitHub placeholder pinned, Hugging Face metadata checked; 7 Knowledge Cards, 1 strengthened and 1 new bounded rule, 1 blocked unrun experiment; no audio, code, DSP or runtime change |
 
 ML-2026-10-04-1800 (`deep_review`, preceding search `ML-2026-10-04-1500`): close local and hidden scores are matched-generator repeatability, not external generalization. B1 is the stronger benchmark comparator; absolute-scale conditioning remains an unproven ablation hypothesis. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
+
+
+## 2026-10-05 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| `ML-2026-10-05-1200` | [Report](ML-2026-10-05-1200.md) · [JSON patch](ML-2026-10-05-1200.json) · [ADR](../adr/mixing-learning-2026-10-05-1200.md) | Full review of stability-regularised recurrent virtual-analogue modelling and its public artifact, plus one fully read rock-vocal companion article and two metadata-only videos; 8 Knowledge Cards, 2 bounded candidate rules and 2 unrun experiments; no audio, code, DSP or runtime change |
+
+ML-2026-10-05-1200 (`deep_review`, preceding successful search `ML-2026-10-04-1500`): static-control fit does not establish safety under automation. The reported zero-input control-noise improvement remains unverified with programme audio, independent holdout, listening or target-host callbacks. Vocal templates are routing scaffolds, not fixed presets. Next executable project test remains `EXP-ML-20261001-1800-01`; all rules remain `auto_apply:false`, all experiments `not_run`.
