@@ -1,0 +1,333 @@
+{
+  "update_id": "ML-2026-10-06-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-06T09:00:00+03:00",
+  "actual_start": "2026-10-06T08:59:51+03:00",
+  "completed_at": "2026-10-06T09:04:55+03:00",
+  "preceding_update": "ML-2026-10-05-1800",
+  "preceding_search": "ML-2026-10-05-1500",
+  "preceding_search_report": "Docs/mixing_learning_updates/ML-2026-10-05-1500.md",
+  "citation_check": "partial",
+  "deduplication": {
+    "excluded_as_existing": [
+      {
+        "stable_id": "arxiv:2606.16551v1",
+        "canonical_source": "SRC-ML-20260914-1800-01",
+        "reason": "already_studied_full_text"
+      },
+      {
+        "stable_id": "arxiv:2609.04224",
+        "reason": "already_present_full_read_in_prior_knowledge"
+      },
+      {
+        "title": "Expressive Acoustic Drum Synthesis via Grid Based MIDI Roll",
+        "reason": "already_reviewed_in_ML-2026-10-05-1500"
+      }
+    ],
+    "version_policy": "doi_then_normalized_title_then_preprint_or_journal_lineage"
+  },
+  "source_cards_added": [
+    {
+      "id": "SRC-ML-20261006-0900-01",
+      "title": "Bleed No More: Generative Interference Reduction for Musical Recordings",
+      "authors": [
+        "Rajesh R",
+        "Rashen Fernando",
+        "Padmanabhan Rajan",
+        "Ryan M. Corey"
+      ],
+      "publication_date": "2026",
+      "venue": "ICASSP 2026",
+      "stable_ids": [
+        "doi:10.1109/ICASSP55912.2026.11460429"
+      ],
+      "url": "https://corey1.web.engr.illinois.edu/download/rajesh_icassp2026_bleed.pdf",
+      "demo": "https://listeningtech.github.io/cGANIR/",
+      "status": "studied_full_text_peer_reviewed",
+      "reading_depth": "full_five_page_paper_method_datasets_tables_ablation_conclusion_limitations",
+      "method": "conditional_WGAN_U_Net_magnitude_spectrogram_generator_PatchGAN_critic_WGAN_GP_plus_L1_mixture_phase_reconstruction",
+      "data": {
+        "MUSDB18HQ_simulated_pairs": 7560,
+        "segment_seconds": 10,
+        "overlap_percent": 50,
+        "mono_sample_rate_hz": 22050,
+        "stft_window": 2047,
+        "hop": 512,
+        "Sanidha_pairs": 2300,
+        "Saraga": "qualitative_live_examples_only"
+      },
+      "selected_results": {
+        "simulated_drums": {
+          "HTDemucs": {
+            "SI_SDR": 13.09,
+            "SIR": 25.36,
+            "SAR": 20.77
+          },
+          "cWGAN_IR": {
+            "SI_SDR": 13.87,
+            "SIR": 29.72,
+            "SAR": 15.6
+          }
+        },
+        "rerecorded_drums": {
+          "HTDemucs": {
+            "SI_SDR": -8.58,
+            "SIR": 18.39,
+            "SAR": 5.06
+          },
+          "cWGAN_IR": {
+            "SI_SDR": -2.58,
+            "SIR": 18.79,
+            "SAR": -0.9
+          }
+        }
+      },
+      "bounded_conclusion": "reported_isolation_can_improve_while_artifact_fidelity_metric_worsens_so_no_single_metric_or_direct_production_rule",
+      "limitations": [
+        "mixture_phase_reconstruction_and_low_SAR_indicate_artifact_risk",
+        "no_formal_listener_test",
+        "live_Saraga_only_informal_listening",
+        "no_real_rock_multitrack_evaluation",
+        "no_multimic_phase_or_coherence_preservation_test",
+        "no_transient_ghost_note_pocket_or_full_mix_preference_test"
+      ],
+      "confidence": "medium_reported_protocol_low_direct_rock_transfer"
+    },
+    {
+      "id": "SRC-ML-20261006-0900-02",
+      "title": "Seconds-Aligned PCA-DAC Latent Diffusion for Symbolic-to-Audio Drum Rendering",
+      "stable_id": "arxiv:2605.13404",
+      "url": "https://arxiv.org/abs/2605.13404",
+      "status": "queued_source_metadata_and_abstract_only",
+      "reading_depth": "metadata_and_abstract_only",
+      "lineage": "same_research_lineage_as_arxiv:2605.10281_not_independent_confirmation",
+      "abstract_level_claims": "PCA_diffusion_reported_better_spectral_and_transient_metrics_than_deterministic_PCA_regression_and_symbolic_baseline_on_1733_held_out_four_beat_windows_but_direct_regression_stronger_on_waveform_L1",
+      "next_action": "full_text_method_split_metric_and_audio_artifact_review_before_rule_candidate"
+    }
+  ],
+  "official_materials_added": [
+    {
+      "id": "OFF-ML-20261006-0900-01",
+      "title": "Drum Phase Alignment",
+      "publisher": "PhaseLock / Jelly Audio",
+      "publication_date": "2026-09-09",
+      "url": "https://jelly.audio/phaselock/learn/drum-phase-alignment/",
+      "status": "studied_full_vendor_article_promotional",
+      "reading_depth": "full_web_article",
+      "bounded_use": "workflow_hypothesis_distinguishing_polarity_time_alignment_and_phase_coherence_with_role_aware_reference_and_full_kit_mono_checks",
+      "limitations": [
+        "vendor_authored",
+        "no_independent_controlled_evaluation",
+        "demonstration_listed_as_to_add"
+      ]
+    },
+    {
+      "id": "TOOL-ML-20261006-0900-01",
+      "title": "faSmartAlign official product page",
+      "publisher": "Forward Audio",
+      "url": "https://www.forward-audio.com/products/plugins/fasmartalign",
+      "status": "official_metadata_and_documentation_promotional_not_run",
+      "reading_depth": "official_product_page",
+      "capabilities_claimed": [
+        "multi_instance_analysis",
+        "time_alignment",
+        "Phase_EQ",
+        "bleed_control_gate",
+        "automatic_reference_and_polarity"
+      ],
+      "constraints": [
+        "commercial_product_not_purchased",
+        "vendor_claims_not_independent_validation",
+        "no_project_audio_test",
+        "no_auto_integration"
+      ]
+    }
+  ],
+  "artifacts_added": [
+    {
+      "id": "ART-ML-20261006-0900-01",
+      "source": "SRC-ML-20261006-0900-01",
+      "advertised_repository": "https://github.com/listeningtech/cGANIR",
+      "status": "advertised_code_link_404",
+      "run_status": "not_run",
+      "independent_reproduction": "not_established",
+      "note": "demo_and_paper_are_accessible_but_public_implementation_was_not_accessible_at_check_time"
+    }
+  ],
+  "knowledge_cards_added": [
+    {
+      "id": "KC-ML-20261006-0900-01",
+      "claim": "bleed_suppression_improvement_in_SI_SDR_or_SIR_can_coexist_with_worse_SAR_and_more_artifact_risk",
+      "confidence": "high_for_reported_tables"
+    },
+    {
+      "id": "KC-ML-20261006-0900-02",
+      "claim": "informal_demo_listening_is_not_formal_listener_validation",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261006-0900-03",
+      "claim": "permutation_equivariance_source_was_already_in_base_and_does_not_create_independent_confirmation_when_rediscovered",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261006-0900-04",
+      "claim": "multichannel_debleeders_need_channel_reorder_room_layout_mic_distance_and_unseen_role_holdouts",
+      "confidence": "high_test_design_existing_rule_reconfirmed"
+    },
+    {
+      "id": "KC-ML-20261006-0900-05",
+      "claim": "polarity_time_alignment_and_phase_coherence_are_distinct_controls_but_vendor_workflow_is_not_scientific_validation",
+      "confidence": "medium_workflow_low_independent_evidence"
+    },
+    {
+      "id": "KC-ML-20261006-0900-06",
+      "claim": "automatic_alignment_and_bleed_control_claims_require_local_full_kit_mono_and_loudness_matched_validation",
+      "confidence": "high_safety_requirement"
+    }
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20260914-1800-03",
+      "source_added": "SRC-ML-20261006-0900-01",
+      "revision": "strengthen_isolation_fidelity_tradeoff_gate",
+      "apply_when": "objective_debleeding_metric_improves",
+      "change": "retain_SI_SDR_SIR_SAR_ISR_transient_timing_room_phase_and_listening_as_separate_outputs",
+      "proposed_range": "no_universal_threshold",
+      "protected_qualities": [
+        "attack_body",
+        "ghost_notes",
+        "cymbal_continuity",
+        "useful_room",
+        "phase_coherence",
+        "mono"
+      ],
+      "success": "isolation_rises_without_SAR_artifact_or_blind_preference_regression",
+      "cancel_when": "SAR_or_artifacts_worsen_or_full_mix_preference_fails",
+      "confidence": "high_for_test_need_low_for_specific_model_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260914-1800-04",
+      "source_added": "OFF-ML-20261006-0900-01",
+      "revision": "explicitly_separate_polarity_time_alignment_and_phase_coherence",
+      "proposed_range": "none_from_vendor_source",
+      "protected_qualities": [
+        "attack_body",
+        "overhead_room_timing",
+        "stereo_image",
+        "mono"
+      ],
+      "verification": "compare_polarity_and_time_as_separate_single_factors_in_full_kit_and_song",
+      "cancel_when": "close_mic_gain_costs_room_depth_stereo_stability_or_mono",
+      "confidence": "medium_workflow_low_independent_validation",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-20260914-1800-01",
+      "status": "not_run_blocked_by_missing_public_implementations_and_rights_clear_test_material",
+      "revision": "add_artifact_regression_gate_and_rerecorded_acoustic_holdout",
+      "A": "untreated_or_current_approved_multichannel_recording",
+      "B": "identical_render_with_one_candidate_debleeder_enabled",
+      "single_factor": "candidate_debleeder_on_off",
+      "fixed": [
+        "edits",
+        "levels",
+        "EQ",
+        "dynamics",
+        "saturation",
+        "panning",
+        "automation",
+        "master_chain"
+      ],
+      "raw_diagnostics": [
+        "per_channel_SDR",
+        "SIR",
+        "SAR",
+        "ISR",
+        "attack_body",
+        "interchannel_lag_coherence",
+        "polarity",
+        "mono",
+        "artifacts"
+      ],
+      "preference": "randomized_full_mix_BS1770_match_within_0.1_LU_three_repeats_Dmitry",
+      "protected_qualities": [
+        "transients",
+        "ghost_notes",
+        "tails",
+        "useful_room",
+        "stereo_image",
+        "phase_coherence",
+        "pocket",
+        "headroom"
+      ],
+      "success": "isolation_gain_without_artifact_transient_room_phase_or_preference_regression",
+      "cancel_when": "isolation_improves_but_SAR_artifacts_transients_room_or_preference_worsen",
+      "optional_future_baseline": "cWGAN_IR_only_if_public_code_and_rights_clear_reproducible_assets_become_available"
+    }
+  ],
+  "videos": {
+    "studied_new": 0,
+    "queued_added": [
+      {
+        "id": "VID-ML-20261006-0900-01",
+        "youtube_id": "-WLxXoT7B-s",
+        "title": "The 12-Step Secret to MASSIVE Band Mixes | Joe Chiccarelli Masterclass",
+        "channel": "Waves Audio",
+        "published": "2026-03-12",
+        "duration": "20:34",
+        "url": "https://www.youtube.com/watch?v=-WLxXoT7B-s",
+        "reading_depth": "official_metadata_description_and_chapters_only",
+        "transcript_status": "captions_unavailable_in_player",
+        "status": "queued_source_not_studied"
+      },
+      {
+        "id": "VID-ML-20261006-0900-02",
+        "youtube_id": "dOnrcpm_hSc",
+        "title": "Mixing Drum Room Mics: Explosive Tips by Joe Barresi",
+        "channel": "Waves Audio",
+        "published_year": 2018,
+        "duration": "5:31",
+        "url": "https://www.youtube.com/watch?v=dOnrcpm_hSc",
+        "reading_depth": "official_metadata_and_description_only",
+        "transcript_status": "captions_unavailable_in_player",
+        "status": "queued_source_not_studied"
+      }
+    ],
+    "catalogue": {
+      "total": 95,
+      "transcript_complete": 8,
+      "partial": 0,
+      "metadata_only": 87
+    }
+  },
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "SRC-ML-20261006-0900-02",
+    "ART-ML-20261005-1500-01",
+    "VID-ML-20261006-0900-01",
+    "VID-ML-20261006-0900-02",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "EXP-ML-20260914-1800-01",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1800-01"
+  ],
+  "project_state": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_code_changed": false,
+    "model_state_changed": false,
+    "paid_access_used": false,
+    "external_audio_uploaded": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
