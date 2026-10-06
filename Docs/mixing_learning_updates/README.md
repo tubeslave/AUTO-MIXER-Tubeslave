@@ -343,3 +343,11 @@ ML-2026-10-06-0900 (search, preceding successful search ML-2026-10-05-1500): imp
 | ML-2026-10-06-1200 | [Report](ML-2026-10-06-1200.md) · [JSON patch](ML-2026-10-06-1200.json) · [ADR](../adr/mixing-learning-2026-10-06-1200.md) | Full 17-page Sec2Drum review and pinned earlier-repository audit; 1 Source Card and 1 Artifact Audit upgraded, 8 Knowledge Cards, 2 existing rules revised and 1 blocked unrun RVQ-CE ablation; no audio, code, DSP, runtime or paid-compute change |
 
 ML-2026-10-06-1200 (deep_review, preceding search ML-2026-10-06-0900): low unpaired FAD can coexist with poor conditioning fidelity, and diffusion's spectral/transient gains coexist with worse waveform L1 than direct regression. Model context radii and dataset filters are not editing thresholds. Public Sec2Drum code/checkpoints/manifests remain pending, so the new ablation stays blocked. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
+
+## 2026-10-06 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-06-1500 | [Report](ML-2026-10-06-1500.md) · [JSON patch](ML-2026-10-06-1500.json) · [ADR](../adr/mixing-learning-2026-10-06-1500.md) | Search: 1 fully read peer-reviewed ICASSP perceptual-metric source, 1 negative artifact audit and 2 new metadata/chapters-only bass videos; 6 scientific and 2 video rediscoveries removed; 6 Knowledge Cards, 1 existing rule and 1 existing experiment revised; no multitrack, audio, code, DSP or runtime change |
+
+ML-2026-10-06-1500 (search, preceding successful search ML-2026-10-06-0900): DeePAQ is retained as domain-specific secondary signal-quality evidence, not a general mix-quality gate. Its non-matching-reference source-separation correlation is weak, and full-reference use requires a true clean target. Two bass videos remain queued because permitted transcript content was not actually read. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
