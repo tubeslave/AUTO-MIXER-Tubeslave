@@ -1,0 +1,299 @@
+{
+  "update_id": "ML-2026-10-06-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-06T12:00:00+03:00",
+  "actual_start": "2026-10-06T11:55:40+03:00",
+  "completed_at": "2026-10-06T12:00:17+03:00",
+  "preceding_update": "ML-2026-10-06-0900",
+  "preceding_search": "ML-2026-10-06-0900",
+  "preceding_search_report": "Docs/mixing_learning_updates/ML-2026-10-06-0900.md",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261006-0900-02",
+      "title": "Seconds-Aligned PCA-DAC Latent Diffusion for Symbolic-to-Audio Drum Rendering",
+      "authors": [
+        "Konstantinos Soiledis",
+        "Maximos Kaliakatsos Papakostas",
+        "Dimos Makris",
+        "Konstantinos Tsamis"
+      ],
+      "stable_ids": [
+        "arxiv:2605.13404v1"
+      ],
+      "submitted": "2026-05-13",
+      "url": "https://arxiv.org/abs/2605.13404",
+      "full_text": "https://arxiv.org/html/2605.13404v1",
+      "status": "studied_full_text_preprint",
+      "reading_depth": "complete_17_page_paper_method_data_splits_baselines_metrics_statistics_tables_code_availability_limitations",
+      "lineage": "same_research_lineage_as_arxiv:2605.10281_not_independent_confirmation",
+      "method": {
+        "decoder": "frozen_DAC_44.1kHz_9_quantizers",
+        "target": "continuous_PCA_coordinates_of_summed_post_quantizer_embeddings",
+        "native_dimension": 1024,
+        "structural_rank": 72,
+        "pca_fit_frames": 1835541,
+        "condition": "8_drum_families_24_numeric_channels_plus_articulation_ids_at_250Hz",
+        "context_radii_ms": [
+          0,
+          88,
+          164,
+          220
+        ],
+        "diffusion_schedule": "cosine_DDPM",
+        "evaluated_steps": [
+          6,
+          12,
+          25,
+          50
+        ],
+        "rvq_ce_lambda": 0.1
+      },
+      "data": {
+        "train_windows": 11523,
+        "validation_windows": 1534,
+        "test_windows": 1733,
+        "window": "four_beats_non_overlapping",
+        "samples_per_condition": 1
+      },
+      "selected_results": {
+        "direct_regressor": {
+          "fad_infinity": 0.355,
+          "mel_error": 13.04,
+          "band_flux_cosine": 0.836,
+          "mrstft": 0.136,
+          "waveform_l1": 0.0451,
+          "rtf": 0.021
+        },
+        "plain_diffusion_25": {
+          "fad_infinity": 0.019,
+          "mel_error": 5.69,
+          "band_flux_cosine": 0.848,
+          "mrstft": 0.106,
+          "waveform_l1": 0.0536,
+          "rtf": 0.077
+        },
+        "rvq_ce_6": {
+          "fad_infinity": 0.022,
+          "mel_error": 5.47,
+          "band_flux_cosine": 0.866,
+          "mrstft": 0.105,
+          "waveform_l1": 0.0509,
+          "rtf": 0.027
+        },
+        "symbolic_nearest_neighbour": {
+          "fad_infinity": 0.025,
+          "mel_error": 17.54,
+          "band_flux_cosine": 0.33
+        }
+      },
+      "statistics": "2000_paired_bootstrap_resamples_2000_paired_sign_flip_permutations_Holm_within_metric",
+      "bounded_conclusion": "seconds_aligned_control_and_short_schedule_RVQ_CE_are_promising_under_reported_metrics_but_do_not_establish_full_song_or_production_mix_benefit",
+      "limitations": [
+        "four_beat_windows_only",
+        "automatic_metrics_no_listener_or_user_study",
+        "one_sample_per_condition_no_seed_variance",
+        "no_real_rock_multitrack_or_full_arrangement_test",
+        "waveform_and_spectral_metrics_disagree",
+        "raw_RMS_gain_handling_artifact_claims_withheld",
+        "source_session_independence_not_publicly_auditable",
+        "72_dimensions_specific_to_exact_DAC_configuration",
+        "public_code_checkpoints_split_manifests_and_evaluation_artifacts_pending"
+      ],
+      "confidence": "medium_reported_internal_protocol_low_direct_production_transfer"
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20261005-1500-01",
+      "repository": "https://github.com/kostantinos-soiledis/midigroove_poc",
+      "pinned_head": "c0df19febfb51bc440a30cda4b4bd6a167190d21",
+      "commit_date": "2026-01-31",
+      "scope": "earlier_discrete_codec_token_proof_of_concept_not_Sec2Drum",
+      "checks": [
+        "no_Sec2Drum_title_or_arxiv_id",
+        "no_root_LICENSE",
+        "README_references_root_artifacts_directory_but_none_present"
+      ],
+      "status": "static_audit_complete",
+      "run_status": "not_run",
+      "independent_reproduction": "not_established",
+      "sec2drum_artifact_status": "claimed_internal_artifact_set_public_release_pending"
+    }
+  ],
+  "knowledge_cards_added": [
+    {
+      "id": "KC-ML-20261006-1200-01",
+      "claim": "seconds_aligned_symbolic_conditioning_preserves_explicit_physical_time_but_four_beat_metric_evaluation_does_not_prove_full_song_groove_or_mix_value",
+      "confidence": "high_scope_boundary"
+    },
+    {
+      "id": "KC-ML-20261006-1200-02",
+      "claim": "72_dimension_PCA_result_is_specific_to_the_frozen_DAC_structural_subspace_not_a_universal_latent_size",
+      "confidence": "high_for_reported_configuration"
+    },
+    {
+      "id": "KC-ML-20261006-1200-03",
+      "claim": "diffusion_improves_reported_paired_spectral_transient_metrics_while_direct_regression_remains_better_on_waveform_L1",
+      "confidence": "high_for_reported_tables"
+    },
+    {
+      "id": "KC-ML-20261006-1200-04",
+      "claim": "low_unpaired_FAD_can_coexist_with_poor_conditioning_fidelity_so_FAD_alone_cannot_qualify_a_renderer",
+      "confidence": "high_for_reported_baseline"
+    },
+    {
+      "id": "KC-ML-20261006-1200-05",
+      "claim": "RVQ_CE_is_a_training_only_auxiliary_objective_with_strongest_reported_benefit_at_short_schedules_not_an_inference_preset",
+      "confidence": "high_for_method"
+    },
+    {
+      "id": "KC-ML-20261006-1200-06",
+      "claim": "more_diffusion_steps_are_not_automatically_better_as_50_steps_were_slower_without_supported_mel_gain_over_25",
+      "confidence": "high_for_reported_comparison"
+    },
+    {
+      "id": "KC-ML-20261006-1200-07",
+      "claim": "one_sample_per_condition_excludes_stochastic_seed_variance_from_reported_intervals",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261006-1200-08",
+      "claim": "internal_artifact_backing_is_not_independent_reproducibility_until_public_code_checkpoints_manifests_and_outputs_are_available",
+      "confidence": "high"
+    }
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20261005-1500-01",
+      "source_added": "SRC-ML-20261006-0900-02",
+      "revision": "add_metric_seed_and_full_arrangement_gates_and_forbid_reusing_model_context_as_edit_threshold",
+      "apply_when": "replacing_rendering_or_humanizing_approved_drum_performance_events",
+      "change": "preserve_explicit_onset_velocity_articulation_role_and_grouped_multimic_events",
+      "proposed_range": "none_context_radii_and_boundary_filter_are_not_edit_ranges",
+      "protected_qualities": [
+        "groove",
+        "ghost_notes",
+        "flams",
+        "transient_hierarchy",
+        "cymbal_continuity",
+        "room_phase_when_present",
+        "bass_pocket",
+        "headroom"
+      ],
+      "verification": "event_fidelity_paired_spectrum_transients_seed_stability_and_randomized_loudness_matched_full_arrangement_preference",
+      "cancel_when": "metric_gain_costs_groove_seed_stability_mix_preference_cymbal_tails_room_phase_or_headroom",
+      "confidence": "medium_test_design_low_production_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261005-1800-02",
+      "source_added": "SRC-ML-20261006-0900-02",
+      "revision": "separate_distributional_similarity_paired_control_fidelity_and_stochastic_stability",
+      "apply_when": "evaluating_generated_or_separated_drum_stems",
+      "change": "retain_FAD_paired_spectral_transient_event_bandwidth_leakage_reconstruction_seed_and_full_mix_preference_as_separate_axes",
+      "proposed_range": "no_production_setting_range",
+      "protected_qualities": [
+        "groove",
+        "transients",
+        "ghost_notes",
+        "cymbal_bandwidth_and_tails",
+        "pocket",
+        "stereo_room_when_present",
+        "headroom"
+      ],
+      "success": "gain_survives_paired_metrics_at_least_three_fixed_seeds_and_repeated_full_mix_preference",
+      "cancel_when": "only_unpaired_metric_improves_or_seed_variance_or_mix_preference_regresses",
+      "confidence": "high_for_multi_axis_test_need_low_for_renderer_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261006-1200-01",
+      "title": "RVQ_auxiliary_loss_ablation_for_seconds_aligned_drum_renderer",
+      "status": "not_run_blocked_by_public_code_checkpoints_split_manifests_dataset_rights_and_compute_audit",
+      "A": "six_step_plain_PCA_DAC_latent_diffusion",
+      "B": "same_architecture_data_split_optimizer_seeds_sampler_and_six_step_schedule_with_training_time_RVQ_CE_lambda_0.10",
+      "single_factor": "training_time_RVQ_CE_auxiliary_loss",
+      "numeric_origin": "paper_ablation_condition_not_production_preset",
+      "fixed": [
+        "architecture",
+        "data_split",
+        "optimizer",
+        "training_budget",
+        "random_seeds",
+        "sampler",
+        "six_reverse_steps",
+        "decoder"
+      ],
+      "seed_policy": "at_least_three_predeclared_fixed_seeds_per_grid_no_cherry_picking",
+      "raw_diagnostics": [
+        "paired_mel",
+        "MRSTFT",
+        "band_flux_cosine",
+        "event_onset_velocity_articulation_fidelity",
+        "waveform_L1",
+        "high_band_ratio",
+        "crest_peak_true_peak",
+        "RTF",
+        "seed_dispersion"
+      ],
+      "listening": "identical_residual_and_full_arrangement_all_processing_fixed_BS1770_match_within_0.1_LU_randomized_labels_three_repeats_Dmitry",
+      "protected_qualities": [
+        "groove_and_pocket",
+        "transient_hierarchy",
+        "ghost_notes_and_flams",
+        "cymbal_bandwidth_and_tails",
+        "naturalness",
+        "section_role",
+        "stereo_room_when_present",
+        "headroom"
+      ],
+      "success": "B_improves_paired_spectral_transient_metrics_across_seeds_and_repeated_full_mix_preference_without_protected_quality_regression",
+      "cancel_when": "advantage_is_unpaired_only_collapses_across_seeds_or_reduces_preference_or_protected_qualities",
+      "auto_apply": false,
+      "paid_compute_authorized": false
+    }
+  ],
+  "videos": {
+    "studied_new": 0,
+    "catalogue": {
+      "total": 95,
+      "transcript_complete": 8,
+      "partial": 0,
+      "metadata_only": 87
+    }
+  },
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "VID-ML-20261006-0900-01",
+    "VID-ML-20261006-0900-02",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "EXP-ML-20261006-1200-01",
+    "EXP-ML-20260914-1800-01",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1800-01"
+  ],
+  "queue_removed_as_completed": [
+    "SRC-ML-20261006-0900-02",
+    "ART-ML-20261005-1500-01"
+  ],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "project_state": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_code_changed": false,
+    "model_state_changed": false,
+    "paid_access_used": false,
+    "paid_compute_used": false,
+    "external_audio_uploaded": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
