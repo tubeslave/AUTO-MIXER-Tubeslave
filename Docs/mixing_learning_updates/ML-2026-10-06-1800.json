@@ -1,0 +1,121 @@
+{
+  "update_id": "ML-2026-10-06-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-06T18:00:00+03:00",
+  "actual_start": "2026-10-06T17:57:58+03:00",
+  "completed": "2026-10-06T18:02:01+03:00",
+  "preceding_search_update": "ML-2026-10-06-1500",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261006-1800-01",
+      "title": "ViSQOL v3: An Open Source Production Ready Objective Speech and Audio Metric",
+      "arxiv": "2004.09584",
+      "url": "https://arxiv.org/pdf/2004.09584",
+      "reading_depth": "full_six_page_peer_reviewed_paper_plus_official_readme",
+      "bounded_conclusion": "full_reference_mono_downmix_metric_requiring_clean_reference_domain_validation_and_treatment_level_aggregation"
+    }
+  ],
+  "sources_updated": [
+    {
+      "id": "SRC-ML-20261006-1500-01",
+      "change": "added_training_and_evaluation_provenance_graph",
+      "independence_correction": "human_test_target_external_but_visqol_is_training_ancestor"
+    },
+    {
+      "id": "SRC-ML-20260930-1800-01",
+      "doi": "10.1109/TASLP.2021.3069302",
+      "reading_depth": "full_12_page_reread_plus_official_SEBASS_2f_supplement",
+      "change": "added_peaq_implementation_and_coefficient_set_sensitivity"
+    }
+  ],
+  "metadata_only_dependency": {
+    "doi": "10.1109/WASPAA.2019.8937179",
+    "title": "An Efficient Model for Estimating Subjective Quality of Separated Audio Source Signals",
+    "reading_depth": "metadata_abstract_only",
+    "source_family": "2f_model",
+    "not_counted_as_fully_read": true
+  },
+  "artifacts_added": [
+    {
+      "id": "ART-ML-20261006-1800-01",
+      "url": "https://github.com/google/visqol",
+      "revision": "38d0b0163e441047d4429bf07ad09e5b9031d02c",
+      "license": "Apache-2.0",
+      "execution": "not_run",
+      "integration": false
+    }
+  ],
+  "knowledge_cards_added": [
+    "KC-ML-20261006-1800-01",
+    "KC-ML-20261006-1800-02",
+    "KC-ML-20261006-1800-03",
+    "KC-ML-20261006-1800-04",
+    "KC-ML-20261006-1800-05",
+    "KC-ML-20261006-1800-06"
+  ],
+  "rules_updated": [
+    {
+      "id": "RULE-ML-20260930-1500-01",
+      "change": "require_metric_provenance_graph_and_group_shared_ancestors_into_one_evidence_family",
+      "confidence": "high_for_evaluation_design_low_for_direct_mix_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_updated": [
+    {
+      "id": "EXP-ML-20260930-1500-01",
+      "status": "not_run",
+      "single_factor": "known_high_frequency_bandwidth_removal",
+      "change": "align_visqol_input_contract_aggregate_same_treatment_and_forbid_composite_vote_with_deepaq"
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261006-1800-01",
+      "status": "not_run_blocked",
+      "single_factor": "reference_identity",
+      "blocker": "no_public_licensed_deepaq_code_checkpoint_inference_contract",
+      "auto_apply": false
+    }
+  ],
+  "videos_studied": [],
+  "videos_added": [],
+  "video_catalogue": {"total": 97, "transcript_complete": 8, "partial": 0, "metadata_only": 89},
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "VID-ML-20261006-1500-01",
+    "VID-ML-20261006-1500-02",
+    "VID-ML-20261006-0900-01",
+    "VID-ML-20261006-0900-02",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "EXP-ML-20260930-1500-01",
+    "EXP-ML-20261006-1800-01",
+    "EXP-ML-20261006-1200-01",
+    "EXP-ML-20260914-1800-01",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1800-01"
+  ],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "deduplication": [
+    "doi:10.1109/TASLP.2021.3069302->SRC-ML-20260930-1800-01",
+    "doi:10.1109/WASPAA.2019.8937179->2f_model_source_family"
+  ],
+  "scite": "not_queried_stored_2026-10-01_status_paid_or_trial_only",
+  "consensus": "not_queried",
+  "safety": {
+    "audio_changed": false,
+    "DSP_changed": false,
+    "model_changed": false,
+    "repository_code_changed": false,
+    "project_audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "paid_compute_used": false,
+    "all_rules_auto_apply": false,
+    "all_experiments_not_run": true
+  }
+}
