@@ -1,0 +1,141 @@
+{
+  "update_id": "ML-2026-10-06-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-06T15:00:00+03:00",
+  "actual_start": "2026-10-06T15:00:15+03:00",
+  "completed_at": "2026-10-06T15:14:34+03:00",
+  "preceding_update": "ML-2026-10-06-1200",
+  "preceding_search": "ML-2026-10-06-0900",
+  "preceding_search_report": "Docs/mixing_learning_updates/ML-2026-10-06-0900.md",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261006-1500-01",
+      "title": "DeePAQ: A Perceptual Audio Quality Metric Based on Foundational Models and Weakly Supervised Learning",
+      "authors": ["Guanxin Jiang", "Andreas Brendel", "Pablo M. Delgado", "Jürgen Herre"],
+      "stable_ids": ["doi:10.1109/ICASSP55912.2026.11465130", "arxiv:2510.12326v1"],
+      "venue": "ICASSP_2026_14467_14471",
+      "conference_dates": ["2026-05-04", "2026-05-08"],
+      "preprint_submitted": "2025-10-14",
+      "doi_url": "https://doi.org/10.1109/ICASSP55912.2026.11465130",
+      "full_text": "https://arxiv.org/pdf/2510.12326",
+      "official_record": "https://www.audiolabs-erlangen.de/fau/assistant/gjiang/publications",
+      "status": "studied_full_text_peer_reviewed",
+      "reading_depth": "complete_five_page_paper_method_training_data_nine_listening_tests_all_tables_ablations_conclusion_limitations",
+      "method": {
+        "foundation_model": "MERT_v1_95M_13_layers_768_features",
+        "pooled_feature_dimension": 9984,
+        "projection_dimension": 256,
+        "fine_tuning": "LoRA_query_value_rank_8_scale_16",
+        "objective": "Rank_n_Contrast",
+        "surrogates": ["ViSQOL_MOS", "codec_bitrate"],
+        "audio_rate_hz": 24000,
+        "excerpt_seconds": 4
+      },
+      "training_data": {
+        "internal_hours_approx": 460,
+        "source_rate_hz": 44100,
+        "codec_hours_each": 122,
+        "clean_hours": 45,
+        "validation_hours": 50,
+        "codecs": ["AAC", "Opus", "MP3"],
+        "bitrates_kbps": [16, 128]
+      },
+      "selected_results": {
+        "all_full_reference": {"PCC": 0.918, "SRCC": 0.889},
+        "source_separation_full_reference": {"DeePAQ_PCC": 0.919, "DeePAQ_SRCC": 0.787, "two_feature_PCC": 0.953, "two_feature_SRCC": 0.881},
+        "PEASS_full_reference": {"DeePAQ_PCC": 0.859, "DeePAQ_SRCC": 0.467, "two_feature_PCC": 0.898, "two_feature_SRCC": 0.624},
+        "source_separation_non_matching_reference": {"PCC": 0.310, "SRCC": 0.314}
+      },
+      "bounded_conclusion": "use_as_domain_specific_secondary_signal_quality_endpoint_only_never_as_arbitrary_mix_acceptance_or_preference_gate",
+      "limitations": ["codec_pseudolabel_training", "source_separation_out_of_distribution", "matched_clean_reference_required_for_full_reference", "four_second_24kHz_context", "no_rock_mix_preference_or_full_song_study", "internal_corpus_not_public", "no_public_code_checkpoint_manifest_or_reproduction_output_found"],
+      "confidence": "high_reported_tables_and_scope_low_direct_production_transfer"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261006-1500-01",
+      "subject": "DeePAQ_public_reproduction_package",
+      "status": "no_public_implementation_or_checkpoint_found",
+      "run_status": "not_run",
+      "independent_reproduction": "not_established",
+      "action": "wait_for_public_repository_license_checkpoint_and_inference_contract"
+    }
+  ],
+  "knowledge_cards_added": [
+    {"id": "KC-ML-20261006-1500-01", "claim": "aggregate_full_reference_correlation_does_not_imply_best_performance_for_each_distortion_domain", "confidence": "high_reported_tables"},
+    {"id": "KC-ML-20261006-1500-02", "claim": "non_matching_reference_DeePAQ_is_weak_on_source_separation_and_not_a_blind_mix_quality_gate", "confidence": "high_reported_tables"},
+    {"id": "KC-ML-20261006-1500-03", "claim": "ViSQOL_and_bitrate_pseudolabels_make_DeePAQ_dependent_on_surrogate_assumptions", "confidence": "high_method_scope"},
+    {"id": "KC-ML-20261006-1500-04", "claim": "mapping_gain_in_PCC_more_than_SRCC_indicates_scale_calibration_not_ordering_quality", "confidence": "medium_reported_ablation"},
+    {"id": "KC-ML-20261006-1500-05", "claim": "four_second_24kHz_evaluation_does_not_cover_full_song_dynamics_space_arrangement_or_intent", "confidence": "high_scope_boundary"},
+    {"id": "KC-ML-20261006-1500-06", "claim": "peer_review_does_not_create_operational_reproducibility_without_public_data_code_checkpoint_license_and_contract", "confidence": "high"}
+  ],
+  "rule_updates": [
+    {
+      "id": "RULE-ML-20260930-1500-01",
+      "source_added": "SRC-ML-20261006-1500-01",
+      "revision": "add_domain_stratification_reference_contract_and_PCC_vs_SRCC_separation",
+      "apply_when": "evaluating_or_selecting_learned_automatic_audio_processing",
+      "change": "evaluation_protocol_only_no_DSP_preset",
+      "proposed_range": "none_paper_numbers_are_study_conditions",
+      "protected_qualities": ["attacks", "tonal_balance", "stereo_mono", "headroom", "section_intent", "musical_density", "style"],
+      "verification": "stratified_correlations_less_coupled_endpoint_raw_diagnostics_and_randomized_BS1770_matched_Dmitry_listening",
+      "success": "improvement_survives_less_coupled_endpoint_and_listening_without_protected_regression",
+      "cancel_when": "optimized_metric_only_nonmatching_score_used_as_mix_gate_unresolved_domain_reference_contract_or_protected_regression",
+      "confidence": "high_evaluation_design_low_mixing_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-20260930-1500-01",
+      "status": "not_run",
+      "A": "approved_full_band_lossless_render",
+      "B": "same_render_antialiased_to_11.025kHz_then_resampled_to_44.1kHz",
+      "single_factor": "known_high_frequency_bandwidth_removal",
+      "level_policy": "retain_raw_and_make_separate_randomized_BS1770_matched_copies_with_logged_gain",
+      "measurements": ["band_log_spectral_error", "true_peak", "crest_onsets", "mid_side_spectra", "mono", "ViSQOL_or_PAQM_if_locally_licensed", "DeePAQ_only_if_public_licensed_artifact_and_reference_contract_available"],
+      "metric_comparison": "compare_matched_full_reference_and_nonmatching_DeePAQ_without_composite_winner_if_artifact_available",
+      "protected_qualities": ["drum_attack", "cymbal_texture", "guitar_bite", "chosen_lead_intelligibility", "stereo_image", "headroom"],
+      "success": "known_degradation_detected_without_treating_metric_agreement_as_musical_acceptance_Dmitry_rating_authoritative",
+      "cancel_when": "license_checkpoint_reference_contract_unresolved_nonfinite_output_level_mismatch_resampler_artifact_external_upload_or_paid_compute",
+      "auto_apply": false
+    }
+  ],
+  "videos_added": [
+    {
+      "id": "VID-ML-20261006-1500-01",
+      "youtube_id": "8VP-MDsvtoA",
+      "title": "METAL MIXING BASICS: How to split your bass guitar",
+      "channel": "URM Academy",
+      "published": "2022-10-25",
+      "duration": "PT7M11S",
+      "url": "https://www.youtube.com/watch?v=8VP-MDsvtoA",
+      "reading_depth": "metadata_description_chapters_only",
+      "chapters": [{"time": "0:00", "title": "Intro"}, {"time": "0:34", "title": "Basic Space Split"}, {"time": "2:07", "title": "Individual Control"}, {"time": "5:23", "title": "Hidden Power"}],
+      "transcript_status": "export_signal_available_but_text_unreadable_loading_in_current_bridge_after_original_audio_selected",
+      "state": "queued_source",
+      "techniques_extracted": []
+    },
+    {
+      "id": "VID-ML-20261006-1500-02",
+      "youtube_id": "B2oXeHL074g",
+      "title": "HOW TO GET A KILLER ROCK BASS TONE! Tone Secrets #10",
+      "channel": "Pete Thorn",
+      "duration": "approximately_PT16M",
+      "url": "https://www.youtube.com/watch?v=B2oXeHL074g",
+      "reading_depth": "metadata_only",
+      "transcript_status": "unavailable",
+      "state": "queued_source",
+      "techniques_extracted": []
+    }
+  ],
+  "video_catalogue": {"total": 97, "transcript_complete": 8, "partial": 0, "metadata_only": 89},
+  "deduplicated_rediscoveries": ["arxiv:2608.05442", "arxiv:2608.05506", "arxiv:2603.15995", "arxiv:2509.15948", "arxiv:2609.02835", "arxiv:2607.23846", "youtube:qQzRy1WLF0A", "youtube:Cmhd8fZ28fk"],
+  "multitracks_added": [],
+  "queue": ["EXP-ML-20261001-1800-01", "EXP-ML-20261005-1500-01", "VID-ML-20261006-1500-01", "VID-ML-20261006-1500-02", "VID-ML-20261006-0900-01", "VID-ML-20261006-0900-02", "VID-ML-20261005-1500-01", "VID-ML-20261005-1500-02", "EXP-ML-20260930-1500-01", "EXP-ML-20261006-1200-01", "EXP-ML-20260914-1800-01", "EXP-ML-20261002-1500-01", "EXP-ML-20261004-0900-01", "EXP-ML-20261005-1800-01"],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "scite": "not_queried_stored_2026-10-01_status_paid_or_trial_only",
+  "consensus": "not_queried",
+  "safety": {"audio_changed": false, "DSP_changed": false, "model_changed": false, "repository_code_changed": false, "project_audio_uploaded": false, "commercial_audio_extracted": false, "paid_compute_used": false, "all_rules_auto_apply": false, "all_experiments_not_run": true}
+}
