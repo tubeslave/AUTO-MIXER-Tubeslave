@@ -325,3 +325,12 @@ ML-2026-10-05-1500 (search, preceding successful search ML-2026-10-04-1500): eve
 | ML-2026-10-05-1800 | [Report](ML-2026-10-05-1800.md) · [JSON patch](ML-2026-10-05-1800.json) · [ADR](../adr/mixing-learning-2026-10-05-1800.md) | Full review of the P-center paper and Separate-and-Detect, plus pinned GitHub and Hugging Face metadata audit; 2 Source Cards upgraded, 1 Artifact Audit, 7 Knowledge Cards, 2 bounded candidate rules, 1 revised and 1 blocked unrun experiment; no audio, code, DSP or runtime change |
 
 ML-2026-10-05-1800 (deep_review, preceding successful search ML-2026-10-05-1500): the P-center study does not establish a universal 40 ms editing boundary, and Separate-and-Detect is class-specific rather than an overall F1 win over direct ADT. Generated-stem editability still requires leakage, bandwidth, reconstruction and loudness-matched listening checks. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
+
+
+## 2026-10-06 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-06-0900 | [Report](ML-2026-10-06-0900.md) · [JSON patch](ML-2026-10-06-0900.json) · [ADR](../adr/mixing-learning-2026-10-06-0900.md) | Search: 1 new full-text ICASSP bleed-reduction source, 1 abstract-only drum-rendering candidate, 2 bounded official vendor materials, 1 unavailable artifact audit and 2 metadata-only videos; 3 scientific rediscoveries removed; 6 Knowledge Cards, 2 existing rules and 1 existing experiment revised; no multitrack, audio, code, DSP or runtime change |
+
+ML-2026-10-06-0900 (search, preceding successful search ML-2026-10-05-1500): improved SI-SDR or SIR can coexist with worse SAR, so debleeding must pass separate artifact, transient, phase/room and loudness-matched preference gates. The rediscovered permutation-equivariance paper was already SRC-ML-20260914-1800-01 and was not duplicated. Vendor alignment claims remain workflow hypotheses. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
