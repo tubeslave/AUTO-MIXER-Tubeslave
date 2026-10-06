@@ -334,3 +334,12 @@ ML-2026-10-05-1800 (deep_review, preceding successful search ML-2026-10-05-1500)
 | ML-2026-10-06-0900 | [Report](ML-2026-10-06-0900.md) · [JSON patch](ML-2026-10-06-0900.json) · [ADR](../adr/mixing-learning-2026-10-06-0900.md) | Search: 1 new full-text ICASSP bleed-reduction source, 1 abstract-only drum-rendering candidate, 2 bounded official vendor materials, 1 unavailable artifact audit and 2 metadata-only videos; 3 scientific rediscoveries removed; 6 Knowledge Cards, 2 existing rules and 1 existing experiment revised; no multitrack, audio, code, DSP or runtime change |
 
 ML-2026-10-06-0900 (search, preceding successful search ML-2026-10-05-1500): improved SI-SDR or SIR can coexist with worse SAR, so debleeding must pass separate artifact, transient, phase/room and loudness-matched preference gates. The rediscovered permutation-equivariance paper was already SRC-ML-20260914-1800-01 and was not duplicated. Vendor alignment claims remain workflow hypotheses. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
+
+
+## 2026-10-06 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-06-1200 | [Report](ML-2026-10-06-1200.md) · [JSON patch](ML-2026-10-06-1200.json) · [ADR](../adr/mixing-learning-2026-10-06-1200.md) | Full 17-page Sec2Drum review and pinned earlier-repository audit; 1 Source Card and 1 Artifact Audit upgraded, 8 Knowledge Cards, 2 existing rules revised and 1 blocked unrun RVQ-CE ablation; no audio, code, DSP, runtime or paid-compute change |
+
+ML-2026-10-06-1200 (deep_review, preceding search ML-2026-10-06-0900): low unpaired FAD can coexist with poor conditioning fidelity, and diffusion's spectral/transient gains coexist with worse waveform L1 than direct regression. Model context radii and dataset filters are not editing thresholds. Public Sec2Drum code/checkpoints/manifests remain pending, so the new ablation stays blocked. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
