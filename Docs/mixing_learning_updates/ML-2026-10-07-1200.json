@@ -1,0 +1,119 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-07-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-07T12:00:00+03:00",
+  "actual_start": "2026-10-07T12:00:12+03:00",
+  "completed_at": "2026-10-07T12:04:45+03:00",
+  "preceding_search_report": "ML-2026-10-07-0900",
+  "preceding_update": "ML-2026-10-07-0900",
+  "citation_check": "partial",
+  "operations": [
+    {"op": "add_source_card", "id": "SRC-ML-20261007-1200-01"},
+    {"op": "add_knowledge_card", "id": "KC-ML-20261007-1200-01"},
+    {"op": "add_knowledge_card", "id": "KC-ML-20261007-1200-02"},
+    {"op": "add_knowledge_card", "id": "KC-ML-20261007-1200-03"},
+    {"op": "revise_candidate_rule", "id": "RULE-ML-20261007-0900-01"},
+    {"op": "add_candidate_rule", "id": "RULE-ML-20261007-1200-01"},
+    {"op": "revise_experiment_plan", "id": "EXP-ML-20261007-0900-01"},
+    {"op": "add_experiment_plan", "id": "EXP-ML-20261007-1200-01"}
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261007-1200-01",
+      "title": "Parameter Automation in a Dynamic Range Compressor",
+      "authors": ["Dimitrios Giannoulis", "Michael Massberg", "Joshua D. Reiss"],
+      "publication": "Journal of the Audio Engineering Society 61(10), 716-726",
+      "publication_date": "2013-10-06",
+      "doi": null,
+      "official_metadata_url": "https://aes2.org/publications/elibrary-page/?id=16965",
+      "full_text_url": "https://joshreiss.github.io/documents/2013/Giannoulis%20Massberg%20Reiss%20-%20dynamic%20range%20compression%20automation%20-%20JAES%202013.pdf",
+      "reading_depth": "complete_eleven_page_full_text_method_equations_evaluation_results_limits_conclusion",
+      "status": "studied_full_text_peer_reviewed_journal",
+      "study_design": {
+        "participants": {"expert_mixing_engineers": 9, "experienced_amateurs": 7},
+        "materials": ["drums", "slap_bass", "soft_vocal", "acoustic_guitar"],
+        "method": "per_parameter_method_of_adjustment_in_participant_environment",
+        "full_chain_randomized_loudness_matched_ab": false
+      },
+      "paper_specific_values_not_presets": {"crest_integration_ms": 200, "max_attack_ms": 80, "max_release_ms": 1000},
+      "limitations": [
+        "uncontrolled_listening_environments",
+        "small_subject_and_signal_sample",
+        "isolated_tracks_not_in_mix",
+        "static_human_choices_compared_with_averaged_adaptive_values",
+        "knee_thresholds_empirically_fit_to_same_user_results",
+        "fixed_infinite_ratio_is_limiter_like"
+      ],
+      "correction": {
+        "official_notice": "small_correction_to_equation_3_posted_2014_02",
+        "exact_correction_content_verified": false,
+        "accessible_author_pdf_contains_original_equation": true,
+        "implementation_parity_status": "blocked_pending_corrected_equation_or_verified_reference_code"
+      },
+      "companion_artifact_status": "historical_url_not_retrieved",
+      "citation_check": "partial"
+    }
+  ],
+  "reconciliation": [
+    {"id": "SRC-ML-20261007-0900-01", "relationship": "methodological_dependency_not_independent_preference_confirmation"},
+    {"id": "SRC-ML-20260914-1500-02", "relationship": "existing_independent_listener_preference_comparator_not_duplicated"}
+  ],
+  "knowledge_cards": [
+    {"id": "KC-ML-20261007-1200-01", "claim": "feature_driven_compressor_automation_should_preserve_an_explicit_bounded_human_intent_control", "confidence": "high_for_paper_design_low_for_universal_preference"},
+    {"id": "KC-ML-20261007-1200-02", "claim": "static_preference_and_adaptive_parameter_trajectories_require_event_aligned_not_average_only_validation", "confidence": "high"},
+    {"id": "KC-ML-20261007-1200-03", "claim": "published_erratum_state_is_required_DSP_provenance_and_unverified_correction_blocks_parity_claims", "confidence": "high"}
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261007-0900-01",
+      "op": "revise",
+      "source_ids": ["SRC-ML-20261007-0900-01", "SRC-ML-20261007-1200-01"],
+      "revision": "require_gain_computer_equation_version_and_block_Giannoulis_parity_until_2014_equation_3_correction_or_verified_reference_code_is_available",
+      "status": "candidate",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261007-1200-01",
+      "source_ids": ["SRC-ML-20261007-1200-01"],
+      "apply_when": "feature_driven_controller_proposes_time_varying_compressor_parameters",
+      "change": "retain_bounded_amount_control_and_log_parameter_trajectories_plus_equation_erratum_code_version",
+      "proposed_range": "no_transferable_preset_range",
+      "instrument_section_scope": "isolated_diagnostics_then_actual_section_and_full_mix_without_automatic_vocal_priority",
+      "protect": ["attack", "body", "decay", "groove", "room_bleed_continuity", "spectral_balance", "stereo_image", "true_peak", "headroom"],
+      "verify": ["event_aligned_gain_reduction", "parameter_trajectories", "section_metrics", "raw_and_BS1770_loudness_matched_blind_copies", "Dmitry_rating"],
+      "cancel": ["unresolved_correction_or_version", "chatter", "pumping", "loudness_only_preference", "isolated_improvement_damages_mix"],
+      "confidence": "medium_for_audit_pattern_low_for_numeric_transfer",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261007-0900-01",
+      "op": "revise",
+      "status": "not_run_blocked",
+      "single_factor": "static_curve_selection_method_manual_vs_moment_match",
+      "new_prerequisite": "verified_common_gain_computer_and_if_Giannoulis_derived_verified_2014_equation_3_correction_or_reference_code",
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20261007-1200-01",
+      "status": "not_run_blocked",
+      "A": "approved_fixed_attack_release_knee_makeup_with_Dmitry_set_threshold",
+      "B": "same_topology_and_threshold_with_feature_driven_attack_release_knee_makeup_trajectories",
+      "single_factor": "parameter_selection_controller_manual_fixed_vs_feature_driven",
+      "frozen": ["topology", "threshold", "detector_input", "channel_linking", "downstream_chain"],
+      "prerequisite": "verified_corrected_gain_computer_or_explicitly_versioned_common_implementation",
+      "level_policy": "retain_raw_and_create_separate_randomized_BS1770_integrated_loudness_matched_copies",
+      "measurements": ["event_aligned_gain_reduction", "parameter_trajectories", "integrated_short_term_loudness", "sample_true_peak", "section_crest", "onset_body_ratio", "recovery_before_next_event", "band_energy", "stereo_correlation"],
+      "protected_qualities": ["attack", "body", "decay", "groove", "bleed_room_continuity", "bass_guitar_separation", "arrangement_defined_lead_role", "width", "headroom"],
+      "listener": "Dmitry_three_randomized_repeats",
+      "auto_apply": false
+    }
+  ],
+  "video_catalogue_after": {"total": 99, "transcript_complete": 9, "partial": 0, "metadata_only_queued": 90},
+  "priority_queue": ["EXP-ML-20261001-1800-01", "EXP-ML-20261005-1500-01", "EXP-ML-20261007-0900-01", "EXP-ML-20261007-1200-01"],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "safety": {"audio_modified": false, "audio_uploaded": false, "dsp_changed": false, "model_changed": false, "production_code_changed": false, "paid_services_used": false, "rules_auto_applied": false}
+}
