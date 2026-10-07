@@ -367,3 +367,12 @@ ML-2026-10-06-1800 (deep_review, preceding search ML-2026-10-06-1500): DeePAQ's 
 | ML-2026-10-07-0900 | [Report](ML-2026-10-07-0900.md) · [JSON patch](ML-2026-10-07-0900.json) · [ADR](../adr/mixing-learning-2026-10-07-0900.md) | Search: 1 older missing DAFx full-text source, 1 existing video upgraded to full-transcript reading, 2 new metadata-only videos and 1 rights-recheck legal multitrack candidate; 3 scientific and 3 video rediscoveries reconciled; 1 Knowledge Card, 1 bounded candidate rule and 1 unrun experiment; no audio, code, DSP or runtime change |
 
 ML-2026-10-07-0900 (search, preceding successful search ML-2026-10-06-1500): long-term detector moment matching is retained only as a compressor-parameter initializer because it does not protect time order, transients, sections, spectrum or stereo. The rock compressor video's approximate 3 dB-GR calibration is not output-loudness matching and its audio examples were not audited. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
+
+
+## 2026-10-07 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-07-1200 | [Report](ML-2026-10-07-1200.md) · [JSON patch](ML-2026-10-07-1200.json) · [ADR](../adr/mixing-learning-2026-10-07-1200.md) | Deep review: full JAES-2013 compressor-automation paper and correction notice reconciled with the 09:00 DAFx source and existing 2017 listener study; 1 Source Card, 3 Knowledge Cards, 1 revised and 1 new bounded rule, 1 revised and 1 new blocked experiment; no video, multitrack, audio, DSP or runtime change |
+
+ML-2026-10-07-1200 (deep_review, preceding search ML-2026-10-07-0900): the 16-person, four-isolated-track method-of-adjustment study is implementation/method evidence, not a full-chain loudness-matched blind preference test. Exact Giannoulis parity is blocked until the February-2014 Eq. 3 correction or verified reference code is available. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and both reviewed experiments not_run_blocked.
