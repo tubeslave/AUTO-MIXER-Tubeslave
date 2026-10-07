@@ -359,3 +359,11 @@ ML-2026-10-06-1500 (search, preceding successful search ML-2026-10-06-0900): Dee
 | ML-2026-10-06-1800 | [Report](ML-2026-10-06-1800.md) · [JSON patch](ML-2026-10-06-1800.json) · [ADR](../adr/mixing-learning-2026-10-06-1800.md) | Deep review: DeePAQ checked against full ViSQOL v3 and objective-metric domain-dependence papers plus official 2f supplement; 1 Source Card and 1 existing Source Card updated, 1 pinned artifact audit, 6 Knowledge Cards, 1 existing rule and 1 existing experiment revised, 1 blocked reference-sensitivity experiment added; no video, multitrack, audio, DSP or runtime change |
 
 ML-2026-10-06-1800 (deep_review, preceding search ML-2026-10-06-1500): DeePAQ's human-test evaluation remains informative, but ViSQOL is in its training-label ancestry, so DeePAQ and ViSQOL are one evidence family rather than independent votes. 2f results require exact PEAQ implementation and coefficient provenance. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and all experiments not_run or blocked.
+
+## 2026-10-07 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-07-0900 | [Report](ML-2026-10-07-0900.md) · [JSON patch](ML-2026-10-07-0900.json) · [ADR](../adr/mixing-learning-2026-10-07-0900.md) | Search: 1 older missing DAFx full-text source, 1 existing video upgraded to full-transcript reading, 2 new metadata-only videos and 1 rights-recheck legal multitrack candidate; 3 scientific and 3 video rediscoveries reconciled; 1 Knowledge Card, 1 bounded candidate rule and 1 unrun experiment; no audio, code, DSP or runtime change |
+
+ML-2026-10-07-0900 (search, preceding successful search ML-2026-10-06-1500): long-term detector moment matching is retained only as a compressor-parameter initializer because it does not protect time order, transients, sections, spectrum or stereo. The rock compressor video's approximate 3 dB-GR calibration is not output-loudness matching and its audio examples were not audited. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false, all experiments not_run.
