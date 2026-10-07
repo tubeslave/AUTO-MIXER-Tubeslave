@@ -1,0 +1,177 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-07-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-07T15:00:00+03:00",
+  "actual_start": "2026-10-07T14:59:27+03:00",
+  "completed_at": "2026-10-07T15:05:58+03:00",
+  "preceding_search_report": "ML-2026-10-07-0900",
+  "preceding_update": "ML-2026-10-07-1200",
+  "citation_check": "partial",
+  "operations": [
+    {"op":"add_source_card","id":"SRC-ML-20261007-1500-01"},
+    {"op":"add_exclusion_source_card","id":"SRC-ML-20261007-1500-02"},
+    {"op":"add_video_source_card","id":"VIDEO-ML-20261007-1500-01"},
+    {"op":"add_video_source_card","id":"VIDEO-ML-20261007-1500-02"},
+    {"op":"add_reference_candidate","id":"REF-ML-20261007-1500-01"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1500-01"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1500-02"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1500-03"},
+    {"op":"add_candidate_rule","id":"RULE-ML-20261007-1500-01"},
+    {"op":"add_candidate_rule","id":"RULE-ML-20261007-1500-02"},
+    {"op":"add_experiment_plan","id":"EXP-ML-20261007-1500-01"},
+    {"op":"add_experiment_plan","id":"EXP-ML-20261007-1500-02"}
+  ],
+  "source_cards": [
+    {
+      "id":"SRC-ML-20261007-1500-01",
+      "title":"Exploring level- and spectrum-based music mixing transforms for hearing-impaired listeners",
+      "authors":["Aravindan Joseph Benjamin","Kai Siedenburg"],
+      "publication":"Journal of the Acoustical Society of America 154(2), 1048-1061",
+      "publication_year":2023,
+      "doi":"10.1121/10.0020269",
+      "pmid":"37607002",
+      "url":"https://pubmed.ncbi.nlm.nih.gov/37607002/",
+      "full_text_url":"https://pubs.aip.org/asa/jasa/article-pdf/154/2/1048/18092580/1048_1_10.0020269.pdf",
+      "reading_depth":"metadata_and_abstract_only",
+      "status":"queued_full_text",
+      "bounded_claim":"accessibility_targeted_alternate_mix_candidate_not_universal_rock_balance_rule",
+      "citation_check":"partial"
+    },
+    {
+      "id":"SRC-ML-20261007-1500-02",
+      "title":"Automatic Minimisation of Masking in Multitrack Audio using Subgroups",
+      "stable_id":"arxiv:1803.09960",
+      "doi":"10.48550/arXiv.1803.09960",
+      "url":"https://arxiv.org/abs/1803.09960",
+      "version_history":["v1_2018-03-27","v2_2018-03-28","v3_2021-01-05_withdrawn"],
+      "reading_depth":"official_arxiv_metadata_withdrawal_notice_and_abstract_only",
+      "withdrawal_reason":"ownership_of_intellectual_property_must_be_resolved",
+      "official_pdf_available":false,
+      "license_available":false,
+      "status":"withdrawn_ip_ownership_unresolved_not_evidence"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id":"VIDEO-ML-20261007-1500-01",
+      "stable_id":"youtube:ADsdGtsleQw",
+      "title":"Guitar Production & Mixing Masterclass With Mike Pepe: Paradox - Get The Message",
+      "channel":"Produce Like A Pro",
+      "url":"https://www.youtube.com/watch?v=ADsdGtsleQw",
+      "published":"2026-08-28",
+      "video_reading_depth":"metadata_only",
+      "transcript_status":"not_obtained",
+      "content_studied":false,
+      "companion_url":"https://producelikeapro.com/blog/how-mike-pepe-built-a-billboard-no-1-guitar-sound-in-a-home-studio/",
+      "companion_reading_depth":"full_article_read",
+      "categories":["rhythm_guitar","lead_guitar","pan_width","delay","reverb","arrangement","guitar_bus","compression"],
+      "source_specific_values":["rhythms_hard_LR","octaves_approx_75_percent_LR","leads_approx_30_and_60_percent","190_BPM_eighth_note_approx_157_ms","plate_approx_1_s","guitar_compression_up_to_approx_6_dB_GR"]
+    },
+    {
+      "id":"VIDEO-ML-20261007-1500-02",
+      "stable_id":"youtube:Ybb376fSpLo",
+      "title":"Mix Tricks You'll Use On Every Session - Mixing Indie Rock With Dax Liniere",
+      "channel":"Produce Like A Pro",
+      "url":"https://www.youtube.com/watch?v=Ybb376fSpLo",
+      "published":"2025-12-29",
+      "video_reading_depth":"metadata_only",
+      "transcript_status":"not_obtained",
+      "content_studied":false,
+      "companion_url":"https://producelikeapro.com/blog/mixing-lighthouse-by-stone-branches-dax-linieres-puzzle-factory-breakdown/",
+      "companion_reading_depth":"full_article_read",
+      "categories":["eq","compression","saturation","reverb","delay","stereo_pan","automation","drums","bass","guitars","vocals"],
+      "source_specific_values":["colour_compression_approx_1_to_2_dB_GR","reverb_send_HPF_examples_approx_70_to_130_Hz","kick_to_bass_ducking_cap_approx_1_5_dB","opposite_side_mono_reverb"]
+    }
+  ],
+  "reference_cards": [
+    {
+      "id":"REF-ML-20261007-1500-01",
+      "artist":"Stone Branches",
+      "title":"Lighthouse",
+      "genre":"indie_rock",
+      "source_url":"https://producelikeapro.lpages.co/stone-branches-lighthouse-multitracks-form/",
+      "reading_depth":"official_companion_link_only",
+      "rights_status":"file_level_terms_and_archive_manifest_not_verified",
+      "raw_audio_acquired":false,
+      "dsp_metrics_measured":false,
+      "status":"reference_candidate_rights_recheck"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261007-1500-01","claim":"withdrawn_source_without_current_authorized_text_or_license_is_metadata_lineage_not_evidence","confidence":"high"},
+    {"id":"KC-ML-20261007-1500-02","claim":"layered_rock_guitar_width_can_be_arranged_by_role_and_section_not_only_by_hard_LR_duplication","confidence":"medium_extraction_low_to_medium_transfer"},
+    {"id":"KC-ML-20261007-1500-03","claim":"opposite_side_mono_ambience_is_a_bounded_balance_option_for_asymmetrical_leads","confidence":"medium_extraction_low_to_medium_transfer"}
+  ],
+  "candidate_rules": [
+    {
+      "id":"RULE-ML-20261007-1500-01",
+      "source_ids":["VIDEO-ML-20261007-1500-01"],
+      "apply_when":"dense_section_has_distinct_guitar_roles_and_hard_LR_duplication_leaves_image_hole_or_poor_separation",
+      "change":"pan_assignment_by_role_only",
+      "proposed_range":"source_specific_rhythms_hard_LR_octaves_about_75_percent_leads_about_30_60_percent_centre_texture_C",
+      "range_origin":"official_companion_article_not_scientific_limit",
+      "instrument_section_scope":"layered_rhythm_and_lead_guitars_in_arrangement_defined_dense_sections",
+      "protect":["mono_compatibility","centre_impact","kick_snare_bass_and_chosen_lead_readability","hook_clarity","section_lift","headroom"],
+      "verify":["mono_fold_down","MS_energy_by_band","stereo_correlation","centre_masking","BS1770_loudness_matched_Dmitry_rating"],
+      "cancel":["centre_congestion","mono_loss","unstable_width","support_steals_focus","loudness_only_win"],
+      "confidence":"low_to_medium",
+      "status":"candidate",
+      "auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20261007-1500-02",
+      "source_ids":["VIDEO-ML-20261007-1500-02"],
+      "apply_when":"hard_panned_lead_is_spatially_unbalanced_but_dry_position_should_remain",
+      "change":"mono_reverb_return_pan_only",
+      "proposed_range":"centred_return_vs_fully_opposite_return_no_transferable_send_or_decay_value",
+      "range_origin":"official_companion_article_plus_project_test_design",
+      "instrument_section_scope":"exposed_panned_lead_guitar_or_similar_melodic_support",
+      "protect":["dry_localization","mono_compatibility","centre_clarity","width_continuity","hook_focus","headroom"],
+      "verify":["raw_and_BS1770_loudness_matched_randomized_copies","mono_fold_down","stereo_correlation","side_energy_balance","Dmitry_three_repeat_rating"],
+      "cancel":["mono_loss","phasey_image","centre_smear","lead_distraction","section_jump","loudness_only_win"],
+      "confidence":"low_to_medium",
+      "status":"candidate",
+      "auto_apply":false
+    }
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20261007-1500-01",
+      "status":"not_run",
+      "A":"approved_current_guitar_panning",
+      "B":"role_based_map_from_RULE_ML_20261007_1500_01",
+      "single_factor":"guitar_pan_assignment",
+      "frozen":["gains","automation","polarity","EQ","dynamics","saturation","delay","reverb","downstream_chain"],
+      "level_policy":"retain_raw_and_create_randomized_BS1770_integrated_loudness_matched_copies",
+      "measurements":["MS_energy_by_band","stereo_correlation","mono_fold_down_level_spectral_delta","centre_masking","sample_true_peak"],
+      "listener":"Dmitry_three_randomized_repeats",
+      "auto_apply":false
+    },
+    {
+      "id":"EXP-ML-20261007-1500-02",
+      "status":"not_run",
+      "A":"mono_reverb_return_centred",
+      "B":"same_return_hard_panned_opposite_dry_lead",
+      "single_factor":"reverb_return_pan",
+      "frozen":["dry_pan","send_amount","algorithm_or_IR","decay","pre_delay","filters","gain","downstream_chain"],
+      "level_policy":"retain_raw_and_create_randomized_BS1770_integrated_loudness_matched_copies",
+      "measurements":["stereo_correlation","LR_and_MS_energy","mono_fold_down_delta","centre_band_masking","sample_true_peak"],
+      "listener":"Dmitry_three_randomized_repeats",
+      "auto_apply":false
+    }
+  ],
+  "deduplication": [
+    {"key":"youtube:b9qBHnlw4Gc","resolution":"existing_card_not_duplicated"},
+    {"key":"youtube:y116iwNcD90","resolution":"existing_card_not_duplicated"},
+    {"key":"youtube:pT8EvSXXDWE","resolution":"same_project_lineage_not_independent_new_card"},
+    {"key":"arxiv:2609.02835","resolution":"existing_source_not_duplicated"},
+    {"key":"arxiv:2608.05442","resolution":"existing_source_not_duplicated"},
+    {"key":"arxiv:2608.05506","resolution":"existing_source_not_duplicated"},
+    {"key":"normalized_title:an_autonomous_method_for_multi_track_dynamic_range_compression","resolution":"existing_source_not_duplicated"}
+  ],
+  "video_catalogue_after":{"total":101,"transcript_complete":9,"partial":0,"metadata_only_queued":92},
+  "priority_queue":["EXP-ML-20261001-1800-01","EXP-ML-20261005-1500-01","SRC-ML-20261007-1500-01","VIDEO-ML-20261007-1500-01","VIDEO-ML-20261007-1500-02","REF-ML-20261007-1500-01","EXP-ML-20261007-1500-02","EXP-ML-20261007-1500-01","EXP-ML-20261007-0900-01","EXP-ML-20261007-1200-01"],
+  "next_executable_experiment":"EXP-ML-20261001-1800-01",
+  "safety":{"audio_modified":false,"audio_uploaded":false,"dsp_changed":false,"model_changed":false,"production_code_changed":false,"paid_services_used":false,"rules_auto_applied":false}
+}
