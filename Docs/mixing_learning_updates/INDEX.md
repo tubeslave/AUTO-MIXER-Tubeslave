@@ -385,3 +385,12 @@ ML-2026-10-07-1200 (deep_review, preceding search ML-2026-10-07-0900): the 16-pe
 | ML-2026-10-07-1500 | [Report](ML-2026-10-07-1500.md) · [JSON patch](ML-2026-10-07-1500.json) · [ADR](../adr/mixing-learning-2026-10-07-1500.md) | Search: 1 abstract-only JASA source queued, 1 withdrawn arXiv source excluded from evidence, 2 new metadata-only videos with 2 fully read official companion articles, 1 rights-recheck multitrack candidate; 2 candidate rules and 2 unrun guitar A/B plans; no audio, code, DSP or runtime change |
 
 ML-2026-10-07-1500 (search, preceding successful search ML-2026-10-07-0900): withdrawn arXiv:1803.09960 is retained only as a provenance marker, not algorithm evidence. The Produce Like A Pro companion articles support source-specific guitar-role placement and opposite-side ambience hypotheses, while both videos remain unstudied without permitted transcripts. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and all experiments not_run or blocked.
+
+
+## 2026-10-07 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-07-1800 | [Report](ML-2026-10-07-1800.md) · [JSON patch](ML-2026-10-07-1800.json) · [ADR](../adr/mixing-learning-2026-10-07-1800.md) | Full JASA accessibility-mix paper and 2025 PLOS ONE performance follow-up reviewed; 1 Source Card upgraded, 1 added, 1 withdrawn-lineage card revised, 4 Knowledge Cards, 2 bounded candidate rules and 2 blocked loudness-matched A/B plans; no video, multitrack, audio, DSP or runtime change |
+
+ML-2026-10-07-1800 (deep_review, preceding search ML-2026-10-07-1500): population LAR means are not fixed presets; listener and hearing-aid state must be explicit. The follow-up found no main EQ-transform detection benefit and a Bass-specific regression at stronger settings, so target-class gates are mandatory. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and new experiments not_run_blocked.
