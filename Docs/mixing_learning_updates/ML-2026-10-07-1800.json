@@ -1,0 +1,144 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-07-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-07T18:00:00+03:00",
+  "actual_start": "2026-10-07T17:58:48+03:00",
+  "completed_at": "2026-10-07T18:04:28+03:00",
+  "preceding_search_report": "ML-2026-10-07-1500",
+  "preceding_update": "ML-2026-10-07-1500",
+  "citation_check": "partial",
+  "operations": [
+    {"op":"update_source_card","id":"SRC-ML-20261007-1500-01"},
+    {"op":"add_source_card","id":"SRC-ML-20261007-1800-01"},
+    {"op":"update_exclusion_source_card","id":"SRC-ML-20261007-1500-02"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1800-01"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1800-02"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1800-03"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261007-1800-04"},
+    {"op":"add_candidate_rule","id":"RULE-ML-20261007-1800-01"},
+    {"op":"add_candidate_rule","id":"RULE-ML-20261007-1800-02"},
+    {"op":"add_experiment_plan","id":"EXP-ML-20261007-1800-01"},
+    {"op":"add_experiment_plan","id":"EXP-ML-20261007-1800-02"}
+  ],
+  "source_cards": [
+    {
+      "id":"SRC-ML-20261007-1500-01",
+      "title":"Exploring level- and spectrum-based music mixing transforms for hearing-impaired listeners",
+      "doi":"10.1121/10.0020269",
+      "pmid":"37607002",
+      "published":"2023-08-22",
+      "url":"https://pubmed.ncbi.nlm.nih.gov/37607002/",
+      "full_text_url":"https://www.researchgate.net/publication/373295416_Exploring_level-_and_spectrum-based_music_mixing_transforms_for_hearing-impaired_listeners",
+      "license":"CC_BY_4_0",
+      "reading_depth":"full_text_methods_results_discussion_limitations",
+      "status":"reviewed_full_text",
+      "bounded_claim":"listener_and_hearing_aid_state_specific_accessibility_controls_not_fixed_LAR_or_spectral_presets",
+      "citation_check":"partial"
+    },
+    {
+      "id":"SRC-ML-20261007-1800-01",
+      "title":"Effects of spectral manipulations of music mixes on musical scene analysis abilities of hearing-impaired listeners",
+      "doi":"10.1371/journal.pone.0316442",
+      "published":"2025-01-10",
+      "url":"https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0316442",
+      "data_url":"https://doi.org/10.5281/zenodo.14541533",
+      "license":"CC_BY_4_0",
+      "reading_depth":"full_text_methods_results_discussion_limitations",
+      "status":"reviewed_full_text",
+      "independence":"same_authors_and_EQ_transform_lineage_not_independent_confirmation",
+      "bounded_claim":"no_main_EQ_transform_detection_benefit_and_bass_specific_regression_require_target_class_gates",
+      "citation_check":"partial"
+    },
+    {
+      "id":"SRC-ML-20261007-1500-02",
+      "stable_id":"arxiv:1803.09960",
+      "status":"withdrawn_ip_ownership_unresolved_not_evidence",
+      "same_lineage_thesis":"https://qmro.qmul.ac.uk/xmlui/handle/123456789/55527",
+      "thesis_relationship":"same_author_method_lineage_not_independent_confirmation",
+      "official_AES_record_found":false,
+      "citation_check":"partial"
+    }
+  ],
+  "corrections": [
+    {"prior":"hearing_impaired_participants_preferred_elevated_LAR","revised":"experiment_1_supports_between_group_contrast_but_not_universal_zero_referenced_preset"},
+    {"prior":"spectral_preference_may_imply_scene_analysis_benefit","revised":"preference_and_detection_are_distinct_and_followup_found_no_main_transform_benefit"},
+    {"prior":"followup_counts_as_confirmation","revised":"same_author_lineage_not_independent"}
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261007-1800-01","claim":"accessibility_mix_controls_must_be_listener_and_hearing_aid_state_specific","confidence":"medium_with_low_transfer"},
+    {"id":"KC-ML-20261007-1800-02","claim":"preference_and_target_detection_are_distinct_endpoints","confidence":"high"},
+    {"id":"KC-ML-20261007-1800-03","claim":"target_class_is_a_rollback_dimension_and_bass_regression_must_not_be_hidden_by_aggregate_scores","confidence":"medium_task_low_to_medium_full_song_transfer"},
+    {"id":"KC-ML-20261007-1800-04","claim":"same_lineage_followup_is_not_independent_confirmation","confidence":"high"}
+  ],
+  "candidate_rules": [
+    {
+      "id":"RULE-ML-20261007-1800-01",
+      "source_ids":["SRC-ML-20261007-1500-01"],
+      "apply_when":"alternate_mix_explicitly_targets_documented_hearing_impaired_listener_and_device_state",
+      "change":"lead_vocal_broadband_gain_only",
+      "proposed_range":"A_0_dB_vs_B_plus_2_dB_LAR_project_pilot",
+      "range_origin":"rounded_experiment_1_HI_group_means_not_clinical_or_universal_recommendation",
+      "instrument_section_scope":"lead_vocal_vs_accompaniment_in_defined_section_without_automatic_vocal_priority",
+      "protect":["accompaniment_balance","backing_vocals","section_dynamics","timbre","true_peak","hearing_aid_headroom","artistic_hierarchy"],
+      "verify":["intended_listener","fixed_aid_state","three_randomized_repeats","raw_and_BS1770_matched_copies","LAR","short_term_loudness","true_peak"],
+      "cancel":["inconsistent_preference","loudness_only_win","device_state_mismatch","arrangement_damage","headroom_breach"],
+      "confidence":"medium_personalization_low_numeric_pilot",
+      "status":"candidate",
+      "auto_apply":false
+    },
+    {
+      "id":"RULE-ML-20261007-1800-02",
+      "source_ids":["SRC-ML-20261007-1500-01","SRC-ML-20261007-1800-01"],
+      "apply_when":"offline_research_evaluation_of_spectral_accessibility_transform",
+      "change":"test_one_transform_level_against_factory_without_production_promotion",
+      "proposed_range":"100_percent_factory_vs_200_percent_overmix",
+      "range_origin":"followup_tested_0_100_200_300_percent_grid",
+      "instrument_section_scope":"project_owned_multitracks_with_per_target_class_reporting",
+      "protect":["bass_detection","target_class_performance","timbre","approved_balance","mono_stereo_image","crest","true_peak"],
+      "verify":["per_target_detection","quality_rating","Gini_index","95_percent_rolloff_difference","BS1770_loudness_matching"],
+      "cancel":["no_repeatable_benefit","bass_regression","quality_loss","descriptor_only_win","implementation_mismatch"],
+      "confidence":"medium_negative_guard_low_full_song_transfer",
+      "status":"candidate",
+      "auto_apply":false
+    }
+  ],
+  "experiments": [
+    {
+      "id":"EXP-ML-20261007-1800-01",
+      "status":"not_run_blocked_target_listener",
+      "A":"approved_factory_mix_LAR_unchanged",
+      "B":"same_mix_plus_2_dB_LAR_via_lead_vocal_gain",
+      "single_factor":"lead_vocal_broadband_gain",
+      "frozen":["accompaniment","backing_vocals","automation_shape","pan","EQ","dynamics","saturation","FX","master_chain"],
+      "level_policy":"retain_raw_and_create_randomized_BS1770_integrated_loudness_matched_copies",
+      "measurements":["section_LAR","integrated_and_short_term_loudness","sample_and_true_peak","vocal_to_accompaniment_band_energy","crest","centre_energy"],
+      "protected":["lyric_intelligibility","groove","accompaniment_detail","section_lift","artistic_hierarchy","device_headroom"],
+      "listener":"intended_HI_listener_three_repeats_fixed_aid_state_Dmitry_artistic_rating_separate",
+      "auto_apply":false
+    },
+    {
+      "id":"EXP-ML-20261007-1800-02",
+      "status":"not_run_blocked_reference_implementation_and_target_listener",
+      "A":"100_percent_factory_transform",
+      "B":"200_percent_EQ_transform",
+      "single_factor":"percent_EQ_transform",
+      "frozen":["target_to_mix_ratio","track_count","levels","pans","dynamics","FX","excerpt","playback_state"],
+      "level_policy":"retain_broadband_normalized_raw_and_create_randomized_BS1770_matched_copies",
+      "measurements":["per_target_detection","quality_rating","Gini_index","target_minus_mix_95_percent_rolloff","LUFS","crest","sample_and_true_peak","mono_compatibility"],
+      "protected":["bass_readability","target_class_performance","natural_timbre","approved_balance","dynamics","stereo_image","headroom"],
+      "listener":"intended_HI_listener_with_documented_device_state",
+      "auto_apply":false
+    }
+  ],
+  "deduplication": [
+    {"key":"doi:10.1121/10.0020269","resolution":"existing_source_upgraded_not_duplicated"},
+    {"key":"doi:10.1371/journal.pone.0316442","resolution":"new_same_lineage_followup_not_counted_as_independent_confirmation"},
+    {"key":"arxiv:1803.09960","resolution":"withdrawn_record_retained_only_as_provenance"},
+    {"key":"qmro:123456789/55527_chapter_7","resolution":"same_lineage_thesis_not_independent_source_card"}
+  ],
+  "video_catalogue_after":{"total":101,"transcript_complete":9,"partial":0,"metadata_only_queued":92,"changed_this_run":false},
+  "priority_queue":["EXP-ML-20261001-1800-01","EXP-ML-20261005-1500-01","VIDEO-ML-20261007-1500-01","VIDEO-ML-20261007-1500-02","REF-ML-20261007-1500-01","EXP-ML-20261007-1800-01","EXP-ML-20261007-1800-02","EXP-ML-20261007-1500-02","EXP-ML-20261007-1500-01"],
+  "next_executable_experiment":"EXP-ML-20261001-1800-01",
+  "safety":{"audio_modified":false,"audio_uploaded":false,"dsp_changed":false,"model_changed":false,"production_code_changed":false,"paid_services_used":false,"rules_auto_applied":false}
+}
