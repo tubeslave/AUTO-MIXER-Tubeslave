@@ -1,0 +1,180 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-07-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-07T09:00:00+03:00",
+  "actual_start": "2026-10-07T08:55:12+03:00",
+  "completed_at": "2026-10-07T09:01:39+03:00",
+  "preceding_search_report": "ML-2026-10-06-1500",
+  "preceding_update": "ML-2026-10-06-1800",
+  "citation_check": "partial",
+  "operations": [
+    {"op": "add_source_card", "id": "SRC-ML-20261007-0900-01"},
+    {"op": "update_video_reading_depth", "id": "VID-ML-20260914-1500-Q3"},
+    {"op": "add_video_source_card", "id": "VIDEO-ML-20261007-0900-01"},
+    {"op": "add_video_source_card", "id": "VIDEO-ML-20261007-0900-02"},
+    {"op": "add_reference_card", "id": "REF-ML-20261007-0900-01"},
+    {"op": "add_knowledge_card", "id": "KC-ML-20261007-0900-01"},
+    {"op": "add_candidate_rule", "id": "RULE-ML-20261007-0900-01"},
+    {"op": "add_experiment_plan", "id": "EXP-ML-20261007-0900-01"}
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261007-0900-01",
+      "title": "A Statistical Approach to Automated Offline Dynamic Processing in the Audio Mastering Process",
+      "authors": ["Marcel Hilsamer", "Stephan Herzog"],
+      "publication": "DAFx-2014",
+      "publication_year": 2014,
+      "discovered_at": "2026-10-07",
+      "doi": null,
+      "stable_url": "https://www.dafx.de/paper-archive/details/0nvFGZkofIGYGxK8KfTZKA",
+      "full_text_url": "https://www.dafx.de/paper-archive/2014/dafx14_marcel_hilsamer_a_statistical_approach_to.pdf",
+      "reading_depth": "complete_six_page_full_text",
+      "status": "studied_full_text_peer_reviewed_conference",
+      "sample_scope": "five_songs_plus_informal_listening_validation",
+      "limitations": [
+        "listener_count_blinding_and_statistics_not_reported",
+        "long_term_level_moments_discard_time_order",
+        "single_compressor_cannot_model_eq_multiband_or_heavy_limiting",
+        "genre_targets_not_validated_as_universal",
+        "no_public_code_or_dataset_manifest_found"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VID-ML-20260914-1500-Q3",
+      "stable_id": "youtube:lPwVsU3uLRM",
+      "op": "update",
+      "title": "Best Mix Bus Compressor for Rock in 2026 | The Sierra Sessions",
+      "channel": "Records On Top",
+      "published": "2026-02-15",
+      "url": "https://www.youtube.com/watch?v=lPwVsU3uLRM",
+      "duration": "PT9M51S",
+      "reading_depth_before": "metadata_and_description_only",
+      "reading_depth_after": "full_transcript_read",
+      "content_studied": true,
+      "audio_examples_audited": false,
+      "transcript_language": "en",
+      "claims": [
+        {"timestamp": "00:24-01:14", "claim": "eight_compressor_candidates_enumerated"},
+        {"timestamp": "01:23-01:27", "claim": "presenter_reports_approximately_3_dB_gain_reduction_calibration"},
+        {"timestamp": "07:05-07:08", "claim": "second_song_section_used_for_detail_check"},
+        {"timestamp": "08:38-09:38", "claim": "presenter_reports_personal_rankings"}
+      ],
+      "bounded_use": "multi_section_comparison_prompt_only",
+      "brand_ranking_promoted": false
+    },
+    {
+      "id": "VIDEO-ML-20261007-0900-01",
+      "stable_id": "youtube:2ZNfIQyRHF8",
+      "title": "When To Apply Mix Bus Compression And Why It Matters",
+      "channel": "Sara Carter - Simply Mixing",
+      "published": "2026-01-08",
+      "url": "https://www.youtube.com/watch?v=2ZNfIQyRHF8",
+      "duration": "PT10M21S",
+      "reading_depth": "metadata_only",
+      "transcript_status": "unavailable",
+      "content_studied": false,
+      "status": "queued_source"
+    },
+    {
+      "id": "VIDEO-ML-20261007-0900-02",
+      "stable_id": "youtube:PhXpLVISDvQ",
+      "title": "Perfect Mix Bus Compression",
+      "channel": "Spinlight Studio",
+      "published": "2023-08-02",
+      "url": "https://www.youtube.com/watch?v=PhXpLVISDvQ",
+      "duration": "PT16M45S",
+      "reading_depth": "metadata_and_visible_chapters_only",
+      "transcript_status": "unavailable",
+      "content_studied": false,
+      "status": "queued_source"
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20261007-0900-01",
+      "artist": "Robert Hammon",
+      "title": "The Elephant",
+      "genre": "melodic_emo_rock",
+      "catalogue_url": "https://cambridge-mt.com/ms2/mtk/",
+      "catalogue": "Cambridge-MT Mixing Secrets Free Multitrack Download Library",
+      "reading_depth": "official_catalogue_metadata_only",
+      "assets_visible": ["edited_excerpt_19_tracks_91_MB", "full_multitrack_24_tracks_615_MB", "mix_previews"],
+      "rights_status": "free_mixing_practice_catalogue_recheck_file_terms_before_download",
+      "raw_audio_acquired": false,
+      "dsp_metrics_measured": false,
+      "status": "reference_candidate"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261007-0900-01",
+      "claim": "long_term_detector_moment_matching_is_parameter_initialisation_not_musical_acceptance",
+      "confidence": {"mathematical_scope": "medium", "rock_mastering_transfer": "low"}
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261007-0900-01",
+      "source_ids": ["SRC-ML-20261007-0900-01"],
+      "apply_when": "offline_stereo_bus_or_mastering_parameter_proposal_from_declared_project_owned_references",
+      "change": "derive_only_threshold_and_ratio_from_target_detector_moments_while_freezing_all_other_processing",
+      "proposed_range": "no_transferable_preset_range_estimator_output_only_inside_validated_implementation_domain",
+      "instrument_section_scope": "full_mix_with_transient_dense_sustained_dense_and_transition_checks",
+      "protect": ["drum_attack", "cymbal_texture", "bass_definition", "arrangement_defined_lead_readability", "groove", "section_lift", "spectral_balance", "stereo_image", "true_peak_headroom"],
+      "verify": ["raw_render_diagnostics", "separate_BS1770_loudness_matched_randomized_listening", "detector_moment_error", "true_peak", "crest", "onset_peak_timing", "band_energy", "stereo_correlation", "Dmitry_rating"],
+      "cancel": ["statistical_only_win", "loudness_only_win", "limiter_overshoot", "pumping", "transient_blur", "spectral_shift", "image_collapse", "masking", "boundary_artifact", "unclear_reference_provenance"],
+      "confidence": "low_to_medium",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261007-0900-01",
+      "status": "not_run",
+      "A": "same_topology_with_manually_approved_threshold_ratio_pair",
+      "B": "same_topology_with_threshold_ratio_estimated_from_target_detector_mean_variance",
+      "single_factor": "static_curve_selection_method_manual_vs_moment_match",
+      "frozen": ["detector", "auto_ballistics", "limiter", "attack_release_implementation", "downstream_chain"],
+      "level_policy": "retain_raw_and_create_separate_randomized_BS1770_integrated_loudness_matched_copies",
+      "measurements": ["detector_mean_variance_error", "integrated_short_term_loudness", "sample_true_peak", "global_section_crest", "onset_peak_timing", "band_energy_spectral_tilt", "stereo_correlation", "transition_discontinuity"],
+      "listener": "Dmitry_three_randomized_repeats",
+      "auto_apply": false
+    }
+  ],
+  "deduplication": [
+    {"key": "normalized_title:evaluating_dynamic_range_compressor_models_using_control_voltage_measurements", "resolution": "existing_source_not_added"},
+    {"key": "normalized_title:keyframe_time_stretching_via_extrema_sampling", "resolution": "existing_source_not_added"},
+    {"key": "normalized_title:probing_low_level_acoustic_attribute_encoding_in_clap_audio_embeddings", "resolution": "existing_source_not_added"},
+    {"key": "youtube:lPwVsU3uLRM", "resolution": "existing_card_reading_depth_updated"},
+    {"key": "youtube:QSj2m9oUJno", "resolution": "existing_card_unchanged_transcript_unavailable"},
+    {"key": "youtube:-AIxQcWfkpA", "resolution": "existing_card_unchanged_transcript_unavailable"}
+  ],
+  "video_catalogue_after": {"total": 99, "transcript_complete": 9, "partial": 0, "metadata_only_queued": 90},
+  "priority_queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "EXP-ML-20261007-0900-01",
+    "VID-ML-20261006-1500-01",
+    "VID-ML-20261006-1500-02",
+    "VID-ML-20261006-0900-01",
+    "VID-ML-20261006-0900-02",
+    "VID-ML-20261005-1500-01",
+    "VID-ML-20261005-1500-02",
+    "VIDEO-ML-20261007-0900-01",
+    "VIDEO-ML-20261007-0900-02",
+    "EXP-ML-20260930-1500-01",
+    "EXP-ML-20261006-1800-01",
+    "EXP-ML-20261006-1200-01",
+    "EXP-ML-20260914-1800-01",
+    "EXP-ML-20261002-1500-01",
+    "EXP-ML-20261004-0900-01",
+    "EXP-ML-20261005-1800-01"
+  ],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "safety": {"audio_modified": false, "audio_uploaded": false, "dsp_changed": false, "model_changed": false, "production_code_changed": false, "paid_services_used": false, "rules_auto_applied": false}
+}
