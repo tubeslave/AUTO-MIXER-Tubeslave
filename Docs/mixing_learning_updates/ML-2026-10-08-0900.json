@@ -1,0 +1,155 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-08-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-08T09:00:00+03:00",
+  "actual_start": "2026-10-08T09:02:14+03:00",
+  "completed_at": "2026-10-08T09:12:00+03:00",
+  "preceding_search_report": "ML-2026-10-07-1500",
+  "preceding_update": "ML-2026-10-07-1800",
+  "citation_check": "partial",
+  "operations": [
+    {"op":"add_source_card","id":"SRC-ML-20261008-0900-01"},
+    {"op":"add_knowledge_card","id":"KC-ML-20261008-0900-01"},
+    {"op":"add_candidate_rule","id":"RULE-ML-20261008-0900-01"},
+    {"op":"add_video_source_card","id":"VIDEO-ML-20261008-0900-01"},
+    {"op":"add_video_source_card","id":"VIDEO-ML-20261008-0900-02"},
+    {"op":"add_video_source_card","id":"VIDEO-ML-20261008-0900-03"},
+    {"op":"add_reference_card","id":"REF-ML-20261008-0900-01"},
+    {"op":"add_experiment_plan","id":"EXP-ML-20261008-0900-01"}
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261008-0900-01",
+      "title": "What Is Crest Factor and Why Is It Important?",
+      "author": "Ian Stewart",
+      "publisher": "iZotope",
+      "published": "2020-07-28",
+      "url": "https://www.izotope.com/community/blog/what-is-crest-factor",
+      "source_type": "official_vendor_educational_material",
+      "reading_depth": "full_web_article_definition_interpretation_mastering_use_low_frequency_section_limitations",
+      "independence": "vendor_authored_not_independent_scientific_validation",
+      "bounded_claim": "crest_factor_is_a_contextual_diagnostic_requiring_explicit_peak_average_window_band_and_section_definitions"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261008-0900-01",
+      "claim": "crest_factor_requires_an_explicit_measurement_contract_and_matched_programme_context",
+      "confidence": "high_definition_low_numeric_transfer"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261008-0900-01",
+      "source_ids": ["SRC-ML-20261008-0900-01"],
+      "apply_when": "comparing_two_renders_of_the_same_section_after_dynamics_or_limiting_change",
+      "change": "report_crest_factor_delta_under_one_frozen_measurement_contract_without_chasing_a_target",
+      "proposed_range": "none_baseline_plus_one_project_local_timing_variant",
+      "range_origin": "no_numeric_production_target_accepted_from_source",
+      "instrument_section_scope": "dense_rock_or_metal_section_with_transient_drums_and_sustained_guitars_bass",
+      "protect": ["transient_identity","groove","artistic_hierarchy","low_end_balance","stereo_image","true_peak","absence_of_pumping_or_distortion"],
+      "verify": ["randomized_loudness_matched_AB","fixed_peak_average_window_band_channel_and_section_contract","short_term_loudness","true_peak"],
+      "cancel": ["inconsistent_preference","loudness_only_win","softened_attacks","pumping","distortion","measurement_contract_change"],
+      "confidence": "medium_workflow_low_parameter_transfer",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VIDEO-ML-20261008-0900-01",
+      "stable_id": "youtube:8rXTnA3Z71U",
+      "title": "How Loud Are the Biggest Songs on Spotify in 2026? - Loudness Investigation #1",
+      "channel": "Mastering Explained",
+      "published": "2026-04-25",
+      "duration": "PT18M49S",
+      "url": "https://www.youtube.com/watch?v=8rXTnA3Z71U",
+      "reading_depth": "metadata_watch_page_and_chapters_only_transcript_export_unavailable",
+      "status": "queued_source",
+      "raw_audio_access": false,
+      "claims_accepted": false
+    },
+    {
+      "id": "VIDEO-ML-20261008-0900-02",
+      "stable_id": "youtube:wJA_svJIe1E",
+      "title": "THE Mix Bus Plugin Chain That Makes Everything Fit",
+      "channel": "Waves Audio",
+      "published": "2026-02-12",
+      "duration": "PT10M07S",
+      "url": "https://www.youtube.com/watch?v=wJA_svJIe1E",
+      "reading_depth": "metadata_watch_page_and_chapters_only_transcript_export_unavailable",
+      "status": "queued_source",
+      "bias": "official_promotional_source",
+      "claims_accepted": false
+    },
+    {
+      "id": "VIDEO-ML-20261008-0900-03",
+      "stable_id": "youtube:3jVagfJtKKE",
+      "title": "Why Top 40 Hits Crush Spotify's -14 LUFS Rule - 4 Tips for Loud, Competitive Masters",
+      "channel": "Matty Harris Mixing & Mastering",
+      "published": "2025-08-22",
+      "duration": "PT13M41S",
+      "url": "https://www.youtube.com/watch?v=3jVagfJtKKE",
+      "reading_depth": "metadata_watch_page_description_and_chapters_only_transcript_export_unavailable",
+      "status": "queued_source",
+      "claims_accepted": false
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20261008-0900-01",
+      "stable_id": "cambridge-mt:empty-signifier:negative",
+      "artist": "Empty Signifier",
+      "title": "Negative",
+      "genre": "Acoustic Folk Rock",
+      "url": "https://www.cambridge-mt.com/ms3/mtk/#EmptySignifier",
+      "reading_depth": "catalogue_metadata_only",
+      "listed_assets": {"edited_excerpt":{"tracks":12,"megabytes":30},"full_multitrack":{"tracks":18,"megabytes":214},"mixed_stems":{"tracks":6,"megabytes":166},"preview_mixes":true},
+      "rights": "educational_mixing_practice_only_verify_project_specific_or_external_host_terms",
+      "status": "queued_rights_recheck",
+      "audio_downloaded": false
+    }
+  ],
+  "deduplication": [
+    {"key":"arxiv:2609.02835","resolution":"discarded_existing_full_source"},
+    {"key":"arxiv:2508.03448_icml_2026","resolution":"merged_existing_sonicmaster_version_family"},
+    {"key":"arxiv:2412.03373","resolution":"discarded_existing_source"},
+    {"key":"arxiv:2606.18573_dafx26_paper_30","resolution":"merged_existing_preprint_conference_lineage"},
+    {"key":"cambridge-mt:dgx:redemptive-pain","resolution":"discarded_existing_reference_candidate"},
+    {"key":"youtube:rediscovered_existing","ids":["2ZNfIQyRHF8","lPwVsU3uLRM","-AIxQcWfkpA","qfY5jnmUvBs","p7s9uHFomwQ","eAgy6SLhjlk","SybFj0Sf1L4"],"resolution":"not_duplicated"}
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261008-0900-01",
+      "status": "not_run",
+      "A": "approved_project_mix_bus_compressor_attack",
+      "B": "one_adjacent_slower_attack_setting_same_compressor",
+      "single_factor": "compressor_attack_setting",
+      "frozen": ["threshold","ratio","knee","release","sidechain_filter","makeup_gain","upstream_tracks_and_automation","downstream_processing"],
+      "level_policy": "retain_raw_and_create_randomized_BS1770_integrated_loudness_matched_copies_using_post_render_trim_only",
+      "measurements": ["exact_attack_values","gain_reduction_envelope","section_crest_factor_fixed_contract","short_term_and_integrated_loudness","sample_and_true_peak","kick_snare_transient_to_sustain","mono_correlation"],
+      "protected": ["glue","kick_snare_identity","groove","guitar_bass_density","artistic_hierarchy","stereo_image","absence_of_pumping_or_distortion"],
+      "success": "Dmitry_prefers_B_across_three_randomized_repeats_and_attack_improves_without_protected_quality_regression",
+      "cancel": ["inconsistent_preference","advantage_disappears_after_matching","peak_or_headroom_breach","softened_groove","pumping","distortion","low_end_imbalance"],
+      "confidence": "low_project_pilot",
+      "auto_apply": false
+    }
+  ],
+  "video_catalogue_after": {"total":104,"transcript_complete":9,"partial":0,"metadata_only_queued":95},
+  "priority_queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "VIDEO-ML-20261007-1500-01",
+    "VIDEO-ML-20261007-1500-02",
+    "REF-ML-20261007-1500-01",
+    "VIDEO-ML-20261008-0900-01",
+    "VIDEO-ML-20261008-0900-02",
+    "VIDEO-ML-20261008-0900-03",
+    "REF-ML-20261008-0900-01",
+    "EXP-ML-20261008-0900-01"
+  ],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "access_status": {"reference_hub":"not_exposed","youtube_learning_bridge":"not_exposed","arxiv_mcp":"not_exposed","freesound_mcp":"not_exposed","zotero_mcp":"not_exposed","scite":"not_retried_prior_paid_plan_or_trial_wall","consensus":"not_retried_free_access_not_confirmed"},
+  "safety": {"audio_modified":false,"audio_downloaded":false,"audio_uploaded":false,"dsp_changed":false,"model_changed":false,"production_code_changed":false,"paid_services_used":false,"rules_auto_applied":false}
+}
