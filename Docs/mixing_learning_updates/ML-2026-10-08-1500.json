@@ -1,0 +1,114 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-08-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-08T15:00:00+03:00",
+  "actual_start": "2026-10-08T15:01:08+03:00",
+  "completed_at": "2026-10-08T15:04:59+03:00",
+  "preceding_search": "ML-2026-10-08-0900",
+  "preceding_update": "ML-2026-10-08-1200",
+  "citation_check": "partial",
+  "deduplicated_source_keys": [
+    "arxiv:2609.02835",
+    "arxiv:2608.05442",
+    "arxiv:2608.05506",
+    "arxiv:2603.15995"
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261008-1500-01",
+      "url": "https://www.nailthemix.com/analog-parallel-drum-compression-with-hardware-ft-sleeping-with-sirens",
+      "date": "2025-05-28",
+      "depth": "full_official_companion_article",
+      "independence": "vendor_educational",
+      "citation_check": "partial",
+      "limitations": ["related video transcript unavailable", "15 samples at 96 kHz is a session-specific example", "device settings are not transferable"]
+    },
+    {
+      "id": "SRC-ML-20261008-1500-02",
+      "url": "https://www.nailthemix.com/parallel-compression-on-drum-fills-and-committing-guitar-tones-during-tracking-ft-silverstein",
+      "date": "2025-06-03",
+      "depth": "full_official_companion_article",
+      "independence": "vendor_educational",
+      "citation_check": "partial",
+      "limitations": ["related video transcript unavailable", "exact compressor parameters absent", "section automation is stylistic"]
+    }
+  ],
+  "video_source_cards": [
+    {"id":"VIDEO-ML-20261008-1500-01","stable_key":"youtube:fk1sy-SjqCg","url":"https://www.youtube.com/watch?v=fk1sy-SjqCg","depth":"metadata_plus_full_official_companion_article","transcript":false,"status":"queued_source","topics":["parallel_drum_compression","latency_alignment","hardware_insert"]},
+    {"id":"VIDEO-ML-20261008-1500-02","stable_key":"youtube:X8jYLcanM4g","url":"https://www.youtube.com/watch?v=X8jYLcanM4g","depth":"metadata_plus_full_official_companion_article","transcript":false,"status":"queued_source","topics":["drum_room","parallel_compression","automation"]},
+    {"id":"VIDEO-ML-20261008-1500-03","stable_key":"youtube:JFkyayPf2rQ","url":"https://www.youtube.com/watch?v=JFkyayPf2rQ","depth":"official_metadata_and_chapters_only","transcript":false,"status":"queued_source","topics":["rock_drums","room_reverb","drum_bus"]},
+    {"id":"VIDEO-ML-20261008-1500-04","stable_key":"youtube:xngm0L4eRT4","url":"https://www.youtube.com/watch?v=xngm0L4eRT4","depth":"official_metadata_and_chapters_only","transcript":false,"status":"queued_source","topics":["parallel_compression","parallel_saturation","drum_bus"]}
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20261008-1500-01",
+      "stable_key": "cambridge-mt:fytakyte:high-anxiety",
+      "title": "Fytakyte — High Anxiety",
+      "genre": "Modern Melodic Rock",
+      "url": "https://www.cambridge-mt.com/ms/mtk/",
+      "depth": "catalogue_metadata_and_preview_links_only",
+      "edited_excerpt": "66 tracks / 122 MB",
+      "full_multitrack": "80 tracks / 743 MB",
+      "rights_status": "candidate_recheck_entry_terms_before_use",
+      "raw_audio_accessed": false,
+      "dsp_metrics": null
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261008-1500-01",
+      "claim": "Measure route-specific residual latency before correcting a blended parallel path; preserve intentional microphone and room arrival differences.",
+      "confidence": "medium_workflow_low_musical_generalisation"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261008-1500-01",
+      "apply_when": "clean and processed drum paths are blended and one path has unknown residual latency",
+      "change": "measure a repeatable signed loopback offset and correct only that residual on the processed path",
+      "range": "measured_route_specific_value_only",
+      "protect": ["intentional room delay","within-stem phase","attack identity","cymbal tone","groove","stereo width","headroom"],
+      "verify": ["repeat loopback transient","mono correlation","comb notches","randomized loudness-matched A/B"],
+      "cancel": ["unstable offset","worse mono or impact","room image regression","preference disappears after matching"],
+      "confidence": "medium_workflow_low_parameter_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261008-1500-01",
+      "status": "not_run",
+      "precondition": "defined sample rate/interface/path with unknown or non-zero residual parallel latency",
+      "A": "current DAW compensation only",
+      "B": "same route with measured residual sample offset corrected",
+      "single_factor": "residual delay correction",
+      "loudness_match": "post-render gain, BS.1770 integrated loudness",
+      "raw_renders_retained": true,
+      "protected_qualities": ["attack solidity","low-end focus","room naturalness","cymbal tone","groove","stereo width","absence of pumping/distortion"],
+      "success": "repeatable offset and Dmitry prefers B in three randomized matched comparisons without protected-quality regression",
+      "cancel": "unstable offset, worse mono/room/groove, or inconsistent matched preference",
+      "auto_apply": false
+    }
+  ],
+  "queue_priority": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "EXP-ML-20261008-1500-01",
+    "VIDEO-ML-20261007-1500-01",
+    "VIDEO-ML-20261007-1500-02",
+    "REF-ML-20261007-1500-01",
+    "VIDEO-ML-20261008-0900-01",
+    "VIDEO-ML-20261008-0900-02",
+    "VIDEO-ML-20261008-0900-03",
+    "REF-ML-20261008-0900-01",
+    "EXP-ML-20261008-0900-01",
+    "VIDEO-ML-20261008-1500-01",
+    "VIDEO-ML-20261008-1500-02",
+    "VIDEO-ML-20261008-1500-03",
+    "VIDEO-ML-20261008-1500-04",
+    "REF-ML-20261008-1500-01"
+  ],
+  "counts": {"video_catalogue_before":104,"video_catalogue_after":108,"video_complete":9,"video_metadata_or_partial":99,"new_scientific_sources":0,"new_video_cards":4,"new_reference_cards":1},
+  "safety": {"audio_changed":false,"dsp_changed":false,"repository_runtime_changed":false,"paid_service_used":false,"commercial_audio_extracted":false}
+}

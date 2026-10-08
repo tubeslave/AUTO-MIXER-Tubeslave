@@ -411,3 +411,12 @@ ML-2026-10-08-0900 (search, preceding successful search ML-2026-10-07-1500): cre
 | ML-2026-10-08-1200 | [Report](ML-2026-10-08-1200.md) · [JSON patch](ML-2026-10-08-1200.json) · [ADR](../adr/mixing-learning-2026-10-08-1200.md) | Deep review: ITU-R BS.1770-5 plus existing EBU Tech 3341/3342 cards reconciled with the 09:00 vendor tutorial; 1 Source Card added, 2 existing Source Cards upgraded, 1 Knowledge Card, 1 candidate rule and 1 unrun experiment revised; no video, multitrack, audio, DSP or runtime change |
 
 ML-2026-10-08-1200 (deep_review, preceding search ML-2026-10-08-0900): mathematical crest factor, peak-to-loudness and LRA are separate metric families. LRA is non-decisive below 60 s; true-peak minus short-term loudness is labelled project-local, not standard crest factor. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the revised experiment remains not_run.
+
+## 2026-10-08 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-08-1500 | [Report](ML-2026-10-08-1500.md) · [JSON patch](ML-2026-10-08-1500.json) · [ADR](../adr/mixing-learning-2026-10-08-1500.md) | Search: 4 new metadata/companion-text video cards, 2 fully read vendor companion Source Cards, 1 catalogue-only multitrack candidate, 1 bounded Knowledge Card/rule and 1 unrun latency A/B; 4 scientific source families deduplicated; no audio, code, DSP or runtime change |
+
+ML-2026-10-08-1500 (search, preceding successful search ML-2026-10-08-0900): route-specific residual parallel latency must be measured before correction; the source example of 15 samples at 96 kHz is not transferable. All videos remain queued because no permitted transcript was available. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the new experiment is not_run.
+
