@@ -403,3 +403,11 @@ ML-2026-10-07-1800 (deep_review, preceding search ML-2026-10-07-1500): populatio
 | ML-2026-10-08-0900 | [Report](ML-2026-10-08-0900.md) · [JSON patch](ML-2026-10-08-0900.json) · [ADR](../adr/mixing-learning-2026-10-08-0900.md) | Search: 1 fully read official crest-factor tutorial, 3 new metadata-only videos and 1 catalogue-only legal multitrack candidate; 4 scientific families, 7 video IDs and 1 multitrack candidate deduplicated; 1 Knowledge Card, 1 bounded candidate rule and 1 unrun loudness-matched A/B plan; no audio, code, DSP or runtime change |
 
 ML-2026-10-08-0900 (search, preceding successful search ML-2026-10-07-1500): crest factor is stored only with an explicit peak/average/window/band/section contract and is not a universal quality target. All three videos remain queued because permitted transcript export was unavailable. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the new experiment is not_run.
+
+## 2026-10-08 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-08-1200 | [Report](ML-2026-10-08-1200.md) · [JSON patch](ML-2026-10-08-1200.json) · [ADR](../adr/mixing-learning-2026-10-08-1200.md) | Deep review: ITU-R BS.1770-5 plus existing EBU Tech 3341/3342 cards reconciled with the 09:00 vendor tutorial; 1 Source Card added, 2 existing Source Cards upgraded, 1 Knowledge Card, 1 candidate rule and 1 unrun experiment revised; no video, multitrack, audio, DSP or runtime change |
+
+ML-2026-10-08-1200 (deep_review, preceding search ML-2026-10-08-0900): mathematical crest factor, peak-to-loudness and LRA are separate metric families. LRA is non-decisive below 60 s; true-peak minus short-term loudness is labelled project-local, not standard crest factor. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the revised experiment remains not_run.
