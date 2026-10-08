@@ -394,3 +394,12 @@ ML-2026-10-07-1500 (search, preceding successful search ML-2026-10-07-0900): wit
 | ML-2026-10-07-1800 | [Report](ML-2026-10-07-1800.md) · [JSON patch](ML-2026-10-07-1800.json) · [ADR](../adr/mixing-learning-2026-10-07-1800.md) | Full JASA accessibility-mix paper and 2025 PLOS ONE performance follow-up reviewed; 1 Source Card upgraded, 1 added, 1 withdrawn-lineage card revised, 4 Knowledge Cards, 2 bounded candidate rules and 2 blocked loudness-matched A/B plans; no video, multitrack, audio, DSP or runtime change |
 
 ML-2026-10-07-1800 (deep_review, preceding search ML-2026-10-07-1500): population LAR means are not fixed presets; listener and hearing-aid state must be explicit. The follow-up found no main EQ-transform detection benefit and a Bass-specific regression at stronger settings, so target-class gates are mandatory. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and new experiments not_run_blocked.
+
+
+## 2026-10-08 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-08-0900 | [Report](ML-2026-10-08-0900.md) · [JSON patch](ML-2026-10-08-0900.json) · [ADR](../adr/mixing-learning-2026-10-08-0900.md) | Search: 1 fully read official crest-factor tutorial, 3 new metadata-only videos and 1 catalogue-only legal multitrack candidate; 4 scientific families, 7 video IDs and 1 multitrack candidate deduplicated; 1 Knowledge Card, 1 bounded candidate rule and 1 unrun loudness-matched A/B plan; no audio, code, DSP or runtime change |
+
+ML-2026-10-08-0900 (search, preceding successful search ML-2026-10-07-1500): crest factor is stored only with an explicit peak/average/window/band/section contract and is not a universal quality target. All three videos remain queued because permitted transcript export was unavailable. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the new experiment is not_run.
