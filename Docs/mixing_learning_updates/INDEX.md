@@ -420,3 +420,11 @@ ML-2026-10-08-1200 (deep_review, preceding search ML-2026-10-08-0900): mathemati
 
 ML-2026-10-08-1500 (search, preceding successful search ML-2026-10-08-0900): route-specific residual parallel latency must be measured before correction; the source example of 15 samples at 96 kHz is not transferable. All videos remain queued because no permitted transcript was available. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the new experiment is not_run.
 
+## 2026-10-08 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-08-1800 | [Report](ML-2026-10-08-1800.md) · [JSON patch](ML-2026-10-08-1800.json) · [ADR](../adr/mixing-learning-2026-10-08-1800.md) | Deep review: 1 full peer-reviewed JAES paper and official Ableton/Cubase latency documentation; 3 Source Cards, 3 Knowledge Cards, 1 narrowed candidate rule, 1 blocked A/B revision and 1 repository risk; no video promotion, audio, DSP or runtime change |
+
+ML-2026-10-08-1800 (deep_review, preceding search ML-2026-10-08-1500): transport round-trip delay is separated from acoustic microphone arrival. Hardware inserts use a DAW ping or bypass/unity loopback; GCC-PHAT remains a content/window-dependent analysis candidate for same-source multi-mic signals and must not erase intentional room timing automatically. The current repository's Hann choice is directionally supported, but its thresholds and OSC actuation are not validated by the paper. Next executable test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
+
