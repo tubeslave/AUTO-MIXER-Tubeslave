@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-08-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-08T18:00:00+03:00",
+  "actual_start": "2026-10-08T17:55:13+03:00",
+  "completed_at": "2026-10-08T17:58:14+03:00",
+  "preceding_search": "ML-2026-10-08-1500",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261008-1800-01",
+      "stable_key": "aes:e-lib:17072",
+      "title": "Using Delay Estimation to Reduce Comb Filtering of Arbitrary Musical Sources",
+      "year": 2013,
+      "url": "https://www.researchgate.net/publication/287427573_Using_Delay_Estimation_to_Reduce_Comb_Filtering_of_Arbitrary_Musical_Sources",
+      "depth": "full_text_theory_simulation_real_recordings_results_conclusion_limitations",
+      "design": {"simulated_seconds":10,"simulated_delay_samples":10,"sample_rate_hz":44100,"simulation_frame_samples":2048,"real_excerpts":20,"real_excerpt_seconds":30,"real_setup":"two microphones, one loudspeaker, treated studio, point-source assumption"},
+      "results": {"mean_accuracy_hann_percent":90.52,"mean_accuracy_blackman_percent":86.24,"mean_accuracy_rectangular_percent":40.14},
+      "limitations": ["no listener preference test","no nonlinear processed branch","no live moving source","point-source loudspeaker assumption","current code/data URL inaccessible"],
+      "reproducibility": "partial_unverified_current_artifacts"
+    },
+    {
+      "id": "SRC-ML-20261008-1800-02",
+      "stable_key": "ableton:live12:external-audio-effect-latency",
+      "url": "https://www.ableton.com/en/live-manual/12/live-audio-effect-reference/#external-audio-effect",
+      "depth": "full_relevant_sections",
+      "source_type": "official_product_documentation"
+    },
+    {
+      "id": "SRC-ML-20261008-1800-03",
+      "stable_key": "steinberg:cubase15:external-effect-measure-delay",
+      "url": "https://www.steinberg.help/r/cubase-pro/15.0/en/cubase_nuendo/topics/vst_connections/vst_connections_external_effect_parameter_window_r.html",
+      "depth": "full_relevant_sections",
+      "source_type": "official_product_documentation"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261008-1800-01","claim":"Transport round-trip delay and acoustic microphone arrival are different intervention classes.","confidence":"high_definition_medium_workflow"},
+    {"id":"KC-ML-20261008-1800-02","claim":"A GCC-PHAT result requires a declared sample-rate, frame/window, signal class, search range, rejection rule and sign convention.","confidence":"high_study_medium_transfer"},
+    {"id":"KC-ML-20261008-1800-03","claim":"A nonlinear compressed branch is not a pure delayed copy; calibrate transport on bypass/unity or a dedicated DAW ping.","confidence":"high_signal_model_medium_workflow"}
+  ],
+  "revised_rules": [
+    {
+      "id": "RULE-ML-20261008-1500-01",
+      "revision": 2,
+      "classify_first": ["transport_roundtrip","acoustic_arrival"],
+      "hardware_action": "dedicated DAW ping or repeatable bypass/unity loopback; correct only measured residual",
+      "multimic_action": "GCC-PHAT analysis candidate with declared Hann/Blackman window and rejection contract; preserve intentional arrival",
+      "rejected_parameter_transfers": ["10 samples","15 samples","50 samples","2048 samples","4096 samples","10 ms","50 ms","published/project thresholds"],
+      "protect": ["microphone geometry","room depth","phase relations","drum attacks","cymbal tone","groove","stereo width","headroom"],
+      "confidence": "high_measurement_discipline_medium_hardware_workflow_low_auto_apply_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261008-1500-01",
+      "revision": 2,
+      "status": "not_run_blocked",
+      "blocker": "specific hardware insert, interface, sample rate, project section and calibration recording absent",
+      "A": "current DAW compensation only",
+      "B": "same route plus measured residual correction on processed branch",
+      "single_factor": "residual delay correction",
+      "calibration": "dedicated DAW ping or bypass/unity loopback repeated at least three times",
+      "loudness_match": "post-render BS.1770 integrated loudness",
+      "raw_renders_retained": true,
+      "objective_checks": ["offset repeatability","mono correlation","comb notches","true peak","declared-window peak/RMS crest factor","transient-to-sustain"],
+      "listener": "Dmitry, three randomized matched comparisons",
+      "auto_apply": false
+    }
+  ],
+  "risks": [
+    {
+      "id": "RISK-ML-20261008-1800-01",
+      "path": "backend/auto_phase_gcc_phat.py",
+      "observation": "Hann GCC-PHAT with project thresholds, smoothing, 50 ms default search and OSC delay write for valid positive estimates above 0.1 ms",
+      "evidence_gap": "paper does not validate thresholds, search range, smoothing, positive-only actuation or automatic live control",
+      "required_before_enablement": ["known-delay offline validation by instrument/bleed class","unrelated-source rejection test","operator approval for hardware writes"],
+      "code_changed": false
+    }
+  ],
+  "queue": {"next_executable":"EXP-ML-20261001-1800-01","next_after":"EXP-ML-20261005-1500-01","blocked":"EXP-ML-20261008-1500-01","videos_carried":["VIDEO-ML-20261008-1500-01","VIDEO-ML-20261008-1500-02","VIDEO-ML-20261008-1500-03","VIDEO-ML-20261008-1500-04"],"reference_carried":"REF-ML-20261008-1500-01"},
+  "access_status": {"scite":"paid_plan_or_trial_required_after_one_post_reset_check","consensus":"not_retried","citation_check":"partial"},
+  "safety": {"audio_changed":false,"dsp_changed":false,"model_changed":false,"runtime_code_changed":false,"audio_downloaded":false,"audio_listened":false,"paid_service_used":false}
+}
