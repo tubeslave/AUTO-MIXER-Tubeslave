@@ -1,0 +1,113 @@
+{
+  "schema_version": "mixing_learning_patch_v1",
+  "update_id": "ML-2026-10-08-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-08T12:00:00+03:00",
+  "actual_start": "2026-10-08T12:00:16+03:00",
+  "completed_at": "2026-10-08T12:03:00+03:00",
+  "preceding_search_report": "ML-2026-10-08-0900",
+  "preceding_update": "ML-2026-10-08-0900",
+  "citation_check": "partial",
+  "operations": [
+    {"op":"add_source_card","id":"SRC-ML-20261008-1200-01"},
+    {"op":"update_source_card","id":"SRC-DYN-20260913-201140-01"},
+    {"op":"update_source_card","id":"SRC-DYN-20260913-201140-02"},
+    {"op":"update_knowledge_card","id":"KC-ML-20261008-0900-01"},
+    {"op":"update_candidate_rule","id":"RULE-ML-20261008-0900-01"},
+    {"op":"update_experiment_plan","id":"EXP-ML-20261008-0900-01"}
+  ],
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261008-1200-01",
+      "title": "Algorithms to measure audio programme loudness and true-peak audio level",
+      "publisher": "ITU-R",
+      "version": "BS.1770-5",
+      "published": "2023-11",
+      "url": "https://www.itu.int/rec/R-REC-BS.1770-5-202311-I/en",
+      "free_pdf": "https://www.itu.int/dms_pubrec/itu-r/rec/bs/R-REC-BS.1770-5-202311-I!!PDF-E.pdf",
+      "source_type": "official_standard_primary",
+      "reading_depth": "full_normative_scope_annex1_loudness_algorithm_annex2_true_peak_and_validation_limitations",
+      "bounded_claim": "standardizes_programme_loudness_and_true_peak_not_universal_crest_factor_targets"
+    },
+    {
+      "id": "SRC-DYN-20260913-201140-01",
+      "title": "EBU Tech 3341 Loudness Metering EBU Mode",
+      "version": "v4_2023",
+      "url": "https://tech.ebu.ch/docs/tech/tech3341.pdf",
+      "reading_depth": "full_document_sections_1_3_including_time_scales_gating_LRA_true_peak_compliance_and_interpretation",
+      "operation": "upgrade_existing"
+    },
+    {
+      "id": "SRC-DYN-20260913-201140-02",
+      "title": "EBU Tech 3342 Loudness Range",
+      "version": "v4_2023",
+      "url": "https://tech.ebu.ch/docs/tech/tech3342.pdf",
+      "reading_depth": "full_document_algorithm_compliance_reference_implementation_and_limitations",
+      "operation": "upgrade_existing"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261008-0900-01",
+      "claim": "mathematical_crest_factor_peak_to_loudness_and_LRA_are_distinct_metric_families_requiring_separate_contracts",
+      "confidence": "high_standards_definitions_medium_project_local_diagnostic_low_numeric_transfer"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261008-0900-01",
+      "source_ids": ["SRC-ML-20261008-0900-01","SRC-ML-20261008-1200-01","SRC-DYN-20260913-201140-01","SRC-DYN-20260913-201140-02"],
+      "apply_when": "comparing_two_renders_of_the_same_section_after_one_dynamics_or_limiting_change",
+      "change": "freeze_metric_family_and_measurement_contract_report_mathematical_CF_and_peak_to_loudness_separately_without_target_chasing",
+      "proposed_range": "none_approved_baseline_plus_one_project_local_variant",
+      "range_origin": "ITU_EBU_windows_and_gates_only_no_musical_target_accepted",
+      "instrument_section_scope": "dense_rock_or_metal_section_with_transient_drums_and_sustained_guitar_bass",
+      "protect": ["transient_identity","groove","artistic_hierarchy","low_end_balance","stereo_image","headroom","absence_of_pumping_or_distortion"],
+      "verify": ["randomized_loudness_matched_AB","raw_renders_retained","exact_measurement_contract","LRA_excluded_from_decision_below_60_seconds"],
+      "cancel": ["inconsistent_preference","loudness_only_win","softened_attacks","pumping","distortion","headroom_breach","metric_contract_drift"],
+      "confidence": "high_measurement_discipline_low_parameter_transfer",
+      "status": "candidate",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261008-0900-01",
+      "revision": 2,
+      "status": "not_run",
+      "A": "approved_project_mix_bus_compressor_attack",
+      "B": "one_adjacent_slower_attack_setting_same_compressor",
+      "single_factor": "compressor_attack_setting",
+      "frozen": ["threshold","ratio","knee","release","sidechain_filter","makeup_gain","routing","upstream_tracks_and_automation","downstream_processing"],
+      "level_policy": "retain_raw_and_create_randomized_BS1770_integrated_loudness_matched_copies_using_post_render_trim_only",
+      "measurement_contract": {
+        "mathematical_CF": "20log10_sample_peak_over_unweighted_RMS_same_fixed_section_and_declared_window_hop_and_stereo_aggregation",
+        "project_local_PLD_S": "maximum_true_peak_dBTP_minus_maximum_3_second_short_term_loudness_LUFS_same_section_nonstandard_label",
+        "loudness_peak": ["BS1770_gated_integrated_LUFS","maximum_3_second_short_term_LUFS","maximum_true_peak_dBTP"],
+        "LRA": "record_only_if_section_at_least_60_seconds_else_provisional_not_decisive",
+        "process": ["exact_attack_values","gain_reduction_envelope","kick_snare_transient_to_sustain","mono_correlation"]
+      },
+      "protected": ["glue","kick_snare_identity","groove","guitar_bass_density","artistic_hierarchy","stereo_image","absence_of_pumping_or_distortion"],
+      "success": "Dmitry_prefers_B_across_three_randomized_repeats_and_attack_improves_without_protected_quality_regression",
+      "cancel": ["inconsistent_preference","advantage_disappears_after_matching","peak_or_headroom_breach","softened_groove","pumping","distortion","low_end_imbalance"],
+      "confidence": "low_project_pilot",
+      "auto_apply": false
+    }
+  ],
+  "videos": {"studied":0,"new_queued":0,"carried_from_search":3},
+  "references": {"new_multitracks":0,"carried_rights_recheck":1},
+  "priority_queue": [
+    "EXP-ML-20261001-1800-01",
+    "EXP-ML-20261005-1500-01",
+    "VIDEO-ML-20261007-1500-01",
+    "VIDEO-ML-20261007-1500-02",
+    "REF-ML-20261007-1500-01",
+    "VIDEO-ML-20261008-0900-01",
+    "VIDEO-ML-20261008-0900-02",
+    "VIDEO-ML-20261008-0900-03",
+    "REF-ML-20261008-0900-01",
+    "EXP-ML-20261008-0900-01"
+  ],
+  "next_executable_experiment": "EXP-ML-20261001-1800-01",
+  "effects": {"audio_changed":false,"dsp_changed":false,"model_trained":false,"runtime_changed":false,"paid_compute_used":false}
+}
