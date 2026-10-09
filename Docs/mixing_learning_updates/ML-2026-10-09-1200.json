@@ -1,0 +1,158 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-09-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-09T12:00:00+03:00",
+  "actual_start": "2026-10-09T12:04:40+03:00",
+  "completed_at": "2026-10-09T12:07:55+03:00",
+  "preceding_search": "ML-2026-10-09-0900",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261009-0900-01",
+      "stable_key": "arxiv:2610.03405",
+      "depth": "full_text_plus_repository_inference_preprocessing_tests_licences_and_hf_metadata",
+      "revisions": {
+        "paper_render_duration_seconds": 10,
+        "released_readme_training_excerpt_seconds": 6,
+        "crop_rule": "not_documented_in_materials_read",
+        "source_independence": "same_author_family_not_independent_confirmation"
+      }
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20261009-0900-01",
+      "github_snapshot": "DBraun/PEACE@2d8a3887501bcdb4779544295845b1e69b6b9b78",
+      "github_commit_date": "2026-10-05",
+      "package_version": "0.1.0",
+      "hf_model": "davidbraun/peace",
+      "hf_metadata_updated": "2026-09-30",
+      "code_license": "MIT",
+      "weight_license": "CC-BY-NC-4.0",
+      "hf_revision": "unresolved_not_downloaded",
+      "tests_read": [
+        "tests/test_model.py",
+        "tests/test_faust.py",
+        "tests/test_t5.py"
+      ],
+      "tests_executed": false,
+      "checkpoint_executed": false,
+      "metric_reproduced": false,
+      "limitations": [
+        "README example does not pin Hub revision",
+        "visible tests do not reproduce published Recall@K with released checkpoint",
+        "renderer test skips KlonCentaur",
+        "renderer embedding shape test uses untrained small model",
+        "mixed renderer-source licence terms"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261009-1200-01",
+      "claim": "Record render duration and model-input crop separately; the public 10 s to 6 s crop rule is unresolved.",
+      "confidence": "high_documentation_gap"
+    },
+    {
+      "id": "KC-ML-20261009-1200-02",
+      "claim": "PEACE preprocessing removes absolute loudness, peak-above-full-scale, L/R direction and phase cues, so retrieval is not evidence for those mix qualities.",
+      "confidence": "high_source_code"
+    },
+    {
+      "id": "KC-ML-20261009-1200-03",
+      "claim": "Inference-contract unit tests do not reproduce released-checkpoint retrieval metrics.",
+      "confidence": "high_repository_audit"
+    },
+    {
+      "id": "KC-ML-20261009-1200-04",
+      "claim": "Parameter-visible exact-program and masked-topology retrieval require distinct target definitions; a controlled comparison must hold topology fixed.",
+      "confidence": "high_task_definition"
+    },
+    {
+      "id": "KC-ML-20261009-1200-05",
+      "claim": "Code, pretrained weights and renderer sources have separate licence gates.",
+      "confidence": "high_primary_notices"
+    }
+  ],
+  "candidate_rule_revisions": [
+    {
+      "id": "RULE-ML-20261009-0900-01",
+      "action": "version_pinned_shadow_retrieval_only",
+      "required_pins": [
+        "peace_git_commit",
+        "hugging_face_commit",
+        "config_hash",
+        "weights_hash",
+        "tokenizer_hash_if_t5",
+        "dependency_lock",
+        "encoder_variant",
+        "padding",
+        "crop_rule",
+        "sample_rate",
+        "loudness_peak_preprocessing",
+        "gallery_manifest",
+        "renderer_revision"
+      ],
+      "forbidden": [
+        "production_audio_change",
+        "mix_quality_score",
+        "automatic_parameter_choice",
+        "unknown_parallel_feedback_graphs",
+        "commercial_weight_use_without_clearance"
+      ],
+      "confidence": "medium_retrieval_research_low_mix_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiment_revisions": [
+    {
+      "id": "EXP-ML-20261009-0900-01",
+      "status": "not_run_blocked",
+      "target": "effect_chain_topology",
+      "A": "parameter_visible_code_embeddings",
+      "B": "same_programs_all_parameters_masked",
+      "single_factor": "parameter_visibility",
+      "fixed_input_duration_seconds": 6,
+      "fixed_sample_rate_hz": 48000,
+      "primary_endpoint": "paired_per_query_MRR_delta",
+      "success": "paired-bootstrap_95pct_CI_above_zero_and_no_predeclared_effect_family_R10_drop_over_5pp",
+      "tolerance_origin": "project_preregistration_not_literature",
+      "listening": "none",
+      "blockers": [
+        "no_approved_local_corpus",
+        "no_pinned_HF_snapshot_hash_manifest",
+        "licence_context_not_cleared",
+        "no_CPU_feasibility_measurement"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "queue": {
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "blocked_research": "EXP-ML-20261009-0900-01",
+    "videos_unchanged": [
+      "youtube:Q6R43aH4jWo",
+      "youtube:VHLpq_Hqrl4"
+    ],
+    "reference_unchanged": "cambridge-mt:reppard-walker:one-of-these-days"
+  },
+  "access_status": {
+    "hugging_face_connector": "model_metadata_read",
+    "local_hf_cli": "not_installed",
+    "checkpoint_files": "not_downloaded",
+    "scite": "not_retried_paid_wall_confirmed_2026-10-08",
+    "consensus": "not_retried"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "checkpoint_executed": false,
+    "paid_service_used": false
+  }
+}
