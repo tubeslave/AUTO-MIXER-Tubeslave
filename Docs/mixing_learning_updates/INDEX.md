@@ -428,3 +428,11 @@ ML-2026-10-08-1500 (search, preceding successful search ML-2026-10-08-0900): rou
 
 ML-2026-10-08-1800 (deep_review, preceding search ML-2026-10-08-1500): transport round-trip delay is separated from acoustic microphone arrival. Hardware inserts use a DAW ping or bypass/unity loopback; GCC-PHAT remains a content/window-dependent analysis candidate for same-source multi-mic signals and must not erase intentional room timing automatically. The current repository's Hann choice is directionally supported, but its thresholds and OSC actuation are not validated by the paper. Next executable test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
 
+
+## 2026-10-09 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-09-0900 | [Report](ML-2026-10-09-0900.md) · [JSON patch](ML-2026-10-09-0900.json) · [ADR](../adr/mixing-learning-2026-10-09-0900.md) | Search: 1 full-text ISMIR-2026 source plus public repository/licence audit, 4 Knowledge Cards, 1 shadow-only rule, 1 blocked retrieval experiment, 0 studied and 2 new metadata-only queued videos, 1 catalogue-only multitrack candidate; duplicates and conflicting catalogue counts resolved conservatively |
+
+ML-2026-10-09-0900 (search, preceding search ML-2026-10-08-1500): PEACE is retained only for version-pinned shadow retrieval, not mix-quality scoring or automatic processing. The two new videos remain metadata-only because captions were unavailable. Reppard Walker “One Of These Days” remains catalogue-only pending live rights and metadata recheck. Next executable project experiment remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false and the new retrieval experiment is not_run_blocked.
