@@ -1,0 +1,220 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-09-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-09T09:00:00+03:00",
+  "actual_start": "2026-10-09T08:55:32+03:00",
+  "completed_at": "2026-10-09T09:01:49+03:00",
+  "preceding_search": "ML-2026-10-08-1500",
+  "preceding_update": "ML-2026-10-08-1800",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261009-0900-01",
+      "stable_key": "arxiv:2610.03405",
+      "title": "PEACE: Joint Embeddings of DSP Effects Code and Audio",
+      "publication_date": "2026-10-02",
+      "status": "ISMIR_2026_arxiv_v1",
+      "url": "https://arxiv.org/html/2610.03405v1",
+      "depth": "full_text_method_dataset_metrics_results_limitations",
+      "design": {
+        "effects": 21,
+        "chain_lengths_seen": [
+          1,
+          2,
+          3
+        ],
+        "train_pairs": 200000,
+        "validation_pairs": 8192,
+        "test_pairs": 4096,
+        "wet_normalization_lufs": -18
+      },
+      "selected_results": {
+        "single_effect_overall": {
+          "boxgraph_r1": 16.8,
+          "t5_r1": 18.1,
+          "boxgraph_r10": 44.3,
+          "t5_r10": 45.2
+        },
+        "rir_ood": {
+          "peace_scratch_boxgraph_r10": 53.5,
+          "afx_rep_r10": 28.3
+        },
+        "topology_exact_boxgraph": {
+          "r1": 17.4,
+          "r10": 61.4
+        }
+      },
+      "limitations": [
+        "random non-curated parameters",
+        "random source-preset pairing",
+        "some source audio not fully dry",
+        "OOD evaluation only reverb",
+        "no user study",
+        "large effect-family variance"
+      ]
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20261009-0900-01",
+      "repository": "https://github.com/DBraun/PEACE",
+      "depth": "README_and_LICENSE",
+      "status": "public_documentation_verified_not_executed",
+      "code_license": "MIT",
+      "weight_terms_reported_by_readme": "CC BY-NC 4.0",
+      "scope": "21 supported serial effects; parallel/feedback/unknown rejected",
+      "version_note": "proceedings reflection padding for two evaluations; arXiv recomputed with training features",
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261009-0900-01",
+      "claim": "Effect-code retrieval does not establish mix quality or preference.",
+      "confidence": "high_definition_high_source_specific"
+    },
+    {
+      "id": "KC-ML-20261009-0900-02",
+      "claim": "PEACE results must be reported per effect family because dynamics/nonlinear/spatial retrieval can be far weaker than reverb.",
+      "confidence": "high_within_paper_medium_transfer"
+    },
+    {
+      "id": "KC-ML-20261009-0900-03",
+      "claim": "Parameter-masked topology retrieval is not parameter estimation; order-tolerant scoring requires an explicit commutativity contract.",
+      "confidence": "high_task_definition_medium_transfer"
+    },
+    {
+      "id": "KC-ML-20261009-0900-04",
+      "claim": "Padding, checkpoint, loudness normalization and paper/version are part of the metric contract.",
+      "confidence": "high_repository_documentation"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261009-0900-01",
+      "action": "shadow_retrieval_only",
+      "required_contract": [
+        "source_class",
+        "sample_rate",
+        "excerpt_duration",
+        "loudness_normalization",
+        "encoder_variant",
+        "checkpoint_revision",
+        "padding_version",
+        "parameter_visibility",
+        "gallery"
+      ],
+      "forbidden_transfers": [
+        "retrieval_score_as_quality",
+        "exact_chain_as_certainty",
+        "reverb_OOD_to_dynamics",
+        "topology_to_parameter_estimation"
+      ],
+      "confidence": "medium_retrieval_research_low_mix_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261009-0900-01",
+      "status": "not_run_blocked",
+      "blocker": "no approved local test corpus/checkpoint cache or CPU feasibility measurement; no paid compute allowed",
+      "A": "parameter-visible code embeddings",
+      "B": "same audio queries/gallery with parameters masked",
+      "single_factor": "parameter_visibility",
+      "loudness_contract": "frozen model preprocessing; later musical A/B requires raw plus BS.1770-matched renders",
+      "listener": "none for retrieval accuracy; Dmitry required for later musical A/B",
+      "auto_apply": false
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VIDEO-ML-20261009-0900-01",
+      "stable_key": "youtube:Q6R43aH4jWo",
+      "title": "Drum Compression with Vance Powell & the UAD EL8 Distressor",
+      "publisher": "Universal Audio",
+      "duration": "00:01:18",
+      "depth": "metadata_only_visible_youtube_page",
+      "transcript": "unavailable",
+      "status": "queued_source",
+      "extracted_techniques": []
+    },
+    {
+      "id": "VIDEO-ML-20261009-0900-02",
+      "stable_key": "youtube:VHLpq_Hqrl4",
+      "title": "CLA MixHub Plugin: Tips, Tricks & Special Features",
+      "publisher": "Waves Audio",
+      "duration": "00:09:28",
+      "depth": "metadata_only_visible_youtube_page",
+      "transcript": "unavailable",
+      "status": "queued_source",
+      "extracted_techniques": []
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20261009-0900-01",
+      "stable_key": "cambridge-mt:reppard-walker:one-of-these-days",
+      "title": "One Of These Days",
+      "artist": "Reppard Walker",
+      "genre": "Americana indie rock",
+      "depth": "catalogue_search_metadata_only",
+      "advertised_assets": [
+        "edited excerpt",
+        "full multitrack",
+        "preview"
+      ],
+      "track_count": "not_recorded_conflicting_search_snippets",
+      "status": "queued_rights_recheck",
+      "audio_downloaded": false
+    }
+  ],
+  "deduplication": {
+    "scientific": [
+      "arxiv:2608.05506",
+      "arxiv:2609.02835",
+      "arxiv:2608.05442",
+      "dafx26:paper19"
+    ],
+    "videos": [
+      "youtube:btsWALco8Xk",
+      "youtube:lhvllefJuao",
+      "youtube:qQzRy1WLF0A",
+      "youtube:Cmhd8fZ28fk"
+    ],
+    "rejected_low_value": [
+      "youtube:_fPpwivQfVk",
+      "youtube:vEilXr1_aco"
+    ]
+  },
+  "queue": {
+    "next_deep_review": [
+      "SRC-ML-20261009-0900-01",
+      "ART-ML-20261009-0900-01"
+    ],
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "blocked": "EXP-ML-20261009-0900-01",
+    "videos_added": [
+      "VIDEO-ML-20261009-0900-01",
+      "VIDEO-ML-20261009-0900-02"
+    ],
+    "reference_added": "REF-ML-20261009-0900-01"
+  },
+  "access_status": {
+    "scite": "not_retried_paid_wall_confirmed_2026-10-08",
+    "consensus": "not_retried",
+    "cambridge_live_page": "cloudflare_verification_blocked_browser",
+    "citation_check": "partial"
+  },
+  "safety": {
+    "audio_changed": false,
+    "dsp_changed": false,
+    "model_changed": false,
+    "runtime_code_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "paid_service_used": false
+  }
+}
