@@ -1,0 +1,172 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-09-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-09T18:00:00+03:00",
+  "actual_start": "2026-10-09T18:02:04+03:00",
+  "completed_at": "2026-10-09T18:07:33+03:00",
+  "preceding_search": "ML-2026-10-09-1500",
+  "citation_check": "partial",
+  "source_updates": [
+    {
+      "id": "SRC-ML-20261009-1500-01",
+      "stable_keys": [
+        "doi:10.1109/ICASSP49660.2025.10888409",
+        "arxiv:2502.17527"
+      ],
+      "depth": "full_text_plus_companion_results_plus_pinned_repository_source_and_static_contract_audit",
+      "task_boundary": "environment_conditioned_final_playback_not_multitrack_demasking",
+      "evaluation": "objective_NMR_and_100ms_A_weighted_GLD_no_listener_study",
+      "independence": "same_author_family_not_independent_confirmation"
+    }
+  ],
+  "artifact_updates": [
+    {
+      "id": "ART-ML-20261009-1500-01",
+      "snapshot": "ClementineBerger/DPNMM@6fb3516e50ec1de0f70d4c4e36a7d88a62e74a97",
+      "syntax_compile": "passed_reviewed_python_files",
+      "executed": false,
+      "entrypoint_contract_failures": [
+        "train_passes_hpss_keywords_not_accepted_by_custom_dataloader",
+        "eval_dataloader_requires_hpss_arguments_omitted_by_eval_model",
+        "example_main_requires_job_id_but_cli_call_omits_it",
+        "train_or_wrapper_read_data_and_mode_fields_absent_from_visible_config"
+      ],
+      "input_contract_gaps": [
+        "torchaudio_sample_rate_return_value_ignored",
+        "no_visible_resample_or_44100Hz_rejection_guard"
+      ],
+      "gain_semantics": {
+        "bark_control_clamp_db": {
+          "maximum": 3.3333333333333335,
+          "minimum": -1.6666666666666667
+        },
+        "last_two_bark_controls_forced_zero": true,
+        "overlapping_patterns_summed": true,
+        "static_formula_reexpression_at_44100Hz_2048": {
+          "all_positive_realised_max_db_approx": 12.328,
+          "all_negative_realised_min_db_approx": -6.164
+        },
+        "measurement_status": "static_derivation_not_audio_measurement"
+      },
+      "smoothing_semantics": {
+        "labelled_attack_release_ms": 250,
+        "nfft": 2048,
+        "overlap": 0.75,
+        "hop_samples": 512,
+        "visible_gamma_formula": "N/(tau*sr)",
+        "derived_e_fold_ms_approx": 56.5,
+        "status": "intended_vs_effective_contract_unresolved"
+      },
+      "reproducibility_status": "not_run_blocked"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261009-1800-01",
+      "claim": "Syntax-valid source is not a runnable reproduction when public entry points disagree on arguments and configuration fields.",
+      "confidence": "high_static_contract_audit"
+    },
+    {
+      "id": "KC-ML-20261009-1800-02",
+      "claim": "Individual Bark-control clamps do not directly bound the realised per-frequency filter after overlapping pattern synthesis.",
+      "confidence": "high_source_code_plus_static_derivation"
+    },
+    {
+      "id": "KC-ML-20261009-1800-03",
+      "claim": "Smoothing time constants require the actual recurrence update interval; the visible 250 ms label and recurrence imply different effective timing.",
+      "confidence": "high_source_code_plus_static_derivation"
+    },
+    {
+      "id": "KC-ML-20261009-1800-04",
+      "claim": "A fixed-rate psychoacoustic model must explicitly resample or reject mismatched input sample rates.",
+      "confidence": "high_source_code"
+    },
+    {
+      "id": "KC-ML-20261009-1800-05",
+      "claim": "The artifact's 100 ms A-weighted GLD does not replace BS.1770 matching, true peak or musical preference assessment.",
+      "confidence": "high_metric_boundary"
+    }
+  ],
+  "candidate_rule_revisions": [
+    {
+      "id": "RULE-ML-20261009-1500-01",
+      "version": 2,
+      "action": "offline_environment_conditioned_playback_only_after_parity_and_input_contract_gates",
+      "required_checks": [
+        "licence_and_revision_pins",
+        "self_contained_configuration",
+        "entrypoint_smoke_test",
+        "sample_rate_resample_or_reject",
+        "realised_filter_min_max",
+        "smoothing_step_response",
+        "true_peak_headroom",
+        "raw_and_BS1770_matched_blind_comparison"
+      ],
+      "numeric_range_provenance": "repository_clamps_are_implementation_observations_not_transferable_presets",
+      "confidence": "medium_playback_research_very_low_artifact_readiness_low_mix_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiment_revisions": [
+    {
+      "id": "EXP-ML-20261009-1500-01",
+      "version": 2,
+      "status": "not_run_blocked",
+      "phase_0": "synthetic_parity_gate_for_entrypoint_rate_determinism_realised_filter_and_step_response",
+      "A": "unmodified_approved_final_mix_plus_fixed_ambient_noise",
+      "B": "same_material_plus_one_frozen_envelope_from_parity_passed_implementation",
+      "single_factor": "music_spectral_envelope",
+      "comparison": [
+        "raw_actual_level_pair",
+        "separate_BS1770_matched_pair"
+      ],
+      "blockers": [
+        "unresolved_repository_licence",
+        "no_public_checkpoint",
+        "no_packaged_dataset_or_metadata",
+        "four_entrypoint_or_configuration_mismatches",
+        "no_sample_rate_guard",
+        "smoothing_contract_unresolved",
+        "no_approved_noise_headphone_test_set"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "video_updates": [],
+  "reference_updates": [],
+  "queue": {
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "blocked_research": "EXP-ML-20261009-1500-01",
+    "bass_DI_experiment": "EXP-ML-20261009-1500-02",
+    "videos_unchanged": [
+      "youtube:_2hjXzNPFTE",
+      "youtube:VzPLwUxKseo",
+      "youtube:bq7ykYGmwwk",
+      "youtube:Q6R43aH4jWo",
+      "youtube:VHLpq_Hqrl4"
+    ],
+    "reference_unchanged": "cambridge-mt:reppard-walker:one-of-these-days"
+  },
+  "access_status": {
+    "paper": "full_text_carried_from_preceding_search",
+    "companion_results": "fully_read",
+    "repository": "pinned_source_audited",
+    "checkpoint": "not_found_not_executed",
+    "dataset": "not_public_not_downloaded",
+    "scite": "not_retried_paid_wall_confirmed_2026-10-08",
+    "consensus": "not_retried"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "audio_measured": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "checkpoint_executed": false,
+    "paid_service_used": false
+  }
+}
