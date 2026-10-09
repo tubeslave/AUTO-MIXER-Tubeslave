@@ -444,3 +444,12 @@ ML-2026-10-09-0900 (search, preceding search ML-2026-10-08-1500): PEACE is retai
 | ML-2026-10-09-1200 | [Report](ML-2026-10-09-1200.md) · [JSON patch](ML-2026-10-09-1200.json) · [ADR](../adr/mixing-learning-2026-10-09-1200.md) | Deep review: PEACE source/inference/frontend/test/licence/Hugging Face metadata audit; 1 source and 1 artifact card revised, 5 Knowledge Cards, 1 narrowed shadow-only rule and 1 corrected topology-fixed blocked experiment; no new videos or references |
 
 ML-2026-10-09-1200 (deep review, preceding search ML-2026-10-09-0900): the public package is pinned at Git commit 2d8a3887501bcdb4779544295845b1e69b6b9b78, but a Hugging Face revision/hash manifest is still required before execution. The paper's 10-second renders and README's 6-second training excerpts need an explicit crop contract. The corrected experiment changes only parameter visibility while keeping the topology target fixed. PEACE remains shadow-only; next executable musical test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
+
+
+## 2026-10-09 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-09-1500 | [Report](ML-2026-10-09-1500.md) · [JSON patch](ML-2026-10-09-1500.json) · [ADR](../adr/mixing-learning-2026-10-09-1500.md) | Search: 1 full-text ICASSP-2025 source plus public-artifact audit, 1 fully studied Puremix/Andrew Scheps video and 3 metadata-only queued videos; 5 Knowledge Cards, 2 candidate rules and 2 unrun experiments; recent paper families and one probable video version duplicate deduplicated; no new reference card |
+
+ML-2026-10-09-1500 (search, preceding successful search ML-2026-10-09-0900): DPNMM is retained only as environment-conditioned playback research, not multitrack de-masking; objective NMR/GLD do not prove musical preference. The studied Scheps video supports an articulation-first DI hypothesis, not transferable preset values. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
