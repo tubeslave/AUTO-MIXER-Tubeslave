@@ -1,0 +1,208 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-09-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-09T15:00:00+03:00",
+  "actual_start": "2026-10-09T15:03:10+03:00",
+  "completed_at": "2026-10-09T15:20:00+03:00",
+  "preceding_search": "ML-2026-10-09-0900",
+  "preceding_update": "ML-2026-10-09-1200",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261009-1500-01",
+      "stable_keys": [
+        "doi:10.1109/ICASSP49660.2025.10888409",
+        "arxiv:2502.17527"
+      ],
+      "title": "Perceptual Noise-Masking with Music through Deep Spectral Envelope Shaping",
+      "publication": "ICASSP 2025",
+      "preprint_date": "2025-02-24",
+      "discovered_at": "2026-10-09",
+      "depth": "full_text_plus_official_results_and_repository_source_config_example_audit",
+      "task_boundary": "environment_conditioned_headphone_playback_not_multitrack_mix_demasking",
+      "evaluation": "objective_NMR_and_GLD_no_listener_study",
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20261009-1500-01",
+      "stable_key": "github:ClementineBerger/DPNMM@6fb3516e50ec1de0f70d4c4e36a7d88a62e74a97",
+      "license": "not_found",
+      "dataset_packaged": false,
+      "checkpoint_found": false,
+      "executed": false,
+      "reproducibility_blockers": [
+        "inconsistent_DATA_MY_DATA_environment_variables",
+        "example_main_call_omits_job_id",
+        "mono_only_visible_path",
+        "no_public_checkpoint_identified"
+      ],
+      "official_erratum_applied": [
+        "NMR_value_bracketing",
+        "architecture_64_labels_should_be_32"
+      ]
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VID-ML-20261009-1500-01",
+      "stable_key": "youtube:lhvllefJuao",
+      "channel": "Puremix",
+      "published": "2017-08-30",
+      "duration_seconds": 363,
+      "depth": "full_permitted_auto_caption_transcript_ru_auto_translation",
+      "asr_numbers_require_visual_verification": true,
+      "classifications": [
+        "bass",
+        "EQ",
+        "saturation",
+        "compression",
+        "transient_attack",
+        "mono_sum",
+        "phase_context"
+      ]
+    },
+    {
+      "id": "VID-ML-20261009-1500-02",
+      "stable_key": "youtube:_2hjXzNPFTE",
+      "channel": "Chris Lord-Alge",
+      "published": "2026-09-07",
+      "duration_seconds": 298,
+      "depth": "metadata_description_only",
+      "status": "queued_source_no_transcript"
+    },
+    {
+      "id": "VID-ML-20261009-1500-03",
+      "stable_key": "youtube:VzPLwUxKseo",
+      "channel": "SonicScoop",
+      "published": "2025-01-09",
+      "duration_seconds": 3559,
+      "depth": "metadata_description_only",
+      "status": "queued_source_no_transcript"
+    },
+    {
+      "id": "VID-ML-20261009-1500-04",
+      "stable_key": "youtube:bq7ykYGmwwk",
+      "channel": "Waves Audio",
+      "published": "2021-05-09",
+      "duration_seconds": 320,
+      "depth": "metadata_description_only",
+      "status": "queued_source_transcript_rows_unreadable"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261009-1500-01",
+      "claim": "Playback masking of ambient noise is not multitrack de-masking.",
+      "confidence": "high_task_boundary"
+    },
+    {
+      "id": "KC-ML-20261009-1500-02",
+      "claim": "Objective NMR and GLD do not establish musical preference or mix quality.",
+      "confidence": "high_method_limit"
+    },
+    {
+      "id": "KC-ML-20261009-1500-03",
+      "claim": "Noise masking and playback-level preservation form an explicit trade-off.",
+      "confidence": "high_full_text"
+    },
+    {
+      "id": "KC-ML-20261009-1500-04",
+      "claim": "Ambient-noise spectrum, SNR and headphone response are part of the task context.",
+      "confidence": "high_full_text"
+    },
+    {
+      "id": "KC-ML-20261009-1500-05",
+      "claim": "In dense rock, a clear DI can make bass feel more aggressive by preserving pick attack; this is a bounded engineering hypothesis.",
+      "confidence": "medium_engineer_demonstration"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261009-1500-01",
+      "action": "offline_environment_conditioned_playback_envelope_only",
+      "confidence": "medium_playback_research_low_mix_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261009-1500-02",
+      "action": "audition_fixed_aligned_DI_for_bass_articulation_before_more_distortion",
+      "confidence": "medium_engineer_demonstration",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261009-1500-01",
+      "status": "not_run_blocked",
+      "A": "unmodified_music_plus_fixed_ambient_noise",
+      "B": "same_material_plus_one_frozen_DPNMM_style_envelope",
+      "single_factor": "music_spectral_envelope",
+      "comparison": [
+        "raw_actual_level",
+        "separate_BS1770_matched_pair"
+      ],
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20261009-1500-02",
+      "status": "not_run",
+      "A": "approved_current_bass_blend",
+      "B": "same_blend_plus_one_frozen_polarity_lag_screened_DI_contribution",
+      "single_factor": "DI_contribution_level",
+      "comparison": [
+        "raw",
+        "separate_BS1770_matched_pair"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "deduplication": [
+    {
+      "stable_keys": [
+        "arxiv:2608.05442",
+        "arxiv:2608.05506",
+        "arxiv:2608.30559",
+        "arxiv:2610.03405"
+      ],
+      "result": "existing_source_families_not_readded"
+    },
+    {
+      "stable_keys": [
+        "youtube:csvLWVxhkPo",
+        "youtube:Uc3SxgT4uCw"
+      ],
+      "result": "probable_version_duplicate_same_normalized_title_and_duration_not_independent_confirmation"
+    }
+  ],
+  "queue": {
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "new_experiments": [
+      "EXP-ML-20261009-1500-01",
+      "EXP-ML-20261009-1500-02"
+    ],
+    "videos_added": [
+      "youtube:_2hjXzNPFTE",
+      "youtube:VzPLwUxKseo",
+      "youtube:bq7ykYGmwwk"
+    ],
+    "videos_carried": [
+      "youtube:Q6R43aH4jWo",
+      "youtube:VHLpq_Hqrl4"
+    ],
+    "reference_unchanged": "cambridge-mt:reppard-walker:one-of-these-days"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "checkpoint_executed": false,
+    "paid_service_used": false
+  }
+}
