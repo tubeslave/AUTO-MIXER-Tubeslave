@@ -453,3 +453,11 @@ ML-2026-10-09-1200 (deep review, preceding search ML-2026-10-09-0900): the publi
 | ML-2026-10-09-1500 | [Report](ML-2026-10-09-1500.md) · [JSON patch](ML-2026-10-09-1500.json) · [ADR](../adr/mixing-learning-2026-10-09-1500.md) | Search: 1 full-text ICASSP-2025 source plus public-artifact audit, 1 fully studied Puremix/Andrew Scheps video and 3 metadata-only queued videos; 5 Knowledge Cards, 2 candidate rules and 2 unrun experiments; recent paper families and one probable video version duplicate deduplicated; no new reference card |
 
 ML-2026-10-09-1500 (search, preceding successful search ML-2026-10-09-0900): DPNMM is retained only as environment-conditioned playback research, not multitrack de-masking; objective NMR/GLD do not prove musical preference. The studied Scheps video supports an articulation-first DI hypothesis, not transferable preset values. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
+
+## 2026-10-09 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-09-1800 | [Report](ML-2026-10-09-1800.md) · [JSON patch](ML-2026-10-09-1800.json) · [ADR](../adr/mixing-learning-2026-10-09-1800.md) | Deep review: DPNMM paper/companion plus pinned source-code contract audit; 1 source and 1 artifact card revised, 5 Knowledge Cards, 1 narrowed candidate rule and 1 parity-gated blocked experiment; no video/reference promotion, audio, DSP or runtime change |
+
+ML-2026-10-09-1800 (deep review, preceding search ML-2026-10-09-1500): DPNMM remains environment-conditioned playback research, but the public artifact is downgraded to not_run_blocked after four confirmed entry-point/configuration mismatches, missing sample-rate handling, non-equivalence of Bark-control and realised filter limits, and unresolved 250 ms smoothing semantics. Next executable project test remains EXP-ML-20261001-1800-01; all rules remain auto_apply:false.
