@@ -1,0 +1,129 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-10-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-10T12:00:00+03:00",
+  "actual_start": "2026-10-10T11:56:59+03:00",
+  "completed_at": "2026-10-10T12:03:03+03:00",
+  "preceding_search": "ML-2026-10-10-0900",
+  "preceding_update": "ML-2026-10-10-0900",
+  "citation_check": "partial",
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261010-0900-01",
+      "depth": "deep_full_text_comparator_protocol_and_ablation_review",
+      "relationship": "dependent_comparator_to_SRC-ML-20260915-1200-01_not_original_end_to_end_replication",
+      "critical_limits": [
+        "private_paired_evaluation_data",
+        "synthetic_training_errors_on_20_percent_of_notes",
+        "shared_SOME_and_NSF_HiFiGAN_chain_isolates_symbolic_map_not_complete_original_systems",
+        "subjective_means_without_confidence_intervals_or_inferential_tests",
+        "code_weights_split_identity_manifest_not_found"
+      ],
+      "artifact_readiness": "not_run_blocked"
+    },
+    {
+      "id": "SRC-ML-20260915-1200-01",
+      "depth": "full_text_rechecked_as_comparator",
+      "comparison_limit": "original_BERT_APC_pipeline_metrics_and_MOS_are_not_directly_comparable_with_RF_SPC_reimplementation_row",
+      "artifact_revision_required": true
+    }
+  ],
+  "artifact_cards": [
+    {
+      "id": "ART-ML-20261010-1200-01",
+      "stable_key": "github:Joshua-1995/BERT-APC-Demo@0b5a5d3f813c92eea08aad930c63403540bd074f",
+      "type": "static_demo_page_with_audio_examples",
+      "license_observed": "MIT_LICENSE_file",
+      "implementation_found": false,
+      "model_weights_found": false,
+      "audio_downloaded": false,
+      "audio_listened": false,
+      "rights_note": "audio_example_provenance_not_independently_established",
+      "version_drift": {
+        "demo_pitch_MOS": "4.30_plus_minus_0.16",
+        "paper_v3_pitch_MOS": "4.32_plus_minus_0.15"
+      }
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261010-1200-01","claim":"Pitch-correction percentages and MOS values are comparable only under the same target definition, frontend, renderer, corpus and metric.","confidence":"high_full_text_comparison"},
+    {"id":"KC-ML-20261010-1200-02","claim":"Reference-free correction requires joint reporting of repair, harm, abstention and artistic-intent errors; accuracy alone hides the risk trade-off.","confidence":"high_within_reported_ablations"},
+    {"id":"KC-ML-20261010-1200-03","claim":"A vocal-derived tonal prior is a soft hypothesis and must not become hard key snapping; excessive source-specific weight reduces validation accuracy.","confidence":"high_source_result_medium_project_transfer"},
+    {"id":"KC-ML-20261010-1200-04","claim":"Subjective means without intervals and a disclosed inferential model remain descriptive; piano-reference correctness is not production preference.","confidence":"high_methodological_limit"},
+    {"id":"KC-ML-20261010-1200-05","claim":"A common transcription/resynthesis chain isolates the symbolic edit map but does not validate complete original systems or raw-vocal fidelity.","confidence":"high_full_text_comparison"},
+    {"id":"KC-ML-20261010-1200-06","claim":"Paper version and artifact commit must be pinned because demo statistics can drift from later manuscript revisions.","confidence":"high_direct_artifact_comparison"}
+  ],
+  "candidate_rule_updates": [
+    {
+      "id": "RULE-ML-20261010-0900-01",
+      "version": 2,
+      "when": "frozen_note_boundaries_and_manual_section_role_exist_for_local_or_licensed_vocal",
+      "change": "one_sparse_human_reviewed_target_edit_map_with_explicit_abstention",
+      "numeric_range_provenance": "paper_offsets_plus_or_minus_1_to_3_and_lambda_2_5_not_adopted",
+      "protect": ["vibrato","scoops","slides","growl_fry","consonants","identity","section_role","intentional_instability"],
+      "test": ["repair","harm","ambiguity_abstention","three_randomised_full_mix_passes","raw_and_separate_BS1770_matched_pairs"],
+      "cancel": ["wrong_target","harm_to_accepted_correct_note","flattened_contour","timbral_damage","worse_arrangement_hierarchy"],
+      "confidence": "medium_manual_workflow_very_low_model_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20260915-1200-02",
+      "version": 2,
+      "change": "treat_nearest_note_context_guide_and_vocal_tonal_prior_as_competing_hypotheses",
+      "cancel": "disagreement_or_weak_context_requires_abstention_and_manual_adjudication",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-20261010-0900-01",
+      "version": 2,
+      "status": "not_run_blocked",
+      "A": "approved_current_vocal_edit",
+      "B": "same_source_timing_gain_renderer_formant_mode_plus_one_frozen_sparse_target_edit_map",
+      "single_factor": "target_edit_map",
+      "measurements": ["repair_on_predeclared_wrong_notes","harm_on_accepted_correct_notes","abstention","target_disagreement","integrated_and_section_loudness","true_peak","clipping"],
+      "comparison": ["raw_actual_level","separate_BS1770_matched_randomised_full_mix_pair","three_Dmitry_passes"],
+      "success": "B_preferred_in_at_least_two_of_three_passes_with_improved_wrong_notes_and_no_clearly_wrong_target_on_accepted_correct_notes",
+      "cancel": ["preference_disappears_after_matching","wrong_target","consonant_or_transition_damage","flattened_expression","identity_change","worse_full_mix_hierarchy"],
+      "blockers": ["candidate_implementation_and_weights_unavailable","exact_project_vocal_missing","manual_correct_wrong_ambiguous_labels_missing"],
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20260915-1200-01",
+      "status": "superseded_for_production_evaluation",
+      "superseded_by": "EXP-ML-20261010-0900-01_v2",
+      "reason": "four_way_variant_set_did_not_isolate_one_factor"
+    }
+  ],
+  "queue": {
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "pitch_correction": "EXP-ML-20261010-0900-01_v2_not_run_blocked",
+    "mastering": ["EXP-ML-20261010-0900-02_not_run","EXP-ML-20261010-0900-03_not_run"],
+    "videos_preserved": ["youtube:XXCPQe4qzpc","youtube:dEbAIeuudEQ"]
+  },
+  "access_status": {
+    "RF_SPC_paper": "full_text_deep_reviewed",
+    "BERT_APC_v3": "full_text_comparator_rechecked",
+    "RF_SPC_project_page": "not_retrievable",
+    "RF_SPC_code_weights_manifest": "not_found",
+    "BERT_APC_demo": "static_page_and_license_read_at_pinned_commit",
+    "BERT_APC_implementation_weights": "not_found",
+    "scite": "not_retried_paid_wall_confirmed_2026_10_08",
+    "consensus": "not_retried"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "audio_measured": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "checkpoint_executed": false,
+    "paid_service_used": false
+  }
+}
+
