@@ -1,0 +1,173 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-10-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-10T15:00:00+03:00",
+  "actual_start": "2026-10-10T15:00:06+03:00",
+  "completed_at": "2026-10-10T15:06:20+03:00",
+  "preceding_search": "ML-2026-10-10-0900",
+  "preceding_update": "ML-2026-10-10-1200",
+  "citation_check": "partial",
+  "literature_search": {
+    "new_unique_sources": [],
+    "resurfaced_duplicates": [
+      {
+        "stable_id": "arxiv:2608.05442",
+        "title": "Diff2Mix",
+        "resolution": "already_indexed"
+      },
+      {
+        "stable_id": "arxiv:2609.02835",
+        "title": "Understanding Automatic Mixing",
+        "resolution": "already_indexed"
+      }
+    ],
+    "conclusion": "no_new_nonduplicate_scientific_source_in_short_interval"
+  },
+  "audio_evidence_cards": [
+    {
+      "id": "AUDIO-ML-PENA-20261010",
+      "stable_key": "library:file_00000000977081f5a4943df000fc12e1",
+      "artifact": "ML-AUDIO-PENA-20261010_evidence_patch.json",
+      "path": "/GPT MIXING ОБЛАКО/Mixing Learning/Audio Tests/ML-AUDIO-PENA-20261010/ML-AUDIO-PENA-20261010_evidence_patch.json",
+      "reading_depth": "selected_structured_fields_first_420_lines_plus_scoped_searches_not_full_3243_lines",
+      "source": {
+        "archive": "Logoped_Pena_Cut_48_Tracks.zip",
+        "ownership": "project_owned",
+        "track_count": 48,
+        "nonempty_tracks": 44,
+        "main_mix_tracks_used": 42
+      },
+      "integrity": {
+        "source_hashes_match": "48/48",
+        "source_modified": false,
+        "lossless_files_reopened": 97,
+        "all_finite": true,
+        "total_clipped_samples": 0
+      },
+      "master": {
+        "duration_seconds": 196.51,
+        "sample_rate_hz": 48000,
+        "pyloudnorm_integrated_lufs": -13.836547093477195,
+        "ffmpeg_integrated_lufs": -13.8,
+        "ffmpeg_true_peak_dbtp": -1.2,
+        "sample_peak_dbfs": -1.1672866344451904
+      },
+      "premaster": {
+        "pyloudnorm_integrated_lufs": -19.575595426370022,
+        "sample_peak_dbfs": -4.00553035736084
+      },
+      "ab_pack": {
+        "pairs": 21,
+        "matched_wav_files": 42,
+        "raw_flac_files": 42,
+        "max_abs_loudness_difference_lu": 5.290486875253464e-7,
+        "status": "rendered_measured_pending_listening",
+        "dmitry_listening_runs": 0,
+        "preference": null,
+        "general_rule_validation": false,
+        "auto_apply": false
+      },
+      "correction_to_prior_summary": {
+        "pair_count": "21_not_17",
+        "master_metrics": "about_-13.84_LUFS-I_and_-1.2_dBTP"
+      }
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261010-1500-01",
+      "claim": "Incoming technique claims require project-owned_or_licensed_multitrack_one-factor_AB_raw_and_BS1770-matched_copies_objective_protected-quality_checks_and_recorded_Dmitry_verdict_before_rule_acceptance.",
+      "scope": "project_governance_not_scientific_finding",
+      "transfer_requirement": "repeat_on_independent_multitrack_before_generalization",
+      "confidence": "high_project_policy",
+      "auto_apply": false
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VID-ML-20261010-1500-01",
+      "stable_id": "youtube:aNQQ6pXQ5G4",
+      "title": "Andy Wallace Drum Overhead Masterclass, Using Phase to Enhance your Stereo Spectrum",
+      "channel": "J.P. Henry",
+      "duration": "8:51",
+      "url": "https://www.youtube.com/watch?v=aNQQ6pXQ5G4",
+      "reading_depth": "metadata_description_only_captions_explicitly_unavailable",
+      "status": "queued_source"
+    },
+    {
+      "id": "VID-ML-20261010-1500-02",
+      "stable_id": "youtube:6NaT9v-fRvE",
+      "title": "Record Rock Drums Like A PRO: Miking Techniques, EQ, Compression & more - Cameron Webb",
+      "channel": "Produce Like A Pro",
+      "duration": "24:00",
+      "url": "https://www.youtube.com/watch?v=6NaT9v-fRvE",
+      "reading_depth": "search_result_metadata_only_transcript_not_retrieved",
+      "status": "queued_source"
+    },
+    {
+      "id": "VID-ML-20261010-1500-03",
+      "stable_id": "youtube:g9McdQrolxc",
+      "title": "5 Quick Master Bus Mixing Tricks - Warren Huart",
+      "channel": "Produce Like A Pro",
+      "duration": "30:00",
+      "url": "https://www.youtube.com/watch?v=g9McdQrolxc",
+      "reading_depth": "search_result_metadata_only_transcript_not_retrieved",
+      "status": "queued_source"
+    }
+  ],
+  "dedupe": [
+    {
+      "key": "youtube:Z0eqw_3cY2A",
+      "resolution": "existing_fully_studied_ML-2026-09-24-1500"
+    },
+    {
+      "key": "youtube:NDfT-3KvqOM",
+      "resolution": "existing_queued_ML-2026-09-30-0900"
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "PENA-AB-01",
+      "adapted_from": "EXP-ML-20261001-1800-01",
+      "title": "parallel_drum_density",
+      "status": "rendered_measured_pending_listening",
+      "single_factor": "frozen_parallel_drum_bus_off_vs_on",
+      "comparison": "hidden_XY_BS1770_matched_three_randomized_Dmitry_passes",
+      "protect": [
+        "attack",
+        "groove",
+        "cymbal_smoothness",
+        "low_end_body",
+        "section_hierarchy",
+        "mono_compatibility",
+        "headroom"
+      ],
+      "success": "same_processing_state_preferred_at_least_2_of_3_without_protected_quality_regression",
+      "cancel": "preference_disappears_after_matching_or_any_protected_quality_worsens",
+      "auto_apply": false
+    }
+  ],
+  "queue": {
+    "next_executable": "PENA-AB-01_pending_Dmitry_listening",
+    "remaining_local_pairs": "PENA-AB-02_through_PENA-AB-21_one_at_a_time",
+    "scientific": "unchanged_no_new_unique_source",
+    "videos": [
+      "youtube:aNQQ6pXQ5G4",
+      "youtube:6NaT9v-fRvE",
+      "youtube:g9McdQrolxc"
+    ],
+    "pitch_correction": "EXP-ML-20261010-0900-01_v2_blocked_and_subject_to_same_multitrack_gate"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_played": false,
+    "subjective_listening_performed": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "paid_service_used": false,
+    "auto_apply": false
+  }
+}
