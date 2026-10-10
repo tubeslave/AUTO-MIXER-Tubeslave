@@ -146,3 +146,41 @@ def test_jsonl_logs_decision_and_reward(tmp_path):
     assert rows[0]["accepted"] is True
     assert rows[0]["score_before"]["model_status"] == "unavailable"
     assert reward_rows[0]["reward"] == rows[0]["reward"]
+
+
+def test_stem_drift_batch_updates_freeze_and_restore():
+    service = _service(
+        enabled=False,
+        stem_drift={
+            "enabled": True,
+            "freeze_normal_seconds": 0.2,
+            "default": {
+                "tau": 0.001,
+                "warn_T": 0.02,
+                "crit_T": 0.04,
+                "debounce_warn": 0.1,
+                "debounce_crit": 0.1,
+            },
+            "groups": {
+                "bass": {
+                    "tau": 0.001,
+                    "warn_T": 0.02,
+                    "crit_T": 0.04,
+                    "debounce_warn": 0.1,
+                    "debounce_crit": 0.1,
+                }
+            },
+        },
+    )
+
+    service.update_stem_score_batch(
+        {"bass": {"score": 0.88}},
+        0.1,
+        params_by_stem={"bass": {"fader_db": -9.0}},
+    )
+    result = service.update_stem_score_batch({"bass": {"score": 0.80}}, 0.1)
+
+    bass = result["stems"]["bass"]
+    assert bass["state"] == "CRIT"
+    assert service.is_stem_ml_correction_frozen("bass") is True
+    assert bass["masks"]["full_band"]["restored_params"] == {"fader_db": -9.0}
