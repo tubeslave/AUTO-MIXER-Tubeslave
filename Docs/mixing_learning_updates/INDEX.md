@@ -464,3 +464,11 @@ ML-2026-10-09-1800 (deep review, preceding search ML-2026-10-09-1500): DPNMM rem
 
 | ML-2026-10-10-0900 | [Report](ML-2026-10-10-0900.md), [JSON patch](ML-2026-10-10-0900.json), [ADR](../adr/mixing-learning-2026-10-10-0900.md) | Search: 1 fresh full-text pitch-correction preprint, 2 fully read official mastering articles, 2 metadata-only linked videos, 1 rights-recheck shoegaze multitrack candidate, 5 Knowledge Cards, 3 bounded rules and 3 unrun experiments; repair/harm, expressive-intent, pre-limited-energy-arc and one-factor M/S limits recorded |
 | ML-2026-10-10-1200 | [Report](ML-2026-10-10-1200.md), [JSON patch](ML-2026-10-10-1200.json) | Deep review: RF-SPC vs BERT-APC comparator/protocol audit, 1 artifact card, 6 Knowledge Cards, 2 tightened candidate rules, 1 revised blocked experiment; metric non-comparability and repair/harm trade-off recorded |
+
+## 2026-10-10 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-10-1500 | [Report](ML-2026-10-10-1500.md) · [JSON patch](ML-2026-10-10-1500.json) · [ADR](../adr/mixing-learning-2026-10-10-1500.md) | Search: no new non-duplicate paper; project-owned «Пена» evidence pack audited at selected structured depth, correcting the record to 21 rendered/measured A/B pairs with 0 Dmitry listening passes; 1 multitrack-validation governance card, 3 unique metadata-only queued videos; no rule promotion, audio, DSP or runtime change |
+
+ML-2026-10-10-1500 (search, preceding successful search ML-2026-10-10-0900): `PENA-AB-01` is now the next executable listening task because its one-factor raw and BS.1770-matched files already exist and passed file QC. The local render remains unapproved: all 21 pairs are `rendered_measured_pending_listening`, `preference:null`, `auto_apply:false`. Incoming claims now require a project multitrack A/B and recorded Dmitry verdict before acceptance.
