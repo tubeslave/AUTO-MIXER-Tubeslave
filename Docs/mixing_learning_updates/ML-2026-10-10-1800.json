@@ -1,0 +1,433 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-10-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-10T18:00:00+03:00",
+  "actual_start": "2026-10-10T18:00:32+03:00",
+  "completed_at": "2026-10-10T18:10:00+03:00",
+  "preceding_search": "ML-2026-10-10-1500",
+  "preceding_update": "ML-2026-10-10-1500",
+  "citation_check": "partial",
+  "sources_reviewed": [
+    {
+      "id": "AUDIO-ML-PENA-20261010",
+      "stable_key": "library:file_00000000977081f5a4943df000fc12e1",
+      "library_file_id": "libfile_cf8a3d0224c48191961e63df58edb365",
+      "artifact": "ML-AUDIO-PENA-20261010_evidence_patch.json",
+      "library_path": "/GPT MIXING ОБЛАКО/Mixing Learning/Audio Tests/ML-AUDIO-PENA-20261010/ML-AUDIO-PENA-20261010_evidence_patch.json",
+      "reading_depth": {
+        "kind": "complete_machine_read",
+        "lines_read": 3243,
+        "total_lines": 3243,
+        "size_bytes": 137864
+      },
+      "source_scope": {
+        "ownership": "project_owned",
+        "state": "already_edited_excerpt",
+        "tracks": 48,
+        "nonempty": 44,
+        "used_in_main_mix": 42
+      },
+      "integrity": {
+        "source_hashes_checked": 48,
+        "source_hashes_match": 48,
+        "source_files_modified": false,
+        "lossless_files_reopened": 97,
+        "all_finite": true,
+        "clipped_samples": 0
+      },
+      "master": {
+        "duration_seconds": 196.51,
+        "sample_rate_hz": 48000,
+        "pyloudnorm_integrated_lufs": -13.836547093477195,
+        "ffmpeg_integrated_lufs": -13.8,
+        "ffmpeg_true_peak_dbtp": -1.2,
+        "sample_peak_dbfs": -1.1672866344451904
+      },
+      "ab_pack": {
+        "pairs": 21,
+        "matched_wav_files": 42,
+        "raw_flac_files": 42,
+        "max_abs_loudness_difference_lu": 5.290486875253464e-7,
+        "all_status": "rendered_measured_pending_listening",
+        "dmitry_listening_runs": 0,
+        "preference": null,
+        "general_rule_validation": false,
+        "auto_apply": false
+      }
+    }
+  ],
+  "findings": {
+    "technical_comparison_ready_count": 21,
+    "narrow_scalar_or_state_count": 16,
+    "frozen_envelope_curve_or_topology_count": 4,
+    "multi_processor_bundle_count": 1,
+    "complete_parameter_manifest_present": false,
+    "sealed_blind_answer_key_present": false,
+    "randomized_presentation_schedule_present": false,
+    "generic_protected_quality_list_reused_across_trials": true,
+    "lra_correctly_unused_for_sub_60_second_excerpts": true,
+    "conclusion": "file_QC_and_level_matching_verified_but_no_preference_or_portable_rule_validated"
+  },
+  "trial_audit": [
+    {
+      "id": "PENA-AB-01",
+      "classification": "multi_processor_bundle",
+      "inference_scope": "whole_parallel_return_only",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": false,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-02",
+      "classification": "narrow_state",
+      "inference_scope": "room_return_off_vs_on",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-03",
+      "classification": "narrow_scalar",
+      "inference_scope": "bass_duck_max_1.25_dB",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-04",
+      "classification": "narrow_state",
+      "inference_scope": "fixed_high_passed_DI_contribution",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-05",
+      "classification": "frozen_envelope",
+      "inference_scope": "phrase_gain_envelope_as_one_intervention",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": false,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-06",
+      "classification": "narrow_state",
+      "inference_scope": "vocal_compressor_bypass_vs_enabled",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-07",
+      "classification": "narrow_scalar",
+      "inference_scope": "2300_Hz_dynamic_cut_max_1.4_dB",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-08",
+      "classification": "narrow_scalar",
+      "inference_scope": "pan_magnitude",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-09",
+      "classification": "narrow_state",
+      "inference_scope": "return_pan",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-10",
+      "classification": "narrow_state",
+      "inference_scope": "tom_expander_bypass_vs_enabled",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-11",
+      "classification": "narrow_state",
+      "inference_scope": "snare_bottom_polarity",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-12",
+      "classification": "narrow_scalar",
+      "inference_scope": "snare_bottom_advance_146_samples",
+      "dependencies": [
+        "PENA-AB-11"
+      ],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-13",
+      "classification": "narrow_scalar_diagnostic",
+      "inference_scope": "close_drum_group_delay_200_samples",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-14",
+      "classification": "narrow_scalar",
+      "inference_scope": "kick_out_advance_47_samples",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-15",
+      "classification": "narrow_scalar",
+      "inference_scope": "mix_bus_attack_10_vs_30_ms",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-16",
+      "classification": "narrow_scalar",
+      "inference_scope": "side_high_shelf_0_vs_-1.2_dB",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-17",
+      "classification": "narrow_scalar",
+      "inference_scope": "mid_gain_0_vs_+1_dB",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-18",
+      "classification": "frozen_envelope",
+      "inference_scope": "post_limiter_section_gain_envelope",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": false,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-19",
+      "classification": "frozen_curve",
+      "inference_scope": "whole_broad_EQ_curve",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": false,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-20",
+      "classification": "topology_level",
+      "inference_scope": "one_vs_two_limiter_stages",
+      "dependencies": [],
+      "narrow_one_parameter_or_state": false,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    },
+    {
+      "id": "PENA-AB-21",
+      "classification": "narrow_scalar",
+      "inference_scope": "room_predelay_0_vs_15_ms",
+      "dependencies": [
+        "PENA-AB-02"
+      ],
+      "narrow_one_parameter_or_state": true,
+      "local_preference_ready": true,
+      "portable_rule_ready": false
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261010-1800-01",
+      "claim": "File integrity and loudness matching establish technical comparison fairness, not listening preference or rule validity.",
+      "scope": "project_experiment_governance",
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-ML-20261010-1800-02",
+      "claim": "A bundled processor chain can validate only the complete frozen intervention; component claims require separate one-factor renders.",
+      "scope": [
+        "PENA-AB-01",
+        "PENA-AB-19",
+        "PENA-AB-20"
+      ],
+      "confidence": "high",
+      "auto_apply": false
+    },
+    {
+      "id": "KC-ML-20261010-1800-03",
+      "claim": "Downstream parameter tests require their assumed upstream state to be accepted or explicitly frozen.",
+      "dependencies": [
+        [
+          "PENA-AB-11",
+          "PENA-AB-12"
+        ],
+        [
+          "PENA-AB-02",
+          "PENA-AB-21"
+        ]
+      ],
+      "confidence": "high",
+      "auto_apply": false
+    }
+  ],
+  "candidate_rule_updates": [
+    {
+      "id": "RULE-ML-20261010-1800-01",
+      "status": "candidate",
+      "when_to_apply": "promoting_external_claim_or_rendered_pair_to_project_rule",
+      "require": [
+        "exact_factor_scope",
+        "full_reproducibility_manifest",
+        "raw_and_BS1770_matched_files",
+        "trial_specific_protected_qualities",
+        "blind_order_and_answer_key",
+        "recorded_Dmitry_verdict",
+        "independent_multitrack_transfer_test_before_generalization"
+      ],
+      "protect": [
+        "artistic_intent",
+        "attack",
+        "groove",
+        "tails",
+        "spectral_balance",
+        "stereo_and_mono_behaviour",
+        "section_hierarchy",
+        "headroom"
+      ],
+      "cancel": [
+        "protected_quality_regression",
+        "unstable_preference",
+        "broken_dependency",
+        "benefit_explained_only_by_level"
+      ],
+      "confidence": "high_project_governance_not_sonic_claim",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+      "source_trial": "PENA-AB-15",
+      "status": "not_run",
+      "audio_pair_status": "rendered_measured_pending_listening",
+      "source_interval_seconds": [
+        51.28,
+        76.88
+      ],
+      "baseline": "mix_bus_compressor_attack_10_ms",
+      "variant": "mix_bus_compressor_attack_30_ms",
+      "held_constant": [
+        "threshold",
+        "ratio",
+        "release",
+        "detector",
+        "knee",
+        "source",
+        "section"
+      ],
+      "listening_files": "existing_hidden_XY_matched_WAV",
+      "matched_target_lufs": -20,
+      "raw_files_use": "objective_confirmation_only",
+      "randomized_repeats": 3,
+      "measurements": [
+        "delivered_LUFS_difference",
+        "true_peak",
+        "sample_peak",
+        "peak_to_loudness",
+        "LR_correlation",
+        "band_energies"
+      ],
+      "protect": [
+        "kick_and_snare_attack",
+        "punch",
+        "cymbal_smoothness",
+        "pumping",
+        "low_end_stability",
+        "vocal_placement",
+        "section_hierarchy",
+        "mono_compatibility",
+        "headroom"
+      ],
+      "success": "same_state_preferred_at_least_2_of_3_without_protected_quality_regression",
+      "cancel": "inconsistent_or_level_dependent_preference_or_any_protected_quality_regression",
+      "inference_limit": "local_mix_only_until_complete_compressor_manifest_and_independent_multitrack_confirmation",
+      "auto_apply": false
+    }
+  ],
+  "queue": {
+    "next_executable": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "then": [
+      "PENA-AB-03",
+      "PENA-AB-11",
+      "PENA-AB-12_if_11_supports_fixed_-1_polarity",
+      "PENA-AB-02",
+      "PENA-AB-21_if_02_accepts_room"
+    ],
+    "scoped_bundle_tests": [
+      "PENA-AB-01",
+      "PENA-AB-19",
+      "PENA-AB-20"
+    ],
+    "reproducibility_action": "recover_or_create_full_pair_parameter_manifest_and_sealed_answer_key",
+    "literature": "unchanged_no_broad_search_in_deep_review",
+    "videos": [
+      "youtube:aNQQ6pXQ5G4",
+      "youtube:6NaT9v-fRvE",
+      "youtube:g9McdQrolxc"
+    ],
+    "pitch_correction": "EXP-ML-20261010-0900-01_v2_not_run_blocked"
+  },
+  "revised_conclusions": [
+    {
+      "prior": "21_fair_one_factor_pairs",
+      "revised": "21_technically_matched_comparisons_of_which_16_are_narrow_scalar_or_state_tests_4_are_frozen_envelope_curve_or_topology_interventions_and_1_is_a_multi_processor_bundle",
+      "reason": "complete_trial_level_audit"
+    },
+    {
+      "prior_next": "PENA-AB-01",
+      "revised_next": "PENA-AB-15",
+      "reason": "attack_only_pair_has_narrower_causal_scope_than_parallel_chain_bundle"
+    }
+  ],
+  "safety": {
+    "audio_changed": false,
+    "audio_played": false,
+    "subjective_listening_performed": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "paid_service_used": false,
+    "external_audio_upload": false,
+    "auto_apply": false
+  }
+}
