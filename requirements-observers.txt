@@ -1,0 +1,15 @@
+# Optional learned observers for Audio Workbench.
+# Install only on a machine intended to run local model inference.
+
+# Qwen2-Audio is Apache-2.0 at the model checkpoint.
+transformers>=4.45
+accelerate>=0.34
+torch>=2.2
+librosa>=0.10
+
+# Audiobox Aesthetics: quality-regression evidence, not an optimization target.
+audiobox_aesthetics>=0.0.4
+
+# RESEARCH ONLY: OpenMuQ/MuQ-MuLan-large checkpoint is CC-BY-NC-4.0.
+# Do not install/use in a commercial production path unless licensing changes or permission is obtained.
+# muq

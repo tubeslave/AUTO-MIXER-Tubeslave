@@ -1,0 +1,2 @@
+# Mixing Director v1.1 Masking milestone
+Start from the accepted fader/pan/automation balance. Measure broad spectral overlap for vocal vs music and kick vs bass. Prefer subtractive complementary EQ on the competitor. Maximum automatic cut 1.5 dB per band, at most two moves per source. No reference matching. Re-render with identical balance and automation.

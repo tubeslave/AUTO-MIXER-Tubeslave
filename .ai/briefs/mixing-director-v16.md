@@ -1,0 +1,2 @@
+# Mixing Director v1.6 Critic + bounded iteration
+The critic is a guardrail, not an aesthetic score. It checks vocal/music balance, kick/bass relation, headroom, over-compression risk and excessive width. If the current mix passes all hard guards, the autonomous loop is allowed to STOP instead of inventing another change. If a guard fails, generate a causal candidate that changes only the relevant control, render, re-measure, and accept only if the failure is removed without creating a new one.

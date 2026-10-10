@@ -1,0 +1,54 @@
+{
+  "goal": "offline-master-delivery-v1",
+  "status": "accepted_machine_validation",
+  "integration_pr": 116,
+  "tested_head": "fa5ee7f9e451ac441ac760bb1cc0a5b017af90a4",
+  "merged_commit": "0ae2efe3a2aa3947468f48b6f88b4ef729b571d9",
+  "scope": "file-oriented MasteringTargetController delivery with post-export WAV/MP3 validation and true-peak safety",
+  "contract": {
+    "rejected_candidate_exported": false,
+    "input_hash_and_immutability_recorded": true,
+    "wav_and_decoded_mp3_remeasured": true,
+    "existing_output_overwrite_allowed": false,
+    "audible_candidate_status": "pending_human_review",
+    "baseline_eligible": false,
+    "live_control_used": false
+  },
+  "validation": {
+    "workflow_run": 35926095336,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "focused_studio_boundary_python_3_11": {"passed": 15, "warnings": 1},
+    "full_suite_python_3_11": {"passed": 1157, "skipped": 2, "warnings": 2},
+    "real_defect_found_and_fixed": "sample-domain maximizer could leave intersample overshoot; linked static post-maximizer true-peak attenuation is now applied before safety evaluation",
+    "machine_acceptance_scope": "delivery mechanics, export integrity, controller rollback, metering and true-peak safety only"
+  },
+  "ptitsa_real_candidate_evidence": {
+    "status": "pending_human_review",
+    "duration_seconds": 259.0,
+    "frames": 11421900,
+    "sample_rate": 44100,
+    "channels": 2,
+    "integrated_lufs": -15.584010006875275,
+    "true_peak_dbtp": -1.300000417815462,
+    "final_limiter_max_gr_db": 2.6350257396698,
+    "worst_band_limiter_max_gr_db": 3.787471055984497,
+    "decoded_mp3_lufs": -15.583917362254544,
+    "decoded_mp3_true_peak_dbtp": -1.3687227249397105,
+    "export_failures": [],
+    "wav_sha256": "c3bf2b2a78966b87756df2d568bf9261a8a8011b0ac3813f637ce3d3f621888c",
+    "mp3_sha256": "3668f09500018965d519153224a7493e21bc1fd02043c4b85d1dccbf6b0f963b",
+    "subjective_acceptance": "human_listening_required"
+  },
+  "known_non_failing_warnings": [
+    "Matchering scipy.ndimage.filters import deprecated",
+    "Optuna metric naming API experimental",
+    "Existing AutomaticMixingPapers submodule URL missing during post-checkout cleanup"
+  ],
+  "blockers": [
+    "Ptitsa fresh mix/master subjective acceptance requires human listening",
+    "Model-cleanup RAW/CLEAN acceptance remains human-listening blocked, especially vocals"
+  ],
+  "audio_baseline_promoted": false,
+  "paid_services_used": false,
+  "next_goal": "Autonomous Iteration v2: persist one-hypothesis Perceptual Critic decisions, baseline/candidate hashes and rollback through the real offline mastering delivery path without automatic subjective baseline promotion"
+}

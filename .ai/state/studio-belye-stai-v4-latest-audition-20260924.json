@@ -1,0 +1,54 @@
+{
+  "goal": "belye-stai-v4-latest-studio-pipeline-audition",
+  "status": "audio_delivered_pending_human_review",
+  "runtime_head": "326cec43286ea3722608fbc92de7dfe0c0481692",
+  "runtime_ci": {
+    "tests": 36019096573,
+    "stem_offline": 36019096577,
+    "conclusion": "success"
+  },
+  "sources": {
+    "count": 18,
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "neural_audio_used": false
+  },
+  "baseline_reproduction": {
+    "accepted_v2_premaster_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+    "reproduced_bit_identical": true
+  },
+  "applied_changes": {
+    "lead_vocal": "preserve human-accepted v2 compression",
+    "bass": "no_change: latest stability gate found no compressor improvement",
+    "guitar": "no_change: no actionable dynamics problem",
+    "kick": "tighter_body, attack 17.6 ms, release 86.25 ms",
+    "snare": "tighter_body, attack 11.2 ms, release 88 ms",
+    "toms": "TOM_1/TOM_2/FLOOR preserve_attack, attack 22.5 ms, release 136 ms",
+    "keys": "no_change: real actionability found but no validated in-place song candidate",
+    "playback": "no_change: macro dynamics may be programmed",
+    "overhead": "no_change: real actionability found but no production candidate cleared decay/floor guards"
+  },
+  "full_mix_gate": {
+    "protected_failures": [],
+    "foreground_delta_db": 0.001365991175565462,
+    "vocal_intelligibility_proxy_delta": -0.00020877448392564446,
+    "punch_proxy_delta_db": -0.1348569359679992,
+    "harshness_delta": 0.0004141720455249631,
+    "density_delta": 0,
+    "width_delta_db": 0.017632655714564294,
+    "climax_lift_delta_db": 0.000027687985859614628
+  },
+  "mastering": {
+    "wav_lufs": -15.57,
+    "wav_true_peak_dbtp": -1.62,
+    "mp3_lufs": -15.57,
+    "mp3_true_peak_dbtp": -1.53,
+    "lra_lu": 4.1,
+    "limiter_1_max_gr_db": 1.994621753692627,
+    "limiter_2_max_gr_db": 1.45000159740448
+  },
+  "local_artifacts": "/mnt/data/Belye_Stai_v4_Final",
+  "automatic_baseline_promoted": false,
+  "human_listening_required": true,
+  "next_goal": "human A/B v2 vs v4; retain accepted vocal and accept/reject drum candidates by listening before baseline promotion"
+}

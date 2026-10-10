@@ -1,0 +1,6 @@
+# Optional Audio Workbench integrations
+fastmcp>=2.0
+langgraph>=0.2
+optuna>=4.0
+pedalboard>=0.9
+python-osc>=1.8

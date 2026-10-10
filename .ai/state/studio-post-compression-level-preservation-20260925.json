@@ -1,0 +1,14 @@
+{
+  "goal": "studio-post-compression-level-preservation",
+  "status": "merged_experimental_validation_pending",
+  "source_branch": "studio/belye-stai-v4-level-preservation-20260924",
+  "integration_policy": "merge useful STUDIO work before full validation; reproduce regressions in the integrated branch and revise or revert if needed",
+  "scope": "explicit bounded constant-gain source-level preservation after compressor replacement",
+  "automatic_baseline_promotion": false,
+  "requires_full_session_rerender": true,
+  "requires_human_listening": true,
+  "full_current_repository_ci_before_merge_required": false,
+  "live_code_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false
+}
