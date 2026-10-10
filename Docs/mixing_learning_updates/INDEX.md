@@ -472,3 +472,12 @@ ML-2026-10-09-1800 (deep review, preceding search ML-2026-10-09-1500): DPNMM rem
 | ML-2026-10-10-1500 | [Report](ML-2026-10-10-1500.md) · [JSON patch](ML-2026-10-10-1500.json) · [ADR](../adr/mixing-learning-2026-10-10-1500.md) | Search: no new non-duplicate paper; project-owned «Пена» evidence pack audited at selected structured depth, correcting the record to 21 rendered/measured A/B pairs with 0 Dmitry listening passes; 1 multitrack-validation governance card, 3 unique metadata-only queued videos; no rule promotion, audio, DSP or runtime change |
 
 ML-2026-10-10-1500 (search, preceding successful search ML-2026-10-10-0900): `PENA-AB-01` is now the next executable listening task because its one-factor raw and BS.1770-matched files already exist and passed file QC. The local render remains unapproved: all 21 pairs are `rendered_measured_pending_listening`, `preference:null`, `auto_apply:false`. Incoming claims now require a project multitrack A/B and recorded Dmitry verdict before acceptance.
+
+## 2026-10-10 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-10-1800 | [Report](ML-2026-10-10-1800.md) · [JSON patch](ML-2026-10-10-1800.json) · [ADR](../adr/mixing-learning-2026-10-10-1800.md) | Complete 3,243-line audit of the project-owned «Пена» evidence pack: all 21 pairs pass recorded file/QC and loudness-matching checks, but 16 are narrow scalar/state tests, 4 are frozen envelope/curve/topology interventions and 1 is a multi-processor bundle; 3 Knowledge Cards, 1 governance-rule revision and 1 not-run listener protocol; no audio, DSP or runtime change |
+
+ML-2026-10-10-1800 (deep review, preceding search ML-2026-10-10-1500): file integrity and sub-micro-LU matching establish technical comparison readiness, not preference. `PENA-AB-15` replaces bundled `PENA-AB-01` as the next listening task. Resolve `11 → 12` and `02 → 21` in order; require a full DSP manifest and sealed answer key before portable rule claims. All rules remain `auto_apply:false`; listener protocol remains `not_run`.
+
