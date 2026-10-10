@@ -1,0 +1,124 @@
+{
+  "schema_version": "1.0",
+  "update_id": "ML-2026-10-10-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-10T09:00:00+03:00",
+  "actual_start": "2026-10-10T08:59:56+03:00",
+  "completed_at": "2026-10-10T09:05:06+03:00",
+  "preceding_search": "ML-2026-10-09-1500",
+  "preceding_update": "ML-2026-10-09-1800",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261010-0900-01",
+      "stable_keys": ["arxiv:2610.11524v1", "doi:10.48550/arXiv.2610.11524"],
+      "title": "Reference-Free Singing Pitch Correction via Music-Constrained Sequence Editing",
+      "publication_date": "2026-10-08",
+      "announcement_date": "2026-10-09",
+      "discovered_at": "2026-10-10",
+      "status": "preprint_submitted_to_ICASSP_2027",
+      "depth": "full_five_page_pdf_method_data_results_ablation_subjective_limitations",
+      "relationship": "dependent_comparator_to_SRC-ML-20260915-1200-01_BERT_APC_not_independent_confirmation",
+      "artifact_status": "project_page_unavailable_code_weights_and_split_manifest_not_found",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261010-0900-02",
+      "stable_key": "url:producelikeapro.com/blog/mastering-in-the-box-with-warren-sokol-making-loud-mixes-musical",
+      "title": "Mastering In The Box with Warren Sokol: Making Loud Mixes Musical",
+      "publication_date": "2025-10-06",
+      "depth": "full_official_companion_article",
+      "evidence_type": "bounded_engineer_workflow_not_controlled_study"
+    },
+    {
+      "id": "SRC-ML-20261010-0900-03",
+      "stable_key": "url:producelikeapro.com/blog/mastering-a-dense-metal-track-with-stefan-brown",
+      "title": "Mastering a Dense Metal Track with Stefan Brown",
+      "publication_date": "2026-03-29",
+      "depth": "full_official_companion_article",
+      "evidence_type": "bounded_engineer_workflow_not_controlled_study"
+    }
+  ],
+  "video_cards": [
+    {
+      "id": "VID-ML-20261010-0900-01",
+      "stable_key": "youtube:XXCPQe4qzpc",
+      "title": "Mastering In The Box with Warren Sokol - Learn How to Turn Loud Mixes into Musical Masters",
+      "depth": "metadata_plus_full_official_companion_article",
+      "video_status": "queued_source_no_transcript",
+      "video_content_studied": false
+    },
+    {
+      "id": "VID-ML-20261010-0900-02",
+      "stable_key": "youtube:dEbAIeuudEQ",
+      "title": "More Clarity and Impact Mastering Tip With Stefan Brown",
+      "depth": "metadata_plus_full_official_companion_article",
+      "video_status": "queued_source_no_transcript",
+      "video_content_studied": false
+    }
+  ],
+  "reference_cards": [
+    {
+      "id": "REF-ML-20261010-0900-01",
+      "stable_key": "cambridge-mt:ana-mady:pele-estranha",
+      "genre": "shoegaze_indie_rock",
+      "catalogue_metadata": {
+        "edited_excerpt": "18_tracks_82_MB",
+        "full_multitrack": "27_tracks_416_MB",
+        "listed_references": ["excerpt_MP3", "full_MP3", "unmastered_WAV"]
+      },
+      "status": "queued_rights_recheck",
+      "audio_downloaded": false,
+      "audio_measured": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261010-0900-01","claim":"Pitch-correction evaluation must report harm to already-correct notes alongside repair and accuracy.","confidence":"high_within_reported_protocol"},
+    {"id":"KC-ML-20261010-0900-02","claim":"Aligned professional singing is an evaluation reference rather than absolute ground truth for expressive pitch.","confidence":"high_full_text"},
+    {"id":"KC-ML-20261010-0900-03","claim":"The paper's synthetic ±1..±3-semitone perturbation support is a training distribution, not a production correction range.","confidence":"high_full_text"},
+    {"id":"KC-ML-20261010-0900-04","claim":"Input gain trim creates headroom but does not reverse prior limiting; section clip-gain is a separate arrangement-envelope change.","confidence":"medium_official_engineer_source_plus_signal_logic"},
+    {"id":"KC-ML-20261010-0900-05","claim":"Dense-metal M/S moves require separate one-factor, band, section, mono and loudness-matched checks.","confidence":"medium_engineer_demonstration"}
+  ],
+  "candidate_rules": [
+    {"id":"RULE-ML-20261010-0900-01","action":"human_reviewed_sparse_note_centre_edit_map_only","numeric_range_provenance":"paper_label_support_not_adopted_as_project_range","confidence":"medium_method_low_project_transfer_very_low_artifact_readiness","auto_apply":false},
+    {"id":"RULE-ML-20261010-0900-02","action":"one_frozen_clip_gain_envelope_before_more_master_bus_dynamics","numeric_range_provenance":"article_examples_not_presets","confidence":"medium_engineer_demonstration","auto_apply":false},
+    {"id":"RULE-ML-20261010-0900-03","action":"one_side_only_high_shelf_cut_as_dense_metal_diagnostic","numeric_range_provenance":"no_published_or_adopted_preset","confidence":"medium_engineer_demonstration","auto_apply":false}
+  ],
+  "experiments": [
+    {"id":"EXP-ML-20261010-0900-01","status":"not_run_blocked","A":"approved_current_vocal_edit","B":"same_audio_plus_one_frozen_human_reviewed_sparse_note_centre_map","single_factor":"note_centre_map","comparison":["raw","separate_BS1770_matched_pair"],"auto_apply":false},
+    {"id":"EXP-ML-20261010-0900-02","status":"not_run","A":"approved_pre_limited_final_mix","B":"same_mix_plus_one_frozen_clip_gain_energy_arc_envelope","single_factor":"clip_gain_envelope","comparison":["raw_actual_level","separate_BS1770_matched_pair"],"auto_apply":false},
+    {"id":"EXP-ML-20261010-0900-03","status":"not_run","A":"approved_dense_section","B":"same_section_plus_one_frozen_side_only_high_shelf_cut","single_factor":"side_high_shelf_gain","comparison":["raw","separate_BS1770_matched_pair"],"auto_apply":false}
+  ],
+  "deduplication": [
+    {"stable_keys":["arxiv:2609.12201","arxiv:2412.03373"],"resolution":"existing_source_families_not_readded"},
+    {"stable_keys":["youtube:wJA_svJIe1E","youtube:3pZlasr3e9Q"],"resolution":"existing_video_cards_not_readded"}
+  ],
+  "queue": {
+    "next_executable": "EXP-ML-20261001-1800-01",
+    "next_after": "EXP-ML-20261005-1500-01",
+    "next_deep_review": "SRC-ML-20261010-0900-01_vs_BERT_APC_and_artifact_availability",
+    "new_videos_metadata_only": ["youtube:XXCPQe4qzpc", "youtube:dEbAIeuudEQ"],
+    "new_reference_rights_recheck": "cambridge-mt:ana-mady:pele-estranha",
+    "existing_queue_preserved": true
+  },
+  "access_status": {
+    "paper": "full_text_read",
+    "project_page": "unavailable_in_retrieval",
+    "code_weights_split_manifest": "not_found_not_executed",
+    "videos": "metadata_only_no_transcript_rows",
+    "cambridge_catalogue": "search_metadata_available_live_page_403",
+    "scite": "not_retried_paid_wall_confirmed_2026-10-08",
+    "consensus": "not_retried"
+  },
+  "safety": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "audio_listened": false,
+    "audio_measured": false,
+    "dsp_changed": false,
+    "runtime_code_changed": false,
+    "model_changed": false,
+    "checkpoint_executed": false,
+    "paid_service_used": false
+  }
+}
