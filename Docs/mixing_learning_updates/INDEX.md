@@ -500,3 +500,12 @@ ML-2026-10-11-0900 (search, preceding successful search ML-2026-10-10-1500): mix
 
 ML-2026-10-11-1200 (deep_review, source search ML-2026-10-11-0900): the reported rho=0.9 is a five-system rank comparison across different objective and subjective sets, not clip-level metric validation. A prior same-team MIT repository exists but is not parity code for the October Apollo method. The blocked restoration A/B is corrected to use the 13 verified Pena processed stems, a null-verified 13-to-8 mapping and Stage-1 on/off as the only factor. Next executable test remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
 | ML-2026-10-11-1500 | [Report](ML-2026-10-11-1500.md), [JSON patch](ML-2026-10-11-1500.json) | Search: 1 new fully read DAFx measured-room demo, 1 licence audit, 3 Knowledge Cards, 1 bounded rule, 1 blocked experiment, 0 studied and 2 new metadata-only queued videos; 4 duplicate literature families removed; no audio or DSP changes |
+
+
+## 2026-10-11 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-11-1800 | [Report](ML-2026-10-11-1800.md) · [JSON patch](ML-2026-10-11-1800.json) · [ADR](../adr/mixing-learning-2026-10-11-1800.md) | Deep review: full cited I3DA modal-synthesis method plus independent full Acta Acustica interpolation/listening study; 2 Source Cards, 1 metadata-only citation candidate, 4 Knowledge Cards, 1 narrowed rule and 1 construct-corrected blocked A/B; no video/reference promotion, audio, DSP or runtime change |
+
+ML-2026-10-11-1800 (deep_review, source search ML-2026-10-11-1500): individual-RIR fitting does not establish position interpolation. Independent listener evidence supports correspondence/alignment only at the general-principle level, not Bunkervik modal clustering or generic moving drum ambience. The prior static-versus-moving-room test is withdrawn and replaced by a direct-arrival-alignment-only RIR interpolation test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and the revised RIR experiment remains not_run_blocked.
