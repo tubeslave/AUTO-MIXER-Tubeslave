@@ -1,0 +1,294 @@
+{
+  "update_id": "ML-2026-10-11-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-11T18:00:00+03:00",
+  "actual_start": "2026-10-11T17:55:48+03:00",
+  "completed_at": "2026-10-11T18:00:14+03:00",
+  "timezone": "Europe/Moscow",
+  "previous_update": "ML-2026-10-11-1500",
+  "source_search_report": "ML-2026-10-11-1500",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261011-1800-01",
+      "operation": "add",
+      "stable_ids": [
+        "doi:10.1109/I3DA65421.2025.11202053"
+      ],
+      "title": "Efficient synthesis of large room impulse responses in the modal domain",
+      "authors": [
+        "Michele Ducceschi",
+        "Craig J. Webb",
+        "Giulia Fratoni"
+      ],
+      "publication_year": 2025,
+      "discovered": "2026-10-11",
+      "reading_depth": "full_text_complete_pages_1_to_8",
+      "urls": [
+        "https://nemusproject.eu/file/2025_ducceschi_efficient.pdf",
+        "https://hdl.handle.net/11585/1022876"
+      ],
+      "lineage": "same_authors_project_family_as_Bunkervik_demo_not_independent_confirmation",
+      "findings": [
+        "sub-band PolyMAX/LSCF with stabilisation diagrams and pole-residue least-squares",
+        "synthetic 100-mode test recovered 95 stable poles; typical frequency error below 0.1 percent and decay/shape deviations within 2 percent",
+        "measured RIRs from three halls fitted from 20 Hz to 12 kHz with 9072, 11475 and 52470 modes",
+        "post-response ringing from spurious modes; smoothing decay times reduces ringing but shifts early-decay phase",
+        "reported real-time synthesis of 20000 modes under 15 percent of one M2 CPU core"
+      ],
+      "limitations": [
+        "fits individual RIRs rather than validating spatial interpolation",
+        "one highlighted source-receiver pair per hall",
+        "no listener test or held-out positions",
+        "no aggregate reconstruction-error table or confidence intervals",
+        "CPU result is hardware and implementation specific"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261011-1800-02",
+      "operation": "add",
+      "stable_ids": [
+        "doi:10.1051/aacus/2020024",
+        "arxiv:2312.02581"
+      ],
+      "title": "Auralization based on multi-perspective ambisonic room impulse responses",
+      "authors": [
+        "Kaspar Müller",
+        "Franz Zotter"
+      ],
+      "published": "2020-11-18",
+      "discovered": "2026-10-11",
+      "reading_depth": "full_text_complete_pages_1_to_18",
+      "urls": [
+        "https://doi.org/10.1051/aacus/2020024",
+        "https://arxiv.org/pdf/2312.02581"
+      ],
+      "license": "CC-BY-4.0",
+      "independence": "independent_authors_and_method_adjacent_task_not_direct_replication",
+      "findings": [
+        "matches direct sound and selected early reflections to common events before interpolation",
+        "19 experienced listeners participated; one unreliable response set excluded",
+        "plain distance-weighted linear interpolation rated below correspondence-aware variants for static localization and coloration at p below 0.001",
+        "direct sound plus ten early reflections outperformed direct sound alone for static coloration at p below 0.001",
+        "full method approached simulated reference for dynamic coloration smoothness"
+      ],
+      "limitations": [
+        "one measured room and one simulated room",
+        "speech and pink noise rather than a rock multitrack",
+        "Ambisonic event geometry rather than modal-pole clustering",
+        "paper-specific numeric settings are not production presets",
+        "paper licence does not itself grant implementation patent rights"
+      ]
+    }
+  ],
+  "metadata_only_candidates": [
+    {
+      "id": "SRC-CAND-ML-20261011-1800-01",
+      "stable_id": "doi:10.1109/I3DA65421.2025.11202090",
+      "title": "On the relationship between objective room acoustic parameters and perceived differences in spatially interpolated RIRs",
+      "reading_depth": "metadata_and_abstract_only",
+      "state": "queued_source",
+      "blocker": "publisher full text returned access error",
+      "imported_conclusions": []
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261011-1800-01",
+      "operation": "add",
+      "claim": "Accurate fitting and resynthesis of individual RIRs does not validate spatial interpolation between positions.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1800-02",
+      "operation": "add",
+      "claim": "Independent Ambisonic evidence supports direct/event correspondence before interpolation only at the general-principle level, not as replication of Bunkervik modal clustering.",
+      "confidence": "medium_high"
+    },
+    {
+      "id": "KC-ML-20261011-1800-03",
+      "operation": "add",
+      "claim": "Reconstruction and CPU metrics are not listener or mix-quality evidence.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1800-04",
+      "operation": "add",
+      "claim": "Grid spacing, event count, update size, late boundary and stability thresholds are method-specific values, not transferable presets.",
+      "confidence": "high"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261011-1500-01",
+      "operation": "revise",
+      "previous_name": "dynamic_room_movement_shadow_only",
+      "name": "correspondence_aware_rir_interpolation_shadow_only",
+      "when": "approved local renderer interpolates a licensed grid of measured or simulated RIR/ARIR positions",
+      "change": "compare explicit direct-arrival/event/mode correspondence against otherwise identical naive interpolation",
+      "exclusions": [
+        "arbitrary_algorithmic_reverb_modulation",
+        "static_vs_moving_ambience",
+        "automatic_drum_processing"
+      ],
+      "parameter_range_and_origin": "none transferable; reviewed numeric values are method and dataset specific",
+      "freeze": [
+        "source_RIR_set",
+        "listener_path",
+        "weights",
+        "wet_level",
+        "renderer_revision",
+        "routing",
+        "stimulus",
+        "random_state",
+        "post_processing"
+      ],
+      "protect": [
+        "onset_timing",
+        "coloration",
+        "localization_or_centre",
+        "room_identity",
+        "attack",
+        "mono",
+        "stereo_stability",
+        "headroom"
+      ],
+      "verify": [
+        "identical_setting_null",
+        "raw_spectral_temporal_diagnostics",
+        "one_factor_randomized_loudness_matched_listening",
+        "Dmitry_verdict"
+      ],
+      "cancel": [
+        "unaligned_paths",
+        "multiple_changed_components",
+        "loudness_only_preference",
+        "new_combing",
+        "abrupt_spatial_jumps",
+        "attack_blur",
+        "centre_or_mono_regression",
+        "rights_uncertainty"
+      ],
+      "confidence": {
+        "general_principle": "medium",
+        "project_transfer": "low"
+      },
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261011-1500-01",
+      "operation": "replace_previous_design",
+      "status": "not_run_blocked",
+      "question": "Does direct-arrival time alignment before interpolation reduce coloration and instability relative to naive interpolation on the same RIR triplet?",
+      "material": "legally reusable multi-position RIR/ARIR dataset plus fixed transient-rich music and pink-noise probes",
+      "A": "distance-weighted linear interpolation of same three RIRs without direct-arrival alignment",
+      "B": "identical interpolation after direct-arrival TOA alignment; no early-reflection matching or residual extrapolation",
+      "single_factor": "direct_arrival_alignment_on_off",
+      "freeze": [
+        "dataset",
+        "positions",
+        "listener_point_or_path",
+        "weights",
+        "resampling",
+        "convolution_engine",
+        "wet_dry",
+        "routing",
+        "source_excerpts",
+        "output_trim"
+      ],
+      "loudness": "retain raw renders and create separate BS.1770-matched listening copies",
+      "measurements": [
+        "sample_alignment",
+        "spectral_deviation_and_notch_movement",
+        "early_window_RMS",
+        "attack_to_sustain",
+        "integrated_and_short_term_loudness",
+        "true_peak",
+        "LR_correlation",
+        "mono_sum_delta"
+      ],
+      "listening": "randomized A/B; static and slow-path conditions separate; three Dmitry repeats per probe",
+      "success": "same variant wins at least two of three trials for coloration stability without protected regression",
+      "cancel": [
+        "failed_null_or_parity",
+        "multiple_changed_components",
+        "rights_uncertainty",
+        "preference_disappears_after_loudness_match"
+      ],
+      "blockers": [
+        "no approved local implementation",
+        "dataset and stimulus licences not audited",
+        "no parity render",
+        "NEMUS Bunkervik binary excluded by EULA"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos": {
+    "studied": [],
+    "queued_unchanged": [
+      "VIDEO-ML-20261011-1500-01",
+      "VIDEO-ML-20261011-1500-02"
+    ],
+    "note": "metadata-only; no transcript-derived claims"
+  },
+  "references": {
+    "added": [],
+    "note": "No new multitrack or Reference Card."
+  },
+  "revisions": [
+    {
+      "target": "RULE-ML-20261011-1500-01 and EXP-ML-20261011-1500-01",
+      "reason": "static versus moving arbitrary reverb is a construct mismatch for measured-position correspondence",
+      "outcome": "rule narrowed; experiment replaced by alignment-only RIR interpolation test"
+    }
+  ],
+  "queue": [
+    {
+      "priority": 1,
+      "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+      "status": "not_run",
+      "note": "next executable"
+    },
+    {
+      "priority": 2,
+      "id": "PENA-13-TO-8-MAPPING-NULL",
+      "status": "pending_after_listener_test"
+    },
+    {
+      "priority": 3,
+      "id": "SRC-CAND-ML-20261011-1800-01",
+      "status": "queued_full_text_citation_check"
+    },
+    {
+      "priority": 4,
+      "id": "VIDEO-ML-20261011-1500-01",
+      "status": "queued_source"
+    },
+    {
+      "priority": 5,
+      "id": "VIDEO-ML-20261011-1500-02",
+      "status": "queued_source"
+    },
+    {
+      "priority": 6,
+      "id": "EXP-ML-20261011-1500-01",
+      "status": "not_run_blocked"
+    }
+  ],
+  "changes": {
+    "source_cards_added": 2,
+    "metadata_only_candidates_added": 1,
+    "knowledge_cards_added": 4,
+    "candidate_rules_revised": 1,
+    "experiments_replaced": 1,
+    "videos_promoted": 0,
+    "references_added": 0,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "model_changed": false
+  }
+}
