@@ -1,0 +1,237 @@
+{
+  "update_id": "ML-2026-10-11-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-11T09:00:00+03:00",
+  "actual_start": "2026-10-11T08:57:56+03:00",
+  "completed_at": "2026-10-11T09:02:00+03:00",
+  "timezone": "Europe/Moscow",
+  "previous_update": "ML-2026-10-10-1800",
+  "preceding_successful_search": "ML-2026-10-10-1500",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261011-0900-01",
+      "operation": "add",
+      "stable_ids": [
+        "arxiv:2610.08284v1",
+        "doi:10.48550/arXiv.2610.08284"
+      ],
+      "title": "Restore, Separate, Restore: A Modular Framework for Music Source Restoration",
+      "authors": [
+        "Tobias Morocutti",
+        "Emmanouil Karystinaios",
+        "Gerhard Widmer"
+      ],
+      "publication_date": "2026-10-06",
+      "discovered_at": "2026-10-11",
+      "source_type": "preprint",
+      "peer_reviewed": false,
+      "url": "https://arxiv.org/html/2610.08284v1",
+      "reading_depth": "full_text_html_complete",
+      "methods_checked": [
+        "problem formulation",
+        "datasets and splits",
+        "model/training setup",
+        "objective metrics",
+        "tables",
+        "limitations"
+      ],
+      "limited_findings": [
+        "Stage 1 plus fixed Stage 2 changed aggregate test MMSNR 3.980->4.047, Zimtohrli 0.015->0.014, FAD 0.300->0.293.",
+        "Validation-selected Stage 3 experts transferred inconsistently; metrics disagree.",
+        "Unconditional all-stem Stage 3 aggregate MMSNR 4.047->3.972 is distinct from selected-final-system MMSNR 4.050.",
+        "No subjective evaluation was conducted in this work.",
+        "Bus-level processing is explicitly not modeled, so outputs are not exact original project stems."
+      ],
+      "limitations": [
+        "preprint",
+        "distribution mismatch between validation and test",
+        "objective-only evaluation",
+        "metric disagreement",
+        "artifact unavailable"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261011-0900-01",
+      "operation": "add",
+      "stable_id": "github:theMoro/music_source_restoration",
+      "url": "https://github.com/theMoro/music_source_restoration",
+      "checked_at": "2026-10-11",
+      "observed_state": "empty_repository",
+      "paper_claim": "code_and_models_released",
+      "reproducibility_status": "not_run_blocked",
+      "blockers": [
+        "no source tree",
+        "no weights",
+        "no checkpoint/config manifest",
+        "no environment",
+        "no visible license"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261011-0900-01",
+      "claim": "Pre-separation mixture restoration is a controlled ablation candidate, not an automatic rule.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261011-0900-02",
+      "claim": "Validation selection by one metric did not guarantee transfer across the independent test collection or metrics.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-0900-03",
+      "claim": "Restored stems are clean-source surrogates and not replacements for project-owned raw tracks.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-0900-04",
+      "claim": "Release claims require live artifact verification; the advertised repository was empty.",
+      "confidence": "high"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261011-0900-01",
+      "operation": "add",
+      "name": "restoration_stems_shadow_evidence_only",
+      "applies_to": [
+        "restored_stems",
+        "separated_stems",
+        "project_owned_multitrack_validation"
+      ],
+      "when": "considering restored/separated stems from a mastered or degraded mixture",
+      "change": "keep outside production automation and compare only as alternate evidence against licensed/project-owned multitrack truth",
+      "parameter_range_and_origin": "no transferable preset; Stage 1 on/off only, from the paper ablation",
+      "protect": [
+        "source_identity",
+        "attacks",
+        "lr_phase",
+        "room_bleed",
+        "low_end_timing",
+        "stereo_image",
+        "reconstruction_sum"
+      ],
+      "verify": [
+        "frozen_input_and_degradation",
+        "frozen_separator_checkpoint_and_config",
+        "raw_reference_metrics",
+        "BS1770_matched_blind_listening",
+        "Dmitry_verdict"
+      ],
+      "cancel": [
+        "identity_or_phase_damage",
+        "transient_damage",
+        "reconstruction_residual_growth",
+        "metric_listening_disagreement",
+        "artifact_not_version_pinned"
+      ],
+      "confidence": "medium_low",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261011-0900-01",
+      "operation": "add",
+      "status": "not_run_blocked",
+      "material": "project-owned multitrack excerpt with clean stems",
+      "A": "fixed separator on frozen synthetically degraded mix",
+      "B": "same separator preceded only by Stage-1 mixture restoration",
+      "single_factor": "Stage-1 mixture restoration enabled/disabled",
+      "loudness_matching": "retain raw outputs; create separate ITU-R BS.1770-matched blind-listening copies",
+      "measurements": [
+        "per-stem MMSNR or SI-SDR against true stems",
+        "verified perceptual metric",
+        "spectral/transient error",
+        "LR phase",
+        "reconstruction residual",
+        "bleed/room energy",
+        "clipping",
+        "true peak"
+      ],
+      "protect": [
+        "attacks",
+        "source identity",
+        "ambience/bleed",
+        "phase",
+        "low-end timing",
+        "mono",
+        "sum coherence"
+      ],
+      "success": "at least two preregistered metrics improve and Dmitry prefers B in at least 2/3 blind repetitions, without protected regression",
+      "cancel": "artifact/identity/phase damage, metric-listening disagreement, or hidden topology/configuration change",
+      "blocker": "advertised author repository contains no code or models",
+      "auto_apply": false
+    }
+  ],
+  "videos": {
+    "studied": [],
+    "queued": [],
+    "deduplicated": [
+      {
+        "stable_id": "youtube:btsWALco8Xk",
+        "reason": "exact duplicate of VID-ML-20260928-1500-01"
+      }
+    ],
+    "rejected": [
+      {
+        "stable_id": "youtube:oeAqqQndaBg",
+        "reading_depth": "metadata_description_only",
+        "reason": "no permitted transcript and no independent content beyond existing DI/amp/distortion cards"
+      }
+    ]
+  },
+  "references": {
+    "added": [],
+    "note": "No new legal multitrack retained; existing project-owned Pena material remains the validation substrate."
+  },
+  "queue": [
+    {
+      "priority": 1,
+      "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+      "status": "not_run",
+      "note": "next executable blind loudness-matched listener test"
+    },
+    {
+      "priority": 2,
+      "id": "ART-ML-20261011-0900-01",
+      "status": "recheck_on_release_signal_only"
+    },
+    {
+      "priority": 3,
+      "id": "EXP-ML-20261011-0900-01",
+      "status": "not_run_blocked"
+    },
+    {
+      "priority": 4,
+      "id": "PENA-DEPENDENCIES",
+      "status": "retained",
+      "order": [
+        "PENA-AB-11->PENA-AB-12",
+        "PENA-AB-02->PENA-AB-21"
+      ]
+    }
+  ],
+  "changes": {
+    "source_cards_added": 1,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 4,
+    "candidate_rules_added": 1,
+    "experiments_added": 1,
+    "video_cards_added": 0,
+    "reference_cards_added": 0
+  },
+  "governance": {
+    "auto_apply": false,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "model_training": false,
+    "paid_compute": false
+  }
+}

@@ -481,3 +481,12 @@ ML-2026-10-10-1500 (search, preceding successful search ML-2026-10-10-0900): `PE
 
 ML-2026-10-10-1800 (deep review, preceding search ML-2026-10-10-1500): file integrity and sub-micro-LU matching establish technical comparison readiness, not preference. `PENA-AB-15` replaces bundled `PENA-AB-01` as the next listening task. Resolve `11 → 12` and `02 → 21` in order; require a full DSP manifest and sealed answer key before portable rule claims. All rules remain `auto_apply:false`; listener protocol remains `not_run`.
 
+
+
+## 2026-10-11 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-11-0900 | [Report](ML-2026-10-11-0900.md) · [JSON patch](ML-2026-10-11-0900.json) · [ADR](../adr/mixing-learning-2026-10-11-0900.md) | Search: 1 fresh full-text music-source-restoration preprint, 1 negative advertised-artifact audit, 4 Knowledge Cards, 1 bounded rule and 1 blocked multitrack A/B; 1 exact video duplicate and 1 non-independent metadata-only video rejected; no new video/reference card, audio, DSP or runtime change |
+
+ML-2026-10-11-0900 (search, preceding successful search ML-2026-10-10-1500): mixture restoration before a fixed separator improved three benchmark metrics, but per-stem restoration selected on validation did not transfer consistently and the work includes no subjective listening. Restored stems are shadow evidence, not project originals. The advertised code/model repository was empty on 2026-10-11, so the new multitrack ablation remains not_run_blocked. Next executable project test remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
