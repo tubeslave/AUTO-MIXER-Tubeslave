@@ -1,0 +1,329 @@
+{
+  "update_id": "ML-2026-10-11-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-11T12:00:00+03:00",
+  "actual_start": "2026-10-11T11:57:16+03:00",
+  "completed_at": "2026-10-11T12:03:00+03:00",
+  "timezone": "Europe/Moscow",
+  "previous_update": "ML-2026-10-11-0900",
+  "source_search_report": "ML-2026-10-11-0900",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261011-0900-01",
+      "operation": "update",
+      "stable_id": "arxiv:2610.08284v1",
+      "reading_depth": "full_text_reconciled_with_benchmark_challenge_and_prior_same_team_system",
+      "corrections": [
+        "challenge rho=0.9 is a five-system rank comparison across different objective and subjective sets, not per-clip metric validation",
+        "exact advertised October repository remains empty",
+        "prior CP-JKU repository is not parity code"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261011-1200-01",
+      "operation": "add",
+      "stable_ids": [
+        "arxiv:2601.04343v1",
+        "doi:10.48550/arXiv.2601.04343"
+      ],
+      "title": "Summary of The Inaugural Music Source Restoration Challenge",
+      "publication_date": "2026-01-07",
+      "reading_depth": "full_text_html_complete",
+      "url": "https://arxiv.org/html/2601.04343v1",
+      "findings": [
+        "objective evaluation used 1000 non-blind clips with references",
+        "subjective evaluation used a different 500-clip blind real-world set",
+        "five-system rank Spearman rho=0.9",
+        "percussion mean MMSNR 0.29 dB versus bass 4.59 dB"
+      ],
+      "limitations": [
+        "listener count/randomization/blinding/uncertainty not reported in visible full text",
+        "rank correlation is system-level across different datasets"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261011-1200-02",
+      "operation": "add",
+      "stable_ids": [
+        "arxiv:2510.10995v1",
+        "doi:10.48550/arXiv.2510.10995"
+      ],
+      "title": "MSRBench: A Benchmarking Dataset for Music Source Restoration",
+      "publication_date": "2025-10-13",
+      "reading_depth": "full_text_html_complete",
+      "url": "https://arxiv.org/html/2510.10995v1",
+      "data_license": "CC-BY-NC",
+      "code_license": "MIT",
+      "findings": [
+        "2000 ten-second 48 kHz stereo clips across eight source classes and 13 conditions",
+        "professional chain includes per-stem, bus and master processing",
+        "dry references retained",
+        "restoration becomes generative as information is destroyed",
+        "phase-sensitive and perceptual metrics disagree"
+      ],
+      "limitations": [
+        "source authors overlap challenge paper",
+        "listening claim lacks visible protocol detail",
+        "non-commercial data licence needs project-use review"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261011-1200-03",
+      "operation": "add",
+      "stable_ids": [
+        "arxiv:2603.04032v1",
+        "doi:10.48550/arXiv.2603.04032"
+      ],
+      "title": "Multi-Stage Music Source Restoration with BandSplit-RoFormer Separation and HiFi++ GAN",
+      "publication_date": "2026-03-04",
+      "reading_depth": "full_text_html_complete_plus_repository_readme_license",
+      "url": "https://arxiv.org/html/2603.04032v1",
+      "repository": "https://github.com/CPJKU/music-source-restoration",
+      "repository_commit": "3bae84c2b42235b42e740b0c9a4ee0249510999c",
+      "repository_license": "MIT",
+      "findings": [
+        "prior same-team challenge system uses BS-RoFormer LoRA/head expansion and HiFi++ GAN experts",
+        "not architecture/version parity with October Apollo-based paper"
+      ],
+      "limitations": [
+        "README resolves checkpoints through W&B run IDs",
+        "no October weights/config parity",
+        "no execution performed"
+      ]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261011-0900-01",
+      "operation": "update",
+      "exact_october_repository_status": "empty",
+      "related_prior_repository": {
+        "stable_id": "github:CPJKU/music-source-restoration",
+        "commit": "3bae84c2b42235b42e740b0c9a4ee0249510999c",
+        "license": "MIT",
+        "parity": "no",
+        "reason": "March HiFi++/LoRA challenge system differs from October Apollo-based method"
+      },
+      "reproducibility_status": "not_run_blocked"
+    }
+  ],
+  "derived_checks": [
+    {
+      "id": "DERIVED-ML-20261011-1200-01",
+      "description": "exact permutation check of the reported five system rankings",
+      "rho": 0.9,
+      "n_systems": 5,
+      "total_permutations": 120,
+      "two_sided_extreme_count": 10,
+      "two_sided_exact_p": 0.08333333333333333,
+      "status": "assistant_derived_not_paper_reported"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261011-0900-01",
+      "operation": "update",
+      "claim": "Stage-1 improvement is one-benchmark objective evidence; challenge rho does not independently validate the metrics.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261011-0900-02",
+      "operation": "update",
+      "claim": "Report restoration by source class and degradation; validation/macro averages can hide transfer failures.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-0900-03",
+      "operation": "update",
+      "claim": "Dry references exist in MSRBench, but outputs remain estimates through non-invertible stem/bus/master/degradation chains.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1200-01",
+      "operation": "add",
+      "claim": "Five-system rank rho=0.9 across different test sets is not clip/stem/project metric validation.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1200-02",
+      "operation": "add",
+      "claim": "Transient percussion needs separate attack/phase protection and cannot inherit bass/tonal-source acceptance criteria.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1200-03",
+      "operation": "add",
+      "claim": "Related open code is not experimental parity code unless architecture, version, weights, config and preprocessing match.",
+      "confidence": "high"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261011-0900-01",
+      "operation": "update",
+      "name": "restoration_outputs_shadow_evidence_with_explicit_target",
+      "when": "evaluating preconditioner/separator/restorer on project audio",
+      "change": "declare target as dry tracks, processed group stems, or final mix; test one source class and degradation at a time",
+      "parameter_range_and_origin": "no transferable amount; on/off with version-pinned model only",
+      "protect": [
+        "identity",
+        "attacks",
+        "phase",
+        "bleed_room",
+        "low_end_timing",
+        "stereo_mono",
+        "reconstruction"
+      ],
+      "verify": [
+        "project_multitrack_truth",
+        "frozen_one_factor_AB",
+        "raw_reference_metrics",
+        "BS1770_matched_blind_listening",
+        "per_stem_failure_report",
+        "Dmitry_verdict"
+      ],
+      "cancel": [
+        "ambiguous_target",
+        "unpinned_artifact",
+        "phase_or_attack_damage",
+        "leakage",
+        "hallucinated_content",
+        "metric_listening_disagreement"
+      ],
+      "confidence": "medium",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261011-0900-01",
+      "operation": "update",
+      "status": "not_run_blocked",
+      "material": "Pena 13 verified synchronous processed stems",
+      "ground_truth_contract": "freeze 13-to-8 mapping and require grouped sum to null against premaster within recorded rounding tolerance",
+      "input_degradation": "one frozen declared degradation; first proposal MP3 128 kbps from MSRBench, not a production recommendation",
+      "A": "degraded premaster -> exact fixed separator",
+      "B": "same degraded premaster -> exact Stage-1 restorer -> same fixed separator",
+      "single_factor": "Stage-1 enabled/disabled",
+      "target": "eight grouped processed stems, not 48 raw mic files",
+      "frozen": [
+        "mapping",
+        "sum",
+        "excerpt",
+        "encoder version/options",
+        "sample rate",
+        "separator checkpoint/config",
+        "seed",
+        "chunk/overlap",
+        "output gain"
+      ],
+      "raw_measurements": [
+        "sample alignment",
+        "per-stem MMSNR",
+        "per-stem SI-SDR with interpretation limits",
+        "spectral/transient error",
+        "LR phase",
+        "leakage",
+        "reconstruction residual",
+        "clipping",
+        "true peak"
+      ],
+      "excluded_decisive_metric": "FAD per clip",
+      "listening": "same frozen stem-to-mix map; separate BS.1770-matched copies; three randomized blind Dmitry trials plus solo artifact checks",
+      "protect": [
+        "drum attacks",
+        "identity",
+        "room_bleed",
+        "bass timing",
+        "stereo_mono",
+        "premaster balance",
+        "sum coherence"
+      ],
+      "success": "predeclared metrics improve without protected regression and same variant wins at least 2/3 blind trials",
+      "cancel": [
+        "target_or_sum_mismatch",
+        "hidden_config_change",
+        "hallucinated_content",
+        "leakage",
+        "phase_or_attack_damage",
+        "objective_listening_disagreement"
+      ],
+      "blockers": [
+        "exact October repository empty",
+        "weights/config/environment/chunking unavailable",
+        "March CP-JKU code is not parity code"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "independence": {
+    "status": "dependent_lineage",
+    "notes": [
+      "MSRBench and challenge summary share authors and benchmark",
+      "March CP-JKU and October preprint share core authors",
+      "no independent replication identified"
+    ]
+  },
+  "videos": {
+    "studied": [],
+    "queued": [],
+    "updated": []
+  },
+  "references": {
+    "added": [],
+    "note": "No external multitrack promoted; project-owned Pena remains the validation substrate."
+  },
+  "queue": [
+    {
+      "priority": 1,
+      "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+      "status": "not_run",
+      "note": "next executable test"
+    },
+    {
+      "priority": 2,
+      "id": "PENA-13-TO-8-MAPPING-NULL",
+      "status": "pending_after_listener_test"
+    },
+    {
+      "priority": 3,
+      "id": "EXP-ML-20261011-0900-01",
+      "status": "not_run_blocked"
+    },
+    {
+      "priority": 4,
+      "id": "ART-ML-20261011-0900-01",
+      "status": "recheck_on_release_signal_only"
+    },
+    {
+      "priority": 5,
+      "id": "PENA-DEPENDENCIES",
+      "status": "retained",
+      "order": [
+        "PENA-AB-11->PENA-AB-12",
+        "PENA-AB-02->PENA-AB-21"
+      ]
+    }
+  ],
+  "changes": {
+    "source_cards_added": 3,
+    "source_cards_updated": 1,
+    "artifact_audits_updated": 1,
+    "knowledge_cards_added": 3,
+    "knowledge_cards_updated": 3,
+    "candidate_rules_updated": 1,
+    "experiments_updated": 1,
+    "video_cards_added": 0,
+    "reference_cards_added": 0
+  },
+  "governance": {
+    "auto_apply": false,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "model_training": false,
+    "model_execution": false,
+    "paid_compute": false
+  }
+}

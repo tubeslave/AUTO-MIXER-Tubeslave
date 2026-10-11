@@ -490,3 +490,12 @@ ML-2026-10-10-1800 (deep review, preceding search ML-2026-10-10-1500): file inte
 | ML-2026-10-11-0900 | [Report](ML-2026-10-11-0900.md) · [JSON patch](ML-2026-10-11-0900.json) · [ADR](../adr/mixing-learning-2026-10-11-0900.md) | Search: 1 fresh full-text music-source-restoration preprint, 1 negative advertised-artifact audit, 4 Knowledge Cards, 1 bounded rule and 1 blocked multitrack A/B; 1 exact video duplicate and 1 non-independent metadata-only video rejected; no new video/reference card, audio, DSP or runtime change |
 
 ML-2026-10-11-0900 (search, preceding successful search ML-2026-10-10-1500): mixture restoration before a fixed separator improved three benchmark metrics, but per-stem restoration selected on validation did not transfer consistently and the work includes no subjective listening. Restored stems are shadow evidence, not project originals. The advertised code/model repository was empty on 2026-10-11, so the new multitrack ablation remains not_run_blocked. Next executable project test remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-11 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-11-1200 | [Report](ML-2026-10-11-1200.md) · [JSON patch](ML-2026-10-11-1200.json) · [ADR](../adr/mixing-learning-2026-10-11-1200.md) | Deep review: full MSR Challenge, MSRBench and prior CP-JKU lineage plus pinned MIT repository audit; 3 Source Cards added, 1 Source and 1 Artifact Card updated, 3 Knowledge Cards added and 3 revised, 1 bounded rule and 1 blocked multitrack experiment revised; no video/reference promotion, audio, DSP or runtime change |
+
+ML-2026-10-11-1200 (deep_review, source search ML-2026-10-11-0900): the reported rho=0.9 is a five-system rank comparison across different objective and subjective sets, not clip-level metric validation. A prior same-team MIT repository exists but is not parity code for the October Apollo method. The blocked restoration A/B is corrected to use the 13 verified Pena processed stems, a null-verified 13-to-8 mapping and Stage-1 on/off as the only factor. Next executable test remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
