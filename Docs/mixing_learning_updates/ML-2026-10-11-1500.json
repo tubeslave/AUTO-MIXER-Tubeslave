@@ -1,0 +1,281 @@
+{
+  "update_id": "ML-2026-10-11-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-11T15:00:00+03:00",
+  "actual_start": "2026-10-11T14:59:50+03:00",
+  "completed_at": "2026-10-11T15:06:23+03:00",
+  "timezone": "Europe/Moscow",
+  "previous_update": "ML-2026-10-11-1200",
+  "source_search_report": "ML-2026-10-11-0900",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261011-1500-01",
+      "operation": "add",
+      "stable_ids": [
+        "conference:dafx:2026:DAFx26_demo_72",
+        "dafx_archive:C5Cw-WWFGKWmKDuLsjjbxQ"
+      ],
+      "title": "Bunkervik Spatial Reverb Demo",
+      "authors": [
+        "Michele Ducceschi",
+        "Craig J. Webb"
+      ],
+      "publication_date": "2026-09-04",
+      "discovered": "2026-10-11",
+      "reading_depth": "full_text_complete_pages_1_to_3",
+      "urls": [
+        "https://dafx.de/paper-archive/details/C5Cw-WWFGKWmKDuLsjjbxQ",
+        "https://dafx.de/paper-archive/2026/papers/DAFx26_demo_72.pdf"
+      ],
+      "license": "CC-BY-4.0",
+      "findings": [
+        "three measured receiver positions with six-orientation summed ESS source at 48 kHz/24-bit",
+        "common basis of 6300 poles from 70 Hz to 12 kHz plus 256-tap FIR corrections",
+        "reported time-domain NRMSE below 3.5 percent and 2-to-3x error reduction versus modal-only fit",
+        "runtime position smoothing and cubic-Lagrange fractional delay",
+        "Aura above 12 kHz is creative generation, not measured reconstruction"
+      ],
+      "limitations": [
+        "single tunnel and three positions",
+        "no listener study",
+        "no rock-mix evaluation",
+        "no uncertainty reported for fit metrics",
+        "no independent replication identified"
+      ]
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261011-1500-01",
+      "operation": "add",
+      "stable_id": "nemus:Bunkervik-Reverb-v1.2.9",
+      "url": "https://nemusproject.eu/resources/software-downloads/",
+      "reading_depth": "official_download_metadata_and_eula",
+      "status": "not_downloaded_not_run",
+      "license_constraints": [
+        "no AI or ML training, fine-tuning or validation with software or generated audio",
+        "no teaching dataset or feature extraction",
+        "no automated process to learn, clone or recreate character"
+      ],
+      "project_decision": "exclude binary and generated output from automixer training or validation"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261011-1500-01",
+      "operation": "add",
+      "claim": "Position-dependent measured-room decompositions need a common anchor or verified correspondence before interpolation is treated as coherent.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261011-1500-02",
+      "operation": "add",
+      "claim": "Fit error and CPU cost do not establish drum transient, phase, mono or listener quality.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261011-1500-03",
+      "operation": "add",
+      "claim": "Spectral content synthesized beyond the measured bandwidth is a creative control, not recovered room evidence.",
+      "confidence": "high"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261011-1500-01",
+      "operation": "add",
+      "name": "dynamic_room_movement_shadow_only",
+      "when": "manual moving-room exploration on rock drums after a static room balance works",
+      "change": "compare static baseline with one position-modulation variant only",
+      "parameter_range_and_origin": "no transferable numeric range; paper exposes host-synced LFO movement without a production preference range",
+      "protect": [
+        "attack",
+        "groove",
+        "cymbal_bleed",
+        "room_identity",
+        "centre",
+        "LR_phase",
+        "mono_sum",
+        "true_peak"
+      ],
+      "verify": [
+        "project_multitrack",
+        "one_factor_AB",
+        "raw_and_BS1770_matched_copies",
+        "onset_tail_energy",
+        "attack_to_sustain",
+        "LR_correlation",
+        "mono_delta",
+        "three_blind_Dmitry_trials"
+      ],
+      "cancel": [
+        "attack_blur",
+        "stepping",
+        "pumping",
+        "centre_weakening",
+        "mono_collapse",
+        "clipping",
+        "unstable_preference"
+      ],
+      "confidence": "low",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261011-1500-01",
+      "operation": "add",
+      "status": "not_run_blocked",
+      "material": "Pena raw drum subgroup in fixed full-mix section",
+      "A": "current approved static short-room ambience chain",
+      "B": "same chain with only receiver-position modulation enabled in an already licensed local processor",
+      "single_factor": "position modulation on/off",
+      "loudness": "separate BS.1770-matched listening copies; preserve raw renders",
+      "measurements": [
+        "sample_alignment",
+        "integrated_loudness",
+        "true_peak",
+        "attack_to_sustain",
+        "early_late_energy",
+        "LR_correlation",
+        "mono_sum_delta"
+      ],
+      "protect": [
+        "drum_attack",
+        "groove",
+        "centre",
+        "cymbal_bleed",
+        "bass_timing",
+        "room_identity",
+        "mono"
+      ],
+      "success": "same variant wins at least 2 of 3 blind trials with no protected regression",
+      "cancel": [
+        "protected_regression",
+        "objective_listening_disagreement",
+        "multiple_changed_factors"
+      ],
+      "blockers": [
+        "approved local processor and static preset not frozen",
+        "NEMUS binary excluded by licence"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos": {
+    "studied": [],
+    "queued": [
+      {
+        "id": "VIDEO-ML-20261011-1500-01",
+        "stable_id": "youtube:zbbrJB0lFas",
+        "title": "Snare Reverb Tips for Metal/Rock Mixing",
+        "channel": "Hardcore Music Studio",
+        "published": "2017-07-11",
+        "duration": "09:21",
+        "url": "https://www.youtube.com/watch?v=zbbrJB0lFas",
+        "reading_depth": "metadata_description_and_chapter_labels_only",
+        "transcript_status": "visible_control_opened_but_timestamped_rows_did_not_populate_after_bounded_retry",
+        "techniques_extracted": []
+      },
+      {
+        "id": "VIDEO-ML-20261011-1500-02",
+        "stable_id": "youtube:QpW3ozo6Z0E",
+        "title": "Mixing Snare to Cut Through a Rock Mix",
+        "channel": "Universal Audio",
+        "presenter_from_description": "Will Yip",
+        "published": "2022-10-11",
+        "duration": "03:46",
+        "url": "https://www.youtube.com/watch?v=QpW3ozo6Z0E",
+        "reading_depth": "metadata_description_and_chapter_labels_only",
+        "transcript_status": "visible_control_opened_but_timestamped_rows_did_not_populate",
+        "techniques_extracted": []
+      }
+    ],
+    "updated": []
+  },
+  "deduplication": {
+    "keys": [
+      "doi",
+      "arxiv_id",
+      "conference_id",
+      "normalized_title",
+      "version_lineage",
+      "youtube_video_id"
+    ],
+    "excluded_existing": [
+      "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements",
+      "A Corpus-Driven Parametric Modal Reverberator",
+      "Group Delay Manipulation for Creative Sound Transformation with the Giant FFT",
+      "Shimmer Reverberation with Nonlinear Feedback Delay Networks"
+    ]
+  },
+  "references": {
+    "added": [],
+    "note": "No new multitrack; project-owned Pena remains validation substrate."
+  },
+  "queue": [
+    {
+      "priority": 1,
+      "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+      "status": "not_run",
+      "note": "next executable test"
+    },
+    {
+      "priority": 2,
+      "id": "PENA-13-TO-8-MAPPING-NULL",
+      "status": "pending_after_listener_test"
+    },
+    {
+      "priority": 3,
+      "id": "SRC-ML-20261011-1500-01",
+      "status": "deep_review_methods_and_independent_perceptual_evidence"
+    },
+    {
+      "priority": 4,
+      "id": "VIDEO-ML-20261011-1500-01",
+      "status": "queued_source"
+    },
+    {
+      "priority": 5,
+      "id": "VIDEO-ML-20261011-1500-02",
+      "status": "queued_source"
+    },
+    {
+      "priority": 6,
+      "id": "EXP-ML-20261011-1500-01",
+      "status": "not_run_blocked"
+    },
+    {
+      "priority": 7,
+      "id": "PENA-DEPENDENCIES",
+      "status": "retained",
+      "order": [
+        "PENA-AB-11->PENA-AB-12",
+        "PENA-AB-02->PENA-AB-21"
+      ]
+    }
+  ],
+  "changes": {
+    "source_cards_added": 1,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 3,
+    "candidate_rules_added": 1,
+    "experiments_added": 1,
+    "video_cards_added": 2,
+    "video_cards_studied": 0,
+    "reference_cards_added": 0,
+    "duplicates_removed": 4
+  },
+  "governance": {
+    "auto_apply": false,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_code_changed": false,
+    "model_training": false,
+    "model_execution": false,
+    "external_binary_downloaded": false,
+    "paid_compute": false
+  }
+}
