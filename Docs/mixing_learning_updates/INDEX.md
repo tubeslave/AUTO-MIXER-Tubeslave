@@ -525,3 +525,12 @@ ML-2026-10-12-0900 (search, preceding successful search ML-2026-10-11-1500): bas
 | ML-2026-10-12-1200 | [Report](ML-2026-10-12-1200.md) · [JSON patch](ML-2026-10-12-1200.json) · [ADR](../adr/mixing-learning-2026-10-12-1200.md) | Deep review: full DAFx-20 virtual-bass paper, official companion and pinned MATLAB artifact audit; 1 Source Card, 1 blocked Artifact Audit, 5 Knowledge Cards, 1 narrowed rule and 1 revised blocked A/B; no video/reference promotion, audio, DSP or runtime change |
 
 ML-2026-10-12-1200 (deep_review, source search ML-2026-10-12-0900): virtual bass is constrained-playback evidence, not recovered low frequency or a universal distorted-bass rule. The full-band reference remained far ahead of all virtual-bass methods; public code is unlicensed, noncausal and not live-ready. The bass A/B now separates raw measurement renders from BS.1770-matched listening copies and evaluates full-range and a fixed 150 Hz high-pass stress condition separately. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-12 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-12-1500 | [Report](ML-2026-10-12-1500.md) · [JSON patch](ML-2026-10-12-1500.json) · [ADR](../adr/mixing-learning-2026-10-12-1500.md) | Search: 1 older missing full-text DAFx-25 DiffVox source plus pinned MIT artifact audit; 5 Knowledge Cards, 1 bounded shadow-only rule and 1 blocked vocal A/B; 4 duplicate literature families removed; no studied video, reference, audio, DSP or runtime change |
+
+ML-2026-10-12-1500 (search, preceding successful search ML-2026-10-12-0900): inverse-fitted vocal-FX controls are topology/loss/data-conditioned proxies, not the original engineer's settings or rock-vocal presets. The paper has no listening test and partly unavailable private audio. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and the new vocal experiment is not_run_blocked.
