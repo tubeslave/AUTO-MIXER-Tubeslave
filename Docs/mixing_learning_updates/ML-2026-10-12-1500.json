@@ -1,0 +1,102 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-12-1500",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-12T15:00:00+03:00",
+  "actual_start_msk": "2026-10-12T14:55:06+03:00",
+  "report_fixed_msk": "2026-10-12T15:53:26+03:00",
+  "preceding_search": "ML-2026-10-12-0900",
+  "latest_intervening_review": "ML-2026-10-12-1200",
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261012-1500-01",
+      "title": "DiffVox: A Differentiable Model for Capturing and Analysing Vocal Effects Distributions",
+      "canonical_id": "arxiv:2504.14735v2",
+      "publication": "DAFx-25",
+      "publication_date": "2025-08-17",
+      "discovered_date": "2026-10-12",
+      "urls": ["https://arxiv.org/abs/2504.14735", "https://arxiv.org/pdf/2504.14735"],
+      "reading_depth": "full_text_11_pages+official_repository_readme+licenses",
+      "evidence_scope": "single-vocal inverse fitting with fixed static differentiable effects topology",
+      "citation_check": "partial",
+      "limitations": [
+        "no listening test in this paper",
+        "single vocal, not full-mix interactions",
+        "private audio unavailable and genre balance unknown",
+        "fixed static topology excludes distortion, modulation and heavy automation",
+        "parameters are non-identifiable topology/loss/data-conditioned proxies",
+        "no external genre/artist/section holdout reported"
+      ]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261012-1500-01",
+      "source_id": "SRC-ML-20261012-1500-01",
+      "url": "https://github.com/SonyResearch/diffvox",
+      "commit": "97ae464c758346a2b1474f533639135b114c0ce4",
+      "code_license": "MIT",
+      "paper_license": "CC-BY-4.0",
+      "status": "available_unrun_free_code_license_mit_data_rights_partial",
+      "executed": false,
+      "reproduced": false,
+      "data_rights": "partial: MedleyDB track-specific; private/Internal source audio unavailable"
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261012-1500-01","claim":"Inverse-fitted vocal FX controls are topology/loss/data-conditioned proxies, not the original engineer's identifiable settings.","confidence":"high_within_source_scope"},
+    {"id":"KC-ML-20261012-1500-02","claim":"Independent Gaussian or uniform sampling is a weak prior for the paper's fitted vocal-effects representation.","confidence":"medium"},
+    {"id":"KC-ML-20261012-1500-03","claim":"Observed threshold/makeup and delay-time/gain/feedback correlations motivate coupled candidate moves, not universal causal rules.","confidence":"medium_low"},
+    {"id":"KC-ML-20261012-1500-04","claim":"Spatial effects improved architecture-aligned inverse-fit losses but did not establish listener preference in rock mixes.","confidence":"high"},
+    {"id":"KC-ML-20261012-1500-05","claim":"Rules from this fixed static chain need a topology gate for distortion, modulation, automation and full-mix interactions.","confidence":"high"}
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261012-1500-01",
+      "name": "vocal_fx_coupled_search_shadow_only",
+      "applies_when": "project-owned vocal; declared section and role; stable baseline; frozen fixed topology",
+      "change": "test one predeclared coherent vector or one scalar macro over it; never copy paper means as presets",
+      "protected_qualities": ["intelligibility","consonant_attack","pitch_formant_identity","depth","mono","stereo_stability","peak_headroom","section_role"],
+      "verify": "raw measurement render plus separate section-wise BS.1770-matched blind copy; exact vector and topology frozen",
+      "cancel": "benefit only from loudness, protected-quality regression, or out-of-topology source processing",
+      "confidence": "medium_low",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261012-1500-01",
+      "status": "not_run_blocked",
+      "material": "project-owned Logoped - Pena lead vocal",
+      "factor": "frozen spatial-return vector bypassed versus enabled",
+      "baseline_A": "current approved vocal-FX state",
+      "variant_B": "same mix with one predeclared delay+reverb return vector enabled",
+      "inference_limit": "bundle-level only; no attribution to individual delay/reverb controls",
+      "loudness_match": "separate section-wise BS.1770-matched blind copies; preserve raw renders",
+      "measurements": ["true_peak","section_loudness","short_term_dynamics_contract","mid_side_energy","mono_delta","dry_wet_energy","consonant_transient_delta"],
+      "success": "same state selected at least 2 of 3 without protected-quality regression",
+      "cancel": "inconsistent preference, level-only benefit, or intelligibility/identity/attack/mono/depth/headroom regression",
+      "auto_apply": false
+    }
+  ],
+  "duplicates_removed": ["arxiv:2608.05442","arxiv:2608.05506","arxiv:2608.30559","arxiv:2603.15995"],
+  "video_lane": {
+    "studied_add": [],
+    "queued_add": [],
+    "status": "human_verification_block; existing metadata-only queue preserved; no transcript-derived claims"
+  },
+  "reference_cards_add": [],
+  "queue_priority": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "arxiv:2505.11315",
+    "ART-ML-20261012-1500-01",
+    "DOI:10.1109/I3DA65421.2025.11202090",
+    "existing_metadata_only_youtube_queue",
+    "EXP-ML-20261012-1500-01",
+    "existing_bass_restoration_rir_blocked_experiments"
+  ],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "mutations": {"audio":false,"dsp":false,"runtime":false,"models":false},
+  "auto_apply": false
+}
