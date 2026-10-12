@@ -509,3 +509,12 @@ ML-2026-10-11-1200 (deep_review, source search ML-2026-10-11-0900): the reported
 | ML-2026-10-11-1800 | [Report](ML-2026-10-11-1800.md) · [JSON patch](ML-2026-10-11-1800.json) · [ADR](../adr/mixing-learning-2026-10-11-1800.md) | Deep review: full cited I3DA modal-synthesis method plus independent full Acta Acustica interpolation/listening study; 2 Source Cards, 1 metadata-only citation candidate, 4 Knowledge Cards, 1 narrowed rule and 1 construct-corrected blocked A/B; no video/reference promotion, audio, DSP or runtime change |
 
 ML-2026-10-11-1800 (deep_review, source search ML-2026-10-11-1500): individual-RIR fitting does not establish position interpolation. Independent listener evidence supports correspondence/alignment only at the general-principle level, not Bunkervik modal clustering or generic moving drum ambience. The prior static-versus-moving-room test is withdrawn and replaced by a direct-arrival-alignment-only RIR interpolation test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and the revised RIR experiment remains not_run_blocked.
+
+## 2026-10-12 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-12-0900 | [Report](ML-2026-10-12-0900.md) · [JSON patch](ML-2026-10-12-0900.json) · [ADR](../adr/mixing-learning-2026-10-12-0900.md) | Search: 1 fully read official bass-mixing article, 4 Knowledge Cards, 2 bounded rules, 1 blocked experiment and 3 unique metadata-only queued videos; 6 scientific/editorial families and 7 video IDs deduplicated; no new legal raw multitrack, audio, DSP or runtime change |
+
+ML-2026-10-12-0900 (search, preceding successful search ML-2026-10-11-1500): bass processing is role- and section-dependent; clean-low, articulation and distorted-character layers are optional functions, not a mandatory chain. Verify timing/polarity/mono before tone judgments and level-match processor comparisons. The article's five examples are one publisher family, not independent confirmations. Three YouTube items remain metadata-only after a human-verification block. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
