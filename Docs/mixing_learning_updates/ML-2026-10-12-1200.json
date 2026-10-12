@@ -1,0 +1,110 @@
+{
+  "update_id": "ML-2026-10-12-1200",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-12T12:00:00+03:00",
+  "actual_start_msk": "2026-10-12T12:02:27+03:00",
+  "actual_finish_msk": "2026-10-12T12:16:21+03:00",
+  "preceding_search_update": "ML-2026-10-12-0900",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261012-1200-01",
+      "title": "Virtual Bass System With Fuzzy Separation of Tones and Transients",
+      "authors": ["Eloi Moliner", "Jussi Ramo", "Vesa Valimaki"],
+      "publication": "DAFx-20",
+      "pages": "86-93",
+      "url": "https://dafx.de/paper-archive/details/N5OM2dbtKMdBf5TGSQUW-Q",
+      "pdf_url": "https://dafx2020.mdw.ac.at/proceedings/papers/DAFx2020_paper_40.pdf",
+      "companion_url": "https://research.spa.aalto.fi/publications/papers/dafx20-vbs/",
+      "reading_depth": "full_text_complete",
+      "bounded_conclusion": "Evidence for virtual-bass enhancement on severely bandwidth-limited playback; not evidence for a universal full-range rock-bass distortion rule.",
+      "limitations": [
+        "11 analysed listeners after 7 exclusions",
+        "uncontrolled headphones",
+        "parameters tuned per stimulus",
+        "commercial excerpts",
+        "no independent replication found",
+        "no full-range creative mixing comparison"
+      ]
+    }
+  ],
+  "artifact_audits_added": [
+    {
+      "id": "ART-ML-20261012-1200-01",
+      "repository": "https://github.com/eloimoliner/virtualbass",
+      "pinned_commit": "a99c5dd6fccfb7302ce7911a394c155bfd2168fc",
+      "status": "available_unrun_license_blocked_not_live_ready",
+      "blockers": [
+        "no repository-level licence found",
+        "no pinned MATLAB/toolbox environment",
+        "no frozen per-stimulus reproduction manifests",
+        "paper/script parameter drift",
+        "noncausal approximately 150 ms separation delay",
+        "author reports tonal path too expensive for feasible real-time use",
+        "commercial example-audio rights not cleared"
+      ],
+      "executed": false
+    }
+  ],
+  "knowledge_cards_added": [
+    {"id": "KC-ML-20261012-1200-01", "topic": "playback_path_condition", "claim": "Virtual bass is a constrained-playback intervention, not recovered low-frequency energy or a universal mix rule."},
+    {"id": "KC-ML-20261012-1200-02", "topic": "reference_ceiling", "claim": "The proposed method averaged 47.0 while the full-band reference averaged 98.6; relative anchor improvement is not parity with intact bass."},
+    {"id": "KC-ML-20261012-1200-03", "topic": "programme_dependence", "claim": "Per-stimulus tuning and varying results block transfer of one universal preset."},
+    {"id": "KC-ML-20261012-1200-04", "topic": "live_deployment", "claim": "The public method is noncausal and approximately 150 ms delayed according to the author; it is not Wing/live-ready."},
+    {"id": "KC-ML-20261012-1200-05", "topic": "artifact_reproducibility", "claim": "Public source availability alone does not establish exact reproduction, licence permission or deployability."}
+  ],
+  "rules_revised": [
+    {
+      "id": "RULE-ML-20261012-0900-01",
+      "name": "role_conditioned_bass_layers_shadow_only",
+      "status": "candidate_revised",
+      "auto_apply": false,
+      "applies_when": "A section has a named bass function and frozen project-owned source and return are available.",
+      "change": "Compare harmonic/distorted return off versus on after declaring creative full-range or constrained-playback intent.",
+      "range_origin": "No source numeric value is promoted as a preset.",
+      "protect": ["full-range timbre", "low-end stability", "attack", "groove", "polarity", "mono compatibility", "headroom", "kick/guitar roles"],
+      "verify": "Raw safety/phase renders plus separate BS.1770-matched blind copies in full-range and constrained-playback strata.",
+      "cancel": "Reject general promotion if full-range playback regresses; constrained-only benefit remains delivery-specific shadow evidence.",
+      "confidence": "medium_low"
+    }
+  ],
+  "rules_unchanged": ["RULE-ML-20261012-0900-02"],
+  "experiments_revised": [
+    {
+      "id": "EXP-ML-20261012-0900-01",
+      "status": "not_run_blocked",
+      "factor": "frozen harmonic/distorted bass return off versus on",
+      "strata": ["full-range project playback", "fixed 150 Hz high-pass stress simulation"],
+      "measurement_renders": "raw gain-unaltered",
+      "listening_copies": "separate randomized BS.1770-matched copies within each stratum",
+      "success": "Dmitry prefers on in at least two of three constrained-playback trials with no systematic full-range rejection or protected-quality regression.",
+      "cancel": "Any repeatable full-range regression blocks general mix-rule promotion.",
+      "blockers": ["EXP-ML-PENA-AB15-LISTEN-20261010-1800 verdict", "frozen eligible bass source and return", "render manifest", "sealed answer key"]
+    }
+  ],
+  "videos": {
+    "studied": [],
+    "queued_metadata_only": ["youtube:_4L64XEaqEs", "youtube:j3F9Z-h8xis", "youtube:FfFpyV6aIv8"],
+    "access_note": "Permitted transcript access hit a human-verification block; no bypass attempted."
+  },
+  "references_added": [],
+  "multitracks_added": [],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "doi:10.1109/I3DA65421.2025.11202090",
+    "youtube-transcript-queue",
+    "EXP-ML-20261012-0900-01",
+    "existing-rir-interpolation-experiment",
+    "dependency-preservation-tasks"
+  ],
+  "changes": {
+    "audio": false,
+    "dsp": false,
+    "runtime": false,
+    "models": false,
+    "repository_code": false
+  }
+}
+
