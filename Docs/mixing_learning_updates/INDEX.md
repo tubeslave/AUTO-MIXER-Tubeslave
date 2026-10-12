@@ -518,3 +518,10 @@ ML-2026-10-11-1800 (deep_review, source search ML-2026-10-11-1500): individual-R
 
 ML-2026-10-12-0900 (search, preceding successful search ML-2026-10-11-1500): bass processing is role- and section-dependent; clean-low, articulation and distorted-character layers are optional functions, not a mandatory chain. Verify timing/polarity/mono before tone judgments and level-match processor comparisons. The article's five examples are one publisher family, not independent confirmations. Three YouTube items remain metadata-only after a human-verification block. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
 
+## 2026-10-12 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-12-1200 | [Report](ML-2026-10-12-1200.md) · [JSON patch](ML-2026-10-12-1200.json) · [ADR](../adr/mixing-learning-2026-10-12-1200.md) | Deep review: full DAFx-20 virtual-bass paper, official companion and pinned MATLAB artifact audit; 1 Source Card, 1 blocked Artifact Audit, 5 Knowledge Cards, 1 narrowed rule and 1 revised blocked A/B; no video/reference promotion, audio, DSP or runtime change |
+
+ML-2026-10-12-1200 (deep_review, source search ML-2026-10-12-0900): virtual bass is constrained-playback evidence, not recovered low frequency or a universal distorted-bass rule. The full-band reference remained far ahead of all virtual-bass methods; public code is unlicensed, noncausal and not live-ready. The bass A/B now separates raw measurement renders from BS.1770-matched listening copies and evaluates full-range and a fixed 150 Hz high-pass stress condition separately. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
