@@ -1,0 +1,201 @@
+{
+  "update_id": "ML-2026-10-12-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-12T09:00:00+03:00",
+  "actual_start": "2026-10-12T08:59:30+03:00",
+  "completed_at": "2026-10-12T09:08:19+03:00",
+  "timezone": "Europe/Moscow",
+  "previous_update": "ML-2026-10-11-1800",
+  "source_search_report": "ML-2026-10-11-1500",
+  "citation_check": "partial",
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261012-0900-01",
+      "operation": "add",
+      "stable_ids": [
+        "url:producelikeapro.com/blog/5-different-ways-to-mix-bass-techniques-from-five-world-class-mixers",
+        "youtube:_4L64XEaqEs"
+      ],
+      "title": "5 Different Ways to Mix Bass: Techniques from Five World-Class Mixers",
+      "author": "Warren Huart",
+      "publisher": "Produce Like A Pro",
+      "publication_date": "2026-09-03",
+      "discovered": "2026-10-12",
+      "url": "https://producelikeapro.com/blog/5-different-ways-to-mix-bass-techniques-from-five-world-class-mixers/",
+      "source_type": "official_educational_editorial_article",
+      "reading_depth": "full_article_complete_lines_22_to_181",
+      "findings": [
+        "choose bass processing by musical role and section",
+        "clean-low, articulation and distorted-character layers are optional separable functions",
+        "check timing, polarity and mono behaviour before tone or dynamics judgments on combined layers",
+        "level-match processor comparisons and retain no-compression and fewer-layer baselines",
+        "preserve intentional note-to-note movement and artist identity"
+      ],
+      "source_specific_numbers_not_presets": [
+        "800 Hz to 1 kHz articulation search region",
+        "60 to 100 Hz clean-low example",
+        "approximately 3 dB gain-reduction level-match example"
+      ],
+      "limitations": [
+        "no controlled listener study or statistics",
+        "five examples mediated by one publisher and not independent confirmations",
+        "selected paid-course excerpts",
+        "no raw audio or complete reproducible manifests",
+        "linked video content not read"
+      ]
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261012-0900-01",
+      "operation": "add",
+      "claim": "Select bass processing from the part's section role rather than the instrument label.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261012-0900-02",
+      "operation": "add",
+      "claim": "Clean-low, articulation and distorted-character layers are optional functions; preserve an unchanged or fewer-layer baseline.",
+      "confidence": "medium"
+    },
+    {
+      "id": "KC-ML-20261012-0900-03",
+      "operation": "add",
+      "claim": "Verify actual timing, polarity and mono behaviour before EQ or compression judgments on layered bass.",
+      "confidence": "medium-high"
+    },
+    {
+      "id": "KC-ML-20261012-0900-04",
+      "operation": "add",
+      "claim": "Output-loudness matching and accounting for saturation's existing peak control are required before judging added compression.",
+      "confidence": "medium-high"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261012-0900-01",
+      "operation": "add",
+      "name": "role_conditioned_bass_layers_shadow_only",
+      "when": "rock or metal bass loses weight or note identity in a dense section",
+      "change": "label the missing function and test only its clean-low, articulation or distorted-character contribution",
+      "parameter_range_and_origin": "no automatic range; 800 Hz to 1 kHz and 60 to 100 Hz are source-specific search regions",
+      "protect": ["kick_identity", "groove", "bass_timing", "note_definition", "intentional_movement", "guitar_mass", "mono_sum", "headroom", "section_contrast"],
+      "verify": ["one_factor_project_AB", "raw_and_BS1770_matched_copies", "true_peak", "band_energy_deltas", "attack_to_sustain", "kick_bass_overlap", "mono_sum_delta", "three_blind_Dmitry_trials"],
+      "cancel": ["weaker_kick", "smeared_attack", "low_end_loss", "clank_or_fizz", "masked_guitars", "mono_cancellation", "clipping", "unstable_preference"],
+      "confidence": "medium-low",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261012-0900-02",
+      "operation": "add",
+      "name": "bass_layer_alignment_gate",
+      "when": "two or more bass sources, reamps or parallel returns are combined",
+      "change": "measure timing and audition explicit polarity states before tone or dynamics processing; do not auto-flip from one metric",
+      "parameter_range_and_origin": "derive any offset from actual project signals; no transferable delay or frequency value",
+      "protect": ["attack", "pitch_centre", "low_end_coherence", "stereo_mono_consistency", "artistic_width"],
+      "verify": ["sample_offset", "broadband_and_band_limited_correlation", "mono_null_delta", "raw_peak", "full_mix_loudness_matched_listening"],
+      "cancel": ["transient_splitting", "hollow_low_end", "worse_mono_sum", "section_dependent_failure"],
+      "confidence": "medium",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261012-0900-01",
+      "operation": "add",
+      "status": "not_run_blocked",
+      "material": "Pena full-mix section with dense guitars and an eligible original bass source",
+      "A": "current bass path with frozen parallel distorted return muted",
+      "B": "identical mix with the same frozen return unmuted at one fixed gain",
+      "single_factor": "frozen distorted-return contribution off versus on",
+      "loudness": "retain raw measurement renders and create separate BS.1770-matched full-mix listening copies",
+      "measurements": ["alignment", "integrated_loudness", "true_peak", "crest_and_attack_to_sustain", "low_and_mid_band_energy_delta", "kick_bass_overlap", "LR_correlation", "mono_sum_delta"],
+      "protect": ["kick_punch", "bass_timing", "note_definition", "guitar_mass", "groove", "mono", "headroom", "section_contrast"],
+      "success": "same variant wins at least two of three blind Dmitry trials with no protected regression",
+      "cancel": ["protected_regression", "objective_listening_disagreement", "clipping", "unstable_preference", "multiple_changed_factors"],
+      "blockers": ["AB15 listener test first", "eligible bass source not frozen", "baseline and parallel return not frozen"],
+      "auto_apply": false
+    }
+  ],
+  "videos": {
+    "studied": [],
+    "queued": [
+      {
+        "id": "VIDEO-ML-20261012-0900-01",
+        "stable_id": "youtube:_4L64XEaqEs",
+        "title_variants": ["Mixing Bass 5 Different Ways From 5 Different Mixers", "How to Get A Killer Bass Tone (For Any Genre!)"],
+        "channel": "Produce Like A Pro",
+        "url": "https://www.youtube.com/watch?v=_4L64XEaqEs",
+        "reading_depth": "official_link_and_article_metadata_only",
+        "transcript_status": "not_obtained_human_verification_block",
+        "techniques_extracted_from_video": []
+      },
+      {
+        "id": "VIDEO-ML-20261012-0900-02",
+        "stable_id": "youtube:j3F9Z-h8xis",
+        "title": "NO MORE CYMBALS in your ROOM MICS! Here's the Trick!",
+        "channel": "Kohle Audio Kult / Produce Like A Pro",
+        "published": "exact_date_not_captured_observed_about_9_months_old_on_2026-10-12",
+        "duration": "09:23",
+        "url": "https://www.youtube.com/watch?v=j3F9Z-h8xis",
+        "reading_depth": "youtube_search_metadata_only",
+        "transcript_status": "not_obtained_human_verification_block",
+        "techniques_extracted": []
+      },
+      {
+        "id": "VIDEO-ML-20261012-0900-03",
+        "stable_id": "youtube:FfFpyV6aIv8",
+        "title": "How to Get a Heavy Bass Tone for Rock/Metal In the Box! (3 plugins)",
+        "channel": "Hardcore Music Studio",
+        "published": "2020-07-28",
+        "duration": "10:05",
+        "url": "https://www.youtube.com/watch?v=FfFpyV6aIv8",
+        "reading_depth": "metadata_and_description_only",
+        "transcript_status": "not_obtained_after_human_verification_block_no_retry_or_bypass",
+        "techniques_extracted": []
+      }
+    ]
+  },
+  "deduplication": {
+    "keys": ["doi", "arxiv_id", "conference_id", "normalized_title", "version_lineage", "canonical_url", "youtube_video_id"],
+    "excluded_existing_science": ["arxiv:2609.02835", "arxiv:2608.05442", "arxiv:2607.15634", "arxiv:2603.15995", "arxiv:2606.18573"],
+    "merged_version_family": ["Produce Like A Pro 2025 Mixing the Bass: Five Approaches", "Produce Like A Pro 2026 5 Different Ways to Mix Bass", "youtube:_4L64XEaqEs"],
+    "excluded_existing_videos": ["youtube:Z0eqw_3cY2A", "youtube:DuU6XdVebJo", "youtube:bq7ykYGmwwk", "youtube:dOnrcpm_hSc", "youtube:97AxLS5W9ys", "youtube:R0h9IcLenI0", "youtube:vc_eZurxpL0"]
+  },
+  "references": {
+    "added": [],
+    "note": "No new free legally unambiguous raw rock multitrack; official playback and course pages are not raw-audio access."
+  },
+  "queue": [
+    {"priority": 1, "id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800", "status": "not_run", "note": "next executable test"},
+    {"priority": 2, "id": "PENA-13-TO-8-MAPPING-NULL", "status": "pending_after_listener_test"},
+    {"priority": 3, "id": "SRC-CAND-ML-20261011-1800-01", "status": "full_text_and_citation_check", "doi": "10.1109/I3DA65421.2025.11202090"},
+    {"priority": 4, "id": "VIDEO-ML-20261012-0900-01..03", "status": "queued_source"},
+    {"priority": 5, "id": "VIDEO-ML-20261011-1500-01..02", "status": "retained_queued_source"},
+    {"priority": 6, "id": "EXP-ML-20261012-0900-01", "status": "not_run_blocked"},
+    {"priority": 7, "id": "EXP-ML-20261011-1500-01", "status": "not_run_blocked"},
+    {"priority": 8, "id": "PENA-DEPENDENCIES", "status": "retained", "order": ["PENA-AB-11->PENA-AB-12", "PENA-AB-02->PENA-AB-21"]}
+  ],
+  "changes": {
+    "source_cards_added": 1,
+    "knowledge_cards_added": 4,
+    "candidate_rules_added": 2,
+    "experiments_added": 1,
+    "video_cards_added": 3,
+    "video_cards_studied": 0,
+    "reference_cards_added": 0,
+    "scientific_or_editorial_families_deduplicated": 6,
+    "video_duplicates_removed": 7
+  },
+  "governance": {
+    "auto_apply": false,
+    "audio_changed": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_code_changed": false,
+    "model_training": false,
+    "model_execution": false,
+    "external_binary_downloaded": false,
+    "paid_compute": false
+  }
+}
