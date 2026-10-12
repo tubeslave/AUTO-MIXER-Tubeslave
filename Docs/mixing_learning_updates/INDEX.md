@@ -534,3 +534,11 @@ ML-2026-10-12-1200 (deep_review, source search ML-2026-10-12-0900): virtual bass
 | ML-2026-10-12-1500 | [Report](ML-2026-10-12-1500.md) · [JSON patch](ML-2026-10-12-1500.json) · [ADR](../adr/mixing-learning-2026-10-12-1500.md) | Search: 1 older missing full-text DAFx-25 DiffVox source plus pinned MIT artifact audit; 5 Knowledge Cards, 1 bounded shadow-only rule and 1 blocked vocal A/B; 4 duplicate literature families removed; no studied video, reference, audio, DSP or runtime change |
 
 ML-2026-10-12-1500 (search, preceding successful search ML-2026-10-12-0900): inverse-fitted vocal-FX controls are topology/loss/data-conditioned proxies, not the original engineer's settings or rock-vocal presets. The paper has no listening test and partly unavailable private audio. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and the new vocal experiment is not_run_blocked.
+
+## 2026-10-12 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-12-1800 | [Report](ML-2026-10-12-1800.md) · [JSON patch](ML-2026-10-12-1800.json) · [ADR](../adr/mixing-learning-2026-10-12-1800.md) | Deep review: full WASPAA Gaussian-prior paper plus pinned implementation/protocol audit; 1 Source Card, 5 Knowledge Cards, 1 narrowed shadow-only rule, 1 blocked prior off/on A/B and 1 DOI queue correction; no video/reference/audio/DSP/runtime change |
+
+ML-2026-10-12-1800 (deep_review, source search ML-2026-10-12-1500): a full-covariance Gaussian can regularize the fixed DiffVox search despite known non-normality, but it is not a faithful FX distribution. The 16-listener ranking was directional and not significant (p=.117). The next plan isolates only the prior term and adds a rare-style cancellation gate. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
