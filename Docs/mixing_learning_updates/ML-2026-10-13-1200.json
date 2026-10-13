@@ -1,0 +1,137 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-13-1200",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-13T12:00:00+03:00",
+  "actual_start_msk": "2026-10-13T12:01:25+03:00",
+  "report_fixed_msk": "2026-10-13T12:04:42+03:00",
+  "preceding_search": "ML-2026-10-13-0900",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261013-1200-01",
+      "title": "BERT-APC: A Reference-free Framework for Automatic Pitch Correction via Musical Context Inference",
+      "canonical_id": "arxiv:2511.20006v3",
+      "doi": "10.48550/arXiv.2511.20006",
+      "publication_state": "arxiv_v3_paper_states_accepted_IEEE_ACM_TASLP",
+      "publication_date": "2026-04-28",
+      "urls": [
+        "https://arxiv.org/abs/2511.20006",
+        "https://arxiv.org/pdf/2511.20006",
+        "https://joshua-1995.github.io/BERT-APC-Demo/"
+      ],
+      "reading_depth": "full_14_page_pdf+full_demo_page+demo_repo_root_html_license",
+      "citation_check": "partial",
+      "key_results": {
+        "rpa_moderate_high": {"BERT_APC": [94.95, 89.24], "ROSVOT": [89.60, 78.75], "frame_rounding": [85.07, 58.02]},
+        "mos_pitch_accuracy_mean_ci95": {"BERT_APC": "4.32+-0.15", "AutoTune": "3.22+-0.18", "Melodyne": "3.08+-0.18"},
+        "mos_expression_mean_ci95": {"BERT_APC": "3.80+-0.17", "AutoTune": "3.81+-0.17", "Melodyne": "3.85+-0.17"}
+      },
+      "limitations": [
+        "sample_split_not_explicitly_singer_or_song_disjoint",
+        "listener_and_excerpt_repeated_factors_not_modelled_in_reported_one_way_ANOVA",
+        "no_inferential_equivalence_test_for_expression_preservation",
+        "fixed_commercial_settings_and_different_render_paths",
+        "context_model_may_degrade_on_atypical_patterns",
+        "no_public_training_inference_code_checkpoint_or_eval_data_identified"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261013-1200-02",
+      "title": "Toward Expressive Singing Voice Correction: On Perceptual Validity of Evaluation Metrics for Vocal Melody Extraction",
+      "canonical_id": "arxiv:2010.12196v1",
+      "doi": "10.48550/arXiv.2010.12196",
+      "publication_date": "2020-10-23",
+      "urls": ["https://arxiv.org/abs/2010.12196", "https://arxiv.org/pdf/2010.12196"],
+      "reading_depth": "full_5_page_paper",
+      "citation_check": "partial",
+      "bounded_conclusion": "standard pitch metrics may disagree with perceptual naturalness and fluency; objective pitch accuracy alone is not a sufficient correction endpoint",
+      "limitations": ["six_30_second_source_songs_in_listening_test", "method_level_correlation_over_few_systems", "reference_based_WORLD_vocoder_pipeline", "no_dense_rock_mix_test"]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261013-1200-01",
+      "source": "SRC-ML-20261013-1200-01",
+      "repository": "https://github.com/Joshua-1995/BERT-APC-Demo",
+      "license": "MIT",
+      "status": "demo_assets_available_model_code_checkpoint_data_unavailable",
+      "paper_demo_statistic_drift": true,
+      "author_reported_td_psola_clicks": true,
+      "executed": false,
+      "reproduced": false,
+      "audio_downloaded": false
+    }
+  ],
+  "source_cards_update": [
+    {
+      "id": "SRC-ML-20261013-0900-01",
+      "add_limitations": ["BERT_APC_comparator_is_not_independent_confirmation", "private_evaluation_and_shared_frontend_renderer_prevent_direct_model_replacement_claim"]
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261013-1200-01","claim":"Context-aware target-note inference improves RPA most strongly on highly detuned material in BERT-APC, but evidence is dataset-, split- and metric-conditioned.","confidence":"medium"},
+    {"id":"KC-ML-20261013-1200-02","claim":"Uniform note-level shifting preserves relative pitch contour mathematically, not necessarily acoustic timbre, boundaries or perceived expression.","confidence":"high"},
+    {"id":"KC-ML-20261013-1200-03","claim":"Objective pitch accuracy can disagree with perceptual naturalness and fluency; both objective and listening endpoints are required.","confidence":"high_as_evaluation_requirement"},
+    {"id":"KC-ML-20261013-1200-04","claim":"Repeated ratings require listener/excerpt-aware inference or aggregation; rating-level one-way ANOVA may be anti-conservative.","confidence":"medium_high"},
+    {"id":"KC-ML-20261013-1200-05","claim":"A public demo without model code, checkpoint and evaluation data does not establish reproducibility; demo/paper statistics must be version-pinned.","confidence":"high"},
+    {"id":"KC-ML-20261013-1200-06","claim":"Sample-level splits without an explicit singer/song-disjoint contract leave identity leakage unresolved.","confidence":"high_as_audit_requirement"}
+  ],
+  "knowledge_cards_update": [
+    {"id":"KC-ML-20261013-0900-01","revision":"separate whether-to-edit and target selection, then validate target inference and rendering independently"},
+    {"id":"KC-ML-20261013-0900-05","revision":"relative F0 contour preservation does not establish timbre, boundary, formant or perceived-expression preservation"},
+    {"id":"KC-ML-20261013-0900-06","revision":"require listener/excerpt-aware inference; arithmetic MOS or naive rating-level ANOVA is insufficient"}
+  ],
+  "rules_update": [
+    {
+      "id": "RULE-ML-20261013-0900-01",
+      "name": "vocal_pitch_sparse_edit_shadow_only",
+      "add_prerequisite": "EXP-ML-20261013-1200-01 renderer zero-shift null passes on the same source class",
+      "change": "one sealed note region and one fixed manually approved offset; manifest off/on only",
+      "protect": ["timing", "consonants", "formants", "timbre", "vibrato", "transitions", "harmony_role", "emotion", "true_peak", "section_loudness"],
+      "verify": "raw diagnostics plus separate BS.1770-matched true-peak-safe blind solo and full-mix listening; pitch error not sole endpoint",
+      "cancel": ["null_failure", "target_uncertain", "expressive_intent_conflict", "click_or_boundary_artifact", "formant_or_vibrato_regression", "worse_mix_role", "loudness_only_benefit", "inconsistent_preference"],
+      "confidence": "medium_low_for_project_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261013-1200-01",
+      "name": "pitch_renderer_zero_shift_null",
+      "status": "not_run_blocked",
+      "material": "project_owned_Pena_exposed_vocal_phrase",
+      "A": "source_bypass_through_frozen_surrounding_chain",
+      "B": "same_source_segmented_and_rendered_with_exactly_0_cent_shift",
+      "only_factor": "pitch_renderer_round_trip_off_on",
+      "measurements": ["difference_residual", "boundary_click_scan", "true_peak", "section_loudness", "spectral_formant_proxy", "vibrato_rate_extent", "F0_continuity"],
+      "listening": "separate_BS1770_matched_true_peak_safe_randomized_blind_solo_and_full_mix_three_Dmitry_passes",
+      "success": "no_repeatable_audible_regression_and_all_predeclared_project_null_thresholds_pass",
+      "cancel": ["repeatable_click", "boundary_timbre_formant_or_vibrato_regression", "loudness_mismatch", "unexplained_non_null_residual", "version_mode_manifest_inconsistency"],
+      "blockers": ["frozen_renderer_version_mode", "sealed_boundaries", "raw_and_loudness_thresholds", "blind_key"],
+      "auto_apply": false
+    }
+  ],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_manifest_and_thresholds_for_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_review_VID-ML-20261013-0900-01/02",
+    "run_EXP-ML-20261013-1200-01_then_conditionally_EXP-ML-20261013-0900-01",
+    "existing_blocked_experiments_and_metadata_only_video_queue"
+  ],
+  "videos_studied": [],
+  "references_promoted": [],
+  "experiments_run": [],
+  "citation_check": "partial"
+}
