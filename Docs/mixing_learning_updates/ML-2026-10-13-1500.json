@@ -1,0 +1,247 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-13-1500",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-13T15:00:00+03:00",
+  "actual_start_msk": "2026-10-13T15:04:05+03:00",
+  "report_fixed_msk": "2026-10-13T15:07:35+03:00",
+  "previous_successful_search": "ML-2026-10-13-0900",
+  "immediate_predecessor": "ML-2026-10-13-1200",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261013-1500-01",
+      "title": "Keyframe Time Stretching via Extrema Sampling",
+      "author": "Matthew Nielsen",
+      "canonical_id": "DAFx26_paper_21",
+      "doi": null,
+      "venue": "DAFx26",
+      "publication_date_range": "2026-09-01/2026-09-04",
+      "discovered_date": "2026-10-13",
+      "urls": [
+        "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_21.pdf",
+        "https://github.com/heavylight-industries/capicola"
+      ],
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_8_page_paper",
+      "citation_check": "partial",
+      "bounded_conclusion": "low-cost creative embedded time stretching; representation loss at unity and material/ratio dependence prevent transparent vocal/full-mix default",
+      "methods": {
+        "corpus": "10_TSM_toolbox_clips",
+        "ratios": [
+          0.5,
+          1.2,
+          1.8
+        ],
+        "listening_N": 15,
+        "device": "480MHz_STM32H7_Daisy_48kHz"
+      },
+      "key_results": {
+        "unity_mean": {
+          "STOI": 0.91,
+          "LAT_deviation": 0.09,
+          "spectral_contrast_loss_dB": 3.08
+        },
+        "keyframe_listening_mean_by_clip": {
+          "bongo": 51.1,
+          "castanets_violin": 42.5,
+          "drum_solo": 48.8,
+          "singing_voice": 31.1,
+          "indie_pop": 46.8
+        },
+        "WSOLA_led_clips": "4_of_5"
+      },
+      "limitations": [
+        "lossy_sparsification_before_stretch",
+        "silent_sparse_regions_can_repeat",
+        "0.5x_compression_underperforms",
+        "small_N",
+        "no_reported_inferential_statistics",
+        "operation_counts_not_end_to_end_latency"
+      ]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261013-1500-01",
+      "source": "SRC-ML-20261013-1500-01",
+      "repository": "https://github.com/heavylight-industries/capicola",
+      "observed_commit": "8c64e855fac64054fdb38451db00866ea682d0d8",
+      "license": "AGPL-3.0",
+      "status": "code_available_not_executed_host_and_parameter_parity_unverified",
+      "available": [
+        "C++_firmware",
+        "lib_DSP_core",
+        "KeyframeRecorder.h",
+        "host_tests",
+        "build_instructions",
+        "public_examples"
+      ],
+      "executed": false,
+      "reproduced": false,
+      "audio_downloaded": false
+    }
+  ],
+  "knowledge_cards_add": [
+    {
+      "id": "KC-ML-20261013-1500-01",
+      "claim": "A time-stretch engine may alter the signal at unity rate; test representation/round-trip null first.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1500-02",
+      "claim": "Transient timing and perceptual quality can diverge; LAT alone cannot select an algorithm.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1500-03",
+      "claim": "Representation loss can dominate effect evaluation; bypass versus unity-round-trip is a required control.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1500-04",
+      "claim": "Time-stretch quality is material- and ratio-conditioned; no universal engine is established.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1500-05",
+      "claim": "MCU operation counts do not prove desktop/live end-to-end latency.",
+      "confidence": "high"
+    }
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261013-1500-01",
+      "name": "time_stretch_representation_null_first",
+      "when": "project_owned_pre_mix_editing_with_role_and_section_declared",
+      "change": "shadow_only_unity_roundtrip_before_one_fixed_nonunity_ratio",
+      "protect": [
+        "groove",
+        "attacks",
+        "consonants",
+        "pitch_formants",
+        "cymbal_decay",
+        "stereo_image",
+        "noise_floor"
+      ],
+      "verify": "raw_diagnostics_plus_BS1770_matched_true_peak_safe_blind_listening",
+      "cancel": [
+        "null_failure",
+        "repeat",
+        "click",
+        "transient_formant_or_stereo_regression",
+        "loudness_only_preference",
+        "manifest_mismatch"
+      ],
+      "confidence": "medium_low_for_project_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261013-1500-01",
+      "name": "time_stretcher_unity_roundtrip_null",
+      "status": "not_run_blocked",
+      "material": "one_sealed_project_owned_Pena_exposed_vocal_phrase",
+      "A": "source_bypass_frozen_chain",
+      "B": "same_source_through_pinned_engine_at_1.0x",
+      "only_factor": "time_stretch_representation_round_trip_off_on",
+      "measurements": [
+        "difference_residual",
+        "boundary_click_repeat_scan",
+        "true_peak",
+        "section_loudness",
+        "spectral_formant_proxy",
+        "F0_continuity",
+        "transient_timing"
+      ],
+      "listening": "BS1770_matched_true_peak_safe_randomized_three_Dmitry_passes_solo_and_mix",
+      "success": "no_repeatable_audible_regression_and_predeclared_null_thresholds_pass",
+      "cancel": [
+        "repeatable_click_or_repeat",
+        "formant_transient_stereo_regression",
+        "loudness_mismatch",
+        "unexplained_residual",
+        "manifest_drift"
+      ],
+      "blockers": [
+        "pinned_engine_commit_mode_parameters",
+        "sealed_excerpt",
+        "project_thresholds",
+        "blind_key"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos_add": [
+    {
+      "id": "VID-ML-20261013-1500-01",
+      "stable_key": "youtube:GUc3_kzsDS0",
+      "title": "Abbey Road Engineer DESTROYS Common MASTERING Myths - Stefan Brown FAQ FRIDAY",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=GUc3_kzsDS0",
+      "companion_date": "2026-04-10",
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript"
+    },
+    {
+      "id": "VID-ML-20261013-1500-02",
+      "stable_key": "youtube:uhwBJFXwRdE",
+      "title": "Mastering: You're Probably Overdoing It (What Stefan Brown Does Instead)",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=uhwBJFXwRdE",
+      "companion_date": "2026-03-26",
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript"
+    },
+    {
+      "id": "VID-ML-20261013-1500-03",
+      "stable_key": "youtube:UsQotpjqqt0",
+      "title": "STOP Ruining Your Mixes! The #1 Mastering Trick from one of Abbey Road's BEST!",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=UsQotpjqqt0",
+      "companion_date": "2025-07-14",
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript"
+    }
+  ],
+  "deduplication": [
+    {
+      "key": "youtube:SG5rkdYwFDE",
+      "resolution": "existing_video_not_added"
+    },
+    {
+      "key": "youtube:XXCPQe4qzpc",
+      "resolution": "existing_video_not_added"
+    },
+    {
+      "key": "youtube:aTIK75TG-gw",
+      "resolution": "existing_video_not_added"
+    }
+  ],
+  "references_promoted": [],
+  "multitracks_promoted": [],
+  "videos_studied": [],
+  "experiments_run": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_manifest_and_thresholds_for_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_review_VID-ML-20261013-0900-01/02",
+    "transcript_review_VID-ML-20261013-1500-01/02/03",
+    "capicola_pinned_code_test_parameter_parity_audit",
+    "freeze_then_conditionally_run_EXP-ML-20261013-1500-01",
+    "existing_blocked_experiments_and_metadata_only_video_queue"
+  ],
+  "citation_check": "partial"
+}
