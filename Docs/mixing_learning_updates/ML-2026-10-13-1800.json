@@ -1,0 +1,279 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-13-1800",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-13T18:00:00+03:00",
+  "actual_start_msk": "2026-10-13T17:55:50+03:00",
+  "report_fixed_msk": "2026-10-13T18:00:55+03:00",
+  "source_search": "ML-2026-10-13-1500",
+  "immediate_predecessor": "ML-2026-10-13-1500",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261013-1800-01",
+      "title": "A Time-Scale Modification Dataset with Subjective Quality Labels",
+      "authors": [
+        "Timothy Roberts",
+        "Kuldip K. Paliwal"
+      ],
+      "canonical_id": "DOI:10.1121/10.0001567",
+      "doi": "10.1121/10.0001567",
+      "venue": "Journal of the Acoustical Society of America 148(1)",
+      "publication_date": "2020-07",
+      "discovered_date": "2026-10-13",
+      "urls": [
+        "https://pubmed.ncbi.nlm.nih.gov/32752755/",
+        "https://arxiv.org/abs/2006.00848",
+        "https://ieee-dataport.org/open-access/time-scale-modification-dataset-subjective-quality-labels"
+      ],
+      "reading_depth": "full_13_page_paper",
+      "dataset_license": "CC-BY-4.0",
+      "citation_check": "partial",
+      "methods": {
+        "source_count": 108,
+        "source_classes": {
+          "music": 34,
+          "solo": 37,
+          "voice": 37
+        },
+        "audio": "mono_16bit_44.1kHz_normalized_pm1_mean_3.7s",
+        "train": "88_sources_x_6_methods_x_10_ratios_5280_files",
+        "test": "20_sources_x_3_unseen_methods_x_4_ratios_240_files",
+        "ratings": 42529,
+        "participants": 263,
+        "sessions": 633,
+        "removed_sessions": 45,
+        "removed_ratings": 2102,
+        "removed_fraction": 0.0494,
+        "expert_rating_fraction": 0.5236,
+        "interrater_reliability_before": 0.871,
+        "interrater_reliability_after": 0.909
+      },
+      "bounded_conclusion": "TSM preference is content- and ratio-direction-conditioned; no universal engine follows.",
+      "limitations": [
+        "mono_short_normalized_clips",
+        "no_stereo_or_multitrack_phase_validation",
+        "no_project_rock_stems",
+        "known_uTVS_bug_near_ratio_1_retained_in_subjective_dataset",
+        "objective_measures_poor_subjective_proxies"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261013-1800-02",
+      "title": "An Objective Measure of Quality for Time-Scale Modification of Audio",
+      "authors": [
+        "Timothy Roberts",
+        "Kuldip K. Paliwal"
+      ],
+      "canonical_id": "DOI:10.1121/10.0003753",
+      "doi": "10.1121/10.0003753",
+      "venue": "Journal of the Acoustical Society of America 149(3)",
+      "publication_date": "2021-03",
+      "discovered_date": "2026-10-13",
+      "urls": [
+        "https://pubmed.ncbi.nlm.nih.gov/33765749/",
+        "https://arxiv.org/abs/2006.06153"
+      ],
+      "reading_depth": "metadata_and_abstract_only",
+      "status": "queued_for_full_review",
+      "citation_check": "partial",
+      "abstract_reported_results": {
+        "RMSE_aggregate": 0.49,
+        "Pearson_r_aggregate": 0.864
+      },
+      "bounded_conclusion": "Aggregate abstract-level performance is not a per-clip acceptance threshold or project-transfer result."
+    }
+  ],
+  "artifact_audits_update": [
+    {
+      "id": "ART-ML-20261013-1500-01",
+      "source": "SRC-ML-20261013-1500-01",
+      "repository": "https://github.com/heavylight-industries/capicola",
+      "observed_commit": "8c64e855fac64054fdb38451db00866ea682d0d8",
+      "release_observed": "1.1.0",
+      "license": "AGPL-3.0",
+      "audited_blobs": {
+        "lib/KeyframeRecorder.h": "564c4a6eccebe86a83c2c4a30637c318a97f78cb",
+        "lib/Analyzer.h": "97678f697c8c6f53ce88d33ab042ca3e0dc8ef48",
+        "lib/Granule.h": "9b9f67a02942b72de7c4012d776b485e05fe0906"
+      },
+      "additional_files": [
+        "tests/host/capicola_tests.cpp",
+        "tests/host/CMakeLists.txt",
+        "tests/host/blend_render.cpp",
+        "src/main.cpp"
+      ],
+      "status": "code_audited_not_executed_current_firmware_not_paper_baseline",
+      "version_parity_with_paper_baseline": "failed_or_unverified",
+      "ci_observed": false,
+      "executed": false,
+      "reproduced": false,
+      "host_test_scope": "synthetic_sine_transient_finite_bounds_direction_and_accelerated_fuzz_not_sample_null",
+      "neutral_unity_harness_available": false,
+      "blend_render_hardcoded": {
+        "stretch": 0.6,
+        "pitch_semitones": 3,
+        "threshold": 0.001,
+        "leash_samples": 128,
+        "fade_samples": 960,
+        "transient_threshold": 2,
+        "block_size": 64
+      },
+      "observed_live_defaults": {
+        "pitch": 1,
+        "stretch": 1,
+        "leash_samples": 128,
+        "analyzer_threshold": 0.001,
+        "fade_samples": 2400,
+        "fade_ms_at_48kHz": 50
+      },
+      "transfer_limits": [
+        "current_transient_driven_multigrain_not_in_paper_public_baseline_examples",
+        "host_tests_not_executed",
+        "unity_test_not_null",
+        "no_target_host_or_music_render",
+        "AGPL_legal_review_required"
+      ]
+    }
+  ],
+  "knowledge_cards_add": [
+    {
+      "id": "KC-ML-20261013-1800-01",
+      "claim": "Paper, examples and current firmware are different evidence objects when current code adds transient-driven multi-grain slicing.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1800-02",
+      "claim": "A bounded sine/RMS host test does not establish sample-null or transparent music round-trip behaviour.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1800-03",
+      "claim": "TSM preference changes with material and ratio direction; engine choice must be stratified.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1800-04",
+      "claim": "Mono short level-normalized clips do not validate stereo/multitrack phase, raw gain or full-song rock transfer.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1800-05",
+      "claim": "Aggregate objective-to-MOS correlation cannot serve as a per-clip acceptance threshold without calibration.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261013-1800-06",
+      "claim": "Near-unity subjective labels containing a known implementation bug cannot calibrate a 1.0x identity test.",
+      "confidence": "high"
+    }
+  ],
+  "rules_update": [
+    {
+      "id": "RULE-ML-20261013-1500-01",
+      "name": "time_stretch_content_class_ratio_shadow_only",
+      "when": "project_owned_pre_mix_editing_with_instrument_role_section_ratio_and_pinned_executable_declared",
+      "prerequisites": [
+        "target_host_tests_pass",
+        "unity_null_exposed_vocal",
+        "unity_null_drum_or_percussion",
+        "constant_latency_measured_and_frozen"
+      ],
+      "change": "shadow_only_one_engine_one_fixed_ratio_after_unity_controls_pass",
+      "numbers_origin": "paper_ratios_and_capicola_defaults_are_provenance_not_presets; objective_abstract_scores_not_gates",
+      "protect": [
+        "groove",
+        "attacks",
+        "consonants",
+        "pitch_formant_intent",
+        "cymbal_decay",
+        "stereo_phase_image",
+        "noise_floor",
+        "boundaries"
+      ],
+      "verify": "raw_constant_delay_aligned_diagnostics_plus_separate_BS1770_matched_true_peak_safe_blind_listening_by_content_class",
+      "cancel": [
+        "either_class_failure",
+        "repeat_or_click",
+        "attack_consonant_formant_cymbal_or_stereo_regression",
+        "time_varying_alignment_required",
+        "loudness_only_preference",
+        "manifest_version_mismatch",
+        "unreviewed_license_exposure"
+      ],
+      "confidence": "medium_low_for_project_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_update": [
+    {
+      "id": "EXP-ML-20261013-1500-01",
+      "name": "time_stretcher_unity_roundtrip_null",
+      "status": "not_run_blocked",
+      "material": [
+        "sealed_project_owned_exposed_vocal_phrase",
+        "sealed_project_owned_snare_drum_or_percussion_phrase"
+      ],
+      "A": "source_bypass_frozen_chain",
+      "B": "same_source_through_pinned_engine_at_1.0x",
+      "only_factor": "candidate_engine_round_trip_off_on",
+      "latency_stage": "measure_impulse_marker_then_freeze_one_constant_delay; no_time_varying_warp_or_gain_fit_for_raw_metrics",
+      "raw_measurements": [
+        "constant_aligned_difference_residual",
+        "boundary_click_repeat_scan",
+        "true_peak",
+        "section_loudness",
+        "spectral_formant_proxy",
+        "F0_continuity",
+        "transient_timing",
+        "stereo_correlation_phase_if_stereo"
+      ],
+      "listening": "separate_BS1770_matched_true_peak_safe_randomized_blind_three_Dmitry_passes_solo_and_mix_each_class",
+      "success": "no_repeatable_audible_regression_on_either_class_and_all_predeclared_thresholds_pass",
+      "cancel": [
+        "repeatable_click_or_repeat",
+        "attack_consonant_formant_cymbal_stereo_regression",
+        "unexplained_residual",
+        "time_varying_alignment_need",
+        "loudness_mismatch",
+        "manifest_drift"
+      ],
+      "blockers": [
+        "executable_build",
+        "exact_commit_mode_parameters",
+        "two_sealed_excerpts",
+        "thresholds",
+        "blind_key",
+        "license_review_if_Capicola"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos_add": [],
+  "videos_studied": [],
+  "references_promoted": [],
+  "multitracks_promoted": [],
+  "experiments_run": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_manifest_and_thresholds_for_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_review_VID-ML-20261013-0900-01/02",
+    "transcript_review_VID-ML-20261013-1500-01/02/03",
+    "full_review_DOI:10.1121/10.0003753",
+    "build_run_pinned_Capicola_host_tests_after_toolchain_and_license_approval",
+    "freeze_then_conditionally_run_EXP-ML-20261013-1500-01_after_higher_priority_tasks",
+    "existing_blocked_experiments_and_metadata_only_video_queue"
+  ],
+  "citation_check": "partial"
+}
