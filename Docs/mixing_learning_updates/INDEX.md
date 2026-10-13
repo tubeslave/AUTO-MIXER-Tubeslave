@@ -550,3 +550,11 @@ ML-2026-10-12-1800 (deep_review, source search ML-2026-10-12-1500): a full-covar
 | ML-2026-10-13-0900 | [Report](ML-2026-10-13-0900.md) · [JSON patch](ML-2026-10-13-0900.json) · [ADR](../adr/mixing-learning-2026-10-13-0900.md) | Search: 1 fresh full-text pitch-correction preprint plus public-demo audit, 2 abstract-only fresh candidates, 8 Knowledge Cards, 1 bounded shadow-only rule, 1 blocked A/B, 0 studied and 2 new metadata-only queued videos, 1 rights-review multitrack candidate; 7 duplicate IDs removed; no audio, DSP or runtime change |
 
 ML-2026-10-13-0900 (search, preceding successful search ML-2026-10-12-1500): separate whether-to-edit from offset choice and evaluate repair plus clean-note harm. The fresh preprint supports a bounded symbolic hypothesis, not automatic vocal tuning; private evaluation, shared transcription/resynthesis, unavailable code/data and untested expressive/full-mix transfer remain limits. Two new videos remain metadata-only because transcripts were unavailable; their official articles were read separately. CoExist multitracks remain rights-review only. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-13 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-13-1200 | [Report](ML-2026-10-13-1200.md) · [JSON patch](ML-2026-10-13-1200.json) · [ADR](../adr/mixing-learning-2026-10-13-1200.md) | Deep review: full BERT-APC comparator plus public-demo/repository audit and independent full ICASSP metric-validity paper; 2 Source Cards, 1 Artifact Audit, 6 Knowledge Cards, 1 narrowed rule and 1 renderer-null-gated blocked A/B; no video/reference/audio/DSP/runtime change |
+
+ML-2026-10-13-1200 (deep_review, source search ML-2026-10-13-0900): context improves target-note RPA under the reported protocol, but sample-level split independence, expression equivalence and executable reproducibility remain unresolved. Pitch accuracy can diverge from naturalness; a zero-shift renderer null and listener/excerpt-aware inference now precede any non-zero edit. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
