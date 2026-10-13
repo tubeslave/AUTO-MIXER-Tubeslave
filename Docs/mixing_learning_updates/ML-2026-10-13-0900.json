@@ -1,0 +1,178 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-13-0900",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-13T09:00:00+03:00",
+  "actual_start_msk": "2026-10-13T09:04:00+03:00",
+  "report_fixed_msk": "2026-10-13T09:10:06+03:00",
+  "preceding_successful_search": "ML-2026-10-12-1500",
+  "previous_update": "ML-2026-10-12-1800",
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261013-0900-01",
+      "title": "Reference-Free Singing Pitch Correction via Music-Constrained Sequence Editing",
+      "canonical_id": "arxiv:2610.11524v1",
+      "doi": "10.48550/arXiv.2610.11524",
+      "doi_status": "arxiv_datacite_pending_registration",
+      "publication": "preprint_submitted_to_ICASSP_2027",
+      "publication_date": "2026-10-08",
+      "discovered_date": "2026-10-13",
+      "urls": [
+        "https://arxiv.org/abs/2610.11524",
+        "https://arxiv.org/html/2610.11524",
+        "https://arxiv.org/pdf/2610.11524",
+        "https://dongb001.github.io/RF-SPC/"
+      ],
+      "reading_depth": "full_experimental_html+full_5_page_pdf+full_project_page",
+      "citation_check": "partial",
+      "limitations": [
+        "preprint_not_peer_reviewed",
+        "private_paired_evaluation",
+        "professional_reference_not_absolute_truth",
+        "a_cappella_not_dense_rock_mix",
+        "integer_semitone_symbolic_edits",
+        "shared_transcriber_and_vocoder",
+        "subjective_means_without_reported_inference",
+        "no_public_code_checkpoint_or_dataset",
+        "project_page_placeholder_author_metadata"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261013-0900-Q01",
+      "title": "STEMMA: Song-to-Stem Multi-Audio Reasoning for Large Audio Language Models",
+      "canonical_id": "arxiv:2610.11884v1",
+      "publication_date": "2026-10-08",
+      "discovered_date": "2026-10-13",
+      "doi": "10.48550/arXiv.2610.11884",
+      "url": "https://arxiv.org/abs/2610.11884",
+      "reading_depth": "metadata+abstract_only",
+      "status": "queued_source"
+    },
+    {
+      "id": "SRC-ML-20261013-0900-Q02",
+      "title": "How Much Audio Is Left In An Embedding? An Inversion Audit Of Audio Encoders",
+      "canonical_id": "arxiv:2610.12250v1",
+      "publication_date": "2026-10-08",
+      "discovered_date": "2026-10-13",
+      "doi": "10.48550/arXiv.2610.12250",
+      "url": "https://arxiv.org/abs/2610.12250",
+      "reading_depth": "metadata+abstract_only",
+      "status": "queued_source"
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261013-0900-01",
+      "source": "SRC-ML-20261013-0900-01",
+      "status": "demo_available_code_checkpoint_private_eval_unavailable",
+      "executed": false,
+      "reproduced": false,
+      "audio_downloaded": false
+    }
+  ],
+  "video_source_cards_add": [
+    {
+      "id": "VID-ML-20261013-0900-01",
+      "youtube_id": "s-Edt0D3364",
+      "title": "DAW Vs Tape: Mixing with Bradley Cook",
+      "url": "https://www.youtube.com/watch?v=s-Edt0D3364",
+      "publisher": "Produce Like A Pro",
+      "publication_date": "2025-12-04",
+      "reading_depth": "metadata_only_transcript_unavailable",
+      "status": "queued_source",
+      "official_companion_article": "https://producelikeapro.com/blog/mixing-on-the-edge-inside-a-tape-vs-daw-session-with-bradley-cook/",
+      "companion_article_depth": "full_text"
+    },
+    {
+      "id": "VID-ML-20261013-0900-02",
+      "youtube_id": "Ucws5v87uDI",
+      "title": "Mixing Victor Indrizzo With Dan Kalisher: CoExist",
+      "url": "https://www.youtube.com/watch?v=Ucws5v87uDI",
+      "publisher": "Produce Like A Pro",
+      "publication_date": "2026-09-16",
+      "reading_depth": "metadata_only_transcript_unavailable",
+      "status": "queued_source",
+      "official_companion_article": "https://producelikeapro.com/blog/inside-the-mix-of-coexist-with-dan-kalisher-and-victor-indrizzo/",
+      "companion_article_depth": "full_text"
+    }
+  ],
+  "reference_cards_add": [
+    {
+      "id": "REF-ML-20261013-0900-01",
+      "title": "Addison Shae - CoExist multitracks",
+      "url": "https://producelikeapro.lpages.co/addison-shea-coexist-form/",
+      "status": "rights_review",
+      "raw_audio_available": false,
+      "downloaded": false,
+      "blocker": "no_file_level_license_or_reuse_terms_visible_on_public_form"
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261013-0900-01","claim":"Separate whether-to-edit from which-offset selection to reduce blanket changes; evidence is pipeline-specific.","confidence":"medium"},
+    {"id":"KC-ML-20261013-0900-02","claim":"Report both error repair and initially-correct-note harm; accuracy alone is insufficient.","confidence":"high_within_protocol"},
+    {"id":"KC-ML-20261013-0900-03","claim":"Soft tonal reranking with an unchanged candidate is safer evidence than hard key snapping in this study.","confidence":"medium"},
+    {"id":"KC-ML-20261013-0900-04","claim":"A professional performance is a reference, not absolute expressive-pitch ground truth.","confidence":"high"},
+    {"id":"KC-ML-20261013-0900-05","claim":"Integer-semitone symbolic editing does not validate preservation of microtonal expressive details or formants.","confidence":"high"},
+    {"id":"KC-ML-20261013-0900-06","claim":"Subjective means without reported inference do not establish a reliable preference difference.","confidence":"high"},
+    {"id":"KC-ML-20261013-0900-07","claim":"Tape and saturation demonstrations require raw level-matched controls before causal attribution.","confidence":"high"},
+    {"id":"KC-ML-20261013-0900-08","claim":"A gated fully-wet short-room return is a section- and source-dependent ambience option, not a default chain.","confidence":"medium_low"}
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261013-0900-01",
+      "name": "vocal_pitch_sparse_edit_shadow_only",
+      "applies_when": "project-owned exposed lead vocal; section role declared; stable note; one gross error independently approved; no intentional expressive pitch target",
+      "change": "compare bypass with one sealed note-region and one fixed integer-semitone offset; never hard-snap the full performance",
+      "proposed_range": "one manually justified +/-1 semitone edit for first project test",
+      "range_origin": "engineering_safety_hypothesis_within_source_candidate_set_0_+/-1_+/-2_+/-3",
+      "protected_qualities": ["timing","groove","consonants","formants","timbre","vibrato","transition_continuity","harmony_role","emotion","true_peak","section_loudness"],
+      "verify": "unmatched raw renders plus separate BS.1770-matched true-peak-safe blinded solo and full-mix copies",
+      "cancel": "uncertain target, expressive-intent conflict, artifact, protected regression, loudness-only benefit, or worse harmony/section role",
+      "confidence": "medium_low_for_project_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261013-0900-01",
+      "status": "not_run_blocked",
+      "material": "project-owned Logoped - Pena exposed lead-vocal phrase selected after role-aware review",
+      "baseline_A": "current approved unedited pitch state",
+      "variant_B": "identical source with one sealed note-region/offset manifest enabled",
+      "factor": "one-note correction manifest off/on",
+      "controls": ["renderer","timing","gain","automation","all_other_processing"],
+      "raw_measurements": ["note_median_F0","target_deviation","boundary_discontinuity","vibrato_rate_extent","formant_spectral_proxy","true_peak","section_loudness"],
+      "loudness_match": "separate section-wise BS.1770-matched true-peak-safe randomized blinded copies; raw renders preserved",
+      "success": "B preferred at least 2_of_3 full-mix passes and target deviation improves with no protected regression",
+      "cancel": "target ambiguity, expressive-intent conflict, artifact, protected regression, loudness-only benefit, worse harmony/role, or inconsistent preference",
+      "blockers": ["sealed_note_region_target_offset_manifest","sealed_listening_key"],
+      "auto_apply": false
+    }
+  ],
+  "duplicates_removed": [
+    "arxiv:2608.05442",
+    "arxiv:2608.05506",
+    "arxiv:2608.30559",
+    "youtube:b9qBHnlw4Gc",
+    "youtube:wSNdwTi6xsc",
+    "youtube:0jZCqDwIpgw",
+    "youtube:2uFh8yUKdOg"
+  ],
+  "queue_priority": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "DEEP-REVIEW-arxiv:2610.11524-comparator-subjective-stats-artifacts",
+    "ART-ML-20261012-1500-01",
+    "EXP-ML-20261012-1800-01",
+    "DEEP-REVIEW-arxiv:2610.12250",
+    "DEEP-REVIEW-arxiv:2610.11884",
+    "RIGHTS-AUDIT-REF-ML-20261013-0900-01",
+    "TRANSCRIPT-REVIEW-VID-ML-20261013-0900-01/02",
+    "EXP-ML-20261013-0900-01",
+    "existing_bass_restoration_rir_blocked_experiments_and_metadata_only_youtube_queue"
+  ],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "mutations": {"audio":false,"dsp":false,"runtime":false,"models":false},
+  "auto_apply": false
+}
+
