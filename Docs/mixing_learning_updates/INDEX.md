@@ -567,3 +567,12 @@ ML-2026-10-13-1200 (deep_review, source search ML-2026-10-13-0900): context impr
 | ML-2026-10-13-1500 | [Report](ML-2026-10-13-1500.md) · [JSON patch](ML-2026-10-13-1500.json) · [ADR](../adr/mixing-learning-2026-10-13-1500.md) | Search: 1 previously missing full DAFx26 time-stretch source, 1 pinned public-code audit, 5 Knowledge Cards, 1 bounded rule, 1 blocked unity-round-trip A/B, 0 studied and 3 metadata-only queued mastering videos, 0 new multitracks; 3 video duplicates removed |
 
 ML-2026-10-13-1500 (search, predecessor ML-2026-10-13-1200): extrema/keyframe stretching is retained only as a creative/embedded candidate. Its representation loss and poor singing-voice preference require a bypass-versus-1.0x null before any timing test. Capicola was pinned but not executed; videos remain transcript-unverified. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-13 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-13-1800 | [Report](ML-2026-10-13-1800.md) · [JSON patch](ML-2026-10-13-1800.json) · [ADR](../adr/mixing-learning-2026-10-13-1800.md) | Deep review: pinned Capicola file/test audit plus 1 independent full subjective TSM source and 1 metadata/abstract-only objective-metric candidate; 6 Knowledge Cards, 1 narrowed rule and 1 expanded blocked unity A/B; no video/reference/audio/DSP/runtime change |
+
+ML-2026-10-13-1800 (deep_review, source search ML-2026-10-13-1500): current Capicola 1.1.0 adds transient-driven multi-grain behaviour not covered by the paper's public baseline examples, and its synthetic host tests are not a sample-null. Independent listener evidence makes TSM choice content- and ratio-conditioned. The revised null freezes one executable and checks both exposed vocal and percussion with constant-delay-only raw alignment before any non-unity test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
