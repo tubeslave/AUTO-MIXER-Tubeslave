@@ -558,3 +558,12 @@ ML-2026-10-13-0900 (search, preceding successful search ML-2026-10-12-1500): sep
 | ML-2026-10-13-1200 | [Report](ML-2026-10-13-1200.md) · [JSON patch](ML-2026-10-13-1200.json) · [ADR](../adr/mixing-learning-2026-10-13-1200.md) | Deep review: full BERT-APC comparator plus public-demo/repository audit and independent full ICASSP metric-validity paper; 2 Source Cards, 1 Artifact Audit, 6 Knowledge Cards, 1 narrowed rule and 1 renderer-null-gated blocked A/B; no video/reference/audio/DSP/runtime change |
 
 ML-2026-10-13-1200 (deep_review, source search ML-2026-10-13-0900): context improves target-note RPA under the reported protocol, but sample-level split independence, expression equivalence and executable reproducibility remain unresolved. Pitch accuracy can diverge from naturalness; a zero-shift renderer null and listener/excerpt-aware inference now precede any non-zero edit. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-13 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-13-1500 | [Report](ML-2026-10-13-1500.md) · [JSON patch](ML-2026-10-13-1500.json) · [ADR](../adr/mixing-learning-2026-10-13-1500.md) | Search: 1 previously missing full DAFx26 time-stretch source, 1 pinned public-code audit, 5 Knowledge Cards, 1 bounded rule, 1 blocked unity-round-trip A/B, 0 studied and 3 metadata-only queued mastering videos, 0 new multitracks; 3 video duplicates removed |
+
+ML-2026-10-13-1500 (search, predecessor ML-2026-10-13-1200): extrema/keyframe stretching is retained only as a creative/embedded candidate. Its representation loss and poor singing-voice preference require a bypass-versus-1.0x null before any timing test. Capicola was pinned but not executed; videos remain transcript-unverified. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
