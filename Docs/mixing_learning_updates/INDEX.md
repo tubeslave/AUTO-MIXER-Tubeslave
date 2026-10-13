@@ -542,3 +542,11 @@ ML-2026-10-12-1500 (search, preceding successful search ML-2026-10-12-0900): inv
 | ML-2026-10-12-1800 | [Report](ML-2026-10-12-1800.md) · [JSON patch](ML-2026-10-12-1800.json) · [ADR](../adr/mixing-learning-2026-10-12-1800.md) | Deep review: full WASPAA Gaussian-prior paper plus pinned implementation/protocol audit; 1 Source Card, 5 Knowledge Cards, 1 narrowed shadow-only rule, 1 blocked prior off/on A/B and 1 DOI queue correction; no video/reference/audio/DSP/runtime change |
 
 ML-2026-10-12-1800 (deep_review, source search ML-2026-10-12-1500): a full-covariance Gaussian can regularize the fixed DiffVox search despite known non-normality, but it is not a faithful FX distribution. The 16-listener ranking was directional and not significant (p=.117). The next plan isolates only the prior term and adds a rare-style cancellation gate. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-13 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-13-0900 | [Report](ML-2026-10-13-0900.md) · [JSON patch](ML-2026-10-13-0900.json) · [ADR](../adr/mixing-learning-2026-10-13-0900.md) | Search: 1 fresh full-text pitch-correction preprint plus public-demo audit, 2 abstract-only fresh candidates, 8 Knowledge Cards, 1 bounded shadow-only rule, 1 blocked A/B, 0 studied and 2 new metadata-only queued videos, 1 rights-review multitrack candidate; 7 duplicate IDs removed; no audio, DSP or runtime change |
+
+ML-2026-10-13-0900 (search, preceding successful search ML-2026-10-12-1500): separate whether-to-edit from offset choice and evaluate repair plus clean-note harm. The fresh preprint supports a bounded symbolic hypothesis, not automatic vocal tuning; private evaluation, shared transcription/resynthesis, unavailable code/data and untested expressive/full-mix transfer remain limits. Two new videos remain metadata-only because transcripts were unavailable; their official articles were read separately. CoExist multitracks remain rights-review only. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
