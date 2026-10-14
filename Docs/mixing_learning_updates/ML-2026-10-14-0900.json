@@ -1,0 +1,360 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-14-0900",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-14T09:00:00+03:00",
+  "actual_start_msk": "2026-10-14T08:59:07+03:00",
+  "report_fixed_msk": "2026-10-14T09:02:35+03:00",
+  "previous_successful_search": "ML-2026-10-13-1500",
+  "immediate_predecessor": "ML-2026-10-13-1800",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false,
+    "training_run": false
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261014-0900-01",
+      "type": "peer_reviewed_proceedings",
+      "title": "Evaluating Dynamic Range Compressor Models Using Control-Voltage Measurements: An Approach and Dataset",
+      "authors": [
+        "Benjamin R. Thompson",
+        "Michael C. Heilemann"
+      ],
+      "canonical_ids": [
+        "arXiv:2606.18573",
+        "DAFx26_paper_30"
+      ],
+      "publication_date_range": "2026-06-17/2026-09-04",
+      "discovered_date": "2026-10-14",
+      "urls": [
+        "https://www.dafx.de/paper-archive/2026/papers/DAFx26_paper_30.pdf",
+        "https://arxiv.org/abs/2606.18573"
+      ],
+      "license": "CC-BY-4.0",
+      "reading_depth": "full_8_page_paper",
+      "citation_check": "partial",
+      "methods": {
+        "architecture": "modified_torchcomp_peak_detector_shared_stereo_gain",
+        "optimized_parameters": [
+          "threshold",
+          "ratio",
+          "attack",
+          "release",
+          "makeup_gain"
+        ],
+        "models_per_loss": 10,
+        "training_clip_seconds": 30,
+        "steps": 3000,
+        "losses": [
+          "gain_reduction_L1",
+          "waveform_L1",
+          "MSTE"
+        ],
+        "split": "same_example_fit_and_evaluation_no_generalization_test"
+      },
+      "key_results": {
+        "direct_gain_L1_trained_gain_dB": 0.0869,
+        "direct_gain_L1_trained_waveform_dB": 0.1493,
+        "direct_gain_L1_trained_MSTE_dB": 0.1615,
+        "error_spread_direct_gain_fraction": 0.859,
+        "error_spread_waveform_L1_fraction": 0.028,
+        "error_spread_MSTE_fraction": 0.133
+      },
+      "bounded_conclusion": "Direct gain-trajectory supervision distinguishes compressor behavior that waveform proxies can obscure under this same-example protocol.",
+      "limitations": [
+        "no_train_validation_split",
+        "no_generalization_claim",
+        "no_listening_test",
+        "simplified_hard_knee_single_pole_model",
+        "restricted_10_to_1_and_fixed_release",
+        "no_final_mix_preference_test"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261014-0900-02",
+      "type": "official_editorial_companion",
+      "title": "Mixing Mike Mangini’s Drums With Dan Malsch",
+      "author": "Warren Huart",
+      "publisher": "Produce Like A Pro",
+      "publication_date": "2026-07-27",
+      "discovered_date": "2026-10-14",
+      "url": "https://producelikeapro.com/blog/mixing-mike-manginis-drums-with-dan-malsch/",
+      "linked_video_key": "youtube:0jZCqDwIpgw",
+      "reading_depth": "full_official_companion_article_video_not_obtained",
+      "citation_check": "partial",
+      "bounded_conclusion": "In one dense metal mix without dedicated room mics, a parallel crush return supplied density/ambience, while gating was limited to protect ghost notes and movement.",
+      "limitations": [
+        "single_engineer_single_song",
+        "editorial_not_controlled_study",
+        "no_transferable_attack_release_ratio_or_return_level",
+        "course_multitracks_not_free_raw_access"
+      ]
+    }
+  ],
+  "reference_cards_add": [
+    {
+      "id": "REF-ML-20261014-0900-01",
+      "type": "paired_hardware_compressor_benchmark",
+      "title": "SSL Bus Compressor Control Voltage Dataset",
+      "canonical_id": "DOI:10.60593/ur.d.31892026",
+      "doi": "10.60593/ur.d.31892026",
+      "urls": [
+        "https://rochester.figshare.com/articles/dataset/SSL_Bus_Compressor_Control_Voltage_Dataset/31892026",
+        "https://huggingface.co/datasets/bthomp23/SSL_bus_compressor_control_voltage_dataset"
+      ],
+      "license": "CC-BY-4.0",
+      "availability": "metadata_card_and_selective_files_accessible_full_snapshot_not_downloaded",
+      "size_approx_gb": 267,
+      "examples": 19710,
+      "input_clips": 219,
+      "permutations": 90,
+      "sample_rate_hz": 44100,
+      "audio_bit_depth": 24,
+      "control_bit_depth": 32,
+      "input_output_alignment": "within_one_sample_with_MLS_calibration",
+      "source_preprocessing": [
+        "10ms_boundary_fades",
+        "peak_normalized_to_0.9"
+      ],
+      "safety": "control_WAVs_are_not_audio_may_have_large_DC_never_route_to_monitors",
+      "status": "legal_paired_benchmark_queued_for_deep_manifest_audit"
+    }
+  ],
+  "knowledge_cards_add": [
+    {
+      "id": "KC-ML-20261014-0900-01",
+      "claim": "Output-waveform agreement can hide compressor-control errors when filtering, phase and noise are entangled with gain modulation.",
+      "confidence": "high_for_protocol"
+    },
+    {
+      "id": "KC-ML-20261014-0900-02",
+      "claim": "Direct gain-trajectory supervision separated the fitted models more clearly, but same-example fitting does not establish generalization.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261014-0900-03",
+      "claim": "Gain-trajectory accuracy is a behavioral endpoint, not a substitute for listening or tone/color evaluation.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261014-0900-04",
+      "claim": "Nominal attack/release/threshold labels need not equal effective hardware behavior; topology and program dependence matter.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261014-0900-05",
+      "claim": "A parallel drum return can supply room-like density when usable room microphones are absent, but can also magnify cymbal wash.",
+      "confidence": "medium_engineer_specific"
+    },
+    {
+      "id": "KC-ML-20261014-0900-06",
+      "claim": "Drum gating should be checked against ghost notes, soft articulations and groove rather than maximized for isolation.",
+      "confidence": "medium_high"
+    },
+    {
+      "id": "KC-ML-20261014-0900-07",
+      "claim": "Peak-normalized benchmark audio cannot define project loudness, crest or gain targets.",
+      "confidence": "high"
+    }
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261014-0900-01",
+      "name": "compressor_model_dual_endpoint_validation",
+      "source": "SRC-ML-20261014-0900-01",
+      "when": "validating_or_fitting_a_compressor_model_with_observable_gain_trajectory",
+      "change": "evaluate_direct_gain_trajectory_and_waveform_perceptual_endpoints_separately",
+      "numbers_origin": "paper_10_to_1_fixed_release_and_error_values_are_reproduction_metadata_not_mix_settings_or_gates",
+      "protect": [
+        "attacks",
+        "release_shape",
+        "stereo_linking",
+        "tone_color",
+        "true_peak",
+        "loudness",
+        "noise"
+      ],
+      "verify": "song_disjoint_held_out_direct_gain_error_raw_waveform_spectral_diagnostics_and_loudness_matched_listening",
+      "cancel": [
+        "training_only_improvement",
+        "gain_error_improves_but_tone_or_transients_regress",
+        "alignment_mismatch",
+        "topology_mismatch"
+      ],
+      "confidence": "medium_for_validation_workflow_low_for_mix_transfer",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261014-0900-02",
+      "name": "parallel_drum_ambience_when_room_missing_shadow_only",
+      "source": "SRC-ML-20261014-0900-02",
+      "when": "dense_rock_section_with_inadequate_usable_room_capture_and_acceptable_performance_intent",
+      "change": "add_one_frozen_parallel_drum_return_as_shadow_candidate",
+      "numbers_origin": "no_transferable_numeric_settings_source_values_song_specific_project_setup_required",
+      "protect": [
+        "original_kick_snare_identity",
+        "ghost_notes",
+        "groove",
+        "cymbal_decay_without_wash",
+        "bleed_balance",
+        "stereo_image",
+        "headroom"
+      ],
+      "verify": "raw_render_plus_separate_BS1770_matched_true_peak_safe_blind_solo_and_full_mix",
+      "cancel": [
+        "cymbal_or_bleed_pumping",
+        "smaller_transient",
+        "lost_ghost_notes",
+        "stereo_collapse",
+        "loudness_only_preference",
+        "vocal_or_guitar_masking"
+      ],
+      "confidence": "medium_low_engineer_specific",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261014-0900-01",
+      "name": "direct_control_loss_vs_waveform_proxy",
+      "status": "not_run_blocked",
+      "material": "small_CC_BY_song_disjoint_subset_REF-ML-20261014-0900-01",
+      "A": "frozen_architecture_trained_with_waveform_MSTE",
+      "B": "same_architecture_data_seed_steps_trained_with_direct_control_L1",
+      "only_factor": "training_loss",
+      "measurements": [
+        "held_out_gain_trajectory_MAE",
+        "waveform_L1_MSTE",
+        "attack_release_trajectory_error",
+        "true_peak",
+        "stereo_link_consistency",
+        "compute"
+      ],
+      "listening": "separate_loudness_matched_blind_held_out_audio_direct_control_never_auditioned",
+      "success": "B_improves_held_out_control_error_without_repeatable_audible_or_protected_quality_regression",
+      "cancel": [
+        "train_only_gain",
+        "song_leakage",
+        "topology_mismatch",
+        "unstable_alignment",
+        "perceptual_regression"
+      ],
+      "blockers": [
+        "selective_legal_file_manifest",
+        "local_reproducible_environment",
+        "song_disjoint_split",
+        "seed_config_lock",
+        "blind_key"
+      ],
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20261014-0900-02",
+      "name": "parallel_drum_ambience_on_off",
+      "status": "not_run_blocked",
+      "material": "one_sealed_project_owned_dense_chorus_with_insufficient_room_capture",
+      "A": "current_approved_drum_balance",
+      "B": "same_balance_plus_one_frozen_parallel_drum_return",
+      "only_factor": "parallel_return_off_on",
+      "measurements": [
+        "section_loudness",
+        "true_peak",
+        "crest_transient_proxy",
+        "cymbal_band_decay",
+        "stereo_correlation",
+        "bleed_sensitive_gaps"
+      ],
+      "listening": "BS1770_matched_true_peak_safe_randomized_blind_three_Dmitry_passes_drums_only_and_full_mix",
+      "success": "B_selected_at_least_2_of_3_without_protected_quality_regression",
+      "cancel": [
+        "louder_only_preference",
+        "cymbal_wash_or_pumping",
+        "lost_ghost_notes",
+        "smaller_attack",
+        "stereo_narrowing",
+        "vocal_or_guitar_masking"
+      ],
+      "blockers": [
+        "sealed_excerpt",
+        "frozen_send_sources_settings_return_level",
+        "thresholds",
+        "blind_key"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos_add": [
+    {
+      "id": "VID-ML-20261014-0900-01",
+      "stable_key": "youtube:0jZCqDwIpgw",
+      "title": "MIXING Mike Mangini DRUMS",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=0jZCqDwIpgw",
+      "companion_date": "2026-07-27",
+      "reading_depth": "metadata_only_video_official_companion_article_read_separately",
+      "status": "queued_source_no_transcript"
+    },
+    {
+      "id": "VID-ML-20261014-0900-02",
+      "stable_key": "youtube:af1m_FzPeEo",
+      "title": "Mixing DRUMS – Inside the Mixer’s Mind – Four Distinct Philosophies",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=af1m_FzPeEo",
+      "companion_date": "2025-08-13",
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript"
+    }
+  ],
+  "deduplication": [
+    {
+      "keys": [
+        "arXiv:2606.18573",
+        "DAFx26_paper_30"
+      ],
+      "resolution": "same_work_one_source_card"
+    },
+    {
+      "key": "DOI:10.60593/ur.d.31892026",
+      "resolution": "dataset_card_linked_to_source_not_independent_confirmation"
+    },
+    {
+      "key": "youtube:0jZCqDwIpgw",
+      "resolution": "new_exact_id"
+    },
+    {
+      "key": "youtube:af1m_FzPeEo",
+      "resolution": "new_exact_id"
+    }
+  ],
+  "fresh_search": {
+    "new_post_previous_search_relevant_papers": 0,
+    "older_missing_sources_added": 1,
+    "statement": "No relevant new post-ML-2026-10-13-1500 open paper survived search; this is not proof none exists."
+  },
+  "videos_studied": [],
+  "multitracks_promoted": [],
+  "experiments_run": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_manifest_and_thresholds_for_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_review_VID-ML-20261013-0900-01/02",
+    "transcript_review_VID-ML-20261013-1500-01/02/03",
+    "full_review_DOI:10.1121/10.0003753",
+    "pinned_Capicola_build_test_after_toolchain_license_approval",
+    "deep_review_SRC_REF-ML-20261014-0900-01_dataset_manifests_splits_torchcomp_parity",
+    "transcript_review_VID-ML-20261014-0900-01/02",
+    "freeze_EXP-ML-20261014-0900-01/02_after_higher_priority_tasks",
+    "existing_blocked_bass_restoration_RIR_experiments_and_metadata_only_video_queue"
+  ],
+  "citation_check": "partial"
+}

@@ -576,3 +576,11 @@ ML-2026-10-13-1500 (search, predecessor ML-2026-10-13-1200): extrema/keyframe st
 | ML-2026-10-13-1800 | [Report](ML-2026-10-13-1800.md) · [JSON patch](ML-2026-10-13-1800.json) · [ADR](../adr/mixing-learning-2026-10-13-1800.md) | Deep review: pinned Capicola file/test audit plus 1 independent full subjective TSM source and 1 metadata/abstract-only objective-metric candidate; 6 Knowledge Cards, 1 narrowed rule and 1 expanded blocked unity A/B; no video/reference/audio/DSP/runtime change |
 
 ML-2026-10-13-1800 (deep_review, source search ML-2026-10-13-1500): current Capicola 1.1.0 adds transient-driven multi-grain behaviour not covered by the paper's public baseline examples, and its synthetic host tests are not a sample-null. Independent listener evidence makes TSM choice content- and ratio-conditioned. The revised null freezes one executable and checks both exposed vocal and percussion with constant-delay-only raw alignment before any non-unity test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-14 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-14-0900 | [Report](ML-2026-10-14-0900.md) · [JSON patch](ML-2026-10-14-0900.json) · [ADR](../adr/mixing-learning-2026-10-14-0900.md) | Search: 1 previously missing full DAFx26 compressor-metric source, 1 verified CC-BY paired hardware benchmark, 1 fully read official drum-mixing companion article, 7 Knowledge Cards, 2 bounded rules, 2 blocked experiments and 2 metadata-only queued videos; no audio/DSP/runtime/model change |
+
+ML-2026-10-14-0900 (search, previous successful search ML-2026-10-13-1500): direct gain-control error can expose compressor-model differences that waveform proxies obscure, but the paper does not test held-out generalisation or listening quality. The new dataset is legal and available but not downloaded. Parallel drum ambience is retained only as a room-missing, engineer-specific shadow candidate. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
