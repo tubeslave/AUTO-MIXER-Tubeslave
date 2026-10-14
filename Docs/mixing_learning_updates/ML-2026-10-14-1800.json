@@ -1,0 +1,158 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-14-1800",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-14T18:00:00+03:00",
+  "actual_start_msk": "2026-10-14T18:00:14+03:00",
+  "report_fixed_msk": "2026-10-14T18:04:11+03:00",
+  "preceding_search_update_id": "ML-2026-10-14-1500",
+  "immediate_predecessor": "ML-2026-10-14-1500",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "checkpoint_downloaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "review_summary": {
+    "source_cards_added": 0,
+    "source_cards_updated": 1,
+    "existing_independent_sources_reused_without_duplication": 1,
+    "artifact_audits_updated": 2,
+    "knowledge_cards_added": 6,
+    "rules_revised": 1,
+    "experiments_revised": 1,
+    "videos_studied": 0,
+    "new_reference_cards": 0
+  },
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261014-1500-01",
+      "action": "update",
+      "canonical_id": "arXiv:2610.16416v1",
+      "reading_depth": "full_paper_plus_selected_data_loss_and_evaluation_code_plus_existing_independent_comparator",
+      "new_findings": [
+        "test_generation_is_seeded_but_output_omits_track_source_start_and_bitrate_provenance",
+        "no_nonoverlap_guard_found_for_multiple_excerpts_from_same_track",
+        "per_bitrate_regrouping_is_not_recoverable_from_numbered_test_outputs_alone",
+        "visqol_pipeline_downmixes_stereo_to_mono_before_scoring",
+        "sdr_and_si_snr_use_unclamped_model_output_while_pd_lsd_and_visqol_read_saved_clamped_audio",
+        "validation_source_disjointness_remains_unresolved",
+        "checkpoint_file_revision_and_sha256_remain_unverified"
+      ],
+      "bounded_conclusion": "objective_short_excerpt_MP3_restoration_results_do_not_support_automatic_use_or_mix_master_preference",
+      "citation_check": "partial"
+    }
+  ],
+  "existing_comparator_reused": [
+    {
+      "id": "SRC-ML-20260930-1500-01",
+      "stable_ids": ["doi:10.17743/jaes.2022.0277", "arxiv:2608.02918"],
+      "action": "cross_link_only_no_new_card",
+      "relevance": "at_32kbps_objective_ViSQOL_LSD_gains_for_two_variants_did_not_produce_significant_subjective_gain_over_low_bitrate_input",
+      "recorded_statistics": {
+        "low_vs_AEROMamba": "p=0.7390_not_significant",
+        "low_vs_AEROMamba_P": "p=0.8233_not_significant",
+        "no_STFT_variant_vs_each_other_system": "p<0.0001"
+      }
+    }
+  ],
+  "artifact_audits_update": [
+    {
+      "id": "ART-ML-20261014-1500-01",
+      "action": "update",
+      "url": "https://github.com/xinghour/MPASCNet",
+      "revision": "a93926cbedf820ef99db742b68121b1213a27202",
+      "status": "selected_code_read_not_run",
+      "selected_blobs_added": {
+        "data/create_test/create_test.py": "ef513bd4f71ede7a3957209da8cc1083b524a342",
+        "data/create_test/delete_overlap.py": "9eddbb94d101557b9096c3d7de5b87c7497fe6cb",
+        "data/create_train/merge.py": "6853d8ddd519f49217a2a6fa8ecabc760fb5ca00",
+        "losses/losses.py": "6a627a297750da882075accc19cc7deeec37d6cd",
+        "losses/pdlsd.py": "082a4dbefe8f2c6d0f9028fef311dd46746f6ac1",
+        "losses/visqol.py": "3a6a1b64d18aac822fcc750957be2448e3374044",
+        "models/wapper.py": "321edf35485d52b380ca3ab5ea78ca4f6d79ba47"
+      },
+      "integration_status": "blocked_pending_manifest_metric_parity_stereo_and_listening_gates"
+    },
+    {
+      "id": "ART-ML-20261014-1500-02",
+      "action": "update",
+      "url": "https://huggingface.co/Xinghour/MPASCNet",
+      "status": "metadata_only_checkpoint_manifest_unavailable",
+      "confirmed": ["repository_card_exists", "updated_2026-09-28", "declared_card_license_CC-BY-4.0"],
+      "attempts": ["hugging_face_connector_metadata_first", "hf_cli_unavailable_in_environment", "public_web_api_not_accessible_in_run"],
+      "blockers": ["checkpoint_filename_unverified", "revision_unverified", "sha256_unverified", "weight_terms_and_training_audio_rights_not_inferred"]
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261014-1800-01","claim":"Seeded evaluation without track time bitrate and hash provenance is not reproducible subgroup evidence.","confidence":"high"},
+    {"id":"KC-ML-20261014-1800-02","claim":"Multiple excerpts from one source track are not independent songs; source-grouped analysis is required.","confidence":"high"},
+    {"id":"KC-ML-20261014-1800-03","claim":"Mono-downmixed ViSQOL cannot validate stereo coherence.","confidence":"high"},
+    {"id":"KC-ML-20261014-1800-04","claim":"Metrics computed before and after output clipping are not directly comparable without parity reporting.","confidence":"high"},
+    {"id":"KC-ML-20261014-1800-05","claim":"Independent compressed-audio evidence shows objective quality gains can coexist with no significant subjective gain.","confidence":"high_within_existing_AEROMamba_test_low_for_cross_model_transfer"},
+    {"id":"KC-ML-20261014-1800-06","claim":"Checkpoint identity and rights plus source-disjoint validation are prerequisites for local restoration evidence.","confidence":"high_for_governance"}
+  ],
+  "rules_revise": [
+    {
+      "id": "RULE-ML-20261014-1500-01",
+      "action": "revise",
+      "when": "codec_and_bitrate_known_or_locally_controlled_checkpoint_code_environment_and_rights_pinned",
+      "change": "compare_restoration_off_on_only_without_concurrent_EQ_limiting_loudness_targeting_or_mastering",
+      "range_and_numbers_origin": "one_fixed_bitrate_and_encoder_build_per_AB; paper_24_to_128_kbps_are_dataset_conditions_not_mix_settings",
+      "protect": ["transients", "cymbal_texture", "consonants", "bass_definition", "noise_texture", "LR_MS_balance", "correlation", "true_peak", "section_intent"],
+      "verify": "raw_clamped_metric_parity_stereo_guard_and_BS1770_matched_blind_listening_with_hidden_lossless_reference",
+      "cancel": ["metric_only_win", "clipping_dependent_ranking", "stereo_drift", "pre_echo_or_warble", "repeatable_transient_or_timbre_regression", "manifest_drift"],
+      "confidence": "medium_low",
+      "auto_apply": false
+    }
+  ],
+  "experiments_revise": [
+    {
+      "id": "EXP-ML-20261014-1500-01",
+      "action": "revise",
+      "status": "not_run_blocked",
+      "prerequisites": ["checkpoint_filename_revision_sha256", "code_revision", "environment_lock", "encoder_decoder_versions", "project_owned_material", "source_time_bitrate_gain_delay_hash_manifest", "nonoverlapping_excerpts"],
+      "A": "fixed_locally_decoded_MP3_restoration_bypassed",
+      "B": "same_PCM_through_pinned_MPASCNet_checkpoint",
+      "only_factor": "restoration_off_on",
+      "material": "multiple_project_owned_rock_tracks_with_transient_rich_drums_cymbals_dense_guitars_bass_and_exposed_consonants",
+      "measurements": ["raw_and_saved_clamped_SDR_SI_SNR_LSD_phase", "ViSQOL_mono_diagnostic_only", "sample_overs_and_clipped_sample_count", "true_peak", "crest_and_onset_error", "LR_and_MS_delta", "stereo_correlation", "runtime", "VRAM"],
+      "loudness_alignment": "raw_diagnostic_pass_plus_separate_BS1770_matched_true_peak_safe_copies_with_common_pair_attenuation",
+      "listening": "randomized_blind_ABX_with_hidden_lossless_reference_and_Dmitry_excerpt_quality_ratings",
+      "success": "repeatable_listening_reduction_of_codec_artifacts_without_protected_regression_objective_metrics_supporting_only",
+      "cancel": ["metric_only_win", "clamp_changes_ranking", "stereo_transient_timbre_or_low_end_regression", "incomplete_manifest"],
+      "auto_apply": false
+    }
+  ],
+  "video_queue": {
+    "studied_this_run": 0,
+    "carried_without_promotion": ["VID-ML-20261014-1500-01", "VID-ML-20261014-1500-02"],
+    "reason": "deep_review_no_new_permitted_transcript_content"
+  },
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261014-1500-01/02_and_QUEUED-ML-20261014-1500-01",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}
