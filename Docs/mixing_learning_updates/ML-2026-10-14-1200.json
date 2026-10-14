@@ -1,0 +1,172 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-14-1200",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-14T12:00:00+03:00",
+  "actual_start_msk": "2026-10-14T11:59:29+03:00",
+  "report_fixed_msk": "2026-10-14T12:04:32+03:00",
+  "source_search": "ML-2026-10-14-0900",
+  "immediate_predecessor": "ML-2026-10-14-0900",
+  "policy": {
+    "free_open_sources_only": true,
+    "dataset_audio_downloaded": false,
+    "build_run": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "source_cards_update": [
+    {
+      "id": "SRC-ML-20261014-0900-01",
+      "reading_depth": "full_paper_re_read_methods_calibration_results_limits",
+      "citation_check": "partial",
+      "methods_verified": {
+        "models_per_loss": 10,
+        "clip_seconds": 30,
+        "hardware_permutations_used_for_fit": 5,
+        "steps": 3000,
+        "optimizer": "Adam_lr_0.01_ReduceLROnPlateau_factor_0.5_patience_25",
+        "waveform_prefilter": "H(z)=(1-z^-1)/(1-0.995z^-1)",
+        "detector": "peak_max_instantaneous_amplitude_across_stereo",
+        "stereo_link": "one_shared_gain_applied_to_left_and_right",
+        "evaluation": "same_example_fit_and_evaluation_no_generalization_test"
+      },
+      "dataset_verified": {
+        "input_clips": 219,
+        "hardware_permutations": 90,
+        "paired_examples": 19710,
+        "sample_rate_hz": 44100,
+        "normalization_peak": 0.9,
+        "boundary_fade_ms": 10,
+        "input_output_alignment": "within_one_sample",
+        "control_alignment": "separate_integer_or_fractional_lag_required",
+        "control_origin": "one_VCA_shared_stereo_control_with_small_calibration_scalar"
+      },
+      "limitations_add": [
+        "paper_torchcomp_patch_not_publicly_identified",
+        "effective_threshold_not_front_panel_or_ideal_threshold",
+        "control_measurement_does_not_validate_channel_specific_color_or_stereo_perception",
+        "threshold_makeup_augmentation_is_data_protocol_not_mix_setting"
+      ]
+    }
+  ],
+  "source_cards_deduplicated": [
+    {
+      "canonical_id": "arXiv:2504.04589",
+      "existing_id": "SRC-ML-20260914-0900-03",
+      "resolution": "reuse_existing_card_as_split_design_comparator_not_independent_confirmation"
+    }
+  ],
+  "reference_cards_update": [
+    {
+      "id": "REF-ML-20261014-0900-01",
+      "revision": "64f1aebb431da651fa0792956eade9516fb35ef3",
+      "viewer_semantics": "40577_flattened_audiofolder_file_rows_not_19710_paired_examples",
+      "viewer_size_approx_gb": 267,
+      "metadata_files_observed": [
+        "metadata_cal.parquet",
+        "metadata_cal_inputs.parquet",
+        "metadata_clips.parquet",
+        "metadata_comp_vals.parquet",
+        "metadata_main.parquet",
+        "metadata_permutation.parquet"
+      ],
+      "selected_sha256": {
+        "metadata_clips.parquet": "e2a1f73bb9ccd64afdb9c593b84fd9b5958ff6fd1c963f92b10041fc3b8a6b54",
+        "metadata_main.parquet": "d37d7e9f563fb48346d78a3fcc7fc969b16a6efa4760c2dcfe5317847e179c49",
+        "metadata_permutation.parquet": "9dac4480c8ffbe26864badbe957184a75ae59c954a185685c7bf93ab7f35e21b",
+        "metadata_comp_vals.parquet": "b9896dc300e67f55c2dccc7266a4e2e9a2a7a5e613f7b09f114cb959277fdde7"
+      },
+      "documentation_mismatch": "cc_calibration_summary.parquet_named_in_card_not_visible_in_checked_metadata_tree",
+      "split_contract": [
+        "join_documented_metadata_tables",
+        "derive_and_verify_original_song_identity",
+        "split_by_song_before_expanding_permutations",
+        "hold_out_hardware_settings_separately_for_parameter_generalization",
+        "never_split_viewer_rows_or_metadata_main_rows_randomly"
+      ],
+      "rights_note": "repository_and_Figshare_declare_CC_BY_4_0_upstream_track_terms_not_exposed_in_inspected_card_check_before_redistribution_or_commercial_use"
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261014-1200-01",
+      "name": "DiffAPF/torchcomp",
+      "url": "https://github.com/DiffAPF/torchcomp",
+      "revision": "d4851be94752eb777e683f17767f2cd6f0107d4b",
+      "version": "0.2.1",
+      "license": "MIT",
+      "status": "paper_patch_unreleased_stock_dependency_audited_not_run",
+      "findings": [
+        "stock_code_uses_RMS_detector",
+        "paper_peak_max_stereo_shared_gain_patch_not_in_public_main",
+        "tests_cover_gradients_and_vmap_not_hardware_or_audio_parity",
+        "environment_not_locked",
+        "README_examples_incomplete",
+        "ms2coef_convention_requires_frozen_unit_test"
+      ]
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261014-1200-01","claim":"AudioFolder viewer rows are files, not necessarily scientific examples; metadata defines joins and split units.","confidence":"high"},
+    {"id":"KC-ML-20261014-1200-02","claim":"Split compressor examples by original song before repeated hardware permutations to prevent source leakage.","confidence":"high"},
+    {"id":"KC-ML-20261014-1200-03","claim":"Audio I/O alignment does not establish control-trajectory alignment; freeze a separate CV-lag procedure.","confidence":"high"},
+    {"id":"KC-ML-20261014-1200-04","claim":"Public torchcomp cannot reproduce the paper experiment without the missing peak/stereo-link modification.","confidence":"high"},
+    {"id":"KC-ML-20261014-1200-05","claim":"Measured effective, front-panel and ideal-model thresholds are different quantities.","confidence":"high"},
+    {"id":"KC-ML-20261014-1200-06","claim":"A shared measured stereo control trajectory does not validate channel-specific color or perceptual stereo quality.","confidence":"high"}
+  ],
+  "rules_update": [
+    {
+      "id": "RULE-ML-20261014-0900-01",
+      "name": "compressor_model_dual_endpoint_validation_with_manifest_gate",
+      "when": "validating_compressor_models_against_paired_hardware_audio_and_observable_gain_trajectory",
+      "change": "compare_direct_gain_and_waveform_endpoints_after_manifest_split_alignment_and_implementation_parity_gates",
+      "numbers_origin": "paper_and_dataset_reproduction_metadata_not_mix_settings_or_universal_thresholds",
+      "protect": ["transient_shape","release_contour","stereo_linking_image","hardware_color","loudness","true_peak","noise","compute"],
+      "verify": "raw_held_out_diagnostics_plus_separate_BS1770_matched_true_peak_safe_blind_listening",
+      "cancel": ["viewer_rows_used_as_examples","song_leakage","test_tuned_alignment","unresolved_implementation_parity","train_only_gain","color_transient_or_stereo_regression"],
+      "confidence": "medium_for_validation_workflow_low_for_mix_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_update": [
+    {
+      "id": "EXP-ML-20261014-0900-01",
+      "status": "not_run_blocked",
+      "phase0": ["pin_revisions_and_hashes","resolve_missing_documented_metadata_file","verify_table_keys_and_song_identity","obtain_or_reconstruct_paper_patch","add_parity_and_alignment_tests"],
+      "material": "selective_CC_BY_subset_joined_through_metadata_not_viewer_split",
+      "split": "song_disjoint_train_validation_test_then_separate_hardware_setting_holdout",
+      "A": "frozen_architecture_waveform_MSTE",
+      "B": "same_architecture_examples_split_seed_optimizer_steps_direct_control_L1",
+      "only_factor": "training_loss",
+      "measurements": ["held_out_gain_MAE_after_frozen_CV_lag","waveform_L1_MSTE","attack_release_error","true_peak","stereo_link_consistency","DC_residual","compute"],
+      "listening": "hardware_output_vs_A_vs_B_held_out_songs_raw_diagnostics_and_separate_BS1770_matched_true_peak_safe_three_pass_Dmitry_blind_control_never_played",
+      "success": "B_improves_held_out_control_error_without_repeatable_protected_quality_regression",
+      "cancel": ["leakage","manifest_drift","test_tuned_alignment","topology_mismatch","missing_parity","train_only_gain","repeatable_listening_regression"],
+      "auto_apply": false
+    }
+  ],
+  "videos_added": [],
+  "videos_promoted": [],
+  "reference_audio_downloaded": [],
+  "experiments_run": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_2026-10-13_and_VID-ML-20261014-0900-01/02",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ],
+  "citation_check": "partial"
+}
+
