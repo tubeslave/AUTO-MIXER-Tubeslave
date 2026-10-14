@@ -1,0 +1,206 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-14-1500",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-14T15:00:00+03:00",
+  "actual_start_msk": "2026-10-14T14:55:36+03:00",
+  "report_fixed_msk": "2026-10-14T15:01:19+03:00",
+  "previous_successful_search": "ML-2026-10-14-0900",
+  "immediate_predecessor": "ML-2026-10-14-1200",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "build_run": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261014-1500-01",
+      "canonical_id": "arXiv:2610.16416v1",
+      "title": "MPASCNet: Magnitude-Phase-Aware Adaptive Spectral Compression for Compressed Music Restoration",
+      "url": "https://arxiv.org/abs/2610.16416",
+      "full_text_url": "https://arxiv.org/html/2610.16416v1",
+      "date_published": "2026-10-12",
+      "date_discovered": "2026-10-14",
+      "publication_status": "preprint_submitted_to_ICASSP_2027",
+      "reading_depth": "full_html_methods_results_ablation_limitations_plus_selected_code",
+      "citation_check": "partial",
+      "task": "low_bitrate_MP3_restoration",
+      "not_evidence_for": ["mix_quality", "mastering_preference", "source_reconstruction", "automatic_application"],
+      "methods": {
+        "spectral_tokens": 80,
+        "blocks": 6,
+        "parameters_millions": 6.49,
+        "sample_rate_hz": 44100,
+        "segment_seconds": 3,
+        "n_fft": 882,
+        "hop_samples": 441,
+        "bitrates_kbps": [24, 32, 48, 64, 96, 128],
+        "training_sources": ["MUSDB18-HQ", "MoisesDB"],
+        "evaluation_source": "MedleyDB_after_46_overlap_tracks_removed_150_tracks_retained",
+        "evaluation_conditions": ["Multi-Stem_500", "Single-Stem_500", "Vocal_500"],
+        "loss_weights": {"magnitude": 1.2, "phase": 0.3, "complex": 0.1, "stft": 0.1, "waveform": 0.2}
+      },
+      "author_reported_results": {
+        "MPASCNet": {"SDR_dB": 17.65, "SI_SNR_dB": 17.27, "ViSQOL": 3.67, "phase_distance_deg": 13.80, "LSD": 0.92},
+        "Apollo": {"SDR_dB": 16.61, "SI_SNR_dB": 15.77, "ViSQOL": 3.60, "phase_distance_deg": 14.88, "LSD": 1.04},
+        "AEROMamba": {"SDR_dB": 16.26, "SI_SNR_dB": 15.73, "ViSQOL": 3.49},
+        "MP3_input": {"SDR_dB": 13.92, "SI_SNR_dB": 12.22, "ViSQOL": 3.02}
+      },
+      "limitations": [
+        "no_human_listening_test",
+        "short_synthetic_MP3_degradations",
+        "no_real_delivery_chain_or_full_song_test",
+        "independent_channel_processing_no_explicit_stereo_coherence",
+        "validation_generated_from_merged_training_data_without_source_disjoint_manifest_in_inspected_code",
+        "very_recent_no_independent_replication_found"
+      ]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261014-1500-01",
+      "name": "xinghour/MPASCNet",
+      "url": "https://github.com/xinghour/MPASCNet",
+      "revision": "a93926cbedf820ef99db742b68121b1213a27202",
+      "license": "Apache-2.0",
+      "status": "selected_code_read_not_run",
+      "selected_blobs": {
+        "README.md": "a2af28c1b7320f4c7264e0cb1b77b522db290fe4",
+        "config.json": "05e5d20aa79343ec56755144f0a035bec65f5217",
+        "data/create_val.py": "10d88ab7ebf806b3d65eb59cc2a304cb1bebb027",
+        "data/dataset.py": "2f2b082f604a867995096cba5a6ce890a04fe7cf",
+        "inference.py": "50e89d65d49b6735b7bab74cc046b4eb0c705711",
+        "requirements.txt": "635d9fb69512a0457b111bbe3c5c9d3b9dd80c19",
+        "LICENSE": "1631810a14fa73d81af8a410285927c583084459"
+      },
+      "findings": [
+        "validation_script_samples_random_segments_from_merged_training_data",
+        "no_source_identity_manifest_in_validation_output",
+        "stereo_channels_flattened_and_processed_independently",
+        "python_packages_and_codec_tools_pinned",
+        "no_tests_or_CI_found_at_checked_revision"
+      ]
+    },
+    {
+      "id": "ART-ML-20261014-1500-02",
+      "name": "Xinghour/MPASCNet checkpoint",
+      "url": "https://huggingface.co/Xinghour/MPASCNet",
+      "updated": "2026-09-28",
+      "declared_card_license": "CC-BY-4.0",
+      "status": "model_card_metadata_only_checkpoint_files_unverified",
+      "blockers": ["checkpoint_filename_unverified", "revision_unverified", "sha256_unverified", "weight_terms_and_training_audio_rights_not_inferred"]
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261014-1500-01","claim":"Objective restoration gains on synthetic MP3 do not establish mix/master preference or source reconstruction.","confidence":"high"},
+    {"id":"KC-ML-20261014-1500-02","claim":"Three-second synthetic codec tests without listening limit transfer to full-song rock masters.","confidence":"high"},
+    {"id":"KC-ML-20261014-1500-03","claim":"Validation sampled from merged training data needs a source-disjoint manifest before model-selection claims are trusted.","confidence":"high_for_inspected_code_medium_for_unpublished_author_intent"},
+    {"id":"KC-ML-20261014-1500-04","claim":"Channel-flattened stereo inference provides no explicit cross-channel coherence guarantee.","confidence":"high"},
+    {"id":"KC-ML-20261014-1500-05","claim":"MPASCNet ablation metrics disagree, so metric choice changes the comparative conclusion.","confidence":"high"},
+    {"id":"KC-ML-20261014-1500-06","claim":"Code and checkpoint licences are distinct and do not establish training-audio rights.","confidence":"high"}
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261014-1500-01",
+      "name": "codec_restoration_shadow_only_with_reference_and_stereo_guard",
+      "source": "SRC-ML-20261014-1500-01",
+      "when": "rights_cleared_known_low_bitrate_MP3_damage_and_lossless_source_unavailable_or_controlled_research",
+      "change": "compare_pinned_restoration_off_on_locally_not_as_loudness_mastering_or_separation_stage",
+      "range_and_numbers_origin": "one_verified_checkpoint_and_one_fixed_bitrate_condition; paper_24_to_128_kbps_are_dataset_conditions_not_mix_settings",
+      "protect": ["transients", "cymbal_texture", "consonants", "bass_definition", "stereo_image", "correlation", "side_balance", "noise_texture", "loudness", "true_peak", "artistic_intent"],
+      "verify": "raw_known_reference_diagnostics_plus_separate_BS1770_matched_true_peak_safe_blind_listening_by_Dmitry",
+      "cancel": ["pre_echo_or_warble", "stereo_drift", "repeatable_transient_or_timbre_regression", "gain_only_preference", "checkpoint_hash_or_license_ambiguity", "no_known_reference"],
+      "confidence": "medium_for_narrow_synthetic_MP3_hypothesis_low_for_real_masters",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261014-1500-01",
+      "status": "not_run_blocked",
+      "prerequisites": ["immutable_checkpoint_filename_revision_sha256", "separate_code_checkpoint_license_record", "local_environment_lock", "project_owned_excerpts", "no_external_upload"],
+      "material": "project_owned_lossless_rock_excerpts_plus_one_fixed_locally_generated_MP3_degradation",
+      "A": "fixed_decoded_MP3_restoration_bypassed",
+      "B": "same_decoded_MP3_through_pinned_MPASCNet_checkpoint",
+      "only_factor": "restoration_off_on",
+      "measurements": ["SDR", "SI_SNR", "LSD", "phase_distance", "true_peak", "integrated_and_short_term_loudness", "crest_factor", "LR_and_MS_delta", "stereo_correlation", "onset_transient_error", "runtime", "VRAM"],
+      "listening": "raw_then_separate_BS1770_matched_true_peak_safe_ABX_with_hidden_lossless_reference_and_Dmitry_rating",
+      "success": "repeatable_codec_artifact_reduction_without_protected_quality_regression_or_gain_bias",
+      "cancel": ["repeatable_stereo_transient_consonant_cymbal_or_low_end_regression", "metric_only_win", "manifest_drift", "unknown_checkpoint_license_or_hash"],
+      "auto_apply": false
+    }
+  ],
+  "videos_add": [
+    {
+      "id": "VID-ML-20261014-1500-01",
+      "youtube_id": "wZwUGfsIiNI",
+      "title": "How to Add Punch to Rock and Metal Mixes",
+      "creator": "Andrew Barr",
+      "published": "2026-09-03",
+      "url": "https://www.youtube.com/watch?v=wZwUGfsIiNI",
+      "reading_depth": "partial_transcript_excerpt_plus_third_party_summary",
+      "status": "partially_studied_not_fully_studied",
+      "verification_required": ["all_numeric_settings", "plugin_and_control_names", "full_context"],
+      "extracted_candidate": "SSL_style_mix_bus_compression_slow_attack_fast_release_4_to_1_approximately_2_to_4_dB_GR_and_2_5_to_3_dB_makeup",
+      "rule_promotion": false
+    },
+    {
+      "id": "VID-ML-20261014-1500-02",
+      "youtube_id": "zbXzXktTxnQ",
+      "title": "How to Get LOUD Masters: Clippers vs. Limiters Explained",
+      "creator": "Waves Audio",
+      "published": "2021-09-09",
+      "url": "https://www.youtube.com/watch?v=zbXzXktTxnQ",
+      "reading_depth": "metadata_plus_official_timeline_no_transcript",
+      "status": "queued_source",
+      "official_timestamps_seconds": [36, 53, 100, 181, 210, 268],
+      "rule_promotion": false
+    }
+  ],
+  "official_sources_queued": [
+    {
+      "id": "QUEUED-ML-20261014-1500-01",
+      "title": "The Mastering Show #112 — When louder is easier?!",
+      "url": "https://themasteringshow.com/episode-112/",
+      "published": "2026-10-09",
+      "reading_depth": "official_metadata_topic_list_only",
+      "status": "queued_source"
+    }
+  ],
+  "deduplicated_or_rejected": [
+    {"canonical":"Joe_Chiccarelli_Waves_page","reason":"already_queued_2026_09_28"},
+    {"canonical":"arXiv:2608.10573","reason":"existing_source_family"},
+    {"canonical":"arXiv:2609.02835","reason":"existing_source_family"},
+    {"canonical":"arXiv:2608.30559","reason":"existing_source_family"},
+    {"canonical":"weak_secondary_video_summaries","reason":"insufficient_primary_metadata_or_transcript"}
+  ],
+  "reference_audio_add": [],
+  "reference_audio_downloaded": [],
+  "experiments_run": [],
+  "queue": [
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-VALIDATION-PROVENANCE",
+    "MPASCNET-STEREO-GUARD",
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261014-1500-01/02_and_QUEUED-ML-20261014-1500-01",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ],
+  "citation_check": "partial"
+}
+
