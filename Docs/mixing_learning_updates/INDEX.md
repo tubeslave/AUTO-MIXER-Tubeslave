@@ -584,3 +584,12 @@ ML-2026-10-13-1800 (deep_review, source search ML-2026-10-13-1500): current Capi
 | ML-2026-10-14-0900 | [Report](ML-2026-10-14-0900.md) · [JSON patch](ML-2026-10-14-0900.json) · [ADR](../adr/mixing-learning-2026-10-14-0900.md) | Search: 1 previously missing full DAFx26 compressor-metric source, 1 verified CC-BY paired hardware benchmark, 1 fully read official drum-mixing companion article, 7 Knowledge Cards, 2 bounded rules, 2 blocked experiments and 2 metadata-only queued videos; no audio/DSP/runtime/model change |
 
 ML-2026-10-14-0900 (search, previous successful search ML-2026-10-13-1500): direct gain-control error can expose compressor-model differences that waveform proxies obscure, but the paper does not test held-out generalisation or listening quality. The new dataset is legal and available but not downloaded. Parallel drum ambience is retained only as a room-missing, engineer-specific shadow candidate. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-14 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-14-1200 | [Report](ML-2026-10-14-1200.md) · [JSON patch](ML-2026-10-14-1200.json) · [ADR](../adr/mixing-learning-2026-10-14-1200.md) | Deep review: DAFx26 compressor method/calibration re-read plus pinned Hugging Face manifest and public torchcomp audit; 1 Source Card and 1 Reference Card revised, 1 Artifact Audit and 6 Knowledge Cards added, 1 rule and 1 blocked A/B narrowed; no video/reference-audio/DSP/runtime/model change |
+
+ML-2026-10-14-1200 (deep_review, source search ML-2026-10-14-0900): the Hugging Face Viewer exposes flattened file rows, not paired examples, so song-grouped metadata joins are mandatory. Public torchcomp lacks the paper's peak/stereo-link patch; the loss A/B remains not_run_blocked until manifest, alignment and implementation parity gates pass. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
