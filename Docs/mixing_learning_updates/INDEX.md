@@ -602,3 +602,12 @@ ML-2026-10-14-1200 (deep_review, source search ML-2026-10-14-0900): the Hugging 
 | ML-2026-10-14-1500 | [Report](ML-2026-10-14-1500.md) · [JSON patch](ML-2026-10-14-1500.json) · [ADR](../adr/mixing-learning-2026-10-14-1500.md) | Search: 1 fresh full-text MP3-restoration preprint, pinned public-code and metadata-only checkpoint audits, 6 Knowledge Cards, 1 shadow-only rule, 1 blocked A/B, 1 partially studied and 1 metadata-only queued video, 1 official metadata-only source; no audio/reference/DSP/runtime/model change |
 
 ML-2026-10-14-1500 (search, previous successful search ML-2026-10-14-0900): MPASCNet reports objective gains for short synthetic MP3 restoration, not mix/master preference. No listening test was reported; validation provenance and checkpoint file/hash remain unresolved, and stereo channels are processed independently. The restoration A/B is blocked pending manifest, rights and stereo/null gates. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-14 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-14-1800 | [Report](ML-2026-10-14-1800.md) · [JSON patch](ML-2026-10-14-1800.json) · [ADR](../adr/mixing-learning-2026-10-14-1800.md) | Deep review: MPASCNet test/evaluation/loss code plus existing independent AEROMamba listening evidence; 1 Source Card and 2 Artifact Audits updated, 6 Knowledge Cards, 1 narrowed rule and 1 parity/stereo/listening-gated blocked A/B; no video/reference/audio/DSP/runtime/model change |
+
+ML-2026-10-14-1800 (deep_review, source search ML-2026-10-14-1500): seeded MPASCNet test generation omits track/time/bitrate provenance; ViSQOL downmixes to mono and metric families use pre/post-clamp outputs. Existing independent evidence shows objective compressed-audio gains can lack subjective gain, so listening is now a hard gate. The exact checkpoint manifest remains unavailable. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
