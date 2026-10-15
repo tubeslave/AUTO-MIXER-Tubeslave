@@ -1,0 +1,182 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-15-0900",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-15T09:00:00+03:00",
+  "actual_start_msk": "2026-10-15T09:02:45+03:00",
+  "report_fixed_msk": "2026-10-15T09:09:16+03:00",
+  "previous_successful_search": "ML-2026-10-14-1500",
+  "immediate_predecessor": "ML-2026-10-14-1800",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "search_summary": {
+    "new_scientific_source_cards": 0,
+    "official_or_editorial_source_cards_added": 3,
+    "reference_cards_added": 1,
+    "knowledge_cards_added": 5,
+    "rules_added": 1,
+    "experiments_added": 1,
+    "videos_fully_studied": 0,
+    "videos_queued": 3,
+    "new_licensed_raw_multitracks": 0
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261015-0900-01",
+      "type": "engineering_editorial_summary",
+      "title": "Fixing cymbal bleed in your parallel drum bus at the source (ft. State Champs)",
+      "url": "https://www.nailthemix.com/kyle-black-state-champs-drums-pop-punk",
+      "publication_date": "2025-05-30",
+      "discovery_date": "2026-10-15",
+      "reading_depth": "full_open_article_not_paid_session_not_video_transcript",
+      "bounded_conclusion": "when_parallel_compression_is_the_identified_bleed_amplifier_test_per_source_send_level_before_adding_post_processing",
+      "limitations": ["staff_summary_of_paid_session", "no_source_audio", "no_numeric_send_delta", "no_loudness_matched_blind_test", "engineer_and_song_specific"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261015-0900-02",
+      "type": "official_companion_article",
+      "title": "DRUM MIXING with FX Joe Carrell",
+      "url": "https://producelikeapro.com/blog/drum-mixing-with-fx-joe-carrell/",
+      "publication_date": "2024-04-11",
+      "discovery_date": "2026-10-15",
+      "reading_depth": "full_companion_article_video_not_transcripted",
+      "bounded_conclusion": "functionally_separated_dry_parallel_distortion_fake_room_and_reverb_returns_are_a_testable_engineer_specific_topology_not_a_preset",
+      "limitations": ["no_video_transcript", "no_numeric_settings", "plugin_and_engineer_specific", "no_controlled_comparison"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261015-0900-03",
+      "type": "production_feature_secondary",
+      "title": "How Beck and Nigel Godrich's simple and clean philosophy produced Sea Change",
+      "url": "https://www.musicradar.com/artists/how-beck-and-nigel-godrichs-simple-and-clean-philosophy-produced-one-of-the-best-sounding-albums-of-the-21st-century-when-he-opens-his-mouth-a-canyonesque-vibration-comes-out-its-quite-remarkable",
+      "publication_date": "2026-10-14",
+      "discovery_date": "2026-10-15",
+      "reading_depth": "full_available_feature_with_attributed_secondary_quotes",
+      "bounded_conclusion": "dry_close_recording_plus_real_chamber_or_plate_is_one_song_specific_spatial_strategy",
+      "limitations": ["secondary_historical_feature", "no_raw_audio_or_stems", "no_controlled_AB", "no_DSP_metrics"],
+      "citation_check": "partial"
+    }
+  ],
+  "reference_cards_add": [
+    {
+      "id": "REF-ML-20261015-0900-01",
+      "artist": "Beck",
+      "work": "Sea Change",
+      "release_date": "2002-09-24",
+      "genres": ["alternative_rock", "folk_rock"],
+      "reference_scope": "dry_close_miked_drums_blended_with_real_chambers_or_plates_song_specific_snare_and_room_choices",
+      "access": "official_playback_catalogue_only",
+      "raw_audio_available": false,
+      "metrics_available": false,
+      "source": "SRC-ML-20261015-0900-03"
+    }
+  ],
+  "videos_add": [
+    {
+      "id": "VID-ML-20261015-0900-01",
+      "stable_id": "youtube:wSNdwTi6xsc",
+      "title": "DRUM MIXING with FX Joe Carrell - FREE Multitracks",
+      "url": "https://www.youtube.com/watch?v=wSNdwTi6xsc",
+      "publisher": "Produce Like A Pro",
+      "status": "queued_source_companion_article_read_no_transcript",
+      "content_not_claimed_from_video": true
+    },
+    {
+      "id": "VID-ML-20261015-0900-02",
+      "stable_id": "youtube:ghwkebpADos",
+      "title": "In-the-Box Mixing: Parallel Drum Compression",
+      "url": "https://www.youtube.com/watch?v=ghwkebpADos",
+      "publisher": "Produce Like A Pro",
+      "status": "queued_source_companion_article_read_no_transcript",
+      "content_not_claimed_from_video": true
+    },
+    {
+      "id": "VID-ML-20261015-0900-03",
+      "stable_id": "youtube:F4Q7S4a8H8w",
+      "title": "Drum Mixing Tips: Get Huge Drum Sounds",
+      "url": "https://www.youtube.com/watch?v=F4Q7S4a8H8w",
+      "publisher": "Produce Like A Pro",
+      "status": "queued_source_companion_page_read_no_transcript",
+      "content_not_claimed_from_video": true
+    }
+  ],
+  "deduplicated_or_rejected": [
+    {"stable_id":"arxiv:2609.02835","resolution":"existing_full_source_card_ML-2026-09-15-0900"},
+    {"stable_id":"arxiv:2606.16551v2","resolution":"merge_version_with_SRC-ML-20260914-1800-01_not_independent_confirmation"},
+    {"stable_id":"title:paedb-a-synthetic-primary-ambient-dataset-generation-pipeline","resolution":"existing_source_family"},
+    {"stable_id":"arxiv:2603.15995","resolution":"existing_source_family"},
+    {"stable_id":"title:fpga-enabled-real-time-audio-sampling-processing-and-recording-for-an-electronic-drum-set","resolution":"not_added_low_direct_relevance_to_mixing_learning"}
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261015-0900-01","claim":"Parallel drum compression can amplify cymbal bleed; per-source send level is a separately controllable factor.","confidence":"medium_engineer_specific"},
+    {"id":"KC-ML-20261015-0900-02","claim":"Identify the branch that amplifies bleed before adding post-compressor EQ or gating.","confidence":"medium"},
+    {"id":"KC-ML-20261015-0900-03","claim":"Equal plugin counts do not establish latency parity; processor latency and DAW PDC require null or impulse verification.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261015-0900-04","claim":"Separate dry crush distortion fake-room and reverb returns improve experimental isolation but are not a universal topology.","confidence":"medium_low"},
+    {"id":"KC-ML-20261015-0900-05","claim":"Dry close-miked drums plus chamber or plate is a valid stylistic strategy, not a universal target or numeric preset.","confidence":"medium_low_reference_specific"}
+  ],
+  "rules_add": [
+    {
+      "id": "RULE-ML-20261015-0900-01",
+      "name": "parallel_drum_bleed_send_trim_before_new_processor",
+      "source_ids": ["SRC-ML-20261015-0900-01"],
+      "when": "parallel_drum_return_audibly_increases_hihat_or_cymbal_wash_in_snare_gaps",
+      "change": "trim_only_snare_top_send_to_parallel_compression",
+      "range": "baseline_current_send_vs_minus_3_dB_test_point",
+      "number_origin": "project_experiment_design_not_source_value",
+      "freeze": ["compressor_threshold_ratio_attack_release", "room_level", "gate", "EQ", "distortion", "overall_drum_balance"],
+      "protect": ["snare_punch", "snare_body", "ghost_notes", "groove", "room_depth", "cymbal_clarity", "section_intent"],
+      "verify": "raw_metrics_plus_separate_BS1770_matched_blind_copies_interhit_5_to_12kHz_energy_crest_onset_true_peak_mono_and_Dmitry",
+      "cancel": ["bleed_not_reduced", "punch_body_or_ghost_notes_regress", "preference_disappears_after_loudness_match"],
+      "confidence": "medium_low_engineer_specific",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261015-0900-01",
+      "status": "not_run",
+      "material": "project_owned_pop_punk_or_rock_drum_section_with_audible_snare_top_cymbal_bleed",
+      "A": "current_snare_top_send_to_parallel_compressor",
+      "B": "same_send_minus_3_dB",
+      "only_factor": "one_send_gain",
+      "loudness_alignment": "retain_raw_renders_plus_separate_BS1770_matched_true_peak_safe_listening_copies_with_common_pair_attenuation",
+      "measurements": ["section_integrated_and_short_term_loudness", "true_peak", "snare_crest_and_onset", "interhit_5_to_12kHz_energy", "mono_difference", "correlation"],
+      "protect": ["snare_punch", "body", "ghost_notes", "groove", "room_depth", "cymbal_clarity"],
+      "success": "repeatably_less_harsh_wash_without_loss_of_impact_notes_or_depth",
+      "cancel": ["level_only_preference", "attack_or_body_loss", "pumping", "groove_loss", "send_factor_not_isolated"],
+      "auto_apply": false
+    }
+  ],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queue_VID-ML-20261015-0900-01/02/03_and_existing",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}

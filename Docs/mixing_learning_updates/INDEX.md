@@ -611,3 +611,12 @@ ML-2026-10-14-1500 (search, previous successful search ML-2026-10-14-0900): MPAS
 | ML-2026-10-14-1800 | [Report](ML-2026-10-14-1800.md) · [JSON patch](ML-2026-10-14-1800.json) · [ADR](../adr/mixing-learning-2026-10-14-1800.md) | Deep review: MPASCNet test/evaluation/loss code plus existing independent AEROMamba listening evidence; 1 Source Card and 2 Artifact Audits updated, 6 Knowledge Cards, 1 narrowed rule and 1 parity/stereo/listening-gated blocked A/B; no video/reference/audio/DSP/runtime/model change |
 
 ML-2026-10-14-1800 (deep_review, source search ML-2026-10-14-1500): seeded MPASCNet test generation omits track/time/bitrate provenance; ViSQOL downmixes to mono and metric families use pre/post-clamp outputs. Existing independent evidence shows objective compressed-audio gains can lack subjective gain, so listening is now a hard gate. The exact checkpoint manifest remains unavailable. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-15 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-15-0900 | [Report](ML-2026-10-15-0900.md) · [JSON patch](ML-2026-10-15-0900.json) · [ADR](../adr/mixing-learning-2026-10-15-0900.md) | Search: no new non-duplicate scientific paper; 3 full open production/editorial sources, 1 catalogue-only Reference Card, 5 Knowledge Cards, 1 bounded send-trim rule and 1 not-run A/B; 3 unique videos queued with companion text but no transcript; no raw audio/DSP/runtime/model change |
+
+ML-2026-10-15-0900 (search, previous successful search ML-2026-10-14-1500): scientific hits for two-stage mixing and permutation-equivariant debleeding were deduplicated against existing full cards. New practical evidence narrows parallel-drum bleed control to a one-factor snare-top send test before adding processors. Beck's Sea Change is catalogue-reference evidence only. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
