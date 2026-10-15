@@ -1,0 +1,322 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-15-1500",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-15T15:00:00+03:00",
+  "actual_start_msk": "2026-10-15T15:00:33+03:00",
+  "report_fixed_msk": "2026-10-15T15:04:48+03:00",
+  "preceding_successful_search_update_id": "ML-2026-10-15-0900",
+  "immediate_predecessor": "ML-2026-10-15-1200",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false,
+    "paid_service_used": false
+  },
+  "search_summary": {
+    "literature_source_cards_added": 3,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 6,
+    "candidate_rules_added": 1,
+    "experiments_added": 1,
+    "videos_added_metadata_only": 2,
+    "videos_studied": 0,
+    "references_added": 0,
+    "raw_multitracks_added": 0,
+    "duplicates_removed": 7
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261015-1500-01",
+      "type": "peer_reviewed_conference_paper",
+      "title": "LLM2Fx-Tools: Tool Calling For Music Post-Production",
+      "arxiv_id": "2512.01559v2",
+      "venue": "ICLR 2026",
+      "url": "https://arxiv.org/abs/2512.01559",
+      "publication_date": "2026-01-28",
+      "discovery_date": "2026-10-15",
+      "reading_depth": "full_text_methods_dataset_results_listening_limitations_appendices",
+      "bounded_conclusion": "structured_fx_tool_calls_are_an_auditable_shadow_plan_not_permission_for_automatic_application_or_full_mix_transfer",
+      "reported_results": {
+        "module_classification_accuracy": 0.8,
+        "chain_order_spearman": 0.56,
+        "normalized_parameter_mae": 0.23,
+        "listening_design": "8_questions_16_participants_MUSHRA_like",
+        "listening_means": {
+          "hidden_reference": 81.5,
+          "llm2fx_tools": 62.8,
+          "gemini_2_5_flash": 56.5,
+          "deepafx_st": 54.8,
+          "no_fx": 39.1,
+          "multitask": 34.9,
+          "regression": 16.2
+        }
+      },
+      "limitations": [
+        "single_instrument_sources_not_multitrack_or_full_mix",
+        "synthetic_known_fx_chains",
+        "no_unseen_fx_module_test",
+        "one_to_many_inverse_mapping",
+        "one_instance_per_effect_type_excludes_serial_same_effect_stages",
+        "small_listening_set",
+        "Gemini_generated_language_and_CoT",
+        "LLM_as_judge_for_language_and_CoT",
+        "multiple_comparison_and_repeated_measures_correction_not_established_in_read_description",
+        "appendix_parameter_ranges_are_sampling_space_not_rock_presets"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261015-1500-02",
+      "type": "professional_editorial_companion",
+      "title": "How to get a LOUD metal master (ft Polaris & Lance Prenc)",
+      "url": "https://www.nailthemix.com/polaris-lance-prenc-clipping-limiting",
+      "publication_date": "2025-06-03",
+      "review_date": "2026-10-15",
+      "reading_depth": "full_open_article_linked_video_not_transcripted",
+      "bounded_conclusion": "multi_stage_clipping_is_an_engineer_and_mix_specific_multi_factor_hypothesis_with_explicit_artifact_risk_not_a_universal_transparency_rule",
+      "limitations": [
+        "editorial_not_controlled_study",
+        "multi_processor_chain",
+        "no_loudness_matched_blind_test",
+        "commercial_session_not_reviewed",
+        "video_not_transcripted"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261015-1500-03",
+      "type": "professional_editorial_companion",
+      "title": "Mixing With A Limiter ON? FAQ Friday With Warren Huart",
+      "url": "https://producelikeapro.com/blog/mixing-with-limiter/",
+      "publication_date": "2023-11-17",
+      "review_date": "2026-10-15",
+      "reading_depth": "full_open_companion_page_linked_video_not_transcripted",
+      "bounded_conclusion": "limiter_or_light_compression_on_mix_bus_is_song_dependent_not_a_required_template",
+      "limitations": [
+        "editorial_not_controlled_study",
+        "brief_summary",
+        "no_video_transcript",
+        "no_source_audio_or_blind_test"
+      ]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261015-1500-01",
+      "source_id": "SRC-ML-20261015-1500-01",
+      "repository": "https://github.com/SonyResearch/LLM2Fx",
+      "pinned_commit": "55883b10b105c0e286a23bb2f990c7e4cfd9aef0",
+      "reading_depth": "README_and_targeted_code_search_no_execution",
+      "code_available": true,
+      "dataset_status": "README_says_coming_soon",
+      "checkpoint_manifest_status": "not_found",
+      "licence_status": "root_and_llm2fx_tools_LICENSE_not_found_via_API",
+      "status": "artifact_partial_not_executable",
+      "code_executed": false
+    }
+  ],
+  "video_source_cards_add": [
+    {
+      "id": "VID-ML-20261015-1500-01",
+      "key": "youtube:hGFJaMBato4",
+      "title": "How Lance Prenc Masters LOUD (ft Polaris)",
+      "channel": "Nail The Mix",
+      "url": "https://www.youtube.com/watch?v=hGFJaMBato4",
+      "publication_date": null,
+      "discovery_date": "2026-10-15",
+      "reading_depth": "metadata_plus_full_companion_article_no_transcript",
+      "status": "queued_source_companion_article_read_no_transcript",
+      "timestamps_available": false,
+      "video_specific_claims_extracted": false,
+      "companion_source_id": "SRC-ML-20261015-1500-02"
+    },
+    {
+      "id": "VID-ML-20261015-1500-02",
+      "key": "youtube:cIS9o0FG4Us",
+      "title": "Mixing With A Limiter ON? FAQ Friday With Warren Huart",
+      "channel": "Produce Like A Pro",
+      "url": "https://www.youtube.com/watch?v=cIS9o0FG4Us",
+      "publication_date": null,
+      "companion_page_date": "2023-11-17",
+      "discovery_date": "2026-10-15",
+      "reading_depth": "metadata_plus_full_companion_page_no_transcript",
+      "status": "queued_source_companion_article_read_no_transcript",
+      "timestamps_available": false,
+      "video_specific_claims_extracted": false,
+      "companion_source_id": "SRC-ML-20261015-1500-03"
+    }
+  ],
+  "deduplication": [
+    {
+      "key": "arxiv:2508.03448",
+      "resolution": "existing_source_not_added"
+    },
+    {
+      "key": "arxiv:2608.05506",
+      "resolution": "existing_source_not_added"
+    },
+    {
+      "key": "arxiv:2608.10573",
+      "resolution": "existing_source_not_added"
+    },
+    {
+      "key": "arxiv:2608.05442",
+      "resolution": "existing_source_not_added"
+    },
+    {
+      "key": "arxiv:2412.03373",
+      "resolution": "existing_source_not_added"
+    },
+    {
+      "key": "youtube:SG5rkdYwFDE",
+      "resolution": "existing_video_not_added"
+    },
+    {
+      "key": "youtube:0KPWB6ca8Eo",
+      "resolution": "existing_video_not_added"
+    }
+  ],
+  "knowledge_cards_add": [
+    {
+      "id": "KC-ML-20261015-1500-01",
+      "claim": "Structured tool calls improve auditability but schema-valid output is not evidence of sonic quality.",
+      "confidence": "high_for_governance"
+    },
+    {
+      "id": "KC-ML-20261015-1500-02",
+      "claim": "CoT generated from known chain labels and judged by another LLM is not independently verified causal explanation.",
+      "confidence": "high_for_governance"
+    },
+    {
+      "id": "KC-ML-20261015-1500-03",
+      "claim": "Single-instrument synthetic-chain results do not establish full-mix rock transfer.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261015-1500-04",
+      "claim": "FX-chain inverse mapping is one-to-many; recovery against one hidden chain is not a unique production target.",
+      "confidence": "high"
+    },
+    {
+      "id": "KC-ML-20261015-1500-05",
+      "claim": "A candidate renderer must beat bypass after loudness matching; model output can be worse than no processing.",
+      "confidence": "high_for_test_design"
+    },
+    {
+      "id": "KC-ML-20261015-1500-06",
+      "claim": "LP-Fx excludes repeated effect types in one chain, so serial compression or EQ needs separate evidence and testing.",
+      "confidence": "high"
+    }
+  ],
+  "candidate_rules_add": [
+    {
+      "id": "RULE-ML-20261015-1500-01",
+      "name": "fx_tool_plan_shadow_only_with_bypass_harm_gate",
+      "sources": [
+        "SRC-ML-20261015-1500-01",
+        "ART-ML-20261015-1500-01"
+      ],
+      "when": "project_owned_isolated_stem_or_single_track_and_licensed_pinned_reproducible_model_data_renderer_manifest_exists",
+      "change": "propose_one_frozen_whitelisted_FX_chain_as_shadow_candidate_only",
+      "range_and_numbers_origin": "no_rock_settings_adopted_schema_ranges_from_exact_renderer_only_appendix_G_retained_as_synthetic_sampling_provenance",
+      "protect": [
+        "attack_and_crest",
+        "timbre",
+        "stereo_and_mono",
+        "noise_and_bleed",
+        "tails",
+        "section_role",
+        "creative_intent"
+      ],
+      "verify": "bypass_vs_frozen_chain_raw_and_BS1770_matched_true_peak_safe_listening_plus_signal_metrics_and_Dmitry_blind_judgement_then_separate_one_effect_removal_ablations",
+      "cancel": [
+        "B_not_better_than_bypass",
+        "preference_disappears_after_loudness_match",
+        "gain_only_preference",
+        "manifest_incomplete",
+        "repeated_effect_stage_required_but_unsupported",
+        "explanation_conflicts_with_measured_effect"
+      ],
+      "confidence": "medium_low_research_only",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261015-1500-01",
+      "status": "not_run_blocked",
+      "material": "one_project_owned_isolated_rock_stem_not_full_mix",
+      "preflight": [
+        "code_model_data_licences",
+        "exact_commit_checkpoint_hash",
+        "FxEncoderPlusPlus_version_hash",
+        "renderer_backend_version",
+        "tool_schema_ranges",
+        "deterministic_chain_JSON",
+        "sample_rate_channel_contract"
+      ],
+      "A": "bypass",
+      "B": "one_frozen_LLM2Fx_Tools_candidate_chain",
+      "only_factor": "frozen_chain_off_vs_on",
+      "raw_measurements": [
+        "sample_channel_length_parity",
+        "finite_output",
+        "gain",
+        "true_peak",
+        "onset_and_crest",
+        "spectrum",
+        "stereo_width_and_correlation",
+        "mono_residual",
+        "noise_and_bleed",
+        "tail"
+      ],
+      "loudness_alignment": "separate_BS1770_matched_true_peak_safe_copies_with_common_pair_attenuation",
+      "listener_protocol": "randomized_order_sealed_answer_key_Dmitry",
+      "success": "B_preferred_after_loudness_matching_without_protected_quality_regression",
+      "cancel": [
+        "manifest_or_licence_gap",
+        "nondeterminism",
+        "factor_leakage",
+        "B_not_better_than_bypass",
+        "level_only_preference",
+        "protected_quality_regression"
+      ],
+      "followup_if_success": "separate_one_effect_removal_ablation",
+      "auto_apply": false
+    }
+  ],
+  "references_and_multitracks": {
+    "reference_cards_added": 0,
+    "raw_multitracks_added": 0,
+    "note": "no_new_free_raw_multitrack_or_file_level_licence_or_measurable_reference_audio"
+  },
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "LLM2FX-TOOLS-ARTIFACT-MANIFEST",
+    "EXP-ML-20261015-1500-01",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261015-1500-01/02",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}

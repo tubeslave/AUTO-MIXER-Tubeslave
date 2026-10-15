@@ -629,3 +629,12 @@ ML-2026-10-15-0900 (search, previous successful search ML-2026-10-14-1500): scie
 | ML-2026-10-15-1200 | [Report](ML-2026-10-15-1200.md) · [JSON patch](ML-2026-10-15-1200.json) · [ADR](../adr/mixing-learning-2026-10-15-1200.md) | Deep review: 2 production texts plus official Ableton and Logic PDC documentation; 3 Source Cards added, 1 source narrowed, 6 Knowledge Cards, 1 rule and 1 not-run A/B revised; no video promotion, raw audio, DSP, runtime or model change |
 
 ML-2026-10-15-1200 (deep_review, source search ML-2026-10-15-0900): the snare-top send candidate survives only after branch localization and a frozen offline render path. Plugin-count matching is rejected; PDC uses reported path latency, while monitoring/low-latency modes and routing can create exceptions or disable sends. The revised 0/−3 dB A/B adds a separate latency preflight and remains not_run, auto_apply:false. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800.
+
+
+## 2026-10-15 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-15-1500 | [Report](ML-2026-10-15-1500.md) · [JSON patch](ML-2026-10-15-1500.json) · [ADR](../adr/mixing-learning-2026-10-15-1500.md) | Search: 1 previously missing full ICLR 2026 FX tool-calling source, 1 pinned public-repository audit, 2 full companion articles, 6 Knowledge Cards, 1 shadow-only rule, 1 blocked bypass A/B and 2 metadata-only queued videos; 7 literature/video duplicates removed; no audio, DSP, runtime or model change |
+
+ML-2026-10-15-1500 (search, previous successful search ML-2026-10-15-0900): LLM2Fx-Tools supports auditable variable FX-chain proposals on synthetic single-instrument tasks, but does not establish full-mix rock transfer, causal CoT or unique parameter recovery. The public repo exposes code while LP-Fx remains “coming soon”; checkpoint/hash and explicit repository licence files were not found. Generated chains stay shadow-only and must beat bypass after loudness matching. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
