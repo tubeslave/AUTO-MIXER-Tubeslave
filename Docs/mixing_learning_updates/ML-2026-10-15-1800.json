@@ -1,0 +1,177 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-15-1800",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-15T18:00:00+03:00",
+  "actual_start_msk": "2026-10-15T17:56:30+03:00",
+  "report_fixed_msk": "2026-10-15T18:00:00+03:00",
+  "preceding_successful_search_update_id": "ML-2026-10-15-1500",
+  "immediate_predecessor": "ML-2026-10-15-1500",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false,
+    "paid_service_used": false
+  },
+  "deep_review_summary": {
+    "source_cards_added": 1,
+    "source_cards_updated": 1,
+    "artifact_audits_updated": 1,
+    "openreview_metadata_cards_added": 1,
+    "knowledge_cards_added": 8,
+    "candidate_rules_revised": 1,
+    "experiments_revised": 1,
+    "videos_studied": 0,
+    "references_added": 0,
+    "raw_multitracks_added": 0
+  },
+  "source_cards_update": [
+    {
+      "id": "SRC-ML-20261015-1500-01",
+      "reading_depth": "full_text_deep_review_methods_metrics_listening_appendices",
+      "listening_evidence_status": "exploratory_due_incomplete_MUSHRA_reporting_and_pairwise_testing",
+      "revisions": [
+        "hidden_reference_mean_81_5_is_not_sufficient_validity_check",
+        "listener_training_screening_anchors_conditions_median_IQR_CI_not_reported_in_read_text",
+        "pairwise_t_tests_do_not_establish_repeated_measures_or_multiplicity_control",
+        "embedding_metrics_are_dependent_endpoints_not_independent_perceptual_confirmation",
+        "blind_style_transfer_includes_Fx_Removal_and_Fx_Norm_preprocessors"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261015-1800-01",
+      "type": "official_standard",
+      "title": "Recommendation ITU-R BS.1534-3: Method for the subjective assessment of intermediate quality level of audio systems",
+      "url": "https://www.itu.int/rec/R-REC-BS.1534-3-201510-I/en",
+      "approval_date": "2015-10-14",
+      "status": "in_force",
+      "reading_depth": "selected_full_text_sections_4_5_9_10_and_attachment_4",
+      "bounded_conclusion": "MUSHRA_claims_require_listener_screening_anchors_conditions_and_repeated_measures_aware_analysis_not_hidden_reference_mean_plus_uncorrected_pairwise_tests",
+      "scope_limit": "used_for_design_and_analysis_quality_control_not_as_proof_that_MUSHRA_is_the_only_valid_project_test"
+    }
+  ],
+  "metadata_cards_add": [
+    {
+      "id": "META-ML-20261015-1800-01",
+      "type": "secondary_openreview_snapshot",
+      "forum_id": "OyIJvyyB3R",
+      "url": "https://openreview.net/forum?id=OyIJvyyB3R",
+      "reading_depth": "metadata_only_secondary_snapshot_primary_review_text_blocked_by_browser_verification",
+      "scores": [4, 8, 6, 4],
+      "mean_score": 5.5,
+      "confidences": [3, 3, 4, 4],
+      "use": "context_only_not_independent_replication_or_claim_evidence"
+    }
+  ],
+  "artifact_audits_update": [
+    {
+      "id": "ART-ML-20261015-1500-01",
+      "repository": "https://github.com/SonyResearch/LLM2Fx",
+      "pinned_commit": "55883b10b105c0e286a23bb2f990c7e4cfd9aef0",
+      "reading_depth": "README_recursive_tree_and_targeted_full_files_no_execution",
+      "files_read": [
+        "llm2fx-tools/README.md",
+        "llm2fx-tools/train.py",
+        "llm2fx-tools/pyproject.toml",
+        "llm2fx-tools/llm4mp/preprocessing/audio_processor/apply_fx.py",
+        "llm2fx-tools/llm4mp/common_utils/audio_utils/audio_io.py",
+        "llm2fx-tools/llm4mp/models/llm/data/pt_dataset.py",
+        "llm2fx-tools/llm4mp/preprocessing/fx_processor/fx_sampling_dasp.py"
+      ],
+      "status": "artifact_scaffold_not_reproducible",
+      "blockers": [
+        "dataset_README_says_coming_soon",
+        "checkpoint_hash_manifest_not_found",
+        "example_training_config_not_found",
+        "inference_entrypoint_not_found",
+        "evaluation_and_listening_scripts_not_found",
+        "stimuli_results_statistics_manifest_not_found",
+        "frozen_environment_lockfile_not_found",
+        "root_and_llm2fx_tools_LICENSE_not_found_via_API",
+        "static_import_path_llm4mp_models_llm2fx2_llm_model_setup_not_present_in_pinned_tree",
+        "exact_paper_backend_config_not_pinned",
+        "tail_headroom_clipping_contract_not_documented"
+      ],
+      "paper_like_renderer_observation": "apply_fx_hardcodes_ndsp_nine_module_backend_while_README_also_exposes_eight_module_DASP_backend",
+      "code_executed": false
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id": "KC-ML-20261015-1800-01", "claim": "Hidden-reference mean does not validate MUSHRA without per-listener screening; BS.1534-3 excludes a listener when hidden reference is below 90 for more than 15 percent of items.", "confidence": "high_for_test_design"},
+    {"id": "KC-ML-20261015-1800-02", "claim": "With multiple systems, pairwise t-tests without an omnibus repeated-measures model and multiplicity control are insufficient inferential support.", "confidence": "high_for_test_design"},
+    {"id": "KC-ML-20261015-1800-03", "claim": "Repeated ratings across listeners and audio materials require listener/material-aware analysis rather than pooled independent observations.", "confidence": "high_for_test_design"},
+    {"id": "KC-ML-20261015-1800-04", "claim": "A metric encoder identical or related to the input encoder is a dependent endpoint and not independent perceptual validation.", "confidence": "high_for_governance"},
+    {"id": "KC-ML-20261015-1800-05", "claim": "Fx-Removal and Fx-Norm are part of the blind-transfer system and require frozen versions and separate ablation.", "confidence": "high"},
+    {"id": "KC-ML-20261015-1800-06", "claim": "Training scaffold without configs checkpoints inference evaluation frozen environment and stimuli manifest cannot reproduce headline claims.", "confidence": "high"},
+    {"id": "KC-ML-20261015-1800-07", "claim": "Backend and tool-schema parity is mandatory because DASP and NDSP/Pedalboard expose different module sets.", "confidence": "high"},
+    {"id": "KC-ML-20261015-1800-08", "claim": "A static import mismatch blocks the public path until resolved but does not prove the authors internal environment was nonfunctional.", "confidence": "high_for_artifact_state"}
+  ],
+  "candidate_rules_update": [
+    {
+      "id": "RULE-ML-20261015-1500-01",
+      "revision": 2,
+      "when": "project_owned_isolated_stem_and_paper_parity_NDSP_backend_exact_schema_checkpoint_dataset_config_environment_hashes_licences_and_frozen_preprocessing_are_available",
+      "change": "propose_one_frozen_whitelisted_chain_as_shadow_candidate_only",
+      "protect": ["attack_and_crest", "timbre", "stereo_and_mono", "noise_and_bleed", "tails", "section_role", "creative_intent"],
+      "verify": "renderer_nulls_then_bypass_vs_frozen_chain_raw_QC_then_BS1770_matched_true_peak_safe_randomized_sealed_blind_judging_with_repeated_measures_aware_analysis",
+      "cancel": ["manifest_or_licence_incomplete", "import_config_backend_parity_unresolved", "preprocessor_effect_not_separated", "B_not_better_than_bypass", "preference_disappears_after_loudness_match", "protected_quality_regression", "only_related_encoder_metric_improves", "listener_or_trap_reliability_failure"],
+      "confidence": "low_research_only",
+      "auto_apply": false
+    }
+  ],
+  "experiments_update": [
+    {
+      "id": "EXP-ML-20261015-1500-01",
+      "revision": 2,
+      "status": "not_run_blocked",
+      "material": "minimum_three_project_owned_isolated_rock_stem_excerpts_with_one_first_executable_pair_and_preregistered_replications",
+      "manifest_gate": ["exact_commit_checkpoint_hash", "dataset_config_environment_lock", "licences", "paper_parity_NDSP_tool_schema", "inference_and_evaluation_entrypoints", "Fx_Removal_and_Fx_Norm_versions", "sample_channel_tail_headroom_contracts"],
+      "renderer_null_gate": ["empty_chain_equals_bypass_within_tolerance", "identity_settings_preserve_length_and_channel", "deterministic_repeat", "finite_output", "tail_capture", "latency_alignment"],
+      "A": "bypass",
+      "B": "one_frozen_generated_chain",
+      "only_factor": "frozen_chain_off_vs_on",
+      "alignment": "archive_raw_renders_then_create_BS1770_matched_true_peak_safe_copies_with_common_pair_attenuation_and_sealed_randomized_key",
+      "measurements": ["integrated_and_short_term_loudness", "true_peak", "onset_and_crest", "band_energy", "stereo_correlation_and_width", "mono_residual", "noise_and_bleed", "tail_length_latency"],
+      "learned_embeddings": "secondary_only",
+      "listener_protocol": "repeated_blind_Dmitry_judgements_with_duplicate_consistency_or_project_appropriate_traps; expanded_panel_requires_listener_excerpt_aware_analysis",
+      "success": "B_preferred_after_loudness_matching_on_preregistered_excerpts_without_protected_quality_regression_or_raw_QC_contradiction",
+      "cancel": ["manifest_or_null_failure", "nondeterminism", "factor_leakage", "level_only_preference", "B_not_better_than_bypass", "protected_quality_regression", "only_related_encoder_metric_improves", "listener_or_trap_reliability_failure"],
+      "auto_apply": false
+    }
+  ],
+  "video_updates": {"studied": 0, "queued_unchanged": ["VID-ML-20261015-1500-01", "VID-ML-20261015-1500-02"]},
+  "references_and_multitracks": {"reference_cards_added": 0, "raw_multitracks_added": 0},
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "LLM2FX-TOOLS-ARTIFACT-MANIFEST:config_import_inference_evaluation_environment_stimuli_statistics_parity",
+    "EXP-ML-20261015-1500-01:revision_2",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261015-1500-01/02",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}
+
