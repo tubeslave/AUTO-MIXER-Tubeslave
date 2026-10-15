@@ -620,3 +620,12 @@ ML-2026-10-14-1800 (deep_review, source search ML-2026-10-14-1500): seeded MPASC
 | ML-2026-10-15-0900 | [Report](ML-2026-10-15-0900.md) · [JSON patch](ML-2026-10-15-0900.json) · [ADR](../adr/mixing-learning-2026-10-15-0900.md) | Search: no new non-duplicate scientific paper; 3 full open production/editorial sources, 1 catalogue-only Reference Card, 5 Knowledge Cards, 1 bounded send-trim rule and 1 not-run A/B; 3 unique videos queued with companion text but no transcript; no raw audio/DSP/runtime/model change |
 
 ML-2026-10-15-0900 (search, previous successful search ML-2026-10-14-1500): scientific hits for two-stage mixing and permutation-equivariant debleeding were deduplicated against existing full cards. New practical evidence narrows parallel-drum bleed control to a one-factor snare-top send test before adding processors. Beck's Sea Change is catalogue-reference evidence only. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-15 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-15-1200 | [Report](ML-2026-10-15-1200.md) · [JSON patch](ML-2026-10-15-1200.json) · [ADR](../adr/mixing-learning-2026-10-15-1200.md) | Deep review: 2 production texts plus official Ableton and Logic PDC documentation; 3 Source Cards added, 1 source narrowed, 6 Knowledge Cards, 1 rule and 1 not-run A/B revised; no video promotion, raw audio, DSP, runtime or model change |
+
+ML-2026-10-15-1200 (deep_review, source search ML-2026-10-15-0900): the snare-top send candidate survives only after branch localization and a frozen offline render path. Plugin-count matching is rejected; PDC uses reported path latency, while monitoring/low-latency modes and routing can create exceptions or disable sends. The revised 0/−3 dB A/B adds a separate latency preflight and remains not_run, auto_apply:false. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800.
