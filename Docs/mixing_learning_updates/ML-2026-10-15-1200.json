@@ -1,0 +1,155 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-15-1200",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-15T12:00:00+03:00",
+  "actual_start_msk": "2026-10-15T11:56:27+03:00",
+  "report_fixed_msk": "2026-10-15T11:59:30+03:00",
+  "preceding_search_update_id": "ML-2026-10-15-0900",
+  "immediate_predecessor": "ML-2026-10-15-0900",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false
+  },
+  "review_summary": {
+    "source_cards_added": 3,
+    "source_cards_updated": 1,
+    "knowledge_cards_added": 6,
+    "rules_revised": 1,
+    "experiments_revised": 1,
+    "videos_studied": 0,
+    "videos_carried_queued": 3,
+    "reference_cards_added": 0,
+    "raw_multitracks_added": 0
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261015-1200-01",
+      "type": "official_companion_editorial",
+      "title": "How to Use Parallel Compression",
+      "url": "https://producelikeapro.com/blog/how-to-use-parallel-compression/",
+      "publication_date": "2021-08-01",
+      "review_date": "2026-10-15",
+      "reading_depth": "full_open_article_video_not_transcripted",
+      "bounded_conclusion": "dry_plus_heavily_compressed_return_is_a_valid_topology_but_plugin_count_does_not_establish_latency_parity",
+      "limitations": ["editorial_not_controlled_study", "linked_video_not_transcripted", "latency_fix_overgeneralized", "no_source_audio_or_blind_test"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261015-1200-02",
+      "type": "official_daw_documentation",
+      "title": "Ableton Delay Compensation FAQ and How Latency Works",
+      "urls": [
+        "https://help.ableton.com/hc/en-us/articles/209072409-Delay-Compensation-FAQ",
+        "https://help.ableton.com/hc/en-us/articles/360010545559-How-Latency-Works"
+      ],
+      "review_date": "2026-10-15",
+      "reading_depth": "full_relevant_official_sections",
+      "bounded_conclusion": "reported_path_latency_is_compensated_by_default_but_routing_monitoring_and_export_exceptions_require_manifest_and_render_verification",
+      "limitations": ["Ableton_specific", "documentation_not_listening_study", "third_party_plugin_reporting_accuracy_not_independently_verified"]
+    },
+    {
+      "id": "SRC-ML-20261015-1200-03",
+      "type": "official_daw_documentation",
+      "title": "Work with plug-in latencies in Logic Pro for Mac",
+      "url": "https://support.apple.com/en-by/guide/logicpro/lgcpe11997ba/mac",
+      "review_date": "2026-10-15",
+      "reading_depth": "full_official_section",
+      "bounded_conclusion": "PDC_uses_measured_reported_latency_while_low_latency_monitoring_can_bypass_processors_and_disable_sends_and_is_not_active_during_bounce",
+      "limitations": ["Logic_specific", "documentation_not_listening_study"]
+    }
+  ],
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261015-0900-01",
+      "action": "narrow",
+      "reading_depth": "full_open_editorial_summary_not_paid_session_not_video_transcript",
+      "bounded_conclusion": "send_trim_is_a_branch_localized_engineer_specific_candidate_not_a_universal_bleed_rule",
+      "additional_limitations": ["no_branch_isolation_measurement", "no_PDC_or_routing_manifest", "no_numeric_delta", "no_loudness_matched_blind_test"]
+    }
+  ],
+  "corrections": [
+    {
+      "claim": "parallel_digital_paths_necessarily_arrive_at_different_times",
+      "resolution": "too_broad_modern_DAWs_normally_apply_reported_latency_compensation_with_documented_exceptions"
+    },
+    {
+      "claim": "same_number_of_processing_stages_guarantees_latency_match",
+      "resolution": "rejected_latency_depends_on_processor_mode_reported_samples_routing_and_DAW_state"
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261015-1200-01","claim":"PDC aligns signal paths by reported latency, not processor count.","confidence":"high_for_documented_DAWs"},
+    {"id":"KC-ML-20261015-1200-02","claim":"Lookahead oversampling convolution and spectral processing can change latency within a processor family.","confidence":"high"},
+    {"id":"KC-ML-20261015-1200-03","claim":"Routing and monitoring exceptions can bypass normal PDC; DAW version mode and routing must be in the manifest.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261015-1200-04","claim":"Low-latency monitoring can disable sends or bypass processors and is not equivalent to offline bounce.","confidence":"high_for_Logic_documented_behavior_medium_for_cross_DAW_transfer"},
+    {"id":"KC-ML-20261015-1200-05","claim":"Latency diagnostics and creative send-trim listening are separate stages and should not share a causal conclusion.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261015-1200-06","claim":"Plugin-count matching is not a valid latency fix; verify sample offset impulse or null in the actual render configuration.","confidence":"high_for_test_design"}
+  ],
+  "rules_revise": [
+    {
+      "id": "RULE-ML-20261015-0900-01",
+      "action": "revise",
+      "when": "parallel_compression_audibly_increases_cymbal_wash_and_branch_solo_localizes_the_snare_top_contribution",
+      "prerequisites": ["DAW_version_sample_rate_buffer_manifest", "PDC_and_monitoring_state_frozen", "routing_graph_frozen", "processor_modes_and_reported_latency_recorded", "same_offline_render_path_for_A_B"],
+      "change": "only_snare_top_send_to_existing_parallel_compressor",
+      "range_and_numbers_origin": "A_current_send_B_minus_3dB_project_test_point_not_source_value",
+      "protect": ["snare_punch", "body", "ghost_notes", "groove", "room_depth", "cymbal_clarity", "mono_compatibility", "section_intent"],
+      "verify": "path_latency_preflight_raw_offline_AB_separate_BS1770_matched_blind_copies_interhit_5_12kHz_onset_crest_true_peak_mono_correlation_Dmitry",
+      "cancel": ["branch_not_isolated", "PDC_or_routing_state_differs", "send_disabled_by_monitoring_mode", "latency_undocumented", "no_bleed_reduction", "protected_regression", "preference_disappears_after_loudness_match"],
+      "confidence": "medium_low_engineer_specific",
+      "auto_apply": false
+    }
+  ],
+  "experiments_revise": [
+    {
+      "id": "EXP-ML-20261015-0900-01",
+      "action": "revise",
+      "status": "not_run",
+      "preflight": "record_reported_path_latency_and_capture_project_owned_impulse_or_transient_through_dry_and_parallel_routes_in_identity_capable_configuration_estimate_constant_sample_offset_and_residual_no_null_claim_when_identity_unavailable",
+      "A": "current_snare_top_send_to_frozen_parallel_compressor",
+      "B": "same_send_minus_3dB",
+      "only_factor": "one_send_gain",
+      "render": "offline_bounce_PDC_enabled_low_latency_and_monitoring_exceptions_disabled",
+      "loudness_alignment": "preserve_raw_renders_plus_separate_BS1770_matched_true_peak_safe_copies_with_common_pair_attenuation",
+      "measurements": ["path_offset_and_preflight_residual", "integrated_and_short_term_loudness", "true_peak", "snare_onset_and_crest", "interhit_5_12kHz_energy", "mono_difference", "correlation"],
+      "success": "repeatable_lower_harsh_wash_without_punch_body_ghost_note_groove_or_space_loss_and_preference_survives_loudness_match",
+      "cancel": ["manifest_or_PDC_mismatch", "send_bypassed_by_monitoring_mode", "factor_not_isolated", "level_only_preference", "pumping", "protected_quality_regression"],
+      "auto_apply": false
+    }
+  ],
+  "video_queue": {
+    "studied_this_run": 0,
+    "carried_without_promotion": ["VID-ML-20261015-0900-01", "VID-ML-20261015-0900-02", "VID-ML-20261015-0900-03"],
+    "reason": "no_permitted_transcript_content"
+  },
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261015-0900-01/02/03",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}
+
