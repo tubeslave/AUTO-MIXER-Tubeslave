@@ -663,3 +663,11 @@ ML-2026-10-16-0900 (search, previous successful search ML-2026-10-15-1500): plug
 | ML-2026-10-16-1200 | [Report](ML-2026-10-16-1200.md) · [JSON patch](ML-2026-10-16-1200.json) · [ADR](../adr/mixing-learning-2026-10-16-1200.md) | Deep review: full Opus released-data recount plus pinned vst-bench package/host source audit; 2 Source Cards and 1 Artifact Audit updated, 1 Artifact Audit and 9 Knowledge Cards added, 2 rules and 2 not-run experiments revised/added; no video/reference/audio/DSP/runtime/model change |
 
 ML-2026-10-16-1200 (deep_review, source search ML-2026-10-16-0900): target 160 unconstrained VBR produced 159–213 kbps across the released Phase-2 samples and is not a project delivery threshold. Phase 2 is a BLUP-selected stress set, not independent expert validation. The vst-bench default normalized-only export and channel-mean QC are insufficient as sole raw/stereo evidence; raw preservation, host-side attempt traces and per-channel/M-S checks are now required. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-16 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-16-1500 | [Report](ML-2026-10-16-1500.md) · [JSON patch](ML-2026-10-16-1500.json) · [ADR](../adr/mixing-learning-2026-10-16-1500.md) | Search: 2 fresh full-text papers, 2 artifact audits, 1 full official companion article, 8 Knowledge Cards, 2 bounded shadow-only rules, 1 blocked A/B, 0 studied and 3 metadata-only queued guitar videos, 1 catalogue-only multitrack candidate; no audio, DSP, runtime or model change |
+
+ML-2026-10-16-1500 (search, previous successful search ML-2026-10-16-0900): PEACE can rank known Faust-chain hypotheses but does not recover exact settings, gain/compression or stereo direction and is weak on several dynamics effects. CTAG-FX supports structured candidate generation, not perceptual or semantic validity; its new guitar A/B is blocked pending code/configuration and finite-output provenance gates. All three videos remain unstudied without permitted transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.

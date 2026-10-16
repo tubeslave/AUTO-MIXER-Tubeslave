@@ -1,0 +1,291 @@
+{
+  "update_id": "ML-2026-10-16-1500",
+  "schema_version": "mixing-learning-patch/v1",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-16T15:00:00+03:00",
+  "actual_start_msk": "2026-10-16T15:02:13+03:00",
+  "report_fixed_msk": "2026-10-16T15:08:13+03:00",
+  "previous_update": "ML-2026-10-16-1200",
+  "preceding_successful_search": "ML-2026-10-16-0900",
+  "assumptions": [],
+  "source_cards_added": [
+    {
+      "id": "SRC-ML-20261016-1500-01",
+      "canonical_id": "arxiv:2610.03405v1",
+      "url": "https://arxiv.org/abs/2610.03405",
+      "published": "2026-10-02",
+      "reading_depth": "full_text",
+      "status": "bounded_research_candidate",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261016-1500-02",
+      "canonical_id": "arxiv:2610.08182v1",
+      "url": "https://arxiv.org/abs/2610.08182",
+      "published": "2026-10-06",
+      "reading_depth": "full_text",
+      "status": "preprint_bounded_research_candidate",
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261016-1500-03",
+      "canonical_id": "url:https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "url": "https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "published": "2017-01-24",
+      "reading_depth": "full_companion_article",
+      "status": "editorial_source_not_independent_scientific_evidence"
+    }
+  ],
+  "artifact_audits_added": [
+    {
+      "id": "ART-ML-20261016-1500-01",
+      "repository": "https://github.com/DBraun/PEACE",
+      "status": "public_repository_readme_and_license_verified_not_executed",
+      "branch_observed": "main",
+      "immutable_revision": null,
+      "code_license": "MIT",
+      "weights_license_claim": "CC-BY-NC-4.0",
+      "gates": [
+        "pin_revision",
+        "dependency_lock",
+        "checkpoint_manifest_and_hashes",
+        "NOTICE",
+        "paper_parity",
+        "tests"
+      ]
+    },
+    {
+      "id": "ART-ML-20261016-1500-02",
+      "url": "https://taylor3527eg-hub.github.io/ctag-fx-platform-demo/",
+      "status": "demo_only_code_unavailable_not_executed",
+      "gates": [
+        "public_code",
+        "license",
+        "immutable_revision",
+        "release_configuration",
+        "stimulus_manifest"
+      ]
+    }
+  ],
+  "video_source_cards_added": [
+    {
+      "id": "VID-ML-20261016-1500-01",
+      "canonical_id": "youtube:gELIK9iyQRk",
+      "title": "How to Mix Rock Guitars That Sound Huge | UAD Spotlight",
+      "channel": "Universal Audio",
+      "published": "2025-10-24",
+      "duration_seconds": 710,
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript",
+      "studied": false
+    },
+    {
+      "id": "VID-ML-20261016-1500-02",
+      "canonical_id": "youtube:y116iwNcD90",
+      "title": "Mixing Pop/Rock: Guitars, Synths, Keys",
+      "channel": "Produce Like A Pro",
+      "published": "2017-01-24",
+      "duration_seconds": 1000,
+      "reading_depth": "metadata_plus_full_companion_article",
+      "status": "queued_source_companion_article_read_no_transcript",
+      "studied": false
+    },
+    {
+      "id": "VID-ML-20261016-1500-03",
+      "canonical_id": "youtube:0LRztXIWtsU",
+      "title": "Mixing Guitars and Keys // Joe Carrell",
+      "channel": "Joe Carrell",
+      "published": "2024-08-12",
+      "duration_seconds": 1981,
+      "reading_depth": "metadata_only",
+      "status": "queued_source_no_transcript",
+      "studied": false
+    }
+  ],
+  "reference_cards_added": [
+    {
+      "id": "REF-ML-20261016-1500-01",
+      "title": "Stay New free multitrack listing",
+      "url": "https://producelikeapro.com/blog/mixing-poprock-guitars-synths-keys/",
+      "status": "catalogue_candidate_access_and_file_manifest_unverified",
+      "raw_audio_available_to_project": false,
+      "downloaded": false
+    }
+  ],
+  "knowledge_cards_added": [
+    {
+      "id": "KC-ML-20261016-1500-01",
+      "claim": "Audio-to-code retrieval ranks topology hypotheses; it does not recover a unique chain, exact settings or mix quality."
+    },
+    {
+      "id": "KC-ML-20261016-1500-02",
+      "claim": "Inactive effects can be unidentifiable; activity checks must accompany evaluation."
+    },
+    {
+      "id": "KC-ML-20261016-1500-03",
+      "claim": "Mid/side magnitude features cannot distinguish mirror panning; stereo direction needs direction-sensitive features."
+    },
+    {
+      "id": "KC-ML-20261016-1500-04",
+      "claim": "Loudness-normalized embeddings cannot support gain or compression-setting recovery without raw cues."
+    },
+    {
+      "id": "KC-ML-20261016-1500-05",
+      "claim": "Out-of-distribution RIR retrieval does not establish transfer to dynamics, nonlinear or stereo effects."
+    },
+    {
+      "id": "KC-ML-20261016-1500-06",
+      "claim": "Prompt-distinct structured mappings support candidate generation, not semantic truth or listening preference."
+    },
+    {
+      "id": "KC-ML-20261016-1500-07",
+      "claim": "Generated configurations require finite-sample, peak and silence gates before measurement or listening."
+    },
+    {
+      "id": "KC-ML-20261016-1500-08",
+      "claim": "Signal proxies and CLAP on one performance do not establish perceptual or section-level generalization."
+    }
+  ],
+  "candidate_rules_added": [
+    {
+      "id": "RULE-ML-20261016-1500-01",
+      "source": "SRC-ML-20261016-1500-01",
+      "when_apply": "research-only known-library topology retrieval after activity check",
+      "change": "rank top-K hypotheses and validate local renders",
+      "range": {
+        "top_k": 10,
+        "origin": "paper reports R@10; experiment parameter, not mix setting"
+      },
+      "protect": [
+        "raw",
+        "gain/dynamics evidence",
+        "stereo direction",
+        "phase",
+        "transients",
+        "rights",
+        "provenance"
+      ],
+      "cancel_if": [
+        "unknown library",
+        "inactive effect",
+        "panning/width task",
+        "loudness cue required",
+        "missing manifests",
+        "non-finite output",
+        "no simple-baseline advantage"
+      ],
+      "confidence": "medium_for_known_topology_low_for_exact_settings",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261016-1500-02",
+      "source": "SRC-ML-20261016-1500-02",
+      "when_apply": "exploratory guitar tone design with one prompt and one frozen configuration",
+      "change": "bypass versus one fixed processor configuration",
+      "range": {
+        "status": "none_accepted_until_audited_release_config"
+      },
+      "protect": [
+        "pick attack",
+        "articulation",
+        "bass/kick separation",
+        "stereo/mono",
+        "noise floor",
+        "true peak",
+        "section intent"
+      ],
+      "cancel_if": [
+        "non-finite",
+        "clipping",
+        "level-only preference",
+        "harshness/noise",
+        "transient or low-end regression",
+        "mono regression",
+        "solo-only benefit"
+      ],
+      "confidence": "low_research_only",
+      "auto_apply": false
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261016-1500-01",
+      "status": "not_run_blocked",
+      "blocked_by": [
+        "audited CTAG-FX code/revision",
+        "release configuration",
+        "stimulus manifest"
+      ],
+      "baseline_A": "bypass",
+      "variant_B": "one predeclared frozen CTAG-FX configuration",
+      "single_changed_factor": "processor bypass state",
+      "loudness_alignment": "separate common-attenuation BS.1770-matched listening copies; retain raw renders",
+      "measurements": [
+        "finite",
+        "silence/stuck",
+        "sample_peak",
+        "true_peak",
+        "integrated_lufs",
+        "short_term_lufs",
+        "crest",
+        "onset",
+        "band_energy",
+        "harmonic_change",
+        "stereo_correlation",
+        "M/S_balance",
+        "mono"
+      ],
+      "evaluator": "Dmitry",
+      "result": "not_run",
+      "auto_apply": false
+    }
+  ],
+  "dedupe": {
+    "identifiers_checked": [
+      "arxiv:2610.03405",
+      "arxiv:2610.08182",
+      "youtube:gELIK9iyQRk",
+      "youtube:y116iwNcD90",
+      "youtube:0LRztXIWtsU"
+    ],
+    "duplicates_removed": 0,
+    "version_policy": "preprint/journal and paper/artifact families are not independent confirmations"
+  },
+  "queue_priority": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "revised snare-top parallel-send 0/-3 dB A/B after latency preflight",
+    "distorted-bass A/B revision 2",
+    "Opus released-data/stimuli provenance audit",
+    "local Opus delivery-only checks",
+    "vst-bench third-party/cross-platform validation",
+    "PEACE immutable revision/model manifest/hash/licence/parity audit",
+    "CTAG-FX code/release configuration/licence/stimulus audit",
+    "LLM2Fx missing release/checkpoint/evaluation/listening manifest",
+    "MPASCNet checkpoint/stereo/parity/listening gates",
+    "PENA mapping/pitch/DiffVox questions",
+    "full review arxiv:2610.12250 and arxiv:2610.11884",
+    "three new video transcript/content checks",
+    "Stay New access/package/file-rights audit",
+    "remaining existing queue unchanged"
+  ],
+  "counts": {
+    "source_cards_added": 3,
+    "artifact_audits_added": 2,
+    "knowledge_cards_added": 8,
+    "candidate_rules_added": 2,
+    "experiments_added": 1,
+    "videos_studied": 0,
+    "videos_queued_new": 3,
+    "reference_cards_added": 1,
+    "raw_multitracks_added": 0
+  },
+  "invariants": {
+    "audio_changed": false,
+    "audio_downloaded": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "model_changed": false,
+    "auto_apply_rules": 0,
+    "experiments_run": 0
+  }
+}
