@@ -646,3 +646,12 @@ ML-2026-10-15-1500 (search, previous successful search ML-2026-10-15-0900): LLM2
 | ML-2026-10-15-1800 | [Report](ML-2026-10-15-1800.md) · [JSON patch](ML-2026-10-15-1800.json) · [ADR](../adr/mixing-learning-2026-10-15-1800.md) | Deep review: LLM2Fx-Tools listening statistics checked against ITU-R BS.1534-3 and pinned public code; 1 official standard card, 1 source and 1 artifact audit updated, 8 Knowledge Cards, 1 rule and 1 blocked experiment revised; hidden-reference validation, repeated-measures, preprocessor attribution and reproducibility limits recorded; no audio, DSP, runtime or model change |
 
 ML-2026-10-15-1800 (deep_review, preceding search ML-2026-10-15-1500): reported listening superiority is now exploratory because the read paper text does not document anchors, listener screening, listening conditions, median/IQR, confidence intervals, repeated-measures omnibus analysis or multiplicity control. The public repository is a useful training scaffold but lacks release configs, checkpoint, dataset, inference/evaluation/listening scripts, frozen environment and stimuli/results manifest; a static import path also does not match the pinned tree. RULE-ML-20261015-1500-01 confidence is lowered to low_research_only, EXP-ML-20261015-1500-01 remains not_run_blocked, and the next executable project test remains EXP-ML-PENA-AB15-LISTEN-20261010-1800. All rules remain auto_apply:false.
+
+
+## 2026-10-16 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-16-0900 | [Report](ML-2026-10-16-0900.md) · [JSON patch](ML-2026-10-16-0900.json) · [ADR](../adr/mixing-learning-2026-10-16-0900.md) | Search: 2 fresh full-text preprints, 1 public plugin-render artifact audit, 2 full official bass companion/editorial sources, 7 Knowledge Cards, 2 bounded candidate rules, 1 not-run distorted-bass A/B and 2 new metadata-only queued videos; 3 video duplicates removed; no audio, DSP, runtime or model change |
+
+ML-2026-10-16-0900 (search, previous successful search ML-2026-10-15-1500): plugin-render hashes prove tested-stack consistency, not portability, scientific suitability or perceptual quality. Non-significant difference is not equivalence. Clean-low plus distorted-upper bass remains an engineer-specific dense-rock hypothesis with source-specific ranges; both new videos remain unstudied without permitted transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and EXP-ML-20261016-0900-01 remains not_run.
