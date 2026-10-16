@@ -1,0 +1,393 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-16-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-16T18:00:00+03:00",
+  "actual_start": "2026-10-16T17:58:28+03:00",
+  "report_time": "2026-10-16T18:03:33+03:00",
+  "preceding_successful_search_id": "ML-2026-10-16-1500",
+  "immediate_predecessor_id": "ML-2026-10-16-1500",
+  "citation_check": "partial",
+  "summary": {
+    "source_cards_updated": 2,
+    "artifact_audits_updated": 2,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 10,
+    "candidate_rules_updated": 2,
+    "experiments_added": 1,
+    "experiments_updated": 1,
+    "videos_studied": 0,
+    "queued_videos_carried": 3,
+    "references_added": 0,
+    "audio_executed": false,
+    "code_or_model_executed": false,
+    "dsp_or_runtime_changed": false
+  },
+  "corrections": [
+    {
+      "target": "SRC-ML-20261016-1500-01",
+      "previous_claim": "No correction or later version found.",
+      "replacement": "arXiv v1 contains minor corrections/clarifications relative to the camera-ready paper; repository documentation attributes small RIR/chain-result differences to reflection padding in the proceedings path versus training-time zero padding in the arXiv path.",
+      "canonical_numerical_version": "arXiv:2610.03405v1",
+      "duplicate_policy": "camera-ready and arXiv are one evidence family, not independent confirmation"
+    }
+  ],
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261016-1500-01",
+      "title": "PEACE",
+      "url": "https://arxiv.org/abs/2610.03405",
+      "reading_depth": "full_text_re_read_plus_results_tables_and_limitations",
+      "status": "full_text_reviewed",
+      "bounded_findings": [
+        "200000 train, 8192 validation, 4096 test; 21 Faust effects; serial chains length 1-3; 10 s, 48 kHz; wet normalized to -18 LUFS.",
+        "Single-effect gallery 1024: BoxGraph R@1 16.8 and R@10 44.3; T5 18.1 and 45.2.",
+        "Ordered-pair benchmark: BoxGraph R@1 17.4 and R@10 61.4; T5 12.4 and 43.2; supervised classifier 21.4 and 65.9.",
+        "Compressor, gate, limiter and stereo-width single-effect R@1 are especially weak.",
+        "No listener study; OOD evaluation is limited to RIR/reverb."
+      ],
+      "limitations": [
+        "Matched synthetic same-library evidence.",
+        "Random parameters and source/preset pairings; source not guaranteed dry.",
+        "No exact parameter recovery or unknown-plugin validation.",
+        "Mid/side power features remove absolute loudness and preserve mirror-panning ambiguity.",
+        "No independent replication established."
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261016-1500-02",
+      "title": "CTAG-FX",
+      "url": "https://arxiv.org/abs/2610.08182",
+      "demo_url": "https://taylor3527eg-hub.github.io/ctag-fx-platform-demo/",
+      "reading_depth": "full_text_re_read_plus_method_results_demo_and_provenance_audit",
+      "status": "full_text_reviewed",
+      "bounded_findings": [
+        "Processor tone-shaping test bypassed A&R-CTAG and used GPT-4o configs on one 10 s guitar performance with 30 shared scrambled permutations per prompt.",
+        "28 of 1200 scrambled renders were excluded for nonfinite output.",
+        "A&R-versus-CTAG CLAP comparison is a separate synth-side evaluation, not end-to-end CTAG-FX validation.",
+        "RMS matching is not full BS.1770 loudness and true-peak matching.",
+        "Eight NAM captures report ESR 0.0003-0.0815, median 0.0140, without listener or arbitrary-setting generalization validation.",
+        "Official demo exposes a normalized 78-D configuration but states code is coming soon."
+      ],
+      "limitations": [
+        "No CTAG-FX listener study.",
+        "Demo RAW input already includes EQ, 1176, EQ73 and LA-2A processing.",
+        "Demo outputs are not loudness matched.",
+        "Processor mapping, stabilizer implementation, lockfile, license and executable source are unavailable.",
+        "No independent replication established."
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261016-1500-01",
+      "operation": "update",
+      "title": "PEACE repository",
+      "repository": "https://github.com/DBraun/PEACE",
+      "pinned_revision": "2d8a3887501bcdb4779544295845b1e69b6b9b78",
+      "status": "pinned_source_static_audit_not_executed",
+      "checks": {
+        "source_revision_pinned": true,
+        "model_revision_pinned": false,
+        "weight_hash_verified": false,
+        "dependency_lock_found": false,
+        "released_weights_executed": false,
+        "paper_tables_reproduced": false,
+        "renderer_external_safety_guard_present": false
+      },
+      "findings": [
+        "Package version 0.1.0; explicit Hugging Face revision supported but omitted in README example.",
+        "Weight loading validates keys/shapes, not artifact hash.",
+        "Tests use small random models and default render checks, not released-weight paper reproduction.",
+        "DawDreamer fixed at 0.9.0; most other dependencies use ranges.",
+        "Top-level MIT code coexists with CC-BY-NC-4.0 weights and mixed effect-source licenses including GPL/LGPL-derived code."
+      ],
+      "execution_status": "not_run"
+    },
+    {
+      "id": "ART-ML-20261016-1800-01",
+      "operation": "add",
+      "title": "PEACE Hugging Face model",
+      "url": "https://huggingface.co/davidbraun/peace",
+      "status": "metadata_only_noncommercial_weights_manifest_unverified_not_downloaded",
+      "reading_depth": "metadata_only",
+      "verified_metadata": {
+        "author": "davidbraun",
+        "library": "peace",
+        "updated": "2026-09-30",
+        "license": "CC-BY-NC-4.0"
+      },
+      "blockers": [
+        "immutable model revision",
+        "file manifest",
+        "hash verification",
+        "released-weight execution",
+        "rights decision"
+      ],
+      "execution_status": "not_run"
+    },
+    {
+      "id": "ART-ML-20261016-1500-02",
+      "operation": "update",
+      "title": "CTAG-FX official demo",
+      "url": "https://taylor3527eg-hub.github.io/ctag-fx-platform-demo/",
+      "status": "live_demo_static_audit_not_downloaded",
+      "findings": [
+        "One 78-D normalized configuration is inspectable.",
+        "RAW guitar provenance names Channel EQ, UA 1176, T-Racks EQ 73 and Teletronix LA-2A.",
+        "Page warns processed outputs are louder and not loudness matched.",
+        "Code release remains marked coming soon."
+      ],
+      "execution_status": "not_run"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261016-1800-01",
+      "claim": "Use PEACE arXiv v1 as the canonical numerical record where padding differs; camera-ready and arXiv are one evidence family.",
+      "confidence": "high_version_fact"
+    },
+    {
+      "id": "KC-ML-20261016-1800-02",
+      "claim": "The supervised classifier outperforms PEACE retrieval on the closed 420-pair benchmark; require a closed-set baseline.",
+      "confidence": "high_reported_benchmark"
+    },
+    {
+      "id": "KC-ML-20261016-1800-03",
+      "claim": "BoxGraph R@10 61.4 implies 38.6 percent exact-chain omission even under the PEACE benchmark; top-K omission is not negative proof.",
+      "confidence": "high_arithmetic_on_reported_result"
+    },
+    {
+      "id": "KC-ML-20261016-1800-04",
+      "claim": "Pinned source code does not pin model bytes; source revision, model revision and file hashes are separate provenance gates.",
+      "confidence": "high_engineering"
+    },
+    {
+      "id": "KC-ML-20261016-1800-05",
+      "claim": "Toy save/load and default renderer tests do not reproduce pretrained retrieval tables.",
+      "confidence": "high_static_audit"
+    },
+    {
+      "id": "KC-ML-20261016-1800-06",
+      "claim": "PEACE batch rendering needs external finite, peak, silence and stuck-output guards.",
+      "confidence": "medium_high_static_audit"
+    },
+    {
+      "id": "KC-ML-20261016-1800-07",
+      "claim": "PEACE is license-composite; MIT code does not override CC-BY-NC weights or effect-source obligations.",
+      "confidence": "high_license_metadata"
+    },
+    {
+      "id": "KC-ML-20261016-1800-08",
+      "claim": "CTAG-FX processor and A&R representation evaluations are separate and cannot be combined into end-to-end evidence.",
+      "confidence": "high_method_read"
+    },
+    {
+      "id": "KC-ML-20261016-1800-09",
+      "claim": "The CTAG-FX demo RAW input is already processed and variants are not loudness matched, so it cannot support a controlled bypass A/B.",
+      "confidence": "high_official_demo"
+    },
+    {
+      "id": "KC-ML-20261016-1800-10",
+      "claim": "NAM ESR on eight fixed captures is not perceptual equivalence or arbitrary-setting generalization.",
+      "confidence": "high_scope_limit"
+    }
+  ],
+  "candidate_rule_updates": [
+    {
+      "id": "RULE-ML-20261016-1500-01",
+      "revision": 2,
+      "title": "PEACE shortlist gate",
+      "apply_when": "Known 21-effect serial Faust research library with immutable rights-cleared model and artifact manifest.",
+      "change": "Generate top-K hypotheses with uncertainty/none; never auto-select.",
+      "proposed_range": {
+        "top_k": 10,
+        "origin": "paper-reported R@10 evaluation point; not universal"
+      },
+      "baseline": "simple closed-set classifier plus documented heuristic",
+      "protect": [
+        "source loudness",
+        "transients",
+        "stereo intent",
+        "dry/wet identity",
+        "none-of-gallery possibility"
+      ],
+      "exclude": [
+        "exact parameter recovery",
+        "gain/compression estimates",
+        "stereo direction/width",
+        "unknown plugins",
+        "parallel or feedback graphs",
+        "quality ranking"
+      ],
+      "success": "Predeclared held-out exact/order-tolerant retrieval improves over baseline with calibrated abstention.",
+      "cancel": [
+        "source/model hashes unresolved",
+        "rights incompatible",
+        "nonfinite or stuck render",
+        "baseline equal or better"
+      ],
+      "confidence": "low_to_medium_known_library_research_only",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261016-1500-02",
+      "revision": 2,
+      "title": "CTAG-FX configuration candidate gate",
+      "apply_when": "Native executable renderer, mapping, stabilizer, dependencies, license and exact configuration are frozen.",
+      "change": "Compare one frozen CTAG-FX config with native bypass on truly dry project-owned guitar.",
+      "exclude": [
+        "official demo audio",
+        "already processed source material",
+        "NAM capture in the same test"
+      ],
+      "protect": [
+        "pick attack",
+        "note separation",
+        "low-end continuity",
+        "stereo image",
+        "headroom",
+        "section role"
+      ],
+      "verify": "Raw renders plus separate attenuation-only BS.1770 loudness-matched listening copies; finite/peak/silence/stuck checks.",
+      "cancel": [
+        "mapping or provenance unresolved",
+        "true-peak violation",
+        "instability",
+        "no blind preference over bypass"
+      ],
+      "confidence": "low_research_only",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261016-1800-01",
+      "operation": "add",
+      "title": "PEACE retrieval baseline gate",
+      "status": "not_run_blocked",
+      "type": "offline_technical_benchmark_not_listening_ab",
+      "A": "simple closed-set classifier or documented nearest-template baseline",
+      "B": "PEACE retrieval with K=10",
+      "one_varied_factor": "retrieval method",
+      "fixed": [
+        "source and model revisions",
+        "effect gallery",
+        "renderer",
+        "fixtures",
+        "splits",
+        "metrics"
+      ],
+      "material": "locally generated project-owned dry fixtures; no third-party upload",
+      "measures": [
+        "exact chain R@1/R@10",
+        "order-tolerant recall",
+        "per-effect confusion",
+        "active/inactive strata",
+        "abstention coverage",
+        "failure rate",
+        "finite/peak/silence/stuck guards"
+      ],
+      "success": "B improves predeclared primary metric over A without worse invalid-output rate and with useful calibrated abstention.",
+      "cancel": [
+        "model hash or rights unresolved",
+        "paper-table replay fails",
+        "A equal or better"
+      ],
+      "blockers": [
+        "immutable model revision/hash",
+        "dependency lock",
+        "renderer parity",
+        "fixture manifest",
+        "license decision"
+      ],
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20261016-1500-01",
+      "operation": "update",
+      "revision": 2,
+      "title": "CTAG-FX native bypass A/B",
+      "status": "not_run_blocked",
+      "A": "native bypass",
+      "B": "one frozen native CTAG-FX configuration",
+      "one_varied_factor": "CTAG-FX enabled versus bypass",
+      "material": "truly dry project-owned guitar, solo and frozen full-mix section; demo audio excluded",
+      "loudness_alignment": "Preserve raw measurement renders and make separate attenuation-only BS.1770 loudness-matched listening copies.",
+      "measures": [
+        "sample peak",
+        "true peak",
+        "integrated and short-term loudness",
+        "crest",
+        "stereo correlation",
+        "blind preference"
+      ],
+      "safety_gates": [
+        "finite",
+        "no unexpected silence",
+        "no stuck output",
+        "no clip or true-peak violation",
+        "exact config and renderer hash"
+      ],
+      "protected_qualities": [
+        "pick attack",
+        "note separation",
+        "low-end continuity",
+        "image stability",
+        "headroom",
+        "section role"
+      ],
+      "success": "Blind repeatable preference for B at matched loudness with no protected-quality failure.",
+      "cancel": [
+        "renderer or provenance gate fails",
+        "loudness advantage explains preference",
+        "instability",
+        "B loses to bypass"
+      ],
+      "blockers": [
+        "public code",
+        "processor mapping",
+        "stabilizer",
+        "dependency lock",
+        "license",
+        "render fixture"
+      ],
+      "notes": [
+        "NAM excluded; native-versus-NAM parity is a separate later null/ABX."
+      ],
+      "auto_apply": false
+    }
+  ],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "Snare parallel-send 0/-3 dB A/B after latency preflight",
+    "Distorted-bass clean-low plus character-layer A/B",
+    "Opus provenance and bitrate-stratum completion",
+    "Delivery-only Opus listening experiment",
+    "vst-bench third-party plugin provenance/stereo audit",
+    "PEACE immutable model revision/hash, lock, paper-table replay and mixed-license decision",
+    "EXP-ML-20261016-1800-01",
+    "CTAG-FX executable mapping/stabilizer/license release",
+    "EXP-ML-20261016-1500-01 revision 2",
+    "Separate native CTAG-FX versus NAM null/ABX",
+    "LLM2Fx, MPASCNet and earlier blocked artifact queues",
+    "Three metadata-only YouTube sources carried from ML-2026-10-16-1500"
+  ],
+  "boundaries": {
+    "free_access_only": true,
+    "audio_downloaded": false,
+    "audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "paid_service_used": false,
+    "gpu_or_job_started": false,
+    "external_space_started": false,
+    "code_executed": false,
+    "model_weights_downloaded": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "model_changed": false
+  },
+  "next_executable_experiment_id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800"
+}
