@@ -655,3 +655,11 @@ ML-2026-10-15-1800 (deep_review, preceding search ML-2026-10-15-1500): reported 
 | ML-2026-10-16-0900 | [Report](ML-2026-10-16-0900.md) · [JSON patch](ML-2026-10-16-0900.json) · [ADR](../adr/mixing-learning-2026-10-16-0900.md) | Search: 2 fresh full-text preprints, 1 public plugin-render artifact audit, 2 full official bass companion/editorial sources, 7 Knowledge Cards, 2 bounded candidate rules, 1 not-run distorted-bass A/B and 2 new metadata-only queued videos; 3 video duplicates removed; no audio, DSP, runtime or model change |
 
 ML-2026-10-16-0900 (search, previous successful search ML-2026-10-15-1500): plugin-render hashes prove tested-stack consistency, not portability, scientific suitability or perceptual quality. Non-significant difference is not equivalence. Clean-low plus distorted-upper bass remains an engineer-specific dense-rock hypothesis with source-specific ranges; both new videos remain unstudied without permitted transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false and EXP-ML-20261016-0900-01 remains not_run.
+
+## 2026-10-16 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-16-1200 | [Report](ML-2026-10-16-1200.md) · [JSON patch](ML-2026-10-16-1200.json) · [ADR](../adr/mixing-learning-2026-10-16-1200.md) | Deep review: full Opus released-data recount plus pinned vst-bench package/host source audit; 2 Source Cards and 1 Artifact Audit updated, 1 Artifact Audit and 9 Knowledge Cards added, 2 rules and 2 not-run experiments revised/added; no video/reference/audio/DSP/runtime/model change |
+
+ML-2026-10-16-1200 (deep_review, source search ML-2026-10-16-0900): target 160 unconstrained VBR produced 159–213 kbps across the released Phase-2 samples and is not a project delivery threshold. Phase 2 is a BLUP-selected stress set, not independent expert validation. The vst-bench default normalized-only export and channel-mean QC are insufficient as sole raw/stereo evidence; raw preservation, host-side attempt traces and per-channel/M-S checks are now required. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
