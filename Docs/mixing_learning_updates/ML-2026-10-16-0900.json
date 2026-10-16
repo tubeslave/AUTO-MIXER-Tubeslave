@@ -1,0 +1,202 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-16-0900",
+  "mode": "search",
+  "planned_slot_msk": "2026-10-16T09:00:00+03:00",
+  "actual_start_msk": "2026-10-16T08:58:01+03:00",
+  "report_fixed_msk": "2026-10-16T09:03:00+03:00",
+  "preceding_successful_search_update_id": "ML-2026-10-15-1500",
+  "immediate_predecessor": "ML-2026-10-15-1800",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false,
+    "paid_service_used": false
+  },
+  "search_summary": {
+    "source_cards_added": 4,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 7,
+    "candidate_rules_added": 2,
+    "experiments_added": 1,
+    "videos_studied": 0,
+    "videos_queued_new": 2,
+    "video_duplicates_removed": 3,
+    "reference_cards_added": 0,
+    "raw_multitracks_added": 0
+  },
+  "source_cards_add": [
+    {
+      "id": "SRC-ML-20261016-0900-01",
+      "type": "preprint_software_paper",
+      "title": "vst-bench-ml: Auditable Dataset Generation for Audio Plugins",
+      "stable_id": "arxiv:2610.20465v1",
+      "doi": "10.48550/arXiv.2610.20465",
+      "url": "https://arxiv.org/abs/2610.20465",
+      "published_utc": "2026-10-14T16:46:39Z",
+      "reading_depth": "full_text_all_11_pages",
+      "peer_review_status": "submitted_under_review",
+      "bounded_conclusion": "plugin_rendered_evidence_needs_host_plugin_parameter_input_output_and_failure_provenance",
+      "limitations": ["single_author_self_funded", "AI_assisted_internal_validation", "one_fixture_host_platform", "no_perceptual_or_model_experiment", "no_cross_machine_identity"]
+    },
+    {
+      "id": "SRC-ML-20261016-0900-02",
+      "type": "preprint_listening_study",
+      "title": "Evaluating perceptual transparency of lossy music audio compression with Opus codec",
+      "stable_id": "arxiv:2610.20246v1",
+      "doi": "10.48550/arXiv.2610.20246",
+      "url": "https://arxiv.org/abs/2610.20246",
+      "published_utc": "2026-10-14T14:19:46Z",
+      "reading_depth": "full_text_all_5_pages",
+      "peer_review_status": "submitted_to_ICASSP_2027",
+      "bounded_conclusion": "absence_of_difference_is_not_equivalence_and_small_impairment_tests_need_listener_material_aware_models_plus_predefined_equivalence_margin",
+      "limitations": ["codec_not_mixing_task", "fixed_booth_headphone_setup", "curated_difficult_material", "phase2_selected_from_phase1", "broader_equipment_and_experts_needed"]
+    },
+    {
+      "id": "SRC-ML-20261016-0900-03",
+      "type": "official_educational_article",
+      "title": "Mixing Secrets - Volume 2: Bass",
+      "url": "https://urm.academy/mixing-secrets-volume-bass/",
+      "published": "2017-02-02",
+      "reading_depth": "full_web_article",
+      "bounded_conclusion": "clean_low_plus_distorted_upper_bass_is_a_dense_rock_metal_workflow_hypothesis_with_source_specific_ranges",
+      "numbers_origin": {"low_branch_lpf_hz": [100, 300], "grit_branch_hpf_hz": [450, 1000], "accent_compression_gr_db": [5, 10]},
+      "limitations": ["commercial_educational_not_scientific", "one_publisher_family", "ranges_not_presets", "foolproof_no_compromises_claim_rejected"]
+    },
+    {
+      "id": "SRC-ML-20261016-0900-04",
+      "type": "official_video_companion_article",
+      "title": "Nolly from PERIPHERY dials in a bass tone",
+      "url": "https://urm.academy/nolly-periphery-dials-bass-tone/",
+      "published": "2016-11-14",
+      "reading_depth": "full_companion_article_video_not_transcribed",
+      "bounded_conclusion": "multiband_saturation_is_presented_as_an_alternative_to_clean_distorted_track_split",
+      "timestamp_from_companion": "00:04:30_approx",
+      "limitations": ["video_content_not_obtained", "no_parameter_extraction", "publisher_rhetoric_not_measurement"]
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261016-0900-01",
+      "package_repository": "https://github.com/itsuzef/vst-bench-ml-public",
+      "companion_repository": "https://github.com/itsuzef/vst-bench-dataset-host-public",
+      "package_index": "https://pypi.org/project/vst-bench-ml/0.1.1/",
+      "version": "0.1.1",
+      "release_date": "2026-09-29",
+      "reading_depth": "repository_landing_README_PyPI_metadata_licence_boundaries_no_execution",
+      "licence": "MIT_source_companion_CC0_only_for_qualifying_sample_free_fixture_outputs",
+      "status": "available_not_executed_fixture_scope_only",
+      "code_executed": false
+    }
+  ],
+  "video_source_cards_add": [
+    {
+      "id": "VID-ML-20261016-0900-01",
+      "stable_id": "youtube:00kI0Ashqp8",
+      "title": "Setting Bass Guitar On A Heavy Mix / using Waves L1 to limit a bass low-end track",
+      "channel": "Nail The Mix / URM",
+      "url": "https://www.youtube.com/watch?v=00kI0Ashqp8",
+      "status": "queued_source",
+      "content_access": "metadata_and_official_companion_context_only_transcript_unavailable",
+      "video_studied": false,
+      "findings": []
+    },
+    {
+      "id": "VID-ML-20261016-0900-02",
+      "stable_id": "youtube:Oq62X1hQoFY",
+      "title": "Nolly from Periphery dials in a bass tone - Nail The Mix preview",
+      "channel": "Nail The Mix / URM",
+      "url": "https://www.youtube.com/watch?v=Oq62X1hQoFY",
+      "published": "2016-11-14",
+      "status": "queued_source",
+      "content_access": "official_companion_article_read_transcript_unavailable",
+      "companion_timestamp": "00:04:30_approx",
+      "video_studied": false,
+      "findings": []
+    }
+  ],
+  "deduplicated_rediscoveries": ["youtube:oeAqqQndaBg", "youtube:qQzRy1WLF0A", "youtube:2hplhOnwmUk"],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261016-0900-01","claim":"Plugin-rendered evidence requires identity parameter input output and failure provenance; preset name is insufficient.","confidence":"high_for_governance"},
+    {"id":"KC-ML-20261016-0900-02","claim":"Matching hashes establish consistency with a manifest on the tested stack but not manifest origin scientific fitness portability or perceptual quality.","confidence":"high"},
+    {"id":"KC-ML-20261016-0900-03","claim":"A non-significant difference test does not establish equivalence; define a practical margin and run an equivalence test.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261016-0900-04","claim":"Sparse randomized listening observations require listener and excerpt aware repeated-measures or clustered analysis.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261016-0900-05","claim":"Worst-case listener and material selection increases stress-test sensitivity but does not replace independent confirmation.","confidence":"high_for_test_design"},
+    {"id":"KC-ML-20261016-0900-06","claim":"Clean-low plus distorted-upper bass is an engineer-specific dense-rock hypothesis and source crossover ranges are not presets.","confidence":"medium_low_engineering"},
+    {"id":"KC-ML-20261016-0900-07","claim":"An official companion timestamp can identify a technique location but does not prove video parameters or an A/B result without the video content.","confidence":"high_for_evidence_depth"}
+  ],
+  "candidate_rules_add": [
+    {
+      "id": "RULE-ML-20261016-0900-01",
+      "when": "research_render_dataset_or_AB_uses_third_party_plugin_or_host",
+      "change": "record_host_plugin_binary_identity_versions_hashes_ordered_parameter_manifest_input_seed_reset_readback_render_settings_raw_output_hashes_and_failures",
+      "protect": ["rights_boundary", "reproducibility", "raw_headroom_length_channel_tail", "auditability"],
+      "verify": "manifest_seal_file_hashes_count_reconciliation_and_fresh_process_replay_on_pinned_environment_then_separate_perceptual_scientific_validation",
+      "cancel": ["identity_incomplete", "reset_readback_missing", "licence_unclear", "output_mismatch", "manifest_verification_substituted_for_listening"],
+      "confidence": "high_for_governance",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261016-0900-02",
+      "when": "dense_rock_or_metal_section_and_bass_lacks_audibility_while_clean_low_and_kick_relation_are_stable",
+      "change": "add_one_frozen_high_passed_distortion_or_multiband_saturation_return_while_main_bass_and_low_band_remain_unchanged",
+      "settings_origin": "URM_tutorial_grit_HPF_450_to_1000_Hz_is_a_search_range_not_default_choose_and_freeze_one_value_before_AB",
+      "protect": ["sub_stability", "kick_separation", "note_articulation", "transient_and_crest", "guitar_and_vocal_clarity", "mono", "noise", "section_intent"],
+      "verify": "latency_polarity_null_preflight_raw_QC_then_BS1770_matched_true_peak_safe_full_mix_and_band_limited_blind_Dmitry_AB",
+      "cancel": ["preference_disappears_after_level_match", "low_end_or_mono_regression", "guitar_or_vocal_masking", "fret_or_noise_harshness", "pumping", "benefit_only_in_solo"],
+      "confidence": "medium_low_engineering",
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261016-0900-01",
+      "status": "not_run",
+      "material": "project_owned_bass_DI_and_full_mix_with_dense_chorus_and_sparser_verse",
+      "preflight": ["duplicate_path_aligned", "empty_identity_return_nulls_against_bypass", "deterministic_render", "finite_output", "tail_length_channel_unchanged"],
+      "A": "approved_current_bass_chain_new_grit_return_muted",
+      "B": "same_chain_plus_one_frozen_high_passed_distorted_or_multiband_saturation_return",
+      "only_factor": "grit_return_off_vs_on_with_frequency_drive_mix_and_return_gain_frozen_before_render",
+      "alignment": "archive_raw_then_make_separate_BS1770_matched_true_peak_safe_copies_with_common_pair_attenuation_and_sealed_randomized_key",
+      "measurements": ["integrated_and_short_term_loudness", "true_peak", "crest_and_onset", "band_energy", "bass_kick_low_band_interaction", "stereo_and_mono_residual", "noise", "section_wise_audibility"],
+      "protect": ["sub_weight", "kick_definition", "bass_articulation", "guitar_and_vocal_clarity", "groove_and_dynamics", "mono", "absence_of_harshness_and_pumping"],
+      "success": "B_preferred_by_Dmitry_after_loudness_match_in_full_mix_and_band_limited_playback_without_protected_quality_regression",
+      "cancel": ["null_or_alignment_failure", "level_only_preference", "no_section_consistent_improvement", "low_end_mono_clarity_or_noise_regression"],
+      "auto_apply": false
+    }
+  ],
+  "references_and_multitracks": {"reference_cards_added": 0, "raw_multitracks_added": 0, "reason": "free_compatible_raw_audio_rights_not_verified"},
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "ART-ML-20261016-0900-01:deep_code_schema_and_cross_platform_boundary_audit",
+    "SRC-ML-20261016-0900-02:released_data_analysis_and_phase_selection_audit",
+    "EXP-ML-20261016-0900-01",
+    "LLM2FX-TOOLS-ARTIFACT-MANIFEST",
+    "EXP-ML-20261015-1500-01:revision_2",
+    "MPASCNET-CHECKPOINT-MANIFEST",
+    "MPASCNET-EVALUATION-MANIFEST",
+    "MPASCNET-RAW-CLAMPED-PARITY",
+    "MPASCNET-STEREO-GUARD",
+    "PENA-13-TO-8-MAPPING-NULL",
+    "freeze_renderer_version_mode_thresholds_EXP-ML-20261013-1200-01",
+    "ART-ML-20261012-1500-01/EXP-ML-20261012-1800-01",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "rights_audit_REF-ML-20261013-0900-01",
+    "transcript_queues_including_VID-ML-20261016-0900-01/02",
+    "resolve_REF-ML-20261014-0900-01_metadata_mismatch_and_provenance",
+    "obtain_or_reconstruct_and_parity_test_DAFx26_torchcomp_patch",
+    "existing_blocked_bass_restoration_RIR_time_stretch_experiments"
+  ]
+}
+
