@@ -1,0 +1,231 @@
+{
+  "schema_version": "mixing-learning-update/1.0",
+  "update_id": "ML-2026-10-16-1200",
+  "mode": "deep_review",
+  "planned_slot_msk": "2026-10-16T12:00:00+03:00",
+  "actual_start_msk": "2026-10-16T11:55:37+03:00",
+  "report_fixed_msk": "2026-10-16T12:06:38+03:00",
+  "preceding_successful_search_update_id": "ML-2026-10-16-0900",
+  "immediate_predecessor": "ML-2026-10-16-0900",
+  "citation_check": "partial",
+  "policy": {
+    "free_open_sources_only": true,
+    "audio_downloaded": false,
+    "external_audio_uploaded": false,
+    "code_executed": false,
+    "training_run": false,
+    "inference_run": false,
+    "listening_run": false,
+    "audio_mutated": false,
+    "dsp_mutated": false,
+    "runtime_mutated": false,
+    "model_mutated": false,
+    "paid_service_used": false
+  },
+  "deep_review_summary": {
+    "source_cards_updated": 2,
+    "artifact_audits_updated": 1,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 9,
+    "candidate_rules_updated": 1,
+    "candidate_rules_added": 1,
+    "experiments_updated": 1,
+    "experiments_added": 1,
+    "videos_studied": 0,
+    "videos_queued_carried": 2,
+    "reference_cards_added": 0,
+    "raw_multitracks_added": 0
+  },
+  "source_cards_update": [
+    {
+      "id": "SRC-ML-20261016-0900-01",
+      "stable_id": "arxiv:2610.20465v1",
+      "reading_depth": "full_text_plus_pinned_package_and_companion_source_audit_no_execution",
+      "package_tag_commit": "v0.1.1:25c839ba41ec6598a844dd2bbc0e91ae47073c3b",
+      "companion_tag_commit": "v0.1.1:783e1d9604e819ea2f10d4427a64ba7238b84bd1",
+      "bounded_conclusion": "core_manifest_integrity_complete_attempt_provenance_raw_amplitude_evidence_and_stereo_QC_are_separate_layers",
+      "limitations": [
+        "one_self_authored_synthetic_fixture",
+        "fixture_is_dual_mono_MIDI_instrument_without_audio_input",
+        "validated_render_scope_macos_arm64_only",
+        "default_path_discards_raw_WAV_after_normalized_NPZ_export",
+        "silence_and_clip_QC_use_channel_mean",
+        "not_executed_in_this_review"
+      ]
+    },
+    {
+      "id": "SRC-ML-20261016-0900-02",
+      "stable_id": "arxiv:2610.20246v1",
+      "reading_depth": "full_text_plus_all_released_Zenodo_CSVs",
+      "release_record": "https://zenodo.org/records/22830003",
+      "bounded_conclusion": "configured_unconstrained_VBR_target_is_not_observed_bitrate_and_selected_phase2_stress_set_is_not_independent_population_validation",
+      "phase1_rows": 735,
+      "phase2_rows": 320,
+      "phase2_subjects": ["B","C","G","H","I","L","M","R","T","Y"],
+      "phase2_samples": [1,2,5,7,9,10,11,20],
+      "phase2_target160_actual_average_kbps": [213,201,160,188,174,195,159,201],
+      "phase2_target160_actual_range_kbps": [159,213],
+      "limitations": [
+        "preprint_submitted_to_ICASSP_2027",
+        "analysis_code_unavailable",
+        "stimuli_and_encoded_files_unavailable",
+        "session_order_AB_assignment_and_timestamp_unavailable",
+        "phase2_people_and_material_selected_from_phase1_extrema",
+        "random_intercepts_without_random_slopes",
+        "equivalence_margin_not_project_validated"
+      ]
+    }
+  ],
+  "artifact_audits_update": [
+    {
+      "id": "ART-ML-20261016-0900-01",
+      "revision": 2,
+      "status": "source_audited_not_executed",
+      "validated_scope": [
+        "tagged_source_identity",
+        "manifest_structure",
+        "default_export_and_QC_path",
+        "fixture_host_restrictions",
+        "documented_and_CI_validation_scope"
+      ],
+      "not_validated": [
+        "build_or_tests",
+        "wheel_install",
+        "plugin_execution",
+        "second_machine_hashes",
+        "third_party_plugin",
+        "audio_effect_input_path",
+        "Windows_or_Linux_host",
+        "perceptual_or_scientific_utility"
+      ],
+      "critical_boundaries": [
+        "core_integrity_is_not_complete_per_attempt_execution_evidence",
+        "raw_pre_normalization_render_not_retained_by_default",
+        "channel_mean_QC_is_not_general_stereo_QC"
+      ],
+      "code_executed": false
+    }
+  ],
+  "artifact_audits_add": [
+    {
+      "id": "ART-ML-20261016-1200-01",
+      "type": "released_data_audit",
+      "record": "https://zenodo.org/records/22830003",
+      "published": "2026-09-18",
+      "version": "v1",
+      "reading_depth": "all_released_CSV_content_and_record_metadata_no_audio_or_analysis_code",
+      "file_md5": {
+        "results_phase1.csv": "52d54cb6f4cf2e14a6aa14d688bd7437",
+        "results_phase2.csv": "192030726632b1e30e0ad5fc284842c6",
+        "sample_index.csv": "46352fd11c1dd3ac9e2fb2304a96b613",
+        "subject_index.csv": "061433d39c2562919ba9c5dd6520f5fe"
+      },
+      "reconciled": [
+        "row_counts",
+        "phase2_subject_and_sample_set",
+        "target_and_actual_bitrate_table",
+        "union_of_five_screened_subjects"
+      ],
+      "unreconciled": [
+        "exact_LMM_and_TOST_implementation",
+        "screening_attribution_order",
+        "optimizer_and_model_diagnostics",
+        "stimuli_identity_and_hashes",
+        "per_trial_session_and_order"
+      ],
+      "status": "partial_reproducibility_descriptive_data_only"
+    }
+  ],
+  "knowledge_cards_add": [
+    {"id":"KC-ML-20261016-1200-01","claim":"Configured VBR target is not observed bitrate; report both target and per-file actual distribution.","confidence":"high"},
+    {"id":"KC-ML-20261016-1200-02","claim":"BLUP-selected critical listeners and material form a conditional stress set, not an independent expert-population validation.","confidence":"high"},
+    {"id":"KC-ML-20261016-1200-03","claim":"Overlapping post-screen filters need explicit order and analysis code; matching retained N alone does not reproduce classification.","confidence":"high"},
+    {"id":"KC-ML-20261016-1200-04","claim":"Random-intercept-only LMM accounts for baseline listener and material heterogeneity but not condition-specific random slopes or interactions.","confidence":"high_for_method"},
+    {"id":"KC-ML-20261016-1200-05","claim":"Released ratings without analysis code, stimuli and trial/session identifiers provide partial rather than end-to-end reproducibility.","confidence":"high"},
+    {"id":"KC-ML-20261016-1200-06","claim":"Core manifest integrity and complete per-attempt execution provenance are different evidence layers.","confidence":"high_for_governance"},
+    {"id":"KC-ML-20261016-1200-07","claim":"Normalized-only audio export cannot replace raw render evidence for gain dynamics clipping or model-target fidelity.","confidence":"high_for_governance"},
+    {"id":"KC-ML-20261016-1200-08","claim":"Mono-summed silence and clip QC can hide stereo channel overload or cancel anti-phase content.","confidence":"high"},
+    {"id":"KC-ML-20261016-1200-09","claim":"Deterministic validation on a dual-mono synthetic instrument does not establish behavior for third-party stereo audio effects.","confidence":"high"}
+  ],
+  "candidate_rules_update": [
+    {
+      "id": "RULE-ML-20261016-0900-01",
+      "revision": 2,
+      "when": "plugin_rendered_audio_supports_research_dataset_or_AB",
+      "change": "retain_immutable_raw_pre_normalization_output_and_separate_matched_derivatives_plus_host_side_attempt_trace_identity_readback_reset_input_output_and_failure_provenance",
+      "protect": ["rights_boundary","raw_amplitude_and_transients","channel_relationships","length_and_tail","deterministic_replay","failure_completeness"],
+      "verify": "core_manifest_consistency_plus_host_side_attempt_trace_per_channel_and_MS_QC_fresh_process_replay_and_independent_validation_for_each_claimed_platform_or_plugin",
+      "cancel": ["only_normalized_outputs_retained","readback_or_reset_only_advertised","host_trace_incomplete","mono_QC_substitutes_for_channel_QC","rights_unclear","output_mismatch","fixture_generalized_beyond_scope"],
+      "confidence": "high_for_governance",
+      "auto_apply": false
+    }
+  ],
+  "candidate_rules_add": [
+    {
+      "id": "RULE-ML-20261016-1200-01",
+      "when": "evaluating_lossy_delivery_or_reference_codec",
+      "change": "record_encoder_version_mode_constraint_configured_target_and_actual_per_file_bitrate_without_transferring_external_threshold",
+      "protect": ["source_identity","loudness","true_peak","stereo_image","transients","cymbals","distortion","ambience","metadata_alignment"],
+      "verify": "project_owned_excerpts_raw_and_separately_loudness_matched_blind_pair_listener_and_material_aware_analysis_and_predeclared_project_margin",
+      "cancel": ["encoder_or_config_mismatch","actual_bitrate_missing","unrepresentative_material","level_driven_preference","CI_crosses_practical_margin","protected_quality_regression"],
+      "confidence": "high_for_method_low_for_specific_160kbps_transfer",
+      "auto_apply": false
+    }
+  ],
+  "experiments_update": [
+    {
+      "id": "EXP-ML-20261016-0900-01",
+      "revision": 2,
+      "status": "not_run",
+      "only_factor": "frozen_grit_return_off_vs_on",
+      "new_gates": [
+        "archive_raw_A_and_B_before_normalization",
+        "create_separate_matched_copies_with_common_pair_attenuation",
+        "per_channel_peak_and_clip_checks",
+        "MS_and_mono_checks",
+        "default_normalized_only_vst_bench_export_is_not_raw_evidence"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "experiments_add": [
+    {
+      "id": "EXP-ML-20261016-1200-01",
+      "status": "not_run",
+      "material": "project_owned_full_mix_excerpts_dense_chorus_cymbal_rich_ambient_and_transient",
+      "A": "lossless_reference",
+      "B": "one_pinned_local_libopus_encode_decode_configuration",
+      "only_factor": "codec_off_vs_on",
+      "replication_note": "target_160_VBR_may_be_initial_replication_setting_not_a_preset",
+      "raw_evidence": ["encoder_version_and_hash","exact_command_and_config","configured_target","actual_bytes_duration_and_bitrate","decoded_file_hash"],
+      "alignment": "sample_align_and_length_check_archive_raw_then_create_separate_BS1770_matched_true_peak_safe_blind_copies_with_sealed_key",
+      "measurements": ["actual_bitrate_distribution","integrated_and_short_term_loudness","sample_and_true_peak","crest_and_onset","protected_band_spectrum","stereo_correlation_and_MS_residual","sectionwise_null_error_energy"],
+      "protect": ["cymbal_texture","distorted_guitar_edge","bass_definition","attacks","ambience_and_reverb_tails","stereo_and_mono_stability"],
+      "success": "no_consistent_audible_impairment_for_Dmitry_on_selected_project_material_and_equivalence_only_with_predeclared_margin_and_adequate_repeats",
+      "cancel": ["encoder_or_config_mismatch","actual_bitrate_missing","sync_or_length_mismatch","clipping","level_only_preference","section_specific_artifact","CI_not_contained_within_practical_margin"],
+      "auto_apply": false
+    }
+  ],
+  "video_source_cards_carried": [
+    {"id":"VID-ML-20261016-0900-01","status":"queued_source","video_studied":false},
+    {"id":"VID-ML-20261016-0900-02","status":"queued_source","video_studied":false}
+  ],
+  "references_and_multitracks": {
+    "reference_cards_added": 0,
+    "raw_multitracks_added": 0
+  },
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261015-0900-01",
+    "EXP-ML-20261016-0900-01:revision_2",
+    "Opus_analysis_script_stimuli_provenance_or_screening_order_clarification",
+    "EXP-ML-20261016-1200-01:only_for_real_delivery_task",
+    "vst_bench_independent_third_party_and_cross_platform_validation",
+    "LLM2FX-TOOLS-ARTIFACT-MANIFEST",
+    "MPASCNET-CHECKPOINT-EVALUATION-RAW-CLAMP-STEREO-GATES",
+    "PENA-13-TO-8-MAPPING-PITCH-RENDERER-DIFFVOX-GATES",
+    "full_review_arxiv:2610.12250",
+    "full_review_arxiv:2610.11884",
+    "CoExist_rights_transcript_queues_and_existing_blocked_experiments"
+  ]
+}
