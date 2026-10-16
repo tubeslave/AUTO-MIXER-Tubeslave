@@ -671,3 +671,11 @@ ML-2026-10-16-1200 (deep_review, source search ML-2026-10-16-0900): target 160 u
 | ML-2026-10-16-1500 | [Report](ML-2026-10-16-1500.md) · [JSON patch](ML-2026-10-16-1500.json) · [ADR](../adr/mixing-learning-2026-10-16-1500.md) | Search: 2 fresh full-text papers, 2 artifact audits, 1 full official companion article, 8 Knowledge Cards, 2 bounded shadow-only rules, 1 blocked A/B, 0 studied and 3 metadata-only queued guitar videos, 1 catalogue-only multitrack candidate; no audio, DSP, runtime or model change |
 
 ML-2026-10-16-1500 (search, previous successful search ML-2026-10-16-0900): PEACE can rank known Faust-chain hypotheses but does not recover exact settings, gain/compression or stereo direction and is weak on several dynamics effects. CTAG-FX supports structured candidate generation, not perceptual or semantic validity; its new guitar A/B is blocked pending code/configuration and finite-output provenance gates. All three videos remain unstudied without permitted transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-16 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-16-1800 | [Report](ML-2026-10-16-1800.md) · [JSON patch](ML-2026-10-16-1800.json) · [ADR](../adr/mixing-learning-2026-10-16-1800.md) | Deep review: PEACE version/results and pinned repository/weight/licence audit plus CTAG-FX method/demo provenance audit; 2 Source Cards and 2 Artifact Audits updated, 1 Artifact Audit and 10 Knowledge Cards added, 2 rules revised, 1 blocked benchmark added and 1 blocked A/B revised; no video/reference/audio/DSP/runtime/model change |
+
+ML-2026-10-16-1800 (deep_review, source search ML-2026-10-16-1500): PEACE arXiv v1 is now the canonical numerical record because the camera-ready path used different padding; both versions are one evidence family. A supervised closed-set classifier outperformed retrieval on the reported 420-pair benchmark, so PEACE now requires a baseline, abstention and immutable model/licence gates. CTAG-FX demo “RAW” guitar is already processed and its variants are not loudness matched, so the A/B remains blocked until native code and provenance are frozen. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
