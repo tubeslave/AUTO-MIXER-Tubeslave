@@ -1,0 +1,144 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-17-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-17T18:00:00+03:00",
+  "actual_start": "2026-10-17T18:01:41+03:00",
+  "report_time": "2026-10-17T18:04:29+03:00",
+  "preceding_successful_search_id": "ML-2026-10-17-1500",
+  "immediate_predecessor_id": "ML-2026-10-17-1500",
+  "citation_check": "partial",
+  "summary": {
+    "source_cards_updated": 2,
+    "full_text_sources_completed": 1,
+    "artifact_audits_added": 2,
+    "knowledge_cards_added": 9,
+    "candidate_rules_updated": 2,
+    "experiments_updated": 2,
+    "videos_studied": 0,
+    "queued_videos_carried": 3,
+    "references_added": 0,
+    "audio_executed": false,
+    "code_or_model_executed": false,
+    "dsp_or_runtime_changed": false
+  },
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261017-1500-02",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_50",
+      "reading_depth": "full_text_complete_8_pages",
+      "status": "full_text_reviewed",
+      "quantitative_scope": {"tasks": ["oboe_to_piano", "string_to_clarinet"], "samples_per_configuration": 50, "unconditional_fad_references": 100, "transfer_guidance": 30, "reference_guidance": 7, "inference_steps": 100},
+      "evidence_revision": "tau_init about 0.8 and JD/FAD bounds are informal-listening, model-specific observations, not controlled listener thresholds",
+      "metric_limits": ["pitch-set Jaccard omits order, timing, duration and dynamics", "mono pitch extraction cannot protect stereo", "FAD does not protect groove, attacks, identity or arrangement", "FAD reference guidance differs from transfer guidance"],
+      "application_limits": ["MIDI-to-real and enhancement are qualitative examples", "human-voice guides are weaker", "percussive/drum suppression is ineffective", "unwanted sources may persist or become artificial"],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261017-1500-01",
+      "stable_id": "conference:dafx:2026:DAFx26_challenge_80",
+      "reading_depth": "full_text_complete_3_pages",
+      "status": "full_text_reviewed_artifact_pinned",
+      "artifact_id": "ART-ML-20261017-1800-02",
+      "scope_revision": "official challenge is synthetic-only; normalized WAV previews discard amplitude required for physical estimation",
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261017-1800-01",
+      "source_id": "SRC-ML-20261017-1500-02",
+      "url": "https://github.com/CristobalAndrade/Audio-to-Audio-via-Diffusion-Warm-Initialization",
+      "commit": "0ff2bbd289014d077e7a63cfafef536188e23414",
+      "reading_depth": "repository_metadata_readme_and_recursive_tree",
+      "found": ["GitHub Pages companion", "timbre-transfer examples", "MIDI-to-real examples", "enhancement examples", "lambda/noise sweep WAVs"],
+      "missing": ["implementation code", "frozen environment", "model revision/hash", "seed manifest", "evaluation scripts", "listener protocol", "release tag", "licence file"],
+      "license": "not_declared_in_repository_metadata_or_root_tree",
+      "executed": false
+    },
+    {
+      "id": "ART-ML-20261017-1800-02",
+      "source_id": "SRC-ML-20261017-1500-01",
+      "url": "https://github.com/LOGUNIVPM/1st-DAFx-Challenge",
+      "commit": "7ff3859a2fae592a3f256649a0880149a98b653a",
+      "reading_depth": "repository_metadata_readme_and_root_manifest",
+      "found": ["synthetic dataset", "ModalPlate simulator", "Task A and Task B baselines", "evaluators", "technical reports", "challenge details"],
+      "data_rule": "use unnormalized NPZ displacement for scientific estimation; peak-normalized WAV is listening-only",
+      "limits": ["synthetic-only official evidence", "hidden official test labels", "no measured real-plate external set identified"],
+      "license": "not_declared_in_repository_metadata_or_root_manifest",
+      "executed": false
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261017-1800-01","claim":"The reported tau_init about 0.8 region is exploratory informal-listening evidence, not a controlled perceptual threshold.","confidence":"high_evidence_classification"},
+    {"id":"KC-ML-20261017-1800-02","claim":"Warm-initialization FAD uses transfer guidance 30 versus reference guidance 7, making numeric thresholds setup-specific.","confidence":"high_method_detail"},
+    {"id":"KC-ML-20261017-1800-03","claim":"Pitch-set Jaccard omits note order, timing, duration, dynamics and stereo and cannot protect groove or transients.","confidence":"high_metric_scope_limit"},
+    {"id":"KC-ML-20261017-1800-04","claim":"Only two timbre-transfer directions receive quantitative sweeps; MIDI-to-real and enhancement are qualitative examples.","confidence":"high_evidence_scope"},
+    {"id":"KC-ML-20261017-1800-05","claim":"Noise injection can worsen pitch faithfulness through hallucination while FAD remains similar, requiring paired multi-seed review.","confidence":"medium_reported_task_specific"},
+    {"id":"KC-ML-20261017-1800-06","claim":"Reported percussive suppression failure blocks transfer to drum cleanup or separation claims.","confidence":"medium_reported_failure_case"},
+    {"id":"KC-ML-20261017-1800-07","claim":"Companion examples without code, model revision, seed manifest and listener protocol support qualitative inspection only.","confidence":"high_reproducibility_limit"},
+    {"id":"KC-ML-20261017-1800-08","claim":"Plate-challenge scientific estimation requires unnormalized NPZ input; normalized WAV previews discard amplitude information.","confidence":"high_official_artifact_rule"},
+    {"id":"KC-ML-20261017-1800-09","claim":"Public availability without an explicit licence is not rights clearance for ingestion or redistribution.","confidence":"high_provenance_rule"}
+  ],
+  "candidate_rule_updates": [
+    {
+      "id": "RULE-ML-20261017-1500-02",
+      "revision": 2,
+      "apply_when": "research-only local evaluation with a pinned rights-cleared model and project-owned guitar or bass",
+      "change": "lambda 0 versus 1 with all other factors fixed",
+      "numbers_origin": "lambda endpoints from the paper; no tau/JD/FAD value is promoted to a project threshold",
+      "protect": ["pitch", "event order", "timing", "groove", "attacks", "identity", "stereo/mono", "noise floor", "absence of invented events"],
+      "verify": "paired predeclared seeds, raw evidence, attenuation-only BS.1770-matched blind copies and artifact log",
+      "cancel": ["invented event", "transformed leakage", "attack smear", "seed sign reversal", "identity loss", "stereo/mono regression", "true-peak overrun", "loudness confound"],
+      "confidence": "very_low_mixing_transfer_informal_listening",
+      "auto_apply": false
+    },
+    {
+      "id": "RULE-ML-20261017-1500-01",
+      "revision": 2,
+      "apply_when": "pinned synthetic challenge reproduction followed by separate measured-plate external validation",
+      "change": "phase channel absent versus one N=512 relative-phase channel",
+      "numbers_origin": "N=512 from the paper, not a mixing setting",
+      "data_gate": "unnormalized NPZ only for scientific estimation",
+      "confidence": "low_to_medium_unreplicated_synthetic_task",
+      "auto_apply": false
+    }
+  ],
+  "experiment_updates": [
+    {
+      "id": "EXP-ML-20261017-1500-02",
+      "revision": 2,
+      "status": "not_run_blocked",
+      "a": "lambda=0",
+      "b": "lambda=1",
+      "one_varied_factor": "lambda",
+      "material": "project-owned short guitar and bass phrases; no drums; no external upload",
+      "seed_design": "8 predeclared paired seeds, an internal feasibility guardrail rather than a paper sufficiency claim",
+      "raw_outputs_preserved": true,
+      "loudness_matched_listening_copies": "separate attenuation-only BS.1770-matched randomized copies",
+      "blockers": ["explicit repository and model licences", "immutable model/environment manifest", "approved local compute", "approved project audio"],
+      "auto_apply": false
+    },
+    {
+      "id": "EXP-ML-20261017-1500-01",
+      "revision": 2,
+      "status": "not_run_blocked",
+      "a": "downsampled multi-resolution magnitude input without phase",
+      "b": "identical pipeline plus one N=512 relative-phase channel",
+      "one_varied_factor": "phase channel",
+      "data_gate": "pinned official simulator/data and unnormalized NPZ input",
+      "blockers": ["explicit artifact licence", "immutable dataset manifest", "rights-cleared measured-plate external set", "approved compute"],
+      "auto_apply": false
+    }
+  ],
+  "queue": [
+    {"rank":1,"id":"EXP-ML-PENA-AB15-LISTEN-20261010-1800","status":"next_executable"},
+    {"rank":2,"item":"snare parallel-send 0/-3 dB A/B after latency preflight"},
+    {"rank":3,"item":"distorted-bass clean-low plus character-layer A/B"},
+    {"rank":4,"id":"EXP-ML-20261017-1500-02","status":"not_run_blocked"},
+    {"rank":5,"id":"EXP-ML-20261017-1500-01","status":"not_run_blocked"},
+    {"rank":6,"item":"carried artifact and parity queues"},
+    {"rank":7,"item":"transcript/content access for carried metadata-only videos"}
+  ],
+  "boundaries": {"audio_downloaded_or_played":false,"commercial_audio_extracted":false,"third_party_audio_upload":false,"paid_service_used":false,"gpu_or_job_started":false,"repository_implementation_changed":false,"runtime_rule_changed":false,"model_changed":false}
+}

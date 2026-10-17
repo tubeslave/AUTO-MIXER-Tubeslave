@@ -705,3 +705,12 @@ ML-2026-10-17-1200 (deep_review, source search ML-2026-10-17-0900): FDverb is an
 | ML-2026-10-17-1500 | [Report](ML-2026-10-17-1500.md) · [JSON patch](ML-2026-10-17-1500.json) · [ADR](../adr/mixing-learning-2026-10-17-1500.md) | 2 new DAFx sources (1 complete, 1 targeted read), 9 duplicate families removed, 7 Knowledge Cards, 2 bounded rules, 2 blocked experiments, 3 metadata-only queued videos; no audio/DSP/runtime/model change |
 
 ML-2026-10-17-1500 (search, preceding search ML-2026-10-17-0900): controlled plate-IR estimation supports phase/band-selection research but not perceptual reverb claims; diffusion warm-initialization settings are model-specific and the source reports weak percussive/source suppression. Three official rock-mixing videos remain metadata-only without transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-17 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-17-1800 | [Report](ML-2026-10-17-1800.md) · [JSON patch](ML-2026-10-17-1800.json) · [ADR](../adr/mixing-learning-2026-10-17-1800.md) | Complete warm-initialization paper and companion audit plus official DAFx plate-challenge artifact audit; 2 Source Cards revised, 2 Artifact Audits and 9 Knowledge Cards added, 2 rules and 2 blocked experiments revised; no video/reference/audio/DSP/runtime/model change |
+
+ML-2026-10-17-1800 (deep_review, source search ML-2026-10-17-1500): the reported warm-initialization region near tau_init≈0.8 is downgraded to model-specific informal-listening evidence; FAD has a guidance mismatch and pitch-set Jaccard omits temporal/dynamic/stereo structure. Both official repositories are pinned, but explicit repository licences are absent. The plate challenge remains synthetic-only and its normalized WAV previews are not valid scientific inputs. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
