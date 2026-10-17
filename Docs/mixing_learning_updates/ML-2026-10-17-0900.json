@@ -1,0 +1,387 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-17-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-17T09:00:00+03:00",
+  "actual_start": "2026-10-17T09:05:02+03:00",
+  "report_time": "2026-10-17T09:08:46+03:00",
+  "preceding_successful_search_id": "ML-2026-10-16-1500",
+  "immediate_predecessor_id": "ML-2026-10-16-1800",
+  "citation_check": "partial",
+  "summary": {
+    "source_cards_added": 2,
+    "full_text_sources_read": 1,
+    "metadata_abstract_only_sources": 1,
+    "knowledge_cards_added": 7,
+    "candidate_rules_added": 1,
+    "experiments_added": 1,
+    "videos_studied": 0,
+    "queued_videos_added": 2,
+    "references_added": 0,
+    "literature_duplicates_removed": 4,
+    "video_duplicates_removed": 3,
+    "audio_executed": false,
+    "code_or_model_executed": false,
+    "dsp_or_runtime_changed": false
+  },
+  "source_cards": [
+    {
+      "id": "SRC-ML-20261017-0900-01",
+      "stable_id": "conference:dafx:2026:DAFx26_paper_27",
+      "title": "Fourier Neural Operators for Sample-Rate-Independent Virtual Analog Modeling",
+      "authors": [
+        "Oliviero Massi",
+        "Alessandro Ilic Mezza",
+        "Alberto Bernardini"
+      ],
+      "publication": "DAFx 2026",
+      "peer_reviewed": true,
+      "license": "CC BY 4.0",
+      "publication_date": "2026-09-01/04",
+      "discovery_date": "2026-10-17",
+      "url": "https://dafx.de/paper-archive/2026/papers/DAFx26_paper_27.pdf",
+      "repository_record": "https://hdl.handle.net/11311/1329845",
+      "reading_depth": "full_text_complete_8_pages",
+      "status": "full_text_reviewed",
+      "method": {
+        "target": "simulated Big Muff Pi input stage",
+        "frame_duration_ms": 20,
+        "hop_ms": 5,
+        "overlap_percent": 75,
+        "window": "root-Hann analysis/synthesis",
+        "layers": 3,
+        "latent_channels": 8,
+        "retained_real_modes": 64,
+        "trainable_parameters": 17785,
+        "training_internal_upsampling": 2,
+        "training_rate_hz": 48000,
+        "dataset_seconds_approx": 130,
+        "split": "90/10 train/evaluation; shuffled frames",
+        "epochs": 1000,
+        "loss": "NMSE",
+        "baseline": "LIDL-RNN, 12929 parameters; different sequence framing",
+        "evaluation_rates_hz": [
+          24000,
+          48000,
+          88200,
+          96000
+        ]
+      },
+      "reported_results": {
+        "mae_x1e3": {
+          "lidl_rnn": [
+            null,
+            2.173,
+            2.319,
+            2.333
+          ],
+          "fno": [
+            2.894,
+            2.897,
+            2.898,
+            2.898
+          ]
+        },
+        "spectral_convergence_x1e2": {
+          "lidl_rnn": [
+            null,
+            3.852,
+            3.92,
+            3.932
+          ],
+          "fno": [
+            2.932,
+            3.237,
+            3.408,
+            3.431
+          ]
+        },
+        "bounded_interpretation": [
+          "FNO is better on reported spectral convergence.",
+          "LIDL-RNN is better on reported MAE at comparable upsampling rates.",
+          "At 24 kHz, rho=2 reduces the reported alias proxy versus rho=1 at added compute cost."
+        ]
+      },
+      "limitations": [
+        "single simulated circuit, no hardware validation",
+        "small guitar/sweep dataset; source/performer/session-disjoint provenance not established",
+        "no listener study or perceptual alias threshold",
+        "no target-host real-time benchmark",
+        "no parameter conditioning",
+        "different framing/context between architectures",
+        "20 ms stateless memory bound and startup zero-fill boundary risk",
+        "no LIDL-RNN 24 kHz comparator",
+        "no public code/weights/dataset artifact located"
+      ],
+      "citation_check": "partial"
+    },
+    {
+      "id": "SRC-ML-20261017-0900-02",
+      "stable_id": "arxiv:2608.27695v1",
+      "title": "A Frequency-Domain Artificial Reverberator Plug-In",
+      "authors": [
+        "Jonas Roth",
+        "Nishanth Kumar",
+        "Silvan Krebs",
+        "David Wieland",
+        "Christoph Studer"
+      ],
+      "publication": "preprint",
+      "publication_date": "2026-08-31",
+      "discovery_date": "2026-10-17",
+      "url": "https://arxiv.org/abs/2608.27695",
+      "reading_depth": "metadata_and_abstract_only",
+      "status": "queued_source",
+      "abstract_level_claim": "FDverb uses STFT analysis/synthesis and noise-carrier spectral envelopes for late reverb, with early reflections, nonlinear decay and pitch shifting; abstract states an open-source JUCE plug-in is provided.",
+      "unverified": [
+        "full method",
+        "evaluation",
+        "code revision",
+        "license",
+        "build",
+        "listener evidence",
+        "real-time cost"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "knowledge_cards": [
+    {
+      "id": "KC-ML-20261017-0900-01",
+      "claim": "Sample-rate-grid operation does not establish transfer to other devices, circuits, material or perceived quality.",
+      "confidence": "high_scope_limit"
+    },
+    {
+      "id": "KC-ML-20261017-0900-02",
+      "claim": "FNO versus LIDL-RNN is metric-dependent: FNO wins spectral convergence; LIDL-RNN wins MAE at comparable upsampling rates.",
+      "confidence": "high_reported_result"
+    },
+    {
+      "id": "KC-ML-20261017-0900-03",
+      "claim": "The 24 kHz result has no LIDL-RNN comparator and is not comparative superiority.",
+      "confidence": "high_table_read"
+    },
+    {
+      "id": "KC-ML-20261017-0900-04",
+      "claim": "The 20 ms stateless frame bounds temporal memory and makes startup/boundary fixtures mandatory.",
+      "confidence": "medium_high_method_inference"
+    },
+    {
+      "id": "KC-ML-20261017-0900-05",
+      "claim": "Internal upsampling can reduce the reported 24 kHz alias proxy but adds compute; perceptual benefit is untested.",
+      "confidence": "high_reported_plus_scope_limit"
+    },
+    {
+      "id": "KC-ML-20261017-0900-06",
+      "claim": "Simulated single-circuit results without listeners or hardware validation are research evidence, not a production rule.",
+      "confidence": "high_scope_limit"
+    },
+    {
+      "id": "KC-ML-20261017-0900-07",
+      "claim": "Generalization needs an explicit source/performer/session-disjoint manifest; shuffled frames are insufficient evidence.",
+      "confidence": "medium_high_evaluation_hygiene"
+    }
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261017-0900-01",
+      "title": "Sample-rate invariance evidence gate",
+      "source": "SRC-ML-20261017-0900-01",
+      "apply_when": "Evaluating one frozen neural virtual-analog model across project sample rates.",
+      "change": "Sample-rate operating condition only; keep weights, input, target circuit, window/hop, gain and alignment fixed.",
+      "proposed_range": {
+        "values_hz": [
+          24000,
+          48000,
+          88200,
+          96000
+        ],
+        "origin": "paper evaluation strata; not recommended production settings"
+      },
+      "protect": [
+        "transient shape",
+        "harmonic structure",
+        "low-end continuity",
+        "phase",
+        "headroom",
+        "boundary continuity",
+        "latency budget"
+      ],
+      "verify": [
+        "MAE",
+        "spectral convergence",
+        "alias proxy",
+        "sample/true peak",
+        "finite output",
+        "timing",
+        "CPU/RTF",
+        "boundary residual",
+        "loudness-matched blind listening"
+      ],
+      "cancel": [
+        "startup/boundary artifact",
+        "target-host deadline miss",
+        "nonfinite output",
+        "clipping",
+        "matched-listening regression"
+      ],
+      "confidence": "low_to_medium_simulated_single_circuit",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261017-0900-01",
+      "title": "FNO internal-upsampling A/B",
+      "status": "not_run_blocked",
+      "A": "same frozen FNO at 24 kHz with rho=1",
+      "B": "same frozen FNO at 24 kHz with rho=2",
+      "one_varied_factor": "internal inference upsampling",
+      "fixed": [
+        "weights",
+        "input",
+        "circuit reference",
+        "output sample rate",
+        "frame/window/hop",
+        "gain",
+        "alignment",
+        "measurement code"
+      ],
+      "material": "locally generated/project-owned dry guitar plus deterministic sweeps; no third-party upload",
+      "loudness_alignment": "Preserve raw measurement renders; create separate attenuation-only BS.1770-matched listening copies.",
+      "measures": [
+        "MAE",
+        "spectral convergence",
+        "SNRA/alias proxy",
+        "sample peak",
+        "true peak",
+        "integrated/short-term loudness",
+        "crest",
+        "boundary residual",
+        "latency",
+        "CPU/RTF",
+        "blind preference"
+      ],
+      "protected_qualities": [
+        "pick attack",
+        "note separation",
+        "harmonic density",
+        "low-end continuity",
+        "headroom",
+        "section role"
+      ],
+      "success": "B reduces the predeclared alias proxy without material raw-error regression, deadline failure or repeatable blind-listening regression.",
+      "cancel": [
+        "artifact/provenance mismatch",
+        "nonfinite output",
+        "startup/boundary defect",
+        "clipping",
+        "target-host miss",
+        "no repeatable benefit"
+      ],
+      "blockers": [
+        "public code/weights/data not found",
+        "parity implementation",
+        "artifact manifest",
+        "simulator reference"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "video_source_cards": [
+    {
+      "id": "VIDEO-ML-20261017-0900-01",
+      "youtube_id": "DPw9KTM-XDo",
+      "title": "Mix Bus Plugins & Tips with Sara Carter",
+      "url": "https://www.youtube.com/watch?v=DPw9KTM-XDo",
+      "channel_context": "Sara Carter / Produce Like A Pro companion page",
+      "reading_depth": "metadata_and_companion_page_only",
+      "transcript_status": "not_obtained",
+      "status": "queued_source",
+      "conclusions_promoted": 0
+    },
+    {
+      "id": "VIDEO-ML-20261017-0900-02",
+      "youtube_id": "LoktLp3rwS0",
+      "title": "Mixing a Rock Song From Start To Finish | Part 2: Mixing Drums",
+      "channel": "Joe at Claricast / Joe Crow",
+      "publication_date": "2020-06-02",
+      "url": "https://www.youtube.com/watch?v=LoktLp3rwS0",
+      "reading_depth": "metadata_and_description_only",
+      "transcript_status": "not_obtained",
+      "status": "queued_source",
+      "conclusions_promoted": 0
+    }
+  ],
+  "duplicates": [
+    {
+      "key": "POLAR",
+      "resolution": "discarded_existing_source"
+    },
+    {
+      "key": "Explicit Wave Digital Model of the Fulltone OCD Distortion Pedal",
+      "resolution": "discarded_existing_source"
+    },
+    {
+      "key": "Perceptually Motivated Alignment and Interpolation of Sound Sources for Continuous Interactions",
+      "resolution": "discarded_existing_source"
+    },
+    {
+      "key": "Deep Regularized Recurrent Neural Networks for Audio Effects Modeling",
+      "resolution": "discarded_existing_source"
+    },
+    {
+      "key": "youtube:SG5rkdYwFDE",
+      "resolution": "discarded_existing_video"
+    },
+    {
+      "key": "youtube:xytsTq_Wolg",
+      "resolution": "discarded_existing_video"
+    },
+    {
+      "key": "youtube:XDtFX1Nbl_o",
+      "resolution": "discarded_existing_video"
+    }
+  ],
+  "reference_check": {
+    "candidate": "Cambridge MT DGX — Redemptive Pain",
+    "status": "already_indexed_not_duplicated",
+    "references_added": 0,
+    "audio_downloaded": false
+  },
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "Snare parallel-send 0/-3 dB A/B after latency preflight",
+    "Distorted-bass clean-low plus character-layer A/B",
+    "FNO artifact/data search, parity implementation gate and EXP-ML-20261017-0900-01",
+    "FDverb full-text, repository, license and real-time/listener-evidence review",
+    "Opus provenance and bitrate-stratum completion",
+    "Delivery-only Opus listening experiment",
+    "vst-bench third-party plugin provenance/stereo audit",
+    "PEACE immutable model revision/hash, lock, paper-table replay and mixed-license decision",
+    "EXP-ML-20261016-1800-01",
+    "CTAG-FX executable mapping/stabilizer/license release",
+    "EXP-ML-20261016-1500-01 revision 2",
+    "Separate native CTAG-FX versus NAM null/ABX",
+    "LLM2Fx, MPASCNet and earlier blocked artifact queues",
+    "VIDEO-ML-20261017-0900-01 transcript/content access",
+    "VIDEO-ML-20261017-0900-02 transcript/content access",
+    "Three metadata-only YouTube sources carried from ML-2026-10-16-1500"
+  ],
+  "boundaries": {
+    "free_access_only": true,
+    "audio_downloaded": false,
+    "audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "paid_service_used": false,
+    "gpu_or_job_started": false,
+    "external_space_started": false,
+    "code_executed": false,
+    "model_weights_downloaded": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_implementation_changed": false,
+    "model_changed": false
+  },
+  "next_executable_experiment_id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800"
+}
