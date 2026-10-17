@@ -1,0 +1,185 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-17-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-17T12:00:00+03:00",
+  "actual_start": "2026-10-17T12:01:18+03:00",
+  "report_time": "2026-10-17T12:04:21+03:00",
+  "preceding_successful_search_id": "ML-2026-10-17-0900",
+  "immediate_predecessor_id": "ML-2026-10-17-0900",
+  "citation_check": "partial",
+  "summary": {
+    "source_cards_updated": 1,
+    "full_text_sources_read": 1,
+    "artifact_audits_added": 1,
+    "knowledge_cards_added": 10,
+    "candidate_rules_added": 1,
+    "experiments_added": 1,
+    "videos_studied": 0,
+    "queued_videos_added": 0,
+    "references_added": 0,
+    "audio_executed": false,
+    "code_or_model_executed": false,
+    "dsp_or_runtime_changed": false
+  },
+  "source_card_updates": [
+    {
+      "id": "SRC-ML-20261017-0900-02",
+      "stable_id": "conference:dafx:2026:DAFx26_demo_66",
+      "version_aliases": ["arxiv:2608.27695v1"],
+      "title": "A Frequency-Domain Artificial Reverberator Plug-In",
+      "publication": "DAFx 2026 demo paper",
+      "peer_reviewed": true,
+      "license": "CC BY 4.0",
+      "publication_date": "2026-09-01/04",
+      "discovery_date": "2026-10-17",
+      "url": "https://www.dafx.de/paper-archive/2026/papers/DAFx26_demo_66.pdf",
+      "arxiv_url": "https://arxiv.org/abs/2608.27695",
+      "reading_depth": "full_text_complete_4_pages",
+      "status": "full_text_reviewed",
+      "method": {
+        "architecture": "sparse time-domain early reflections plus STFT noise-carrier late tail",
+        "overlap_percent": 50,
+        "window": "sine analysis and synthesis",
+        "attack_ms": 10,
+        "algorithmic_latency": "N/(2*fs)",
+        "example_latency": "approximately 85 ms at N=8192, fs=48 kHz",
+        "block_sizes": "2^5 through 2^14",
+        "max_early_reflections": 32,
+        "max_er_delay_ms": 500,
+        "stereo_controls": ["width controls carrier correlation and ER spread", "link controls envelope coupling"],
+        "creative_modes": ["arithmetic/gated-like", "freeze", "inharmonic shift", "inharmonic drift"]
+      },
+      "reported_runtime": {
+        "processing_time_ms_per_block": "0.011 at N=32 through 3.81 at N=16384",
+        "reaper_cpu": "under 2.6% for one instance",
+        "condition": "MacBook Pro M2 Pro, REAPER 7.76, 512-sample I/O, 48 kHz"
+      },
+      "limitations": [
+        "demo paper; no controlled listener study",
+        "no comparator or mix-quality outcome",
+        "single host/machine CPU condition",
+        "no cross-host, multi-instance or worst-case deadline test",
+        "no mono/downmix or anti-phase safety result",
+        "paper describes repository v1.0, not current v1.1.0"
+      ],
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits": [
+    {
+      "id": "ART-ML-20261017-1200-01",
+      "repository": "https://github.com/IIP-Group/FDverb",
+      "audited_main_commit": "7fa78f638c7be81c6813cb72082d2dd361c940fc",
+      "paper_parity": {"tag": "v1.0", "commit": "5357071c87b8bc5f2483ad8d32c5b3793d5a6c25"},
+      "current_release": {"tag": "v1.1.0", "commit": "f5ad84c081192e5e76774f12c3d4d484ade4c23f"},
+      "juce_submodule_commit": "501c07674e1ad693085a7e7c398f205c2677f5da",
+      "license": "AGPL-3.0-or-later",
+      "static_audit_only": true,
+      "tests_or_ci_found": false,
+      "release_records_immutable": false,
+      "release_asset_sha256": {
+        "v1.0_macOS-arm_AU": "f7f60ab777147de4e4d4cb188b74216c56425653f32230fef032e59898d1d169",
+        "v1.0_macOS-arm_VST3": "3fa59fc85db925492956651e0c7996abeb9ba1adbf817a57885a4a938f453db5",
+        "v1.0_Windows_VST3": "a9fe12104e26726524655aa5b600616450791ae795621a513b99019251dd3ba1",
+        "v1.1.0_macOS-arm64_AU": "5dd3ad49f41fc0d207ea6544de83708c83e901067236bb5826f4998f8a8a7144",
+        "v1.1.0_macOS-arm64_VST3": "a77175d6a58ca3a9054e7a26ea23dd454fff0c3f591fc54a0fd4b1e3ba635935",
+        "v1.1.0_Windows-x64_VST3": "4123450e9763abcdb237db69d9f77a82cd5ca8da43576fbdb909891599f0454b"
+      },
+      "version_drift": [
+        "v1.1.0 fixes ER decay/level and distorted or silent ER output",
+        "preset/default values changed",
+        "fractional drift added",
+        "tail-delay clamp/UI, AU validation, sandbox, bypass and extreme-tilt defects fixed"
+      ],
+      "deployment_limit": "macOS release notes state binaries are not notarized; do not bypass OS security controls"
+    }
+  ],
+  "knowledge_cards": [
+    {"id":"KC-ML-20261017-1200-01","claim":"Open hybrid ER/STFT implementation does not prove perceptual quality, naturalness or mix improvement.","confidence":"high_method_and_scope_limit"},
+    {"id":"KC-ML-20261017-1200-02","claim":"Block size jointly changes spectral resolution, tonal/noise character, temporal smearing and latency.","confidence":"high_method"},
+    {"id":"KC-ML-20261017-1200-03","claim":"ERs can precede and bridge a delayed tail but do not remove N/(2*fs) tail latency or the minimum tail-delay constraint.","confidence":"high_method"},
+    {"id":"KC-ML-20261017-1200-04","claim":"pre_delay seeds the ER PRNG, so changing it also changes the later tap pattern.","confidence":"high_implementation_description"},
+    {"id":"KC-ML-20261017-1200-05","claim":"Width can reach anti-correlated/side-only tails and also spreads ER taps; mono/downmix and correlation checks are mandatory.","confidence":"high_method_plus_safety_gate"},
+    {"id":"KC-ML-20261017-1200-06","claim":"link changes inter-channel envelope coupling independently of noise correlation; do not vary link and width together in attribution tests.","confidence":"high_method"},
+    {"id":"KC-ML-20261017-1200-07","claim":"Shift/drift are linear-bin operations and create inharmonic tails; they are creative effects, not transparent modulation.","confidence":"high_method"},
+    {"id":"KC-ML-20261017-1200-08","claim":"v1.0 and v1.1.0 are one lineage; version drift requires separate paper-parity and deployment manifests.","confidence":"high_repository_audit"},
+    {"id":"KC-ML-20261017-1200-09","claim":"One REAPER/M2 Pro CPU reading is not target-host, multi-instance or deadline evidence.","confidence":"high_scope_limit"},
+    {"id":"KC-ML-20261017-1200-10","claim":"No discovered automated tests/CI and no executed parity check mean repository presence is not reproduction.","confidence":"high_static_audit_scope"}
+  ],
+  "candidate_rules": [
+    {
+      "id": "RULE-ML-20261017-1200-01",
+      "title": "Tail-only stereo-width gate for creative rock reverb",
+      "sources": ["SRC-ML-20261017-0900-02", "ART-ML-20261017-1200-01"],
+      "apply_when": "Evaluating FDverb as a send effect on a rock snare/room role after a safe local build and host-validation preflight.",
+      "change": "Tail noise-correlation state through width only; ER muted so ER panning is not a second factor.",
+      "proposed_range": {"states":["fully correlated","fully uncorrelated"],"origin":"paper named states; no numeric UI value promoted until pinned build verification"},
+      "protect": ["snare attack/body","center stability","cymbal separation","groove","mono fold-down","headroom","section role"],
+      "verify": ["raw sample/true peak","integrated/short-term loudness","crest","L/R and M/S energy","stereo correlation","mono-sum delta","latency/PDC","null/alignment check","blind loudness-matched listening"],
+      "cancel": ["mono tail loss","anti-phase instability","center/transient regression","cymbal masking","detached tail","latency mismatch","host instability","loudness-confounded preference"],
+      "confidence": "low_to_medium_unvalidated_demo_implementation",
+      "auto_apply": false
+    }
+  ],
+  "experiments": [
+    {
+      "id": "EXP-ML-20261017-1200-01",
+      "title": "FDverb tail-correlation A/B on rock snare",
+      "status": "not_run_blocked",
+      "A": "pinned FDverb v1.1.0, wet tail only, width fully correlated/mono-tail",
+      "B": "identical chain, width fully uncorrelated/full-stereo-tail",
+      "one_varied_factor": "tail noise correlation through width",
+      "fixed": ["source segment","version/commit/asset digest","host","sample rate","I/O buffer","seed/pre-delay","ER muted","block size","mode","color","decay","tilt","tail delay","shift/drift","cuts","link","wet gain","automation","render boundaries"],
+      "material": "project-owned snare-close plus room/bus section; no external upload",
+      "loudness_alignment": "Preserve raw renders; create separate attenuation-only BS.1770-matched randomized listening copies.",
+      "measures": ["sample peak","true peak","integrated/short-term loudness","crest","latency","L/R energy","M/S energy","stereo correlation","mono fold-down","blind preference"],
+      "protected_qualities": ["attack","body","center stability","cymbal separation","groove","mono compatibility","headroom","section role"],
+      "success": "B is repeatedly preferred for width without worse center/transient/mono scores, host instability or raw-level advantage.",
+      "cancel": ["digest/version mismatch","unverified build","security bypass requirement","PDC/alignment failure","mono loss/comb filtering","detached tail","clicks/dropouts","true-peak overrun","no repeatable preference"],
+      "blockers": ["safe local build or verified signed/notarized binary","sandbox host","manifest","target-host validation","PDC/latency preflight","approved project audio"],
+      "auto_apply": false
+    }
+  ],
+  "revisions": [
+    {"previous":"FDverb metadata_and_abstract_only queued_source","current":"full_text_reviewed DAFx demo paper plus pinned repository audit","reason":"full paper, changelog, licence, tags, release metadata, digests and tree were read"},
+    {"previous":"code revision, licence, listener evidence and real-time cost unverified","current":"repository/version/licence/single-host timing verified; listener/cross-host evidence still absent","reason":"static artifact audit and full-text reading"}
+  ],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "Snare parallel-send 0/-3 dB A/B after latency preflight",
+    "Distorted-bass clean-low plus character-layer A/B",
+    "FNO artifact/data search, parity implementation gate and EXP-ML-20261017-0900-01",
+    "Safe FDverb v1.1.0 build/provenance/host preflight, then EXP-ML-20261017-1200-01",
+    "Opus provenance and bitrate-stratum completion",
+    "Delivery-only Opus listening experiment",
+    "vst-bench third-party plug-in provenance/stereo audit",
+    "PEACE immutable model revision/hash, lock, paper-table replay and mixed-license decision",
+    "EXP-ML-20261016-1800-01",
+    "CTAG-FX executable mapping/stabilizer/licence release",
+    "EXP-ML-20261016-1500-01 revision 2",
+    "Separate native CTAG-FX versus NAM null/ABX",
+    "LLM2Fx, MPASCNet and earlier blocked artifact queues",
+    "VIDEO-ML-20261017-0900-01 transcript/content access",
+    "VIDEO-ML-20261017-0900-02 transcript/content access",
+    "Three metadata-only YouTube sources carried from ML-2026-10-16-1500"
+  ],
+  "boundaries": {
+    "free_access_only": true,
+    "audio_downloaded": false,
+    "audio_uploaded": false,
+    "commercial_audio_extracted": false,
+    "paid_service_used": false,
+    "gpu_or_job_started": false,
+    "external_space_started": false,
+    "code_executed": false,
+    "plugin_executed": false,
+    "release_asset_downloaded": false,
+    "model_weights_downloaded": false,
+    "dsp_changed": false,
+    "runtime_changed": false,
+    "repository_implementation_changed": false,
+    "model_changed": false
+  },
+  "next_executable_experiment_id": "EXP-ML-PENA-AB15-LISTEN-20261010-1800"
+}
