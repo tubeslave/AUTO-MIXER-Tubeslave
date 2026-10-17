@@ -696,3 +696,12 @@ ML-2026-10-17-0900 (search, previous search ML-2026-10-16-1500): the FNO paper i
 | ML-2026-10-17-1200 | [Report](ML-2026-10-17-1200.md) · [JSON patch](ML-2026-10-17-1200.json) · [ADR](../adr/mixing-learning-2026-10-17-1200.md) | FDverb full-text method review plus pinned repository/version/licence/release audit; 1 Source Card updated, 1 Artifact Audit and 10 Knowledge Cards added, 1 bounded rule and 1 blocked tail-correlation A/B; no video/reference/audio/DSP/runtime/model change |
 
 ML-2026-10-17-1200 (deep_review, source search ML-2026-10-17-0900): FDverb is an open hybrid ER/STFT-noise-tail implementation, but the demo paper has no controlled listener study and only one REAPER/M2 Pro runtime condition. The paper describes v1.0; v1.1.0 materially changes early reflections and fixes audio/validation defects, so versions are one evidence family and require separate manifests. A tail-only correlated-versus-uncorrelated width A/B is planned but blocked on safe build/provenance, host/PDC and approved project audio. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-17 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-17-1500 | [Report](ML-2026-10-17-1500.md) · [JSON patch](ML-2026-10-17-1500.json) · [ADR](../adr/mixing-learning-2026-10-17-1500.md) | 2 new DAFx sources (1 complete, 1 targeted read), 9 duplicate families removed, 7 Knowledge Cards, 2 bounded rules, 2 blocked experiments, 3 metadata-only queued videos; no audio/DSP/runtime/model change |
+
+ML-2026-10-17-1500 (search, preceding search ML-2026-10-17-0900): controlled plate-IR estimation supports phase/band-selection research but not perceptual reverb claims; diffusion warm-initialization settings are model-specific and the source reports weak percussive/source suppression. Three official rock-mixing videos remain metadata-only without transcripts. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
