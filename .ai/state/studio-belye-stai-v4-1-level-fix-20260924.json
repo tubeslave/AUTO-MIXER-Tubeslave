@@ -1,0 +1,65 @@
+{
+  "goal": "belye-stai-v4-1-restore-levels-without-changing-liked-compression",
+  "status": "corrected_audio_exported_pending_human_review",
+  "user_feedback": "v4 compression liked, but kick/snare seem quieter; toms seem fine",
+  "runtime_commit": "326cec43286ea3722608fbc92de7dfe0c0481692",
+  "scope": "addressed the delivered v4, not a fresh all-instrument mix",
+  "reproduction": {
+    "v4_premaster_byte_identical": true,
+    "sha256": "b3609a1ad465a53aeef4af8de4f6ca71af99077803a1e3364ae8422ef663f776",
+    "all_six_changed_v4_local_source_pcm_hashes_verified": true,
+    "original_WAV_hashes_rechecked": 18
+  },
+  "root_causes": [
+    "Compressor replacements used frozen baseline final gain, but the v4 delivery recipe omitted explicit post-insert source-level matching. Frozen gain does not imply invariant output level.",
+    "The v4 mastering report ranked candidate loudness before the final static true-peak attenuation. Chosen -15.1815 LUFS became -15.5774 LUFS afterward. New delivery ranks and gates actual post-safety output."
+  ],
+  "source_level_evidence": {
+    "measurement": "fixed previous-processed-source active 20 ms RMS frames; not perceived loudness or peak normalization",
+    "KICK": {"reference_percentile": 92, "v4_delta_db": -0.11655327630975391, "constant_compensation_db": 0.11655327630975391},
+    "SNARE": {"reference_percentile": 94, "v4_delta_db": -0.2378898615495354, "constant_compensation_db": 0.2378898615495354},
+    "TOM_1_delta_db": 0.1622172473129389,
+    "TOM_2_delta_db": 0.16332782131871545,
+    "FLOOR_delta_db": 0.18095387502810614,
+    "toms_and_vocal_local_audio_unchanged": true,
+    "compressor_parameters_changed": false,
+    "full_downstream_session_rerendered": true,
+    "protected_full_mix_failures": []
+  },
+  "delivery": {
+    "previous_WAV_FFmpeg_LUFS": {"v2": -15.13, "v4": -15.57},
+    "corrected_WAV_FFmpeg_LUFS": -15.15,
+    "corrected_WAV_FFmpeg_dBTP": -1.62,
+    "corrected_MP3_FFmpeg_LUFS": -15.15,
+    "corrected_MP3_FFmpeg_dBTP": -1.65,
+    "LRA_LU": 4.1,
+    "limiter_1_max_GR_db": 2.686534881591797,
+    "limiter_2_max_GR_db": 1.450002670288086,
+    "crest_loss_db": 3.99907221372591,
+    "crest_limit_db_unchanged": 4.0,
+    "frames": 9128700,
+    "sample_rate": 44100,
+    "clipped_samples": 0,
+    "master_WAV_sha256": "1e7fb5d40901149afa1345aeba44ab28c3bc65ef07107fb279bf749a08d60b91",
+    "master_MP3_sha256": "fb9fdc726c121e91b2077ef466359631684b170339adf998b70bcf62b7043cd8",
+    "premaster_sha256": "139ed0fddede693b2a4b619a7db09496c3d37ae6fd3bf06525a08fd27a60cf7b",
+    "local_directory": "/mnt/data/Belye_Stai_v4_1_LevelFix/delivery"
+  },
+  "validation": {
+    "local_level_compensation_tests_passed": 7,
+    "full_CI_run_claimed": false,
+    "shared_DSP_library_changed": false,
+    "source_level_compensation_applied_in_versioned_render_script": true,
+    "final_WAV_and_decoded_MP3_independently_measured": true
+  },
+  "execution_failures": [
+    "Previous intermediate audit files were absent in the current environment; recovered exact source archives and runtime already attached to this chat, without downloading user audio again.",
+    "Initial coarse master gain grid found no candidate within both 0.05 LU of reference and existing 4 dB crest-loss limit. Near-target candidate with 4.0232 dB crest loss was rejected. Refined pregain only within the existing interval; no thresholds or processor settings were weakened."
+  ],
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "live_code_changed": false,
+  "next_goal": "Make post-insert fixed-reference level preservation and post-true-peak delivery loudness mandatory at orchestration boundaries. Keep frozen no-change adapters intact. Do not infer source balance from whole-mix LUFS or body-spread metrics, and do not add arbitrary multi-dB drum boosts as a technical fix."
+}

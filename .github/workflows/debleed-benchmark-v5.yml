@@ -1,0 +1,125 @@
+name: Ptitsa model debleed benchmark v5
+on:
+  push:
+    branches: [audio-workbench-mcp-v0.1]
+    paths: [.github/workflows/debleed-benchmark-v5.yml]
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install separator
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install --upgrade pip
+          python -m pip install "audio-separator[cpu]" audioread
+      - name: Fetch Ptitsa snippets
+        shell: python
+        run: |
+          import json, subprocess, urllib.parse, urllib.request, pathlib
+          key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
+          jobs={
+            "ValeraVox":("VALERA VOX 0002 [2023-03-03 191740].wav", 29*60+54+179),
+            "SnareTop":("SN T 0002 [2023-03-03 191740].wav", 29*60+54+35),
+            "Bass":("BASS 0002 [2023-03-03 191740].wav", 29*60+54+13),
+            "Guitar":("GTR 0002 [2023-03-03 191740].wav", 29*60+54+13),
+          }
+          pathlib.Path("bench/raw").mkdir(parents=True,exist_ok=True)
+          for label,(name,start) in jobs.items():
+              q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
+              with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
+                  href=json.load(r)["href"]
+              out=f"bench/raw/{label}.wav"
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",href,
+                              "-t","12","-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-i",out,
+                              "-c:a","libmp3lame","-b:a","320k",f"bench/raw/{label}_RAW.mp3"],check=True)
+      - name: Run pretrained models with explicit stem semantics
+        shell: bash
+        run: |
+          set -euxo pipefail
+          models=(
+            "mel_band_roformer_bleed_suppressor_v1.ckpt"
+            "mel_band_roformer_denoise_debleed_gabox.ckpt"
+            "denoise_mel_band_roformer_aufr33_sdr_27.9959.ckpt"
+          )
+          for model in "${models[@]}"; do
+            tag="${model%.ckpt}"
+            for f in bench/raw/*.wav; do
+              name="$(basename "$f" .wav)"
+              od="bench/$tag/$name"; mkdir -p "$od"
+              audio-separator "$f" -m "$model" --output_format WAV --output_dir "$od" --normalization 1.0 --use_soundfile
+              case "$tag" in
+                mel_band_roformer_bleed_suppressor_v1)
+                  clean="$(find "$od" -maxdepth 1 -type f -name '*_(Instrumental)_*.wav' | head -1)"
+                  rejected="$(find "$od" -maxdepth 1 -type f -name '*_(Bleed)_*.wav' | head -1)"
+                  ;;
+                mel_band_roformer_denoise_debleed_gabox)
+                  if [ "$name" = "ValeraVox" ]; then
+                    clean="$(find "$od" -maxdepth 1 -type f -name '*_(Vocals)_*.wav' | head -1)"
+                    rejected="$(find "$od" -maxdepth 1 -type f -name '*_(Instrumental)_*.wav' | head -1)"
+                  else
+                    clean="$(find "$od" -maxdepth 1 -type f -name '*_(Instrumental)_*.wav' | head -1)"
+                    rejected="$(find "$od" -maxdepth 1 -type f -name '*_(Vocals)_*.wav' | head -1)"
+                  fi
+                  ;;
+                denoise_mel_band_roformer_aufr33_sdr_27.9959)
+                  clean="$(find "$od" -maxdepth 1 -type f -name '*_(dry)_*.wav' | head -1)"
+                  rejected="$(find "$od" -maxdepth 1 -type f -name '*_(other)_*.wav' | head -1)"
+                  ;;
+              esac
+              test -n "$clean"; cp "$clean" "$od/CLEAN100.wav"
+              test -n "$rejected" && cp "$rejected" "$od/MODEL_REMOVED.wav" || true
+              python - "$f" "$od/CLEAN100.wav" "$od" <<'PY'
+          import sys, soundfile as sf, numpy as np, pathlib, json
+          raw,sr=sf.read(sys.argv[1],always_2d=True,dtype="float32")
+          clean,sr2=sf.read(sys.argv[2],always_2d=True,dtype="float32")
+          n=min(len(raw),len(clean));raw=raw[:n];clean=clean[:n]
+          if clean.shape[1]!=raw.shape[1]: clean=np.repeat(clean[:,:1],raw.shape[1],axis=1)
+          od=pathlib.Path(sys.argv[3])
+          removed=raw-clean
+          sf.write(od/"REMOVED.wav",removed,sr,subtype="PCM_24")
+          for pct in (25,50,75,100):
+              a=pct/100
+              blend=raw+a*(clean-raw)
+              sf.write(od/f"CLEAN{pct}.wav",blend,sr,subtype="PCM_24")
+          rr=np.sqrt(np.mean(raw.astype("float64")**2)+1e-20)
+          cr=np.sqrt(np.mean(clean.astype("float64")**2)+1e-20)
+          er=np.sqrt(np.mean(removed.astype("float64")**2)+1e-20)
+          (od/"metrics.json").write_text(json.dumps({
+              "clean_vs_raw_rms_db":float(20*np.log10(cr/rr)),
+              "removed_vs_raw_rms_db":float(20*np.log10(er/rr))
+          },indent=2))
+          PY
+              for pct in 25 50 75 100; do
+                ffmpeg -hide_banner -loglevel error -y -i "$od/CLEAN$pct.wav" -c:a libmp3lame -b:a 320k "$od/CLEAN$pct.mp3"
+              done
+              ffmpeg -hide_banner -loglevel error -y -i "$od/REMOVED.wav" -c:a libmp3lame -b:a 320k "$od/REMOVED.mp3"
+            done
+          done
+      - name: Build manifest
+        shell: python
+        run: |
+          import json,pathlib
+          rows=[]
+          for m in pathlib.Path("bench").iterdir():
+              if not m.is_dir() or m.name=="raw": continue
+              for d in m.iterdir():
+                  if not d.is_dir(): continue
+                  met=json.loads((d/"metrics.json").read_text())
+                  rows.append({"model":m.name,"target":d.name,**met,
+                    "clean25":str(d/"CLEAN25.mp3"),"clean50":str(d/"CLEAN50.mp3"),
+                    "clean75":str(d/"CLEAN75.mp3"),"clean100":str(d/"CLEAN100.mp3"),
+                    "removed":str(d/"REMOVED.mp3")})
+          pathlib.Path("bench/manifest.json").write_text(json.dumps(rows,indent=2))
+          print(json.dumps(rows,indent=2))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-model-debleed-benchmark-v5
+          path: |
+            bench/**/*.mp3
+            bench/**/metrics.json
+            bench/manifest.json
+          retention-days: 7

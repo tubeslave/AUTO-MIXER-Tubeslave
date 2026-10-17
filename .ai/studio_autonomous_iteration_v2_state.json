@@ -1,0 +1,43 @@
+{
+  "goal": "autonomous-iteration-v2",
+  "status": "accepted_machine_validation",
+  "integration_pr": 117,
+  "tested_head": "8f1d2b71eef0ba6808270f9789f4e72afbb3e862",
+  "merged_commit": "6132bbe3ed9798302192c96756a3f9cd26ee65ae",
+  "scope": "STUDIO-only persistent bridge from bounded Perceptual Critic decisions to real offline mastering delivery with immutable baseline/candidate evidence and rollback",
+  "contract": {
+    "causal_no_change_counterfactual_required": true,
+    "baseline_and_candidate_file_hashes_recorded": true,
+    "baseline_and_candidate_audio_hashes_recorded": true,
+    "sample_rate_and_shape_identity_required": true,
+    "critic_rejection_routes_to_baseline_before_mastering": true,
+    "machine_safe_candidate_export_role": "candidate_audition",
+    "mastering_rejection_blocks_candidate": true,
+    "autonomous_subjective_baseline_promotion_allowed": false,
+    "input_files_rehashed_after_delivery": true,
+    "existing_output_overwrite_allowed": false,
+    "requires_human_listening": true,
+    "live_control_used": false
+  },
+  "validation": {
+    "workflow_run": 35931620609,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "focused_studio_boundary_python_3_11": {"passed": 21, "warnings": 1},
+    "full_suite_python_3_11": {"passed": 1163, "skipped": 2, "warnings": 2},
+    "real_delivery_boundary_exercised": "synthetic stereo candidate traversed the actual deliver_master WAV/320-kbps-MP3 path while baseline promotion remained false",
+    "machine_acceptance_scope": "iteration routing, evidence persistence, rollback selection, mastering handoff and baseline immutability only"
+  },
+  "known_non_failing_warnings": [
+    "Matchering scipy.ndimage.filters import deprecated",
+    "Optuna metric naming API experimental",
+    "Existing AutomaticMixingPapers submodule URL missing during post-checkout cleanup",
+    "GitHub Actions Node 20 deprecation compatibility warning"
+  ],
+  "blockers": [
+    "Subjective acceptance of any audible candidate still requires explicit human listening",
+    "Model-cleanup RAW/CLEAN acceptance remains human-listening blocked, especially vocals"
+  ],
+  "audio_baseline_promoted": false,
+  "paid_services_used": false,
+  "next_goal": "Replace the bespoke Ptitsa one-hypothesis refinement orchestration with the generic Autonomous Iteration v2 runner, execute one real-song Perceptual Critic candidate through persisted rollback/audition mastering evidence, and keep baseline promotion gated by human listening"
+}

@@ -1,0 +1,36 @@
+{
+  "branch": "audio-workbench-mcp-v0.1",
+  "scope": "studio_offline",
+  "task": "Prevent subjective studio candidates from being promoted by machine evidence alone",
+  "status": "completed",
+  "decision": "accept",
+  "implementation": {
+    "code_commit": "4e93c2d84f0b987250bd9b274f76574507572ee3",
+    "tests_commit": "673d4329d3a384bb109fb40b04b29fbb78b4c0a7",
+    "docs_commit": "c4d813f241a53d8adc8fce47d9b00a558346eae7",
+    "contract": [
+      "A subjective candidate marked requires_human_review cannot become accepted while listening status is pending.",
+      "Explicit human acceptance is required in addition to a passing machine gate.",
+      "Human acceptance cannot override machine safety or protected-metric regressions.",
+      "Human rejection keeps the candidate rejected.",
+      "Non-subjective candidates preserve the existing machine-gate behavior."
+    ]
+  },
+  "validation": {
+    "focused_smoke": "5 passed",
+    "github_tests_run": 35872090524,
+    "python_3_10": "success",
+    "python_3_11": "success",
+    "python_3_12": "success"
+  },
+  "current_cleanup_baseline": {
+    "status": "pending_human_review",
+    "workflow_run": 35859737710,
+    "note": "Balance-transparent Ptitsa cleanup remains machine-valid but is not an accepted studio baseline until human listening accepts RAW vs CLEAN, with special attention to both vocals."
+  },
+  "next_studio_goal": {
+    "id": "perceptual-critic-v2",
+    "priority": 95,
+    "task": "Strengthen Perceptual Critic evidence/uncertainty output so Autonomous Iteration can distinguish machine-safe, human-pending and rejected subjective candidates without conflating those states."
+  }
+}

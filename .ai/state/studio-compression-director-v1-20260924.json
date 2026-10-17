@@ -1,0 +1,74 @@
+{
+  "goal": "studio-compression-director-v1",
+  "status": "accepted_machine_validation",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "6415aeffd337efef89610129f022c9cd6b7d8821",
+  "pull_request": 119,
+  "tested_head_commit": "11fa8cabb8d4bdf7948d3fff1bd796ab094324ed",
+  "merge_commit": "50b7b7d6db395772602f099772bdab9ae5fa678f",
+  "priority_reason": "next explicit blocker from accepted compression-v2 state: source-aware attack/release/threshold proposals and level-match/headroom resolution",
+  "scope": "opt-in offline Compression Director candidate generation and fair A/B gain planning",
+  "implementation": {
+    "candidate_ids": ["preserve_transient", "balanced", "control"],
+    "selection_policy": "candidate set only; no machine winner",
+    "event_evidence": "role-smoothed macro RMS envelope, 6 dB attack/recovery timing and inter-event spacing",
+    "level_match": "fixed reference-active 20 ms RMS mask",
+    "audition_headroom": "exact active-RMS match followed by one common pair trim; no limiter or clipper",
+    "human_gate": true,
+    "baseline_eligible": false
+  },
+  "prototype_revision": {
+    "rejected": "naive waveform-scale peak detector",
+    "reason": "real Belye Stai inspection counted approximately 6246 bass, 4471 snare and 3715 vocal micro-peaks and proposed implausibly short roughly 20-33 ms releases",
+    "accepted_change": "macro envelope smoothing plus role-specific prominence and minimum event spacing",
+    "accepted_real_counts": {"bass": 232, "snare_top": 794, "valera_vocal": 341}
+  },
+  "validation": {
+    "workflow_run": 35937588857,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "compile_step": "success",
+    "focused_studio_boundary_step": "success",
+    "full_repository_test_step": "success",
+    "pytest_total_count": null,
+    "pytest_total_count_note": "not inferred because workflow job-status response exposes success but not pytest totals",
+    "local_minimal_package_tests_passed": 12,
+    "repository_integration_test": "Director candidate rendered through accepted offline dynamics adapter and human-review metadata preserved"
+  },
+  "real_audio_experiment": {
+    "song": "Belye Stai",
+    "sample_rate": 44100,
+    "duration_seconds": 207,
+    "sources": ["01_BASS.wav", "15_SN_T.wav", "18_VALERA_VOX.wav"],
+    "selected_source_sha256_match_manifest": true,
+    "source_arrays_unchanged": true,
+    "processing": "compressor-only LinkedCompressor v2; no rider, makeup, limiter, clipper or neural audio",
+    "audition_windows_seconds": {"bass": [110, 130], "snare_top": [125, 145], "valera_vocal": [20, 40]},
+    "gr_db": {
+      "bass": {"preserve_transient": {"max": 3.754, "p95": 2.932}, "balanced": {"max": 3.963, "p95": 3.482}, "control": {"max": 4.0, "p95": 3.781}},
+      "snare_top": {"preserve_transient": {"max": 2.997, "p95": 2.428}, "balanced": {"max": 3.0, "p95": 2.668}, "control": {"max": 3.0, "p95": 2.884}},
+      "valera_vocal": {"preserve_transient": {"max": 4.591, "p95": 2.664}, "balanced": {"max": 4.979, "p95": 3.56}, "control": {"max": 5.0, "p95": 4.095}}
+    },
+    "audition_match": "exact fixed-mask active-RMS first; then common trim if necessary for -3 dBTP",
+    "bass_common_trim_db_range": [-2.329, -1.653],
+    "snare_and_vocal_common_trim_needed": false,
+    "artifact_path": "/mnt/data/Studio_Compression_Director_v1_Belye_Stai_AB.zip",
+    "status": "pending_human_listening"
+  },
+  "limitations": [
+    "macro event evidence is not note transcription or musical preference",
+    "role bounds and three candidate intents remain engineering priors",
+    "requested static GR is not calibrated to actual p95 GR; real renders show measurable mismatch",
+    "some candidates reach the configured max-GR safety cap",
+    "subjective preference among candidates remains unresolved until matched human listening",
+    "repository merge does not deploy to the user's computer"
+  ],
+  "default_audio_path_changed": false,
+  "live_code_changed": false,
+  "backend_code_changed": false,
+  "mastering_code_changed": false,
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "next_goal": "Compression Director v1.1: calibrate threshold proposals against actual processor p95 GR with bounded passes, expose censored macro-timing uncertainty/fallbacks, then re-run matched real-source A/B before any Autonomous Iteration integration"
+}

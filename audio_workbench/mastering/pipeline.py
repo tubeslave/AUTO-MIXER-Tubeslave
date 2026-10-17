@@ -1,0 +1,72 @@
+from __future__ import annotations
+from dataclasses import dataclass,asdict
+import numpy as np
+from .analyzer import analyze, true_peak_dbtp
+from . import stabilizer,clarity,impact,clipper,maximizer
+from .decision import MasteringSafetyPolicy,evaluate
+
+@dataclass
+class MasteringConfig:
+    stabilizer: bool=True
+    clarity: bool=True
+    impact: bool=True
+    clipper: bool=True
+    maximizer: bool=True
+    clarity_strength: float=.18
+    clip_drive_db: float=.8
+    maximizer_drive_db: float=2.0
+    pregain_db: float=0.0
+    ceiling_db: float=-1.0
+    target_lufs: float|None=None
+    loudness_tolerance_lu: float=.5
+    max_final_limiter_gr_db: float=3.0
+    max_band_limiter_gr_db: float=4.0
+
+class MasteringDirector:
+    def __init__(self,config:MasteringConfig|None=None): self.config=config or MasteringConfig()
+    def render(self,x:np.ndarray,sr:int):
+        source=np.asarray(x,dtype=np.float32)
+        y=source.copy()
+        before=analyze(source,sr,include_true_peak=True,include_loudness=True);events=[]
+        if abs(float(self.config.pregain_db))>1e-12:
+            gain=np.float32(10**(float(self.config.pregain_db)/20.0))
+            y=(y*gain).astype(np.float32,copy=False)
+            events.append({"module":"pregain","gain_db":float(self.config.pregain_db),"linear_gain":float(gain)})
+        if self.config.stabilizer:
+            y,s=stabilizer.process(y,sr,before);events.append({"module":"stabilizer",**s})
+        if self.config.clarity:
+            y,s=clarity.process(y,sr,self.config.clarity_strength);events.append({"module":"clarity",**s})
+        if self.config.impact:
+            y,s=impact.process(y,sr);events.append({"module":"impact",**s})
+        if self.config.clipper:
+            y,s=clipper.process(y,sr,self.config.clip_drive_db);events.append({"module":"clipper",**s})
+        if self.config.maximizer:
+            y,s=maximizer.process(y,sr,self.config.ceiling_db,self.config.maximizer_drive_db);events.append({"module":"maximizer",**s})
+        safety_event=None
+        if self.config.maximizer:
+            pre_safety_peak=true_peak_dbtp(y)
+            if not np.isfinite(pre_safety_peak):
+                raise ValueError("unmeasurable mastering true peak")
+            attenuation_db=max(0.0, float(pre_safety_peak-self.config.ceiling_db))
+            if attenuation_db>0.0:
+                y=(y*np.float32(10**(-attenuation_db/20))).astype(np.float32)
+            safety_event={"module":"true_peak_safety", "mode":"linked_static_attenuation",
+                          "input_true_peak_dbtp":pre_safety_peak,
+                          "attenuation_db":attenuation_db, "adds_gain":False}
+        after=analyze(y,sr,include_true_peak=True,include_loudness=True)
+        regression={"crest_change_db":after["crest_db"]-before["crest_db"],
+          "side_mid_change_db":after["side_mid_db"]-before["side_mid_db"],
+          "correlation_change":after["correlation"]-before["correlation"]}
+        maximizer_event=next((e for e in events if e.get("module")=="maximizer"),None)
+        if maximizer_event is not None:
+            maximizer_event["true_peak_safety"]=safety_event
+        budget={"maximizer":maximizer_event,"true_peak_safety":safety_event}
+        safety=evaluate(before,after,MasteringSafetyPolicy(
+          true_peak_ceiling_dbtp=self.config.ceiling_db,
+          target_lufs=self.config.target_lufs,
+          loudness_tolerance_lu=self.config.loudness_tolerance_lu,
+          require_limiter_evidence=self.config.maximizer,
+          max_final_limiter_gr_db=self.config.max_final_limiter_gr_db,
+          max_band_limiter_gr_db=self.config.max_band_limiter_gr_db,
+        ),processing_evidence=budget)
+        return y,{"config":asdict(self.config),"before":before,"after":after,"events":events,"regression":regression,"budget":budget,"safety":safety}

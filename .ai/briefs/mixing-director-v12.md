@@ -1,0 +1,2 @@
+# Mixing Director v1.2 Dynamics
+Dynamics follows accepted balance and masking EQ. Measure before compressing. Compression has a musical goal per role: vocal stability, bass consistency, kick/snare density while retaining attack, and light guitar glue. OH/cymbals remain uncompressed by default. Thresholds are derived from the source envelope; target GR is bounded and no role is compressed merely because a compressor exists.
