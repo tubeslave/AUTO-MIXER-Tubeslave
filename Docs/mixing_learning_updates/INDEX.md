@@ -677,5 +677,14 @@ ML-2026-10-16-1500 (search, previous successful search ML-2026-10-16-0900): PEAC
 | Update | Artifacts | Outcome |
 |---|---|---|
 | ML-2026-10-16-1800 | [Report](ML-2026-10-16-1800.md) · [JSON patch](ML-2026-10-16-1800.json) · [ADR](../adr/mixing-learning-2026-10-16-1800.md) | Deep review: PEACE version/results and pinned repository/weight/licence audit plus CTAG-FX method/demo provenance audit; 2 Source Cards and 2 Artifact Audits updated, 1 Artifact Audit and 10 Knowledge Cards added, 2 rules revised, 1 blocked benchmark added and 1 blocked A/B revised; no video/reference/audio/DSP/runtime/model change |
+| ML-2026-10-17-0900 | [Report](ML-2026-10-17-0900.md), [JSON patch](ML-2026-10-17-0900.json), [ADR](../adr/mixing-learning-2026-10-17-0900.md) | Search: 1 full-text DAFx-26 FNO source, 1 metadata/abstract-only FDverb preprint, 7 Knowledge Cards, 1 candidate rule, 0 studied and 2 new queued videos, 1 blocked experiment; 7 duplicates removed; no new reference/audio/DSP/runtime/model change |
 
 ML-2026-10-16-1800 (deep_review, source search ML-2026-10-16-1500): PEACE arXiv v1 is now the canonical numerical record because the camera-ready path used different padding; both versions are one evidence family. A supervised closed-set classifier outperformed retrieval on the reported 420-pair benchmark, so PEACE now requires a baseline, abstention and immutable model/licence gates. CTAG-FX demo “RAW” guitar is already processed and its variants are not loudness matched, so the A/B remains blocked until native code and provenance are frozen. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-17 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-17-0900 | [Report](ML-2026-10-17-0900.md) · [JSON patch](ML-2026-10-17-0900.json) · [ADR](../adr/mixing-learning-2026-10-17-0900.md) | Full-text FNO sample-rate study plus metadata-only FDverb and two queued rock-mixing videos; one bounded rule and one blocked one-factor A/B; no runtime change |
+
+ML-2026-10-17-0900 (search, previous search ML-2026-10-16-1500): the FNO paper is useful evidence for one simulated circuit across 24/48/88.2/96 kHz, but metric-dependent results, no listener/hardware test, a 20 ms memory bound and missing artifacts prevent production promotion. FDverb and two videos remain queued_source. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
