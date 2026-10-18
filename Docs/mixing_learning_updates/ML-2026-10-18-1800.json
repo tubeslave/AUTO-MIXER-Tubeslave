@@ -1,0 +1,166 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-18-1800",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-18T18:00:00+03:00",
+  "actual_start": "2026-10-18T17:58:05+03:00",
+  "report_time": "2026-10-18T18:03:13+03:00",
+  "source_search_report": "ML-2026-10-18-1500",
+  "immediate_predecessor": "ML-2026-10-18-1500",
+  "citation_check": "partial",
+  "sources_revised": [
+    {
+      "id": "SRC-ML-20261018-1500-01",
+      "revision": 2,
+      "stable_id": "arxiv:2610.15967v1",
+      "doi": "10.48550/arXiv.2610.15967",
+      "reading_depth": "full_text_recheck_methods_equations_tables_listening_appendix_plus_official_demo_manifest_and_dependency_audit",
+      "publication_state": "preprint_under_review_per_author_page",
+      "missing_replication_fields": [
+        "exact_model_ids_and_revisions",
+        "aura_code_revision",
+        "stft_window_hop",
+        "erb_band_count_and_weights",
+        "lambda",
+        "beta",
+        "eta",
+        "optimizer_learning_rate_and_state_policy",
+        "epsilon_values",
+        "expanded_pass_budget_R",
+        "exact_evaluation_manifest"
+      ],
+      "conclusion": "human_gated_aura_like_research_only_exact_reproduction_blocked",
+      "confidence": "low_research_only_preprint_small_listener_test_incomplete_artifacts"
+    }
+  ],
+  "artifact_audits_added": [
+    {
+      "id": "ART-ML-20261018-1800-01",
+      "type": "official_demo_repository",
+      "repository": "basusattwik/aura-demo",
+      "commit": "f7170bd1a48c5bdd76dc258437a58a32338bf229",
+      "files_read": [
+        "index.html",
+        "samples.js",
+        "app.js",
+        "README.md"
+      ],
+      "files_absent": [
+        "LICENSE",
+        "build_audio.py"
+      ],
+      "manifest": {
+        "best": {
+          "clips": 10,
+          "systems": 5
+        },
+        "mychoice": {
+          "clips": 8,
+          "systems": 6
+        },
+        "lpf": {
+          "clips": 7,
+          "systems": 3
+        }
+      },
+      "audio_format_declared": "flac",
+      "audio_access": "not_downloaded_not_played",
+      "reproducibility_status": "demonstration_only_not_scientific_bundle"
+    },
+    {
+      "id": "ART-ML-20261018-1800-02",
+      "type": "dependency_repository_and_model_cards",
+      "repository": "Stability-AI/stable-audio-3",
+      "commit": "77e0398c26f7d22d801ec1bb036307e8b231f741",
+      "license": "MIT_code",
+      "blobs": {
+        "license": "b72d712daa003aa3947ace398ae7866250634428",
+        "pyproject": "bfc139732f4c2601c48e6a841c634e518b1ce671",
+        "uv_lock": "9b658cf6164313d27d7fc9c73a420f2b54f3dc21"
+      },
+      "model_access": "gated_requires_login_contact_sharing_license_acceptance_and_gemma_terms",
+      "access_action": "metadata_only_no_account_no_acceptance_no_download_no_run",
+      "reproducibility_status": "base_dependency_documented_aura_specific_layer_missing"
+    }
+  ],
+  "references_revised": [
+    {
+      "id": "REF-ML-MUSDB18HQ",
+      "doi": "10.5281/zenodo.3338373",
+      "rights": "educational_only_source_specific_rights_commercial_permission_required",
+      "project_effect": "metadata_and_research_context_only_not_project_raw_audio"
+    }
+  ],
+  "knowledge_cards_added": [
+    "KC-ML-20261018-1800-01",
+    "KC-ML-20261018-1800-02",
+    "KC-ML-20261018-1800-03",
+    "KC-ML-20261018-1800-04",
+    "KC-ML-20261018-1800-05",
+    "KC-ML-20261018-1800-06",
+    "KC-ML-20261018-1800-07",
+    "KC-ML-20261018-1800-08",
+    "KC-ML-20261018-1800-09",
+    "KC-ML-20261018-1800-10"
+  ],
+  "rules_revised": [
+    {
+      "id": "RULE-ML-20261018-1500-01",
+      "revision": 2,
+      "title": "Human-gated Aura-like mono-to-stereo research only",
+      "applicability": "genuinely_mono_project_owned_or_rights_cleared_or_known_synthetic_downmix_with_explicit_artistic_brief",
+      "one_factor_control": "identical_second_phase_g_reward_0_vs_1",
+      "proposed_settings": {
+        "kappa": 1,
+        "kappa_origin": "paper_formula_unchanged_reference_target_not_reward_off",
+        "reward_iterations": 5,
+        "reward_iterations_origin": "paper_schedule_not_project_default",
+        "reward_gain": [
+          0,
+          1
+        ],
+        "reward_gain_origin": "project_ab_control_not_paper_claim"
+      },
+      "success": "at_least_three_held_out_excerpts_b_preferred_for_image_on_at_least_two_with_no_hard_content_mono_transient_failure",
+      "confidence": "low_research_only_preprint_small_listener_test_incomplete_artifacts",
+      "auto_apply": false
+    }
+  ],
+  "experiments_revised": [
+    {
+      "id": "EXP-ML-20261018-1500-01",
+      "revision": 2,
+      "title": "Matched-compute Aura reward multiplier gate",
+      "status": "not_run_blocked",
+      "a": "identical_full_pipeline_second_phase_retained_g_reward_0",
+      "b": "identical_full_pipeline_g_reward_1",
+      "one_varied_factor": "frozen_spatial_reward_multiplier",
+      "loudness_matching": "raw_preserved_plus_separate_attenuation_only_bs1770_matched_blind_copies_with_logged_compensation",
+      "decision_owner": "Dmitry",
+      "blockers": [
+        "aura_implementation_and_config_absent",
+        "exact_reward_optimizer_stft_erb_parameters_absent",
+        "exact_stable_audio_3_model_ids_and_revisions_absent",
+        "weights_gated_terms_not_accepted",
+        "compute_runtime_budget_not_approved",
+        "project_audio_and_reference_not_selected",
+        "criteria_not_preregistered"
+      ],
+      "fallback": "independent_implementation_must_be_labelled_aura_like_not_exact_reproduction",
+      "auto_apply": false
+    }
+  ],
+  "videos_studied": 0,
+  "videos_queued": [
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02"
+  ],
+  "multitracks_added": 0,
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "audio_run": false,
+  "model_run": false,
+  "code_run": false,
+  "dsp_changed": false,
+  "runtime_changed": false,
+  "model_changed": false
+}
