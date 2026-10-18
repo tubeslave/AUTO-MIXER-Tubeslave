@@ -723,3 +723,12 @@ ML-2026-10-17-1800 (deep_review, source search ML-2026-10-17-1500): the reported
 | ML-2026-10-18-0900 | [Report](ML-2026-10-18-0900.md) · [JSON patch](ML-2026-10-18-0900.json) · [ADR](../adr/mixing-learning-2026-10-18-0900.md) | Search: 1 complete PADP preprint, 2 metadata/official-companion-only queued videos, 9 Knowledge Cards, 1 bounded metric-robustness rule and 1 blocked A/B; 9 paper families and 4 YouTube IDs deduplicated; no new multitrack/audio/DSP/runtime/model change |
 
 ML-2026-10-18-0900 (search, preceding search ML-2026-10-17-1500): PADP shows that listener-transparent waveform changes can destabilize objective metrics, but its evidence is mono-only, small-N and preprint-level. No objective metric may become a sole mix-acceptance gate; a one-factor human-transparent perturbation stress test is planned but blocked. Both new videos remain queued_source because no transcript/captions were obtained, despite reading their official companion articles. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+## 2026-10-18 12:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-18-1200 | [Report](ML-2026-10-18-1200.md) · [JSON patch](ML-2026-10-18-1200.json) · [ADR](../adr/mixing-learning-2026-10-18-1200.md) | PADP full-method audit plus official MUSHRA and ODAQ verification; 1 Source Card revised, 1 Source Card and 1 Artifact Audit added, 10 Knowledge Cards, 1 rule and 1 blocked experiment revised; no video/reference/audio/DSP/runtime/model change |
+
+ML-2026-10-18-1200 (deep_review, source search ML-2026-10-18-0900): DIF2 is untested, SCD codec/alignment provenance is incomplete, the SCD inequality text conflicts, and pooled metric SRCC lacks uncertainty and held-out validation. PADP is retained only as a human-gated research stress test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
