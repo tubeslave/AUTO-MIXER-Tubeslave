@@ -741,3 +741,12 @@ ML-2026-10-18-1200 (deep_review, source search ML-2026-10-18-0900): DIF2 is unte
 | ML-2026-10-18-1500 | [Report](ML-2026-10-18-1500.md) · [JSON patch](ML-2026-10-18-1500.json) · [ADR](../adr/mixing-learning-2026-10-18-1500.md) | Search: 1 fresh full-text mono-to-stereo preprint, 1 fully content-read video, 9 Knowledge Cards, 1 bounded research-only rule and 1 blocked A/B; 3 video duplicates removed; no multitrack/audio/DSP/runtime/model change |
 
 ML-2026-10-18-1500 (search, preceding search ML-2026-10-18-0900): Aura supports a human-gated mono-to-stereo research hypothesis, not an automatic width processor: it is not mono-preserving, trades mid fidelity for spatial metrics in restoration, uses a vocal-removed short-excerpt domain and has an n=5 listening test. Andrew Scheps' parallel-compression video was studied from a permitted companion transcript; no numeric settings were accepted. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-18 18:00 MSK — deep review
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-18-1800 | [Report](ML-2026-10-18-1800.md) · [JSON patch](ML-2026-10-18-1800.json) · [ADR](../adr/mixing-learning-2026-10-18-1800.md) | Deep review: Aura full-method recheck plus pinned official demo, Stable Audio 3 dependency and MUSDB18-HQ rights audit; 1 Source Card, 1 Reference Card, 1 rule and 1 blocked A/B revised; 2 Artifact Audits and 10 Knowledge Cards added; no video/reference-audio/DSP/runtime/model change |
+
+ML-2026-10-18-1800 (deep_review, source search ML-2026-10-18-1500): Stable Audio 3 base code and lockfile are public, but Aura-specific code/config, exact model revisions and critical reward/STFT/optimizer constants remain absent; weights are gated and no terms were accepted. The official demo is a rights-constrained showcase without a reproducible loudness or listener-data bundle. The A/B now holds compute constant and varies only g_reward=0/1. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
