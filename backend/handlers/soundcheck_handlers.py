@@ -216,6 +216,49 @@ def register_handlers(server):
             **status
         })
 
+    async def handle_update_muq_stem_scores(websocket, data):
+        """Accept a batch of per-stem MuQ scores for EWMA drift visualization."""
+
+        engine = server.auto_soundcheck_engine
+        if engine is None or not hasattr(engine, "update_muq_stem_score_batch"):
+            await server.send_to_client(websocket, {
+                "type": "muq_stem_drift",
+                "status": "unavailable",
+                "enabled": False,
+                "stems": {},
+                "error": "Auto soundcheck engine is not running",
+            })
+            return
+
+        stem_scores = (
+            data.get("stem_scores")
+            or data.get("scores")
+            or data.get("stems")
+            or {}
+        )
+        if not isinstance(stem_scores, dict):
+            await server.send_to_client(websocket, {
+                "type": "muq_stem_drift",
+                "status": "error",
+                "enabled": False,
+                "stems": {},
+                "error": "stem_scores must be an object",
+            })
+            return
+
+        result = engine.update_muq_stem_score_batch(
+            stem_scores,
+            data.get("dt"),
+            params_by_stem=data.get("params_by_stem") or data.get("params") or {},
+        )
+        payload = {
+            "type": "muq_stem_drift",
+            "status": "updated",
+            **result,
+        }
+        await server.send_to_client(websocket, payload)
+        await server.broadcast(payload)
+
     return {
         "start_auto_soundcheck": handle_start_auto_soundcheck,
         "stop_auto_soundcheck": handle_stop_auto_soundcheck,
@@ -223,4 +266,6 @@ def register_handlers(server):
         "start_auto_engine": handle_start_auto_engine,
         "stop_auto_engine": handle_stop_auto_engine,
         "get_auto_engine_status": handle_get_auto_engine_status,
+        "update_muq_stem_scores": handle_update_muq_stem_scores,
+        "muq_stem_scores": handle_update_muq_stem_scores,
     }

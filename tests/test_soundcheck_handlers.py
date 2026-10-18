@@ -136,3 +136,42 @@ async def test_start_auto_engine_uses_config_and_wires_callbacks(monkeypatch):
 
     assert {"type": "auto_engine_state", "state": "running", "message": "Engine started"} in server.broadcast_messages
     assert {"type": "auto_engine_channel", "channel": 3, "data": {"preset": "kick"}} in server.broadcast_messages
+
+
+@pytest.mark.asyncio
+async def test_update_muq_stem_scores_forwards_batch_to_engine():
+    server = DummyServer()
+
+    class FakeEngine:
+        def __init__(self):
+            self.received = None
+
+        def update_muq_stem_score_batch(self, stem_scores, dt=None, params_by_stem=None):
+            self.received = (stem_scores, dt, params_by_stem)
+            return {
+                "enabled": True,
+                "stems": {"vox": {"state": "WARN"}},
+                "summary": "MuQ stem EWMA drift: NORMAL=0 WARN=1 CRIT=0",
+            }
+
+    server.auto_soundcheck_engine = FakeEngine()
+    handlers = register_handlers(server)
+
+    await handlers["update_muq_stem_scores"](
+        "ws",
+        {
+            "stem_scores": {"vox": {"score": 0.7}},
+            "dt": 1.0,
+            "params_by_stem": {"vox": {"fader_db": -6.0}},
+        },
+    )
+
+    assert server.auto_soundcheck_engine.received == (
+        {"vox": {"score": 0.7}},
+        1.0,
+        {"vox": {"fader_db": -6.0}},
+    )
+    _, payload = server.sent_messages[-1]
+    assert payload["type"] == "muq_stem_drift"
+    assert payload["status"] == "updated"
+    assert payload["stems"]["vox"]["state"] == "WARN"

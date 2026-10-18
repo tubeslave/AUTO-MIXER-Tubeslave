@@ -17,7 +17,7 @@ import os
 from pathlib import Path
 import sys
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 import numpy as np
 
@@ -26,11 +26,23 @@ try:
 except ImportError:  # pragma: no cover - package import fallback
     from backend.output_paths import ai_logs_path
 
+try:
+    from ewma_metrics import StemEwmaDriftMonitor
+except ImportError:  # pragma: no cover - package import fallback
+    from backend.ewma_metrics import StemEwmaDriftMonitor
+
 logger = logging.getLogger(__name__)
 
 
 def _clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
     return float(max(low, min(high, float(value))))
+
+
+def _fmt_metric(value: Any) -> str:
+    try:
+        return f"{float(value):.4f}"
+    except (TypeError, ValueError):
+        return "n/a"
 
 
 def _as_mono(audio: np.ndarray) -> np.ndarray:
@@ -186,6 +198,9 @@ class MuQEvalService:
         self._model_error: str = ""
         self._fallback_logged = False
         self._last_quality_decision_at = 0.0
+        self.stem_drift_monitor = StemEwmaDriftMonitor(
+            self.config.extra.get("stem_drift", {})
+        )
 
         if self.config.enabled:
             self._try_load_model()
@@ -388,6 +403,71 @@ class MuQEvalService:
             reward=reward,
         )
         return decision
+
+    def update_stem_score_batch(
+        self,
+        stem_scores: Mapping[str, Any],
+        dt: Optional[float] = None,
+        *,
+        params_by_stem: Optional[Mapping[str, Mapping[str, Any]]] = None,
+        timestamp: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Update per-stem EWMA drift metrics from a MuQ score batch.
+
+        The method is intentionally side-effect-light: it stores EWMA state,
+        returns restore/freeze actions, and logs/serializes the result. Applying
+        restored parameters is left to the live engine safety path.
+        """
+
+        result = self.stem_drift_monitor.update_batch(
+            stem_scores,
+            dt,
+            params_by_stem=params_by_stem,
+            timestamp=timestamp,
+        )
+        if result.get("enabled", False):
+            logger.info(result.get("summary", "MuQ stem EWMA drift updated"))
+            for stem, stem_result in result.get("stems", {}).items():
+                self._log_stem_drift_update(stem, stem_result)
+        return result
+
+    def is_stem_ml_correction_frozen(self, stem_name: str) -> bool:
+        """Return whether ML corrections are currently frozen for a stem."""
+
+        return self.stem_drift_monitor.is_stem_frozen(stem_name)
+
+    def restore_stem_last_good(self, stem_name: str) -> Optional[Dict[str, Any]]:
+        """Return the full-band last-known-good params for a stem."""
+
+        return self.stem_drift_monitor.restore_stem_last_good(stem_name)
+
+    def stem_drift_status(self) -> Dict[str, Any]:
+        """Return visualization-friendly stem drift status."""
+
+        return {
+            "enabled": bool(self.stem_drift_monitor.enabled),
+            "frozen_stems": self.stem_drift_monitor.frozen_stems(),
+            "tracked_streams": len(self.stem_drift_monitor.trackers),
+        }
+
+    @staticmethod
+    def _log_stem_drift_update(stem: str, stem_result: Mapping[str, Any]) -> None:
+        state = str(stem_result.get("state", "NORMAL"))
+        log_fn = logger.warning if state in {"WARN", "CRIT"} else logger.debug
+        masks = stem_result.get("masks", {}) or {}
+        full_band = masks.get("full_band") or next(iter(masks.values()), {})
+        log_fn(
+            "MuQ stem drift: stem=%s group=%s state=%s ewma=%s drift=%s "
+            "warn_timer=%s crit_timer=%s actions=%s",
+            stem,
+            stem_result.get("group", ""),
+            state,
+            _fmt_metric(full_band.get("ewma")),
+            _fmt_metric(full_band.get("drift")),
+            _fmt_metric(full_band.get("warn_timer")),
+            _fmt_metric(full_band.get("crit_timer")),
+            stem_result.get("actions", []),
+        )
 
     def log_decision(self, decision: MuQValidationDecision) -> None:
         """Append a validation decision and reward row to JSONL logs."""
