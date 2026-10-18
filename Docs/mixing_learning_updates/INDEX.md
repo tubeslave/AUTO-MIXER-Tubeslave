@@ -714,3 +714,12 @@ ML-2026-10-17-1500 (search, preceding search ML-2026-10-17-0900): controlled pla
 | ML-2026-10-17-1800 | [Report](ML-2026-10-17-1800.md) · [JSON patch](ML-2026-10-17-1800.json) · [ADR](../adr/mixing-learning-2026-10-17-1800.md) | Complete warm-initialization paper and companion audit plus official DAFx plate-challenge artifact audit; 2 Source Cards revised, 2 Artifact Audits and 9 Knowledge Cards added, 2 rules and 2 blocked experiments revised; no video/reference/audio/DSP/runtime/model change |
 
 ML-2026-10-17-1800 (deep_review, source search ML-2026-10-17-1500): the reported warm-initialization region near tau_init≈0.8 is downgraded to model-specific informal-listening evidence; FAD has a guidance mismatch and pitch-set Jaccard omits temporal/dynamic/stereo structure. Both official repositories are pinned, but explicit repository licences are absent. The plate challenge remains synthetic-only and its normalized WAV previews are not valid scientific inputs. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
+
+
+## 2026-10-18 09:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-18-0900 | [Report](ML-2026-10-18-0900.md) · [JSON patch](ML-2026-10-18-0900.json) · [ADR](../adr/mixing-learning-2026-10-18-0900.md) | Search: 1 complete PADP preprint, 2 metadata/official-companion-only queued videos, 9 Knowledge Cards, 1 bounded metric-robustness rule and 1 blocked A/B; 9 paper families and 4 YouTube IDs deduplicated; no new multitrack/audio/DSP/runtime/model change |
+
+ML-2026-10-18-0900 (search, preceding search ML-2026-10-17-1500): PADP shows that listener-transparent waveform changes can destabilize objective metrics, but its evidence is mono-only, small-N and preprint-level. No objective metric may become a sole mix-acceptance gate; a one-factor human-transparent perturbation stress test is planned but blocked. Both new videos remain queued_source because no transcript/captions were obtained, despite reading their official companion articles. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.

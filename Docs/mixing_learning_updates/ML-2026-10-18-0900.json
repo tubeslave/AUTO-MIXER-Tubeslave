@@ -1,0 +1,106 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-18-0900",
+  "mode": "search",
+  "planned_slot": "2026-10-18T09:00:00+03:00",
+  "actual_start": "2026-10-18T08:59:44+03:00",
+  "report_time": "2026-10-18T09:04:45+03:00",
+  "preceding_successful_search": "ML-2026-10-17-1500",
+  "immediate_predecessor": "ML-2026-10-17-1800",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261018-0900-01",
+      "stable_id": "arxiv:2610.01405v1",
+      "title": "PADP: Perceptual Audio Data Perturbation for Probing Perception Awareness in Audio Quality Models",
+      "url": "https://arxiv.org/abs/2610.01405",
+      "full_text_url": "https://arxiv.org/html/2610.01405v1",
+      "publication_state": "preprint",
+      "publication_date": "2026-10-01",
+      "reading_depth": "full_text_complete_5_pages",
+      "artifact_status": "not_found",
+      "citation_check": "partial",
+      "limits": [
+        "retained_listener_n_9_scd_and_8_other",
+        "12_source_items",
+        "mono_only_left_channel",
+        "12_of_4096_apx_combinations_sampled",
+        "no_rock_mix_or_stereo_validation",
+        "no_reported_uncertainty_or_mixed_effects",
+        "no_official_code_stimuli_results_manifest_found"
+      ]
+    }
+  ],
+  "video_sources_added": [
+    {
+      "id": "VIDEO-ML-20261018-0900-01",
+      "youtube_id": "p0ejDJYv-ds",
+      "url": "https://www.youtube.com/watch?v=p0ejDJYv-ds",
+      "title": "Recording Punk Rock Drums with Brad Cook at Barefoot: Big Sounds, Real Decisions and Scully Tape",
+      "status": "queued_source",
+      "reading_depth": "video_metadata_plus_full_official_companion_article",
+      "transcript_available": false,
+      "companion_url": "https://producelikeapro.com/blog/recording-punk-rock-drums-with-brad-cook-at-barefoot-big-sounds-real-decisions-and-scully-tape/"
+    },
+    {
+      "id": "VIDEO-ML-20261018-0900-02",
+      "youtube_id": "JGjqrzW-o78",
+      "url": "https://www.youtube.com/watch?v=JGjqrzW-o78",
+      "title": "Too Compressed Or Just Badly Compressed? FAQ Friday",
+      "status": "queued_source",
+      "reading_depth": "video_metadata_plus_substantive_official_companion_article",
+      "transcript_available": false,
+      "companion_url": "https://producelikeapro.com/blog/faq-friday-reverb-on-the-mix-bus-too-compressed-first-hardware-and-choosing-monitors/"
+    }
+  ],
+  "videos_studied": 0,
+  "knowledge_cards_added": [
+    "KC-ML-20261018-0900-01",
+    "KC-ML-20261018-0900-02",
+    "KC-ML-20261018-0900-03",
+    "KC-ML-20261018-0900-04",
+    "KC-ML-20261018-0900-05",
+    "KC-ML-20261018-0900-06",
+    "KC-ML-20261018-0900-07",
+    "KC-ML-20261018-0900-08",
+    "KC-ML-20261018-0900-09"
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261018-0900-01",
+      "title": "Objective-metric perturbation robustness gate",
+      "confidence": "low_to_medium_preprint_small_mono_study",
+      "auto_apply": false
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261018-0900-01",
+      "title": "Human-transparent perturbation versus metric stability",
+      "status": "not_run_blocked",
+      "one_varied_factor": "perturbation_absent_vs_present",
+      "auto_apply": false
+    }
+  ],
+  "reference_cards_added": [],
+  "multitracks_added": [],
+  "dedupe": {
+    "paper_families_removed": 9,
+    "youtube_ids_removed": ["81d-Yumfcxs", "0KPWB6ca8Eo", "zees-BXNYBw", "Ucws5v87uDI"]
+  },
+  "queue": [
+    "SRC-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02",
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "EXP-ML-20261018-0900-01"
+  ],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "safety": {
+    "audio_downloaded_or_uploaded": false,
+    "audio_analyzed": false,
+    "code_or_model_run": false,
+    "paid_service_used": false,
+    "dsp_or_runtime_changed": false
+  }
+}
