@@ -1,0 +1,32 @@
+{
+  "branch": "audio-workbench-mcp-v0.1",
+  "scope": "studio_offline",
+  "task": "Require standards-based loudness-target evidence and limiter gain-reduction budgets before a mastering candidate can advance",
+  "status": "accepted",
+  "decision": "machine_validation_passed_human_acceptance_still_required",
+  "implementation_commit": "864508aaa8bd23f5069517b7954836d3a696cd9d",
+  "contract": [
+    "Configured LUFS targets require pyloudnorm integrated-LUFS evidence; an RMS approximation cannot satisfy the target gate.",
+    "A configured loudness target outside the configured tolerance rejects the candidate.",
+    "When the maximizer is enabled, final and per-band gain-reduction evidence is mandatory.",
+    "The default final limiter GR budget is 3.0 dB and the default worst-band limiter GR budget is 4.0 dB; exceeding either rejects the candidate.",
+    "Machine-safe mastering remains pending_human_review and baseline_eligible=false until level-matched human listening accepts it."
+  ],
+  "validation": {
+    "local_targeted_tests": "12 passed",
+    "stem_offline_run": 35900568898,
+    "stem_offline_status": "success",
+    "github_tests_run": 35900568906,
+    "github_tests_status": "success",
+    "python_matrix": ["3.10", "3.11", "3.12"]
+  },
+  "current_cleanup_baseline": {
+    "status": "pending_human_review",
+    "workflow_run": 35859737710,
+    "note": "Balance-transparent Ptitsa cleanup remains outside the accepted baseline until human RAW/CLEAN listening accepts it, especially both vocals."
+  },
+  "next_studio_goal": {
+    "id": "mastering-target-controller-v2",
+    "task": "Add a bounded mastering target controller that approaches configured LUFS by distributing gain and drive without violating true-peak, final-limiter or per-band GR budgets; rejected candidates must roll back and subjective acceptance remains human."
+  }
+}

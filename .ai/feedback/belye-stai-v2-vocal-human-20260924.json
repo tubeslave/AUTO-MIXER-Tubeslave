@@ -1,0 +1,21 @@
+{
+  "schema": "studio-scoped-human-listening-feedback-v1",
+  "song": "Belye Stai",
+  "version": "v2 balanced first-vocal-compressor replacement",
+  "date": "2026-09-24",
+  "reviewer": "user Дмитрий",
+  "human_review": "accepted",
+  "scope": "vocal compression and its stable position in the delivered v2 mix; not universal settings for other sources",
+  "quote": "Да, с этой компрессией гораздо лучше стал вокал звучать, не выпирает, не пропадает, все на своем месте. Такую же компрессию бы разработать для остальных инструментов. Ну не такую же, а вообще разработать для остальных инструментов.",
+  "master_wav_sha256": "ff167ba9fa33413e78e337c429d2b23b3ff5c125000d0b2f52b76a067f591227",
+  "premaster_sha256": "73e407ac2893b94ea49aecfa4274da52c3131cc0dafb04fc394c0f94a596eb59",
+  "source_state": ".ai/state/studio-belye-stai-remix-v2-listening-20260924.json",
+  "supersedes": "pending human listening for the named vocal comparison only",
+  "automatic_intelligibility_verdict": "rejected_target_not_improved_preserved",
+  "automatic_intelligibility_delta": -0.008662921039834015,
+  "protected_regressions_in_prior_report": [],
+  "interpretation": "User prefers foreground stability/phrase consistency; the existing energy-ratio intelligibility objective did not capture that improvement. Preserve this disagreement as critic-calibration evidence, do not rewrite metric history.",
+  "automatic_baseline_promoted": false,
+  "freeze_vocal_in_following_instrument_experiments": true,
+  "no_neural_audio_constraint_retained": true
+}

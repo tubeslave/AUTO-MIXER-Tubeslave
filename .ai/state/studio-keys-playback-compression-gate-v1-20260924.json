@@ -1,0 +1,53 @@
+{
+  "goal": "keys-playback-role-aware-compression-gate-v1",
+  "status": "accepted_machine_validation_real_song_source_blocked",
+  "base_commit": "29a6ecc999032c6653917c72798c299122973aa4",
+  "pull_request": 139,
+  "tested_head": "8913dd2964251fd6cd04863f37d977df257db7d0",
+  "merge_commit": "be03e6c8ad15f1dda25d769ae3f509628d809d77",
+  "ci_run": 35997681124,
+  "ci_matrix": {"3.10":"success","3.11":"success","3.12":"success"},
+  "bounded_task": "separate KEYS and PLAYBACK actionability before compression; protect transients, programmed macro dynamics and stereo image; preserve no-change as a valid result",
+  "implementation": {
+    "module": "audio_workbench/mixing/keys_playback_director.py",
+    "roles": ["keys", "playback"],
+    "explicit_stereo_required": true,
+    "fixed_evidence": ["2s active-frame local spread", "macro block spread", "high-band transient events", "attack/body", "side/mid", "L/R correlation"],
+    "candidate_change_scope": "attack_release_only",
+    "playback_macro_alternate": "review_section_level_ride_not_compression",
+    "human_listening_required": true,
+    "automatic_baseline_promotion": false
+  },
+  "local_validation": {
+    "new_tests_passed": 7,
+    "focused_tests_passed": 38,
+    "compileall": "passed",
+    "synthetic_duration_s": 24,
+    "synthetic_sample_rate": 8000,
+    "synthetic_keys_actionable": true,
+    "synthetic_keys_local_spread_db": 17.2106239000944,
+    "synthetic_candidate_local_spread_deltas_db": {
+      "preserve_attack": -0.9197488246213332,
+      "balanced": -1.0461553060616673,
+      "tighten_body": -1.140381881490498
+    },
+    "synthetic_candidate_technical_survivors": ["preserve_attack", "balanced", "tighten_body"],
+    "stable_synthetic_playback_actionable": false,
+    "programmed_macro_playback_actionable": false,
+    "programmed_macro_playback_alternate": "review_section_level_ride_not_compression"
+  },
+  "real_song_validation": {
+    "status": "blocked_by_missing_source_stems_in_current_runtime",
+    "missing": ["KEYS_L", "KEYS_R", "PLAYBACK_L", "PLAYBACK_R"],
+    "available_substitute_accepted": false,
+    "full_session_rerender_claimed": false,
+    "musical_candidate_claimed": false
+  },
+  "review": "self-review plus local tests and green GitHub Actions matrix; no independent listener invented",
+  "live_code_changed": false,
+  "accepted_vocal_changed": false,
+  "mastering_changed": false,
+  "neural_audio_used": false,
+  "paid_external_credits_used": false,
+  "next_goal": "run the role-aware gate against original Belye Stai KEYS/PLAYBACK stems when source access is restored; independently advance OH/cymbal no-change-first actionability while that source-bound validation remains blocked"
+}

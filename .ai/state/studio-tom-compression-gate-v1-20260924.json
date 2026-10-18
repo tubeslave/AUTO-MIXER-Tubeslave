@@ -1,0 +1,72 @@
+{
+  "goal": "grouped-source-specific-tom-compression-gate-v1",
+  "status": "accepted_machine_validation_pending_human_listening",
+  "pull_request": 136,
+  "tested_head": "00ce8ee8fc0c7fb128590dce27aca62b3cab0132",
+  "merge_commit": "69b9004a04da2ec6192b4d17812dabaede63a23c",
+  "workflow_run": 35983620427,
+  "ci_python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+  "local_validation_this_acceptance_turn": {
+    "focused_tests_passed": 41,
+    "initial_test_command_failure": "wrong test filename only; corrected without code or threshold changes",
+    "thresholds_changed_after_results": false
+  },
+  "scope": ["TOM_1", "TOM_2", "FLOOR"],
+  "no_change": {
+    "TOM_1_max_pcm_error": 0.0,
+    "TOM_2_max_pcm_error": 0.0,
+    "FLOOR_max_pcm_error": 0.0,
+    "source_bound_controls": true,
+    "candidate_insert": "replaces original compressor; never stacks after processed tom",
+    "full_session_rerender_required": true
+  },
+  "gate": {
+    "required_body_spread_improvement_db": 0.08,
+    "max_attack_body_loss_db": 0.35,
+    "max_decay_shape_change_db": 0.45,
+    "max_quiet_hit_loss_db": 0.35,
+    "max_between_hit_floor_increase_db": 0.40,
+    "candidate_scope": "attack_release_only; threshold ratio knee max-GR detector and final gain frozen"
+  },
+  "real_207_second_experiment": {
+    "candidate_family": ["preserve_attack", "tighter_body", "longer_decay"],
+    "common_survivor": "preserve_attack",
+    "survivor_attack_ms": 22.5,
+    "survivor_release_ms": 136.0,
+    "TOM_1": {"events": 65, "body_spread_delta_db": -0.20644182012762258, "attack_body_delta_db": -0.002661820617440469, "body_tail_delta_db": 0.037317598189879675, "quiet_hit_delta_db": 0.17476499096994047, "between_hit_floor_delta_db": 0.22289184473402202},
+    "TOM_2": {"events": 31, "body_spread_delta_db": -0.24364234255525474, "attack_body_delta_db": 0.022801771823580452, "body_tail_delta_db": -0.005025740773717757, "quiet_hit_delta_db": 0.23634024663570585, "between_hit_floor_delta_db": 0.12874632038311518},
+    "FLOOR": {"events": 71, "body_spread_delta_db": -0.24602397583556979, "attack_body_delta_db": -0.008704418027321026, "body_tail_delta_db": -0.04801344815526676, "quiet_hit_delta_db": 0.23382567265721121, "between_hit_floor_delta_db": 0.13479026807209493},
+    "other_candidates_rejected": true,
+    "audio_baseline_promoted": false
+  },
+  "full_mix_validation": {
+    "protected_failures": [],
+    "foreground_delta_db": -0.00022373508598239056,
+    "vocal_intelligibility_proxy_delta": 0.00006777143710490208,
+    "punch_proxy_delta_db": -0.03849505619135485,
+    "harshness_delta": -0.0002991892740350499,
+    "density_delta": 0.0,
+    "depth_proxy_delta": 0.0010502834031764219,
+    "width_delta_db": -0.0031625127432892697,
+    "climax_lift_delta_db": 0.0,
+    "human_listening_required": true
+  },
+  "execution_failures": [
+    "Two monolithic evidence attempts timed out before final JSON; partial outputs were discarded and evidence was recomputed in deterministic stages.",
+    "Initial synthetic fixture produced too few events; fixture duration was extended instead of weakening the gate."
+  ],
+  "artifacts_local": {
+    "report": "/mnt/data/Belye_Stai_Tom_Compression_Gate_v1_Report_RU.md",
+    "level_matched_ab_and_evidence": "/mnt/data/Belye_Stai_Tom_Gate_v1_AB_and_Evidence.zip"
+  },
+  "constraints": {
+    "human_listening_required": true,
+    "neural_audio_used": false,
+    "paid_external_credits_used": false,
+    "live_code_changed": false,
+    "mastering_changed": false,
+    "accepted_vocal_changed": false,
+    "bass_kick_snare_changed": false
+  },
+  "next_goal": "Guitar Compression Gate v1: first prove whether the distorted GTR actually has an actionable level/sustain problem; prefer no-change if already self-limited. If intervention is justified, expose the original compressor boundary, use fixed event windows to protect pick attack and accents, then full routed rerender plus level-matched human A/B."
+}
