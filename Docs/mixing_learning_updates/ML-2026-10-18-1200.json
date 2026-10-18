@@ -1,0 +1,110 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-18-1200",
+  "mode": "deep_review",
+  "planned_slot": "2026-10-18T12:00:00+03:00",
+  "actual_start": "2026-10-18T12:02:31+03:00",
+  "report_time": "2026-10-18T12:05:34+03:00",
+  "preceding_successful_search": "ML-2026-10-18-0900",
+  "immediate_predecessor": "ML-2026-10-18-0900",
+  "citation_check": "partial",
+  "sources_revised": [
+    {
+      "id": "SRC-ML-20261018-0900-01",
+      "revision": 2,
+      "stable_id": "arxiv:2610.01405v1",
+      "reading_depth": "full_text_complete_5_pages_rechecked_methods_results_limitations",
+      "bounded_conclusion": "human_gated_metric_robustness_probe_only",
+      "confidence": "low_research_only_small_nonindependent_preprint",
+      "new_limits": [
+        "dif2_not_directly_tested",
+        "apx_assignment_and_seed_unreported",
+        "mp3_implementation_unreported",
+        "loudness_compensation_and_alignment_undocumented",
+        "scd_inequality_text_inconsistent",
+        "no_ci_significance_or_held_out_validation",
+        "deepaq_same_author_lab_lineage_not_independent",
+        "embedding_distance_is_ad_hoc_probe",
+        "data_augmentation_not_tested"
+      ]
+    }
+  ],
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261018-1200-01",
+      "stable_id": "ITU-R:BS.1534-3:2015",
+      "title": "Method for the subjective assessment of intermediate quality level of audio systems",
+      "url": "https://www.itu.int/rec/R-REC-BS.1534",
+      "reading_depth": "targeted_normative_sections_experimental_design_listeners_analysis_reporting",
+      "citation_check": "partial"
+    }
+  ],
+  "artifact_audits_added": [
+    {
+      "id": "ART-ML-20261018-1200-01",
+      "title": "ODAQ upstream dataset and benchmark",
+      "url": "https://github.com/Fraunhofer-IIS/ODAQ",
+      "pinned_commit": "4fb90979b89864821c18cdb18ec2155f0e44230d",
+      "reading_depth": "repository_readme_root_manifest_benchmark_guidance_plus_targeted_paper_sections",
+      "execution": "not_run",
+      "rights_status": "subset_license_requires_doi_record_verification_before_ingestion"
+    }
+  ],
+  "knowledge_cards_added": [
+    "KC-ML-20261018-1200-01",
+    "KC-ML-20261018-1200-02",
+    "KC-ML-20261018-1200-03",
+    "KC-ML-20261018-1200-04",
+    "KC-ML-20261018-1200-05",
+    "KC-ML-20261018-1200-06",
+    "KC-ML-20261018-1200-07",
+    "KC-ML-20261018-1200-08",
+    "KC-ML-20261018-1200-09",
+    "KC-ML-20261018-1200-10"
+  ],
+  "rules_revised": [
+    {
+      "id": "RULE-ML-20261018-0900-01",
+      "revision": 2,
+      "title": "Objective-metric perturbation robustness gate",
+      "confidence": "low_research_only_small_nonindependent_preprint",
+      "auto_apply": false
+    }
+  ],
+  "experiments_revised": [
+    {
+      "id": "EXP-ML-20261018-0900-01",
+      "revision": 2,
+      "title": "Held-out SCD metric-stability check",
+      "status": "not_run_blocked",
+      "one_varied_factor": "scd_residual_absent_vs_present",
+      "candidate_lambda": 0.6,
+      "candidate_parameter_origin": "PADP_directly_tested_research_provenance_not_default",
+      "evaluation_split": "calibration_then_disjoint_held_out",
+      "auto_apply": false
+    }
+  ],
+  "videos_studied": 0,
+  "video_sources_queued": [
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02"
+  ],
+  "reference_cards_added": [],
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "snare_parallel_send_0_vs_minus3_db_after_latency_preflight",
+    "distorted_bass_clean_low_plus_character_layer_ab",
+    "EXP-ML-20261018-0900-01_rev2_blocked",
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02"
+  ],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "safety": {
+    "audio_downloaded_or_uploaded": false,
+    "audio_analyzed": false,
+    "code_or_model_run": false,
+    "paid_service_used": false,
+    "dsp_or_runtime_changed": false
+  }
+}
