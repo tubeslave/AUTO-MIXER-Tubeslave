@@ -732,3 +732,12 @@ ML-2026-10-18-0900 (search, preceding search ML-2026-10-17-1500): PADP shows tha
 
 ML-2026-10-18-1200 (deep_review, source search ML-2026-10-18-0900): DIF2 is untested, SCD codec/alignment provenance is incomplete, the SCD inequality text conflicts, and pooled metric SRCC lacks uncertainty and held-out validation. PADP is retained only as a human-gated research stress test. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.
 
+
+
+## 2026-10-18 15:00 MSK — search
+
+| Update | Artifacts | Outcome |
+|---|---|---|
+| ML-2026-10-18-1500 | [Report](ML-2026-10-18-1500.md) · [JSON patch](ML-2026-10-18-1500.json) · [ADR](../adr/mixing-learning-2026-10-18-1500.md) | Search: 1 fresh full-text mono-to-stereo preprint, 1 fully content-read video, 9 Knowledge Cards, 1 bounded research-only rule and 1 blocked A/B; 3 video duplicates removed; no multitrack/audio/DSP/runtime/model change |
+
+ML-2026-10-18-1500 (search, preceding search ML-2026-10-18-0900): Aura supports a human-gated mono-to-stereo research hypothesis, not an automatic width processor: it is not mono-preserving, trades mid fidelity for spatial metrics in restoration, uses a vocal-removed short-excerpt domain and has an n=5 listening test. Andrew Scheps' parallel-compression video was studied from a permitted companion transcript; no numeric settings were accepted. Next executable remains EXP-ML-PENA-AB15-LISTEN-20261010-1800; all rules remain auto_apply:false.

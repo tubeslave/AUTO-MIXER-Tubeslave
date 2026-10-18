@@ -1,0 +1,115 @@
+{
+  "schema_version": "mixing_learning_patch.v1",
+  "update_id": "ML-2026-10-18-1500",
+  "mode": "search",
+  "planned_slot": "2026-10-18T15:00:00+03:00",
+  "actual_start": "2026-10-18T15:02:55+03:00",
+  "report_time": "2026-10-18T15:08:23+03:00",
+  "preceding_successful_search": "ML-2026-10-18-0900",
+  "immediate_predecessor": "ML-2026-10-18-1200",
+  "citation_check": "partial",
+  "sources_added": [
+    {
+      "id": "SRC-ML-20261018-1500-01",
+      "stable_id": "arxiv:2610.15967v1",
+      "doi": "10.48550/arXiv.2610.15967",
+      "title": "Controllable Mono-to-Stereo Upmixing using Reward-tilted Flows",
+      "url": "https://arxiv.org/abs/2610.15967",
+      "full_text": "https://arxiv.org/html/2610.15967v1",
+      "submitted": "2026-10-11",
+      "publication_state": "preprint",
+      "reading_depth": "full_text_complete_methods_equations_experiments_results_discussion_appendix",
+      "evidence_scope": "200_disjoint_5s_vocal_removed_musdb18hq_test_excerpts_plus_n5_listening_test",
+      "bounded_conclusion": "shadow_only_human_gated_mono_to_stereo_research",
+      "confidence": "low_research_only_preprint_small_listener_test_no_artifact"
+    }
+  ],
+  "video_source_cards_added": [
+    {
+      "id": "VIDEO-ML-20261018-1500-01",
+      "stable_id": "youtube:yZ5ODieH4UE",
+      "title": "Mixing Master Class with Andrew Scheps Part 4",
+      "url": "https://www.youtube.com/watch?v=yZ5ODieH4UE",
+      "channel": "Westlake Pro",
+      "published": "2014-08-11",
+      "companion_transcript": "https://theproaudiofiles.com/video/mixing-masterclass-with-andrew-scheps-part-4/",
+      "reading_depth": "youtube_metadata_plus_complete_visible_companion_transcript_no_timecodes",
+      "numeric_settings": [],
+      "confidence": "medium_engineer_source_specific"
+    }
+  ],
+  "video_duplicates_removed": [
+    "youtube:Z0eqw_3cY2A",
+    "youtube:JSttlIYSk_Q",
+    "youtube:XDtFX1Nbl_o"
+  ],
+  "knowledge_cards_added": [
+    "KC-ML-20261018-1500-01",
+    "KC-ML-20261018-1500-02",
+    "KC-ML-20261018-1500-03",
+    "KC-ML-20261018-1500-04",
+    "KC-ML-20261018-1500-05",
+    "KC-ML-20261018-1500-06",
+    "KC-ML-20261018-1500-07",
+    "KC-ML-20261018-1500-08",
+    "KC-ML-20261018-1500-09"
+  ],
+  "rules_added": [
+    {
+      "id": "RULE-ML-20261018-1500-01",
+      "title": "Human-gated generative mono-to-stereo research only",
+      "applicability": "genuinely_mono_rights_cleared_or_known_synthetic_downmix_when_artistic_brief_requires_invented_stereo",
+      "proposed_setting": {
+        "kappa": 1,
+        "kappa_origin": "paper_formula_unchanged_reference_target_not_validated_default",
+        "reward_iterations": 5,
+        "reward_iterations_origin": "paper_schedule_not_project_default"
+      },
+      "confidence": "low_research_only_preprint_small_listener_test_no_artifact",
+      "auto_apply": false
+    }
+  ],
+  "experiments_added": [
+    {
+      "id": "EXP-ML-20261018-1500-01",
+      "title": "Aura reward-off versus reward-on spatial gate",
+      "status": "not_run_blocked",
+      "one_varied_factor": "spatial_reward_disabled_vs_enabled",
+      "a": "measurement_consistency_only",
+      "b": "same_pipeline_with_spatial_reward_kappa_1_and_5_reward_iterations",
+      "loudness_matching": "separate_attenuation_only_bs1770_matched_blind_copies_raw_preserved",
+      "blockers": [
+        "official_code_checkpoint_environment_and_executable_license_not_found",
+        "demo_not_inspectable",
+        "compute_budget_not_audited",
+        "approved_reference_and_project_audio_not_selected",
+        "criteria_not_preregistered"
+      ],
+      "auto_apply": false
+    }
+  ],
+  "videos_studied": 1,
+  "video_sources_queued": [
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02"
+  ],
+  "reference_cards_added": [],
+  "multitracks_added": [],
+  "queue": [
+    "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+    "snare_parallel_send_0_vs_minus3_db_after_latency_preflight",
+    "distorted_bass_clean_low_plus_character_layer_ab",
+    "EXP-ML-20261018-1500-01_blocked",
+    "EXP-ML-20261018-0900-01_rev2_blocked",
+    "VIDEO-ML-20261018-0900-01",
+    "VIDEO-ML-20261018-0900-02"
+  ],
+  "next_executable_experiment": "EXP-ML-PENA-AB15-LISTEN-20261010-1800",
+  "safety": {
+    "audio_downloaded_or_uploaded": false,
+    "audio_analyzed": false,
+    "code_or_model_run": false,
+    "paid_service_used": false,
+    "dsp_or_runtime_changed": false
+  }
+}
