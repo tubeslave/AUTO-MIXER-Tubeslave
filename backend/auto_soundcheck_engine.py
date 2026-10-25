@@ -10,6 +10,7 @@ This is the main entry point for fully automatic operation.
 """
 
 import asyncio
+import json
 import logging
 import time
 import threading
@@ -91,6 +92,12 @@ from channel_recognizer import (
 )
 from config_manager import ConfigManager
 from feedback_detector import FeedbackDetector, FeedbackDetectorConfig, FeedbackEvent
+from heuristics.spectral_ceiling_eq import (
+    SpectralCeilingEQAnalyzer,
+    SpectralCeilingEQConfig,
+    format_spectral_ceiling_log,
+    merge_spectral_proposal_into_eq_bands,
+)
 from mixer_discovery import (
     discover_mixer_auto, discover_mixers, DiscoveredMixer,
 )
@@ -103,6 +110,21 @@ from signal_metrics import (
     InterChannelMetrics, LevelMetrics, DynamicsMetrics, SpectralMetrics,
 )
 from observation_mixer import ObservationMixerClient
+
+try:
+    from automixer.config import load_decision_engine_v2_config
+    from automixer.decision import DecisionEngine
+    from automixer.executor import ActionPlanExecutor
+    from automixer.knowledge import MixingKnowledgeBase
+    from automixer.logs import HumanDecisionLogger
+    from automixer.safety import SafetyGate
+except Exception:
+    load_decision_engine_v2_config = None
+    DecisionEngine = None
+    ActionPlanExecutor = None
+    MixingKnowledgeBase = None
+    HumanDecisionLogger = None
+    SafetyGate = None
 
 try:
     from perceptual import PerceptualEvaluator
@@ -492,6 +514,8 @@ class AutoSoundcheckEngine:
         on_channel_update: Optional[Callable] = None,
         on_observation: Optional[Callable] = None,
         config_path: Optional[str] = None,
+        use_decision_engine_v2: bool = False,
+        decision_engine_dry_run: bool = False,
     ):
         self.mixer_type = mixer_type
         self.mixer_ip = mixer_ip
@@ -511,13 +535,41 @@ class AutoSoundcheckEngine:
             int(ch) for ch in (selected_channels or [])
             if int(ch) > 0
         })
+        self.use_decision_engine_v2 = bool(use_decision_engine_v2)
+        self.decision_engine_v2_dry_run_requested = bool(decision_engine_dry_run)
 
         default_config_path = Path(config_path) if config_path else (
             Path(__file__).resolve().parents[1] / "config" / "automixer.yaml"
         )
         resolved_config_path = str(default_config_path) if default_config_path.exists() else config_path
         self.config_manager = ConfigManager(config_path=resolved_config_path)
+        self.decision_engine_v2_config = (
+            load_decision_engine_v2_config(resolved_config_path)
+            if load_decision_engine_v2_config is not None
+            else None
+        )
+        if self.decision_engine_v2_config is not None:
+            self.use_decision_engine_v2 = bool(
+                self.use_decision_engine_v2 or self.decision_engine_v2_config.enabled
+            )
+            self.decision_engine_v2_dry_run = bool(
+                self.decision_engine_v2_dry_run_requested
+                or self.decision_engine_v2_config.dry_run
+            )
+        else:
+            self.decision_engine_v2_dry_run = self.decision_engine_v2_dry_run_requested
         autofoh_config = self.config_manager.get_section("autofoh")
+        self.spectral_ceiling_eq_config = SpectralCeilingEQConfig.from_mapping(
+            self.config_manager.get_section("spectral_ceiling_eq")
+        )
+        try:
+            self.spectral_ceiling_eq_analyzer: Optional[SpectralCeilingEQAnalyzer] = (
+                SpectralCeilingEQAnalyzer(self.spectral_ceiling_eq_config)
+            )
+        except Exception as exc:
+            logger.warning("Spectral ceiling EQ disabled; profile load failed: %s", exc)
+            self.spectral_ceiling_eq_config.enabled = False
+            self.spectral_ceiling_eq_analyzer = None
         self.classifier_config = autofoh_config.get("classifier", {})
         autofoh_safety = autofoh_config.get("safety", {})
         autofoh_evaluation = autofoh_config.get("evaluation", {})
@@ -678,6 +730,10 @@ class AutoSoundcheckEngine:
         self._feedback_actions_sent_by_channel: Dict[int, int] = {}
         self._feedback_actions_sent_total: int = 0
         self.safety_controller: Optional[AutoFOHSafetyController] = None
+        self.decision_engine_v2 = None
+        self.decision_engine_v2_safety_gate = None
+        self.decision_engine_v2_logger = None
+        self.decision_engine_v2_last_result: Optional[Dict[str, Any]] = None
         self.autofoh_logger: Optional[AutoFOHStructuredLogger] = None
         self.autofoh_session_report: Optional[AutoFOHSessionReport] = None
         self.autofoh_session_report_summary: str = ""
@@ -687,6 +743,7 @@ class AutoSoundcheckEngine:
         self.muq_eval_config = muq_eval_config
         self.muq_eval_service: Optional[Any] = None
         self._muq_pending_audio: Dict[int, Dict[str, Any]] = {}
+        self._last_muq_stem_drift: Dict[str, Any] = {}
         self.muq_eval_session_id = f"autofoh_{int(time.time())}"
         if bool(perceptual_config.get("enabled", False)):
             if PerceptualEvaluator is None:
@@ -1002,24 +1059,45 @@ class AutoSoundcheckEngine:
             return default
 
     def _load_muq_eval_config(self) -> Dict[str, Any]:
-        """Load MuQ-Eval config from ConfigManager and optional config/muq_eval.yaml."""
+        """Load MuQ-Eval config from ConfigManager and optional YAML drift profiles."""
 
         config = dict(self.config_manager.get_section("muq_eval") or {})
         config_path = Path(__file__).resolve().parents[1] / "config" / "muq_eval.yaml"
-        if not config_path.exists():
-            return config
+        drift_path = Path(__file__).resolve().parents[1] / "config" / "ewma_metrics.yaml"
         try:
             import yaml
-
-            with config_path.open(encoding="utf-8") as handle:
-                payload = yaml.safe_load(handle) or {}
         except Exception as exc:
-            logger.warning("MuQ-Eval config load skipped: %s", exc)
+            logger.warning("MuQ-Eval YAML config load skipped: %s", exc)
             return config
-        if isinstance(payload, dict) and isinstance(payload.get("muq_eval"), dict):
-            payload = payload["muq_eval"]
-        if isinstance(payload, dict):
-            config.update(payload)
+
+        if config_path.exists():
+            try:
+                with config_path.open(encoding="utf-8") as handle:
+                    payload = yaml.safe_load(handle) or {}
+            except Exception as exc:
+                logger.warning("MuQ-Eval config load skipped: %s", exc)
+            else:
+                if isinstance(payload, dict) and isinstance(payload.get("muq_eval"), dict):
+                    payload = payload["muq_eval"]
+                if isinstance(payload, dict):
+                    config.update(payload)
+
+        if drift_path.exists():
+            try:
+                with drift_path.open(encoding="utf-8") as handle:
+                    drift_payload = yaml.safe_load(handle) or {}
+            except Exception as exc:
+                logger.warning("EWMA drift config load skipped: %s", exc)
+            else:
+                if isinstance(drift_payload, dict) and isinstance(
+                    drift_payload.get("ewma_metrics"),
+                    dict,
+                ):
+                    drift_payload = drift_payload["ewma_metrics"]
+                if isinstance(drift_payload, dict):
+                    merged_drift = dict(config.get("stem_drift") or {})
+                    merged_drift.update(drift_payload)
+                    config["stem_drift"] = merged_drift
         return config
 
     def _perceptual_shadow_enabled(self) -> bool:
@@ -1150,6 +1228,85 @@ class AutoSoundcheckEngine:
             reward=muq_decision.reward,
         )
         return muq_decision
+
+    def update_muq_stem_score_batch(
+        self,
+        stem_scores: Dict[str, Any],
+        dt: Optional[float] = None,
+        params_by_stem: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Update per-stem MuQ EWMA drift metrics for visualization and freeze guards."""
+
+        service = getattr(self, "muq_eval_service", None)
+        if service is None or not hasattr(service, "update_stem_score_batch"):
+            return {"enabled": False, "stems": {}, "summary": "MuQ stem EWMA drift unavailable"}
+
+        result = service.update_stem_score_batch(
+            stem_scores,
+            dt,
+            params_by_stem=params_by_stem,
+        )
+        self._last_muq_stem_drift = dict(result or {})
+        if not result.get("enabled", False):
+            return result
+
+        self._log_autofoh_event("muq_stem_drift", drift=result)
+        summary = str(result.get("summary", "MuQ stem EWMA drift updated"))
+        attention = [
+            f"{stem}:{payload.get('state')}"
+            for stem, payload in result.get("stems", {}).items()
+            if payload.get("state") in {"WARN", "CRIT"}
+        ]
+        if attention:
+            summary = f"{summary}; attention={', '.join(attention)}"
+
+        self._emit_observation(
+            message=summary,
+            summary={"muq_stem_drift": result},
+            operation={
+                "type": "muq_stem_drift",
+                "osc_endpoint": self._muq_stem_drift_osc_endpoint(result),
+                "stems": result.get("stems", {}),
+                "frozen_stems": result.get("frozen_stems", {}),
+            },
+        )
+        return result
+
+    @staticmethod
+    def _muq_stem_drift_osc_endpoint(result: Dict[str, Any]) -> str:
+        for stem_result in result.get("stems", {}).values():
+            endpoint = str(stem_result.get("osc_endpoint", ""))
+            if endpoint:
+                return endpoint.rsplit("/", 1)[0]
+        return "/autofoh/muq_drift"
+
+    def _stem_ml_corrections_frozen(self, info: ChannelInfo) -> bool:
+        service = getattr(self, "muq_eval_service", None)
+        monitor = getattr(service, "stem_drift_monitor", None)
+        if service is None or monitor is None:
+            return False
+
+        frozen = getattr(monitor, "frozen_stems", lambda: {})()
+        if not frozen:
+            return False
+
+        candidates = [
+            str(info.source_role or ""),
+            str(info.preset or ""),
+            *(str(role) for role in (info.stem_roles or [])),
+        ]
+        candidate_groups = {
+            getattr(monitor, "infer_group", lambda value: str(value))(candidate)
+            for candidate in candidates
+            if candidate
+        }
+        for frozen_stem in frozen:
+            if frozen_stem in candidates:
+                return True
+            frozen_group = getattr(monitor, "infer_group", lambda value: str(value))(frozen_stem)
+            if frozen_group in candidate_groups:
+                return True
+        return False
 
     def _capture_perceptual_audio(self, channel_id: Optional[int]) -> Optional[np.ndarray]:
         if (
@@ -1895,6 +2052,159 @@ class AutoSoundcheckEngine:
                 ] if decision.payload else []
         return decision
 
+    def _ensure_decision_engine_v2(self) -> bool:
+        """Initialize the opt-in v2 decision stack."""
+        if not self.use_decision_engine_v2:
+            return False
+        if DecisionEngine is None or SafetyGate is None or MixingKnowledgeBase is None:
+            logger.error("Decision Engine v2 imports failed; falling back to legacy path")
+            self.use_decision_engine_v2 = False
+            return False
+        if self.decision_engine_v2 is not None:
+            return True
+        config = self.decision_engine_v2_config
+        try:
+            knowledge_path = getattr(config, "knowledge_path", "") if config is not None else ""
+            if knowledge_path:
+                path = Path(knowledge_path).expanduser()
+                if not path.is_absolute():
+                    path = Path(__file__).resolve().parents[1] / path
+                knowledge = MixingKnowledgeBase.load(path)
+            else:
+                knowledge = MixingKnowledgeBase.load()
+            self.decision_engine_v2 = DecisionEngine(
+                knowledge,
+                getattr(config, "decision", None),
+            )
+            self.decision_engine_v2_safety_gate = SafetyGate(
+                getattr(config, "safety", None)
+            )
+            if HumanDecisionLogger is not None and config is not None:
+                self.decision_engine_v2_logger = HumanDecisionLogger(config.log_path)
+            logger.info(
+                "Decision Engine v2 initialized (dry_run=%s)",
+                self.decision_engine_v2_dry_run,
+            )
+            return True
+        except Exception as exc:
+            logger.error("Decision Engine v2 initialization failed: %s", exc)
+            self.use_decision_engine_v2 = False
+            return False
+
+    def _build_decision_engine_v2_analyzer_output(self) -> Dict[str, Any]:
+        channels = []
+        for ch, info in sorted(self.channels.items()):
+            metrics = {
+                "channel_id": ch,
+                "lufs": float(info.lufs),
+                "target_lufs": float(INSTRUMENT_TARGET_LUFS.get(info.preset or "custom", -23.0)),
+                "peak_db": float(info.peak_db),
+                "rms_db": float(info.rms_db),
+                "confidence": float(info.classification_confidence),
+            }
+            if info.metrics is not None:
+                metrics.update(info.metrics.to_dict())
+                metrics.update({
+                    "true_peak_dbtp": float(info.metrics.level.true_peak_dbtp),
+                    "crest_factor_db": float(info.metrics.level.crest_factor_db),
+                    "dynamic_range_db": float(info.metrics.dynamics.dynamic_range_db),
+                    "mud_db": float(info.metrics.spectral.mud_ratio) * 10.0,
+                    "harshness_db": float(info.metrics.spectral.presence_ratio) * 10.0,
+                })
+            channels.append({
+                "channel_id": ch,
+                "name": info.name,
+                "role": info.source_role or info.preset or "unknown",
+                "preset": info.preset or "custom",
+                "metrics": metrics,
+                "confidence": float(info.classification_confidence),
+                "source_module": "auto_soundcheck_engine",
+            })
+        return {
+            "source_module": "auto_soundcheck_engine",
+            "channels": channels,
+        }
+
+    def _build_decision_engine_v2_current_state(self) -> Dict[str, Any]:
+        state: Dict[str, Any] = {}
+        for ch, info in self.channels.items():
+            snapshot = info.original_snapshot
+            raw = dict(snapshot.raw_settings or {}) if snapshot is not None else {}
+            state[f"channel:{ch}"] = {
+                "fader_db": float(snapshot.fader_db) if snapshot is not None else -144.0,
+                "pan": self._as_float(raw.get("pan"), 0.0),
+                "true_peak_dbtp": (
+                    float(info.metrics.level.true_peak_dbtp)
+                    if info.metrics is not None
+                    else float(info.peak_db)
+                ),
+                "compression_threshold_db": self._as_float(
+                    raw.get("compressor_threshold_db"),
+                    -18.0,
+                ),
+            }
+        return state
+
+    def _run_decision_engine_v2(self):
+        """Run the opt-in v2 plan/gate/executor layer."""
+        if not self._ensure_decision_engine_v2():
+            if self.auto_apply:
+                logger.warning("Decision Engine v2 unavailable; using legacy correction path")
+                return self._apply_corrections()
+            return None
+
+        analyzer_output = self._build_decision_engine_v2_analyzer_output()
+        current_state = self._build_decision_engine_v2_current_state()
+        plan = self.decision_engine_v2.create_action_plan(
+            analyzer_output,
+            critic_evaluations={},
+            mode="live",
+        )
+        for decision in plan.decisions:
+            logger.info("Decision Engine v2 proposed: %s", decision.reason)
+            if self.decision_engine_v2_logger is not None:
+                self.decision_engine_v2_logger.log_decision(decision)
+
+        executor = ActionPlanExecutor(
+            self.mixer_client,
+            self.decision_engine_v2_safety_gate,
+            logger=self.decision_engine_v2_logger,
+            dry_run=self.decision_engine_v2_dry_run or not self.auto_apply,
+        )
+        result = executor.execute(
+            plan,
+            current_state=current_state,
+            live_mode=True,
+        )
+        self.decision_engine_v2_last_result = result.to_dict()
+        logger.info(
+            "Decision Engine v2 complete: sent=%s recommended=%s blocked=%s dry_run=%s",
+            len(result.sent),
+            len(result.recommended_only),
+            len(result.blocked),
+            result.safety.dry_run,
+        )
+        self._log_autofoh_event(
+            "decision_engine_v2_result",
+            sent_count=len(result.sent),
+            recommended_count=len(result.recommended_only),
+            blocked_count=len(result.blocked),
+            dry_run=result.safety.dry_run,
+            result=result.to_dict(),
+        )
+        if self.soundcheck_profile_capture_multiphase_learning and not result.sent:
+            self._capture_learning_phase(
+                "SNAPSHOT_LOCK",
+                RuntimeState.SNAPSHOT_LOCK,
+                metadata={
+                    "applied_channel_ids": [],
+                    "decision_engine_v2": True,
+                    "dry_run": result.safety.dry_run,
+                },
+                notes="Snapshot lock captured after Decision Engine v2 dry-run/no-send pass",
+            )
+        return result
+
     def apply_bus_fader_target(self, bus_id: int, target_db: float, reason: str = "bus level correction"):
         """Apply a bounded bus fader correction through the safety layer."""
         return self._execute_action(
@@ -2010,6 +2320,8 @@ class AutoSoundcheckEngine:
     def _control_allowed(self, info: ChannelInfo, control_name: str) -> bool:
         if control_name in {"feedback_notch", "emergency_fader"}:
             return control_name in info.allowed_controls
+        if self._stem_ml_corrections_frozen(info):
+            return False
         return info.auto_corrections_enabled and control_name in info.allowed_controls
 
     def _log_processing_skip(self, ch: int, info: ChannelInfo, stage: str):
@@ -2601,6 +2913,10 @@ class AutoSoundcheckEngine:
                     skipped_count += 1
                     self._log_processing_skip(ch, info, "pre-analysis preserve")
                     continue
+                if self._stem_ml_corrections_frozen(info):
+                    skipped_count += 1
+                    self._log_processing_skip(ch, info, "MuQ stem freeze")
+                    continue
                 preserved_count += 1
                 info.was_reset = False
 
@@ -2642,6 +2958,10 @@ class AutoSoundcheckEngine:
             if not info.auto_corrections_enabled:
                 skipped_count += 1
                 self._log_processing_skip(ch, info, "reset")
+                continue
+            if self._stem_ml_corrections_frozen(info):
+                skipped_count += 1
+                self._log_processing_skip(ch, info, "MuQ stem freeze")
                 continue
 
             try:
@@ -3283,6 +3603,7 @@ class AutoSoundcheckEngine:
                 if ch in self.channels
                 and self.channels[ch].has_signal
                 and self.channels[ch].auto_corrections_enabled
+                and not self._stem_ml_corrections_frozen(self.channels[ch])
             ]
             if not source_infos:
                 continue
@@ -3955,6 +4276,9 @@ class AutoSoundcheckEngine:
             if not info.auto_corrections_enabled:
                 self._log_processing_skip(ch, info, "auto-processing")
                 continue
+            if self._stem_ml_corrections_frozen(info):
+                self._log_processing_skip(ch, info, "MuQ stem freeze")
+                continue
 
             preset = info.preset or "custom"
             had_proc = ""
@@ -4155,6 +4479,70 @@ class AutoSoundcheckEngine:
         except Exception as e:
             logger.warning(f"Ch {ch}: HPF failed: {e}")
 
+    def _build_spectral_ceiling_eq_proposal(
+        self,
+        ch: int,
+        info: ChannelInfo,
+        preset: str,
+    ):
+        if (
+            self.spectral_ceiling_eq_analyzer is None
+            or not self.spectral_ceiling_eq_config.enabled
+            or self.audio_capture is None
+        ):
+            return None
+
+        fft_size = int(self.autofoh_analysis_config.get("fft_size", 4096))
+        window_samples = max(self.block_size * 4, fft_size * 2)
+        try:
+            samples = np.asarray(
+                self.audio_capture.get_buffer(ch, window_samples),
+                dtype=np.float32,
+            ).reshape(-1)
+        except Exception as exc:
+            logger.debug("Ch %s: spectral ceiling audio capture failed: %s", ch, exc)
+            return None
+        if samples.size < max(1024, self.block_size // 2):
+            return None
+
+        lead_channel_ids = [
+            lead_ch for lead_ch in self._lead_channel_ids()
+            if lead_ch != ch and self.channels.get(lead_ch) is not None
+        ]
+        lead_confidence = 0.0
+        if lead_channel_ids:
+            lead_confidence = max(
+                float(self.channels[lead_ch].classification_confidence)
+                for lead_ch in lead_channel_ids
+            )
+
+        role = info.source_role or preset
+        return self.spectral_ceiling_eq_analyzer.analyze(
+            samples,
+            instrument_role=role,
+            sample_rate=self.sample_rate,
+            track_id=info.name or f"Ch {ch}",
+            role_confidence=float(info.classification_confidence or 0.0),
+            lead_vocal_active=bool(lead_channel_ids),
+            lead_vocal_confidence=lead_confidence,
+        )
+
+    def _log_spectral_ceiling_eq_proposal(
+        self,
+        proposal,
+        merge_report: Optional[Dict[str, Any]],
+    ) -> None:
+        if proposal is None:
+            return
+        if self.spectral_ceiling_eq_config.log_verbose:
+            logger.info("%s", format_spectral_ceiling_log(proposal, merge_report))
+        self._log_autofoh_event(
+            "spectral_ceiling_eq",
+            channel=proposal.track_id,
+            proposal=proposal.to_dict(),
+            merge_report=merge_report or {},
+        )
+
     def _apply_eq(
         self,
         ch: int,
@@ -4235,6 +4623,18 @@ class AutoSoundcheckEngine:
 
                 adapted_gain = max(-8.0, min(8.0, round(adapted_gain, 1)))
                 adapted_bands[i] = (freq, adapted_gain, q)
+
+        spectral_proposal = self._build_spectral_ceiling_eq_proposal(ch, info, preset)
+        spectral_merge_report = None
+        if spectral_proposal is not None:
+            adapted_bands, spectral_merge_report = merge_spectral_proposal_into_eq_bands(
+                adapted_bands,
+                spectral_proposal,
+            )
+            self._log_spectral_ceiling_eq_proposal(
+                spectral_proposal,
+                spectral_merge_report,
+            )
 
         try:
             sent_any = False
@@ -4814,6 +5214,8 @@ class AutoSoundcheckEngine:
     ):
         """Enable a bounded gate on close drum mics before tonal decisions."""
         if not info.auto_corrections_enabled:
+            return
+        if self._stem_ml_corrections_frozen(info):
             return
         if not self.auto_gate_close_mics:
             return
@@ -5524,6 +5926,9 @@ class AutoSoundcheckEngine:
         if not info.auto_corrections_enabled:
             self._log_processing_skip(ch, info, "single-channel auto-processing")
             return
+        if self._stem_ml_corrections_frozen(info):
+            self._log_processing_skip(ch, info, "MuQ stem freeze")
+            return
         preset = info.preset or "custom"
         try:
             try:
@@ -5819,7 +6224,9 @@ class AutoSoundcheckEngine:
         self._wait_and_analyze()
 
         # Step 10: Apply bounded corrections over the preserved console state
-        if self.auto_apply:
+        if self.use_decision_engine_v2:
+            self._run_decision_engine_v2()
+        elif self.auto_apply:
             self._apply_corrections()
         elif self.soundcheck_profile_capture_multiphase_learning:
             self._capture_learning_phase(
@@ -6026,6 +6433,11 @@ class AutoSoundcheckEngine:
                 for dca_id, snapshot in sorted(self.dca_snapshots.items())
             },
             "observe_only": self.observe_only,
+            "decision_engine_v2": {
+                "enabled": bool(self.use_decision_engine_v2),
+                "dry_run": bool(self.decision_engine_v2_dry_run),
+                "last_result": self.decision_engine_v2_last_result,
+            },
             "applied_channel_ids": sorted(self._applied_channels),
             "safety_action_history_size": len(self.safety_controller.history) if self.safety_controller else 0,
             "pending_action_evaluations": len(self._pending_action_evaluations),
@@ -6049,6 +6461,16 @@ class AutoSoundcheckEngine:
                 else ""
             ),
             "muq_eval_log_path": str(self.muq_eval_config.get("log_path", "")),
+            "muq_stem_drift": (
+                self._last_muq_stem_drift
+                if self._last_muq_stem_drift
+                else (
+                    self.muq_eval_service.stem_drift_status()
+                    if self.muq_eval_service is not None
+                    and hasattr(self.muq_eval_service, "stem_drift_status")
+                    else {}
+                )
+            ),
             "shared_chat_mix_enabled": self.shared_chat_mix_config.enabled,
             "autofoh_log_enabled": self.autofoh_logging_enabled,
             "autofoh_log_path": str(self._default_autofoh_log_path()) if self.autofoh_logging_enabled else "",
@@ -6118,6 +6540,16 @@ def main():
                         help="Sample rate (default: 48000)")
     parser.add_argument("--no-apply", action="store_true",
                         help="Analyze only, do not apply corrections")
+    parser.add_argument("--use-decision-engine-v2", action="store_true",
+                        help="Use opt-in Analyzer -> Knowledge -> Critic -> Decision Engine -> Safety Gate -> Executor path")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Analyze and recommend only; do not send mixer writes")
+    parser.add_argument("--offline-experiment", action="store_true",
+                        help="Run the v2 offline experiment harness instead of connecting to a live mixer")
+    parser.add_argument("--experiment-input", default="",
+                        help="Metrics JSON for --offline-experiment")
+    parser.add_argument("--experiment-output-dir", default="",
+                        help="Output directory for --offline-experiment reports")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     parser.add_argument("--scan-only", action="store_true",
@@ -6134,6 +6566,38 @@ def main():
     if args.scan_only:
         from mixer_discovery import main as discovery_main
         discovery_main()
+        return
+
+    if args.offline_experiment:
+        from automixer.experiments import ExperimentRunner
+
+        if args.experiment_input:
+            payload = json.loads(Path(args.experiment_input).expanduser().read_text(encoding="utf-8"))
+        else:
+            payload = {
+                "analyzer_output": {
+                    "source_module": "auto_soundcheck_engine_cli_sample",
+                    "channels": [
+                        {
+                            "channel_id": 1,
+                            "name": "Sample Lead Vocal",
+                            "role": "lead_vocal",
+                            "metrics": {
+                                "lufs": -24.0,
+                                "target_lufs": -20.0,
+                                "true_peak_dbtp": -8.0,
+                                "crest_factor_db": 14.0,
+                                "SibilanceIndex": 3.0,
+                            },
+                            "confidence": 0.9,
+                        }
+                    ],
+                },
+                "current_state": {"channel:1": {"fader_db": -12.0, "true_peak_dbtp": -8.0}},
+            }
+        output_dir = args.experiment_output_dir or str(Path.cwd() / "decision_engine_v2_experiment")
+        report = ExperimentRunner().run(payload, output_dir)
+        print(json.dumps({"artifacts": report.get("artifacts", {})}, ensure_ascii=False))
         return
 
     auto_discover = not args.no_discover
@@ -6155,11 +6619,13 @@ def main():
         audio_device_name=args.audio_device,
         num_channels=args.channels,
         sample_rate=args.sample_rate,
-        auto_apply=not args.no_apply,
+        auto_apply=(not args.no_apply) and (not args.dry_run),
         auto_discover=auto_discover,
         scan_subnet=args.full_scan,
         on_state_change=on_state,
         on_channel_update=on_channel,
+        use_decision_engine_v2=args.use_decision_engine_v2,
+        decision_engine_dry_run=args.dry_run,
     )
 
     print("=" * 60)
@@ -6171,7 +6637,9 @@ def main():
     print(f"  Mixer: {mixer_desc}")
     print(f"  Audio: {args.audio_device or 'auto-detect'}")
     print(f"  Channels: {args.channels}")
-    print(f"  Auto-apply: {not args.no_apply}")
+    print(f"  Auto-apply: {(not args.no_apply) and (not args.dry_run)}")
+    print(f"  Decision Engine v2: {args.use_decision_engine_v2}")
+    print(f"  Dry-run: {args.dry_run}")
     print(f"  Auto-discover: {auto_discover}")
     print("=" * 60)
     print()

@@ -23,6 +23,7 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
   const [showSettings, setShowSettings] = useState(false);
   const [showSessionDetails, setShowSessionDetails] = useState(false);
   const [sessionStatus, setSessionStatus] = useState({});
+  const [stemDrift, setStemDrift] = useState(null);
   const [timings, setTimings] = useState({
     gainDuration: 30, phaseDuration: 15, eqDuration: 20,
     compDuration: 15, gateDuration: 10, faderDuration: 15,
@@ -52,6 +53,9 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
       if (data.message) {
         setLog(prev => [...prev.slice(-80), data.message]);
       }
+      const drift = data.summary?.muq_stem_drift
+        || (data.operation?.type === 'muq_stem_drift' ? data.operation : null);
+      if (drift) setStemDrift(drift);
     };
     websocketService.on('auto_soundcheck_status', handle);
     websocketService.on('auto_soundcheck_observation', handleObservation);
@@ -88,6 +92,8 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
 
   const channels = selectedChannels || [];
   const sessionSummary = buildAutofohSessionSummary(sessionStatus);
+  const driftStems = Object.entries(stemDrift?.stems || {})
+    .filter(([, data]) => data.state && data.state !== 'NORMAL');
   if (!channels.length) return (<div><SignalHint moduleKey="auto_soundcheck" /><div className="no-channels">Выберите каналы на вкладке Connect</div></div>);
 
   return (
@@ -114,6 +120,20 @@ function AutoSoundcheckTab({ selectedChannels, availableChannels, selectedDevice
           <div className="module-status">Режим наблюдения: пульт не изменяется, все команды только логируются.</div>
         )}
         {statusMessage && <div className="module-status">{statusMessage}</div>}
+        {driftStems.length > 0 && (
+          <div className="muq-drift-strip">
+            {driftStems.map(([stem, data]) => {
+              const fullBand = data.masks?.full_band || Object.values(data.masks || {})[0] || {};
+              return (
+                <div key={stem} className={`muq-drift-chip ${String(data.state).toLowerCase()}`}>
+                  <span className="muq-drift-stem">{stem}</span>
+                  <span className="muq-drift-state">{data.state}</span>
+                  <span className="muq-drift-metric">{Number(fullBand.drift || 0).toFixed(3)}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
         {!running && sessionSummary && (
           <div className="autofoh-session-card">
             <div className="autofoh-session-head">
