@@ -1,0 +1,76 @@
+{
+  "goal": "studio-belye-stai-session-renderer-v1",
+  "status": "accepted_machine_validation",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "0bb9d2b5bc4693715c744ecfa307b34e3fdf2780",
+  "pull_request": 125,
+  "tested_code_commit": "fb0499c2357587a357e0006e83658e112d68a271",
+  "merge_commit": "e74cd95bb6e3e13c7bf2cc0283f3e7ae327f6859",
+  "priority_reason": "accepted routed contribution renderer recorded this adapter as the next blocker for real full-premaster compression evaluation",
+  "bounded_task": "expose the delivered Belye Stai post-local-track-processing stage as a deterministic SessionRender callback and prove exact no-change reproduction of the stored premaster",
+  "scope": "studio/offline only; no raw-track local-processing migration, no new mastering, no live control",
+  "override_stage": "post_local_track_processing_pre_context",
+  "processed_track_inputs": 13,
+  "real_song_reproduction": {
+    "source_archives": [
+      "Belye_Stai_Original_WAV_1_of_2.zip",
+      "Belye_Stai_Original_WAV_2_of_2.zip"
+    ],
+    "source_manifest_hash_check": "passed while regenerating the frozen processed-track stage",
+    "sample_rate": 44100,
+    "frames": 9128700,
+    "stored_premaster": "Belye_Stai_Premaster_44k24.wav",
+    "stored_premaster_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "adapter_export_sha256": "9cf6c5a9ffbd02d7685d6f16e76dd98525662499ae33364277d1c75ed39c8e76",
+    "decoded_pcm24_max_abs_error": 0.0,
+    "decoded_pcm24_mismatch_samples": 0,
+    "decoded_pcm24_total_samples": 18257400,
+    "file_sha256_identical": true,
+    "important_boundary": "this proves the downstream processed-track-stage adapter reproduces the final delivered premaster; it does not prove raw-track local DSP has been modularized"
+  },
+  "local_validation": {
+    "focused_tests": "5 passed",
+    "verified": [
+      "exact no-change override identity",
+      "immutable caller inputs",
+      "vocal override reroutes the dependent full mix",
+      "snare override reroutes drum bus and room",
+      "unknown or wrong-layout overrides fail closed",
+      "frozen PCM24 export is deterministic"
+    ]
+  },
+  "ci": {
+    "workflow_run": 35956523545,
+    "python_matrix": {
+      "3.10": "success",
+      "3.11": "success",
+      "3.12": "success"
+    },
+    "compile_step": "success on all matrix jobs",
+    "studio_offline_boundary_step": "success on all matrix jobs",
+    "full_tests_step": "success on all matrix jobs",
+    "python_3_11_studio_boundary": "21 passed",
+    "python_3_11_full_suite": "1249 passed, 2 skipped",
+    "non_blocking_warnings": [
+      "Matchering scipy.ndimage.filters deprecation",
+      "Optuna Study.set_metric_names experimental API",
+      "AutomaticMixingPapers has no URL in .gitmodules during checkout cleanup",
+      "GitHub Actions Node 20 deprecation warning"
+    ]
+  },
+  "acceptance": "architecture, deterministic rerender and exact delivered-premaster reproduction accepted; no subjective audio result accepted",
+  "review": "self-review only; no independent reviewer claimed",
+  "neural_audio_used": false,
+  "paid_services_used": false,
+  "live_code_changed": false,
+  "mastering_code_changed": false,
+  "audio_baseline_promoted": false,
+  "human_listening_required": true,
+  "limitations": [
+    "override boundary is post-local-track-processing / pre-context, so candidate compression here is an insert after the frozen local track chain",
+    "raw-track local EQ/dynamics remain procedural and are not yet reusable session stages",
+    "Pedalboard Reverb is part of the frozen delivery recipe and exact reproduction is tied to the validated environment/version behavior",
+    "machine validation cannot select or promote a subjective musical winner"
+  ],
+  "next_goal": "run one real Compression Director v1.1 candidate family at the explicit processed-track insert boundary through Routed Contribution Renderer -> Perceptual Critic -> level-matched human-review A/B, reject machine-unsafe candidates, and export only surviving audition candidates without baseline promotion"
+}

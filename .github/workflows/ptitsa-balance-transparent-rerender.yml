@@ -1,0 +1,205 @@
+name: Ptitsa balance-transparent cleanup rerender
+
+on:
+  push:
+    branches: [audio-workbench-mcp-v0.1]
+    paths: [.github/workflows/ptitsa-balance-transparent-rerender.yml]
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: Completed Ptitsa cleanup run containing ptitsa-clean-* checkpoints
+        required: false
+        default: '35846566268'
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  render:
+    name: rerender with RAW-matched cleanup levels
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      SOURCE_RUN_ID: ${{ inputs.source_run_id || '35846566268' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install render tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg
+          python -m pip install soundfile numpy pyloudnorm
+
+      - name: Download completed cleanup checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ env.SOURCE_RUN_ID }}
+          pattern: ptitsa-clean-*
+          path: work/checkpoints
+          merge-multiple: false
+
+      - name: Download original Ptitsa multitrack
+        shell: python
+        run: |
+          import json,urllib.parse,urllib.request,subprocess,pathlib,re
+          key="https://disk.yandex.ru/d/OvdRlysTGFbxEQ"
+          prefixes=["BASS","FLOOR","GTR","HI HAT","KEYS L","KEYS R","KICK IN","KICK OUT","NIKITA VOX",
+                    "OH R","OHL","PB L","PB R","SN B","SN T","TOM 1","TOM 2","VALERA VOX"]
+          q=urllib.parse.urlencode({"public_key":key,"limit":100})
+          with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources?"+q,timeout=60) as r:
+              listing=json.load(r)
+          items=listing.get("_embedded",{}).get("items",[])
+          names=[i["name"] for i in items if i.get("type")=="file" and i["name"].lower().endswith(".wav")]
+          pathlib.Path("work/raw").mkdir(parents=True,exist_ok=True)
+          def canon(s): return re.sub(r"[^A-Z0-9]+"," ",s.upper()).strip()
+          for prefix in prefixes:
+              cp=canon(prefix)
+              matches=[n for n in names if canon(n).startswith(cp+" ") or canon(n)==cp+" WAV"]
+              if not matches: raise RuntimeError(f"No WAV found for {prefix}; available={names}")
+              name=sorted(matches)[0]
+              q=urllib.parse.urlencode({"public_key":key,"path":"/"+name})
+              with urllib.request.urlopen("https://cloud-api.yandex.net/v1/disk/public/resources/download?"+q,timeout=60) as r:
+                  href=json.load(r)["href"]
+              out="work/raw/"+prefix.replace(" ","_")+".wav"
+              subprocess.run(["ffmpeg","-hide_banner","-loglevel","error","-y","-ss",str(29*60+54),"-i",href,
+                              "-t","259","-ac","2","-ar","44100","-c:a","pcm_s24le",out],check=True)
+
+      - name: Match CLEAN levels to RAW and render A/B pair
+        shell: python
+        run: |
+          import json, math, pathlib
+          import numpy as np
+          import soundfile as sf
+          import pyloudnorm as pyln
+
+          CLEAN_STEMS={"BASS","FLOOR","GTR","KICK_IN","KICK_OUT","NIKITA_VOX","SN_B","SN_T","TOM_1","TOM_2","VALERA_VOX"}
+          GAINS={"BASS":-7.0,"FLOOR":-11.0,"GTR":-8.0,"HI_HAT":-15.0,"KEYS_L":-12.0,"KEYS_R":-12.0,
+                 "KICK_IN":-8.0,"KICK_OUT":-10.0,"NIKITA_VOX":-7.5,"OH_R":-12.0,"OHL":-12.0,
+                 "PB_L":-11.0,"PB_R":-11.0,"SN_B":-14.0,"SN_T":-8.5,"TOM_1":-11.0,"TOM_2":-11.0,"VALERA_VOX":-6.5}
+          PANS={"BASS":0,"FLOOR":.35,"GTR":-.45,"HI_HAT":.5,"KEYS_L":-.65,"KEYS_R":.65,"KICK_IN":0,"KICK_OUT":0,
+                "NIKITA_VOX":.18,"OH_R":.75,"OHL":-.75,"PB_L":-.8,"PB_R":.8,"SN_B":0,"SN_T":0,
+                "TOM_1":-.3,"TOM_2":.3,"VALERA_VOX":0}
+          SR=44100
+          raw_dir=pathlib.Path("work/raw")
+          match_dir=pathlib.Path("work/matched")
+          match_dir.mkdir(parents=True,exist_ok=True)
+          report={"source_cleanup_run":35846566268,"contract":"cleanup level-matched to RAW before frozen accepted gain/pan recipe","stems":{}}
+
+          def rms_db(x):
+              r=float(np.sqrt(np.mean(np.square(x,dtype=np.float64))+1e-20))
+              return float(20*np.log10(r+1e-20))
+
+          def active_match(raw, clean, stem):
+              if raw.ndim==1: raw=raw[:,None]
+              if clean.ndim==1: clean=clean[:,None]
+              raw_frames=len(raw); original_clean_frames=len(clean)
+              if clean.shape[1]!=raw.shape[1]:
+                  if clean.shape[1]==1: clean=np.repeat(clean,raw.shape[1],axis=1)
+                  else: raise RuntimeError(f"{stem}: channel mismatch raw={raw.shape[1]} clean={clean.shape[1]}")
+              diff=raw_frames-original_clean_frames
+              if abs(diff)>int(0.10*SR):
+                  raise RuntimeError(f"{stem}: cleanup length drift {diff} samples exceeds 100 ms")
+              if diff>0: clean=np.vstack([clean,raw[original_clean_frames:]])
+              elif diff<0: clean=clean[:raw_frames]
+
+              frame=max(1,int(0.050*SR)); chunks=raw_frames//frame
+              r=raw[:chunks*frame].reshape(chunks,frame,-1)
+              c=clean[:chunks*frame].reshape(chunks,frame,-1)
+              frame_rms=np.sqrt(np.mean(np.square(r,dtype=np.float64),axis=(1,2))+1e-20)
+              frame_db=20*np.log10(frame_rms+1e-20)
+              valid=frame_db>-80.0
+              if valid.any():
+                  p90=float(np.percentile(frame_db[valid],90))
+                  threshold=max(-55.0,p90-35.0)
+                  active=frame_db>=threshold
+              else:
+                  threshold=-80.0
+                  active=np.ones(chunks,dtype=bool)
+              if not active.any(): active=np.ones(chunks,dtype=bool)
+              raw_active=float(np.sqrt(np.mean(np.square(r[active],dtype=np.float64))+1e-20))
+              clean_active=float(np.sqrt(np.mean(np.square(c[active],dtype=np.float64))+1e-20))
+              correction_db=float(20*np.log10((raw_active+1e-20)/(clean_active+1e-20)))
+              if abs(correction_db)>6.0:
+                  raise RuntimeError(f"{stem}: required level correction {correction_db:.2f} dB exceeds +/-6 dB guard")
+              matched=clean*np.float32(10**(correction_db/20))
+              m=matched[:chunks*frame].reshape(chunks,frame,-1)
+              matched_active=float(np.sqrt(np.mean(np.square(m[active],dtype=np.float64))+1e-20))
+              delta_db=float(20*np.log10((matched_active+1e-20)/(raw_active+1e-20)))
+              return matched,{"raw_frames":raw_frames,"clean_frames":original_clean_frames,"length_delta_samples":diff,
+                              "active_threshold_dbfs":threshold,"active_fraction":float(np.mean(active)),
+                              "raw_active_rms_dbfs":float(20*np.log10(raw_active+1e-20)),
+                              "clean_active_rms_dbfs":float(20*np.log10(clean_active+1e-20)),
+                              "correction_db":correction_db,"matched_active_delta_db":delta_db,
+                              "raw_full_rms_dbfs":rms_db(raw),"clean_full_rms_dbfs":rms_db(clean),"matched_full_rms_dbfs":rms_db(matched)}
+
+          raw_audio={}
+          candidate_audio={}
+          for p in sorted(raw_dir.glob("*.wav")):
+              stem=p.stem
+              raw,sr=sf.read(p,always_2d=True,dtype="float32")
+              if sr!=SR: raise RuntimeError(f"{stem}: expected {SR}, got {sr}")
+              raw_audio[stem]=raw
+              if stem in CLEAN_STEMS:
+                  cp=pathlib.Path("work/checkpoints")/f"ptitsa-clean-{stem}"/"clean"/f"{stem}.wav"
+                  if not cp.exists(): raise RuntimeError(f"missing checkpoint {cp}")
+                  clean,sr2=sf.read(cp,always_2d=True,dtype="float32")
+                  if sr2!=SR: raise RuntimeError(f"{stem}: checkpoint sample rate {sr2}")
+                  matched,metrics=active_match(raw,clean,stem)
+                  if abs(metrics["matched_active_delta_db"])>0.05:
+                      raise RuntimeError(f"{stem}: matched active RMS delta {metrics['matched_active_delta_db']:.4f} dB")
+                  candidate_audio[stem]=matched
+                  report["stems"][stem]=metrics
+                  sf.write(match_dir/f"{stem}.wav",matched,SR,subtype="PCM_24")
+              else:
+                  candidate_audio[stem]=raw
+
+          names=sorted(raw_audio)
+          N=min(len(raw_audio[n]) for n in names)
+          baseline=np.zeros((N,2),np.float32)
+          candidate=np.zeros((N,2),np.float32)
+          for name in names:
+              amp=np.float32(10**(GAINS.get(name,-12.0)/20))
+              theta=(PANS.get(name,0.0)+1.0)*np.pi/4.0
+              l=np.float32(np.cos(theta)*amp); r=np.float32(np.sin(theta)*amp)
+              raw_mono=raw_audio[name][:N].mean(axis=1)
+              cand_mono=candidate_audio[name][:N].mean(axis=1)
+              baseline[:,0]+=raw_mono*l; baseline[:,1]+=raw_mono*r
+              candidate[:,0]+=cand_mono*l; candidate[:,1]+=cand_mono*r
+
+          raw_peak=float(np.max(np.abs(baseline))); cand_peak=float(np.max(np.abs(candidate)))
+          common_peak=max(raw_peak,cand_peak,1e-20)
+          common_gain=float(10**(-3/20)/common_peak)
+          baseline*=np.float32(common_gain); candidate*=np.float32(common_gain)
+          out=pathlib.Path("work/output"); out.mkdir(parents=True,exist_ok=True)
+          sf.write(out/"Ptitsa_RAW_BalanceReference.wav",baseline,SR,subtype="PCM_24")
+          sf.write(out/"Ptitsa_CLEAN_BalanceTransparent.wav",candidate,SR,subtype="PCM_24")
+
+          meter=pyln.Meter(SR)
+          diff=candidate-baseline
+          report["mix"]={"common_master_gain_db":float(20*np.log10(common_gain)),
+                         "baseline_peak_dbfs":float(20*np.log10(np.max(np.abs(baseline))+1e-20)),
+                         "candidate_peak_dbfs":float(20*np.log10(np.max(np.abs(candidate))+1e-20)),
+                         "baseline_lufs":float(meter.integrated_loudness(baseline)),
+                         "candidate_lufs":float(meter.integrated_loudness(candidate)),
+                         "candidate_minus_baseline_rms_db":rms_db(diff)}
+          pathlib.Path("work/output/ptitsa_balance_transparency_report.json").write_text(json.dumps(report,indent=2),encoding="utf-8")
+          print(json.dumps(report["mix"],indent=2))
+          print("per-stem corrections:")
+          for stem,m in report["stems"].items(): print(stem, f"corr={m['correction_db']:+.3f} dB delta={m['matched_active_delta_db']:+.5f} dB")
+
+      - name: Encode A/B listening MP3s
+        run: |
+          ffmpeg -hide_banner -loglevel error -y -i work/output/Ptitsa_RAW_BalanceReference.wav -c:a libmp3lame -b:a 320k work/output/Ptitsa_RAW_BalanceReference_320.mp3
+          ffmpeg -hide_banner -loglevel error -y -i work/output/Ptitsa_CLEAN_BalanceTransparent.wav -c:a libmp3lame -b:a 320k work/output/Ptitsa_CLEAN_BalanceTransparent_320.mp3
+
+      - name: Upload balance-transparent candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptitsa-balance-transparent-rerender
+          path: |
+            work/output/*.wav
+            work/output/*.mp3
+            work/output/*.json
+          retention-days: 7

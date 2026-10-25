@@ -1,0 +1,107 @@
+{
+  "goal": "full-mix-compression-context-v1",
+  "status": "accepted_machine_validation",
+  "base_branch": "audio-workbench-mcp-v0.1",
+  "base_commit": "d24d7656772e191969a98309d037fa961f3358de",
+  "priority_reason": "Compression Iteration Bridge v1 explicitly lacked complete-mix before/after evidence",
+  "pull_request": 122,
+  "tested_code_commit": "a545b5b0798bde52b69ba6f2b42e7e64fb274f04",
+  "merge_commit": "580482ce825cba4e533188f120674cb4d453b841",
+  "scope": "STUDIO/offline one-source replacement -> full-mix Perceptual Critic -> existing Autonomous Iteration",
+  "implementation": {
+    "module": "audio_workbench/compression_mix_context.py",
+    "test_file": "tests/test_studio_full_mix_compression_context_v1.py",
+    "source_match": "fixed-reference-active RMS before insertion",
+    "replacement_formula": "candidate_mix = baseline_mix - original_contribution + matched_candidate_contribution",
+    "protected_anchor_update": "same exact replacement for vocal or drum anchor when owned by target source",
+    "context_failures": "appended to existing compression objective veto path",
+    "human_audition_export": "only when existing transition next_action == human_listening",
+    "baseline_promotion_from_adapter": false
+  },
+  "validation": {
+    "workflow_run": 35950882443,
+    "python_matrix": {"3.10": "success", "3.11": "success", "3.12": "success"},
+    "python_3_11_studio_boundary": {"passed": 21, "warnings": 1},
+    "python_3_11_full_suite": {"passed": 1239, "skipped": 2, "warnings": 2},
+    "module_py_compile": "success",
+    "test_file_py_compile": "success",
+    "review": "self-review; no independent reviewer claimed",
+    "known_nonblocking_ci_warnings": [
+      "Matchering imports scipy.ndimage.filters.maximum_filter1d from a deprecated namespace",
+      "Optuna Study.set_metric_names is experimental",
+      "checkout cleanup reports missing .gitmodules URL for external/AutomaticMixingPapers",
+      "GitHub Actions warns Node.js 20 actions are being forced onto Node.js 24"
+    ]
+  },
+  "real_audio_experiment": {
+    "song": "Belye Stai",
+    "window_seconds": [20, 40],
+    "sample_rate": 44100,
+    "frames": 882000,
+    "candidate": "Compression Director v1.1 vocal balanced",
+    "target": "vocal_intelligibility",
+    "context": "controlled pre-bus real-source mix; real recipe-processed non-lead contributions; identical static lead mapping; no FX/glue/mastering",
+    "candidate_contribution_match_gain_db": -0.015048693378062694,
+    "baseline_reconstruction_max_error": 0.0,
+    "candidate_rest_max_error": 2.9802322387695312e-08,
+    "before": {
+      "vocal_intelligibility": 0.7846992610425761,
+      "foreground_db": -1.2360676047739392,
+      "harshness": 0.4764898275082241,
+      "density": 0.8775,
+      "width_db": -10.257100983643024,
+      "punch_db": 18.908533124830164,
+      "climax_lift_db": 1.3437200601475006
+    },
+    "after": {
+      "vocal_intelligibility": 0.8013813571248335,
+      "foreground_db": -1.0894313585674051,
+      "harshness": 0.49185675741023,
+      "density": 0.88,
+      "width_db": -10.317078515487283,
+      "punch_db": 18.908533124830164,
+      "climax_lift_db": 0.6650528528977127
+    },
+    "deltas": {
+      "vocal_intelligibility": 0.016682096082257347,
+      "foreground_db": 0.14663624620653404,
+      "harshness": 0.015366929902005888,
+      "density": 0.0025000000000000577,
+      "width_db": -0.059977531844259246,
+      "punch_db": 0.0,
+      "climax_lift_db": -0.6786672072497879
+    },
+    "critic_policy_result": {
+      "machine_decision": "rejected",
+      "failures": ["target_not_improved", "climax_regression"],
+      "target_required_improvement": 0.02,
+      "protected_max_climax_regression_db": 0.5,
+      "audition_export_allowed": false,
+      "baseline_promoted": false
+    }
+  },
+  "limitations": [
+    "The real experiment is a controlled pre-bus context, not a rebuild of the previously delivered mix",
+    "Source-dependent FX/send ownership is not inferred; a complete routed contribution must be supplied explicitly",
+    "No candidate is ranked or accepted subjectively by this adapter",
+    "Rejected candidates intentionally produce no listening export",
+    "Human listening remains mandatory for any candidate that survives objective gates"
+  ],
+  "constraints": {
+    "live_code_changed": false,
+    "backend_code_changed": false,
+    "mastering_code_changed": false,
+    "neural_audio_processing_used": false,
+    "paid_services_used": false,
+    "delivered_mix_replaced": false,
+    "audio_baseline_promoted": false,
+    "human_listening_required": true
+  },
+  "artifacts": {
+    "real_context_script": "/mnt/data/context_adapter_run/real_context_experiment.py",
+    "real_context_evidence": "/mnt/data/context_adapter_run/full_mix_context/evidence.json",
+    "report": "/mnt/data/context_adapter_run/full_mix_context/REPORT_RU.md",
+    "bundle": "/mnt/data/Studio_Full_Mix_Compression_Context_v1_Evidence.zip"
+  },
+  "next_goal": "Routed Contribution Renderer v1: deterministically render a target source's complete dry plus explicitly owned send/return contribution from the session recipe, verify summation identity against the actual premaster, then feed all three Compression Director candidates through the full-mix context adapter"
+}

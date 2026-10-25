@@ -1,0 +1,37 @@
+{
+  "branch": "audio-workbench-mcp-v0.1",
+  "scope": "studio_offline",
+  "task": "Add an auditable machine-safety gate to Mastering Director before autonomous mastering candidates can advance",
+  "status": "accepted",
+  "decision": "machine_validation_passed_human_acceptance_still_required",
+  "implementation": {
+    "true_peak_commit": "ef630800cfd2c3edd612d0f90470f45ce75d3c17",
+    "safety_verdict_commit": "a26df92e78dc49056798f22a8ae043c7cb05025f",
+    "pipeline_integration_commit": "26ead51a7a0e20fe0da4c530f4ebb11c79edfd06",
+    "tests_commit": "ace60d19dbb789788ae6ed8b313c617c616bd280",
+    "contract": [
+      "Mastering analysis can explicitly estimate inter-sample true peak with 4x polyphase oversampling.",
+      "Mastering safety rejects a true-peak ceiling violation, excessive crest loss, excessive width shift, negative stereo correlation, or missing true-peak evidence.",
+      "A machine-safe mastering candidate remains pending_human_review by default because mastering is subjectively audible.",
+      "baseline_eligible remains false until a later explicit human-listening acceptance transition.",
+      "MasteringDirector render reports before/after true peak, protected-regression evidence, uncertainty and the safety verdict."
+    ]
+  },
+  "validation": {
+    "manual_true_peak_smoke": "4x oversampled true peak on the mastering-workbench synthetic tone was finite and 0.0055 dB above sample peak",
+    "stem_offline_run": 35893635585,
+    "stem_offline_status": "success",
+    "github_tests_run": 35893635712,
+    "github_tests_status": "success",
+    "python_matrix": ["3.10", "3.11", "3.12"]
+  },
+  "current_cleanup_baseline": {
+    "status": "pending_human_review",
+    "workflow_run": 35859737710,
+    "note": "Balance-transparent Ptitsa cleanup is still outside the accepted baseline until human RAW/CLEAN listening accepts it, especially both vocals."
+  },
+  "next_studio_goal": {
+    "id": "mastering-budget-evidence-v2",
+    "task": "Propagate limiter and loudness-budget diagnostics into the same mastering safety decision so final limiter GR and loudness-target evidence cannot be bypassed before human listening."
+  }
+}
