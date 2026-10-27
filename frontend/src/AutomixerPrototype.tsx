@@ -5,18 +5,21 @@ import { useOperatorBackend } from './services/useOperatorBackend';
 import type { ActionFocus, AutomixerMode, RouteId, Task, ToastState, Tone, UiActions, UiState } from './types';
 import { getModeDisplayLabel, toneForMode } from './utils/prototypeTone';
 import { buildView } from './views/AutomixerViews';
+import { ConsoleView } from './components/console/ConsoleView';
 
-const routeIds = new Set<RouteId>(navItems.map(item => item.id));
+const routeIds = new Set<RouteId>(['console', ...navItems.map(item => item.id)]);
 
 function readHashRoute(): RouteId {
   const raw = window.location.hash.replace(/^#\/?/, '') as RouteId;
-  return routeIds.has(raw) ? raw : 'dashboard';
+  return routeIds.has(raw) ? raw : 'console';
 }
 
 export default function App() {
   const {
     backend,
     backendActions,
+    consoleProcessing,
+    consoleDevices,
     connected,
     decisionQueue,
     emergencyStop,
@@ -343,11 +346,16 @@ export default function App() {
 
   const view = useMemo(() => buildView(activeRoute, ui, actions, viewData), [activeRoute, ui, actions, viewData]);
 
+  if (activeRoute === 'console') {
+    return <ConsoleView ui={ui} actions={actions} data={viewData} backendActions={backendActions}
+      processing={consoleProcessing} devices={consoleDevices} />;
+  }
+
   return (
     <AppShell
       actions={actions}
       active={activeRoute}
-      items={navItems}
+      items={[{ id: 'console', label: 'Console View', section: 'Operator', mark: 'CV' }, ...navItems]}
       mode={mode}
       onModeChange={updateMode}
       onNavigate={navigate}

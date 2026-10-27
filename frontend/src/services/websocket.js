@@ -404,7 +404,7 @@ class WebSocketService extends BaseWebSocketTransport {
   }
 
   createOperatorProposal(proposal) {
-    this.send({
+    return this.send({
       type: 'create_operator_proposal',
       proposal
     });

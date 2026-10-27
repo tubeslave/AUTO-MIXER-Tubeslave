@@ -494,6 +494,7 @@ export interface ActionFocus {
 }
 
 export type RouteId =
+  | 'console'
   | 'dashboard'
   | 'soundcheck'
   | 'agents'
@@ -551,6 +552,19 @@ export interface Channel {
   readCoverageStatus?: string;
   cacheFreshnessStatus?: string;
   dataSource?: 'backend' | 'mock';
+  consoleState?: {
+    hpf: boolean | null;
+    gate: boolean | null;
+    eq: boolean | null;
+    comp: boolean | null;
+    mute: boolean | null;
+    fader: number | null;
+    rms: number | null;
+    peak: number | null;
+    lufs: number | null;
+    gateThreshold: number | null;
+    compThreshold: number | null;
+  };
 }
 
 export interface InstrumentSpaceEvidenceValue {

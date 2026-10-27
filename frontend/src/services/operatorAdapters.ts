@@ -871,8 +871,21 @@ export function adaptChannels(payload: unknown, fallback: Channel[]): Channel[] 
       gateAvailable,
       compAvailable,
       readCoverageStatus: str(readCoverage.status, 'unknown'),
-      cacheFreshnessStatus: str(asRecord(readCoverage.cache_freshness).status, str(asRecord(row.cache_freshness).status, 'unknown')),
-      dataSource: 'backend'
+      cacheFreshnessStatus: str(asRecord(readCoverage.cache_freshness).status, str(asRecord(row.cache_freshness).status, str(asRecord(data.cache_freshness).status, 'unknown'))),
+      dataSource: 'backend',
+      consoleState: {
+        hpf: boolish(control.hpf_enabled) ?? null,
+        gate: boolish(control.gate_enabled) ?? null,
+        eq: boolish(control.eq_enabled) ?? null,
+        comp: boolish(control.compressor_enabled) ?? null,
+        mute: boolish(control.mute) ?? null,
+        fader: finiteMetric(control.fader_db) ? Number(control.fader_db) : null,
+        rms: finiteMetric(row.level_db ?? meter.rms_db) ? Number(row.level_db ?? meter.rms_db) : null,
+        peak: finiteMetric(row.peak_db ?? meter.peak_db) ? Number(row.peak_db ?? meter.peak_db) : null,
+        lufs: finiteMetric(row.lufs ?? meter.lufs) ? Number(row.lufs ?? meter.lufs) : null,
+        gateThreshold: finiteMetric(control.gate_threshold_db) ? Number(control.gate_threshold_db) : null,
+        compThreshold: finiteMetric(control.compressor_threshold_db) ? Number(control.compressor_threshold_db) : null,
+      }
     };
   });
 }

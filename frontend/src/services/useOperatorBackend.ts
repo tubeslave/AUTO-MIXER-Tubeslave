@@ -976,6 +976,8 @@ export function useOperatorBackend() {
     socketIsOpen() ? 'connected' : shouldAutoConnect() ? 'connecting' : 'mock'
   ));
   const [payloads, setPayloads] = useState<ProductLayerPayloads>({});
+  const [consoleProcessing, setConsoleProcessing] = useState<{ payload: unknown; receivedAt: number }>({ payload: null, receivedAt: 0 });
+  const [consoleDevices, setConsoleDevices] = useState<Array<{ id: number; name: string; channels: number }>>([]);
   const [modeFromBackend, setModeFromBackend] = useState<AutomixerMode | null>(null);
   const [logs, setLogs] = useState<LogRecord[]>(mockLogs);
   const [proposalApplyResult, setProposalApplyResult] = useState<ProposalApplyResult | null>(null);
@@ -1158,6 +1160,24 @@ export function useOperatorBackend() {
     }
     websocketService.runOperatorAnalysis(48, true);
   }, [refreshBackend]);
+
+  const createConsoleProposal = useCallback((proposal: Record<string, unknown>) => {
+    if (!socketIsOpen()) return false;
+    return websocketService.createOperatorProposal(proposal);
+  }, []);
+
+  const refreshConsoleState = useCallback(() => {
+    if (socketIsOpen()) websocketService.send({ type: 'get_channel_processing_snapshot', total_channels: 48 });
+  }, []);
+
+  const getConsoleDevices = useCallback(() => {
+    if (socketIsOpen()) websocketService.send({ type: 'get_audio_devices' });
+  }, []);
+
+  const startConsoleAudio = useCallback((deviceId: number, numChannels: number) => {
+    if (!socketIsOpen() || !Number.isInteger(deviceId) || !Number.isInteger(numChannels) || numChannels < 1 || numChannels > 64) return false;
+    return websocketService.send({ type: 'start_audio_capture_preview', device_id: deviceId, num_channels: numChannels, sample_rate: 48000 });
+  }, []);
 
   const startReplayRun = useCallback((runId?: string) => {
     if (!socketIsOpen()) {
@@ -1977,6 +1997,7 @@ export function useOperatorBackend() {
       websocketService.getAutoSoundcheckStatus();
     };
     const handleConnectionStatus = (payload: unknown) => {
+      setConsoleProcessing({ payload: null, receivedAt: 0 });
       const data = recordValue(payload);
       setPayloads(current => mergeConnectionStatusIntoPayloads(current, data));
       setLogs(current => appendBackendLog(
@@ -2015,6 +2036,8 @@ export function useOperatorBackend() {
       ));
     };
     const handleDisconnected = (payload: unknown) => {
+      setConsoleProcessing({ payload: null, receivedAt: 0 });
+      setConsoleDevices([]);
       const data = recordValue(payload);
       const terminal = data.terminal === true || numberValue(data.code) === 1009;
       setConnectionState(previous => previous === 'mock'
@@ -2082,6 +2105,18 @@ export function useOperatorBackend() {
     };
 
     websocketService.on('dashboard_snapshot', handleDashboard);
+    const handleConsoleProcessing = (payload: unknown) => setConsoleProcessing({ payload, receivedAt: Date.now() });
+    const handleConsoleDevices = (payload: unknown) => {
+      const devices = recordValue(payload).devices;
+      setConsoleDevices(Array.isArray(devices) ? devices.flatMap(raw => {
+        const row = recordValue(raw);
+        const channels = Array.isArray(row.channels) ? row.channels.length : Number(row.max_input_channels ?? row.channels);
+        return Number.isInteger(row.id) && typeof row.name === 'string' && channels > 0
+          ? [{ id: Number(row.id), name: row.name, channels }] : [];
+      }) : []);
+    };
+    websocketService.on('channel_processing_snapshot', handleConsoleProcessing);
+    websocketService.on('audio_devices', handleConsoleDevices);
     websocketService.on('channel_inventory', handleChannels);
     websocketService.on('decision_queue', handleDecisions);
     websocketService.on('decision_queue_error', handleDecisionQueueError);
@@ -2156,6 +2191,8 @@ export function useOperatorBackend() {
       websocketService.off('replay_runs', handleReplayRuns);
       websocketService.off('replay_run_started', handleReplayRunStarted);
       websocketService.off('channel_intelligence', handleChannelIntelligence);
+      websocketService.off('channel_processing_snapshot', handleConsoleProcessing);
+      websocketService.off('audio_devices', handleConsoleDevices);
       websocketService.off('operator_agent_roster', handleAgents);
       websocketService.off('connection_topology', handleTopology);
       websocketService.off('groups_buses_snapshot', handleGroups);
@@ -2316,6 +2353,10 @@ export function useOperatorBackend() {
   }, [backend, decisionQueue, logs, payloads.agents, payloads.channelIntelligence, payloads.channels, payloads.communications, payloads.dashboard, payloads.decisionTraces, payloads.decisions, payloads.groups, payloads.memory, payloads.pipelinePreview, payloads.processing, payloads.replayRuns, payloads.rules, payloads.safetyMonitor, payloads.telemetryAlerts, payloads.topology, payloads.training]);
 
   const backendActions = useMemo(() => ({
+    createConsoleProposal,
+    refreshConsoleState,
+    getConsoleDevices,
+    startConsoleAudio,
     refreshBackend,
     toggleAudioPreview,
     connectWingReadOnly,
@@ -2335,10 +2376,12 @@ export function useOperatorBackend() {
     triggerEmergencyStop,
     setVoiceLanguage,
     toggleVoiceEnabled
-  }), [acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, loadNextDecisionQueuePage, reanalyzeSoundcheckStage, refreshBackend, requestProposalDetail, runBackendAnalysis, setBackendMode, setVoiceLanguage, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, toggleVoiceEnabled, triggerEmergencyStop]);
+  }), [createConsoleProposal, refreshConsoleState, getConsoleDevices, startConsoleAudio, acceptProposal, acceptSoundcheckReplan, applyProposal, connectWingReadOnly, dismissProposal, finalizeSoundcheckReadiness, loadNextDecisionQueuePage, reanalyzeSoundcheckStage, refreshBackend, requestProposalDetail, runBackendAnalysis, setBackendMode, setVoiceLanguage, startReplayRun, startSoundcheck, stopSoundcheck, toggleAudioPreview, toggleVoiceEnabled, triggerEmergencyStop]);
 
   return {
     backend,
+    consoleProcessing,
+    consoleDevices,
     decisionQueue,
     proposalReview,
     soundcheck,
