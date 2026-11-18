@@ -1,0 +1,98 @@
+{
+  "project": "Automixer / Mixing Learning",
+  "theory": "KVMS",
+  "version": "0.2",
+  "date": "2026-11-18",
+  "status": {
+    "hypothesis": "unvalidated",
+    "engineering_synthetic_tests": "passed",
+    "test_count": 15,
+    "real_multitrack": "not_run",
+    "blind_listening": "not_run",
+    "HIL": "not_run",
+    "repo_integration": "not_applied"
+  },
+  "new_hypothesis": {
+    "id": "H6",
+    "statement": "Adding section role, source grouping and reliable attribution improves held-out predictions of perceptual effects of local gain/EQ changes compared with masking-only and level-only baselines",
+    "falsifier": "No significant generalizable gain under song-disjoint validation with loudness and arrangement controlled",
+    "pre_registered_effect_threshold": "to_be_set_before_confirmatory_study"
+  },
+  "studies": [
+    {
+      "id": "PILOT-00",
+      "material": "synthetic two 440 Hz aligned mono sine sources",
+      "type": "engineering_smoke_test",
+      "status": "passed",
+      "human_evidence": false
+    },
+    {
+      "id": "PENA-KVMS-01",
+      "material": "Pena 48 stem project proposed, audio not available in session",
+      "type": "listener_aware_shadow_A_B",
+      "status": "not_run",
+      "primary_endpoint": "foreground identification accuracy",
+      "secondary_endpoints": [
+        "pairwise preference",
+        "perceived blending",
+        "naturalness"
+      ],
+      "controls": [
+        "BS1770 attenuation-only level matched listening copies",
+        "raw mix preserved",
+        "randomized order",
+        "song-disjoint holdout",
+        "human verified source attribution"
+      ],
+      "variants": [
+        "original",
+        "masker_minus_0_5db",
+        "masker_minus_1db",
+        "target_plus_0_5db"
+      ]
+    }
+  ],
+  "safety": {
+    "default_enabled": false,
+    "mode": "offline_shadow",
+    "dry_run": true,
+    "live_control": false,
+    "auto_apply": false,
+    "permissions": "no device API",
+    "blocked_if": [
+      "UNKNOWN",
+      "BLEED",
+      "TARGET+BLEED",
+      "low confidence",
+      "inactive target",
+      "non foreground role"
+    ]
+  },
+  "sources": [
+    {
+      "id": "S26-A",
+      "url": "https://arxiv.org/abs/2609.02835",
+      "claim": "two-stage grouping and coordination validated on three excerpts"
+    },
+    {
+      "id": "S26-B",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13451197/",
+      "claim": "music selective attention experimentally studied"
+    },
+    {
+      "id": "S24-C",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11258268/",
+      "claim": "timbre modulates consonance preference"
+    },
+    {
+      "id": "S21-D",
+      "url": "https://www.mdpi.com/2076-3417/11/20/9578",
+      "claim": "mix clarity modeling with masking thresholds"
+    },
+    {
+      "id": "S24-E",
+      "url": "https://www.mdpi.com/2624-6120/5/4/35",
+      "claim": "adaptive multitrack time-frequency masking filtering"
+    }
+  ]
+}
