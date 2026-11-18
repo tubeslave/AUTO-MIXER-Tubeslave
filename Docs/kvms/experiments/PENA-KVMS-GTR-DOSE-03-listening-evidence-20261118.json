@@ -1,0 +1,113 @@
+{
+  "schema_version": "kvms-blind-result/1.1",
+  "experiment_id": "PENA-KVMS-GTR-DOSE-03",
+  "date": "2026-11-18",
+  "project": "AUTO-MIXER-Tubeslave",
+  "track": "Логопед — Пена",
+  "blinding": "key_revealed_after_listener_choices",
+  "listener_n": 1,
+  "listener_input": {
+    "S1_early_voice": "C",
+    "S2_dense_voice": "B",
+    "S3_final_section": "A",
+    "comment": null
+  },
+  "blind_key": {
+    "S1_early_voice": {
+      "A": "v04",
+      "B": "v06",
+      "C": "v05"
+    },
+    "S2_dense_voice": {
+      "A": "v06",
+      "B": "v05",
+      "C": "v04"
+    },
+    "S3_final_section": {
+      "A": "v05",
+      "B": "v04",
+      "C": "v06"
+    }
+  },
+  "revealed_choices": [
+    {
+      "id": "S1_early_voice",
+      "start_s": 26,
+      "end_s": 46,
+      "selected_letter": "C",
+      "selected_mix": "v05"
+    },
+    {
+      "id": "S2_dense_voice",
+      "start_s": 52,
+      "end_s": 72,
+      "selected_letter": "B",
+      "selected_mix": "v05"
+    },
+    {
+      "id": "S3_final_section",
+      "start_s": 172,
+      "end_s": 192,
+      "selected_letter": "A",
+      "selected_mix": "v05"
+    }
+  ],
+  "intervention": {
+    "crunch_rhythm_gain_db_relative_original_control": {
+      "v04": -3,
+      "v05": -3.8,
+      "v06": -4.6
+    },
+    "lead_gain_db": -2,
+    "lead2_gain_db": -4,
+    "other_dsp_held_constant": true
+  },
+  "levels": {
+    "wav_lufs_target": -20,
+    "actual_max_within_section_lufs_difference_below": 0.001
+  },
+  "signal_integrity": {
+    "all_nine_mp3_hashes_match_existing_verification": true,
+    "hash_algorithm": "SHA-256"
+  },
+  "observed": {
+    "preferred_mix_in_all_three_sections": "v05",
+    "n_sections_prefer_v05": 3,
+    "engineering_guitar_vocal_rms_db_dense": {
+      "v04": 3.45,
+      "v05": 2.94,
+      "v06": 2.47
+    }
+  },
+  "inference": {
+    "status": "exploratory_single_listener_repeated_sections",
+    "candidate_peak_among_three_levels": "v05",
+    "exact_optimum_known": false,
+    "statistical_significance_claimed": false,
+    "independent_sample_count": 1,
+    "hypothesis_H7b": "supported_in_this_song_and_listener",
+    "auto_apply": false,
+    "default_control": "v05"
+  },
+  "limitations": [
+    "three sections of same song and same listener, not three independent listeners",
+    "preference not a trained reward function",
+    "no exact optimum or confidence interval",
+    "single-dimensional combined Crunch and Rhythm change cannot attribute individual roles",
+    "other genres and devices not tested",
+    "MP3 listening vs lossless file is unverified"
+  ],
+  "next_experiment": {
+    "id": "PENA-KVMS-GTR-DOSE-04",
+    "status": "planned_not_run",
+    "goal": "replicate interior maximum and measure preference sensitivity to smaller steps",
+    "recommendation": "Blind randomized repeated trials with v04/v05/v06 and v05±0.4dB, across at least three sections and multiple days/listeners; no forced choice, preserve level matching and check blind identity",
+    "priority": "before any automatic mixing rule"
+  },
+  "software_control": {
+    "production_dsp_modified": false,
+    "osc_calls": false,
+    "console_actions": false,
+    "active_rule_promoted": false
+  }
+}
