@@ -1,0 +1,67 @@
+{
+  "schema_version": "kvms-listener-evidence/1.0",
+  "date": "2026-11-18",
+  "experiment_id": "PENA-KVMS-GTR-DOSE-02",
+  "composition": "Логопед — Пена",
+  "listener_count": 1,
+  "user_response": {
+    "preferred_blind_label": "X",
+    "verbatim": "Результат слепого теста Пены КВМС v0.5: предпочитаю X.",
+    "other_feedback": null
+  },
+  "revealed_key": {
+    "X": "v05_new_candidate",
+    "Y": "v04_chosen_X"
+  },
+  "preferred_version": "v0.5",
+  "comparison_version": "v0.4",
+  "controlled_difference": {
+    "crunch_gain_db": -0.8,
+    "rhythm_gain_db": -0.8,
+    "lead_gain_db": 0,
+    "lead2_gain_db": 0,
+    "dynamic_guitar_eq": false
+  },
+  "gain_db_relative_to_original_Y_control_v03": {
+    "crunch": -3.8,
+    "rhythm": -3.8,
+    "lead": -2,
+    "lead2": -4
+  },
+  "comparison_window_seconds": [
+    51.28,
+    77.28
+  ],
+  "level_match": {
+    "x_lufs": -20.000000023795852,
+    "y_lufs": -19.99999999929878,
+    "kind": "matched WAV excerpts"
+  },
+  "measured_guitar_over_vocal_rms_db": {
+    "v04": 3.45,
+    "v05": 2.94
+  },
+  "integrity": {
+    "original_x_wav_sha256": "13b8a419f43e1e071be0b128bd4f4da21843c39b96212721ae02fba35e57ee41",
+    "original_y_wav_sha256": "4e6ae0522c8879323295068c7ca8cfd226c4256f93c83a45176c58c5f5cd8e75",
+    "v05_wav_sha256": "59509ea91ba4d9c7709e8b34b7b9a4386e7e5d796e3b293e82d589295a23daa1"
+  },
+  "theory_update": {
+    "hypothesis": "H7",
+    "status": "supported_by_two_sequential_single_listener_pairwise_preferences",
+    "scope": "single_listener_single_excerpt",
+    "production_validated": false,
+    "auto_apply": false
+  },
+  "next_experiment": {
+    "id": "PENA-KVMS-GTR-DOSE-03",
+    "goal": "test whether preference saturates or reverses as rhythm-guitar level is reduced",
+    "design": "Three-way randomized loudness-matched blind comparison v0.4 / v0.5 / one additional reduction with control excerpts from at least three musical sections; retain v0.5 unless replicated listeners disagree",
+    "status": "planned_not_run"
+  },
+  "safeguards": {
+    "no_live_control": true,
+    "no_automatic_rule_promotion": true,
+    "master_branch_unchanged": true
+  }
+}
